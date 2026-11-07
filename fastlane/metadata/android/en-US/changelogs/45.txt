@@ -1,0 +1,5 @@
+First public beta.
+• Prices and alerts for Coles, Woolworths, Aldi, bottle shops and pharmacies
+• Scan to add, with the same product ticked at each shop
+• Your own store's prices: sign in to Woolworths, or add your Coles store number
+• Recall alerts, receipts, widgets, shortcuts and automatic backups

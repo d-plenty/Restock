@@ -1,0 +1,37 @@
+# Draft recipe for F-Droid (goes in the fdroiddata repository as metadata/family.plenty.restock.yml).
+# F-Droid's reviewers will help adjust the build section, especially the Node.js setup.
+Categories:
+  - Money
+  - Shopping
+License: GPL-3.0-only
+AuthorName: Plenty Technologies
+SourceCode: https://github.com/d-plenty/Restock
+IssueTracker: https://github.com/d-plenty/Restock/issues
+Changelog: https://github.com/d-plenty/Restock/releases
+
+AutoName: Restock
+
+AntiFeatures:
+  NonFreeNet:
+    en-US: Reads prices from the shops' own websites (Coles, Woolworths, Aldi and others), which aren't free services.
+
+RepoType: git
+Repo: https://github.com/d-plenty/Restock.git
+
+Builds:
+  - versionName: 0.7.1
+    versionCode: 45
+    commit: v0.7.1
+    subdir: android/app
+    sudo:
+      - apt-get update
+      - apt-get install -y npm
+    init: cd ../.. && npm ci
+    prebuild: cd ../.. && npm run build && npx cap sync android
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.7.1
+CurrentVersionCode: 45

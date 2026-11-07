@@ -1,0 +1,25 @@
+<p><b>Half price? Prove it.</b> Restock watches prices at the Australian supermarkets, bottle shops and pharmacies you choose, and tells you in plain words when a special is real, when to wait, and when to swap.</p>
+
+<p><b>What it tells you</b></p>
+<ul>
+<li><b>Great deal</b>: 30% or more below its normal price</li>
+<li><b>On sale</b>: 15% or more below normal</li>
+<li><b>Wait</b>: on sale, but it's been cheaper recently and usually comes back down</li>
+<li><b>Fake sale</b>: marked as a special at its normal price</li>
+<li><b>Swap &amp; save</b>: something you'd happily buy instead is cheaper per 100 g, litre or item</li>
+</ul>
+
+<p><b>Features</b></p>
+<ul>
+<li>Coles, Woolworths and Aldi, plus bottle shops (18+) and pharmacies if you want them, and any other shop's website</li>
+<li>Built-in open-source barcode scanner; Restock finds the same product at each of your shops</li>
+<li>Shopping list that compares the same shopping at each store, so one bulk deal can't tip it</li>
+<li>Background price checks and alerts, and a weekly deals summary</li>
+<li>Recall alerts from the official Australian recall lists (FSANZ, Product Safety Australia, TGA)</li>
+<li>Optional receipt scanning, read on the phone</li>
+<li>Shopping mode, widgets, shortcuts, backups, themes and accessibility settings</li>
+</ul>
+
+<p><b>Private by design.</b> Everything stays in a database on your phone. No account, no ads, no analytics, no tracking, and no Google Play services. The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists). Nothing goes to the people who make Restock.</p>
+
+<p>Restock isn't connected with any shop or government agency. Prices can be wrong or out of date. It reads each shop's public website from your phone, so the shops' own terms and privacy policies apply to those visits.</p>

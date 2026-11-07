@@ -111,7 +111,7 @@ Read the full **[privacy policy](PRIVACY.md)** and the **[fine print](DISCLAIMER
 
 **Build it yourself:** see **[BUILD.md](BUILD.md)**. About 20 minutes the first time, on Linux, macOS or Windows.
 
-F-Droid is planned once Restock is out of beta.
+Restock is on its way to [F-Droid](https://f-droid.org) too.
 
 ## How you can help
 
@@ -129,17 +129,36 @@ Restock is built by one person in their spare time. Prices, shops and websites a
 
 Please don't post anything private (loyalty card numbers, backup files, your address) in issues. Crop screenshots if you need to.
 
-## What's next
+## Coming soon
 
-- What you have at home, and "running low" suggestions
-- A monthly spending summary
-- Sync and household sharing, on a small Docker server you run yourself
-- An iPhone version
-- Home Assistant: your shopping list both ways
-- F-Droid
-- Opt-in shared prices, so new items arrive with months of history
+These are planned, and each already has its own page in the app under **Settings → Coming soon**. None of them are switched on yet. Want one sooner, or have a better idea? Say so in [Discussions → Ideas](../../discussions/categories/ideas).
 
-Each one has its own page in the app under Settings → Coming soon.
+### What you have at home
+Tell Restock roughly how much of something you've got (a full bottle, two left, nearly out) and it keeps track as you buy and use things. It learns how fast you get through each one, so it can put things on your shopping list before you run out, and time it with a good price: *"You're nearly out of coffee, and it's half price at Coles this week."* Scanning a receipt or ticking things off in the shop tops your stock back up.
+
+### Spending summary
+A simple month-by-month look at what you spent at each shop (from your kept receipts) and what Restock's deals saved you. It stays on your phone like everything else. Full budgeting is planned as a separate app that works with Restock, so this stays light.
+
+### Sync and household sharing
+One pantry and one shopping list for everyone at home, with changes showing up on every phone. Tick something off in the shop and it's off everyone's list. It runs on a small server you control, such as a Docker container on a home server, NAS or Raspberry Pi. There's no Restock account and no Restock server holding your data. Price checks are shared too, so the house only checks each price once.
+
+### iPhone version
+The same Restock on iOS, so a household with both kinds of phone can share a pantry and list once sync arrives. Most of Restock already works on iPhone; the parts that talk to Android (background price checks, widgets and alerts) need iPhone versions of their own.
+
+### Home Assistant
+Connect Restock to [Home Assistant](https://www.home-assistant.io) and your shopping list shows up there, with changes going both ways: add milk from a kitchen tablet or by voice and it's on your Restock list. Deals and recall alerts can show up in Home Assistant too. This comes after sync, since it uses the same server.
+
+### Shared prices, free for everyone
+Every price a phone sees can help everyone else. With shared prices, a new item arrives with months of history, so you know straight away whether its "special" is real. Restock will run a **free public price website** that anyone can browse and that every Restock phone can download history from, with no account and no ads.
+
+Sharing is **off unless you turn it on**. If you do, Restock sends:
+- prices from searches and price checks: each product's shop, name, size, price, "was" price and date;
+- if you choose, prices from your receipts: each item, the price paid and the date.
+
+It **never** sends what you searched for, what's in your pantry, what's on your list or ticked off, receipt photos or totals, or anything that says who you are or where you live. There's no account and no phone ID. Restock will ask the shops and data sources for permission before this goes live.
+
+### F-Droid
+Restock on [F-Droid](https://f-droid.org), the app store for free and open-source Android apps, so it installs and updates without downloading APKs by hand.
 
 ## How it works
 
