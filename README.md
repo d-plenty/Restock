@@ -27,8 +27,8 @@
 
 | | | |
 |---|---|---|
-| ![Home: this week's deals and your shopping list total](docs/screenshots/home.png) | ![Pantry: everything you buy, with today's verdict](docs/screenshots/pantry.png) | ![Scanning: the same product ticked at each shop](docs/screenshots/scan.png) |
-| ![An item's price history and verdict](docs/screenshots/item.png) | ![The same product compared across shops](docs/screenshots/compare.png) | ![Dark mode: a great deal on a multi-buy](docs/screenshots/dark.png) |
+| ![Home: this week's deals and your shopping list total](docs/screenshots/home-0.7.png) | ![Pantry: everything you buy, with today's verdict](docs/screenshots/pantry-0.7.png) | ![Scanning: the same product ticked at each shop](docs/screenshots/scan.png) |
+| ![An item's price history and verdict](docs/screenshots/item-0.7.png) | ![The same product compared across shops](docs/screenshots/compare.png) | ![Dark mode: a great deal on a multi-buy](docs/screenshots/dark.png) |
 
 ## Why
 
