@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Restock</string>
+    <string name="title_activity_main">Restock</string>
+    <string name="package_name">family.plenty.restock</string>
+    <string name="custom_url_scheme">family.plenty.restock</string>
+    <string name="shortcut_scan">Scan</string>
+    <string name="shortcut_scan_long">Scan a barcode</string>
+    <string name="shortcut_list">List</string>
+    <string name="shortcut_list_long">Shopping list</string>
+    <string name="shortcut_receipt">Receipt</string>
+    <string name="shortcut_receipt_long">Add a receipt</string>
+    <string name="widget_deals_description">Your best deals right now</string>
+    <string name="widget_list_description">What\'s on your shopping list</string>
+    <string name="widget_quick_description">Scan, shopping list and receipts in one tap</string>
+    <string name="share_to_list">Restock: Add to shopping list</string>
+</resources>

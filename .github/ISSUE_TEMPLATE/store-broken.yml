@@ -1,0 +1,53 @@
+name: Store stopped working
+description: Searching or price checks fail for a supermarket, bottle shop or pharmacy
+labels: [store]
+body:
+  - type: dropdown
+    id: store
+    attributes:
+      label: Which store?
+      options: [Coles, Woolworths, Aldi, "Dan Murphy's", BWS, Liquorland, Liquorland Warehouse, Liquorland Cellars, The Bottle-O, Cellarbrations, Thirsty Camel, Porters Liquor, Chemist Warehouse, My Chemist, Amcal, Discount Drug Stores, Guardian / PharmaSave, Priceline Pharmacy, Soul Pattinson, TerryWhite Chemmart, Blooms The Chemist, Good Price Pharmacy, Pharmacy 4 Less, Direct Chemist Outlet, Star Discount Chemist, Capital Chemist, National Pharmacies, Chempro, A shop I added myself]
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it fail?
+      options:
+        - Searching on the Add tab
+        - Check now / background price checks
+        - Both
+    validations:
+      required: true
+  - type: dropdown
+    id: state
+    attributes:
+      label: Which state or territory are you in?
+      description: Some shops price by state or by store. Your suburb isn't needed.
+      options: [QLD, NSW, VIC, ACT, TAS, SA, WA, NT]
+  - type: textarea
+    id: details
+    attributes:
+      label: Search details file
+      description: In Restock, Settings → Troubleshooting → Diagnostics → Send search details. Pick this shop, search for something it sells, and drag the saved file in here. It only contains the shop's answer, nothing about you.
+  - type: input
+    id: error
+    attributes:
+      label: The error message
+      description: Exactly as the app shows it, for example "HTTP 403".
+  - type: dropdown
+    id: open
+    attributes:
+      label: Did "Open <store>" in Settings → Troubleshooting help?
+      options: [Didn't try, "Yes, it works again", "No, still failing"]
+  - type: input
+    id: version
+    attributes:
+      label: Restock version
+      placeholder: 0.7.1
+    validations:
+      required: true
+  - type: textarea
+    id: shots
+    attributes:
+      label: Screenshot

@@ -1,0 +1,43 @@
+{
+  "name": "restock",
+  "private": true,
+  "version": "0.7.1",
+  "type": "module",
+  "description": "Restock (working name) — local-first grocery price tracker for Coles, Woolworths and Aldi.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "build:preview": "VITE_PREVIEW=1 vite build --config vite.preview.config.ts"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/local-notifications": "8.3.1",
+    "@capacitor/share": "8.0.3",
+    "jsbarcode": "3.12.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "sql.js": "^1.15.2",
+    "tesseract.js": "7.0.0",
+    "zxing-wasm": "^3.1.6"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/sql.js": "^1.4.11",
+    "@vitejs/plugin-react": "6.2.1",
+    "linkedom": "^0.18.12",
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "vite-plugin-singlefile": "^2.3.4",
+    "vitest": "5.1.0"
+  }
+}

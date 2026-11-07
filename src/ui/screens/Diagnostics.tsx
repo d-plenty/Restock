@@ -1,0 +1,232 @@
+import { useState } from 'react';
+import { shareTextFile } from '../../lib/backup';
+import { getSettings } from '../../lib/db';
+import { captureWhile, clearProblems, problems, problemsText } from '../../lib/diagnostics';
+import { recordTrolley } from '../../lib/accounts';
+import { getHealth } from '../../lib/health';
+import { useLive } from '../../lib/useLive';
+import { chainName, enabledIn, SECTION_NAMES, type Section, type StoreChain } from '../../shops';
+import { adapterFor } from '../../stores';
+import { searchStoreId } from '../../types';
+import { isNative } from '../../stores/http';
+import { CheckedAgo, ChainDot, Icon, LoadingBar, TopBar } from '../components';
+import { useNav } from '../nav';
+
+// Settings → Diagnostics: what went wrong lately, shop by shop, and "Send search details" to
+// capture exactly what a shop sends back, so its connection can be fixed.
+
+export function DiagnosticsScreen() {
+  const nav = useNav();
+  const settings = useLive(getSettings, []);
+  const list = useLive(problems, []);
+  const health = useLive(getHealth, []);
+  const [chain, setChain] = useState<StoreChain>();
+  const [term, setTerm] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (!settings || !list || !health) return <div className="screen" />;
+
+  const sections: Section[] = ['pantry', 'keg', 'pharmacy'];
+  const shops = sections.flatMap((sec) => enabledIn(settings.enabledChains, sec).map((c) => ({ c, sec })));
+  const shop = chain ?? shops[0]?.c;
+
+  const copy = async () => {
+    const text = problemsText(list, __APP_VERSION__);
+    try {
+      await navigator.clipboard.writeText(text);
+      nav.toast('Copied');
+    } catch {
+      await shareTextFile(`restock-diagnostics-${new Date().toISOString().slice(0, 10)}.txt`, text, 'text/plain');
+    }
+  };
+
+  const send = async () => {
+    if (!shop || !term.trim()) return;
+    setBusy(true);
+    try {
+      // The same store as a real search: your Coles when "Prices and stock at my Coles" is on.
+      const storeId = searchStoreId(await getSettings(), shop);
+      const run = await captureWhile(() => adapterFor(shop)!.search(term.trim(), storeId));
+      const file = {
+        app: 'restock',
+        kind: 'search-details',
+        version: __APP_VERSION__,
+        at: new Date().toISOString(),
+        shop,
+        storeId: storeId ?? 'online',
+        shopName: chainName(shop),
+        term: term.trim(),
+        found: run.result?.length ?? 0,
+        firstResults: (run.result ?? []).slice(0, 10),
+        error: run.error,
+        answers: run.captured,
+      };
+      await shareTextFile(
+        `restock-search-${shop}-${new Date().toISOString().slice(0, 10)}.json`,
+        JSON.stringify(file, null, 1),
+        'application/json',
+        'Restock search details',
+      );
+      nav.toast(run.error ? `Saved. ${chainName(shop)} said: ${run.error}` : `Saved what ${chainName(shop)} sent back (${file.found} results).`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="screen">
+      <TopBar title="Diagnostics" />
+      <p className="sub">What went wrong lately, in plain words. It stays on your phone unless you copy or send it.</p>
+
+      <div className="eyebrow">Each shop</div>
+      <div className="card flush">
+        {shops.map(({ c, sec }) => {
+          const h = health[c];
+          return (
+            <div key={c} className="row">
+              <ChainDot chain={c} />
+              <span className="grow">
+                <span className="title" style={{ fontSize: 14 }}>
+                  {chainName(c)} <span className="small">· {SECTION_NAMES[sec]}</span>
+                </span>
+                <span className="small">
+                  {h?.failingSince && h.error ? (
+                    <>
+                      <Icon name="alert" size={13} /> {h.error}
+                    </>
+                  ) : h?.lastOk ? (
+                    <>
+                      Working · <CheckedAgo date={h.lastOk} />
+                    </>
+                  ) : (
+                    'Not used yet'
+                  )}
+                </span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="eyebrow">Latest problems</div>
+      <div className="card flush">
+        {list.slice(0, 30).map((p) => (
+          <div key={p.at + p.chain + p.message} className="row" style={{ alignItems: 'flex-start' }}>
+            <ChainDot chain={p.chain} />
+            <span className="grow">
+              <span className="small" style={{ fontWeight: 700 }}>
+                {chainName(p.chain)} · {p.what} ·{' '}
+                {new Date(p.at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+              </span>
+              <span className="small">{p.message}</span>
+            </span>
+          </div>
+        ))}
+        {!list.length && (
+          <p className="small" style={{ padding: 14, margin: 0 }}>
+            Nothing has gone wrong lately.
+          </p>
+        )}
+      </div>
+      <div className="two">
+        <button className="btn" onClick={() => void copy()}>
+          <Icon name="share" size={17} /> Copy
+        </button>
+        <button className="btn" disabled={!list.length} onClick={() => void clearProblems()}>
+          <Icon name="trash" size={17} /> Clear
+        </button>
+      </div>
+
+      <TrolleyRecorder />
+
+      <div className="eyebrow">Send search details</div>
+      <div className="card">
+        <p className="small" style={{ margin: 0 }}>
+          If a shop's search looks wrong, run one search here. Restock saves exactly what the shop sent back into a file you can send to the
+          developer, so the connection can be fixed. It only has the shop's answer: nothing about you or your pantry.
+        </p>
+        <label className="field">
+          <span>Shop</span>
+          <select className="input" value={shop ?? ''} onChange={(e) => setChain(e.target.value as StoreChain)}>
+            {shops.map(({ c }) => (
+              <option key={c} value={c}>
+                {chainName(c)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Search for</span>
+          <input className="input" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="e.g. paracetamol" />
+        </label>
+        <button className="btn primary" disabled={!isNative() || busy || !term.trim() || !shop} onClick={() => void send()}>
+          {busy ? 'Searching…' : 'Search and save the details'}
+        </button>
+        {busy && <LoadingBar seconds={15} />}
+        {!isNative() && <p className="small">This works in the Android app.</p>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Record adding to a trolley: you add one item on the shop's own website inside Restock, and
+ * Restock saves what the website asked its servers (its own API calls only, personal details
+ * removed) into a file to send to the developer, so Restock can learn to fill that trolley.
+ */
+function TrolleyRecorder() {
+  const nav = useNav();
+  const [chain, setChain] = useState<'coles' | 'woolworths'>('coles');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string>();
+  const run = async () => {
+    setBusy(true);
+    setNote(undefined);
+    try {
+      const calls = await recordTrolley(chain);
+      if (!calls.length) {
+        setNote(`Nothing was recorded. Make sure you added an item to your ${chainName(chain)} trolley before tapping Done.`);
+        return;
+      }
+      const file = { app: 'restock', kind: 'trolley-recording', version: __APP_VERSION__, at: new Date().toISOString(), shop: chain, calls };
+      await shareTextFile(
+        `restock-trolley-${chain}-${new Date().toISOString().slice(0, 10)}.json`,
+        JSON.stringify(file, null, 1),
+        'application/json',
+        'Restock trolley recording',
+      );
+      nav.toast(`Saved ${calls.length} steps from ${chainName(chain)}`);
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <div className="eyebrow">Record adding to a trolley</div>
+      <div className="card">
+        <p className="small" style={{ margin: 0 }}>
+          Teaches Restock to fill your trolley. Sign in to the shop first (Settings → Supermarkets). Then tap Record, add any one item to your trolley
+          on the shop's page, and tap Done. Restock saves only the shop's own trolley and search calls, with names, emails, addresses and card numbers
+          removed, into a file for you to send. You can open it and check before sending.
+        </p>
+        <div className="seg" role="radiogroup" aria-label="Which shop">
+          {(['coles', 'woolworths'] as const).map((c) => (
+            <button key={c} role="radio" aria-checked={chain === c} className={chain === c ? 'on' : ''} onClick={() => setChain(c)}>
+              {chainName(c)}
+            </button>
+          ))}
+        </div>
+        <button className="btn primary" disabled={busy || !isNative()} onClick={() => void run()}>
+          <Icon name="cartPlus" size={17} />{' '}
+          {busy ? 'Recording…' : isNative() ? `Record at ${chainName(chain)}` : 'Recording works in the Android app'}
+        </button>
+        {note && (
+          <div className="banner amber" style={{ fontSize: 13 }}>
+            {note}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}

@@ -1,0 +1,277 @@
+{
+ "results": [
+  {
+   "_type": "PRODUCT",
+   "id": 9393015,
+   "name": "Weet-bix Cereal",
+   "brand": "Sanitarium",
+   "size": "1.2kg",
+   "availability": true,
+   "pricing": {
+    "now": 7.0,
+    "was": 0,
+    "comparable": "$0.58/ 100g",
+    "promotionType": "EVERYDAY",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 133117,
+   "name": "Weet-bix Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "375g",
+   "availability": true,
+   "pricing": {
+    "now": 4.0,
+    "was": 0,
+    "comparable": "$1.07/ 100g",
+    "promotionType": "EVERYDAY",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 4951398,
+   "name": "Weet-bix Bites Wild Berry Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "500g",
+   "availability": true,
+   "pricing": {
+    "now": 6.5,
+    "was": 0,
+    "comparable": "$1.30/ 100g",
+    "promotionType": "BONUSCOLLECTABLE",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 2001784,
+   "name": "Weet-bix Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "575g",
+   "availability": true,
+   "pricing": {
+    "now": 3.5,
+    "was": 5.0,
+    "saveStatement": "save $1.50",
+    "comparable": "$0.61/ 100g",
+    "promotionType": "SPECIAL",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 8127832,
+   "name": "Weet-bix Bites Coco Crunch Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "500g",
+   "availability": true,
+   "pricing": {
+    "now": 6.5,
+    "was": 0,
+    "comparable": "$1.30/ 100g",
+    "promotionType": "BONUSCOLLECTABLE",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 9623884,
+   "name": "Weet-bix Bites Honey Crunch Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "510g",
+   "availability": true,
+   "pricing": {
+    "now": 6.5,
+    "was": 0,
+    "comparable": "$1.27/ 100g",
+    "promotionType": "BONUSCOLLECTABLE",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 3049630,
+   "name": "Weet-bix Cholesterol Lowering Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "440g",
+   "availability": true,
+   "pricing": {
+    "now": 7.5,
+    "was": 0,
+    "comparable": "$1.70/ 100g",
+    "promotionType": "BONUSCOLLECTABLE",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 2001365,
+   "name": "Weet-bix Gluten Free Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "375g",
+   "availability": true,
+   "pricing": {
+    "now": 5.0,
+    "was": 0,
+    "comparable": "$1.33/ 100g",
+    "promotionType": "EVERYDAY",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 4233292,
+   "name": "Weet-bix Little Kids Essentials Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "400g",
+   "availability": true,
+   "pricing": {
+    "now": 5.0,
+    "was": 0,
+    "comparable": "$1.25/ 100g",
+    "promotionType": "BONUSCOLLECTABLE",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 5002998,
+   "name": "Weet-bix Honey & Golden Oats Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "450g",
+   "availability": true,
+   "pricing": {
+    "now": 5.0,
+    "was": 6.5,
+    "saveStatement": "save $1.50",
+    "comparable": "$1.11/ 100g",
+    "promotionType": "SPECIAL",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 429612,
+   "name": "Weet-bix Multi-grain Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "575g",
+   "availability": true,
+   "pricing": {
+    "now": 5.0,
+    "was": 6.5,
+    "saveStatement": "save $1.50",
+    "comparable": "$0.87/ 100g",
+    "promotionType": "SPECIAL",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 1556047,
+   "name": "Weet-bix Protein Bites Caramel Crunch",
+   "brand": "Sanitarium",
+   "size": "510g",
+   "availability": true,
+   "pricing": {
+    "now": 8.0,
+    "was": 0,
+    "comparable": "$1.57/ 100g",
+    "promotionType": "BONUSCOLLECTABLE",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 2715951,
+   "name": "Weet-bix Cranberry & Coconut Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "450g",
+   "availability": true,
+   "pricing": {
+    "now": 5.0,
+    "was": 6.5,
+    "saveStatement": "save $1.50",
+    "comparable": "$1.11/ 100g",
+    "promotionType": "SPECIAL",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 9384240,
+   "name": "Brits",
+   "brand": "Vita",
+   "size": "1Kg",
+   "availability": true,
+   "pricing": {
+    "now": 7.0,
+    "was": 0,
+    "comparable": "$0.70/ 100g",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 4951376,
+   "name": "Weet-bix Bites Apricot Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "500g",
+   "availability": true,
+   "pricing": {
+    "now": 6.5,
+    "was": 0,
+    "comparable": "$1.30/ 100g",
+    "promotionType": "BONUSCOLLECTABLE",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 2715962,
+   "name": "Weet-bix Gluten Free Coconut & Cinnamon Breakfast Cereal",
+   "brand": "Sanitarium",
+   "size": "400g",
+   "availability": true,
+   "pricing": {
+    "now": 5.5,
+    "was": 0,
+    "comparable": "$1.38/ 100g",
+    "promotionType": "EVERYDAY",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 1870880,
+   "name": "Wildberry Bites",
+   "brand": "Weet-Bix",
+   "size": "900g",
+   "availability": true,
+   "pricing": {
+    "now": 9.0,
+    "was": 0,
+    "comparable": "$1.00/ 100g",
+    "promotionType": "EVERYDAY",
+    "onlineSpecial": false
+   }
+  },
+  {
+   "_type": "PRODUCT",
+   "id": 1870904,
+   "name": "Bites Honey",
+   "brand": "Weet-Bix",
+   "size": "900g",
+   "availability": true,
+   "pricing": {
+    "now": 9.0,
+    "was": 0,
+    "comparable": "$1.00/ 100g",
+    "promotionType": "EVERYDAY",
+    "onlineSpecial": false
+   }
+  }
+ ]
+}

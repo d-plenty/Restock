@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App shortcut icon: receipt on Australian green. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#FF00843D" android:pathData="M24,0a24,24 0 1 1 0,48a24,24 0 1 1 0,-48z" />
+    <group android:scaleX="1.1" android:scaleY="1.1" android:translateX="10.8" android:translateY="10.8">
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M6,3h12v18l-3,-2 -3,2 -3,-2 -3,2z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M9,8h6M9,12h6M9,16h3" />
+    </group>
+</vector>

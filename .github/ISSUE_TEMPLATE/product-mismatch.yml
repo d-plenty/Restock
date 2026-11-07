@@ -1,0 +1,38 @@
+name: Wrong product or price
+description: A search result, barcode match or price that doesn't match the shelf
+labels: [matching]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What's wrong?
+      options:
+        - A barcode found the wrong product
+        - The right product was hard to find in search
+        - The price or "was" price is wrong
+        - The verdict (Great deal, Wait, Fake sale...) seems wrong
+        - Stock (in stock / out of stock) is wrong
+    validations:
+      required: true
+  - type: input
+    id: product
+    attributes:
+      label: Product
+      description: Name and size, and the barcode if you have it.
+      placeholder: Vegemite 380g, 9300650658615
+    validations:
+      required: true
+  - type: dropdown
+    id: store
+    attributes:
+      label: Store
+      options: [Coles, Woolworths, Aldi, A bottle shop, A pharmacy, A shop I added myself, More than one]
+  - type: textarea
+    id: detail
+    attributes:
+      label: What did you search or scan, and what did you expect?
+  - type: input
+    id: version
+    attributes:
+      label: Restock version
+      placeholder: 0.7.1
