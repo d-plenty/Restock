@@ -105,7 +105,7 @@ Read the full **[privacy policy](PRIVACY.md)** and the **[fine print](DISCLAIMER
 
 ## Get it
 
-**Download:** grab the latest `restock-x.y.z.apk` from **[Releases](../../releases)**, open it on your phone and allow the install. Android 8.0 or newer.
+**Download: [restock.apk](https://github.com/d-plenty/Restock/releases/latest/download/restock.apk)** (always the newest version), or pick a version from **[Releases](../../releases)**. Open it on your phone and allow the install. Android 8.0 or newer.
 
 **Stay up to date:** add this repository to [Obtainium](https://github.com/ImranR98/Obtainium) and it'll tell you when a new version is out.
 
