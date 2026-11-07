@@ -557,6 +557,10 @@ export function SettingsScreen() {
         Restock {version} beta · free and open source
         <br />
         Your data stays on this phone
+        <br />
+        <a href="https://github.com/d-plenty/Restock" target="_blank" rel="noreferrer">
+          Source code and bug reports on GitHub
+        </a>
       </p>
       {reading && <LegalSheet doc={reading} onClose={() => setReading(undefined)} />}
       {testing && <ConnectionsSheet settings={settings} onClose={() => setTesting(false)} />}
@@ -751,7 +755,11 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
       </button>
       <p className="small">
         Still failing? Try Store connections → Always use the browser, or open the store and tick "I'm not a robot" if it asks. If a store keeps
-        failing, please report it on GitHub with the error above.
+        failing, please{' '}
+        <a href="https://github.com/d-plenty/Restock/issues/new/choose" target="_blank" rel="noreferrer">
+          report it on GitHub
+        </a>{' '}
+        with the error above.
       </p>
     </Sheet>
   );

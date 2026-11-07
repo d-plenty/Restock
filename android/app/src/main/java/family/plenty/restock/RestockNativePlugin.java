@@ -363,10 +363,12 @@ public class RestockNativePlugin extends Plugin {
         final String path = call.getString("path");
         final String message = call.getString("message");
         final boolean record = Boolean.TRUE.equals(call.getBoolean("record", false));
-        getActivity().runOnUiThread(() -> StoreWeb.showUnblock(getActivity(), chain, path, message, record, json -> {
+        final boolean pickStore = !record && Boolean.TRUE.equals(call.getBoolean("pickStore", false));
+        getActivity().runOnUiThread(() -> StoreWeb.showUnblock(getActivity(), chain, path, message, record, pickStore, json -> {
             com.getcapacitor.JSObject out = new com.getcapacitor.JSObject();
             // evaluateJavascript hands back a JSON string literal ("\"[...]\""): the app unwraps it.
-            if (json != null) out.put("recording", json);
+            // With pickStore, it's the store page's address instead (0.7.2).
+            if (json != null) out.put(pickStore ? "storePage" : "recording", json);
             call.resolve(out);
         }));
     }
@@ -379,6 +381,7 @@ public class RestockNativePlugin extends Plugin {
      * Android has already padded the app clear of the bars, the overlap is 0.
      */
     @PluginMethod
+    @SuppressWarnings("deprecation") // getSystemWindowInset* is only used before Android 11
     public void getInsets(PluginCall call) {
         getActivity().runOnUiThread(() -> {
             android.view.View decor = getActivity().getWindow().getDecorView();
@@ -581,7 +584,7 @@ public class RestockNativePlugin extends Plugin {
                 java.io.File dir = f.getParentFile();
                 if (dir != null && !dir.exists() && !dir.mkdirs()) throw new Exception("Couldn't make the folder");
                 tmp = new java.io.File(f.getPath() + ".part");
-                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) Net.url(url).openConnection();
                 c.setConnectTimeout(20000);
                 c.setReadTimeout(30000);
                 c.setInstanceFollowRedirects(true);

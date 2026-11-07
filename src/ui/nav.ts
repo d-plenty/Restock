@@ -39,7 +39,8 @@ export type Screen =
 
 export interface Nav {
   tab: Tab;
-  setTab: (t: Tab) => void;
+  /** Switch tab. For the List tab, `section` picks which list opens (else the one looked at last). */
+  setTab: (t: Tab, section?: Section) => void;
   /** The Pantry, Keg or Pharmacy tab looked at last, so Add and the list know which shops to use. */
   section: Section;
   push: (s: Screen) => void;

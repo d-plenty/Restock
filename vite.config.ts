@@ -12,6 +12,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    // The app loads from the phone, not the internet, so one ~600 kB file is fine.
+    chunkSizeWarningLimit: 700,
+    // React in its own file: the app's code changes every version, React rarely does.
+    rolldownOptions: {
+      output: {
+        codeSplitting: { groups: [{ name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ }] },
+      },
+    },
   },
   test: {
     environment: 'node',

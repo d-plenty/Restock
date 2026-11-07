@@ -76,6 +76,22 @@ const KINDS = [
   'liquid stock',
   'stock',
   'baked beans',
+  // tinned fruit ("Pineapple Slices in Juice" is pineapple, not juice)
+  'pineapple slices',
+  'pineapple pieces',
+  'crushed pineapple',
+  'pineapple',
+  'peach slices',
+  'sliced peaches',
+  'peaches',
+  'apricot halves',
+  'apricots',
+  'pear halves',
+  'pears',
+  'fruit salad',
+  'fruit cocktail',
+  'mango slices',
+  'mandarin segments',
   'spaghetti',
   'kidney beans',
   'chickpeas',
@@ -293,6 +309,9 @@ export function genericName(productName: string | undefined, brand?: string): st
   // "Spaghetti in Tomato Sauce", "Tuna in Springwater": the thing comes before "in"/"with".
   const head = lower.split(/ (?:in|with) /)[0];
   if (head !== lower && KINDS.some((k) => new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(head))) lower = `${head} `;
+  // "… in Juice / Syrup / Brine / Springwater / Oil": what it's packed in is never the thing itself.
+  else if (head !== lower && / (?:in|with) (?:natural |its own |light |heavy )?(?:juice|syrup|brine|spring ?water|water|oil|olive oil)\b/.test(lower))
+    lower = `${head} `;
   for (const b of BRAND_ITEMS) if (lower.includes(` ${b} `) || lower.includes(` ${b}'`)) return cap(b);
   // The kind named last is usually the thing itself ("chocolate ice cream topping" → topping, not chocolate).
   let found: { kind: string; at: number } | undefined;

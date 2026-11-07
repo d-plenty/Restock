@@ -153,6 +153,8 @@ export function ListScreen() {
   const allCats = useLive(allCategories, []);
   const settings = useLive(getSettings, []);
   const [picked0, setSection] = useState<Section>(nav.section);
+  // Opening the list from Home picks the grocery list even when the List tab is already open.
+  useEffect(() => setSection(nav.section), [nav.section]);
   const [text, setText] = useState('');
   const [view, setView] = useState<'all' | 'shop'>('shop');
   const [sending, setSending] = useState<'woolworths' | 'coles'>();
@@ -780,6 +782,9 @@ function PickShops({
                   <span className="small">
                     {st.missing.length ? `Has ${st.lines.length} of ${n}` : n === 1 ? 'Has your item' : `Has all ${n}`}
                     {st.lines.length ? ` · ${money(st.total)}` : ''}
+                    {st.missing.length && st.lines.length && st.missing.every((m) => m.elsewhere)
+                      ? ` · about ${money(st.totalWithElsewhere)} with the other ${st.missing.length === 1 ? 'one' : st.missing.length} elsewhere`
+                      : ''}
                   </span>
                 )}
               </span>
@@ -928,7 +933,7 @@ function ShoppingMode({
         </button>
       </div>
       {cards && cards.length > 0 && (
-        <div className="chips" style={{ padding: '0 16px' }}>
+        <div className="chips shopmode-cards">
           {cards.map((k) => (
             <button key={k.id} className="chip" onClick={() => setCard(k)}>
               <Icon name="card" size={16} /> Show {k.program === 'other' ? k.label : PROGRAMS[k.program].name}

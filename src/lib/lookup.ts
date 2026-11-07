@@ -67,7 +67,7 @@ async function openDb(db: OpenDb, code: string): Promise<Identified | undefined>
       barcode: code,
       name,
       brand,
-      size: p.quantity?.trim() || undefined,
+      size: sizeWithUnit(p.quantity),
       imageUrl: p.image_small_url || p.image_front_small_url,
       source: OPEN_HOSTS[db].label,
       kindOnly: kindOnly || undefined,
@@ -300,3 +300,14 @@ export const QUICK_PICKS: Record<Section, string[]> = {
   keg: ['Beer', 'Pre-mix cans', 'Wine', 'Spirits', 'Cider', 'Seltzer'],
   pharmacy: ['Paracetamol', 'Ibuprofen', 'Antihistamine', 'Cold and flu', 'Vitamins', 'Sunscreen', 'First aid'],
 };
+
+/** Open Food Facts' size, only when it has a unit ("425 g", "6 x 375ml", "24 pack"); a bare "4" is noise. */
+export function sizeWithUnit(q: string | undefined): string | undefined {
+  const t = q?.trim();
+  if (!t) return undefined;
+  return /\d\s*(?:k?g|mg|m?l|cl|dl|litres?|liters?|oz|lb|pack|pk|pcs?|pieces?|sheets?|rolls?|tablets?|capsules?|caps|sachets?|bags?|serves?|each|ea)\b/i.test(
+    t,
+  )
+    ? t
+    : undefined;
+}

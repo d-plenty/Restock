@@ -1,6 +1,6 @@
 # Privacy policy
 
-_Last updated 7 November 2026_
+_Last updated 8 November 2026_
 
 **Privacy policy? There's nothing to collect, so there's nothing to hide from you. But here's the long version anyway.**
 
@@ -86,7 +86,7 @@ Restock isn't made for children and doesn't knowingly collect anything from anyo
 
 ## Changes and contact
 
-If this policy changes, the new version will be in the app and in the project's source code, with a new date. Questions or concerns? Open an issue on the project's GitHub page.
+If this policy changes, the new version will be in the app and in the project's source code, with a new date. Questions or concerns? Open an issue on the project's GitHub page: https://github.com/d-plenty/Restock/issues
 
 _If you've read all the way to the bottom: thank you, and also, you might be a tiny bit boring. We say that with love. Go and find something on special._
 

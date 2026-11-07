@@ -371,6 +371,18 @@ final class StoreWeb implements StoreClient.WebFetcher {
         + "})();";
 
     static void showUnblock(Activity activity, String chain, String path, String message, boolean record, Recorded onDone) {
+        showUnblock(activity, chain, path, message, record, false, onDone);
+    }
+
+    /** A Coles store page: ".../find-stores/coles/qld/kirwan-0844". Its number is the last part. */
+    static final java.util.regex.Pattern COLES_STORE_PAGE = java.util.regex.Pattern.compile("/find-stores/[^?#]*?-(\\d{3,5})/?(?:[?#].*)?$", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * With pickStore (0.7.2), the page closes by itself as soon as you open a store's own page on
+     * the shop's site, and hands that page's address back (Coles keeps the store number in it).
+     */
+    @SuppressWarnings("deprecation") // getSystemWindowInset* is only used before Android 11
+    static void showUnblock(Activity activity, String chain, String path, String message, boolean record, boolean pickStore, Recorded onDone) {
         final Dialog dialog = new Dialog(activity, android.R.style.Theme_Material_Light_NoActionBar);
         LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -418,18 +430,36 @@ final class StoreWeb implements StoreClient.WebFetcher {
         setUp(w);
         w.setBackgroundColor(Color.WHITE);
         w.getSettings().setBlockNetworkImage(false);
-        if (record) {
+        final String[] recording = {null};
+        final boolean[] picked = {false};
+        if (record || pickStore) {
             w.setWebViewClient(new WebViewClient() {
                 @Override
                 public void onPageFinished(WebView view, String url) {
-                    view.evaluateJavascript(RECORDER, null);
+                    if (record) view.evaluateJavascript(RECORDER, null);
+                    else spot(url);
+                }
+
+                // The store finder changes page without loading a new one; this still sees it.
+                @Override
+                public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+                    super.doUpdateVisitedHistory(view, url, isReload);
+                    if (pickStore) spot(url);
+                }
+
+                private void spot(String url) {
+                    if (picked[0] || url == null || !url.startsWith(home(chain).replaceAll("/+$", ""))) return;
+                    if (!COLES_STORE_PAGE.matcher(url).find()) return;
+                    picked[0] = true;
+                    recording[0] = url;
+                    note.setText("Got it. Going back to Restock…");
+                    w.postDelayed(dialog::dismiss, 700);
                 }
             });
         } else {
             w.setWebViewClient(new WebViewClient());
         }
         root.addView(w, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        final String[] recording = {null};
 
         dialog.setContentView(root);
         Window win = dialog.getWindow();

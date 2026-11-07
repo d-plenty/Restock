@@ -95,10 +95,11 @@ export default function App() {
     () => ({
       tab,
       section,
-      setTab: (t) => {
+      setTab: (t, sec) => {
         setStack([]);
         setTab(t);
         if (isSectionTab(t)) setSection(t);
+        else if (sec) setSection(sec);
       },
       push: (s) => setStack((st) => [...st, s]),
       pop: () => setStack((st) => st.slice(0, -1)),

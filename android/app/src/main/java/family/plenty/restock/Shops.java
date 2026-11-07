@@ -121,8 +121,8 @@ final class Shops {
         String site = website(id);
         if (site == null || url == null) return false;
         try {
-            String a = new java.net.URL(site).getHost().replaceFirst("^www\\.", "");
-            java.net.URL u = new java.net.URL(url);
+            String a = Net.url(site).getHost().replaceFirst("^www\\.", "");
+            java.net.URL u = Net.url(url);
             if (!"https".equals(u.getProtocol()) && !"http".equals(u.getProtocol())) return false;
             String b = u.getHost().replaceFirst("^www\\.", "");
             return b.equals(a) || b.endsWith("." + a);

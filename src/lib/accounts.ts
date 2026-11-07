@@ -112,3 +112,33 @@ export async function recordTrolley(chain: 'coles' | 'woolworths'): Promise<Reco
   });
   return tidyRecording(out?.recording, chain === 'coles' ? 'https://www.coles.com.au/' : 'https://www.woolworths.com.au/');
 }
+
+// ---------- picking your Coles store (0.7.2) ----------
+
+/** "…/find-stores/coles/qld/bohle-plains-0844" → { storeNo: '0844', name: 'Coles Bohle Plains' }. */
+export function colesStoreFromPage(url: string): { storeNo: string; name: string } | undefined {
+  const m = /\/find-stores\/(?:[^/?#]+\/)*([a-z0-9-]+?)-(\d{3,5})\/?(?:[?#].*)?$/i.exec(url.trim());
+  if (!m) return undefined;
+  const suburb = m[1]
+    .split('-')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+  return { storeNo: m[2], name: `Coles ${suburb}` };
+}
+
+/**
+ * Opens Coles' store finder in Restock's browser. As soon as you open your store's page, it closes
+ * by itself and brings back that store's number (Coles keeps it at the end of the page's address),
+ * so there's nothing to copy. Undefined if you close it first.
+ */
+export async function pickColesStore(): Promise<{ storeNo: string; name: string } | undefined> {
+  if (!isNative()) throw new Error('Choosing your store works in the Android app.');
+  const out = await RestockNative.openStore({
+    chain: 'coles',
+    path: '/find-stores',
+    pickStore: true,
+    message: 'Search your suburb, then tap your Coles store. Restock picks up its store number by itself.',
+  });
+  return out && out.storePage ? colesStoreFromPage(out.storePage) : undefined;
+}

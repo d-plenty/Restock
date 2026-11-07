@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { getSettings, nowIso, uid, updateSettings } from '../../lib/db';
 import { request as askPermission } from '../../lib/permissions';
 import { describePosition, findPickedShops, nearbyStores, searchArea, type Area, type NearbyStore } from '../../lib/places';
@@ -19,10 +19,19 @@ import {
   type StoreChain,
 } from '../../shops';
 import { adapterFor } from '../../stores';
+import { colesAtStore } from '../../stores/coles';
 import { isNative } from '../../stores/http';
 import { forgetSearchInfo } from '../../stores/web';
-import { colesStoreNo, stockAtBranch, storeChoice, wooliesAccount, type Settings, type ShopAccount, type StoreChoice } from '../../types';
-import { checkWoolworths, openWoolworths, signInColes, signInWoolworths, stopUsingColes, stopUsingWoolworths } from '../../lib/accounts';
+import { colesStoreNo, storeChoice, type Settings, type ShopAccount, type StoreChoice } from '../../types';
+import {
+  checkWoolworths,
+  openWoolworths,
+  pickColesStore,
+  signInColes,
+  signInWoolworths,
+  stopUsingColes,
+  stopUsingWoolworths,
+} from '../../lib/accounts';
 import { confirmAction } from '../../lib/confirm';
 import { ChainDot, Icon, LoadingBar, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
@@ -922,6 +931,49 @@ export function shopSummary(settings: Settings, section: Section): string {
     .join(', ');
 }
 
+/** A shop's account card: its name, one status line, one main button, and the details behind ⓘ. */
+function AccountCard({
+  chain,
+  beta,
+  status,
+  ok,
+  info,
+  children,
+}: {
+  chain: 'woolworths' | 'coles';
+  beta?: boolean;
+  status: string;
+  ok: boolean;
+  info: { title: string; body: ReactNode };
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="woolies-account">
+      <div className="row" style={{ padding: 0, minHeight: 0, gap: 10 }}>
+        <ChainDot chain={chain} />
+        <span className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span className="title" style={{ fontSize: 15, display: 'flex', gap: 6, alignItems: 'center' }}>
+            {chainName(chain)} {beta && <span className="tag normal">BETA</span>}
+          </span>
+          <span className="small" style={{ color: ok ? 'var(--green-ink)' : 'var(--ink-2)' }}>
+            {status}
+          </span>
+        </span>
+        <button className="info-btn" onClick={() => setOpen(true)} aria-label={info.title}>
+          <Icon name="info" size={20} />
+        </button>
+      </div>
+      {children}
+      {open && (
+        <Sheet title={info.title} onClose={() => setOpen(false)}>
+          {info.body}
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
 /**
  * Woolworths: sign in (your store's prices and stock, and your list straight into your trolley) or
  * don't (online prices, no stock). You sign in on Woolworths' own page inside Restock, so your
@@ -941,7 +993,7 @@ function WoolworthsAccount({ settings }: { settings: Settings }) {
           a.signedIn
             ? a.storeId
               ? { ok: true, text: `Signed in. Your store: ${a.storeName ?? `Woolworths store ${a.storeId}`}.` }
-              : { ok: false, text: 'Signed in, but no store is picked yet. Tap "Pick my store", choose Pick up and your store, then tap Done.' }
+              : { ok: false, text: 'Signed in, but no store is picked yet. Tap "Change store", choose Pick up and your store, then tap Done.' }
             : { ok: false, text: "Woolworths says you're not signed in. Try again, and tap Done once you're in." },
         );
     } catch (e) {
@@ -952,49 +1004,57 @@ function WoolworthsAccount({ settings }: { settings: Settings }) {
   };
   const on = !!acct?.signedIn;
   return (
-    <div className="woolies-account">
-      <div className="title" style={{ fontSize: 15 }}>
-        Woolworths account
-      </div>
-      <div className="acct-choices">
-        <div className={`acct-choice${on ? ' on' : ''}`}>
-          <strong>Sign in</strong>
-          <span className="small">
-            Your store's prices and stock. Send your shopping list straight into your Woolworths trolley, ready in the app.
-          </span>
-        </div>
-        <div className={`acct-choice${on ? '' : ' on'}`}>
-          <strong>Don't sign in</strong>
-          <span className="small">Woolworths' online prices. No stock shown, as online stock isn't reliable for your store.</span>
-        </div>
-      </div>
+    <AccountCard
+      chain="woolworths"
+      ok={on && !!acct?.storeId}
+      status={
+        on
+          ? acct?.storeId
+            ? `Signed in · prices and stock at ${acct.storeName ?? `store ${acct.storeId}`}`
+            : 'Signed in · no store picked yet'
+          : 'Not signed in · online prices only, no stock'
+      }
+      info={{
+        title: 'Woolworths sign-in',
+        body: (
+          <>
+            <p className="small">
+              <strong>Signed in:</strong> your own store's prices and stock, and you can send your shopping list straight into your Woolworths
+              trolley.
+            </p>
+            <p className="small">
+              <strong>Not signed in:</strong> Woolworths' online prices. No stock is shown, as online stock isn't reliable for your store.
+            </p>
+            <p className="small">
+              You sign in on Woolworths' own page, so your password goes to Woolworths, not Restock. Restock then asks the Woolworths website for
+              prices as you, and adds to your trolley only when you tap Send. Woolworths may not allow apps to do this, and it may stop working if
+              they change their website.
+            </p>
+          </>
+        ),
+      }}
+    >
       {on ? (
-        <>
-          <p className="small" style={{ margin: 0 }}>
-            <strong>Signed in</strong>
-            {acct?.storeId ? ` · your store: ${acct.storeName ?? `store ${acct.storeId}`}` : ' · no store picked yet'}
-          </p>
-          <div className="chips">
-            <button
-              className="btn small"
-              disabled={!!busy}
-              onClick={() =>
-                void go(
-                  'store',
-                  async () => (await openWoolworths('Choose Pick up and your store at the top of the page. Then tap Done.'), checkWoolworths()),
-                )
-              }
-            >
-              Pick my store
-            </button>
-            <button className="btn small" disabled={!!busy} onClick={() => void go('check', checkWoolworths)}>
-              {busy === 'check' ? 'Checking…' : 'Check again'}
-            </button>
-            <button className="btn small ghost" disabled={!!busy} onClick={() => void go('stop', stopUsingWoolworths)}>
-              Stop using my account
-            </button>
-          </div>
-        </>
+        <div className="chips" style={{ flexWrap: 'wrap' }}>
+          <button
+            className="btn small"
+            disabled={!!busy}
+            onClick={() =>
+              void go(
+                'store',
+                async () => (await openWoolworths('Choose Pick up and your store at the top of the page. Then tap Done.'), checkWoolworths()),
+              )
+            }
+          >
+            Change store
+          </button>
+          <button className="btn small" disabled={!!busy} onClick={() => void go('check', checkWoolworths)}>
+            {busy === 'check' ? 'Checking…' : 'Check again'}
+          </button>
+          <button className="btn small ghost" disabled={!!busy} onClick={() => void go('stop', stopUsingWoolworths)}>
+            Sign out
+          </button>
+        </div>
       ) : (
         <button className="btn primary" disabled={!!busy || !isNative()} onClick={() => void go('in', signInWoolworths)}>
           {busy === 'in' ? 'Checking…' : isNative() ? 'Sign in to Woolworths' : 'Sign in works in the Android app'}
@@ -1005,108 +1065,33 @@ function WoolworthsAccount({ settings }: { settings: Settings }) {
           {note.text}
         </div>
       )}
-      <p className="small" style={{ margin: 0 }}>
-        You sign in on Woolworths' own page, so your password goes to Woolworths, not Restock. Restock then asks the Woolworths website for prices as
-        you, and adds to your trolley only when you tap Send. Woolworths may not allow apps to do this, and it may stop working if they change their
-        website.
-      </p>
-    </div>
+    </AccountCard>
   );
 }
 
 /**
- * Coles: sign in to fill your Coles trolley from your list. Not needed for your store's prices and
- * stock (its store number, below, does that).
+ * Coles: your own store's prices and stock come from its store number. "Choose your Coles store"
+ * opens Coles' store finder and picks the number up from the store's page by itself (0.7.2); the
+ * map fills it in too when it knows it, and typing it is a fallback. Signing in is only for
+ * filling your Coles trolley, which Restock hasn't learned yet.
  */
-function ColesAccount({ settings }: { settings: Settings }) {
+function ColesStore({ settings }: { settings: Settings }) {
   const nav = useNav();
-  const on = !!settings.accounts?.coles?.signedIn;
-  const [error, setError] = useState<string>();
-  return (
-    <div className="woolies-account">
-      <div className="title" style={{ fontSize: 15 }}>
-        Coles account
-      </div>
-      <div className="acct-choices">
-        <div className={`acct-choice${on ? ' on' : ''}`}>
-          <strong>Sign in</strong>
-          <span className="small">Send your shopping list straight into your Coles trolley (as soon as Restock has learned how: see below).</span>
-        </div>
-        <div className={`acct-choice${on ? '' : ' on'}`}>
-          <strong>Don't sign in</strong>
-          <span className="small">Everything else still works. Your store's prices and stock come from its store number below.</span>
-        </div>
-      </div>
-      {on ? (
-        <div className="chips">
-          <span className="small" style={{ alignSelf: 'center' }}>
-            <strong>Signed in</strong>
-          </span>
-          <button className="btn small ghost" onClick={() => void stopUsingColes()}>
-            Stop using my account
-          </button>
-        </div>
-      ) : (
-        <button
-          className="btn primary"
-          disabled={!isNative()}
-          onClick={() =>
-            void signInColes(() =>
-              confirmAction('Did you sign in to Coles?', { detail: "Coles doesn't tell Restock, so just say if you did.", action: 'Yes, signed in' }),
-            ).catch((e) => setError(errText(e)))
-          }
-        >
-          {isNative() ? 'Sign in to Coles' : 'Sign in works in the Android app'}
-        </button>
-      )}
-      {error && (
-        <div className="banner amber" style={{ fontSize: 13 }}>
-          {error}
-        </div>
-      )}
-      <p className="small" style={{ margin: 0 }}>
-        To teach Restock your Coles trolley: sign in, then go to Settings → Diagnostics → "Record adding to a trolley", add one item, and send the
-        recording.{' '}
-        <button className="linkish small" style={{ padding: 0 }} onClick={() => nav.push({ name: 'diagnostics' })}>
-          Open Diagnostics
-        </button>
-      </p>
-    </div>
-  );
-}
-
-/**
- * Check your stores: what Restock can see at each supermarket you use. Coles answers per store
- * (prices and stock, at your primary and second branch) when asked by store number; Woolworths only
- * does that for a signed-in shopper, and Aldi doesn't share stock, so those stay as their websites
- * show them.
- */
-function LocalPrices({ settings }: { settings: Settings }) {
   const st = storeChoice(settings, 'coles');
-  const coles = settings.enabledChains.includes('coles');
+  const on = !!(settings.localPrices && st.branchStoreNo);
+  const signedIn = !!settings.accounts?.coles?.signedIn;
   const [texts, setTexts] = useState<Record<'branchStoreNo' | 'branchStoreNo2', string>>({
     branchStoreNo: st.branchStoreNo ?? '',
     branchStoreNo2: st.branchStoreNo2 ?? '',
   });
   const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
   const [test, setTest] = useState<{ busy?: boolean; text?: string; ok?: boolean }>({});
-  const saveNo = async (key: 'branchStoreNo' | 'branchStoreNo2', value: string) => {
-    const n = value.trim() ? colesStoreNo(value) : undefined;
-    if (value.trim() && !n) {
-      setError("That doesn't look like a Coles store link or number. It's the number at the end of the store's page, like …/kirwan-0844.");
-      return;
-    }
-    setError(undefined);
-    setTexts((t) => ({ ...t, [key]: n ?? '' }));
-    const latest = await getSettings();
-    await updateSettings({ stores: { ...latest.stores, coles: { ...storeChoice(latest, 'coles'), [key]: n } } });
-  };
   const runTest = async () => {
     const no = storeChoice(await getSettings(), 'coles').branchStoreNo;
     if (!no) return;
     setTest({ busy: true });
     try {
-      const { colesAtStore } = await import('../../stores/coles');
       const found = await colesAtStore('milk', no);
       setTest(
         found.length
@@ -1122,103 +1107,207 @@ function LocalPrices({ settings }: { settings: Settings }) {
       });
     }
   };
-  const field = (key: 'branchStoreNo' | 'branchStoreNo2', label: string, branch?: string) => (
+  const save = async (slot: 'primary' | 'secondary', no: string | undefined, name?: string) => {
+    const latest = await getSettings();
+    const cur = storeChoice(latest, 'coles');
+    const key = slot === 'primary' ? 'branchStoreNo' : 'branchStoreNo2';
+    const next: StoreChoice = { ...cur, [key]: no };
+    // A store picked on Coles' own site replaces a different branch picked on the map.
+    if (name && cur[slot] !== name) {
+      next[slot] = name;
+      if (slot === 'primary') next.primaryMap = undefined;
+      else next.secondaryMap = undefined;
+    }
+    setTexts((t) => ({ ...t, [key]: no ?? '' }));
+    await updateSettings({ stores: { ...latest.stores, coles: next }, ...(no && slot === 'primary' ? { localPrices: true } : {}) });
+  };
+  const choose = async (slot: 'primary' | 'secondary') => {
+    setError(undefined);
+    setBusy(true);
+    try {
+      const got = await pickColesStore();
+      if (!got) return;
+      await save(slot, got.storeNo, got.name);
+      if (slot === 'primary') await runTest();
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const saveTyped = async (key: 'branchStoreNo' | 'branchStoreNo2', value: string) => {
+    const n = value.trim() ? colesStoreNo(value) : undefined;
+    if (value.trim() && !n) {
+      setError("That doesn't look like a Coles store link or number. It's the number at the end of the store's page address, like …/kirwan-0844.");
+      return;
+    }
+    setError(undefined);
+    await save(key === 'branchStoreNo' ? 'primary' : 'secondary', n);
+  };
+  const field = (key: 'branchStoreNo' | 'branchStoreNo2', label: string) => (
     <label className="field">
-      <span>
-        {label}
-        {branch ? ` (${cleanStoreName(branch)})` : ''}
-      </span>
+      <span>{label}</span>
       <input
         className="input"
         inputMode="url"
-        placeholder="Paste the store's page link, or its number"
+        placeholder="Store number, or the store page's link"
         value={texts[key]}
         onChange={(e) => setTexts((t) => ({ ...t, [key]: e.target.value }))}
-        onBlur={(e) => void saveNo(key, e.target.value)}
+        onBlur={(e) => void saveTyped(key, e.target.value)}
       />
     </label>
   );
-  const row = (chain: StoreChain, what: string, ok: boolean) =>
-    settings.enabledChains.includes(chain) && (
-      <div className="row" style={{ padding: '6px 0', minHeight: 0, gap: 10 }}>
-        <ChainDot chain={chain} />
-        <span className="grow small" style={{ color: 'var(--ink-2)' }}>
-          <strong>{chainName(chain)}:</strong> {what}
-        </span>
-        <Icon name={ok ? 'check' : 'info'} size={16} />
-      </div>
-    );
+  const where = (name: string | undefined, no: string) => `${name ? cleanStoreName(name) : 'your store'} (store ${no})`;
+  return (
+    <AccountCard
+      chain="coles"
+      beta
+      ok={on}
+      status={
+        on
+          ? `Prices and stock at ${where(st.primary, st.branchStoreNo!)}${st.branchStoreNo2 ? `, and stock at ${where(st.secondary, st.branchStoreNo2)}` : ''}`
+          : 'Online prices only, no stock'
+      }
+      info={{
+        title: 'Your Coles store',
+        body: (
+          <>
+            <p className="small">
+              Coles answers for any of its stores by store number, without signing in. With your store chosen, Restock shows that store's own prices
+              and stock instead of the online store's. This is new, so it's marked Beta: if Coles doesn't answer for your store, Restock uses the
+              online prices and notes it in Settings → Diagnostics.
+            </p>
+            <p className="small">
+              <strong>Choose your Coles store</strong> opens Coles' store finder inside Restock. Tap your store, and Restock picks up its number by
+              itself and comes back. The number is the four digits at the end of the store page's address, for example …/kirwan-0844.
+            </p>
+            <p className="small">
+              <strong>Signing in to Coles</strong> isn't needed for prices. It's for sending your list into your Coles trolley, once Restock has
+              learned how: sign in, then go to Settings → Diagnostics → "Record adding to a trolley", add one item, and send the recording.
+            </p>
+          </>
+        ),
+      }}
+    >
+      {on ? (
+        <div className="chips" style={{ flexWrap: 'wrap' }}>
+          <button className="btn small" disabled={busy} onClick={() => void choose('primary')}>
+            Change store
+          </button>
+          <button className="btn small" disabled={test.busy} onClick={() => void runTest()}>
+            {test.busy ? 'Asking Coles…' : 'Test it'}
+          </button>
+          <button className="btn small ghost" onClick={() => void updateSettings({ localPrices: false })}>
+            Use online prices
+          </button>
+        </div>
+      ) : (
+        <button className="btn primary" disabled={busy || !isNative()} onClick={() => void choose('primary')}>
+          {busy ? 'Opening Coles…' : isNative() ? 'Choose your Coles store' : 'Choosing your store works in the Android app'}
+        </button>
+      )}
+      {!on && st.branchStoreNo && (
+        <button className="linkish small" style={{ padding: 0, alignSelf: 'flex-start' }} onClick={() => void updateSettings({ localPrices: true })}>
+          Use {where(st.primary, st.branchStoreNo)} again
+        </button>
+      )}
+      {on && !st.branchStoreNo2 && (
+        <button className="linkish small" style={{ padding: 0, alignSelf: 'flex-start' }} disabled={busy} onClick={() => void choose('secondary')}>
+          + Add a 2nd Coles, for its stock
+        </button>
+      )}
+      {on && st.branchStoreNo2 && (
+        <div className="chips" style={{ flexWrap: 'wrap' }}>
+          <button className="btn small" disabled={busy} onClick={() => void choose('secondary')}>
+            Change 2nd store
+          </button>
+          <button className="btn small ghost" onClick={() => void save('secondary', undefined)}>
+            Remove 2nd store
+          </button>
+        </div>
+      )}
+      {error && (
+        <div className="banner amber" style={{ fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+      {test.text && (
+        <div className={`banner ${test.ok ? 'green' : 'amber'}`} style={{ fontSize: 13 }}>
+          {test.text}
+        </div>
+      )}
+      <details className="more">
+        <summary className="small">Other ways</summary>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 8 }}>
+          <p className="small" style={{ margin: 0 }}>
+            Know the store number? Type it here, or paste the store page's link. Picking a branch on the map above fills it in too, when the map knows
+            it.
+          </p>
+          {field('branchStoreNo', 'Your Coles store number')}
+          {field('branchStoreNo2', '2nd Coles (optional, for its stock)')}
+          <div className="row" style={{ padding: 0, minHeight: 0, gap: 8 }}>
+            <span className="grow small">
+              <strong>Coles account</strong> · {signedIn ? 'signed in' : 'not signed in'} (only for your trolley, later)
+            </span>
+            {signedIn ? (
+              <button className="btn small ghost" onClick={() => void stopUsingColes()}>
+                Sign out
+              </button>
+            ) : (
+              <button
+                className="btn small"
+                disabled={!isNative()}
+                onClick={() =>
+                  void signInColes(() =>
+                    confirmAction('Did you sign in to Coles?', {
+                      detail: "Coles doesn't tell Restock, so just say if you did.",
+                      action: 'Yes, signed in',
+                    }),
+                  ).catch((e) => setError(errText(e)))
+                }
+              >
+                Sign in
+              </button>
+            )}
+          </div>
+          <button className="linkish small" style={{ padding: 0, alignSelf: 'flex-start' }} onClick={() => nav.push({ name: 'diagnostics' })}>
+            Teach Restock your Coles trolley (Diagnostics)
+          </button>
+        </div>
+      </details>
+    </AccountCard>
+  );
+}
+
+/**
+ * Check your stores: what Restock can see at each supermarket you use. Coles answers per store
+ * (prices and stock, at your primary and second branch) when asked by store number; Woolworths only
+ * does that for a signed-in shopper, and Aldi doesn't share stock, so those stay as their websites
+ * show them.
+ */
+function LocalPrices({ settings }: { settings: Settings }) {
+  const coles = settings.enabledChains.includes('coles');
+  const woolies = settings.enabledChains.includes('woolworths');
+  if (!coles && !woolies && !settings.enabledChains.includes('aldi')) return null;
   return (
     <div className="card">
       <p className="small" style={{ margin: 0 }}>
-        What Restock can check at each shop you use:
+        Your own store's prices and stock, where the shop allows it:
       </p>
-      {row(
-        'coles',
-        settings.localPrices && st.branchStoreNo
-          ? `prices and stock at ${st.primary ? cleanStoreName(st.primary) : 'your store'}${st.branchStoreNo2 ? ` and ${st.secondary ? cleanStoreName(st.secondary) : 'your 2nd store'}` : ''}`
-          : "online prices only, and no stock (it isn't reliable for your store). Turn on your own store below.",
-        !!(settings.localPrices && st.branchStoreNo),
-      )}
-      {row(
-        'woolworths',
-        wooliesAccount(settings)
-          ? `prices and stock at ${stockAtBranch(settings, 'woolworths')}, and your list straight into your trolley`
-          : "online prices only, and no stock (it isn't reliable for your store). Sign in below for your store's.",
-        wooliesAccount(settings),
-      )}
-      {row('aldi', "one price for everyone. Aldi doesn't say what's in stock, so Restock doesn't show any.", false)}
-      {settings.enabledChains.includes('woolworths') && <WoolworthsAccount settings={settings} />}
-      {coles && <ColesAccount settings={settings} />}
-      {coles && (
-        <>
-          <label className="check" style={{ padding: 0 }}>
-            <input
-              type="checkbox"
-              checked={!!settings.localPrices}
-              onChange={(e) => void updateSettings({ localPrices: e.target.checked })}
-              aria-label="Prices and stock at my Coles"
-            />
-            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      {woolies && <WoolworthsAccount settings={settings} />}
+      {coles && <ColesStore settings={settings} />}
+      {settings.enabledChains.includes('aldi') && (
+        <div className="woolies-account">
+          <div className="row" style={{ padding: 0, minHeight: 0, gap: 10 }}>
+            <ChainDot chain="aldi" />
+            <span className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span className="title" style={{ fontSize: 15 }}>
-                Prices and stock at my Coles (testing)
+                Aldi
               </span>
-              <span className="small">
-                Ask Coles for your own stores instead of its online store. If Coles doesn't answer for your store, Restock uses the online prices and
-                notes it in Settings → Diagnostics.
-              </span>
+              <span className="small">One price for everyone. Aldi doesn't say what's in stock, so Restock doesn't show any.</span>
             </span>
-          </label>
-          {settings.localPrices && (
-            <>
-              {field('branchStoreNo', 'Your Coles store number', st.primary)}
-              {field('branchStoreNo2', '2nd Coles (optional, for its stock)', st.secondary)}
-              {error && (
-                <div className="banner amber" style={{ fontSize: 13 }}>
-                  {error}
-                </div>
-              )}
-              <p className="small" style={{ margin: 0 }}>
-                {st.branchStoreNo
-                  ? 'Picking a branch above fills these in when the map knows its number.'
-                  : "The map didn't have your branch's number. On coles.com.au, open Find a store, pick your store, copy the page's link and paste it here."}{' '}
-                <a href="https://www.coles.com.au/find-stores" target="_blank" rel="noreferrer">
-                  Open Coles' store finder
-                </a>
-              </p>
-              {st.branchStoreNo && (
-                <button className="btn small" style={{ alignSelf: 'flex-start' }} disabled={test.busy} onClick={() => void runTest()}>
-                  <Icon name="refresh" size={16} /> {test.busy ? 'Asking Coles…' : 'Test it'}
-                </button>
-              )}
-              {test.text && (
-                <div className={`banner ${test.ok ? 'green' : 'amber'}`} style={{ fontSize: 13 }}>
-                  {test.text}
-                </div>
-              )}
-            </>
-          )}
-        </>
+          </div>
+        </div>
       )}
     </div>
   );

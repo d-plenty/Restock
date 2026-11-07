@@ -1,0 +1,7 @@
+Bug fixes and tidy-ups.
+• Choose your Coles store in Coles' own store finder: no more hunting for the store number
+• Simpler Woolworths and Coles cards in My shops
+• Scanning ticks the best match again, even after an earlier search
+• Fruit in juice is named properly, and stray sizes are gone
+• Fairer one-shop pick when a cheaper shop is missing an item or two
+• Shopping list opens groceries; loyalty cards no longer cramped

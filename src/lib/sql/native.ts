@@ -32,7 +32,14 @@ export interface RestockNativePlugin {
   storeRender(opts: { chain: string; url: string; home?: string }): Promise<{ status: number; html: string; url: string }>;
   /** Show the store's website so the user can clear its "are you human" check. Resolves when closed. */
   /** The shop's website, full screen. `path` opens a page on that site (its sign-in page); `message` is the note in the bar. */
-  openStore(opts: { chain: string; home?: string; path?: string; message?: string; record?: boolean }): Promise<{ recording?: string } | void>;
+  openStore(opts: {
+    chain: string;
+    home?: string;
+    path?: string;
+    message?: string;
+    record?: boolean;
+    pickStore?: boolean;
+  }): Promise<{ recording?: string; storePage?: string } | void>;
   /** How far the system bars overlap the app, in CSS px (0 when Android already keeps clear). */
   getInsets(): Promise<{ top: number; bottom: number }>;
 

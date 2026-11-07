@@ -27,6 +27,7 @@ final class Locator {
     private Locator() {}
 
     @SuppressLint("MissingPermission")
+    @SuppressWarnings("deprecation") // requestSingleUpdate is only used before Android 11
     static void locate(Context context, Callback cb) {
         LocationManager lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         if (lm == null) {

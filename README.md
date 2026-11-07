@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Beta 0.7.1" src="https://img.shields.io/badge/status-beta%200.7.1-ffcd00">
+  <img alt="Beta 0.7.2" src="https://img.shields.io/badge/status-beta%200.7.2-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -58,7 +58,7 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Specials** this week (Woolworths and Coles half price, Aldi Special Buys), filtered to things like what you buy.
 - **Recall alerts.** Once a day Restock checks the official Australian recall lists (FSANZ, Product Safety Australia, TGA) against what you have.
 - **Receipts** (optional). Scan, straighten and read receipts on the phone, and keep them as long as you choose.
-- **Your own store's prices.** Sign in to Woolworths inside Restock (on Woolworths' own page; your password never reaches Restock), or give your Coles store number, and prices and stock are for your local shop.
+- **Your own store's prices.** Sign in to Woolworths inside Restock (on Woolworths' own page; your password never reaches Restock), or choose your Coles store (Restock picks up its store number from Coles' store finder by itself), and prices and stock are for your local shop.
 - **Shopping mode** with big ticks, aisle groups, a running total and your loyalty card one tap away.
 - **Widgets, shortcuts, share-to-list**, automatic backups, Australian green-and-gold or plain themes, and accessibility settings.
 
@@ -72,7 +72,7 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Pantry**: each item is your product (linked at every store that sells it) plus alternatives you'd accept. Swipe to add to your list or delete (with undo).
 - **Scanning**: zxing-cpp inside the app. Normal barcodes, GS1 QR codes, Data Matrix and DataBar, from the camera or a photo, or type the number. **Scan several** walks your cupboard and fills your shopping list. Unknown barcodes fall back to the supermarkets' own data, a generic search (an ingredient and strength for medicines) or reading the front of the pack.
 - **Best match**: after a scan, the same product (brand, variant and size) is ticked at each shop. If the barcode only names the brand, you pick which one it is once and Restock ticks it everywhere and remembers.
-- **Your store's prices and stock**: Woolworths shows your own store's prices and stock, and Restock can fill your Woolworths trolley, once you sign in to your Woolworths account inside Restock. You sign in on Woolworths' own page in Restock's built-in browser, so your password only ever goes to Woolworths; Restock just remembers that you're signed in and which store. For Coles, type your store number (and a second store's, if you like) in My shops. Without these, Restock shows online prices and leaves stock out, since online stock isn't reliable for your shop.
+- **Your store's prices and stock**: Woolworths shows your own store's prices and stock, and Restock can fill your Woolworths trolley, once you sign in to your Woolworths account inside Restock. You sign in on Woolworths' own page in Restock's built-in browser, so your password only ever goes to Woolworths; Restock just remembers that you're signed in and which store. For Coles, tap Choose your Coles store in My shops and tap your store in Coles' own store finder; Restock picks up its store number by itself (you can add a second store for its stock, or type the number by hand). Without these, Restock shows online prices and leaves stock out, since online stock isn't reliable for your shop.
 - **Hold to preview**: press and hold any product for a bigger photo, its full name, size, price, ingredients, allergens and nutrition.
 - **Search**: all your stores at once, ranked by how well each result matches, unit prices worked out the same way everywhere, a best-value sort, "On special only", recent searches, and fixes for Aussie names (snags, loo paper).
 - **Shopping list**: quantities, by shop or all together, Best value / Lowest price, one-store totals with a "why this one?", share as text, or send to the Coles or Woolworths app.

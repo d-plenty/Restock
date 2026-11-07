@@ -113,7 +113,7 @@ final class MarketData {
 
     private static int importFile(SQLiteDatabase db, String chain, String url, long now, String stamp, Result result, Progress progress)
         throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        HttpURLConnection c = (HttpURLConnection) Net.url(url).openConnection();
         c.setConnectTimeout(20_000);
         c.setReadTimeout(60_000);
         c.setRequestProperty("User-Agent", StoreClient.APP_UA + " shared-history-test");

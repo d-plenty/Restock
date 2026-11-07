@@ -301,6 +301,8 @@ export function AddScreen({
     if (!text) return;
     setRankQ(rq);
     setLastText(text);
+    // A new scan is a new product: ticks left from an earlier search would block "ticked for you".
+    if (rq.barcode && !attachGroup) setPicks(new Map());
     setShowing({});
     setAuto(undefined);
     setCandidates(undefined);
@@ -326,10 +328,11 @@ export function AddScreen({
       if (rankQ.brand) setCandidates(whichOne(rankQ, byChain));
       return;
     }
+    // Keep anything you ticked while the shops were answering, and add the best match at each shop.
     setPicks((prev) => {
-      if (prev.size) return prev;
-      const next = new Map<string, StoreProduct>();
-      for (const m of found.values()) next.set(keyOf(m.sp), m.sp);
+      const next = new Map(prev);
+      const ticked = new Set([...prev.values()].map((p) => p.chain));
+      for (const m of found.values()) if (!ticked.has(m.sp.chain)) next.set(keyOf(m.sp), m.sp);
       return next;
     });
     const first = [...found.values()][0].sp;
@@ -1237,7 +1240,7 @@ export function AddScreen({
             <span className="title" style={{ fontSize: 15 }}>
               {picks.size} ticked · tap to add
             </span>
-            <span className="small clip">{[...picks.values()].map((p) => chainName(p.chain)).join(', ')}</span>
+            <span className="small clip">{tickedShops([...picks.values()])}</span>
           </span>
           <span className="add-mini-arrow" aria-hidden="true">
             <span style={{ display: 'inline-flex', transform: 'rotate(-90deg)' }}>
@@ -1647,4 +1650,11 @@ function storePreview(sp: StoreProduct): PreviewProduct {
     // Only stock about your own store (see stockKnown); online stock isn't shown.
     inStock: stockKnown(cachedSettings(), sp.chain) ? sp.inStock : undefined,
   };
+}
+
+/** "Aldi, Woolworths (2), Coles": each shop once, with how many are ticked there when it's more than one. */
+export function tickedShops(picks: StoreProduct[]): string {
+  const counts = new Map<StoreChain, number>();
+  for (const p of picks) counts.set(p.chain as StoreChain, (counts.get(p.chain as StoreChain) ?? 0) + 1);
+  return [...counts].map(([c, n]) => (n > 1 ? `${chainName(c)} (${n})` : chainName(c))).join(', ');
 }

@@ -811,6 +811,10 @@ function HowPicked({ totals, onClose }: { totals: Totals; onClose: () => void })
         The cheapest store is recommended, unless it only just wins (by under $2, or 3%) or one item alone makes the difference. Then the store that's
         cheapest for more of your items is recommended instead, so one big special at a store that's dearer for everything else doesn't decide it.
       </p>
+      <p className="small">
+        A store that's missing a few items can still be recommended, if it's clearly cheaper (by over $2, or 3%) even after buying those few at the
+        next cheapest shop.
+      </p>
       <div className="card flush">
         <div className="row small" style={{ fontWeight: 700 }}>
           <span className="grow">Store</span>
@@ -846,6 +850,15 @@ function HowPicked({ totals, onClose }: { totals: Totals; onClose: () => void })
           {(r.close || r.mostlyFrom) &&
             n > 1 &&
             ' That’s close, but it’s also the cheapest for at least as many of your items, so it stays recommended.'}
+        </p>
+      )}
+      {rec && r.fewestMissing && r.saving !== undefined && r.reason === 'with-elsewhere' && (
+        <p className="small">
+          <strong>{chainName(rec.chain)}</strong> doesn't have {rec.missing.length === 1 ? '1 of your items' : `${rec.missing.length} of your items`},
+          but even after buying {rec.missing.length === 1 ? 'it' : 'those'} at the next cheapest shop, it comes to {money(r.saving)} less {how} than{' '}
+          {chainName(r.fewestMissing.chain)}
+          {r.fewestMissing.missing.length ? '' : ', which has everything'}. So {chainName(rec.chain)} is recommended, plus a quick stop for{' '}
+          {rec.missing.map((m) => m.item.toLowerCase()).join(', ')}.
         </p>
       )}
       {rec && low && r.saving !== undefined && r.reason === 'more-items' && (
@@ -958,6 +971,9 @@ export function ShopTotalsCard({
                 </span>
                 <span className="small">
                   {s.missing.length ? `Has ${s.lines.length} of ${n} · ${s.missing.length} elsewhere` : n === 1 ? 'Has your item' : `Has all ${n}`}
+                  {s.missing.length && s.missing.every((m) => m.elsewhere) && s.lines.length
+                    ? ` · about ${money(s.totalWithElsewhere)} with ${s.missing.length === 1 ? 'that one' : 'those'}`
+                    : ''}
                   {several && n > 1 && s.lines.length ? ` · cheapest for ${totals.by === 'price' ? s.cheapestForTill : s.cheapestFor}` : ''}
                   {showFair && totals.by !== 'price' ? ` · same shopping ${money(s.fair)}` : ''}
                 </span>

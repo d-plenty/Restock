@@ -342,3 +342,57 @@ describe('the same price everywhere', () => {
     expect(tiedWithBest(rec)).toHaveLength(2);
   });
 });
+
+describe('a cheaper store missing a couple of items (0.7.2)', () => {
+  // Coles is much cheaper for 4 things but doesn't have 2; Woolworths has all 6.
+  const products: Product[] = [];
+  const groups: Group[] = [];
+  const readings = new Map<string, PriceReading[]>();
+  const add = (id: string, prices: Partial<Record<'coles' | 'woolworths', number>>) => {
+    const ids: string[] = [];
+    for (const [chain, price] of Object.entries(prices) as ['coles' | 'woolworths', number][]) {
+      products.push(prod(`${id}-${chain}`, chain));
+      readings.set(`${id}-${chain}`, [reading(`${id}-${chain}`, price)]);
+      ids.push(`${id}-${chain}`);
+    }
+    groups.push({ id, name: id, usualProductId: ids[0], sameProductIds: ids.slice(1), altProductIds: [], alertLevel: 'any', createdAt: '' });
+  };
+  for (let i = 0; i < 4; i++) add(`thing${i}`, { coles: 5, woolworths: 15 });
+  add('only-ww-a', { woolworths: 3 });
+  add('only-ww-b', { woolworths: 4 });
+  const pm = new Map(products.map((p) => [p.id, p]));
+  const recs = groups.map((g) => recommend(g, pm, readings, new Set(), NOW));
+  const entries: ListEntry[] = groups.map((g) => ({ id: g.id, text: g.name, groupId: g.id, checked: false, createdAt: '' }));
+
+  it('recommends it when it still wins after buying the rest elsewhere', () => {
+    for (const by of ['unit', 'price'] as const) {
+      const t = shopTotals(entries, recs, ['woolworths', 'coles'], by);
+      const r = recommendedStores(t);
+      expect(r.recommended?.chain).toBe('coles'); // $20 + $7 elsewhere, against $67
+      expect(r.reason).toBe('with-elsewhere');
+      expect(r.fewestMissing?.chain).toBe('woolworths');
+      expect(r.saving).toBeCloseTo(40, 1);
+    }
+  });
+
+  it('sticks with the store that has everything when the saving is small', () => {
+    const near = recs.map((x) => x);
+    const t = shopTotals(
+      entries.filter((e) => e.groupId !== 'thing0' && e.groupId !== 'thing1' && e.groupId !== 'thing2'),
+      near,
+      ['woolworths', 'coles'],
+      'price',
+    );
+    // Left: thing3 ($5 vs $15) and two only at Woolworths ($7): Coles route $12, Woolworths $22: still a clear win.
+    expect(recommendedStores(t).recommended?.chain).toBe('coles');
+    readings.set('thing3-coles', [reading('thing3-coles', 14)]);
+    const recs2 = groups.map((g) => recommend(g, pm, readings, new Set(), NOW));
+    const t2 = shopTotals(
+      entries.filter((e) => e.groupId !== 'thing0' && e.groupId !== 'thing1' && e.groupId !== 'thing2'),
+      recs2,
+      ['woolworths', 'coles'],
+      'price',
+    );
+    expect(recommendedStores(t2).recommended?.chain).toBe('woolworths'); // only $1 less: not worth a second stop
+  });
+});

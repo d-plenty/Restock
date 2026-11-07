@@ -201,7 +201,7 @@ final class StoreClient {
 
     /** Today's price from a product page: Shopify's product data, JSON-LD, price meta tags; the hidden browser if those fail. */
     private Quote webProduct(String chain, String url) throws Exception {
-        String store = Shops.website(chain) != null ? new URL(Shops.website(chain)).getHost() : chain;
+        String store = Shops.website(chain) != null ? Net.url(Shops.website(chain)).getHost() : chain;
         Quote q = null;
         boolean blocked = false;
         if (!browserOnly) {
@@ -648,7 +648,7 @@ final class StoreClient {
     }
 
     private Resp request(String method, String url, Map<String, String> headers, String body) throws Exception {
-        URL u = new URL(url);
+        URL u = Net.url(url);
         HttpURLConnection c = (HttpURLConnection) u.openConnection();
         try {
             c.setRequestMethod(method);

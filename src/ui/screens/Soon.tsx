@@ -98,17 +98,21 @@ export const SOON: Soon[] = [
   {
     id: 'github',
     icon: 'external',
-    title: 'GitHub and F-Droid',
-    short: 'The code in public, and installs and updates from F-Droid',
+    title: 'F-Droid',
+    short: 'Install and update Restock from F-Droid',
     body: (
       <>
         <p>
-          Restock's code goes up on GitHub with version 1.0, the first public beta. Anyone can read it, check what it does with their data, report
-          problems and suggest ideas there.
+          Restock's code is already public on{' '}
+          <a href="https://github.com/d-plenty/Restock" target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+          . Anyone can read it, check what it does with their data, report problems and suggest ideas there, and each new version's APK is
+          downloadable from its Releases page.
         </p>
         <p>
-          After that, Restock goes on F-Droid, the app store for free and open-source Android apps, so it can be installed and updated without passing
-          APKs around.
+          Next, Restock goes on F-Droid, the app store for free and open-source Android apps, so it can be installed and kept up to date without
+          downloading APKs by hand.
         </p>
       </>
     ),
@@ -135,8 +139,9 @@ export const SOON: Soon[] = [
           <li>Receipt photos, totals, or anything that says who you are or where you live. No account, no phone ID.</li>
         </ul>
         <p>
-          The shared prices would live on a server you can run yourself, the developer's, or a public file on GitHub, and new phones could download
-          the last six months of history. Restock would ask the sources for permission before this is offered publicly.
+          The shared prices would live on a free public website run by the developer, open to anyone, with no account needed. New phones could
+          download the last six months of history, and the prices could be browsed on the website too. Restock would ask the shops for permission
+          before this is offered publicly.
         </p>
       </>
     ),

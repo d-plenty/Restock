@@ -43,7 +43,7 @@ export function DiagnosticsScreen() {
     if (!shop || !term.trim()) return;
     setBusy(true);
     try {
-      // The same store as a real search: your Coles when "Prices and stock at my Coles" is on.
+      // The same store as a real search: your Coles when you have chosen your Coles store in My shops.
       const storeId = searchStoreId(await getSettings(), shop);
       const run = await captureWhile(() => adapterFor(shop)!.search(term.trim(), storeId));
       const file = {

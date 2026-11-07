@@ -31,7 +31,19 @@ Builds:
     gradle:
       - yes
 
+  - versionName: 0.7.2
+    versionCode: 46
+    commit: v0.7.2
+    subdir: android/app
+    sudo:
+      - apt-get update
+      - apt-get install -y npm
+    init: cd ../.. && npm ci
+    prebuild: cd ../.. && npm run build && npx cap sync android
+    gradle:
+      - yes
+
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.7.1
-CurrentVersionCode: 45
+CurrentVersion: 0.7.2
+CurrentVersionCode: 46

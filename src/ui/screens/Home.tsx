@@ -10,7 +10,7 @@ import { lineCost } from '../../lib/verdict';
 import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { isBlockMessage, isNative } from '../../stores/http';
-import { WEEKDAYS, chainName } from '../../types';
+import { WEEKDAYS, chainName, stockKnown } from '../../types';
 import { ChainDot, ChainName, Icon, OpenStoreButton, Price, SectionMark, SwapBox, Thumb, timeAgo, usePullToRefresh } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { ActionInfoTag, MemberInfoTag, MultiInfoTag } from '../tagInfo';
@@ -140,7 +140,7 @@ export function HomeScreen() {
                 {!isNative()
                   ? 'Live prices work in the Android app'
                   : settings.lastCheck
-                    ? `Prices & stock updated ${timeAgo(settings.lastCheck)}${next ? ` · next ${next}` : ''}`
+                    ? `${settings.enabledChains.some((c) => stockKnown(settings, c)) ? 'Prices & stock' : 'Prices'} updated ${timeAgo(settings.lastCheck)}${next ? ` · next ${next}` : ''}`
                     : 'Prices not checked yet'}
               </span>
               {isNative() && (
@@ -170,7 +170,7 @@ export function HomeScreen() {
       {totals.linked > 0 && (
         <button
           className="card home-list"
-          onClick={() => nav.setTab('list')}
+          onClick={() => nav.setTab('list', 'pantry')}
           aria-label={`Shopping list, about ${money(totals.around.total)}. Open it`}
         >
           <span className="home-list-top">

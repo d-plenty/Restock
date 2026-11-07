@@ -1631,6 +1631,16 @@ select.input {
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
+/* Loyalty cards under the header: room to breathe, and never squeezed by the list below. */
+.shopmode-cards {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.shopmode-cards .chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 .shopmode-list {
   flex: 1;
   overflow-y: auto;
@@ -2951,4 +2961,14 @@ table.nutrition td.num {
 .acct-choice.on {
   border: 2px solid var(--green-solid);
   background: var(--green-bg);
+}
+
+/* "Other ways" under a shop's account card (0.7.2). */
+details.more summary {
+  cursor: pointer;
+  color: var(--green-ink);
+  font-weight: 600;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
 }

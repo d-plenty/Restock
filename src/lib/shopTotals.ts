@@ -47,6 +47,8 @@ export interface ShopTotal {
   missing: MissingLine[];
   /** This store, plus the missing items from their next best store. */
   totalWithElsewhere: number;
+  /** The missing items from their next best store, like for like (see ShopLine.fair). */
+  elsewhereFair: number;
   /** How many of those are an alternative rather than your own product. */
   alternatives: number;
   /**
@@ -133,7 +135,9 @@ export interface Recommended {
    * Why the recommended store won: it's clearly the cheapest, or the totals were too close to
    * call (or one item made the difference) and it's the cheapest for more of your items.
    */
-  reason?: 'cheapest' | 'more-items';
+  reason?: 'cheapest' | 'more-items' | 'with-elsewhere';
+  /** With 'with-elsewhere': the store compared against, the one missing the fewest items. */
+  fewestMissing?: ShopTotal;
   /** Most for your money per 100 g / litre / item, like for like. */
   bestValue?: ShopTotal;
   /** The lowest checkout total with this list's picks. */
@@ -164,7 +168,7 @@ const countFor = (s: ShopTotal, by: CompareBy) => (by === 'unit' ? s.cheapestFor
  * cheapest for more of your items is recommended, so one big special at an otherwise dearer
  * store doesn't decide it. Stores missing something only count if none has everything.
  */
-export function recommendedStores(t: ShopTotals, by: CompareBy = t.by): Recommended {
+function fromFewestMissing(t: ShopTotals, by: CompareBy): Recommended {
   const withLines = t.stores.filter((s) => s.lines.length);
   const fewestMissing = Math.min(...withLines.map((s) => s.missing.length));
   const pool = withLines.filter((s) => s.missing.length === fewestMissing);
@@ -210,6 +214,41 @@ export function recommendedStores(t: ShopTotals, by: CompareBy = t.by): Recommen
   return out;
 }
 
+export function recommendedStores(t: ShopTotals, by: CompareBy = t.by): Recommended {
+  const out = fromFewestMissing(t, by);
+  const withLines = t.stores.filter((s) => s.lines.length);
+  const fewestMissing = Math.min(...withLines.map((s) => s.missing.length));
+  const lowestOf = (list: ShopTotal[], f: (s: ShopTotal) => number) =>
+    list.reduce<ShopTotal | undefined>((b, s) => (!b || f(s) < f(b) - 0.005 ? s : b), undefined);
+  // A store missing a few more items can still be the one to go to: if, after buying those few at
+  // their next best store, it clearly beats the store that has the most (by over $2, or 3%).
+  const withRest = (s: ShopTotal) => measure(s, by) + (by === 'unit' ? s.elsewhereFair : s.totalWithElsewhere - s.total);
+  const base = out.recommended;
+  const challenger = lowestOf(
+    withLines.filter((s) => s.missing.length > fewestMissing && s.missing.every((m) => m.elsewhere)),
+    withRest,
+  );
+  if (base && challenger) {
+    const gap = withRest(base) - withRest(challenger);
+    if (gap > tooClose(withRest(base)) + 0.005) {
+      out.recommended = challenger;
+      out.cheapest = challenger;
+      out.reason = 'with-elsewhere';
+      out.fewestMissing = base;
+      out.runnerUp = base;
+      out.saving = gap;
+      out.close = false;
+      out.mostlyFrom = undefined;
+    }
+  }
+  return out;
+}
+
+/** What a store comes to with its missing items bought at their next best store, for how the list is set. */
+export function withElsewhere(s: ShopTotal, by: CompareBy): number {
+  return by === 'unit' ? s.fair + s.elsewhereFair : s.totalWithElsewhere;
+}
+
 export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains: Chain3[], by: CompareBy = 'unit'): ShopTotals {
   const open = entries.filter((e) => !e.checked);
   // Items that don't want bulk packs never get one picked for them.
@@ -228,6 +267,7 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains:
       lines: [],
       missing: [],
       totalWithElsewhere: 0,
+      elsewhereFair: 0,
       alternatives: 0,
       value: 0,
       fair: 0,
@@ -261,7 +301,12 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains:
           by,
         ).pick;
         t.missing.push({ item: rec.group.name, groupId: rec.group.id, elsewhere, qty });
-        if (elsewhere) t.totalWithElsewhere += lineCost(elsewhere, qty);
+        if (elsewhere) {
+          t.totalWithElsewhere += lineCost(elsewhere, qty);
+          t.elsewhereFair +=
+            (elsewhere.product.chain !== 'other' ? fairCost(rec, elsewhere.product.chain, qty) : undefined) ??
+            sameAmountCost(elsewhere, usual(rec), qty);
+        }
       }
     }
     t.totalWithElsewhere += t.total;

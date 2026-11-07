@@ -234,7 +234,7 @@ final class RecallChecker {
     }
 
     static String get(String url) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        HttpURLConnection c = (HttpURLConnection) Net.url(url).openConnection();
         try {
             c.setConnectTimeout(15_000);
             c.setReadTimeout(25_000);

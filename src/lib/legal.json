@@ -1,5 +1,5 @@
 {
-  "updated": "7 November 2026",
+  "updated": "8 November 2026",
   "privacy": {
     "title": "Privacy policy",
     "intro": "Restock is a free, open-source app that helps you spend less on groceries. It isn't here to take advantage of you. There's no account, no advertising, no analytics and no tracking, and the people who make Restock never receive your data. All the code is public, so anyone can check that this is true.",
@@ -81,7 +81,7 @@
       {
         "title": "Changes and contact",
         "body": [
-          "If this policy changes, the new version will be in the app and in the project's source code, with a new date. Questions or concerns? Open an issue on the project's GitHub page."
+          "If this policy changes, the new version will be in the app and in the project's source code, with a new date. Questions or concerns? Open an issue on the project's GitHub page: https://github.com/d-plenty/Restock/issues"
         ]
       }
     ],
