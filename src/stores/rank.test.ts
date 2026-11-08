@@ -62,3 +62,43 @@ describe('search ranking', () => {
     expect(rankResults({ text: 'vegemite' }, items).top).toHaveLength(3);
   });
 });
+
+describe('what you most likely mean (0.7.5)', () => {
+  const sp = (name: string, brand?: string): StoreProduct => ({
+    chain: 'coles',
+    storeProductId: name,
+    name,
+    brand,
+    price: 5,
+    isSpecial: false,
+    memberOnly: false,
+  });
+  const order = (q: string, names: string[]) =>
+    rankAll(
+      { text: q },
+      names.map((n) => sp(n)),
+    ).map((p) => p.name);
+  it('puts butter first for "butter"', () => {
+    const r = order('butter', [
+      'Bega Peanut Butter Smooth 470g',
+      'Butter Chicken Simmer Sauce 485g',
+      'Cobs Popcorn Butter Flavour 100g',
+      'Buttery Shortbread Biscuits 250g',
+      'Western Star Original Butter 500g',
+      'Coles Salted Butter 500g',
+    ]);
+    expect(r.slice(0, 2).sort()).toEqual(['Coles Salted Butter 500g', 'Western Star Original Butter 500g']);
+    expect(r.indexOf('Cobs Popcorn Butter Flavour 100g')).toBeGreaterThan(2);
+  });
+  it('still finds peanut butter when you ask for it', () => {
+    expect(order('peanut butter', ['Western Star Original Butter 500g', 'Bega Peanut Butter Smooth 470g'])[0]).toBe('Bega Peanut Butter Smooth 470g');
+  });
+  it('puts milk before milk chocolate', () => {
+    const r = order('milk', ['Cadbury Dairy Milk Chocolate Block 180g', 'Coles Full Cream Milk 2L', 'Milk Arrowroot Biscuits 250g']);
+    expect(r[0]).toBe('Coles Full Cream Milk 2L');
+  });
+  it('puts eggs before egg noodles', () => {
+    const r = order('eggs', ['Fantastic Egg Noodles 375g', 'Coles Free Range Eggs 12 Pack 700g']);
+    expect(r[0]).toBe('Coles Free Range Eggs 12 Pack 700g');
+  });
+});

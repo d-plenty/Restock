@@ -337,3 +337,116 @@ export function genericName(productName: string | undefined, brand?: string): st
   rest = rest.replace(/\s+/g, ' ').trim();
   return cap(rest || productName.trim());
 }
+
+/**
+ * What kind of thing a product is, for search (0.7.5): "Western Star Salted Butter 250g" → "butter",
+ * "Bega Peanut Butter Smooth" → "peanut butter", "Butter Chicken Simmer Sauce" → "sauce",
+ * "Popcorn Butter Flavour" → "popcorn". Flavours, scents and what it comes "with" aren't the kind.
+ * Undefined when no known kind is in the name.
+ */
+export function kindOf(productName: string | undefined): string | undefined {
+  if (!productName) return undefined;
+  let lower = ` ${productName
+    .toLowerCase()
+    .replace(/[’']/g, "'")
+    .replace(/[^a-z0-9' ]+/g, ' ')
+    .replace(/\s+/g, ' ')} `;
+  lower = lower.replace(/ [a-z]+ (?:flavou?r(?:ed)?|scented|style|taste|infused) /g, ' ');
+  const head = lower.split(/ (?:in|with) /)[0];
+  if (head !== lower) lower = `${head} `;
+  for (const b of BRAND_ITEMS) if (lower.includes(` ${b} `) || lower.includes(` ${b}'`)) return b;
+  let found: { kind: string; at: number } | undefined;
+  for (const k of KINDS) {
+    const m = new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).exec(lower);
+    if (!m) continue;
+    const end = m.index + k.length;
+    if (!found || end > found.at + found.kind.length || (end === found.at + found.kind.length && k.length > found.kind.length))
+      found = { kind: k, at: m.index };
+  }
+  return found?.kind;
+}
+
+/** Words that name a kind of product (the last word of each kind, plus a few more), for search. */
+export const PRODUCT_NOUNS: ReadonlySet<string> = new Set([
+  ...KINDS.map((k) => k.split(' ').pop()!),
+  ...[
+    'crumbs',
+    'crumb',
+    'twisties',
+    'pie',
+    'pies',
+    'bubbles',
+    'crackers',
+    'cracker',
+    'scroll',
+    'scrolls',
+    'rolls',
+    'roll',
+    'bars',
+    'bar',
+    'cake',
+    'cakes',
+    'pickles',
+    'creamer',
+    'stock',
+    'noodles',
+    'noodle',
+    'shapes',
+    'chips',
+    'sauce',
+    'paste',
+    'powder',
+    'spread',
+    'biscuits',
+    'cookies',
+    'muffins',
+    'slice',
+    'mix',
+    'cubes',
+    'gravy',
+    'soup',
+    'dip',
+    'dressing',
+    'marinade',
+    'seasoning',
+    'drink',
+    'juice',
+    'cordial',
+    'snack',
+    'snacks',
+    'pods',
+    'capsules',
+    'tablets',
+    'wipes',
+    'spray',
+    'puffs',
+    'rings',
+    'bites',
+    'balls',
+    'nuggets',
+    'pieces',
+    'strips',
+    'kiev',
+    'schnitzel',
+    'pizza',
+    'pasta',
+    'lasagne',
+    'wraps',
+    'buns',
+    'loaf',
+    'cereal',
+    'flakes',
+    'oats',
+    'popcorn',
+    'crisps',
+    'chocolate',
+    'block',
+    'icecream',
+    'cream',
+    'custard',
+    'jelly',
+    'yoghurt',
+    'milk',
+    'cheese',
+  ],
+]);

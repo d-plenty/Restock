@@ -13,10 +13,12 @@
 <ul>
 <li>Coles, Woolworths and Aldi, plus bottle shops (18+) and pharmacies if you want them, and any other shop's website</li>
 <li>Built-in open-source barcode scanner; Restock finds the same product at each of your shops</li>
+<li>Search that works out what you mean: "butter" puts butter first, not peanut butter or butter chicken sauce</li>
+<li>Price history for each product at each shop: where today's price sits, how often it's on sale and when the next sale is likely</li>
 <li>Shopping list that compares the same shopping at each store, so one bulk deal can't tip it</li>
 <li>Background price checks and alerts, and a weekly deals summary</li>
 <li>Recall alerts from the official Australian recall lists (FSANZ, Product Safety Australia, TGA)</li>
-<li>Optional receipt scanning, read on the phone</li>
+<li>Optional receipt scanning, read on the phone by a built-in open-source reader that works offline</li>
 <li>Shopping mode, widgets, shortcuts, backups, themes and accessibility settings</li>
 </ul>
 

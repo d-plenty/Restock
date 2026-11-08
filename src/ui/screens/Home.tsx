@@ -95,16 +95,17 @@ export function HomeScreen() {
   // Deals at one shop only, or all of them (0.7.4). The shop each deal is at: the swap's for a swap.
   const dealChain = (r: (typeof recs)[number]) => (r.action === 'alt' ? r.alt : r.best)?.product.chain;
   const dealRecs = recs.filter((r) => r.action === 'buy' || r.action === 'alt' || r.action === 'small');
-  const dealShops = [...new Set(dealRecs.map(dealChain).filter((c): c is NonNullable<typeof c> => !!c))].sort((a, b) =>
+  // Every section follows the shop picked (0.7.5): sales, small savings, wait, fake sales, normal price.
+  const dealShops = [...new Set(recs.map(dealChain).filter((c): c is NonNullable<typeof c> => !!c))].sort((a, b) =>
     chainName(a).localeCompare(chainName(b)),
   );
   const atShop = (r: (typeof recs)[number]) => !dealShop || !dealShops.includes(dealShop as never) || dealChain(r) === dealShop;
   const buys = recs.filter((r) => r.action === 'buy' && atShop(r));
   const altDeals = recs.filter((r) => r.action === 'alt' && atShop(r));
   const smalls = recs.filter((r) => r.action === 'small' && atShop(r));
-  const waits = recs.filter((r) => r.action === 'wait');
-  const skips = recs.filter((r) => r.action === 'skip');
-  const normal = recs.filter((r) => r.action === 'none');
+  const waits = recs.filter((r) => r.action === 'wait' && atShop(r));
+  const skips = recs.filter((r) => r.action === 'skip' && atShop(r));
+  const normal = recs.filter((r) => r.action === 'none' && atShop(r));
   const worth = [...buys, ...altDeals];
   const saving = worth.reduce((sum, r) => sum + (r.saving ?? 0), 0);
 
@@ -352,7 +353,7 @@ export function HomeScreen() {
           {dealShops.map((c) => (
             <button key={c} role="tab" className="chip" aria-selected={dealShop === c} aria-pressed={dealShop === c} onClick={() => setDealShop(c)}>
               <ChainDot chain={c} /> {chainName(c)}
-              <span className="ph-count">{dealRecs.filter((r) => dealChain(r) === c).length}</span>
+              {dealRecs.some((r) => dealChain(r) === c) && <span className="ph-count">{dealRecs.filter((r) => dealChain(r) === c).length}</span>}
             </button>
           ))}
         </div>

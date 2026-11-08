@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Beta 0.7.4" src="https://img.shields.io/badge/status-beta%200.7.4-ffcd00">
+  <img alt="Beta 0.7.5" src="https://img.shields.io/badge/status-beta%200.7.5-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -27,8 +27,8 @@
 
 | | | |
 |---|---|---|
-| ![Home: this week's deals and your shopping list total](docs/screenshots/home-0.7.png) | ![Pantry: everything you buy, with today's verdict](docs/screenshots/pantry-0.7.png) | ![Scanning: the same product ticked at each shop](docs/screenshots/scan.png) |
-| ![An item's price history and verdict](docs/screenshots/item-0.7.png) | ![The same product compared across shops](docs/screenshots/compare.png) | ![Dark mode: a great deal on a multi-buy](docs/screenshots/dark.png) |
+| ![Home: this week's deals, with how much you'd save](docs/screenshots/home-0.7.5.png) | ![Pantry: everything you buy, with today's verdict](docs/screenshots/pantry-0.7.png) | ![Scanning: the same product ticked at each shop](docs/screenshots/scan.png) |
+| ![Price history: pick the exact product, see where today's price sits and how often it's on sale](docs/screenshots/item-0.7.5.png) | ![The same product compared across shops](docs/screenshots/compare.png) | ![Dark mode: a great deal on a multi-buy](docs/screenshots/dark.png) |
 
 ## Why
 
@@ -59,7 +59,7 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Recall alerts.** Once a day Restock checks the official Australian recall lists (FSANZ, Product Safety Australia, TGA) against what you have.
 - **Receipts** (optional). Scan, straighten and read receipts on the phone, and keep them as long as you choose.
 - **Your own store's prices.** Sign in to Woolworths inside Restock (on Woolworths' own page; your password never reaches Restock), or choose your Coles store (Restock picks up its store number from Coles' store finder by itself), and prices and stock are for your local shop.
-- **Shopping mode** with big ticks, aisle groups, a running total and your loyalty card one tap away.
+- **Shopping mode** with big ticks, aisle groups, a running total, your loyalty card one tap away, and ⓘ on every item to see what it looks like on the shelf.
 - **Widgets, shortcuts, share-to-list**, automatic backups, Australian green-and-gold or plain themes, and accessibility settings.
 
 <details>
@@ -74,9 +74,10 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Best match**: after a scan, the same product (brand, variant and size) is ticked at each shop. If the barcode only names the brand, you pick which one it is once and Restock ticks it everywhere and remembers.
 - **Your store's prices and stock**: Woolworths shows your own store's prices and stock, and Restock can fill your Woolworths trolley, once you sign in to your Woolworths account inside Restock. You sign in on Woolworths' own page in Restock's built-in browser, so your password only ever goes to Woolworths; Restock just remembers that you're signed in and which store. For Coles, tap Choose your Coles store in My shops and tap your store in Coles' own store finder; Restock picks up its store number by itself (you can add a second store for its stock, or type the number by hand). Without these, Restock shows online prices and leaves stock out, since online stock isn't reliable for your shop.
 - **Hold to preview**: press and hold any product for a bigger photo, its full name, size, price, ingredients, allergens and nutrition.
-- **Search**: all your stores at once, ranked by how well each result matches, unit prices worked out the same way everywhere, a best-value sort, "On special only", recent searches, and fixes for Aussie names (snags, loo paper).
-- **Shopping list**: quantities, by shop or all together, Best value / Lowest price, one-store totals with a "why this one?", share as text, or send to the Coles or Woolworths app.
-- **Price history**: a chart over 1 month to 6 months, where today's price sits against the lowest, usual sale and normal price, how often it's on special, sale-cycle detection, and multi-buys counted at their price each.
+- **Search**: all your stores at once, ranked by what you most likely mean: type "butter" and butter comes first, with peanut butter, butter chicken sauce and butter-flavoured popcorn further down. Unit prices worked out the same way everywhere, a best-value sort, "On special only", recent searches, and fixes for Aussie names (snags, loo paper).
+- **Shopping list**: quantities, by shop or all together, A to Z, Best value / Lowest price, one-store totals with a "why this one?", share as text, or send to the Coles or Woolworths app. Type in the list and your pantry items come up first; or add a plain name, or **Find cheapest** to search the shops for a one-off buy without adding it to your pantry.
+- **Price history**: a tab for each shop, then that shop's products by size, so you always know which one you're looking at. A chart over 1 month to 6 months, where today's price sits against the lowest, usual sale and normal price, how often it's on special and when the next sale is likely, and multi-buys counted at their price each.
+- **This week**: deals, small savings and "wait for a better sale" for all your shops, or one shop at a time.
 - **Alert me under $X** per item, and **stock-up tips** for things that rarely go on sale.
 - **Near me**: find every supermarket, bottle shop or pharmacy nearby from OpenStreetMap and pick your branch.
 - **Store health**: Home tells you if a store hasn't worked for a day, and Settings → Troubleshooting → Test connections shows what went wrong.
@@ -90,7 +91,8 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Backups**: export and restore exactly the parts you pick, plus optional automatic backups into a folder you choose.
 - **Look and colours**: Light, Dark or System; Australian or Plain; 24 accent colours; 16 app icon colours.
 - **Accessibility**: bigger text, high contrast, less motion and bigger buttons, checked with an automatic accessibility audit.
-- **Shared price history (testing)**: optionally download months of Coles and Woolworths history from [hotprices.org](https://hotprices.org) ([source](https://github.com/Javex/hotprices-au), MIT) so new items get a fair verdict from day one. Off by default.
+- **Updates from GitHub**: Settings → About and updates → Check for updates, or a weekly check if you turn it on. Android shows its own Install screen.
+- **Shared price history (Beta)**: optionally download months of Coles and Woolworths history from [hotprices.org](https://hotprices.org) ([source](https://github.com/Javex/hotprices-au), MIT) so new items get a fair verdict from day one. Off by default.
 
 </details>
 
