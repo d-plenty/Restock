@@ -71,9 +71,38 @@ export interface RestockNativePlugin {
   appFilesSize(opts: { dir: string }): Promise<{ bytes: number }>;
   /** Refresh the home screen widgets with the latest deals and list. */
   updateWidgets(opts: { data: string }): Promise<void>;
+  // ---------- 0.8.0: phone-to-phone sync (SyncHub.java) ----------
+  syncInfo(): Promise<SyncInfo>;
+  /** Starts (or reuses) the household; the code to show as a QR code. */
+  syncInvite(opts: { household: string; shareCards: boolean }): Promise<{ code: string }>;
+  /** Joins with a scanned code. replace: start from the household's things instead of combining. */
+  syncJoin(opts: { code: string; replace: boolean; shareCards: boolean }): Promise<SyncInfo & { reached: number; received: number }>;
+  syncNow(): Promise<SyncInfo & { reached: number; received: number; sent: number }>;
+  syncSet(opts: { name?: string; shareCards?: boolean; keepReady?: boolean }): Promise<SyncInfo>;
+  syncLeave(): Promise<SyncInfo>;
+  requestBatteryExemption(): Promise<void>;
+  addListener(event: 'syncChanged', fn: () => void): Promise<PluginListenerHandle>;
+  addListener(event: 'syncDone', fn: (info: SyncInfo) => void): Promise<PluginListenerHandle>;
   /** Text or a link shared to Restock from another app, and app icon shortcuts, if any are waiting. */
   takeLaunchAction(): Promise<{ action?: LaunchAction; text?: string }>;
   addListener(event: 'launchAction', fn: (e: { action: LaunchAction; text?: string }) => void): Promise<PluginListenerHandle>;
+}
+
+export interface SyncInfo {
+  paired: boolean;
+  device?: string;
+  /** This phone's name, shown on the others. */
+  name?: string;
+  household?: string;
+  shareCards?: boolean;
+  keepReady?: boolean;
+  peers?: { device: string; name: string | null; syncedAt: string | null }[];
+  batteryExempt: boolean;
+  lastSyncAt?: string | null;
+  lastError?: string | null;
+  listening?: boolean;
+  /** The phone's maker (some stop apps in the background regardless; see dontkillmyapp.com). */
+  maker?: string;
 }
 
 /** Why Restock was opened: a share, an app icon shortcut, a widget or a notification. */

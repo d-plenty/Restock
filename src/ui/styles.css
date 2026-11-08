@@ -3304,3 +3304,20 @@ details.fold-inline {
   height: auto;
   max-height: 30vh;
 }
+
+/* 0.8.0: the sync pairing QR code (always dark on white, so any camera can read it). */
+.sync-qr {
+  align-self: center;
+  width: min(260px, 70vw);
+  aspect-ratio: 1;
+  padding: 14px;
+  background: #fff;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+}
+.sync-qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

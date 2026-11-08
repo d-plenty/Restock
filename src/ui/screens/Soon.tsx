@@ -49,19 +49,18 @@ export const SOON: Soon[] = [
   {
     id: 'sync',
     icon: 'refresh',
-    title: 'Sync and household sharing',
-    short: 'One pantry and list for everyone at home, on your own server',
+    title: 'Sync away from home',
+    short: 'Through a small server you run, when the phones aren’t on the same Wi-Fi',
     body: (
       <>
         <p>
-          Share one pantry and shopping list across everyone in the house, with changes showing up on each phone. Tick something off in the shop and
-          it's off everyone's list.
+          Phones in a household already sync on the same Wi-Fi (Settings → Sync). This adds syncing from anywhere: tick something off at the shops and
+          it's off the list at home straight away.
         </p>
         <p>
-          It runs on a small server you control: a Docker container on a home server, NAS or Raspberry Pi. There's no Restock account and no Restock
-          server holding your data.
+          It would run on a small server you control: a Docker container on a home server, NAS or Raspberry Pi. There's no Restock account and no
+          Restock server holding your data, and the server only ever sees encrypted data.
         </p>
-        <p>Price checks would be shared too, so the house only checks each price once.</p>
       </>
     ),
   },
@@ -173,7 +172,6 @@ export function ComingSoon() {
 }
 
 export function SoonScreen({ id }: { id: string }) {
-  const nav = useNav();
   const s = SOON.find((x) => x.id === id);
   if (!s) return <div className="screen" />;
   return (
@@ -189,11 +187,6 @@ export function SoonScreen({ id }: { id: string }) {
         </p>
       </div>
       <div className="card soon-body">{s.body}</div>
-      {id === 'sync' && (
-        <button className="btn block" onClick={() => nav.push({ name: 'sync' })}>
-          Have a look at how sync will work
-        </button>
-      )}
       <p className="small">Not switched on yet. It'll show up in Settings when it's ready.</p>
     </div>
   );

@@ -3,24 +3,32 @@ import { useEffect, useRef, useState } from 'react';
 
 /** 1×1 black GIF. */
 const BLACK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
-import { decodeFrame, decodePhoto, loadReader, productCode, setScannerListener, type ScanOutcome } from '../lib/barcode';
+import {
+  decodeFrame,
+  decodePhoto,
+  loadReader,
+  productCode,
+  setScannerListener,
+  type ScanKind,
+  type ScanOutcome,
+  type ScanRequest,
+} from '../lib/barcode';
 import { Icon } from './components';
 
 /** Mounted once in App; shows the camera scanner whenever scanBarcode() is called. */
 export function ScannerHost() {
-  const [req, setReq] = useState<{
-    title: string;
-    resolve: (o: ScanOutcome) => void;
-  }>();
+  const [req, setReq] = useState<ScanRequest>();
   useEffect(() => {
     setScannerListener(setReq);
     return () => setScannerListener(undefined);
   }, []);
   if (!req) return null;
-  return <Scanner title={req.title} onDone={req.resolve} />;
+  return <Scanner title={req.title} kind={req.kind} onDone={req.resolve} />;
 }
 
-function Scanner({ title, onDone }: { title: string; onDone: (o: ScanOutcome) => void }) {
+function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDone: (o: ScanOutcome) => void }) {
+  // A product barcode, unless this scan is for something else (0.8.0: the sync pairing code).
+  const read = (text: string) => (kind ? kind.accept(text) : productCode(text));
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const trackRef = useRef<MediaStreamTrack | undefined>(undefined);
@@ -36,9 +44,11 @@ function Scanner({ title, onDone }: { title: string; onDone: (o: ScanOutcome) =>
   const ignoredRef = useRef<{ text: string; until: number }>(undefined);
 
   const notProduct = (text: string) =>
-    /^https?:/i.test(text)
-      ? "That QR code is a website link, not a product code. Try the pack's barcode instead."
-      : "That code isn't a product barcode. Try the pack's barcode instead.";
+    kind
+      ? kind.wrong
+      : /^https?:/i.test(text)
+        ? "That QR code is a website link, not a product code. Try the pack's barcode instead."
+        : "That code isn't a product barcode. Try the pack's barcode instead.";
 
   const finish = (o: ScanOutcome) => {
     if (doneRef.current) return;
@@ -77,7 +87,7 @@ function Scanner({ title, onDone }: { title: string; onDone: (o: ScanOutcome) =>
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const text = await decodeFrame(ctx.getImageData(0, 0, canvas.width, canvas.height));
           if (text) {
-            const code = productCode(text);
+            const code = read(text);
             if (code) {
               navigator.vibrate?.(60);
               finish({ ok: true, code });
@@ -192,7 +202,9 @@ function Scanner({ title, onDone }: { title: string; onDone: (o: ScanOutcome) =>
         ) : error ? (
           <p className="scanner-msg">{error}</p>
         ) : (
-          <p className="scanner-msg">{live ? 'Line the barcode or QR code up inside the box.' : 'Starting the camera…'}</p>
+          <p className="scanner-msg">
+            {live ? (kind ? 'Line the QR code up inside the box.' : 'Line the barcode or QR code up inside the box.') : 'Starting the camera…'}
+          </p>
         )}
         <div style={{ display: 'flex' }}>
           <button className="btn small scanner-photo" disabled={reading} onClick={() => fileRef.current?.click()}>
@@ -212,7 +224,7 @@ function Scanner({ title, onDone }: { title: string; onDone: (o: ScanOutcome) =>
             setNotice(undefined);
             try {
               const text = await decodePhoto(file);
-              const code = text && productCode(text);
+              const code = text && read(text);
               if (code) finish({ ok: true, code });
               else setNotice(text ? notProduct(text) : "Couldn't find a barcode in that photo. Try one that's sharp and close up.");
             } catch (err) {
@@ -227,18 +239,18 @@ function Scanner({ title, onDone }: { title: string; onDone: (o: ScanOutcome) =>
           style={{ display: 'flex', gap: 8 }}
           onSubmit={(e) => {
             e.preventDefault();
-            const code = typed.replace(/\s+/g, '');
+            const code = kind ? typed.trim() : typed.replace(/\s+/g, '');
             if (!code) return;
-            const product = productCode(code);
+            const product = read(code);
             if (product) finish({ ok: true, code: product });
-            else setNotice("That doesn't look like a barcode number. They're 8, 12, 13 or 14 digits.");
+            else setNotice(kind ? kind.wrong : "That doesn't look like a barcode number. They're 8, 12, 13 or 14 digits.");
           }}
         >
           <input
             className="input"
-            inputMode="numeric"
-            placeholder="Or type the number"
-            aria-label="Type the barcode number"
+            inputMode={kind ? 'text' : 'numeric'}
+            placeholder={kind ? kind.typeHint : 'Or type the number'}
+            aria-label={kind ? kind.typeHint : 'Type the barcode number'}
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
           />

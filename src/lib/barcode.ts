@@ -142,7 +142,18 @@ export async function decodePhoto(file: Blob): Promise<string | undefined> {
 
 export type ScanOutcome = { ok: true; code: string } | { ok: false; reason: 'cancelled' };
 
-type Listener = (req: { title: string; resolve: (o: ScanOutcome) => void } | undefined) => void;
+/** 0.8.0: a scan for something other than a product (the sync pairing code). */
+export interface ScanKind {
+  /** The code to hand back, or undefined if this isn't one. */
+  accept: (text: string) => string | undefined;
+  /** Said when a code is read that isn't one. */
+  wrong: string;
+  /** Hint in the "type it" box. */
+  typeHint: string;
+}
+
+export type ScanRequest = { title: string; kind?: ScanKind; resolve: (o: ScanOutcome) => void };
+type Listener = (req: ScanRequest | undefined) => void;
 let listener: Listener | undefined;
 
 export function setScannerListener(fn: Listener | undefined) {
@@ -150,11 +161,12 @@ export function setScannerListener(fn: Listener | undefined) {
 }
 
 /** Opens the camera scanner and resolves with the code (or cancelled). */
-export function scanBarcode(title = 'Scan a barcode'): Promise<ScanOutcome> {
+export function scanBarcode(title = 'Scan a barcode', kind?: ScanKind): Promise<ScanOutcome> {
   return new Promise((resolve) => {
     if (!listener) return resolve({ ok: false, reason: 'cancelled' });
     listener({
       title,
+      kind,
       resolve: (o) => {
         listener?.(undefined);
         resolve(o);

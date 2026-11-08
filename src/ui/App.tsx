@@ -2,6 +2,7 @@ import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openDatabase } from '../lib/boot';
+import { wireSync } from '../lib/sync';
 import { checkPrices, syncBackgroundSchedule } from '../lib/check';
 import { getSettings, pruneHistory, refresh, updateSettings } from '../lib/db';
 import { checkForUpdate, SELF_UPDATE, weeklyCheckDue } from '../lib/updates';
@@ -96,7 +97,10 @@ export default function App() {
 
   useEffect(() => {
     openDatabase()
-      .then(() => setReady(true))
+      .then(() => {
+        wireSync();
+        setReady(true);
+      })
       .catch((e) => setBootError(e instanceof Error ? e.message : String(e)));
   }, []);
 
@@ -234,6 +238,15 @@ export default function App() {
         <div className="app">
           <div className="status-shade" aria-hidden />
           <Onboarding />
+          {/* 0.8.0: setup tiles can open these (cards, shop accounts, sync) before setup is finished. */}
+          {stack.length > 0 && (
+            <div className="overlay">
+              {stack[stack.length - 1].name === 'stores' && <StoresScreen section={(stack[stack.length - 1] as { section?: Section }).section} />}
+              {stack[stack.length - 1].name === 'cards' && <CardsScreen />}
+              {stack[stack.length - 1].name === 'sync' && <SyncScreen />}
+              {stack[stack.length - 1].name === 'household' && <HouseholdScreen />}
+            </div>
+          )}
           <ScannerHost />
           <ConfirmHost />
           {toastMsg && (

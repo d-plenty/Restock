@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import type { BackupSummary } from '../../lib/backup';
-import { getSettings, updateSettings } from '../../lib/db';
+import { allCards, getSettings, updateSettings } from '../../lib/db';
+import { syncInfo } from '../../lib/sync';
 import legal from '../../lib/legal.json';
 import { downloadMarket, MARKET_SIZE_TEXT, MARKET_SOURCE } from '../../lib/market';
 import { useLive } from '../../lib/useLive';
@@ -17,12 +18,33 @@ import { RecallSettings } from './Recalls';
 import { ReceiptsSettings } from './Receipts';
 import { readBackupFile, RestoreSheet } from './Restore';
 import { StoreFields } from './Stores';
+import { NotificationSettings, PriceCheckSettings, UpdateRows } from './Settings';
+import { syncSummary } from './Sync';
+import { WidgetSettings } from './WidgetSettings';
 
 // Setup: a welcome screen, the privacy step (the only one that's required), then a page of
 // tiles. Each tile can be done in any order, or Continue goes through the unfinished ones.
 // Anything left can be finished later from Settings → Setup.
 
-export type TileId = 'pantry' | 'keg' | 'pharmacy' | 'permissions' | 'receipts' | 'recalls' | 'backups' | 'history' | 'look' | 'a11y';
+export type TileId =
+  | 'pantry'
+  | 'keg'
+  | 'pharmacy'
+  | 'permissions'
+  | 'receipts'
+  | 'recalls'
+  | 'backups'
+  | 'history'
+  | 'look'
+  | 'a11y'
+  // 0.8.0: everything else in Settings, so people know it's there.
+  | 'accounts'
+  | 'checks'
+  | 'alerts'
+  | 'household'
+  | 'sync'
+  | 'widgets'
+  | 'updates';
 
 interface Tile {
   id: TileId;
@@ -108,6 +130,65 @@ const ALL_TILES: Tile[] = [
     intro: 'Australian green and gold by default. Make it yours.',
   },
   {
+    id: 'accounts',
+    title: 'Cards and shop accounts',
+    sub: 'Member prices, your own store',
+    icon: 'card',
+    heading: 'Loyalty cards and shop accounts',
+    intro:
+      'Add your Flybuys and Everyday Rewards cards so member prices count. Sign in to Woolworths or pick your Coles store, and prices and stock are for your local shop.',
+  },
+  {
+    id: 'checks',
+    title: 'Price checks',
+    sub: 'How often, which day',
+    icon: 'refresh',
+    heading: 'Checking prices for you',
+    intro: 'Restock checks your items in the background, even while it is closed. Pick how often.',
+  },
+  {
+    id: 'alerts',
+    title: 'Notifications',
+    sub: 'Which deals tell you',
+    icon: 'bell',
+    heading: 'Which alerts do you want?',
+    intro: 'Restock only tells you about deals you care about. Each pantry item can also have its own alert level.',
+  },
+  {
+    id: 'household',
+    title: 'Household',
+    sub: 'Your household’s name',
+    icon: 'home',
+    heading: 'Name your household',
+    intro: 'Shown on Home and used for sync, so the phones in your house know they belong together.',
+  },
+  {
+    id: 'sync',
+    title: 'Sync',
+    sub: 'One pantry and list for the house',
+    icon: 'swap',
+    heading: 'Share with your household?',
+    intro:
+      "Phones in the same house can share one pantry and shopping list, syncing with each other on the same Wi-Fi. No server and no account. Skip this if it's just you.",
+  },
+  {
+    id: 'widgets',
+    title: 'Widgets',
+    sub: 'Deals and list on your home screen',
+    icon: 'phone',
+    heading: 'Home screen widgets',
+    intro:
+      "Restock has three: this week's deals, your shopping list, and quick actions (scan, list, receipt). To add one, press and hold an empty spot on your home screen, tap Widgets, and find Restock.",
+  },
+  {
+    id: 'updates',
+    title: 'Updates',
+    sub: 'Hear about new versions',
+    icon: 'up',
+    heading: 'Stay up to date',
+    intro: 'New versions of Restock come from GitHub. Restock can check once a week and tell you when there is one.',
+  },
+  {
     id: 'a11y',
     title: 'Accessibility',
     sub: 'Text size, contrast, motion',
@@ -121,7 +202,25 @@ const ALL_TILES: Tile[] = [
  * The order setup goes through them: how Restock looks and works for you first (text size,
  * permissions, colours, backups, price history), then your shops, then the add-ons.
  */
-const TILE_ORDER: TileId[] = ['a11y', 'permissions', 'look', 'backups', 'history', 'pantry', 'keg', 'pharmacy', 'receipts', 'recalls'];
+const TILE_ORDER: TileId[] = [
+  'a11y',
+  'permissions',
+  'look',
+  'backups',
+  'history',
+  'pantry',
+  'keg',
+  'pharmacy',
+  'accounts',
+  'checks',
+  'alerts',
+  'receipts',
+  'recalls',
+  'household',
+  'sync',
+  'widgets',
+  'updates',
+];
 export const TILES: Tile[] = TILE_ORDER.map((id) => ALL_TILES.find((t) => t.id === id)!);
 
 /** A tile's status, as shown on it. */
@@ -292,6 +391,50 @@ function MarketSetup({ settings }: { settings: Settings }) {
   );
 }
 
+/** Cards and shop accounts: straight to where each is set up (0.8.0). */
+function AccountsTile() {
+  const nav = useNav();
+  const cards = useLive(async () => (await allCards()).length, []);
+  return (
+    <div className="card flush">
+      <button className="row" onClick={() => nav.push({ name: 'cards' })}>
+        <Icon name="card" size={18} />
+        <span className="grow">
+          <span className="title">Loyalty cards</span>
+          <span className="small">{cards ? `${cards} added` : 'Flybuys, Everyday Rewards'}</span>
+        </span>
+        <Icon name="chevron" size={18} />
+      </button>
+      <button className="row" onClick={() => nav.push({ name: 'stores', section: 'pantry' })}>
+        <Icon name="cart" size={18} />
+        <span className="grow">
+          <span className="title">Woolworths sign-in and your Coles store</span>
+          <span className="small">Your local shop's prices and stock</span>
+        </span>
+        <Icon name="chevron" size={18} />
+      </button>
+    </div>
+  );
+}
+
+/** Sync: where it's at, and the way in (0.8.0). */
+function SyncTile() {
+  const nav = useNav();
+  const info = useLive(syncInfo, []);
+  return (
+    <div className="card flush">
+      <button className="row" onClick={() => nav.push({ name: 'sync' })}>
+        <Icon name="refresh" size={18} />
+        <span className="grow">
+          <span className="title">{info?.paired ? 'Sync is on' : 'Set up sync'}</span>
+          <span className="small">{syncSummary(info)}</span>
+        </span>
+        <Icon name="chevron" size={18} />
+      </button>
+    </div>
+  );
+}
+
 function TileBody({ id, settings }: { id: TileId; settings: Settings }): ReactNode {
   switch (id) {
     case 'pantry':
@@ -323,6 +466,33 @@ function TileBody({ id, settings }: { id: TileId; settings: Settings }): ReactNo
       return <LookSettings settings={settings} />;
     case 'a11y':
       return <AccessibilitySettings settings={settings} />;
+    case 'accounts':
+      return <AccountsTile />;
+    case 'checks':
+      return <PriceCheckSettings settings={settings} />;
+    case 'alerts':
+      return <NotificationSettings settings={settings} />;
+    case 'household':
+      return (
+        <label className="field">
+          <span>Household name</span>
+          <input
+            className="input"
+            defaultValue={settings.household.name}
+            onBlur={(e) => updateSettings({ household: { name: e.target.value.trim() || 'Our house' } })}
+          />
+        </label>
+      );
+    case 'sync':
+      return <SyncTile />;
+    case 'widgets':
+      return <WidgetSettings settings={settings} />;
+    case 'updates':
+      return (
+        <div className="card flush">
+          <UpdateRows settings={settings} />
+        </div>
+      );
   }
 }
 

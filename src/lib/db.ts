@@ -25,6 +25,11 @@ export async function initDb(d: SqlDriver): Promise<void> {
   await migrate(d);
 }
 
+/** Use a database without upgrading it yet (to back it up first, 0.8.0). */
+export function useDriver(d: SqlDriver): void {
+  driver = d;
+}
+
 function sql(): SqlDriver {
   if (!driver) throw new Error('Database not ready');
   return driver;

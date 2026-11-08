@@ -1,6 +1,8 @@
 import { Capacitor } from '@capacitor/core';
-import { ensureDefaults, initDb } from './db';
-import { createNativeDriver } from './sql/native';
+import { ensureDefaults, getSettings, initDb, useDriver } from './db';
+import { createNativeDriver, RestockNative } from './sql/native';
+import { SYNC_VERSION } from './sql/schema';
+import type { SqlDriver } from './sql/driver';
 import { createSqlJsDriver } from './sql/sqljs';
 
 // Opens the database: the phone's SQLite on Android, or sql.js (kept in the browser's
@@ -25,7 +27,9 @@ function idb<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<
 
 export async function openDatabase(): Promise<void> {
   if (Capacitor.isNativePlatform()) {
-    await initDb(createNativeDriver());
+    const d = createNativeDriver();
+    await backupBeforeUpgrade(d);
+    await initDb(d);
   } else {
     // The one-file preview uses the pure-JavaScript SQLite build (no WebAssembly needed).
     const load =
@@ -58,4 +62,31 @@ export async function openDatabase(): Promise<void> {
     await initDb(driver);
   }
   await ensureDefaults();
+}
+
+/** Where the copy made just before the 0.8.0 upgrade is kept (Settings → Data and backup). */
+export const BEFORE_UPGRADE_FILE = 'backups/before-0.8.0.json';
+
+/**
+ * 0.8.0 adds sync to the database. Just before that upgrade runs, Restock saves a full backup
+ * (without receipt photos) inside the app, and in the automatic backup folder if one is set.
+ * If it can't, the upgrade still goes ahead: it only adds tables.
+ */
+async function backupBeforeUpgrade(d: SqlDriver): Promise<void> {
+  try {
+    const [{ user_version }] = await d.query<{ user_version: number }>('PRAGMA user_version');
+    const v = Number(user_version);
+    if (v === 0 || v > SYNC_VERSION) return;
+    useDriver(d);
+    const { saveCopyInApp } = await import('./backup');
+    const json = await saveCopyInApp(BEFORE_UPGRADE_FILE);
+    const s = await getSettings().catch(() => undefined);
+    if (s?.autoBackup.folder) {
+      await RestockNative.writeBackup({ uri: s.autoBackup.folder, name: 'restock-before-0.8.0.json', json, keep: s.autoBackup.keep + 1 }).catch(
+        () => undefined,
+      );
+    }
+  } catch (e) {
+    console.error('backup before upgrade failed', e);
+  }
 }

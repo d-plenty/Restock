@@ -1,0 +1,3 @@
+Back up before updating (Settings → Data and backup → Export a backup). Restock also saves a copy itself.
+• Sync: phones in the same household share one pantry and list on the same Wi-Fi. No server, no account, encrypted. Settings → Sync
+• Setup has tiles for everything: sync, price checks, notifications, cards and shop accounts, widgets, updates and household name

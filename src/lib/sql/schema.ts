@@ -3,6 +3,70 @@ import type { SqlDriver } from './driver';
 // The database layout. The Android background worker (PriceCheckWorker.java) reads and
 // writes these same tables, so any change here must be mirrored there.
 // Each entry is one migration; never edit a shipped one, only append.
+// ---------- 0.8.0: phone-to-phone sync ----------
+//
+// sync_log has one row per synced record: when it last changed (stamp, in milliseconds), which
+// phone changed it (device), whether it's been deleted, and seq, this phone's own running number
+// for the change, so a paired phone can ask for "everything since number N".
+// Prices are only ever added (each phone tidies its own old prices), keyed by product and date.
+
+/** Synced tables and how each record is named in sync_log. Mirrored in SyncEngine.java. */
+export const SYNCED: { table: string; key: string; deletes: boolean }[] = [
+  { table: 'categories', key: 'id', deletes: true },
+  { table: 'products', key: 'id', deletes: true },
+  { table: 'items', key: 'id', deletes: true },
+  { table: 'list_entries', key: 'id', deletes: true },
+  { table: 'cards', key: 'id', deletes: true },
+  { table: 'prices', key: "product_id || '|' || date", deletes: false },
+];
+
+const STAMP = `MAX(CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), COALESCE((SELECT CAST(value AS INTEGER) FROM sync_meta WHERE key = 'clock'), 0))`;
+const DEVICE = `COALESCE((SELECT value FROM sync_meta WHERE key = 'device'), '')`;
+const NEXT_SEQ = `COALESCE((SELECT MAX(seq) FROM sync_log), 0) + 1`;
+const NOT_APPLYING = `NOT EXISTS (SELECT 1 FROM sync_meta WHERE key = 'applying')`;
+
+function syncTriggers(t: { table: string; key: string; deletes: boolean }): string[] {
+  const key = (row: 'NEW' | 'OLD') => t.key.replace(/\b(id|product_id|date)\b/g, `${row}.$1`);
+  const log = (row: 'NEW' | 'OLD', deleted: 0 | 1) =>
+    `INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq) VALUES ('${t.table}', ${key(row)}, ${STAMP}, ${DEVICE}, ${deleted}, ${NEXT_SEQ});`;
+  const out = [`CREATE TRIGGER sync_${t.table}_ins AFTER INSERT ON ${t.table} WHEN ${NOT_APPLYING} BEGIN ${log('NEW', 0)} END`];
+  if (t.deletes) {
+    out.push(`CREATE TRIGGER sync_${t.table}_upd AFTER UPDATE ON ${t.table} WHEN ${NOT_APPLYING} BEGIN ${log('NEW', 0)} END`);
+    out.push(`CREATE TRIGGER sync_${t.table}_del AFTER DELETE ON ${t.table} WHEN ${NOT_APPLYING} BEGIN ${log('OLD', 1)} END`);
+  }
+  return out;
+}
+
+const SYNC_MIGRATION: string[] = [
+  `CREATE TABLE sync_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+  `INSERT OR IGNORE INTO sync_meta (key, value) VALUES ('device', lower(hex(randomblob(8))))`,
+  `CREATE TABLE sync_log (
+    tbl TEXT NOT NULL,
+    pk TEXT NOT NULL,
+    stamp INTEGER NOT NULL,
+    device TEXT NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    seq INTEGER NOT NULL,
+    PRIMARY KEY (tbl, pk)
+  )`,
+  `CREATE INDEX sync_log_seq ON sync_log(seq)`,
+  `CREATE TABLE sync_peers (
+    device TEXT PRIMARY KEY,
+    name TEXT,
+    got INTEGER NOT NULL DEFAULT 0,
+    synced_at TEXT,
+    host TEXT,
+    port INTEGER
+  )`,
+  // Everything already here counts as changed now, by this phone.
+  ...SYNCED.map(
+    (t) =>
+      `INSERT OR IGNORE INTO sync_log (tbl, pk, stamp, device, deleted, seq)
+       SELECT '${t.table}', ${t.key}, ${STAMP}, ${DEVICE}, 0, (SELECT COALESCE(MAX(seq), 0) FROM sync_log) + rowid FROM ${t.table}`,
+  ),
+  ...SYNCED.flatMap(syncTriggers),
+];
+
 export const MIGRATIONS: string[][] = [
   [
     `CREATE TABLE products (
@@ -137,7 +201,13 @@ export const MIGRATIONS: string[][] = [
   ],
   // 0.7.3: a one-off buy found at a shop keeps what it is (photo, size, brand) for the list.
   ['ALTER TABLE list_entries ADD COLUMN product TEXT'],
+  // 0.8.0: phone-to-phone sync (SyncEngine.java). Every change to a synced table is noted in
+  // sync_log by triggers, whether the screens or the background price check made it.
+  SYNC_MIGRATION,
 ];
+
+/** The database version before sync was added, for "back up before updating" (0.8.0). */
+export const SYNC_VERSION = MIGRATIONS.indexOf(SYNC_MIGRATION);
 
 export async function migrate(driver: SqlDriver): Promise<void> {
   const [{ user_version }] = await driver.query<{ user_version: number }>('PRAGMA user_version');

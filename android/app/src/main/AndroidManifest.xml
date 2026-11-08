@@ -278,6 +278,21 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_quick_info" />
         </receiver>
 
+        <!-- 0.8.0: phone-to-phone sync. "Ready to sync" keeps Restock listening for the household's
+             other phones on the same Wi-Fi (a quiet notification; off in Settings → Sync). -->
+        <service
+            android:name=".SyncService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+        <receiver
+            android:name=".SyncBoot"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -292,6 +307,15 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 0.7.3: "Check for updates" hands a new Restock release to Android's installer (you tap Install). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- 0.8.0: phone-to-phone sync on the same Wi-Fi. Finding the other phones (network discovery,
+         like Apple's Bonjour), staying ready to sync while closed, and after a restart. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- A short buzz when something is added to the shopping list. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- The open-source barcode scanner uses the camera inside the app. -->

@@ -12,11 +12,11 @@ Restock is a free, open-source app that helps you spend less on groceries. It is
 - No account, no ads, no analytics, no tracking.
 - Permissions are only used for the feature that asks for them, and only when you use it.
 - The app talks directly to the stores and a few open services, never to us.
-- If you set up your own sync server, you're in charge of it and its security.
+- If you turn on sync, your household's phones share your Restock data straight with each other over your Wi-Fi, encrypted. It never goes through us.
 
 ## What stays on your phone
 
-Your pantry, keg and pharmacy items, shopping lists, the shops you've picked or added yourself, price history, loyalty card numbers, household name, categories and settings are stored in a database on your phone. They never leave it unless you export a backup, or turn on sync to a server you run yourself.
+Your pantry, keg and pharmacy items, shopping lists, the shops you've picked or added yourself, price history, loyalty card numbers, household name, categories and settings are stored in a database on your phone. They never leave it unless you export a backup, or turn on sync, which copies them to the other phones in your household (see Sync between your phones).
 
 Uninstalling Restock, or clearing its storage in Android settings, deletes all of it.
 
@@ -41,6 +41,8 @@ Approximate location: only when you tap "Use my location" to find nearby stores,
 Notifications, and alarms & reminders: to tell you about deals and send the reminders you choose. They're made on your phone.
 
 Vibration: a small buzz when you add something to your list.
+
+Wi-Fi network discovery, staying ready in the background, and starting after a restart: only if you turn on sync. Restock uses them to find your household's other phones on your Wi-Fi and to sync with them while it's closed. While it's ready to sync, Android shows a quiet notification. Restock may also ask to be left out of Android's battery saving, so sync keeps working while it's closed.
 
 Every permission is optional. Turn any of them off in Android settings and the rest of the app keeps working.
 
@@ -74,9 +76,15 @@ GitHub (github.com), only when you tap Check for updates in Settings, or once a 
 
 Automatic backups are off unless you turn them on. When they're on, Restock saves the same kind of file into a folder you pick, as often as you choose, and removes its own older automatic backups so only the newest few are kept. If that folder is synced by a cloud app, that app's own policy applies to the copies it keeps.
 
-## Your own sync server
+## Sync between your phones
 
-Restock can, in a future version, sync between your household's phones through a server you run yourself, for example a Docker container on your own NAS. If you do that, your data lives on your server, and you're responsible for keeping it updated, backed up and secure. The makers of Restock never see it and can't recover it for you.
+Sync is off unless you turn it on (Settings → Sync). When it's on, the phones in your household send each other your pantry, keg and pharmacy items, shopping list, prices, categories and alert settings, and loyalty card numbers if you choose to share them, directly over your own Wi-Fi. Nothing goes through the internet or any server, and the makers of Restock never see it.
+
+Everything sent between the phones is encrypted with a key that's made on your phone and shared only by scanning the pairing QR code. A device without that key can't read what's sent or join in. Keep the code to yourself, like a Wi-Fi password.
+
+Each phone keeps its own copy. Stopping sync on a phone keeps what it has; to remove the household's things from a phone, delete them or uninstall Restock there.
+
+A future version may also sync through a server you run yourself, for example a Docker container on your own NAS. If you do that, your data lives on your server, and you're responsible for keeping it updated, backed up and secure.
 
 ## Sharing prices (optional, later)
 

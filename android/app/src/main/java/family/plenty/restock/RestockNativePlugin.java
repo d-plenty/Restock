@@ -772,6 +772,165 @@ public class RestockNativePlugin extends Plugin {
             pendingAction = actionFrom(getActivity().getIntent());
             consume(getActivity().getIntent());
         }
+        // 0.8.0: another phone's changes arrived; open screens refresh.
+        SyncHub.onChanged = () -> notifyListeners("syncChanged", new JSObject());
+    }
+
+    @Override
+    protected void handleOnResume() {
+        super.handleOnResume();
+        // Opening Restock syncs with the household's phones on this Wi-Fi (0.8.0).
+        syncThread.execute(() -> {
+            SyncHub hub = SyncHub.get(getContext());
+            if (!hub.paired()) return;
+            SyncService.startIfWanted(getContext());
+            hub.syncAll();
+            notifyListeners("syncDone", syncInfoObject(hub));
+        });
+    }
+
+    // ---------- 0.8.0: phone-to-phone sync ----------
+
+    private final ExecutorService syncThread = Executors.newSingleThreadExecutor();
+
+    private JSObject syncInfoObject(SyncHub hub) {
+        JSObject o = new JSObject();
+        try {
+            boolean ready = hub.ready();
+            o.put("paired", ready && hub.paired());
+            if (ready) {
+                o.put("device", hub.engine.device());
+                o.put("name", hub.engine.name());
+                o.put("household", hub.engine.meta("household"));
+                o.put("shareCards", hub.engine.shareCards());
+                o.put("keepReady", hub.keepReady());
+                JSArray peers = new JSArray();
+                for (JSONObject r : hub.engine.db.query("SELECT device, name, synced_at FROM sync_peers ORDER BY synced_at DESC")) {
+                    JSObject p = new JSObject();
+                    p.put("device", r.optString("device"));
+                    p.put("name", r.isNull("name") ? null : r.optString("name"));
+                    p.put("syncedAt", r.isNull("synced_at") ? null : r.optString("synced_at"));
+                    peers.put(p);
+                }
+                o.put("peers", peers);
+            }
+            o.put("batteryExempt", hub.batteryExempt());
+            o.put("lastSyncAt", hub.lastSyncAt);
+            o.put("lastError", hub.lastError);
+            o.put("listening", hub.port() > 0);
+            o.put("maker", android.os.Build.MANUFACTURER);
+        } catch (Exception e) {
+            o.put("error", e.getMessage());
+        }
+        return o;
+    }
+
+    @PluginMethod
+    public void syncInfo(PluginCall call) {
+        syncThread.execute(() -> call.resolve(syncInfoObject(SyncHub.get(getContext()))));
+    }
+
+    /** Starts (or reuses) the household and returns the pairing code to show as a QR code. */
+    @PluginMethod
+    public void syncInvite(PluginCall call) {
+        final String household = call.getString("household", "");
+        final boolean shareCards = Boolean.TRUE.equals(call.getBoolean("shareCards", false));
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                JSObject r = new JSObject();
+                r.put("code", hub.invite(household, shareCards));
+                SyncService.startIfWanted(getContext());
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void syncJoin(PluginCall call) {
+        final String code = call.getString("code", "");
+        final boolean replace = Boolean.TRUE.equals(call.getBoolean("replace", false));
+        final boolean shareCards = Boolean.TRUE.equals(call.getBoolean("shareCards", false));
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.join(code, replace, shareCards);
+                SyncService.startIfWanted(getContext());
+                SyncHub.Summary s = hub.syncAll();
+                JSObject r = syncInfoObject(hub);
+                r.put("reached", s.reached);
+                r.put("received", s.received);
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void syncNow(PluginCall call) {
+        syncThread.execute(() -> {
+            SyncHub hub = SyncHub.get(getContext());
+            SyncHub.Summary s = hub.syncAll();
+            JSObject r = syncInfoObject(hub);
+            r.put("reached", s.reached);
+            r.put("received", s.received);
+            r.put("sent", s.sent);
+            call.resolve(r);
+        });
+    }
+
+    /** Changes this phone's name, card sharing or "stay ready to sync". */
+    @PluginMethod
+    public void syncSet(PluginCall call) {
+        final String name = call.getString("name");
+        final Boolean shareCards = call.getBoolean("shareCards");
+        final Boolean keepReady = call.getBoolean("keepReady");
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                if (name != null && !name.trim().isEmpty()) hub.engine.setMeta("name", name.trim());
+                if (shareCards != null) hub.engine.setShareCards(shareCards);
+                if (keepReady != null) {
+                    hub.engine.setMeta("keep_ready", keepReady ? "1" : "0");
+                    if (keepReady) SyncService.startIfWanted(getContext());
+                    else getContext().stopService(new Intent(getContext(), SyncService.class));
+                }
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void syncLeave(PluginCall call) {
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.leave();
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** Android's "Allow Restock to always run in the background?" question. */
+    @PluginMethod
+    public void requestBatteryExemption(PluginCall call) {
+        try {
+            if (!SyncHub.get(getContext()).batteryExempt()) {
+                Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getContext().getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(i);
+            }
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(e.getMessage(), e);
+        }
     }
 
     private static void consume(Intent intent) {

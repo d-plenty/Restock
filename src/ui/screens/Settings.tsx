@@ -2,7 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { version } from '../../../package.json';
 import legal from '../../lib/legal.json';
 import { confirmAction } from '../../lib/confirm';
-import { type BackupSummary } from '../../lib/backup';
+import { readCopyInApp, shareTextFile, type BackupSummary } from '../../lib/backup';
+import { BEFORE_UPGRADE_FILE } from '../../lib/boot';
+import { RestockNative } from '../../lib/sql/native';
+import { syncInfo } from '../../lib/sync';
+import { isNative } from '../../stores/http';
+import { syncSummary } from './Sync';
 import { allCards, getSettings, pruneHistory, updateSettings } from '../../lib/db';
 import { loadDemo, removeDemo } from '../../lib/demo';
 import { syncBackgroundSchedule } from '../../lib/check';
@@ -92,6 +97,9 @@ export function SettingsScreen() {
   const nav = useNav();
   const settings = useLive(getSettings, []);
   const cardCount = useLive(async () => (await allCards()).length, []);
+  const sync = useLive(syncInfo, []);
+  // 0.8.0: the copy saved just before the upgrade, if there is one.
+  const beforeUpgrade = useLive(async () => (isNative() ? (await RestockNative.appFileInfo({ path: BEFORE_UPGRADE_FILE })).exists : false), []);
   const fileRef = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState<'privacy' | 'disclaimer'>();
   const [picking, setPicking] = useState<BackupSummary>();
@@ -107,22 +115,6 @@ export function SettingsScreen() {
     setMatches(filterSettings(screen.current, query));
   }, [query, settings, cardCount]);
   if (!settings) return <div className="screen" />;
-
-  const setAlerts = async (patch: Partial<Settings['alerts']>) => {
-    // Turning an alert on is the moment to ask for notifications.
-    if (Object.values(patch).some((v) => v === true)) await ensureNotificationPermission().catch(() => false);
-    const s = await updateSettings({ alerts: { ...settings.alerts, ...patch } });
-    await scheduleReminders(s).catch(() => undefined);
-  };
-
-  const setChecks = async (patch: { hours?: number; on?: boolean; weekday?: number }) => {
-    const s = await updateSettings({
-      ...(patch.hours !== undefined ? { checkIntervalHours: patch.hours } : {}),
-      ...(patch.weekday !== undefined ? { checkWeekday: patch.weekday } : {}),
-      ...(patch.on !== undefined ? { sync: { ...settings.sync, backgroundActivity: patch.on } } : {}),
-    });
-    await syncBackgroundSchedule(s).catch(() => undefined);
-  };
 
   const row = (title: string, sub: string, onClick: () => void) => (
     <button className="row" onClick={onClick}>
@@ -161,6 +153,7 @@ export function SettingsScreen() {
       <nav className="chips jump" aria-label="Jump to" data-search-hide="1">
         {[
           ['s-stores', 'Shops'],
+          ['s-sync', 'Sync'],
           ['s-checks', 'Price checks'],
           ['s-alerts', 'Alerts'],
           ['s-look', 'Colours'],
@@ -193,141 +186,23 @@ export function SettingsScreen() {
         {row('Catalogues', 'This week at Coles, Woolworths and Aldi', () => nav.push({ name: 'catalogues' }))}
       </div>
 
+      <div className="eyebrow" id="s-sync">
+        Sync
+      </div>
+      <div className="card flush">
+        {row('Sync with your household', syncSummary(sync) || 'Share one pantry and list between phones', () => nav.push({ name: 'sync' }))}
+        {row('Household name', settings.household.name, () => nav.push({ name: 'household' }))}
+      </div>
+
       <div className="eyebrow" id="s-checks">
         Price checks
       </div>
-      <div className="card flush">
-        <label className="check">
-          <input type="checkbox" checked={settings.sync.backgroundActivity} onChange={(e) => setChecks({ on: e.target.checked })} />
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
-              Check prices in the background
-            </span>
-            <span className="small">Only on a network connection and when the battery isn't low.</span>
-          </span>
-        </label>
-        <label
-          className="check"
-          style={settings.sync.backgroundActivity ? undefined : { opacity: 0.5 }}
-          aria-disabled={!settings.sync.backgroundActivity || undefined}
-        >
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
-              How often
-            </span>
-            <span className="small">Android may run it a little later to save battery.</span>
-          </span>
-          <select
-            className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
-            value={settings.checkIntervalHours}
-            disabled={!settings.sync.backgroundActivity}
-            onChange={(e) => setChecks({ hours: parseInt(e.target.value, 10) })}
-            aria-label="How often to check prices"
-          >
-            {CHECK_INTERVALS.map((h) => (
-              <option key={h} value={h}>
-                {intervalLabel(h)}
-                {h === 12 ? ' (default)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        {settings.checkIntervalHours >= 168 && (
-          <label
-            className="check"
-            style={settings.sync.backgroundActivity ? undefined : { opacity: 0.5 }}
-            aria-disabled={!settings.sync.backgroundActivity || undefined}
-          >
-            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <span className="title" style={{ fontSize: 14 }}>
-                Which day
-              </span>
-              <span className="small">Wednesday recommended: that's when new specials start.</span>
-            </span>
-            <select
-              className="input"
-              style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
-              value={settings.checkWeekday}
-              disabled={!settings.sync.backgroundActivity}
-              onChange={(e) => setChecks({ weekday: parseInt(e.target.value, 10) })}
-              aria-label="Day for weekly price checks"
-            >
-              {WEEKDAYS.map((d, i) => (
-                <option key={d} value={i}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-      </div>
+      <PriceCheckSettings settings={settings} />
 
       <div className="eyebrow" id="s-alerts">
         Notifications
       </div>
-      <div className="card flush">
-        <label className="check">
-          <input type="checkbox" checked={settings.alerts.catalogueDay} onChange={(e) => setAlerts({ catalogueDay: e.target.checked })} />
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
-              Weekly deals summary
-            </span>
-            <span className="small">
-              Which of your items are on special and roughly what you'd save, after the first price check that day. Wednesday is when new specials
-              start.
-            </span>
-          </span>
-          <select
-            className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
-            value={settings.alerts.catalogueWeekday}
-            onChange={(e) => setAlerts({ catalogueWeekday: parseInt(e.target.value, 10) })}
-            aria-label="Roundup day"
-          >
-            {WEEKDAYS.map((d, i) => (
-              <option key={d} value={i}>
-                {d.slice(0, 3)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={settings.alerts.daily} onChange={(e) => setAlerts({ daily: e.target.checked })} />
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
-              Daily reminder
-            </span>
-            <span className="small">A nudge to open the app and check prices.</span>
-          </span>
-          <input
-            type="time"
-            className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
-            value={settings.alerts.dailyTime}
-            onChange={(e) => setAlerts({ dailyTime: e.target.value || '07:30' })}
-            aria-label="Reminder time"
-          />
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={settings.alerts.greatDeals} onChange={(e) => setAlerts({ greatDeals: e.target.checked })} />
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
-              Great deals, straight away
-            </span>
-            <span className="small">When a price check finds a deal that matches an item's alert setting, or an item is under its target price.</span>
-          </span>
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={settings.alerts.stockUpTips} onChange={(e) => setAlerts({ stockUpTips: e.target.checked })} />
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
-              Stock-up tips
-            </span>
-            <span className="small">On deals for things that only go on sale every few weeks: "a good time to stock up".</span>
-          </span>
-        </label>
-      </div>
+      <NotificationSettings settings={settings} />
 
       <Explain title="How Restock judges a sale">
         <p>
@@ -412,6 +287,21 @@ export function SettingsScreen() {
             <span className="small">Pick what goes in: everything, or just some tabs, lists, cards or settings. Keep it private.</span>
           </span>
         </button>
+        {beforeUpgrade && (
+          <button
+            className="row"
+            onClick={async () => {
+              const json = await readCopyInApp(BEFORE_UPGRADE_FILE);
+              if (json) await shareTextFile('restock-before-0.8.0.json', json);
+              else nav.toast("Couldn't read that copy");
+            }}
+          >
+            <span className="grow">
+              <span className="title">Backup from before 0.8.0</span>
+              <span className="small">Saved automatically just before the update. Share it to keep it somewhere safe, or restore it from there.</span>
+            </span>
+          </button>
+        )}
         <button className="row" onClick={() => fileRef.current?.click()}>
           <span className="grow">
             <span className="title">Restore a backup</span>
@@ -784,6 +674,166 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
 }
 
 /** A short line for "Shop accounts and stock": who you're signed in to and your Coles store. */
+/** Background price checks: on or off, how often, which day (Settings, and the setup tile, 0.8.0). */
+export function PriceCheckSettings({ settings }: { settings: Settings }) {
+  const setChecks = async (patch: { hours?: number; on?: boolean; weekday?: number }) => {
+    const s = await updateSettings({
+      ...(patch.hours !== undefined ? { checkIntervalHours: patch.hours } : {}),
+      ...(patch.weekday !== undefined ? { checkWeekday: patch.weekday } : {}),
+      ...(patch.on !== undefined ? { sync: { ...settings.sync, backgroundActivity: patch.on } } : {}),
+    });
+    await syncBackgroundSchedule(s).catch(() => undefined);
+  };
+
+  return (
+    <>
+      <div className="card flush">
+        <label className="check">
+          <input type="checkbox" checked={settings.sync.backgroundActivity} onChange={(e) => setChecks({ on: e.target.checked })} />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 14 }}>
+              Check prices in the background
+            </span>
+            <span className="small">Only on a network connection and when the battery isn't low.</span>
+          </span>
+        </label>
+        <label
+          className="check"
+          style={settings.sync.backgroundActivity ? undefined : { opacity: 0.5 }}
+          aria-disabled={!settings.sync.backgroundActivity || undefined}
+        >
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 14 }}>
+              How often
+            </span>
+            <span className="small">Android may run it a little later to save battery.</span>
+          </span>
+          <select
+            className="input"
+            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+            value={settings.checkIntervalHours}
+            disabled={!settings.sync.backgroundActivity}
+            onChange={(e) => setChecks({ hours: parseInt(e.target.value, 10) })}
+            aria-label="How often to check prices"
+          >
+            {CHECK_INTERVALS.map((h) => (
+              <option key={h} value={h}>
+                {intervalLabel(h)}
+                {h === 12 ? ' (default)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        {settings.checkIntervalHours >= 168 && (
+          <label
+            className="check"
+            style={settings.sync.backgroundActivity ? undefined : { opacity: 0.5 }}
+            aria-disabled={!settings.sync.backgroundActivity || undefined}
+          >
+            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <span className="title" style={{ fontSize: 14 }}>
+                Which day
+              </span>
+              <span className="small">Wednesday recommended: that's when new specials start.</span>
+            </span>
+            <select
+              className="input"
+              style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+              value={settings.checkWeekday}
+              disabled={!settings.sync.backgroundActivity}
+              onChange={(e) => setChecks({ weekday: parseInt(e.target.value, 10) })}
+              aria-label="Day for weekly price checks"
+            >
+              {WEEKDAYS.map((d, i) => (
+                <option key={d} value={i}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** Which alerts Restock sends (Settings, and the setup tile, 0.8.0). */
+export function NotificationSettings({ settings }: { settings: Settings }) {
+  const setAlerts = async (patch: Partial<Settings['alerts']>) => {
+    // Turning an alert on is the moment to ask for notifications.
+    if (Object.values(patch).some((v) => v === true)) await ensureNotificationPermission().catch(() => false);
+    const s = await updateSettings({ alerts: { ...settings.alerts, ...patch } });
+    await scheduleReminders(s).catch(() => undefined);
+  };
+
+  return (
+    <>
+      <div className="card flush">
+        <label className="check">
+          <input type="checkbox" checked={settings.alerts.catalogueDay} onChange={(e) => setAlerts({ catalogueDay: e.target.checked })} />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 14 }}>
+              Weekly deals summary
+            </span>
+            <span className="small">
+              Which of your items are on special and roughly what you'd save, after the first price check that day. Wednesday is when new specials
+              start.
+            </span>
+          </span>
+          <select
+            className="input"
+            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+            value={settings.alerts.catalogueWeekday}
+            onChange={(e) => setAlerts({ catalogueWeekday: parseInt(e.target.value, 10) })}
+            aria-label="Roundup day"
+          >
+            {WEEKDAYS.map((d, i) => (
+              <option key={d} value={i}>
+                {d.slice(0, 3)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.alerts.daily} onChange={(e) => setAlerts({ daily: e.target.checked })} />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 14 }}>
+              Daily reminder
+            </span>
+            <span className="small">A nudge to open the app and check prices.</span>
+          </span>
+          <input
+            type="time"
+            className="input"
+            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+            value={settings.alerts.dailyTime}
+            onChange={(e) => setAlerts({ dailyTime: e.target.value || '07:30' })}
+            aria-label="Reminder time"
+          />
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.alerts.greatDeals} onChange={(e) => setAlerts({ greatDeals: e.target.checked })} />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 14 }}>
+              Great deals, straight away
+            </span>
+            <span className="small">When a price check finds a deal that matches an item's alert setting, or an item is under its target price.</span>
+          </span>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.alerts.stockUpTips} onChange={(e) => setAlerts({ stockUpTips: e.target.checked })} />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 14 }}>
+              Stock-up tips
+            </span>
+            <span className="small">On deals for things that only go on sale every few weeks: "a good time to stock up".</span>
+          </span>
+        </label>
+      </div>
+    </>
+  );
+}
+
 function shopAccountsSummary(settings: Settings): string {
   const w = settings.accounts?.woolworths;
   const coles = settings.stores?.coles;
@@ -814,7 +864,7 @@ function Fold({ title, sub, children }: { title: string; sub?: string; children:
  * Updates from GitHub (0.7.3): check now, install a newer release (Android shows its own Install
  * screen), and an optional weekly check when Restock opens. Nothing is sent but the request itself.
  */
-function UpdateRows({ settings }: { settings: Settings }) {
+export function UpdateRows({ settings }: { settings: Settings }) {
   if (!SELF_UPDATE) return null;
   return <UpdateRowsOn settings={settings} />;
 }

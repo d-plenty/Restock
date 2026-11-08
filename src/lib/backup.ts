@@ -1,3 +1,4 @@
+import { RestockNative } from './sql/native';
 import { Capacitor } from '@capacitor/core';
 import { SECTIONS, shopDef, type Section } from '../shops';
 import type { Group, Product, Settings } from '../types';
@@ -74,6 +75,32 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
     if (Object.keys(photos).length) file.photos = photos;
   }
   return JSON.stringify(file);
+}
+
+/**
+ * A full backup (without receipt photos) kept inside Restock (0.8.0): before the 0.8.0 upgrade,
+ * and before joining a household with "use the household's things". Returns the JSON too.
+ */
+export async function saveCopyInApp(path: string): Promise<string> {
+  const json = await backupJson({ ...EVERYTHING, receiptPhotos: false });
+  const bytes = new TextEncoder().encode(json);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  await RestockNative.writeAppFile({ path, data: btoa(bin) });
+  return json;
+}
+
+/** A copy saved by saveCopyInApp, or undefined if there isn't one. */
+export async function readCopyInApp(path: string): Promise<string | undefined> {
+  try {
+    const { data } = await RestockNative.readAppFile({ path });
+    const bin = atob(data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return undefined;
+  }
 }
 
 /** A backup file of the parts picked (everything by default), shared through Android's share menu. */
