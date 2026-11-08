@@ -1,4 +1,5 @@
 import type { StoreChain } from '../shops';
+import { brandKind } from '../lib/brandKinds';
 import { isNative, looksMemberOnly, num, parseJson, request, stockFlag, viaBrowser, type HttpResult } from './http';
 import type { StoreAdapter, StoreProduct } from './types';
 import { searchWeb } from './web';
@@ -56,6 +57,26 @@ export function pictureOf(chain: 'danmurphys' | 'bws', id: string, raw?: string)
   return PICTURE[chain](id);
 }
 
+/**
+ * A sales blurb isn't a name: "Canadian Club was first established in Walkerville…" (Dan
+ * Murphy's sometimes puts one where the name goes, 0.8.6).
+ */
+const blurb = (s: string) => s.length > 80 || /…$|\.\.\.$/.test(s) || /\b(is|was|were|are)\s+(a|an|the|known|brewed|first|made|crafted|perfect|great)\b/i.test(s);
+
+/** The product's name: the first of the shop's name fields that's a name and not a blurb. */
+function nameOf(p: Raw): string {
+  const list = [
+    typeof p.Name === 'string' ? p.Name.trim() : undefined,
+    typeof p.DisplayName === 'string' ? p.DisplayName.trim() : undefined,
+    detail(p, 'productname'),
+    detail(p, 'product_short_name'),
+    detail(p, 'webtitle'),
+    detail(p, 'producttitle'),
+    detail(p, 'webdescriptionshort'),
+  ].filter((x): x is string => !!x);
+  return list.find((x) => !blurb(x)) ?? list[0] ?? 'Unknown product';
+}
+
 export function mapEndeavour(chain: 'danmurphys' | 'bws', p: Raw): StoreProduct | undefined {
   const id = p.Stockcode ?? p.stockcode ?? p.Sku;
   if (id === undefined || id === null) return undefined;
@@ -70,7 +91,7 @@ export function mapEndeavour(chain: 'danmurphys' | 'bws', p: Raw): StoreProduct 
     (typeof p.PromotionDescription === 'string' ? p.PromotionDescription : undefined) ||
     detail(p, 'webpromotiondescription', 'promotiondescription');
   const brand = detail(p, 'webbrandname', 'brand') ?? (typeof p.Brand === 'string' ? p.Brand : undefined);
-  const baseName = String(p.Name ?? p.DisplayName ?? detail(p, 'webdescriptionshort', 'webtitle') ?? 'Unknown product');
+  const baseName = nameOf(p);
   const image =
     detail(p, 'image1', 'webimage1', 'image') ??
     (typeof p.MediumImageFile === 'string' ? p.MediumImageFile : undefined) ??
@@ -158,7 +179,8 @@ const inBrowser =
 
 async function browse(chain: 'danmurphys' | 'bws', location: string, headers: Record<string, string>, send: Send, page = 1): Promise<StoreProduct[]> {
   const e = ENDEAVOUR[chain];
-  const path = new URL(location, e.site).pathname.replace(/\/$/, '');
+  // "/beer/all" is the whole beer department.
+  const path = new URL(location, e.site).pathname.replace(/\/$/, '').replace(/\/all$/, '');
   const [department, sub, category] = path.split('/').filter(Boolean);
   if (!department || /search|resource-not-found/.test(department)) return [];
   const q = new URLSearchParams({
@@ -189,7 +211,20 @@ async function browse(chain: 'danmurphys' | 'bws', location: string, headers: Re
   return lists.flat().filter((p) => (seen.has(p.storeProductId) ? false : seen.add(p.storeProductId)));
 }
 
-async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send = direct, page = 1): Promise<StoreProduct[]> {
+export function goTo(res: HttpResult): string | undefined {
+  if (res.status !== 200 || !res.text.includes('RedirectUrl')) return undefined;
+  let d: unknown;
+  try {
+    d = JSON.parse(res.text);
+  } catch {
+    return undefined;
+  }
+  const first = (Array.isArray(d) ? d[0] : d) as Raw | undefined;
+  const url = first && typeof first.RedirectUrl === 'string' ? first.RedirectUrl : undefined;
+  return url && !(first as Raw).Products ? url : undefined;
+}
+
+async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send = direct, page = 1, again = false): Promise<StoreProduct[]> {
   const e = ENDEAVOUR[chain];
   const headers = {
     Accept: 'application/json, text/plain, */*',
@@ -206,7 +241,14 @@ async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send =
     Filters: [],
   };
   let moved: string | undefined;
-  const redirect = (res: { status: number; headers: Record<string, string> }) => {
+  const redirect = (res: HttpResult) => {
+    // Dan Murphy's answers a category or brand word with where to go instead, in an ordinary
+    // answer: [{ ActionType: 'GoToUrl', RedirectUrl: 'https://www.danmurphys.com.au/beer/all' }] (0.8.6).
+    const sent = goTo(res);
+    if (sent) {
+      moved = sent;
+      return true;
+    }
     if (res.status < 300 || res.status >= 400) return false;
     const where = Object.entries(res.headers).find(([k]) => k.toLowerCase() === 'location')?.[1];
     moved = where || moved || CATEGORY[term.trim().toLowerCase()] || '';
@@ -236,7 +278,15 @@ async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send =
   }
   // Sent to a category page, or nothing found for a category word: read that category.
   const where = moved || CATEGORY[term.trim().toLowerCase()];
-  if (where) return browse(chain, where, headers, send, page);
+  if (where) {
+    const out = await browse(chain, where, headers, send, page).catch(() => [] as StoreProduct[]);
+    if (out.length) return out;
+    // Sent to a brand's page Restock can't read ("great northern" → its brand page): search for
+    // the brand and what it is instead, which the shop does answer (0.8.6).
+    const kind = brandKind(term);
+    if (kind && !again) return apiSearch(chain, `${term} ${kind}`, send, page, true);
+    return out;
+  }
   if (failed) throw failed;
   return [];
 }
@@ -247,14 +297,14 @@ export function endeavourAdapter(chain: 'danmurphys' | 'bws'): StoreAdapter {
     pages: true,
     async search(term, _storeId, page = 1) {
       try {
-        const out = await apiSearch(chain, term, direct, page);
-        if (out.length || page > 1) return out;
+        // The shop answered: that's the answer, even when it's nothing. Reading its website
+        // instead only finds the same page of featured products for every word (0.8.6).
+        return await apiSearch(chain, term, direct, page);
       } catch {
         // turned away: ask again from inside the shop's own page, the way the site itself does
         if (isNative())
           try {
-            const out = await apiSearch(chain, term, inBrowser(chain), page);
-            if (out.length || page > 1) return out;
+            return await apiSearch(chain, term, inBrowser(chain), page);
           } catch {
             // fall back to reading the website
           }

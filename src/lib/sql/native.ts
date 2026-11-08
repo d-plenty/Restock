@@ -85,6 +85,12 @@ export interface RestockNativePlugin {
   syncHandOver(opts: { device: string }): Promise<SyncInfo>;
   /** Owner: never mind, stay the owner. */
   syncCancelHandOver(): Promise<SyncInfo>;
+  /** The search test with the screen off (0.8.6): a notification with progress and a Stop button. */
+  searchTestStart(opts: { total: number }): Promise<void>;
+  searchTestProgress(opts: { done: number; total: number; text: string }): Promise<{ stop: boolean }>;
+  searchTestEnd(opts: { title?: string; text?: string }): Promise<void>;
+  /** A pause that keeps time with the screen off. */
+  pause(opts: { ms: number }): Promise<void>;
   /** 0.8.5: what a code's household is, before joining (doesn't use the code up). */
   syncPeek(opts: { code: string }): Promise<{ household?: string; ownerName?: string; tabs: Section[]; settings?: string }>;
   syncDismissNotice(): Promise<void>;

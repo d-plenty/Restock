@@ -36,6 +36,7 @@
           "Notifications, and alarms & reminders: to tell you about deals and send the reminders you choose. They're made on your phone.",
           "Vibration: a small buzz when you add something to your list.",
           "Wi-Fi network discovery, staying ready in the background, and starting after a restart: only if you turn on sync. Restock uses them to find your household's other phones on your Wi-Fi and to sync with them while it's closed. While it's ready to sync, Android shows a quiet notification. Restock may also ask to be left out of Android's battery saving, so sync keeps working while it's closed.",
+          "Running in the background and keeping the phone awake: only while a search test you started in Diagnostics is running, so it can carry on with the screen off. A notification shows how far it's got, with a Stop button.",
           "Every permission is optional. Turn any of them off in Android settings and the rest of the app keeps working.",
           "Photos: there's no photos permission. If you import a barcode from a picture, Android's photo picker hands Restock only the one picture you choose. It's read on your phone to find the code and isn't kept."
         ]

@@ -1,5 +1,6 @@
 import { kindOf, PRODUCT_NOUNS } from '../lib/naming';
 import { packSize, parseSize, type ParsedSize } from '../lib/units';
+import { brandKind } from '../lib/brandKinds';
 import type { StoreProduct } from './types';
 
 // Orders a store's search results by how well they match what you scanned or typed,
@@ -52,6 +53,7 @@ function DRINKS_LIST(): string[] {
   return ['gin', 'vodka', 'whisky', 'whiskey', 'rum', 'bourbon', 'tequila', 'liqueur', 'brandy', 'wine', 'beer', 'lager', 'cider', 'seltzer'];
 }
 const DRINKS = new Set(DRINKS_LIST());
+const SPIRITS = new Set(['vodka', 'gin', 'rum', 'whisky', 'whiskey', 'bourbon', 'tequila', 'liqueur', 'brandy']);
 
 export function stem(w: string): string {
   // Dishwasher tablets and dishwashing tablets are the same thing (0.8.5).
@@ -251,7 +253,28 @@ const DIFFERENT: [string, string][] = [
   ['kale', 'chips'],
   ['breast', 'chips'],
   ['chocolate', 'chips'],
+  // From the phone search test (0.8.6): made with it, or a different thing with its name.
+  ['fabric', 'conditioner'],
+  ['salt', 'vinegar'],
+  ['tuna', 'oil'],
+  ['kebab', 'honey'],
+  ['honey', 'soy'],
+  ['smoothie', 'honey'],
+  ['iced', 'coffee'],
+  ['spring', 'onion'],
+  ['ginger', 'beer'],
 ];
+/** Products named for what they are first, with a flavour after: the flavour isn't the product. */
+const CARRIERS = new Set(['drink', 'smoothie', 'kebab', 'skewer', 'chip', 'bar', 'biscuit', 'cereal', 'yoghurt', 'snack', 'cookie', 'muesli']);
+function afterCarrier(q: string[], name: string): boolean {
+  const words = tokens(name);
+  return q.some((t) => {
+    if (CARRIERS.has(t)) return false;
+    const at = words.findIndex((w) => close(t, w));
+    return at > 0 && words.slice(0, at).some((w) => CARRIERS.has(w) && !q.includes(w));
+  });
+}
+
 /** One word of such a pair typed, the other not, and the pair in the name: a different product. */
 function different(q: string[], name: string): boolean {
   const words = tokens(name);
@@ -356,6 +379,9 @@ export function score(q: RankQuery, p: StoreProduct, index?: number): number {
     if (flavour) s -= 0.3;
     if (modifier) s -= 0.35;
     if (different(qTokens, name)) s -= 0.4;
+    // Named after it, at the end: "Protein Smoothie Drink Banana Honey", "Chicken Kebabs Honey
+    // Soy". The thing is the drink or the kebab, not honey (0.8.6).
+    if (!flavour && afterCarrier(qTokens, name)) s -= 0.3;
     // Made for children ("6 Years - 12 Years", "Kids", "Infant", "Junior"), when you didn't ask (0.7.6).
     if (KIDS.test(name) && !KIDS.test(q.text)) s -= 0.4;
   }
@@ -375,6 +401,15 @@ export function score(q: RankQuery, p: StoreProduct, index?: number): number {
   if (qt.size && ![...qt].some((t) => pTokens.some((u) => close(t.split(' ').pop()!, u)))) s -= 0.2;
 
   if (!q.barcode && negated(qTokens, name) && !negated(qTokens, q.text)) s -= 0.6;
+
+  // A brand searched by itself: its usual thing first (Western Star *butter*, Smirnoff *vodka*), and
+  // for a spirit, the bottle before the cans of premix (0.8.6).
+  const usual = named ? brandKind(q.text) : undefined;
+  if (usual) {
+    const has = tokens(usual).every((t) => pTokens.some((u) => close(t, u)));
+    if (has) s += 0.15;
+    if (SPIRITS.has(usual) && /\b(cans?|ice|seltzer|soda|cola|dry|lemonade|mixed|premix)\b|&|\bx\s?\d|\d+\s?(pk|pack)\b/i.test(name)) s -= 0.15;
+  }
   if (SEASONAL.test(name) && !SEASONAL.test(q.text)) s -= 0.2;
 
   return s + placeBonus(index);

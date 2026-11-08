@@ -29,6 +29,20 @@ async function fileBytes(url: string): Promise<ArrayBuffer> {
   return r.arrayBuffer();
 }
 
+/**
+ * The English model, packed (gzip). It's built as "….gz.bin" so Android leaves it alone (0.8.7);
+ * in case a build still unpacked it and dropped the ".gz", the unpacked copy is tried too.
+ */
+async function modelBytes(): Promise<{ bytes: ArrayBuffer; packed: boolean }> {
+  try {
+    return { bytes: await fileBytes(langFile), packed: true };
+  } catch (e) {
+    const unpacked = langFile.replace(/\.gz(\.bin)?$/, '');
+    if (unpacked === langFile) throw e;
+    return { bytes: await fileBytes(unpacked), packed: false };
+  }
+}
+
 type TWorker = import('tesseract.js').Worker;
 let worker: Promise<TWorker> | undefined;
 let idle: ReturnType<typeof setTimeout> | undefined;
@@ -39,17 +53,17 @@ function getWorker(onStatus?: (s: string) => void): Promise<TWorker> {
   if (!worker) {
     worker = (async () => {
       onStatus?.('Starting the receipt reader…');
-      const [{ createWorker, OEM }, core, lang] = await Promise.all([import('tesseract.js'), fileBytes(coreFile), fileBytes(langFile)]);
+      const [{ createWorker, OEM }, core, model] = await Promise.all([import('tesseract.js'), fileBytes(coreFile), modelBytes()]);
       // Everything is handed to Tesseract from memory, so nothing is fetched by its worker: the
       // engine as a blob (the "#.js" tells Tesseract it's the file itself, not a folder), and the
       // English model through a small wrapper that answers the worker's request for it.
       const blobUrl = (data: BlobPart, type: string) => URL.createObjectURL(new Blob([data], { type }));
       const coreUrl = `${blobUrl(core, 'text/javascript')}#core.wasm.js`;
-      const langUrl = blobUrl(lang, 'application/gzip');
+      const langUrl = blobUrl(model.bytes, model.packed ? 'application/gzip' : 'application/octet-stream');
       const realWorker = new URL(workerUrl, location.href).href;
       const wrapper = blobUrl(
         `const f = self.fetch.bind(self);
-self.fetch = (u, o) => (String(u).endsWith('/eng.traineddata.gz') ? f(${JSON.stringify(langUrl)}) : f(u, o));
+self.fetch = (u, o) => (String(u).endsWith('/eng.traineddata.gz') || String(u).endsWith('/eng.traineddata') ? f(${JSON.stringify(langUrl)}) : f(u, o));
 importScripts(${JSON.stringify(realWorker)});`,
         'text/javascript',
       );
@@ -58,7 +72,7 @@ importScripts(${JSON.stringify(realWorker)});`,
         corePath: coreUrl,
         langPath: 'https://reader.restock.invalid',
         cacheMethod: 'none',
-        gzip: true,
+        gzip: model.packed,
       });
     })();
     worker.catch(() => (worker = undefined));

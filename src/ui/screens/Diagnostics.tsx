@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { shareTextFile } from '../../lib/backup';
 import { getSettings } from '../../lib/db';
 import { captureWhile, clearProblems, problems, problemsText } from '../../lib/diagnostics';
@@ -9,7 +9,14 @@ import { chainName, enabledIn, SECTION_NAMES, type Section, type StoreChain } fr
 import { adapterFor } from '../../stores';
 import { searchStoreId } from '../../types';
 import { isNative } from '../../stores/http';
-import { runSearchTest, searchTestSize, type SearchTestProgress } from '../../lib/searchTest';
+import {
+  searchTestSize,
+  shareLastSearchTest,
+  startSearchTest,
+  stopSearchTest,
+  watchSearchTest,
+  type SearchTestState,
+} from '../../lib/searchTest';
 import { CheckedAgo, ChainDot, Icon, LoadingBar, TopBar } from '../components';
 import { useNav } from '../nav';
 
@@ -236,55 +243,34 @@ function TrolleyRecorder() {
 
 /**
  * The search test (0.8.6): a list of everyday words searched at your shops, marked, and saved to
- * one file for the developer, so search can be made better with what your phone really gets.
+ * one file for the developer, so search can be made better with what your phone really gets. It
+ * keeps going with the screen off, with a notification showing how far it's got.
  */
 function SearchTest() {
   const nav = useNav();
   const [which, setWhich] = useState<'all' | Section>('pantry');
   const [every, setEvery] = useState(false);
   const [count, setCount] = useState<number>();
-  const [progress, setProgress] = useState<SearchTestProgress>();
-  const [summary, setSummary] = useState<string>();
-  const stop = useRef(false);
+  const [test, setTest] = useState<SearchTestState>({});
   const sections: Section[] = which === 'all' ? ['pantry', 'keg', 'pharmacy'] : [which];
+  useEffect(() => watchSearchTest(setTest), []);
   useEffect(() => {
     void searchTestSize(sections, every).then(setCount);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [which, every]);
-  // Keep the screen on while it runs: Android may pause Restock when the screen goes off.
-  useEffect(() => {
-    if (!progress) return;
-    let lock: { release: () => Promise<void> } | undefined;
-    const wake = (navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } }).wakeLock;
-    void wake
-      ?.request('screen')
-      .then((l) => (lock = l))
-      .catch(() => undefined);
-    return () => void lock?.release().catch(() => undefined);
-  }, [!!progress]);
+  const progress = test.progress;
 
   const start = async () => {
-    stop.current = false;
-    setSummary(undefined);
-    setProgress({ done: 0, total: count ?? 0, now: 'Starting…' });
     try {
-      const { file, summary: text } = await runSearchTest(sections, every, setProgress, () => stop.current);
-      setSummary(text);
-      await shareTextFile(
-        `restock-search-test-${new Date().toISOString().slice(0, 10)}.json`,
-        JSON.stringify(file),
-        'application/json',
-        'Restock search test',
-      );
-      nav.toast(stop.current ? 'Stopped. Saved what it found so far.' : 'Search test done and saved.');
+      const how = await startSearchTest(sections, every);
+      if (how === 'saved') nav.toast('Search test done. Send it from here.');
     } catch (e) {
       nav.toast(e instanceof Error ? e.message : String(e));
-    } finally {
-      setProgress(undefined);
     }
   };
 
-  const minutes = Math.max(1, Math.round(((count ?? 0) * 3) / 60));
+  // About 5 seconds a search on a phone: the shop's answer and a pause before the next one.
+  const minutes = Math.max(1, Math.round(((count ?? 0) * 5) / 60));
   return (
     <>
       <div className="eyebrow">Search test</div>
@@ -316,9 +302,9 @@ function SearchTest() {
               <span style={{ width: `${progress.total ? (100 * progress.done) / progress.total : 0}%` }} />
             </div>
             <p className="small" style={{ margin: 0 }}>
-              Keep Restock open until it's done.
+              You can lock the phone or use other apps: it keeps going, and the notification shows how far it's got.
             </p>
-            <button className="btn" onClick={() => (stop.current = true)}>
+            <button className="btn" onClick={stopSearchTest}>
               Stop and save what it has
             </button>
           </>
@@ -328,10 +314,19 @@ function SearchTest() {
           </button>
         )}
         {!isNative() && <p className="small">This works in the Android app.</p>}
-        {summary && (
-          <pre className="small" style={{ whiteSpace: 'pre-wrap', overflowX: 'auto', margin: 0 }}>
-            {summary}
-          </pre>
+        {test.last && !progress && (
+          <>
+            <p className="small" style={{ margin: 0 }}>
+              Last test: {new Date(test.last.at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}
+              {test.last.stoppedEarly ? ' (stopped early)' : ''}
+            </p>
+            <pre className="small" style={{ whiteSpace: 'pre-wrap', overflowX: 'auto', margin: 0 }}>
+              {test.last.summary}
+            </pre>
+            <button className="btn" onClick={() => void shareLastSearchTest()}>
+              Send the last test
+            </button>
+          </>
         )}
       </div>
     </>

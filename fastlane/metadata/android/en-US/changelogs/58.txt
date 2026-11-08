@@ -1,0 +1,1 @@
+Receipt scanning fixed: the reader's English model went missing from the app ("Couldn't load the receipt reader (404)"). Dan Murphy's search fixed. Fewer near misses in search: fabric conditioner, iced coffee, honey-flavoured things; a brand's usual product first. The search test in Diagnostics now runs with the screen off, with a notification and a Stop button.

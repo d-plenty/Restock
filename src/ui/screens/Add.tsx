@@ -71,6 +71,7 @@ import {
   shopDef,
   type Section,
   type StoreChain,
+  kindOf as shopKindOf,
 } from '../../shops';
 
 const SEARCH_PLACEHOLDER: Record<Section, string> = {
@@ -1455,7 +1456,14 @@ export function AddScreen({
                     )}
                   </p>
                 )}
-                {r.status === 'ok' && !r.items.length && <p className="small">No matches at {chainName(chain)}.</p>}
+                {r.status === 'ok' && !r.items.length && (
+                  <p className="small">
+                    No matches at {chainName(chain)}.
+                    {/* A shop read off its website that found nothing may just not be readable yet (0.8.6). */}
+                    {shopKindOf(chain) === 'web' &&
+                      ' If it sells this, its website may not work with Restock yet: Settings → Troubleshooting → Diagnostics → Send search details helps get it fixed.'}
+                  </p>
+                )}
                 {r.status === 'ok' && r.items.length > 0 && !pool.length && <p className="small">Nothing on special at {chainName(chain)}.</p>}
                 {unlikely && (
                   <p className="small">

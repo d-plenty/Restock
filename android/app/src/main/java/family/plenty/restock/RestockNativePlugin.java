@@ -59,6 +59,44 @@ public class RestockNativePlugin extends Plugin {
 
     // ---------- SQL ----------
 
+    // ---------- the search test, with the screen off (0.8.6) ----------
+
+    @PluginMethod
+    public void searchTestStart(PluginCall call) {
+        try {
+            SearchTestService.begin(getContext(), call.getInt("total", 0));
+            call.resolve();
+        } catch (Exception e) {
+            // Android said no (rare): the test still runs while Restock is open.
+            call.reject(e.getMessage());
+        }
+    }
+
+    /** Updates the notification, and says whether its Stop button was tapped. */
+    @PluginMethod
+    public void searchTestProgress(PluginCall call) {
+        SearchTestService.progress(getContext(), call.getInt("done", 0), call.getInt("total", 0), call.getString("text", ""));
+        JSObject out = new JSObject();
+        out.put("stop", SearchTestService.stopAsked);
+        call.resolve(out);
+    }
+
+    @PluginMethod
+    public void searchTestEnd(PluginCall call) {
+        SearchTestService.end(getContext(), call.getString("title"), call.getString("text", ""));
+        call.resolve();
+    }
+
+    /**
+     * A pause that keeps time with the screen off: the WebView's own timers slow right down when
+     * Restock isn't on screen, which would stretch a 1-second pause to a minute.
+     */
+    @PluginMethod
+    public void pause(PluginCall call) {
+        long ms = Math.max(0, Math.min(60000, call.getInt("ms", 1000)));
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(call::resolve, ms);
+    }
+
     @PluginMethod
     public void sqlQuery(final PluginCall call) {
         final String sql = call.getString("sql");

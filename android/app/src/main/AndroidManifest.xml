@@ -284,6 +284,11 @@
             android:name=".SyncService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+        <!-- 0.8.6: the search test in Diagnostics keeps going with the screen off, with a notification. -->
+        <service
+            android:name=".SearchTestService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <receiver
             android:name=".SyncBoot"
             android:exported="false">
@@ -314,6 +319,9 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- 0.8.6: the search test, only while one you started is running. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- A short buzz when something is added to the shopping list. -->
