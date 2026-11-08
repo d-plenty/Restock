@@ -30,24 +30,29 @@ export function HomeScreen() {
   const health = useLive(getHealth, []);
   const failingAll = health ? failingStores(health) : [];
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [dealShop, setDealShopState] = useState<string | undefined>(() => {
+  // The shops whose deals show (0.8.8: pick several, from a menu). None picked: every shop.
+  const [picked, setPickedState] = useState<string[]>(() => {
     try {
-      return localStorage.getItem('homeDealShop') ?? undefined;
+      const many = localStorage.getItem('homeDealShops');
+      if (many) return JSON.parse(many) as string[];
+      const one = localStorage.getItem('homeDealShop');
+      return one ? [one] : [];
     } catch {
-      return undefined;
+      return [];
     }
   });
-  const setDealShop = (c: string | undefined) => {
-    setDealShopState(c);
+  const [shopMenu, setShopMenu] = useState(false);
+  const setPicked = (list: string[]) => {
+    setPickedState(list);
     try {
-      if (c) localStorage.setItem('homeDealShop', c);
-      else localStorage.removeItem('homeDealShop');
+      localStorage.setItem('homeDealShops', JSON.stringify(list));
+      localStorage.removeItem('homeDealShop');
     } catch {
       // storage can be unavailable
     }
   };
-  // Pulling down (or Check now) syncs with the household first, then checks prices, then shares
-  // the new prices with the household. The same run as the other tabs, so only one goes at a time.
+  // Check now syncs with the household first, then checks prices, then shares the new prices with
+  // the household. Pulling down only syncs (0.8.8). One run at a time, across every tab.
   const refresh = useFullRefresh((res) => setErrors(res.errors as Record<string, string>));
   const progress = refresh.stage === 'prices' ? (refresh.progress ?? [0, 1]) : undefined;
 
@@ -101,7 +106,8 @@ export function HomeScreen() {
   const dealShops = [...new Set(recs.map(dealChain).filter((c): c is NonNullable<typeof c> => !!c))].sort((a, b) =>
     chainName(a).localeCompare(chainName(b)),
   );
-  const atShop = (r: (typeof recs)[number]) => !dealShop || !dealShops.includes(dealShop as never) || dealChain(r) === dealShop;
+  const showing = picked.filter((c) => dealShops.includes(c as never));
+  const atShop = (r: (typeof recs)[number]) => !showing.length || showing.includes(dealChain(r) ?? '');
   const buys = recs.filter((r) => r.action === 'buy' && atShop(r));
   const altDeals = recs.filter((r) => r.action === 'alt' && atShop(r));
   const smalls = recs.filter((r) => r.action === 'small' && atShop(r));
@@ -130,19 +136,24 @@ export function HomeScreen() {
             <Icon name="settings" size={20} />
           </button>
         </div>
-        <div className="chips" style={{ margin: '2px 0 4px' }}>
-          <button className="chip" onClick={() => nav.push({ name: 'cards' })}>
-            <Icon name="card" size={16} /> Loyalty cards
+        {/* Fixed tiles, not a row that scrolls sideways (0.8.8): easier to hit, nothing to swipe. */}
+        <div className="home-links" style={{ gridTemplateColumns: `repeat(${settings.receipts.enabled ? 4 : 3}, 1fr)` }}>
+          <button onClick={() => nav.push({ name: 'cards' })}>
+            <Icon name="card" size={22} />
+            <span>Loyalty cards</span>
           </button>
-          <button className="chip" onClick={() => nav.push({ name: 'catalogues' })}>
-            <Icon name="book" size={16} /> Catalogues
+          <button onClick={() => nav.push({ name: 'catalogues' })}>
+            <Icon name="book" size={22} />
+            <span>Catalogues</span>
           </button>
-          <button className="chip" onClick={() => nav.push({ name: 'specials' })}>
-            <Icon name="flame" size={16} /> Specials
+          <button onClick={() => nav.push({ name: 'specials' })}>
+            <Icon name="flame" size={22} />
+            <span>Specials</span>
           </button>
           {settings.receipts.enabled && (
-            <button className="chip" onClick={() => nav.push({ name: 'receipts' })}>
-              <Icon name="receipt" size={16} /> Receipts
+            <button onClick={() => nav.push({ name: 'receipts' })}>
+              <Icon name="receipt" size={22} />
+              <span>Receipts</span>
             </button>
           )}
         </div>
@@ -171,8 +182,8 @@ export function HomeScreen() {
                     : 'Prices not checked yet'}
               </span>
               {isNative() && (
-                <button className="linkish" onClick={runCheck} aria-label="Check prices and stock now">
-                  <Icon name="refresh" size={14} /> Check now
+                <button className="btn primary small check-now" onClick={runCheck} aria-label="Check prices and stock now">
+                  <Icon name="refresh" size={16} /> Check now
                 </button>
               )}
             </>
@@ -180,7 +191,7 @@ export function HomeScreen() {
         </div>
         {isNative() && !refresh.busy && (
           <span className="small">
-            {refresh.paired ? 'Pull down to sync and check prices.' : 'Pull down to check prices.'}{' '}
+            {refresh.paired ? 'Pull down to sync with your household. ' : ''}
             {settings.sync.backgroundActivity
               ? settings.checkIntervalHours >= 168
                 ? `Also checks every ${WEEKDAYS[settings.checkWeekday]}.`
@@ -343,23 +354,60 @@ export function HomeScreen() {
       )}
 
       {dealShops.length > 1 && (
-        <div className="chips deal-shops" role="tablist" aria-label="Deals at">
-          <button
-            role="tab"
-            className="chip"
-            aria-selected={!dealShop || !dealShops.includes(dealShop as never)}
-            aria-pressed={!dealShop || !dealShops.includes(dealShop as never)}
-            onClick={() => setDealShop(undefined)}
-          >
-            All shops
-          </button>
-          {dealShops.map((c) => (
-            <button key={c} role="tab" className="chip" aria-selected={dealShop === c} aria-pressed={dealShop === c} onClick={() => setDealShop(c)}>
-              <ChainDot chain={c} /> {chainName(c)}
-              {dealRecs.some((r) => dealChain(r) === c) && <span className="ph-count">{dealRecs.filter((r) => dealChain(r) === c).length}</span>}
+        <>
+          {/* All shops, or the ones you pick from a menu (0.8.8: was a row of every shop). */}
+          <div className="deal-shops" role="group" aria-label="Deals at">
+            <button
+              className="chip"
+              aria-pressed={!showing.length}
+              onClick={() => {
+                setPicked([]);
+                setShopMenu(false);
+              }}
+            >
+              All shops
             </button>
-          ))}
-        </div>
+            <button className="chip" aria-pressed={showing.length > 0} aria-expanded={shopMenu} onClick={() => setShopMenu(!shopMenu)}>
+              {showing.length === 1 ? (
+                <>
+                  <ChainDot chain={showing[0] as StoreChain} /> {chainName(showing[0] as StoreChain)}
+                </>
+              ) : showing.length > 1 ? (
+                `${showing.length} shops`
+              ) : (
+                'Choose shops'
+              )}
+              <span className={`deal-caret${shopMenu ? ' open' : ''}`} aria-hidden>
+                <Icon name="chevron" size={14} />
+              </span>
+            </button>
+          </div>
+          {shopMenu && (
+            <div className="card flush deal-menu">
+              {dealShops.map((c) => {
+                const n = dealRecs.filter((r) => dealChain(r) === c).length;
+                const on = showing.includes(c);
+                return (
+                  <label key={c} className="row">
+                    <input type="checkbox" checked={on} onChange={() => setPicked(on ? showing.filter((x) => x !== c) : [...showing, c])} />
+                    <ChainDot chain={c} />
+                    <span className="grow">{chainName(c)}</span>
+                    {n > 0 && <span className="small">{n === 1 ? '1 deal' : `${n} deals`}</span>}
+                  </label>
+                );
+              })}
+              <div className="row">
+                <button className="btn small" onClick={() => setPicked([])}>
+                  Show all
+                </button>
+                <span className="grow" />
+                <button className="btn primary small" onClick={() => setShopMenu(false)}>
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
       {buys.length > 0 && <div className="eyebrow green">On sale now</div>}
       {buys.map((r) => (

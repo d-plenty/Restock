@@ -3258,6 +3258,56 @@ details.fold-inline {
 /* Home: deals at one shop (0.7.4). */
 .deal-shops {
   margin: 4px 0 -2px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* The shops menu for deals on Home (0.8.8). */
+.deal-caret {
+  display: inline-flex;
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+}
+.deal-caret.open {
+  transform: rotate(-90deg);
+}
+.deal-menu .row {
+  gap: 10px;
+}
+.deal-menu input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--green-solid);
+}
+/* Loyalty cards, catalogues, specials, receipts on Home: fixed tiles (0.8.8). */
+.home-links {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0;
+}
+.home-links button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 72px;
+  padding: 10px 4px;
+  border-radius: 14px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}
+.home-links button:active {
+  background: var(--line);
+}
+.checkline .check-now {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 .deal-shops .chip {
   display: inline-flex;

@@ -7,8 +7,10 @@ import { isNative } from '../stores/http';
 import { LoadingBar, usePullToRefresh } from './components';
 import { useNav } from './nav';
 
-// Pull down on Home, Pantry, Keg, Pharmacy or the shopping list for a full update (0.8.2): sync
-// with the household, check prices, then sync again so the other phones get the new prices.
+// Check now on Home does a full update (0.8.2): sync with the household, check prices, then sync
+// again so the other phones get the new prices. Pulling down on Home, Pantry, Keg, Pharmacy or
+// the shopping list only syncs (0.8.8): a pull is easy to do by accident, and every price check
+// asks each shop about each item.
 
 export type RefreshStage = 'sync' | 'prices' | 'share';
 
@@ -74,12 +76,22 @@ export function useFullRefresh(onChecked?: (res: CheckResult) => void) {
     });
   };
 
-  const pull = usePullToRefresh(
-    run,
-    !!stage,
-    paired ? 'Pull to sync and check prices' : 'Pull to check prices',
-    paired ? 'Let go to sync and check prices' : 'Let go to check prices',
-  );
+  /** Just syncs with the household's other phones. */
+  const syncOnly = () => {
+    if (running) return;
+    running = (async () => {
+      if (!isNative()) return;
+      setStage('sync');
+      const r = await RestockNative.syncNow().catch(() => undefined);
+      nav.toast(r?.reached ? `Synced with ${r.reached === 1 ? 'your household' : `${r.reached} phones`}` : "Couldn't find the household's other phones");
+    })().finally(() => {
+      running = undefined;
+      setStage(undefined);
+    });
+  };
+
+  // Not in a household: pulling does nothing at all.
+  const pull = usePullToRefresh(syncOnly, !!stage || !paired, 'Pull to sync with your household', 'Let go to sync');
   const status = stage ? (
     <div className="refresh-status" role="status">
       <span className="small">{refreshText(stage, progress)}</span>

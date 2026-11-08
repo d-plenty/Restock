@@ -524,7 +524,7 @@ export function SettingsScreen() {
         <Logo size={40} />
       </div>
       <p className="small" style={{ textAlign: 'center' }}>
-        Restock {version} beta · free and open source
+        Restock {version} public beta · free and open source
         <br />
         Your data stays on this phone, and your household's phones only if you share
         <br />

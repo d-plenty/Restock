@@ -1152,26 +1152,42 @@ export function Logo({ size = 56 }: { size?: number }) {
  */
 export function usePullToRefresh(onRefresh: () => void, disabled = false, pullText = 'Pull to check prices', letGoText = 'Let go to check prices') {
   const [pull, setPull] = useState(0);
-  const start = useRef<number | undefined>(undefined);
-  const THRESHOLD = 70;
+  // Less easy to set off by accident (0.8.8): it only counts once the finger has clearly gone
+  // down, not sideways (swiping through cards), and has to go further before letting go does it.
+  const start = useRef<{ x: number; y: number; dir?: 'down' | 'other' } | undefined>(undefined);
+  const THRESHOLD = 100;
+  const DEAD = 14;
   const props = {
     onTouchStart: (e: React.TouchEvent<HTMLDivElement>) => {
-      start.current = !disabled && e.currentTarget.scrollTop <= 0 ? e.touches[0].clientY : undefined;
+      const t = e.touches[0];
+      start.current = !disabled && e.currentTarget.scrollTop <= 0 && e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : undefined;
     },
     onTouchMove: (e: React.TouchEvent<HTMLDivElement>) => {
-      if (start.current === undefined) return;
-      const dy = e.touches[0].clientY - start.current;
-      setPull(dy > 0 ? Math.min(110, dy * 0.6) : 0);
+      const s0 = start.current;
+      if (!s0) return;
+      const t = e.touches[0];
+      const dx = t.clientX - s0.x;
+      const dy = t.clientY - s0.y;
+      if (!s0.dir) {
+        if (Math.abs(dx) < DEAD && Math.abs(dy) < DEAD) return;
+        s0.dir = dy > 0 && dy > Math.abs(dx) * 2 ? 'down' : 'other';
+      }
+      if (s0.dir !== 'down') return;
+      setPull(dy > DEAD ? Math.min(140, (dy - DEAD) * 0.5) : 0);
     },
     onTouchEnd: () => {
-      if (pull >= THRESHOLD) onRefresh();
+      if (pull >= THRESHOLD && start.current?.dir === 'down') onRefresh();
+      start.current = undefined;
+      setPull(0);
+    },
+    onTouchCancel: () => {
       start.current = undefined;
       setPull(0);
     },
   };
   const indicator =
-    pull > 8 ? (
-      <div className="pull" style={{ height: pull }} aria-hidden>
+    pull > 12 ? (
+      <div className="pull" style={{ height: Math.min(pull, 110) }} aria-hidden>
         <Icon name="refresh" size={18} />
         <span>{pull >= THRESHOLD ? letGoText : pullText}</span>
       </div>

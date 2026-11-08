@@ -1,0 +1,1 @@
+Public beta. Pulling down now only syncs with your household; Check now on Home checks prices, and is a proper button. Pulling is harder to set off by accident, and swiping sideways no longer starts it. Home's shortcuts (loyalty cards, catalogues, specials, receipts) are fixed tiles, and deals have All shops and a Choose shops list to pick one or more shops.
