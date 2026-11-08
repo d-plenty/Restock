@@ -56,6 +56,8 @@ Your Woolworths account, only if you sign in to it inside Restock: you sign in o
 
 Diagnostics recordings, only when you start one: while you add something to a shop's trolley yourself, Restock notes what that shop's own page asks its servers. Sign-in, account, payment and tracking calls are left out, and names, emails, addresses, card and member numbers are blanked. The recording stays on your phone unless you choose to share it.
 
+Search test and "Wrong results?" files, only when you make one: the words searched and what the shops sent back for them, saved in a file on your phone. There's nothing about you, your items or your store in it, and it goes nowhere unless you choose to share it.
+
 Open Food Facts (openfoodfacts.org): when you scan a barcode or open a product's details, the barcode number is sent to look up the product's name, ingredients, allergens and nutrition. Nothing else is sent.
 
 OpenStreetMap (Nominatim and Overpass): when you look for nearby stores, the suburb or postcode you type, or your approximate position, is sent to find the closest supermarkets, bottle shops or pharmacies. Nothing else is sent.

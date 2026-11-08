@@ -57,37 +57,11 @@ vi.mock('../../src/lib/db', () => {
 
 const { adapterFor } = await import('../../src/stores/index');
 const { SHOPS } = await import('../../src/shops');
-const { matchesFor, likeThis, bestScore, normaliseQuery, UNLIKELY, scoreAll, topPicks } = await import('../../src/lib/searchHelp');
+const { matchesFor, likeThis, bestScore, normaliseQuery, UNLIKELY, scoreAll, topPicks, intendedKind, weakShops } = await import('../../src/lib/searchHelp');
+const { mark, scorecard } = await import('../../src/lib/searchScore');
 const { genericName } = await import('../../src/lib/naming');
 
-// Everyday words people type: plain, with a brand, with a size, Aussie names, and a few typos.
-const WORDS: Record<string, string[]> = {
-  pantry: [
-    'milk', 'full cream milk 2l', 'lactose free milk', 'oat milk', 'butter', 'western star butter', 'margarine', 'eggs', 'free range eggs 12',
-    'bread', 'wholemeal bread', 'tip top bread', 'wraps', 'cheese', 'tasty cheese 500g', 'mozzarella', 'yoghurt', 'greek yoghurt', 'cream',
-    'chicken breast', 'chicken thigh', 'mince', 'beef mince 500g', 'sausages', 'snags', 'bacon', 'ham', 'salmon', 'tuna', 'john west tuna',
-    'bananas', 'apples', 'potatoes', 'onions', 'tomatoes', 'avocado', 'carrots', 'broccoli', 'lettuce', 'frozen peas', 'frozen chips',
-    'rice', 'basmati rice', 'pasta', 'spaghetti', 'pasta sauce', 'dolmio', 'flour', 'sugar', 'olive oil', 'canola oil', 'salt',
-    'weet-bix', 'weetbix', 'corn flakes', 'oats', 'peanut butter', 'vegemite', 'jam', 'honey', 'nutella', 'baked beans',
-    'coffee', 'instant coffee', 'moccona', 'coffee beans', 'coffee pods', 'tea bags', 'milo', 'coke', 'coca cola 24 pack', 'pepsi max',
-    'sparkling water', 'orange juice', 'chips', 'smiths chips', 'tim tams', 'chocolate', 'cadbury dairy milk', 'biscuits', 'ice cream',
-    'toilet paper', 'loo paper', 'paper towel', 'tissues', 'dishwashing liquid', 'dishwasher tablets', 'finish dishwasher tablets',
-    'laundry powder', 'laundry liquid', 'fabric softener', 'bin bags', 'cling wrap', 'shampoo', 'conditioner', 'body wash', 'deodorant',
-    'toothpaste', 'toothbrush', 'nappies', 'huggies nappies', 'baby wipes', 'formula', 'dog food', 'cat food', 'kitty litter',
-    'chiken breast', 'banannas', 'toilet paper 24',
-  ],
-  keg: [
-    'beer', 'great northern', 'great northern 30 pack', 'xxxx gold', 'xxxx gold cans', 'vb', 'victoria bitter', 'corona', 'stone & wood',
-    'pale ale', 'cider', 'shiraz', 'sauvignon blanc', 'prosecco', 'rose', 'red wine', 'vodka', 'smirnoff', 'bourbon', 'jim beam',
-    'bundaberg rum', 'gin', 'tequila', 'whisky', 'premix', 'canadian club and dry', 'seltzer', 'zero alcohol beer',
-  ],
-  pharmacy: [
-    'paracetamol', 'panadol', 'panadol rapid', 'ibuprofen', 'nurofen', 'antihistamine', 'hayfever tablets', 'cold and flu', 'cough syrup',
-    'vitamin d', 'vitamin c', 'multivitamin', 'fish oil', 'magnesium', 'probiotic', 'sunscreen', 'sunscreen spf 50', 'moisturiser',
-    'toothpaste', 'mouthwash', 'band aids', 'first aid kit', 'hand sanitiser', 'nappy rash cream', 'baby panadol', 'electrolytes',
-    'hydralyte', 'pregnancy test', 'face wash', 'razor',
-  ],
-};
+const { SEARCH_WORDS: WORDS } = await import('../../src/lib/searchWords');
 const tabs = process.env.TABS?.split(',').map((s) => s.trim());
 const pickShops = process.env.SHOPS?.split(',').map((s) => s.trim());
 const shops = SHOPS.filter((s) => (pickShops ? pickShops.includes(s.id) || pickShops.includes(s.section) : tabs ? tabs.includes(s.section) : true));
@@ -149,6 +123,23 @@ describe('big search test', () => {
         await pause();
       }
     }
+    // Shops with nothing like a word, searched again for what it is, as the app does (0.8.6):
+    // "western star" is butter at Woolworths, so Aldi is searched for butter.
+    for (const [word, at] of byWord) {
+      const text = normaliseQuery(word);
+      const scored = Object.fromEntries([...at.keys()].map((shop) => [shop, scoreAll({ text }, (raw[`${shop}|${word}`] ?? []) as never)]));
+      const kind = intendedKind({ text }, scored);
+      if (!kind) continue;
+      for (const shop of weakShops(scored)) {
+        try {
+          raw[`${shop}|${word}|${kind}`] = await adapterFor(shop)!.search(kind, undefined as never);
+          lines.push(`${shop.padEnd(24)} ${word.padEnd(26)} nothing like it, so searched "${kind}": ${raw[`${shop}|${word}|${kind}`].length} results`);
+        } catch {
+          // that shop didn't answer
+        }
+        await pause();
+      }
+    }
     // What Restock would recommend at the other shops after you tick the top result at the first shop.
     for (const [word, at] of byWord) {
       const chains = [...at.keys()];
@@ -182,6 +173,9 @@ describe('big search test', () => {
     writeFileSync(join(out, 'ranked.json'), JSON.stringify(rows, null, 1));
     writeFileSync(join(out, 'recommend.json'), JSON.stringify(recs, null, 1));
     writeFileSync(join(out, 'raw.json'), JSON.stringify(raw));
-    console.log(`\nSaved in ${out}: report.txt, ranked.json, recommend.json, raw.json`);
+    const card = scorecard(mark(raw as never));
+    writeFileSync(join(out, 'scorecard.txt'), card);
+    console.log(`\n${card.split('\n\n')[0]}`);
+    console.log(`\nSaved in ${out}: report.txt, scorecard.txt, ranked.json, recommend.json, raw.json`);
   });
 });

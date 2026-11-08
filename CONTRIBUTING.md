@@ -25,6 +25,10 @@ This is the single most useful thing you can attach:
 
 The file has the shop's own answer to that one search, and nothing about you, your items or your list. With it, a broken connection can usually be fixed in one go.
 
+### Search gave you the wrong things? Send them
+
+Under any shop's results in Restock, tap **Wrong results? Save them for the developer** and attach the file to a **Wrong product or price** issue, with what you expected to see. It has the search and that shop's results, nothing else. To help more widely, run **Settings → Troubleshooting → Diagnostics → Search test**: it searches a list of everyday words at your shops and saves one file to attach.
+
 ### Keep it private
 
 Issues are public. Leave out loyalty card numbers, backup files, your address and anything else personal, and crop screenshots if needed. To report a security problem, see [SECURITY.md](SECURITY.md) instead.

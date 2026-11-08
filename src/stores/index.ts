@@ -86,6 +86,18 @@ function fakeAdapter(chain: StoreChain): StoreAdapter {
     pages: ['woolworths', 'coles', 'aldi'].includes(chain),
     search: async (term: string, _storeId?: string, page = 1) => {
       const grocer = chain === 'woolworths' || chain === 'coles';
+      // "western star": Woolworths and Coles sell it, Aldi only has things with "star" in them (0.8.6).
+      const fake = (id: string, name: string, size: string, price: number) => ({ ...earth(id, name, size, price), brand: undefined });
+      if (/^western star$/i.test(term.trim()))
+        return chain === 'aldi'
+          ? [fake('st1', 'Chocolate Drizzle Stars 150g', '150g', 3.49), fake('st2', '4 Star Grass Fed Beef Mince 500g', '500g', 8.99), fake('st3', '2 Star Beef Mince 500g', '500g', 6.49)]
+          : [
+              { ...fake('ws1', 'Western Star Salted Butter Block 250g', '250g', 5.5), brand: 'Western Star' },
+              { ...fake('ws2', 'Western Star Salted Butter Block 500g', '500g', 8), brand: 'Western Star' },
+              { ...fake('ws3', 'Western Star Original Spreadable Butter Blend Tub 500g', '500g', 7), brand: 'Western Star' },
+            ];
+      if (/^butter$/i.test(term.trim()) && chain === 'aldi')
+        return [fake('b1', 'Salted Butter 500g', '500g', 6.39), fake('b2', 'Unsalted Butter 500g', '500g', 6.39), fake('b3', 'Spreadable Dairy Blend 500g', '500g', 5.49)];
       // "milk": two pages of results, to try "Show more" and "Get more" (0.8.5).
       if (/^milk$/i.test(term.trim())) {
         const kinds = ['Full Cream Milk', 'Light Milk', 'Skim Milk', 'Lactose Free Milk', 'Oat Milk', 'Almond Milk', 'Chocolate Milk', 'Farmhouse Unhomogenised Milk'];

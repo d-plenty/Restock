@@ -26,6 +26,8 @@ import {
 } from '../../lib/db';
 import { addGroupToList } from '../../lib/listActions';
 import { genericName, nameHasSize } from '../../lib/naming';
+import { shareTextFile } from '../../lib/backup';
+import { slim } from '../../lib/searchTest';
 import {
   bestMatches,
   bestScore,
@@ -47,6 +49,8 @@ import {
   scoreAll,
   surePick,
   topPicks,
+  intendedKind,
+  weakShops,
   type Scored,
 } from '../../lib/searchHelp';
 import { money, packSize, tidySize } from '../../lib/units';
@@ -249,6 +253,11 @@ export function AddScreen({
   // A scan that only told us the brand: the brand's products across your shops, to pick from.
   const [candidates, setCandidates] = useState<Candidate[]>();
   const [showUnlikely, setShowUnlikely] = useState<Partial<Record<Chain, boolean>>>({});
+  // A shop that came back with nothing like a typed search, searched again for the kind of thing
+  // it is ("western star" → that shop's butter), and whether to show what it first found (0.8.6).
+  const [instead, setInstead] = useState<Partial<Record<Chain, { kind: string; items: StoreProduct[]; top: string[] }>>>({});
+  const [original, setOriginal] = useState<Partial<Record<Chain, boolean>>>({});
+  const insteadFor = useRef<string | undefined>(undefined);
   // After a match at one shop: the other shops being searched again by the product's type, and
   // similar products at shops that don't sell that brand.
   const [following, setFollowing] = useState<Chain[]>([]);
@@ -366,6 +375,9 @@ export function AddScreen({
     setAuto(undefined);
     setCandidates(undefined);
     setShowUnlikely({});
+    setInstead({});
+    setOriginal({});
+    insteadFor.current = undefined;
     setFollowing([]);
     setSimilar({});
     followFor.current = undefined;
@@ -425,6 +437,66 @@ export function AddScreen({
     toggle(sp);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results, searched, rankQ]);
+
+  // Once every shop has answered a typed search: shops with nothing like it are searched again for
+  // what it is, worked out from the shops that do have it ("western star" is butter at Woolworths
+  // and Coles, so Aldi is searched for butter), or from the brands Restock knows (0.8.6).
+  useEffect(() => {
+    if (rankQ.barcode || onlyChain || !searched.length || insteadFor.current === rankQ.text) return;
+    const answers = searched.map((c) => results[c]);
+    if (answers.some((r) => !r || r.status === 'loading')) return;
+    insteadFor.current = rankQ.text;
+    const byChain = Object.fromEntries(
+      searched.filter((c) => results[c]?.status === 'ok').map((c) => [c, (results[c] as { scored?: Scored[] }).scored ?? []]),
+    );
+    const weak = weakShops(byChain) as StoreChain[];
+    const kind = weak.length ? intendedKind(rankQ, byChain) : undefined;
+    if (!kind) return;
+    const tag = rankQ.text;
+    void (async () => {
+      const s = settings ?? (await getSettings());
+      await Promise.all(
+        weak.map(async (chain) => {
+          const a = adapterFor(chain);
+          if (!a) return;
+          const found = await a.search(kind, searchStoreId(s, chain)).catch(() => [] as StoreProduct[]);
+          if (insteadFor.current !== tag) return;
+          const scored = scoreAll({ text: kind }, found);
+          if (!scored.length || scored[0].s < UNLIKELY) return;
+          setInstead((m) => ({ ...m, [chain]: { kind, items: scored.map((x) => x.sp), top: topPicks(scored).map(keyOf) } }));
+        }),
+      );
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results, searched, rankQ]);
+
+  /**
+   * "Wrong results?": saves what this shop sent back for this search into a file to send to the
+   * developer, so it becomes a test that search has to get right (0.8.6). Only the search and the
+   * shop's results: nothing about you or your pantry.
+   */
+  const reportWrong = async (chain: StoreChain) => {
+    const r = results[chain];
+    const alt = instead[chain];
+    const file = {
+      app: 'restock',
+      kind: 'wrong-results',
+      version: __APP_VERSION__,
+      at: new Date().toISOString(),
+      shop: chain,
+      shopName: chainName(chain),
+      tab: section,
+      search: lastText,
+      results: r?.status === 'ok' ? r.items.slice(0, 60).map(slim) : [],
+      instead: alt ? { kind: alt.kind, results: alt.items.slice(0, 60).map(slim) } : undefined,
+    };
+    await shareTextFile(
+      `restock-wrong-results-${chain}-${new Date().toISOString().slice(0, 10)}.json`,
+      JSON.stringify(file, null, 1),
+      'application/json',
+      'Restock wrong results',
+    );
+  };
 
   /** Switch which kind of shop to search, and search again there. */
   const switchSection = (sec: Section) => {
@@ -1295,7 +1367,11 @@ export function AddScreen({
         return searched
           .filter((c) => results[c])
           .map((chain) => {
-            const r = results[chain]!;
+            const alt = instead[chain];
+            const useAlt = !!alt && !original[chain];
+            const first = results[chain]!;
+            const firstCount = first.status === 'ok' ? first.items.length : 0;
+            const r: ChainResult = useAlt ? { status: 'ok', items: alt.items, top: alt.top } : first;
             if (r.status === 'error' && !isNative()) return null;
             const limit = showing[chain] ?? FIRST_PAGE;
             const pool = r.status === 'ok' ? r.items.filter((sp) => !specialsOnly || sp.isSpecial) : [];
@@ -1306,6 +1382,7 @@ export function AddScreen({
               by === 'relevant' ? [...ordered.filter((sp) => picks.has(keyOf(sp))), ...ordered.filter((sp) => !picks.has(keyOf(sp)))] : ordered;
             // A shop with nothing like what you scanned or typed (wine and tofu for a dishwashing liquid).
             const unlikely =
+              !useAlt &&
               r.status === 'ok' &&
               !!rankQ.text &&
               likely.size > 0 &&
@@ -1363,6 +1440,20 @@ export function AddScreen({
                       </div>
                     )}
                   </div>
+                )}
+                {alt && (
+                  <p className="small">
+                    {useAlt && (
+                      <>
+                        {chainName(chain)} doesn’t seem to have “{lastText}”. Its {alt.kind} instead:{' '}
+                      </>
+                    )}
+                    {(useAlt ? firstCount > 0 : true) && (
+                      <button className="linkish small" onClick={() => setOriginal((m) => ({ ...m, [chain]: !m[chain] }))}>
+                        {useAlt ? `Show what it found for “${lastText}” (${firstCount})` : `Show ${chainName(chain)}’s ${alt.kind} instead`}
+                      </button>
+                    )}
+                  </p>
                 )}
                 {r.status === 'ok' && !r.items.length && <p className="small">No matches at {chainName(chain)}.</p>}
                 {r.status === 'ok' && r.items.length > 0 && !pool.length && <p className="small">Nothing on special at {chainName(chain)}.</p>}
@@ -1459,6 +1550,11 @@ export function AddScreen({
                 {left <= 0 && more && r.status === 'ok' && (
                   <button className="btn ghost small" disabled={r.loadingMore} onClick={() => void loadMore(chain)}>
                     {r.loadingMore ? `Getting more from ${chainName(chain)}…` : `Get more from ${chainName(chain)}`}
+                  </button>
+                )}
+                {first.status === 'ok' && !rankQ.barcode && isNative() && (
+                  <button className="linkish small" style={{ alignSelf: 'flex-end' }} onClick={() => void reportWrong(chain)}>
+                    Wrong results? Save them for the developer
                   </button>
                 )}
               </section>

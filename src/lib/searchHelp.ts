@@ -1,4 +1,6 @@
-import { score, stem, tokens, typedSize, type RankQuery } from '../stores/rank';
+import { nameOnly, score, stem, tokens, typedSize, type RankQuery } from '../stores/rank';
+import { brandKind } from './brandKinds';
+import { kindOf } from './naming';
 import type { StoreProduct } from '../stores/types';
 import { formatUnitPrice, packSize, tidyUnitText, unitPrice } from './units';
 
@@ -9,6 +11,9 @@ import { formatUnitPrice, packSize, tidyUnitText, unitPrice } from './units';
 const SYNONYMS: [RegExp, string][] = [
   [/\b(loo|dunny|bog) (paper|roll)s?\b/g, 'toilet paper'],
   [/\btp\b/g, 'toilet paper'],
+  // Shops write it out (0.8.6).
+  [/\bvb\b/g, 'victoria bitter'],
+  [/\bcoke\b/g, 'coca cola'],
   [/\bloo rolls?\b/g, 'toilet paper'],
   [/\bsoft ?drinks?\b/g, 'soft drink'],
   [/\bfizzy drinks?\b/g, 'soft drink'],
@@ -547,4 +552,45 @@ export function surePick(q: RankQuery, byChain: Partial<Record<string, Scored[]>
     if (sizeOk && countOk && (!best || top.s > best.s)) best = top;
   }
   return best?.sp;
+}
+
+// ---------- the same kind of thing, at a shop that doesn't have what you typed (0.8.6) ----------
+
+/**
+ * What a typed search is after, for searching again at shops that came back with nothing like it.
+ * A search that names a kind ("western star butter") is after that kind. A search that's only a
+ * name ("western star") is after whatever the shops that do have it say it is (all butter at
+ * Woolworths and Coles), or failing that, what Restock knows that brand to be. Undefined when
+ * there's nothing better to search for than what you typed.
+ */
+export function intendedKind(q: RankQuery, byChain: Partial<Record<string, Scored[]>>): string | undefined {
+  if (q.barcode) return undefined;
+  const typed = q.text.trim().toLowerCase();
+  const own = kindOf(typed);
+  // "panadol", "milo": brands that name the thing itself still mean a kind (paracetamol, drinking chocolate).
+  const brandItem = !!own && !!brandKind(typed) && tokens(own).every((t) => tokens(typed).includes(t));
+  const kind = (() => {
+    if (!nameOnly(tokens(typed)) && !brandItem) return own;
+    const votes = new Map<string, number>();
+    let picks = 0;
+    for (const scored of Object.values(byChain)) {
+      if (!scored?.length || scored[0].s < GOOD) continue;
+      for (const sp of topPicks(scored)) {
+        picks++;
+        const k = kindOf(sp.name);
+        if (k && !tokens(typed).includes(stem(k))) votes.set(k, (votes.get(k) ?? 0) + 1);
+      }
+    }
+    const [best] = [...votes.entries()].sort((a, b) => b[1] - a[1]);
+    if (best && best[1] * 2 >= picks) return best[0];
+    return brandKind(typed);
+  })();
+  return kind && kind !== typed ? kind : undefined;
+}
+
+/** Shops whose results are nothing like the search (or that found nothing at all). */
+export function weakShops(byChain: Partial<Record<string, Scored[]>>): string[] {
+  return Object.entries(byChain)
+    .filter(([, scored]) => !scored?.length || scored[0].s < UNLIKELY)
+    .map(([chain]) => chain);
 }

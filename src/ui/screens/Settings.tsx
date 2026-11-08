@@ -436,7 +436,7 @@ export function SettingsScreen() {
       </div>
       <div className="card flush">
         {row('Test connections', 'Try a search at each shop and see what happens', () => setTesting(true))}
-        {row('Diagnostics', 'What went wrong lately, and send search details', () => nav.push({ name: 'diagnostics' }))}
+        {row('Diagnostics', 'What went wrong lately, the search test and search details', () => nav.push({ name: 'diagnostics' }))}
         {row('Permissions', 'Notifications, alarms, camera, location', () => nav.push({ name: 'permissions' }))}
         <details className="pick-more fold-inline">
           <summary>

@@ -245,6 +245,12 @@ const DIFFERENT: [string, string][] = [
   ['face', 'wash'],
   ['body', 'wash'],
   ['microwave', 'rice'],
+  // Not potato chips (0.8.6).
+  ['banana', 'chips'],
+  ['lentil', 'chips'],
+  ['kale', 'chips'],
+  ['breast', 'chips'],
+  ['chocolate', 'chips'],
 ];
 /** One word of such a pair typed, the other not, and the pair in the name: a different product. */
 function different(q: string[], name: string): boolean {
@@ -267,6 +273,19 @@ export function typedSize(text: string): { size?: ParsedSize; count?: number } {
   return { size: size ? parseSize(size[1]) : undefined, count: count ? parseInt(count[1] ?? count[2], 10) : undefined };
 }
 
+/** Kinds that belong to a wider one, for a search for the wider one (stemmed words, as tokens() makes them). */
+const FAMILY: Record<string, string[]> = {
+  'red wine': ['shiraz', 'cabernet', 'merlot', 'pinot noir', 'grenache', 'tempranillo', 'malbec', 'sangiovese', 'montepulciano', 'durif', 'red blend'],
+  'white wine': ['sauvignon blanc', 'chardonnay', 'pinot grigio', 'pinot gri', 'riesling', 'moscato', 'semillon', 'fiano', 'vermentino', 'white blend'],
+  beer: ['lager', 'pale ale', 'ale', 'stout', 'ipa', 'pilsner', 'bitter', 'draught', 'larger'],
+  spirit: ['vodka', 'gin', 'rum', 'whisky', 'whiskey', 'bourbon', 'tequila', 'brandy'],
+};
+
+/** No word in the search names a kind of product: it's a brand or a product's name (0.8.6). */
+export function nameOnly(qTokens: string[]): boolean {
+  return qTokens.length > 0 && !qTokens.some((t) => NOUNS.has(t)) && !kindOf(qTokens.join(' '));
+}
+
 export function score(q: RankQuery, p: StoreProduct, index?: number): number {
   if (isExactBarcode(q, p)) return 10 - (index ?? 0) * 0.001;
   const qTokens = [...new Set(tokens(q.text))];
@@ -274,7 +293,10 @@ export function score(q: RankQuery, p: StoreProduct, index?: number): number {
   const pTokens = [...new Set(tokens(name))];
   if (!qTokens.length) return 0.5 - (index ?? 0) * 0.004;
 
-  const matched = qTokens.filter((t) => pTokens.some((u) => close(t, u))).length;
+  // A family word: "red wine" is a shiraz or a merlot even when the name doesn't say "red wine" (0.8.6).
+  const family = FAMILY[qTokens.join(' ')];
+  const inFamily = !!family && family.some((m) => ` ${pTokens.join(' ')} `.includes(` ${m} `));
+  const matched = inFamily ? qTokens.length : qTokens.filter((t) => pTokens.some((u) => close(t, u))).length;
   let s = matched / qTokens.length;
 
   // You typed the brand first ("coca cola 24 pack", "cadbury dairy milk", "nutella"): every one of
@@ -283,6 +305,11 @@ export function score(q: RankQuery, p: StoreProduct, index?: number): number {
   const brandWords = tokens(p.brand);
   const brandLed = brandWords.length > 0 && close(qTokens[0], brandWords[0]);
   const justBrand = brandLed && qTokens.every((t) => brandWords.some((b) => close(t, b)));
+  // A name, not a kind of thing ("western star", "smirnoff", "great northern"): no word in it says
+  // what the product is (0.8.6). Shops match any one of its words, so "star" brings up 2 Star beef
+  // mince and chocolate stars. Without its first word, a result isn't that product at all.
+  const named = nameOnly(qTokens);
+  if (named && qTokens.length > 1 && !pTokens.some((u) => close(qTokens[0], u))) s -= 0.5;
 
   const extras = pTokens.filter((u) => !qTokens.some((t) => close(t, u))).length;
   // A smaller cap (0.8.5): a long, descriptive name ("Milo Malt Drinking Chocolate Powder Hot or
@@ -324,7 +351,7 @@ export function score(q: RankQuery, p: StoreProduct, index?: number): number {
       const inKind = qTokens.filter((t) => kt.some((u) => close(t, u))).length;
       if (inKind === qTokens.length && kt.length === qTokens.length) s += 0.3;
       // "Tasty cheese" for cheese, "peanut butter" for butter: a kind of it, so neither up nor down.
-      else if (inKind === 0 && matched > 0 && !brandLed) s -= 0.3;
+      else if (inKind === 0 && matched > 0 && !brandLed && !named) s -= 0.3;
     }
     if (flavour) s -= 0.3;
     if (modifier) s -= 0.35;

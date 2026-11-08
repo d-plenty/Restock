@@ -44,6 +44,20 @@ npx vitest run --config tools/probe-check/vitest.config.ts
 PROBE=/path/to/probe/out npx vitest run --config tools/probe-check/vitest.config.ts
 ```
 
+## Search scorecard
+
+Every run of the big search test ends with `scorecard.txt`: for each shop, how often the right
+thing comes first, is in the top 3, how often junk is in the top 3, and every miss. What counts
+as "right" for each word is written down in `src/lib/searchExpect.ts`. Shops with nothing
+like a word are searched again for what it is (as the app does), and marked on that.
+
+To see what a ranking change does without going back to the shops, mark a saved run again:
+
+```bash
+npx vitest run --config tools/search-test/scorecard.config.ts
+RAW=/path/to/raw.json npx vitest run --config tools/search-test/scorecard.config.ts
+```
+
 ## Ranking tests from real results
 
 `src/stores/rank.real.test.ts` holds real results saved by the big search test, and what should
