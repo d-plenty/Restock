@@ -3308,14 +3308,16 @@ details.fold-inline {
 /* 0.8.0: the sync pairing QR code (always dark on white, so any camera can read it). */
 .sync-qr {
   align-self: center;
-  width: min(260px, 70vw);
+  width: min(280px, 72vw);
   aspect-ratio: 1;
-  padding: 14px;
+  padding: 0;
+  overflow: hidden;
   background: #fff;
   border-radius: 16px;
   display: grid;
   place-items: center;
 }
+.sync-qr > span,
 .sync-qr svg {
   width: 100%;
   height: 100%;
@@ -3344,4 +3346,14 @@ details.fold-inline {
   border-radius: 12px;
   background: var(--card-2, rgba(0, 0, 0, 0.05));
   user-select: all;
+}
+
+/* 0.8.2: pull down for a full update (sync, then prices). */
+.refresh-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--card);
 }

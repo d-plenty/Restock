@@ -7,21 +7,14 @@ import { RestockNative, type SyncInfo } from './sql/native';
 
 export type { SyncInfo };
 
-/** A sync pairing code, or undefined if the scanned text isn't one. */
+/**
+ * A sync pairing code, or undefined if the scanned text isn't one. 0.8.2's one-time codes are
+ * RESTOCK:3:TOKEN:IP:PORT; older ones are passed on too, so the phone can say to update.
+ */
 export function pairingCode(text: string): string | undefined {
   const t = text.trim().replace(/\s+/g, '');
-  if (/^RESTOCK:\d+:[A-Z2-7]{52}(:|$)/i.test(t)) return t.toUpperCase(); // 0.8.1's short code
-  return /^RESTOCK-SYNC:\d+:[A-Za-z0-9_-]{43}:/.test(t) ? t : undefined; // 0.8.0's
-}
-
-/** The household name inside a pairing code. */
-export function householdIn(code: string): string {
-  if (!code.startsWith('RESTOCK-SYNC:')) return ''; // the short code doesn't carry it; the first sync does
-  try {
-    return decodeURIComponent(code.split(':').slice(5).join(':').replace(/\+/g, ' '));
-  } catch {
-    return '';
-  }
+  if (/^RESTOCK:3:[A-Z2-7]{26}(:|$)/i.test(t)) return t.toUpperCase();
+  return /^RESTOCK(-SYNC)?:\d+:/i.test(t) ? t : undefined;
 }
 
 export const syncAvailable = () => Capacitor.isNativePlatform();

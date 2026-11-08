@@ -1,3 +1,4 @@
+import { useFullRefresh } from '../refresh';
 import { useEffect, useState } from 'react';
 import { nameHasSize } from '../../lib/naming';
 import { lookupBarcode, scanBarcode } from '../../lib/barcode';
@@ -169,6 +170,7 @@ export function ListScreen() {
   const [skipToday, setSkipToday] = useState<Set<string>>(new Set());
   const [preview, setPreview] = useState<ListEntry>();
 
+  const full = useFullRefresh();
   if (!allEntries || !allRecs || !allCats || !settings) return <div className="screen" />;
   // One list per tab (Pantry, Keg, Pharmacy), each with its own shops.
   const sectionsOn = activeSections(settings);
@@ -404,7 +406,9 @@ export function ListScreen() {
   };
 
   return (
-    <div className="screen">
+    <div className="screen" {...full.props}>
+      {full.indicator}
+      {full.status}
       <div className="topbar">
         <h1>{LIST_TITLE[section]}</h1>
         {entries.length > 0 && !selecting && (

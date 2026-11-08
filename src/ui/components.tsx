@@ -1080,7 +1080,7 @@ export function Logo({ size = 56 }: { size?: number }) {
  * Pull down from the top of a scrolling screen to refresh. Returns the props for the screen
  * element and the indicator to show above its content.
  */
-export function usePullToRefresh(onRefresh: () => void, disabled = false) {
+export function usePullToRefresh(onRefresh: () => void, disabled = false, pullText = 'Pull to check prices', letGoText = 'Let go to check prices') {
   const [pull, setPull] = useState(0);
   const start = useRef<number | undefined>(undefined);
   const THRESHOLD = 70;
@@ -1103,7 +1103,7 @@ export function usePullToRefresh(onRefresh: () => void, disabled = false) {
     pull > 8 ? (
       <div className="pull" style={{ height: pull }} aria-hidden>
         <Icon name="refresh" size={18} />
-        <span>{pull >= THRESHOLD ? 'Let go to check prices' : 'Pull to check prices'}</span>
+        <span>{pull >= THRESHOLD ? letGoText : pullText}</span>
       </div>
     ) : null;
   return { props, indicator };

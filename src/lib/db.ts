@@ -977,3 +977,20 @@ export async function restoreParts(s: Snapshot, parts: RestoreParts, renames: Ma
 export function refresh(): void {
   changed();
 }
+
+/**
+ * "Erase everything and start fresh" (0.8.2): every table emptied, so Restock opens on its first
+ * screen again. Nothing is noted for sync (the household was left first), and this phone gets a
+ * new sync identity.
+ */
+export async function eraseEverything(): Promise<void> {
+  const tables = await sql().query<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('sync_meta')",
+  );
+  const ops: SqlOp[] = [{ sql: "INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')" }];
+  for (const t of tables) ops.push({ sql: `DELETE FROM "${t.name}"` });
+  ops.push({ sql: 'DELETE FROM sync_meta' });
+  ops.push({ sql: "INSERT INTO sync_meta (key, value) VALUES ('device', lower(hex(randomblob(8))))" });
+  await sql().batch(ops);
+  changed();
+}

@@ -50,6 +50,8 @@ final class SyncEngine {
         { "list_entries", "id" },
         { "cards", "id" },
         { "prices", "product_id || '|' || date" },
+        // 0.8.2: the household itself: its name, which phone is the owner, its members.
+        { "household", "k" },
     };
 
     static final int PAGE = 400;
@@ -189,6 +191,7 @@ final class SyncEngine {
                 String key = keyOf(tbl);
                 if (key == null) continue;
                 String pk = e.getString("pk");
+                if ("household".equals(tbl) && !householdChangeAllowed(pk, e.optString("device", ""))) continue;
                 long stamp = e.getLong("stamp");
                 String device = e.optString("device", "");
                 clock = Math.max(clock, stamp);
@@ -220,6 +223,21 @@ final class SyncEngine {
             db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
         });
         return changed[0];
+    }
+
+    /**
+     * Only the owner phone changes the household (its name, members, who's owner), except that a
+     * phone may change or remove its own member entry (its name, or leaving). Before this phone
+     * knows an owner (just joined), it takes what comes.
+     */
+    boolean householdChangeAllowed(String pk, String byDevice) throws Exception {
+        String owner = householdValue("owner");
+        return owner == null || owner.equals(byDevice) || pk.equals("member:" + byDevice);
+    }
+
+    String householdValue(String k) throws Exception {
+        List<JSONObject> r = db.query("SELECT v FROM household WHERE k = ?", k);
+        return r.isEmpty() ? null : r.get(0).optString("v", null);
     }
 
     static boolean newer(long stamp, String device, long mineStamp, String mineDevice) {
@@ -337,6 +355,10 @@ final class SyncEngine {
         String peer;
         String peerName;
         String household;
+        /** The other phone (the owner) says this one was removed from the household. */
+        boolean removed;
+        /** The household's key changed; this is the new one, sealed with this phone's own secret. */
+        String rekey;
         int received;
         int sent;
     }
@@ -357,6 +379,14 @@ final class SyncEngine {
         r.peer = h.optString("device");
         r.peerName = h.optString("name", null);
         r.household = h.isNull("household") ? null : h.optString("household", null);
+        if (h.optBoolean("removed", false)) {
+            r.removed = true;
+            return r;
+        }
+        if (h.has("rekey")) {
+            r.rekey = h.getString("rekey");
+            return r;
+        }
         if (r.peer.isEmpty() || r.peer.equals(me)) return r;
         notePeer(r.peer, r.peerName, null, 0);
 

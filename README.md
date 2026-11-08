@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Beta 0.8.1" src="https://img.shields.io/badge/status-beta%200.8.1-ffcd00">
+  <img alt="Beta 0.8.2" src="https://img.shields.io/badge/status-beta%200.8.2-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -90,7 +90,8 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Catalogues**: a link to the catalogue of every shop you use.
 - **Home screen widgets**: Deals, Shopping list and Quick actions, with your choice of background, transparency and text colour.
 - **App icon shortcuts** (Scan, List, Receipt) and **Share to Restock** from any app.
-- **Sync** (0.8.0): phones in a household pair by scanning a QR code, then sync straight to each other whenever they're on the same Wi-Fi: when you open Restock, shortly after a change, and every 15 minutes or so in the background. Pantry, list (ticks too), prices, categories and alerts, plus loyalty cards if you choose. Encrypted with a key only your phones have; no server and no account. If both phones change the same thing, the later change wins.
+- **Sync** (0.8.0): phones in a household pair by scanning a one-time QR code from the owner phone (it works once, for 10 minutes, and never contains the household's key), then sync straight to each other whenever they're on the same Wi-Fi: when you open Restock, shortly after a change, and every 15 minutes or so in the background. Pantry, list (ticks too), prices, categories and alerts, plus loyalty cards if you choose. Encrypted with a key only your phones have; no server and no account. If both phones change the same thing, the later change wins. The owner phone adds and removes phones (removing one changes the household's key) and can hand ownership to another phone. Pull down on Home, Pantry, Keg, Pharmacy or the list to sync and check prices.
+- **Start fresh, restore, or join your household** on the first screen; **Erase everything and start fresh** at the bottom of Settings (it asks twice).
 - **Setup tiles for everything**: sync, price checks, notifications, loyalty cards and shop accounts, widgets, updates and your household name, as well as shops, permissions, look, backups and the rest. Skip any of them.
 - **Backups**: export and restore exactly the parts you pick, plus optional automatic backups into a folder you choose.
 - **Look and colours**: Light, Dark or System; Australian or Plain; 24 accent colours; 16 app icon colours.

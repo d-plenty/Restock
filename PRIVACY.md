@@ -80,7 +80,7 @@ Automatic backups are off unless you turn them on. When they're on, Restock save
 
 Sync is off unless you turn it on (Settings → Sync). When it's on, the phones in your household send each other your pantry, keg and pharmacy items, shopping list, prices, categories and alert settings, and loyalty card numbers if you choose to share them, directly over your own Wi-Fi. Nothing goes through the internet or any server, and the makers of Restock never see it.
 
-Everything sent between the phones is encrypted with a key that's made on your phone and shared only by scanning the pairing QR code. A device without that key can't read what's sent or join in. Keep the code to yourself, like a Wi-Fi password.
+Everything sent between the phones is encrypted with a key made on the phone that started the household (the owner phone). The key is never shown or put in a code: a phone joins by scanning a one-time code that works once and only for 10 minutes, and is then given the key over the encrypted link. A device without the key can't read what's sent or join in. When the owner removes a phone, the household's key changes so that phone can't sync again.
 
 Each phone keeps its own copy. Stopping sync on a phone keeps what it has; to remove the household's things from a phone, delete them or uninstall Restock there.
 

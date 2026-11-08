@@ -8,7 +8,7 @@ import { RestockNative } from '../../lib/sql/native';
 import { syncInfo } from '../../lib/sync';
 import { isNative } from '../../stores/http';
 import { syncSummary } from './Sync';
-import { allCards, getSettings, pruneHistory, updateSettings } from '../../lib/db';
+import { allCards, eraseEverything, getSettings, pruneHistory, updateSettings } from '../../lib/db';
 import { loadDemo, removeDemo } from '../../lib/demo';
 import { syncBackgroundSchedule } from '../../lib/check';
 import { ensureNotificationPermission, scheduleReminders } from '../../lib/notify';
@@ -93,6 +93,38 @@ function filterSettings(root: HTMLElement, query: string): number {
   return count;
 }
 
+/** "Erase everything and start fresh" (0.8.2): asks twice, then wipes this phone and reopens Restock. */
+async function eraseAll() {
+  const first = await confirmAction('Erase everything on this phone?', {
+    detail:
+      "Every item, list, price, loyalty card, receipt and setting is deleted from this phone, and it leaves your household if it's in one. Other phones keep their things. Export a backup first if you might want any of it back.",
+    action: 'Continue',
+  });
+  if (!first) return;
+  const second = await confirmAction('Are you sure? This deletes all your data', {
+    detail: "Restock will start again from its first screen. This can't be undone.",
+    action: 'Erase everything',
+  });
+  if (!second) return;
+  if (isNative()) {
+    // Tell the household this phone is going, if it's here; then stop everything in the background.
+    await RestockNative.syncLeave().catch(() => undefined);
+    await RestockNative.eraseNative().catch(() => undefined);
+    await RestockNative.scheduleChecks({ enabled: false, intervalHours: 12 }).catch(() => undefined);
+    await RestockNative.scheduleRecalls({ enabled: false }).catch(() => undefined);
+    for (const dir of ['receipts', 'backups']) await RestockNative.deleteAppDir({ path: dir }).catch(() => undefined);
+  }
+  await eraseEverything();
+  try {
+    localStorage.clear();
+  } catch {
+    // nothing kept there
+  }
+  // Let the last write land (the browser preview saves a moment later), then open Restock fresh.
+  await new Promise((r) => setTimeout(r, 800));
+  window.location.reload();
+}
+
 export function SettingsScreen() {
   const nav = useNav();
   const settings = useLive(getSettings, []);
@@ -166,6 +198,7 @@ export function SettingsScreen() {
           ['s-help', 'Help'],
           ['s-about', 'About and updates'],
           ['s-soon', 'Coming soon'],
+          ['s-erase', 'Start fresh'],
         ].map(([id, label]) => (
           <button key={id} className="chip" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
             {label}
@@ -458,6 +491,21 @@ export function SettingsScreen() {
         <ComingSoon />
       </Fold>
 
+      <div className="eyebrow" id="s-erase">
+        Start fresh
+      </div>
+      <div className="card flush">
+        <button className="row" onClick={() => void eraseAll()}>
+          <Icon name="trash" size={18} />
+          <span className="grow">
+            <span className="title" style={{ color: 'var(--red-ink)' }}>
+              Erase everything and start fresh
+            </span>
+            <span className="small">Deletes all your items, lists, prices, cards, receipts and settings from this phone. It can't be undone.</span>
+          </span>
+        </button>
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
         <Logo size={40} />
       </div>
@@ -480,6 +528,16 @@ export function SettingsScreen() {
           onDone={(what) => {
             setPicking(undefined);
             nav.toast(`Restored your ${what}`);
+            // 0.8.2: backups never hold the household; offer to join it again.
+            void syncInfo().then(async (i) => {
+              if (i.paired || !isNative()) return;
+              const join = await confirmAction('Sync this phone with your household?', {
+                detail: "Backups don't include the household, so a restored phone joins again with a new code from the owner phone.",
+                action: 'Join a household',
+                danger: false,
+              });
+              if (join) nav.push({ name: 'sync' });
+            });
           }}
         />
       )}

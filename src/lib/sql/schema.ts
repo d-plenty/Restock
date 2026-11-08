@@ -18,6 +18,8 @@ export const SYNCED: { table: string; key: string; deletes: boolean }[] = [
   { table: 'list_entries', key: 'id', deletes: true },
   { table: 'cards', key: 'id', deletes: true },
   { table: 'prices', key: "product_id || '|' || date", deletes: false },
+  // 0.8.2: the household itself (its name, owner phone and members), as key/value rows.
+  { table: 'household', key: 'k', deletes: true },
 ];
 
 const STAMP = `MAX(CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), COALESCE((SELECT CAST(value AS INTEGER) FROM sync_meta WHERE key = 'clock'), 0))`;
@@ -26,7 +28,7 @@ const NEXT_SEQ = `COALESCE((SELECT MAX(seq) FROM sync_log), 0) + 1`;
 const NOT_APPLYING = `NOT EXISTS (SELECT 1 FROM sync_meta WHERE key = 'applying')`;
 
 function syncTriggers(t: { table: string; key: string; deletes: boolean }): string[] {
-  const key = (row: 'NEW' | 'OLD') => t.key.replace(/\b(id|product_id|date)\b/g, `${row}.$1`);
+  const key = (row: 'NEW' | 'OLD') => t.key.replace(/\b(id|product_id|date|k)\b/g, `${row}.$1`);
   const log = (row: 'NEW' | 'OLD', deleted: 0 | 1) =>
     `INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq) VALUES ('${t.table}', ${key(row)}, ${STAMP}, ${DEVICE}, ${deleted}, ${NEXT_SEQ});`;
   const out = [`CREATE TRIGGER sync_${t.table}_ins AFTER INSERT ON ${t.table} WHEN ${NOT_APPLYING} BEGIN ${log('NEW', 0)} END`];
@@ -59,12 +61,18 @@ const SYNC_MIGRATION: string[] = [
     port INTEGER
   )`,
   // Everything already here counts as changed now, by this phone.
-  ...SYNCED.map(
+  ...SYNCED.filter((t) => t.table !== 'household').map(
     (t) =>
       `INSERT OR IGNORE INTO sync_log (tbl, pk, stamp, device, deleted, seq)
        SELECT '${t.table}', ${t.key}, ${STAMP}, ${DEVICE}, 0, (SELECT COALESCE(MAX(seq), 0) FROM sync_log) + rowid FROM ${t.table}`,
   ),
-  ...SYNCED.flatMap(syncTriggers),
+  ...SYNCED.filter((t) => t.table !== 'household').flatMap(syncTriggers),
+];
+
+/** 0.8.2: the synced household record (owner, members), with its own change notes. */
+const HOUSEHOLD_MIGRATION: string[] = [
+  `CREATE TABLE household (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
+  ...syncTriggers(SYNCED.find((t) => t.table === 'household')!),
 ];
 
 export const MIGRATIONS: string[][] = [
@@ -204,6 +212,8 @@ export const MIGRATIONS: string[][] = [
   // 0.8.0: phone-to-phone sync (SyncEngine.java). Every change to a synced table is noted in
   // sync_log by triggers, whether the screens or the background price check made it.
   SYNC_MIGRATION,
+  // 0.8.2: owner phone and members, one-time pairing codes (SyncHousehold.java).
+  HOUSEHOLD_MIGRATION,
 ];
 
 /** The database version before sync was added, for "back up before updating" (0.8.0). */

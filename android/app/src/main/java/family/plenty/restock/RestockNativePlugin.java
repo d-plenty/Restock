@@ -796,12 +796,19 @@ public class RestockNativePlugin extends Plugin {
     private JSObject syncInfoObject(SyncHub hub) {
         JSObject o = new JSObject();
         try {
+            hub.upgradeOldPairing();
             boolean ready = hub.ready();
             o.put("paired", ready && hub.paired());
             if (ready) {
                 o.put("device", hub.engine.device());
                 o.put("name", hub.engine.name());
-                o.put("household", hub.engine.meta("household"));
+                String hh = hub.engine.householdValue("name");
+                o.put("household", hh != null ? hh : hub.engine.meta("household"));
+                o.put("isOwner", hub.paired() && hub.household.isOwner());
+                o.put("notice", hub.engine.meta("notice"));
+                JSArray members = new JSArray();
+                if (hub.paired()) for (JSONObject m : hub.household.members()) members.put(m);
+                o.put("members", members);
                 o.put("shareCards", hub.engine.shareCards());
                 o.put("keepReady", hub.keepReady());
                 JSArray peers = new JSArray();
@@ -840,6 +847,7 @@ public class RestockNativePlugin extends Plugin {
                 SyncHub hub = SyncHub.get(getContext());
                 JSObject r = new JSObject();
                 r.put("code", hub.invite(household, shareCards));
+                r.put("expiresInMs", SyncHousehold.CODE_LIFE_MS);
                 SyncService.startIfWanted(getContext());
                 call.resolve(r);
             } catch (Exception e) {
@@ -853,13 +861,16 @@ public class RestockNativePlugin extends Plugin {
         final String code = call.getString("code", "");
         final boolean replace = Boolean.TRUE.equals(call.getBoolean("replace", false));
         final boolean shareCards = Boolean.TRUE.equals(call.getBoolean("shareCards", false));
+        final boolean wantSettings = Boolean.TRUE.equals(call.getBoolean("settings", false));
         syncThread.execute(() -> {
             try {
                 SyncHub hub = SyncHub.get(getContext());
-                hub.join(code, replace, shareCards);
+                JSONObject got = hub.join(code, replace, shareCards, wantSettings);
                 SyncService.startIfWanted(getContext());
                 SyncHub.Summary s = hub.syncAll();
                 JSObject r = syncInfoObject(hub);
+                if (got.has("settings")) r.put("settings", got.getString("settings"));
+                r.put("ownerName", got.optString("ownerName", null));
                 r.put("reached", s.reached);
                 r.put("received", s.received);
                 call.resolve(r);
@@ -891,7 +902,7 @@ public class RestockNativePlugin extends Plugin {
         syncThread.execute(() -> {
             try {
                 SyncHub hub = SyncHub.get(getContext());
-                if (name != null && !name.trim().isEmpty()) hub.engine.setMeta("name", name.trim());
+                if (name != null && !name.trim().isEmpty()) hub.household.rename(name.trim());
                 if (shareCards != null) hub.engine.setShareCards(shareCards);
                 if (keepReady != null) {
                     hub.engine.setMeta("keep_ready", keepReady ? "1" : "0");
@@ -905,13 +916,90 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
+    /** The sheet showing a code was closed: the code stops working. */
+    @PluginMethod
+    public void syncCloseInvite(PluginCall call) {
+        syncThread.execute(() -> {
+            try {
+                SyncHub.get(getContext()).closeInvite();
+            } catch (Exception ignored) {
+                // nothing open
+            }
+            call.resolve();
+        });
+    }
+
+    /** Owner: take a phone out of the household. */
+    @PluginMethod
+    public void syncRemove(PluginCall call) {
+        final String device = call.getString("device", "");
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.remove(device);
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** Owner: make another phone the owner. */
+    @PluginMethod
+    public void syncHandOver(PluginCall call) {
+        final String device = call.getString("device", "");
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.handOver(device);
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** Erase everything (0.8.2): forget the household on this phone and stop all background work. */
+    @PluginMethod
+    public void eraseNative(PluginCall call) {
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.stop();
+                if (hub.ready()) hub.household.forget();
+                getContext().stopService(new Intent(getContext(), SyncService.class));
+                WorkManager wm = WorkManager.getInstance(getContext());
+                wm.cancelUniqueWork(SyncHub.WORK_NAME);
+                wm.cancelUniqueWork(PriceCheckWorker.UNIQUE_NAME);
+                wm.cancelUniqueWork(RecallWorker.UNIQUE_NAME);
+            } catch (Exception e) {
+                android.util.Log.w("Restock", "erase", e);
+            }
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
+    public void syncDismissNotice(PluginCall call) {
+        syncThread.execute(() -> {
+            try {
+                SyncHub.get(getContext()).engine.setMeta("notice", null);
+            } catch (Exception ignored) {
+                // fine
+            }
+            call.resolve();
+        });
+    }
+
     @PluginMethod
     public void syncLeave(PluginCall call) {
         syncThread.execute(() -> {
             try {
                 SyncHub hub = SyncHub.get(getContext());
-                hub.leave();
-                call.resolve(syncInfoObject(hub));
+                boolean left = hub.leave();
+                JSObject r = syncInfoObject(hub);
+                r.put("left", left);
+                call.resolve(r);
             } catch (Exception e) {
                 call.reject(e.getMessage(), e);
             }

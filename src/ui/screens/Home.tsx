@@ -11,7 +11,9 @@ import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { isBlockMessage, isNative } from '../../stores/http';
 import { WEEKDAYS, chainName, stockKnown } from '../../types';
-import { ChainDot, ChainName, Icon, OpenStoreButton, Price, SectionMark, SwapBox, Thumb, timeAgo, usePullToRefresh } from '../components';
+import { ChainDot, ChainName, Icon, LoadingBar, OpenStoreButton, Price, SectionMark, SwapBox, Thumb, timeAgo, usePullToRefresh } from '../components';
+import { RestockNative } from '../../lib/sql/native';
+import { syncInfo } from '../../lib/sync';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { ActionInfoTag, MemberInfoTag, MultiInfoTag } from '../tagInfo';
 import { failingStores, getHealth } from '../../lib/health';
@@ -47,7 +49,21 @@ export function HomeScreen() {
       // storage can be unavailable
     }
   };
-  const refresh = usePullToRefresh(() => void runCheck());
+  // 0.8.2: pulling down (or Check now) syncs with the household first, then checks prices, then
+  // shares the new prices with the household.
+  const [syncing, setSyncing] = useState(false);
+  const fullRun = async () => {
+    if (progress || syncing) return;
+    const i = await syncInfo().catch(() => undefined);
+    if (i?.paired) {
+      setSyncing(true);
+      await RestockNative.syncNow().catch(() => undefined);
+      setSyncing(false);
+    }
+    await runCheck();
+    if (i?.paired) void RestockNative.syncNow().catch(() => undefined);
+  };
+  const refresh = usePullToRefresh(() => void fullRun(), !!progress || syncing, 'Pull to sync and check prices', 'Let go to sync and check prices');
 
   const cards = useLive(allCards, []);
   const [testing, setTesting] = useState(false);
@@ -151,7 +167,14 @@ export function HomeScreen() {
           )}
         </div>
         <div className="checkline">
-          {progress ? (
+          {syncing ? (
+            <>
+              <span>Syncing with your household…</span>
+              <div style={{ flex: 1 }}>
+                <LoadingBar seconds={6} />
+              </div>
+            </>
+          ) : progress ? (
             <>
               <span>Checking prices & stock…</span>
               <div className="progress" style={{ flex: 1 }}>
@@ -168,7 +191,7 @@ export function HomeScreen() {
                     : 'Prices not checked yet'}
               </span>
               {isNative() && (
-                <button className="linkish" onClick={() => void runCheck()} aria-label="Check prices and stock now">
+                <button className="linkish" onClick={() => void fullRun()} aria-label="Check prices and stock now">
                   <Icon name="refresh" size={14} /> Check now
                 </button>
               )}
@@ -177,7 +200,7 @@ export function HomeScreen() {
         </div>
         {isNative() && !progress && (
           <span className="small">
-            Pull down to check.{' '}
+            Pull down to sync and check.{' '}
             {settings.sync.backgroundActivity
               ? settings.checkIntervalHours >= 168
                 ? `Also checks every ${WEEKDAYS[settings.checkWeekday]}.`

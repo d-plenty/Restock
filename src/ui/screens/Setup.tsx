@@ -18,6 +18,7 @@ import { RecallSettings } from './Recalls';
 import { ReceiptsSettings } from './Receipts';
 import { readBackupFile, RestoreSheet } from './Restore';
 import { StoreFields } from './Stores';
+import { JoinSheet, scanPairingCode } from './Sync';
 import { NotificationSettings, PriceCheckSettings, UpdateRows } from './Settings';
 import { syncSummary } from './Sync';
 import { WidgetSettings } from './WidgetSettings';
@@ -304,7 +305,7 @@ function FlagBackground() {
   );
 }
 
-function Welcome({ onSetUp, onRestore }: { onSetUp: () => void; onRestore: () => void }) {
+function Welcome({ onSetUp, onRestore, onJoin }: { onSetUp: () => void; onRestore: () => void; onJoin: () => void }) {
   return (
     <div className="welcome">
       <FlagBackground />
@@ -330,6 +331,9 @@ function Welcome({ onSetUp, onRestore }: { onSetUp: () => void; onRestore: () =>
           </button>
           <button className="welcome-restore" onClick={onRestore}>
             Restore from a backup
+          </button>
+          <button className="welcome-restore" onClick={onJoin}>
+            Join your household
           </button>
         </div>
       </div>
@@ -625,6 +629,10 @@ function useTileWalk(onFinished: () => void) {
 export function Onboarding() {
   const settings = useLive(getSettings, []);
   const [stage, setStage] = useState<'welcome' | 'privacy' | 'tiles' | 'restored'>('welcome');
+  // 0.8.2: joining a household from the first screen: privacy, then scan the owner phone's code.
+  const [joiningHousehold, setJoiningHousehold] = useState(false);
+  const [joinCode, setJoinCode] = useState<string>();
+  const [joinedMsg, setJoinedMsg] = useState<string>();
   const [reading, setReading] = useState<'privacy' | 'disclaimer'>();
   const [picking, setPicking] = useState<BackupSummary>();
   const nav = useNav();
@@ -673,6 +681,19 @@ export function Onboarding() {
   const sheets = (
     <>
       {reading && <LegalSheet doc={reading} onClose={() => setReading(undefined)} />}
+      {joinCode && (
+        <JoinSheet
+          code={joinCode}
+          // From the first screen: a fresh phone takes the household's things. After a restore: ask.
+          fresh={stage !== 'restored'}
+          onClose={() => setJoinCode(undefined)}
+          onJoined={(msg) => {
+            setJoinCode(undefined);
+            setJoinedMsg(msg);
+            setStage('restored');
+          }}
+        />
+      )}
       {picking && (
         <RestoreSheet
           summary={picking}
@@ -692,7 +713,17 @@ export function Onboarding() {
   if (stage === 'welcome')
     return (
       <>
-        <Welcome onSetUp={() => setStage('privacy')} onRestore={() => fileRef.current?.click()} />
+        <Welcome
+          onSetUp={() => {
+            setJoiningHousehold(false);
+            setStage('privacy');
+          }}
+          onRestore={() => fileRef.current?.click()}
+          onJoin={() => {
+            setJoiningHousehold(true);
+            setStage('privacy');
+          }}
+        />
         {fileInput}
         {sheets}
       </>
@@ -746,7 +777,10 @@ export function Onboarding() {
               className="btn primary"
               onClick={async () => {
                 await updateSettings({ privacyAccepted: legal.updated });
-                setStage('tiles');
+                if (!joiningHousehold) return setStage('tiles');
+                if (!isNative()) return nav.toast('Joining a household works in the Android app.');
+                const code = await scanPairingCode();
+                if (code) setJoinCode(code);
               }}
             >
               I understand
@@ -767,9 +801,32 @@ export function Onboarding() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div className="eyebrow green">Nearly there</div>
             <h1>Allow what Restock needs</h1>
-            <p className="sub">Your things are back. Allow what this phone needs, or skip: Restock asks for each one the first time it's needed.</p>
+            <p className="sub">
+              {joinedMsg
+                ? `${joinedMsg} Your household's shops and settings are on this phone too. Allow what this phone needs, or skip: Restock asks for each one the first time it's needed.`
+                : "Your things are back. Allow what this phone needs, or skip: Restock asks for each one the first time it's needed."}
+            </p>
           </div>
           <PermissionList hideNote />
+          {!joinedMsg && isNative() && (
+            <div className="card" style={{ gap: 6 }}>
+              <strong>Share with your household again?</strong>
+              <span className="small">
+                Backups don't include the household. To sync this phone, join with a new code from the owner phone (Settings → Sync → Add a phone
+                there).
+              </span>
+              <button
+                className="btn small"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={async () => {
+                  const code = await scanPairingCode();
+                  if (code) setJoinCode(code);
+                }}
+              >
+                Join your household
+              </button>
+            </div>
+          )}
           <div className="spacer" />
           <button className="btn primary block" onClick={() => updateSettings({ onboarded: true })}>
             Open Restock

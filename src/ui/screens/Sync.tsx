@@ -4,13 +4,29 @@ import { saveCopyInApp } from '../../lib/backup';
 import { confirmAction } from '../../lib/confirm';
 import { allGroups, getSettings, updateSettings } from '../../lib/db';
 import { RestockNative } from '../../lib/sql/native';
-import { agoText, householdIn, pairingCode, strictBatteryMaker, syncAvailable, syncInfo, type SyncInfo } from '../../lib/sync';
+import { agoText, pairingCode, strictBatteryMaker, syncAvailable, syncInfo, type SyncInfo } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
+import { syncBackgroundSchedule } from '../../lib/check';
+import { scheduleReminders } from '../../lib/notify';
 import { Icon, LoadingBar, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
 
 // Settings → Sync (0.8.0): phones in the same household sync with each other on the same Wi-Fi.
 // No server, no account: one phone shows a QR code, the other scans it.
+
+/**
+ * A QR code as an SVG that scales to any size: one square per module, with the white border
+ * scanners need (0.8.2: the zxing picture had a fixed size and was cut off when stretched).
+ */
+export function qrSvg(symbol: { data: ArrayLike<number>; width: number; height: number }): string {
+  const q = 4;
+  let d = '';
+  for (let y = 0; y < symbol.height; y++)
+    for (let x = 0; x < symbol.width; x++) if (symbol.data[y * symbol.width + x] < 128) d += `M${x + q} ${y + q}h1v1h-1z`;
+  const w = symbol.width + q * 2;
+  const h = symbol.height + q * 2;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" height="100%" shape-rendering="crispEdges"><rect width="${w}" height="${h}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+}
 
 /** The pairing code as a QR code, drawn on the phone (zxing, bundled; nothing is sent anywhere). */
 function PairingQr({ code }: { code: string }) {
@@ -20,8 +36,8 @@ function PairingQr({ code }: { code: string }) {
     void (async () => {
       const [mod, { default: wasmUrl }] = await Promise.all([import('zxing-wasm/writer'), import('zxing-wasm/writer/zxing_writer.wasm?url')]);
       mod.prepareZXingModule({ overrides: { locateFile: (path: string, prefix: string) => (path.endsWith('.wasm') ? wasmUrl : prefix + path) } });
-      const r = await mod.writeBarcode(code, { format: 'QRCode', options: 'ecLevel=M', scale: 8 } as never);
-      if (alive && r.svg) setSvg(r.svg);
+      const r = await mod.writeBarcode(code, { format: 'QRCode', options: 'ecLevel=M' });
+      if (alive && r.symbol?.width) setSvg(qrSvg(r.symbol));
     })().catch((e) => console.error('qr', e));
     return () => {
       alive = false;
@@ -97,22 +113,42 @@ function CardsQuestion({ onAnswer }: { onAnswer: (share: boolean) => void }) {
   );
 }
 
-/** Start a household (or add another phone to it): ask about cards, then show the QR code. */
+/** "9:41 left" until a code runs out. */
+function useCountdown(until: number | undefined) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!until) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [until]);
+  if (!until) return undefined;
+  const left = Math.max(0, Math.round((until - now) / 1000));
+  return { left, text: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` };
+}
+
+/**
+ * Start a household, or (owner) add a phone: a new one-time code each time, working once and
+ * for 10 minutes. Closing the sheet closes the code.
+ */
 function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void }) {
   const settings = useLive(getSettings, []);
   const [household, setHousehold] = useState<string>();
   const [code, setCode] = useState<string>();
+  const [until, setUntil] = useState<number>();
   const [error, setError] = useState<string>();
-  const [peers, setPeers] = useState(info.peers?.length ?? 0);
+  const [members, setMembers] = useState(info.members?.length ?? 1);
   const [joined, setJoined] = useState<string>();
   const name = household ?? info.household ?? settings?.household.name ?? 'Our house';
+  const left = useCountdown(until);
 
   const make = async (shareCards: boolean) => {
     setError(undefined);
     try {
       const r = await RestockNative.syncInvite({ household: name, shareCards });
-      await updateSettings({ household: { name } });
+      if (!info.paired) await updateSettings({ household: { name } });
       setCode(r.code);
+      setUntil(Date.now() + r.expiresInMs);
+      setJoined(undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -127,19 +163,25 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
     if (!code) return;
     const t = setInterval(() => {
       void syncInfo().then((i) => {
-        const n = i.peers?.length ?? 0;
-        if (n > peers) {
-          setJoined(i.peers?.[0]?.name ?? 'the other phone');
-          setPeers(n);
+        const n = i.members?.length ?? 0;
+        if (n > members) {
+          setJoined(i.members?.find((m) => !m.me && !info.members?.some((x) => x.device === m.device))?.name ?? 'the other phone');
+          setMembers(n);
+          setCode(undefined);
         }
       });
-    }, 3000);
+    }, 2000);
     return () => clearInterval(t);
-  }, [code, peers]);
+  }, [code, members, info.members]);
+  const close = () => {
+    void RestockNative.syncCloseInvite().catch(() => undefined);
+    onClose();
+  };
+  const expired = left && left.left === 0;
 
   return (
-    <Sheet title={info.paired ? 'Add a phone' : 'Start a household'} onClose={onClose}>
-      {!code && !info.paired && (
+    <Sheet title={info.paired ? 'Add a phone' : 'Start a household'} onClose={close}>
+      {!code && !joined && !info.paired && (
         <>
           <label className="field">
             <span>Household name</span>
@@ -149,26 +191,45 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
         </>
       )}
       {error && <div className="banner amber">{error}</div>}
-      {code && (
+      {joined && (
         <>
-          <PairingQr code={code} />
-          <CodeText code={code} />
-          <ol className="small" style={{ margin: 0, paddingLeft: 18 }}>
-            <li>Put both phones on the same Wi-Fi.</li>
-            <li>On the other phone, update to Restock 0.8.1 or newer, then open Settings → Sync → Join a household.</li>
-            <li>Scan this code. The phones sync straight away, then whenever they're both on this Wi-Fi.</li>
-          </ol>
-          {joined ? (
-            <div className="banner green" role="status">
-              <strong>Paired with {joined}</strong>
+          <div className="banner green" role="status">
+            <strong>{joined} joined</strong>
+            <span style={{ fontSize: 13 }}>The phones are syncing. That code can't be used again.</span>
+          </div>
+          <button className="btn block" onClick={() => void make(!!info.shareCards)}>
+            Add another phone
+          </button>
+          <button className="btn block primary" onClick={close}>
+            Done
+          </button>
+        </>
+      )}
+      {code && !joined && (
+        <>
+          {expired ? (
+            <div className="banner amber">
+              <strong>This code has run out</strong>
+              <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => void make(!!info.shareCards)}>
+                Make a new code
+              </button>
             </div>
           ) : (
-            <span className="small" role="status">
-              Waiting for the other phone…
+            <PairingQr code={code} />
+          )}
+          {!expired && left && (
+            <span className="small" role="status" style={{ textAlign: 'center' }}>
+              Works once, for the next {left.text}. Waiting for the other phone…
             </span>
           )}
-          <button className="btn block" onClick={onClose}>
-            Done
+          {!expired && <CodeText code={code} />}
+          <ol className="small" style={{ margin: 0, paddingLeft: 18 }}>
+            <li>Put both phones on the same Wi-Fi, and keep this screen open.</li>
+            <li>On the other phone (Restock 0.8.2 or newer), tap Join your household on the first screen, or Settings → Sync → Join a household.</li>
+            <li>Scan this code.</li>
+          </ol>
+          <button className="btn block" onClick={close}>
+            Cancel
           </button>
         </>
       )}
@@ -176,28 +237,78 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
   );
 }
 
-/** After scanning another phone's code: combine or replace, cards, then join. */
-function JoinSheet({ code, onClose, onJoined }: { code: string; onClose: () => void; onJoined: (msg: string) => void }) {
+/** The household's settings worth copying to a phone joining from the first screen. */
+export const COPIED_SETTINGS = [
+  'enabledChains',
+  'stores',
+  'sections',
+  'customShops',
+  'hiddenTabs',
+  'checkIntervalHours',
+  'checkWeekday',
+  'alerts',
+  'historyWeeks',
+  'defaultThresholdPct',
+  'listCompare',
+  'productOrder',
+  'marketData',
+  'household',
+  'recalls',
+] as const;
+
+/** Copies the owner's shop choices and settings (as JSON text) into this phone's settings. */
+export async function copyHouseholdSettings(json: string | undefined): Promise<void> {
+  if (!json) return;
+  try {
+    const theirs = JSON.parse(json) as Record<string, unknown>;
+    const patch: Record<string, unknown> = {};
+    for (const k of COPIED_SETTINGS) if (theirs[k] !== undefined) patch[k] = theirs[k];
+    // Price checks in the background follow the household's choice too.
+    const sync = theirs.sync as { backgroundActivity?: boolean } | undefined;
+    const mine = await getSettings();
+    if (typeof sync?.backgroundActivity === 'boolean') patch.sync = { ...mine.sync, backgroundActivity: sync.backgroundActivity };
+    const s = await updateSettings(patch as never);
+    await syncBackgroundSchedule(s).catch(() => undefined);
+    await scheduleReminders(s).catch(() => undefined);
+    if (syncAvailable()) await RestockNative.scheduleRecalls({ enabled: s.recalls.enabled }).catch(() => undefined);
+  } catch (e) {
+    console.error('copy settings', e);
+  }
+}
+
+/** Joining with a code: combine or replace (if this phone has things), cards, then join. */
+export function JoinSheet({
+  code,
+  fresh,
+  onClose,
+  onJoined,
+}: {
+  code: string;
+  /** From the first screen: take the household's things and settings, no questions about this phone's things. */
+  fresh?: boolean;
+  onClose: () => void;
+  onJoined: (msg: string) => void;
+}) {
   const groups = useLive(allGroups, []);
   const [replace, setReplace] = useState<boolean>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const household = householdIn(code) || 'the household';
-  const hasThings = (groups?.length ?? 0) > 0;
-  const mode = hasThings ? replace : false;
+  const hasThings = !fresh && (groups?.length ?? 0) > 0;
+  const mode = fresh ? true : hasThings ? replace : false;
 
   const join = async (shareCards: boolean) => {
     setBusy(true);
     setError(undefined);
     try {
       // "Use the household's things" empties this phone first: keep a copy, just in case.
-      if (mode) await saveCopyInApp('backups/before-joining.json');
-      const r = await RestockNative.syncJoin({ code, replace: !!mode, shareCards });
-      if (householdIn(code)) await updateSettings({ household: { name: householdIn(code) } });
+      if (mode && !fresh) await saveCopyInApp('backups/before-joining.json');
+      const r = await RestockNative.syncJoin({ code, replace: !!mode, shareCards, settings: !!fresh });
+      if (fresh) await copyHouseholdSettings(r.settings);
+      const where = r.household ?? 'the household';
       onJoined(
         r.reached > 0
-          ? `Joined ${household}. Synced with ${r.peers?.[0]?.name ?? 'the other phone'}.`
-          : `Joined ${household}. Restock syncs as soon as it finds the other phone on this Wi-Fi.`,
+          ? `Joined ${where}. Synced with ${r.ownerName ?? 'the owner phone'}.`
+          : `Joined ${where}. Syncing as soon as the phones find each other.`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -206,10 +317,10 @@ function JoinSheet({ code, onClose, onJoined }: { code: string; onClose: () => v
   };
 
   return (
-    <Sheet title={`Join ${household}`} onClose={busy ? () => undefined : onClose}>
+    <Sheet title="Join your household" onClose={busy ? () => undefined : onClose}>
       {busy ? (
         <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span className="small">Joining and syncing with the other phone…</span>
+          <span className="small">Joining and syncing with the owner phone…</span>
           <LoadingBar seconds={15} />
         </div>
       ) : hasThings && replace === undefined ? (
@@ -247,11 +358,77 @@ function JoinSheet({ code, onClose, onJoined }: { code: string; onClose: () => v
   );
 }
 
+/** Scan (or paste) a household's code. */
+export async function scanPairingCode(): Promise<string | undefined> {
+  const out = await scanBarcode('Scan the code on the owner phone', {
+    accept: pairingCode,
+    qr: true,
+    wrong: "That isn't a Restock sync code. On the owner phone, open Settings → Sync → Add a phone.",
+    typeHint: 'Or paste the code',
+  });
+  return out.ok ? out.code : undefined;
+}
+
+/** What the owner can do with another phone. */
+function MemberSheet({
+  member,
+  onClose,
+  onDone,
+}: {
+  member: { device: string; name: string };
+  onClose: () => void;
+  onDone: (info: SyncInfo, msg: string) => void;
+}) {
+  const [error, setError] = useState<string>();
+  const run = async (what: 'remove' | 'owner') => {
+    const ok = await confirmAction(what === 'remove' ? `Remove ${member.name} from the household?` : `Make ${member.name} the owner?`, {
+      detail:
+        what === 'remove'
+          ? "It stops syncing straight away, and the household's key changes so it can't sync again, even with an old code. It keeps what it has now. The other phones get the new key next time they sync with this one."
+          : 'It will be the one that adds and removes phones. This phone becomes an ordinary member. The change takes effect when the two phones next sync.',
+      action: what === 'remove' ? 'Remove' : 'Make owner',
+      danger: what === 'remove',
+    });
+    if (!ok) return;
+    try {
+      const info =
+        what === 'remove' ? await RestockNative.syncRemove({ device: member.device }) : await RestockNative.syncHandOver({ device: member.device });
+      onDone(info, what === 'remove' ? `${member.name} removed` : `${member.name} will be the owner after the next sync`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <Sheet title={member.name} onClose={onClose}>
+      <div className="card flush">
+        <button className="row" onClick={() => void run('owner')}>
+          <Icon name="star" size={18} />
+          <span className="grow">
+            <span className="title">Make this the owner phone</span>
+            <span className="small">For when this phone is being replaced, or someone else looks after the household.</span>
+          </span>
+        </button>
+        <button className="row" onClick={() => void run('remove')}>
+          <Icon name="trash" size={18} />
+          <span className="grow">
+            <span className="title" style={{ color: 'var(--red-ink)' }}>
+              Remove from the household
+            </span>
+            <span className="small">A lost, sold or old phone.</span>
+          </span>
+        </button>
+      </div>
+      {error && <div className="banner amber">{error}</div>}
+    </Sheet>
+  );
+}
+
 export function SyncScreen() {
   const nav = useNav();
   const [info, setInfo] = useState<SyncInfo>();
   const [inviting, setInviting] = useState(false);
   const [joining, setJoining] = useState<string>();
+  const [member, setMember] = useState<{ device: string; name: string }>();
   const [busy, setBusy] = useState(false);
   const [, tick] = useState(0);
 
@@ -270,13 +447,8 @@ export function SyncScreen() {
   }, []);
 
   const scan = async () => {
-    const out = await scanBarcode('Scan the other phone’s sync code', {
-      accept: pairingCode,
-      qr: true,
-      wrong: "That isn't a Restock sync code. On the other phone, open Settings → Sync → Start a household (or Add a phone).",
-      typeHint: 'Or paste the code',
-    });
-    if (out.ok) setJoining(out.code);
+    const code = await scanPairingCode();
+    if (code) setJoining(code);
   };
 
   const syncNow = async () => {
@@ -297,12 +469,28 @@ export function SyncScreen() {
   const set = async (patch: { name?: string; shareCards?: boolean; keepReady?: boolean }) => setInfo(await RestockNative.syncSet(patch));
 
   const leave = async () => {
+    const others = (info?.members ?? []).filter((m) => !m.me);
+    if (info?.isOwner && others.length) {
+      await confirmAction('Make another phone the owner first', {
+        detail: `This is the owner phone. Tap ${others[0].name} in the list above and choose "Make this the owner phone", sync once, then stop syncing this phone.`,
+        action: 'OK',
+        danger: false,
+      });
+      return;
+    }
     const ok = await confirmAction('Stop syncing this phone?', {
-      detail: 'This phone keeps everything it has now, but changes stop going between it and the household. You can join again any time.',
+      detail:
+        "This phone keeps everything it has now, and nothing is deleted on the household's other phones. Changes just stop going between them. To join again, you'll need a new code from the owner phone.",
       action: 'Stop syncing',
     });
-    if (ok) setInfo(await RestockNative.syncLeave());
+    if (!ok) return;
+    const r = await RestockNative.syncLeave();
+    setInfo(r);
+    if (r.left) nav.toast('This phone has stopped syncing');
   };
+
+  const synced = (device: string) => info?.peers?.find((p) => p.device === device)?.syncedAt;
+  const owner = info?.members?.find((m) => m.owner);
 
   return (
     <div className="screen">
@@ -312,6 +500,20 @@ export function SyncScreen() {
         <div className="banner grey">
           <strong>Sync works in the Android app</strong>
           <span style={{ fontSize: 13 }}>In this preview everything stays in this browser.</span>
+        </div>
+      )}
+
+      {info?.notice && !info.paired && (
+        <div className="banner amber" role="status">
+          <strong>{info.notice === 'removed' ? 'This phone was removed from the household' : 'Pair your phones again'}</strong>
+          <span style={{ fontSize: 13 }}>
+            {info.notice === 'removed'
+              ? 'The owner phone took it out. It kept everything it had. To join again, ask the owner for a new code.'
+              : 'Restock 0.8.2 adds an owner phone and one-time codes. Everything is still on this phone. On the phone that will be the owner, tap Start a household; on the other, tap Join a household and scan the code. Choose "Combine" so nothing is lost.'}
+          </span>
+          <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => void RestockNative.syncDismissNotice().then(refresh)}>
+            OK
+          </button>
         </div>
       )}
 
@@ -330,7 +532,7 @@ export function SyncScreen() {
             <Icon name="plus" size={18} />
             <span className="grow">
               <span className="title">Start a household</span>
-              <span className="small">On the first phone. It shows a code for the others to scan.</span>
+              <span className="small">This phone becomes the owner: it adds and removes the other phones.</span>
             </span>
             <Icon name="chevron" size={18} />
           </button>
@@ -338,7 +540,7 @@ export function SyncScreen() {
             <Icon name="scan" size={18} />
             <span className="grow">
               <span className="title">Join a household</span>
-              <span className="small">Scan the code on a phone that's already set up.</span>
+              <span className="small">Scan the code on the owner phone.</span>
             </span>
             <Icon name="chevron" size={18} />
           </button>
@@ -354,7 +556,9 @@ export function SyncScreen() {
                 <span className="title">{info.lastSyncAt ? `Synced ${agoText(info.lastSyncAt)}` : 'Not synced yet'}</span>
                 <span className="small">
                   {info.lastError ??
-                    (info.peers?.length ? 'Syncs when you open Restock, after changes, and every 15 minutes or so.' : 'No other phones yet.')}
+                    ((info.members?.length ?? 0) > 1
+                      ? 'Syncs when you open Restock, after changes, and every 15 minutes or so.'
+                      : 'No other phones yet.')}
                 </span>
               </span>
               <button className="btn small primary" disabled={busy} onClick={() => void syncNow()}>
@@ -366,26 +570,60 @@ export function SyncScreen() {
                 <LoadingBar seconds={8} />
               </div>
             )}
-            {(info.peers ?? []).map((p) => (
-              <div key={p.device} className="row">
-                <Icon name="phone" size={18} />
-                <span className="grow">
-                  <span className="title" style={{ fontSize: 14 }}>
-                    {p.name ?? 'Another phone'}
-                  </span>
-                  <span className="small">Last synced {agoText(p.syncedAt)}</span>
-                </span>
-              </div>
-            ))}
-            <button className="row" onClick={() => setInviting(true)}>
-              <Icon name="plus" size={18} />
+            <button className="row" onClick={() => void leave()}>
+              <Icon name="close" size={18} />
               <span className="grow">
-                <span className="title" style={{ fontSize: 14, color: 'var(--green)' }}>
-                  Add a phone
+                <span className="title" style={{ fontSize: 14 }}>
+                  Stop syncing this phone
                 </span>
-                <span className="small">Shows the code for another phone to scan</span>
+                <span className="small">This phone keeps everything. Nothing is deleted on the other phones.</span>
               </span>
             </button>
+          </div>
+
+          <div className="eyebrow">The household's phones</div>
+          <div className="card flush">
+            {(info.members ?? []).map((m) => {
+              const canManage = info.isOwner && !m.me;
+              const body = (
+                <>
+                  <Icon name="phone" size={18} />
+                  <span className="grow">
+                    <span className="title" style={{ fontSize: 14, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {m.name}
+                      {m.owner && <span className="tag great">Owner</span>}
+                      {m.me && <span className="tag normal">This phone</span>}
+                    </span>
+                    {!m.me && <span className="small">Last synced {agoText(synced(m.device))}</span>}
+                  </span>
+                  {canManage && <Icon name="more" size={18} />}
+                </>
+              );
+              return canManage ? (
+                <button key={m.device} className="row" onClick={() => setMember(m)} aria-label={`${m.name}: remove or make owner`}>
+                  {body}
+                </button>
+              ) : (
+                <div key={m.device} className="row">
+                  {body}
+                </div>
+              );
+            })}
+            {info.isOwner ? (
+              <button className="row" onClick={() => setInviting(true)}>
+                <Icon name="plus" size={18} />
+                <span className="grow">
+                  <span className="title" style={{ fontSize: 14, color: 'var(--green)' }}>
+                    Add a phone
+                  </span>
+                  <span className="small">Shows a new one-time code for it to scan</span>
+                </span>
+              </button>
+            ) : (
+              <p className="small" style={{ padding: '4px 14px 12px', margin: 0 }}>
+                Only the owner phone{owner ? ` (${owner.name})` : ''} can add or remove phones.
+              </p>
+            )}
           </div>
 
           <label className="field">
@@ -448,10 +686,6 @@ export function SyncScreen() {
               </a>
             </p>
           )}
-
-          <button className="btn ghost" onClick={() => void leave()}>
-            Stop syncing this phone
-          </button>
         </>
       )}
 
@@ -460,6 +694,10 @@ export function SyncScreen() {
         <span className="small">
           Both phones need to be on the same Wi-Fi at the same time; whatever changed while apart catches up then. Some routers and guest networks
           keep devices from seeing each other ("client isolation" or "AP isolation"); if the phones never find each other, that's the usual reason.
+        </span>
+        <span className="small">
+          Codes work once and only for 10 minutes, and never contain the household's key, so a code that's been seen or shared can't be used later.
+          Backups never include the household either: a phone restored from a backup joins again with a new code.
         </span>
         <span className="small">
           If both phones change the same thing while apart, the later change wins. Restoring a backup on one phone changes the household's things to
@@ -488,6 +726,17 @@ export function SyncScreen() {
           }}
         />
       )}
+      {member && (
+        <MemberSheet
+          member={member}
+          onClose={() => setMember(undefined)}
+          onDone={(i, msg) => {
+            setMember(undefined);
+            setInfo(i);
+            nav.toast(msg);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -495,9 +744,9 @@ export function SyncScreen() {
 /** One line for Settings and the setup tile. */
 export function syncSummary(info: SyncInfo | undefined): string {
   if (!info) return '';
-  if (!info.paired) return 'Share one pantry and list between phones';
-  const n = info.peers?.length ?? 0;
-  return n
-    ? `${info.household ?? 'Household'} · ${n + 1} phones · synced ${agoText(info.lastSyncAt)}`
+  if (!info.paired) return info.notice === 'repair' ? 'Pair your phones again (0.8.2)' : 'Share one pantry and list between phones';
+  const n = info.members?.length ?? 1;
+  return n > 1
+    ? `${info.household ?? 'Household'} · ${n} phones · synced ${agoText(info.lastSyncAt)}`
     : `${info.household ?? 'Household'} · waiting for another phone`;
 }

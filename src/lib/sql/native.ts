@@ -74,12 +74,28 @@ export interface RestockNativePlugin {
   // ---------- 0.8.0: phone-to-phone sync (SyncHub.java) ----------
   syncInfo(): Promise<SyncInfo>;
   /** Starts (or reuses) the household; the code to show as a QR code. */
-  syncInvite(opts: { household: string; shareCards: boolean }): Promise<{ code: string }>;
+  syncInvite(opts: { household: string; shareCards: boolean }): Promise<{ code: string; expiresInMs: number }>;
+  /** The sheet showing a code was closed: the code stops working. */
+  syncCloseInvite(): Promise<void>;
+  /** Owner: take a phone out of the household (the household's key changes). */
+  syncRemove(opts: { device: string }): Promise<SyncInfo>;
+  /** Owner: make another phone the owner. */
+  syncHandOver(opts: { device: string }): Promise<SyncInfo>;
+  syncDismissNotice(): Promise<void>;
+  /** 0.8.2 "Erase everything": forget the household and stop background work on this phone. */
+  eraseNative(): Promise<void>;
   /** Joins with a scanned code. replace: start from the household's things instead of combining. */
-  syncJoin(opts: { code: string; replace: boolean; shareCards: boolean }): Promise<SyncInfo & { reached: number; received: number }>;
+  /** settings: also ask for the owner's settings (joining from the first screen); they come back as JSON text. */
+  syncJoin(opts: {
+    code: string;
+    replace: boolean;
+    shareCards: boolean;
+    settings?: boolean;
+  }): Promise<SyncInfo & { reached: number; received: number; settings?: string; ownerName?: string }>;
   syncNow(): Promise<SyncInfo & { reached: number; received: number; sent: number }>;
   syncSet(opts: { name?: string; shareCards?: boolean; keepReady?: boolean }): Promise<SyncInfo>;
-  syncLeave(): Promise<SyncInfo>;
+  /** left false: this is the owner and other phones are in the household; hand over first. */
+  syncLeave(): Promise<SyncInfo & { left: boolean }>;
   requestBatteryExemption(): Promise<void>;
   addListener(event: 'syncChanged', fn: () => void): Promise<PluginListenerHandle>;
   addListener(event: 'syncDone', fn: (info: SyncInfo) => void): Promise<PluginListenerHandle>;
@@ -101,6 +117,11 @@ export interface SyncInfo {
   lastSyncAt?: string | null;
   lastError?: string | null;
   listening?: boolean;
+  /** 0.8.2: whether this phone is the household's owner, and the household's phones. */
+  isOwner?: boolean;
+  members?: { device: string; name: string; owner: boolean; me: boolean }[];
+  /** "repair": paired on 0.8.0/0.8.1, pair again. "removed": the owner removed this phone. */
+  notice?: string | null;
   /** The phone's maker (some stop apps in the background regardless; see dontkillmyapp.com). */
   maker?: string;
 }

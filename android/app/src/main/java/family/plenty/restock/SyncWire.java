@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.crypto.Cipher;
@@ -176,9 +177,18 @@ final class SyncWire {
 
     // ---------- answering other phones ----------
 
-    /** What the server does with each message it can open. */
+    /**
+     * The keys the server accepts, in order (0.8.2): the household's key, the one before it (on
+     * the owner, so phones that missed a change can be given the new one) and a one-time pairing
+     * key while an invite is open. Missing ones are null.
+     */
+    interface Keys {
+        List<byte[]> keys();
+    }
+
+    /** What the server does with each message it can open; `which` says which key opened it. */
     interface Handler {
-        JSONObject handle(JSONObject message, String fromHost) throws Exception;
+        JSONObject handle(JSONObject message, String fromHost, int which) throws Exception;
 
         /** Called after a connection ends, when something was taken in. */
         default void done(String fromHost) {}
@@ -186,14 +196,14 @@ final class SyncWire {
 
     /** Listens for other phones in the household. */
     static final class Server {
-        private final byte[] key;
+        private final Keys keys;
         private final Handler handler;
         private final ServerSocket socket;
         private final ExecutorService pool = Executors.newFixedThreadPool(2);
         private volatile boolean running = true;
 
-        Server(byte[] key, Handler handler) throws IOException {
-            this.key = key;
+        Server(Keys keys, Handler handler) throws IOException {
+            this.keys = keys;
             this.handler = handler;
             ServerSocket s;
             try {
@@ -230,6 +240,8 @@ final class SyncWire {
                 s.setSoTimeout(60_000);
                 DataInputStream in = new DataInputStream(s.getInputStream());
                 DataOutputStream out = new DataOutputStream(s.getOutputStream());
+                byte[] key = null;
+                int which = -1;
                 while (running) {
                     byte[] sealed;
                     try {
@@ -237,15 +249,32 @@ final class SyncWire {
                     } catch (IOException end) {
                         break;
                     }
-                    JSONObject msg;
-                    try {
-                        msg = open(key, sealed);
-                    } catch (Exception wrongKey) {
-                        break; // not one of ours: say nothing and hang up
+                    JSONObject msg = null;
+                    if (key == null) {
+                        // The first message decides which key this connection uses.
+                        List<byte[]> list = keys.keys();
+                        for (int i = 0; i < list.size() && msg == null; i++) {
+                            byte[] k = list.get(i);
+                            if (k == null) continue;
+                            try {
+                                msg = open(k, sealed);
+                                key = k;
+                                which = i;
+                            } catch (Exception notThisOne) {
+                                // try the next
+                            }
+                        }
+                    } else {
+                        try {
+                            msg = open(key, sealed);
+                        } catch (Exception e) {
+                            msg = null;
+                        }
                     }
+                    if (msg == null) break; // not one of ours: say nothing and hang up
                     JSONObject res;
                     try {
-                        res = handler.handle(msg, host);
+                        res = handler.handle(msg, host, which);
                     } catch (Exception e) {
                         res = new JSONObject();
                         res.put("error", String.valueOf(e.getMessage()));

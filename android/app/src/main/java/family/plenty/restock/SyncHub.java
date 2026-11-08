@@ -73,6 +73,13 @@ final class SyncHub {
     private SyncHub(Context context) {
         this.context = context;
         this.engine = new SyncEngine(new AndroidDb(RestockDatabase.get(context)));
+        this.household = new SyncHousehold(engine);
+        // A phone joining from the first screen gets the owner's shop choices and settings once.
+        household.settings = () -> {
+            try (Cursor c = RestockDatabase.get(context).rawQuery("SELECT value FROM kv WHERE key = 'settings'", null)) {
+                return c.moveToFirst() ? c.getString(0) : null;
+            }
+        };
     }
 
     static String nowIso() {
@@ -83,18 +90,20 @@ final class SyncHub {
 
     // ---------- the household ----------
 
+    final SyncHousehold household;
+
     /** True once the app's tables (and sync's) exist. */
     boolean ready() {
-        try (Cursor c = RestockDatabase.get(context).rawQuery("SELECT 1 FROM sqlite_master WHERE name = 'sync_meta'", null)) {
+        try (Cursor c = RestockDatabase.get(context).rawQuery("SELECT 1 FROM sqlite_master WHERE name = 'household'", null)) {
             return c.moveToFirst();
         }
     }
 
+    /** The household's current key, or null when this phone isn't in one. */
     byte[] key() {
         try {
-            if (!ready()) return null;
-            String k = engine.meta("key");
-            return k == null ? null : SyncWire.decodeKey(k);
+            if (!ready() || !household.paired()) return null;
+            return household.key();
         } catch (Exception e) {
             return null;
         }
@@ -108,71 +117,115 @@ final class SyncHub {
         return !"0".equals(engine.meta("keep_ready"));
     }
 
-    /** Starts a household on this phone (or reuses it) and returns the code the other phone scans. */
-    String invite(String household, boolean shareCards) throws Exception {
-        if (!paired()) engine.setMeta("key", SyncWire.encodeKey(SyncWire.newKey()));
-        if (household != null && !household.trim().isEmpty()) engine.setMeta("household", household.trim());
-        engine.setShareCards(shareCards);
-        if (engine.meta("name") == null) engine.setMeta("name", defaultName());
-        start();
-        return pairingCode();
+    /**
+     * 0.8.2: phones paired on 0.8.0 or 0.8.1 pair again (owner phone and one-time codes need it).
+     * They keep everything; the Sync screen says what to do.
+     */
+    void upgradeOldPairing() {
+        try {
+            if (ready() && household.legacy()) {
+                household.forget();
+                engine.setMeta("notice", "repair");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "upgradeOldPairing", e);
+        }
     }
 
     /**
-     * RESTOCK:2:KEY:IP:PORT, scanned by the other phone (0.8.1). Only capitals, digits and
-     * punctuation a QR code packs tightly, so the code is small and easy to scan off a screen.
-     * The household's name comes over in the first sync instead.
+     * Owner: a new one-time code for another phone (starting the household first if there isn't
+     * one). Each call makes a different code; it works once, for 10 minutes.
      */
-    String pairingCode() throws Exception {
-        String ip = localIp();
-        return "RESTOCK:2:" + SyncWire.base32(SyncWire.decodeKey(engine.meta("key"))) + ":" + (ip == null ? "" : ip) + ":"
-            + (server == null ? 0 : server.port());
+    String invite(String householdName, boolean shareCards) throws Exception {
+        upgradeOldPairing();
+        if (!household.paired()) {
+            if (engine.meta("name") == null) engine.setMeta("name", defaultName());
+            household.create(householdName, null);
+            engine.setShareCards(shareCards);
+            engine.setMeta("notice", null);
+        }
+        start();
+        String code = household.invite(localIp(), port());
+        readvertise();
+        return code;
     }
 
-    /** Joins the household in a scanned code. `replace`: this phone starts from the household's things. */
-    void join(String code, boolean replace, boolean shareCards) throws Exception {
-        String c = code.trim();
-        String key;
-        String host = "";
-        String port = "0";
-        String household = "";
-        String[] p = c.split(":", 6);
-        if (p.length >= 3 && "RESTOCK".equalsIgnoreCase(p[0]) && "2".equals(p[1])) {
-            key = SyncWire.encodeKey(SyncWire.unbase32(p[2]));
-            if (p.length >= 5) {
-                host = p[3];
-                port = p[4];
+    void closeInvite() throws Exception {
+        household.closeInvite();
+        readvertise();
+    }
+
+    /**
+     * Joins with a scanned or pasted code: reaches the owner phone (at the address in the code,
+     * or by looking for it on the Wi-Fi), proves the code, and gets the household's key.
+     * `replace`: this phone starts from the household's things. Answers what the owner sent.
+     */
+    JSONObject join(String code, boolean replace, boolean shareCards, boolean wantSettings) throws Exception {
+        String[] c = SyncHousehold.parseCode(code);
+        byte[] token = SyncWire.unbase32(c[0]);
+        if (token.length != 16) throw new IllegalArgumentException("That code is damaged. Make a new one on the owner phone.");
+        byte[] pk = SyncHousehold.pairingKey(token);
+        upgradeOldPairing();
+        if (household.paired()) throw new IllegalStateException("This phone is already in a household. Stop syncing it first.");
+        if (engine.meta("name") == null) engine.setMeta("name", defaultName());
+        List<String> where = new ArrayList<>();
+        if (!c[1].isEmpty() && !"0".equals(c[2])) where.add(c[1] + ":" + c[2]);
+        JSONObject got = null;
+        String reached = null;
+        Exception last = null;
+        for (int round = 0; round < 2 && got == null; round++) {
+            if (round == 1) where = discover(5000, "p", SyncHousehold.pairingTag(token));
+            for (String hp : where) {
+                int colon = hp.lastIndexOf(':');
+                try (SyncWire.Client cl = new SyncWire.Client(pk, hp.substring(0, colon), Integer.parseInt(hp.substring(colon + 1)), 3000)) {
+                    got = household.join(cl, wantSettings);
+                    reached = hp;
+                    break;
+                } catch (Exception e) {
+                    last = e;
+                }
             }
-        } else if (p.length >= 6 && "RESTOCK-SYNC".equals(p[0]) && "1".equals(p[1])) {
-            // 0.8.0's longer code
-            key = p[2];
-            host = p[3];
-            port = p[4];
-            household = URLDecoder.decode(p[5], "UTF-8");
-        } else if (p.length >= 2 && p[0].toUpperCase(Locale.ROOT).startsWith("RESTOCK")) {
-            throw new IllegalArgumentException("That code is from a newer Restock. Update this phone first.");
-        } else {
-            throw new IllegalArgumentException("That isn't a Restock sync code.");
         }
-        SyncWire.decodeKey(key); // throws if it's damaged
+        if (got == null) {
+            String why = last == null ? "" : last.getMessage();
+            if (why != null && (why.contains("run out") || why.contains("join first"))) throw new IllegalStateException(why.replace("the other phone said: ", ""));
+            throw new IllegalStateException(
+                "Couldn't reach the owner phone. Keep Restock open on it with the code showing, make sure both phones are on the same Wi-Fi, and try again.");
+        }
         stop();
         if (replace) engine.clearForJoin();
-        engine.setMeta("key", key);
-        if (!household.isEmpty()) engine.setMeta("household", household);
         engine.setShareCards(shareCards);
-        if (engine.meta("name") == null) engine.setMeta("name", defaultName());
-        if (!host.isEmpty() && !"0".equals(port)) engine.setMeta("invite", host + ":" + port);
+        engine.setMeta("notice", null);
+        if (got.has("household")) engine.setMeta("household", got.optString("household"));
+        if (reached != null) engine.setMeta("invite", reached);
         start();
+        return got;
     }
 
-    /** Leaves the household: this phone keeps its things but stops syncing. */
-    void leave() throws Exception {
+    /** This phone leaves the household (keeping its things). False: the owner must hand over first. */
+    boolean leave() throws Exception {
+        if (!household.paired()) return true;
+        if (!household.startLeaving()) return false;
+        syncAll(); // let the others see it go, if they're here
         stop();
+        household.forget();
         context.stopService(new android.content.Intent(context, SyncService.class));
         WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME);
-        engine.setMeta("key", null);
-        engine.setMeta("invite", null);
-        engine.db.exec("DELETE FROM sync_peers");
+        return true;
+    }
+
+    /** Owner: removes a phone. The household's key changes so it can't sync again. */
+    void remove(String device) throws Exception {
+        household.remove(device);
+        readvertise();
+        new Thread(this::syncAll).start(); // hand the new key out to whoever's here
+    }
+
+    /** Owner: makes another phone the owner (it takes over when it next syncs). */
+    void handOver(String device) throws Exception {
+        household.handOver(device);
+        readvertise();
+        new Thread(this::syncAll).start();
     }
 
     static String defaultName() {
@@ -184,29 +237,38 @@ final class SyncHub {
 
     /** Listens for the household's other phones and tells the Wi-Fi this phone is here. */
     synchronized void start() {
-        byte[] key = key();
-        if (key == null || server != null) return;
+        upgradeOldPairing();
+        if (key() == null || server != null) return;
         try {
-            server = new SyncWire.Server(key, new SyncWire.Handler() {
+            server = new SyncWire.Server(household::serverKeys, new SyncWire.Handler() {
                 volatile boolean took;
 
                 @Override
-                public JSONObject handle(JSONObject m, String host) throws Exception {
-                    JSONObject r = engine.handle(m, host);
+                public JSONObject handle(JSONObject m, String host, int which) throws Exception {
+                    JSONObject r = household.handle(m, host, which);
                     if (r.optInt("changed", 0) > 0) took = true;
+                    if (which == SyncHousehold.PAIRING && r.has("key")) {
+                        took = true;
+                        readvertise(); // the code is used up
+                    }
                     return r;
                 }
 
                 @Override
                 public void done(String host) {
                     lastSyncAt = nowIso();
+                    try {
+                        if (household.takeHandover()) readvertise();
+                    } catch (Exception ignored) {
+                        // next time
+                    }
                     if (took) {
                         took = false;
                         changed();
                     }
                 }
             });
-            advertise(key, server.port());
+            advertise();
             schedule();
         } catch (Exception e) {
             lastError = "Couldn't listen for other phones: " + e.getMessage();
@@ -215,14 +277,7 @@ final class SyncHub {
     }
 
     synchronized void stop() {
-        if (registration != null) {
-            try {
-                nsd().unregisterService(registration);
-            } catch (Exception ignored) {
-                // already gone
-            }
-            registration = null;
-        }
+        unadvertise();
         if (server != null) {
             server.stop();
             server = null;
@@ -238,14 +293,48 @@ final class SyncHub {
         return (NsdManager) context.getSystemService(Context.NSD_SERVICE);
     }
 
-    private void advertise(byte[] key, int port) throws Exception {
+    private synchronized void unadvertise() {
+        if (registration != null) {
+            try {
+                nsd().unregisterService(registration);
+            } catch (Exception ignored) {
+                // already gone
+            }
+            registration = null;
+        }
+    }
+
+    /** The household's key, an open code, or the owner changed: tell the Wi-Fi again. */
+    synchronized void readvertise() {
+        if (server == null) return;
+        unadvertise();
+        try {
+            advertise();
+        } catch (Exception e) {
+            Log.w(TAG, "readvertise", e);
+        }
+    }
+
+    /**
+     * Tells the Wi-Fi this phone is here: "h" is a public tag for the household's key (and "o"
+     * for the one before it, on the owner), "p" for an open pairing code, "d" this phone.
+     */
+    private synchronized void advertise() throws Exception {
+        byte[] key = key();
+        if (key == null || server == null) return;
         NsdServiceInfo info = new NsdServiceInfo();
         String device = engine.device();
         info.setServiceName("Restock-" + device.substring(0, Math.min(8, device.length())));
         info.setServiceType(SERVICE_TYPE);
-        info.setPort(port);
+        info.setPort(server.port());
         info.setAttribute("h", SyncWire.householdId(key));
         info.setAttribute("d", device);
+        if (household.isOwner()) {
+            byte[] old = household.oldKey();
+            if (old != null) info.setAttribute("o", SyncWire.householdId(old));
+            String tag = household.openPairingTag();
+            if (tag != null) info.setAttribute("p", tag);
+        }
         registration = new NsdManager.RegistrationListener() {
             @Override
             public void onServiceRegistered(NsdServiceInfo i) {}
@@ -276,10 +365,30 @@ final class SyncHub {
 
     /** The household's other phones on this Wi-Fi, as host:port, found within `ms`. */
     List<String> discover(long ms) {
-        List<String> found = new ArrayList<>();
         byte[] key = key();
-        if (key == null) return found;
-        final String household = SyncWire.householdId(key);
+        if (key == null) return new ArrayList<>();
+        List<String> found = discover(ms, "h", SyncWire.householdId(key));
+        // An owner that changed the key still shows the old one as "o", for phones that missed it.
+        for (String hp : discover(0, "o", SyncWire.householdId(key))) if (!found.contains(hp)) found.add(hp);
+        return found;
+    }
+
+    private final Map<String, Map<String, String>> lastAttrs = new java.util.HashMap<>();
+
+    /**
+     * Phones on this Wi-Fi whose `attr` is `value` (the household, or an open pairing code), as
+     * host:port, looking for `ms`. With ms 0, matches among what the last look found.
+     */
+    List<String> discover(long ms, String attr, String value) {
+        List<String> found = new ArrayList<>();
+        if (ms <= 0) {
+            synchronized (lastAttrs) {
+                for (Map.Entry<String, Map<String, String>> en : lastAttrs.entrySet()) if (value.equals(en.getValue().get(attr))) found.add(en.getKey());
+            }
+            return found;
+        }
+        final String household = value;
+        final String wanted = attr;
         String me;
         try {
             me = engine.device();
@@ -351,10 +460,15 @@ final class SyncHub {
                 NsdServiceInfo r = got[0];
                 if (r == null || r.getHost() == null) continue;
                 Map<String, byte[]> attrs = r.getAttributes();
-                String h = attrs.get("h") == null ? null : new String(attrs.get("h"), StandardCharsets.UTF_8);
-                String d = attrs.get("d") == null ? null : new String(attrs.get("d"), StandardCharsets.UTF_8);
-                if (!household.equals(h) || self.equals(d)) continue;
-                found.add(r.getHost().getHostAddress() + ":" + r.getPort());
+                Map<String, String> text = new java.util.HashMap<>();
+                for (Map.Entry<String, byte[]> en : attrs.entrySet())
+                    if (en.getValue() != null) text.put(en.getKey(), new String(en.getValue(), StandardCharsets.UTF_8));
+                String hp = r.getHost().getHostAddress() + ":" + r.getPort();
+                synchronized (lastAttrs) {
+                    lastAttrs.put(hp, text);
+                }
+                if (!household.equals(text.get(wanted)) || self.equals(text.get("d"))) continue;
+                found.add(hp);
             }
         } catch (Exception e) {
             Log.w(TAG, "discover", e);
@@ -415,8 +529,32 @@ final class SyncHub {
                 String host = hp.substring(0, colon);
                 int port = Integer.parseInt(hp.substring(colon + 1));
                 if (host.equals(mine) && port == port()) continue;
-                try (SyncWire.Client c = new SyncWire.Client(key, host, port, 2500)) {
-                    SyncEngine.Result r = engine.syncWith(c, nowIso(), port());
+                SyncEngine.Result r = null;
+                for (int attempt = 0; attempt < 2; attempt++) {
+                    try (SyncWire.Client c = new SyncWire.Client(key, host, port, 2500)) {
+                        r = engine.syncWith(c, nowIso(), port());
+                    } catch (Exception e) {
+                        error = e.getMessage();
+                        r = null;
+                    }
+                    if (r == null || r.rekey == null) break;
+                    // The owner changed the household's key (it removed a phone): take the new one and go again.
+                    household.takeRekey(r.rekey);
+                    key = key();
+                    readvertise();
+                }
+                if (r == null) continue;
+                if (r.removed) {
+                    // The owner removed this phone. It keeps its things, but stops syncing.
+                    stop();
+                    household.forget();
+                    engine.setMeta("notice", "removed");
+                    context.stopService(new android.content.Intent(context, SyncService.class));
+                    WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME);
+                    changed();
+                    break;
+                }
+                {
                     if (r.peer == null || r.peer.isEmpty() || r.peer.equals(engine.device()) || !done.add(r.peer)) continue;
                     engine.notePeer(r.peer, r.peerName, host, port);
                     // A phone that joined with a short code learns the household's name here.
@@ -426,10 +564,10 @@ final class SyncHub {
                     s.sent += r.sent;
                     if (r.peerName != null) s.names.add(r.peerName);
                     if (invite != null && invite.equals(hp)) engine.setMeta("invite", null);
-                } catch (Exception e) {
-                    error = e.getMessage();
                 }
             }
+            // Made the owner by the phone before? Take over (the phones' secrets came sealed for this one).
+            if (key() != null && household.takeHandover()) readvertise();
             lastSyncAt = nowIso();
             lastError = s.reached > 0 ? null : (where.isEmpty() ? "No other phones found on this Wi-Fi." : "Couldn't reach the other phone" + (error == null ? "." : ": " + error));
             if (s.received > 0) changed();

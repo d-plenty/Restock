@@ -1,0 +1,5 @@
+Phones paired on 0.8.0 or 0.8.1: pair again (everything is kept).
+• Pairing codes work once, for 10 minutes. The QR code now scans
+• Owner phone: adds and removes phones, or hands over to another
+• Pull down on Home, Pantry, Keg, Pharmacy or the list to sync and check prices
+• First screen: Join your household. Settings: Erase everything (asks twice)

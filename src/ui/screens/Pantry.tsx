@@ -1,3 +1,4 @@
+import { useFullRefresh } from '../refresh';
 import { useState } from 'react';
 import { addListEntry, allCategories, allListEntries, deleteGroup, deleteListEntries, nowIso, uid, updateGroup } from '../../lib/db';
 import { buzz } from '../../lib/listActions';
@@ -84,6 +85,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
     }
   };
 
+  const full = useFullRefresh();
   if (!recs || !categories || !entries) return <div className="screen" />;
 
   const onList = new Map(entries.filter((e) => !e.checked && e.groupId).map((e) => [e.groupId!, e.id]));
@@ -189,7 +191,9 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   };
 
   return (
-    <div className="screen">
+    <div className="screen" {...full.props}>
+      {full.indicator}
+      {full.status}
       <div className="topbar">
         <h1>{SECTION_NAMES[section]}</h1>
         {recs.length > 0 && (
