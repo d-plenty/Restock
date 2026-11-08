@@ -223,7 +223,8 @@ export function SettingsScreen() {
         Sync
       </div>
       <div className="card flush">
-        {row('Sync with your household', syncSummary(sync) || 'Share one pantry and list between phones', () => nav.push({ name: 'sync' }))}
+        {row('Local sync', syncSummary(sync) || 'Phone to phone on your Wi-Fi · no account', () => nav.push({ name: 'sync' }))}
+        {row('Hosted sync', 'From anywhere, through your own server · coming later', () => nav.push({ name: 'soon', id: 'sync' }))}
         {row('Household name', settings.household.name, () => nav.push({ name: 'household' }))}
       </div>
 

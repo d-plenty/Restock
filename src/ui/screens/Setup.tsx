@@ -165,12 +165,12 @@ const ALL_TILES: Tile[] = [
   },
   {
     id: 'sync',
-    title: 'Sync',
-    sub: 'One pantry and list for the house',
+    title: 'Local sync',
+    sub: 'Phone to phone · no account',
     icon: 'swap',
     heading: 'Share with your household?',
     intro:
-      "Phones in the same house can share one pantry and shopping list, syncing with each other on the same Wi-Fi. No server and no account. Skip this if it's just you.",
+      "Local sync: phones in the same house share one pantry and shopping list, straight from one phone to another on your Wi-Fi. No account, no server, and nothing leaves your phones. Up to 6 phones. Skip this if it's just you.",
   },
   {
     id: 'widgets',
@@ -430,11 +430,22 @@ function SyncTile() {
       <button className="row" onClick={() => nav.push({ name: 'sync' })}>
         <Icon name="refresh" size={18} />
         <span className="grow">
-          <span className="title">{info?.paired ? 'Sync is on' : 'Set up sync'}</span>
+          <span className="title">{info?.paired ? 'Local sync is on' : 'Set up local sync'}</span>
           <span className="small">{syncSummary(info)}</span>
         </span>
         <Icon name="chevron" size={18} />
       </button>
+      <div className="row">
+        <Icon name="refresh" size={18} />
+        <span className="grow">
+          <span className="title" style={{ fontSize: 14 }}>
+            Hosted sync
+          </span>
+          <span className="small">
+            Sync from anywhere through a small server you run, for when the phones aren't on the same Wi-Fi. Coming later.
+          </span>
+        </span>
+      </div>
     </div>
   );
 }
@@ -812,7 +823,7 @@ export function Onboarding() {
             <div className="card" style={{ gap: 6 }}>
               <strong>Share with your household again?</strong>
               <span className="small">
-                Backups don't include the household. To sync this phone, join with a new code from the owner phone (Settings → Sync → Add a phone
+                Backups don't include the household. To sync this phone, join with a new code from the owner phone (Settings → Local sync → Add a phone
                 there).
               </span>
               <button

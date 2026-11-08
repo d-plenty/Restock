@@ -93,7 +93,8 @@ export interface RestockNativePlugin {
     settings?: boolean;
   }): Promise<SyncInfo & { reached: number; received: number; settings?: string; ownerName?: string }>;
   syncNow(): Promise<SyncInfo & { reached: number; received: number; sent: number }>;
-  syncSet(opts: { name?: string; shareCards?: boolean; keepReady?: boolean }): Promise<SyncInfo>;
+  /** household: the household's name (owner only). */
+  syncSet(opts: { name?: string; household?: string; shareCards?: boolean; keepReady?: boolean }): Promise<SyncInfo>;
   /** left false: this is the owner and other phones are in the household; hand over first. */
   syncLeave(): Promise<SyncInfo & { left: boolean }>;
   requestBatteryExemption(): Promise<void>;

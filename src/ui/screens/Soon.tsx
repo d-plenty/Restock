@@ -49,13 +49,13 @@ export const SOON: Soon[] = [
   {
     id: 'sync',
     icon: 'refresh',
-    title: 'Sync away from home',
-    short: 'Through a small server you run, when the phones aren’t on the same Wi-Fi',
+    title: 'Hosted sync',
+    short: 'Sync from anywhere, through a small server you run',
     body: (
       <>
         <p>
-          Phones in a household already sync on the same Wi-Fi (Settings → Sync). This adds syncing from anywhere: tick something off at the shops and
-          it's off the list at home straight away.
+          Phones in a household already sync on the same Wi-Fi with local sync (Settings → Local sync), with no account and nothing leaving your
+          phones. This adds syncing from anywhere: tick something off at the shops and it's off the list at home straight away.
         </p>
         <p>
           It would run on a small server you control: a Docker container on a home server, NAS or Raspberry Pi. There's no Restock account and no

@@ -1,0 +1,4 @@
+• Local sync: phone to phone on your Wi-Fi, no account, nothing leaves your phones, up to 6 phones
+• Hosted sync (your own server, from anywhere) shown as coming later
+• Household page lists your phones and links to local sync
+• Updates retry when GitHub's download server is busy

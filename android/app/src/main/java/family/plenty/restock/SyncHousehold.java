@@ -29,6 +29,9 @@ import org.json.JSONObject;
  */
 final class SyncHousehold {
     static final long CODE_LIFE_MS = 10 * 60 * 1000L;
+    /** Local sync is for a household: up to 6 phones (0.8.3). */
+    static final int MAX_PHONES = 6;
+    static final String FULL = "A household can have up to " + MAX_PHONES + " phones. Remove one first (Settings → Local sync).";
     static final long OLD_KEY_LIFE_MS = 60L * 24 * 3600 * 1000;
     /** Which key opened a message (the order of keys()). */
     static final int CURRENT = 0, OLD = 1, PAIRING = 2;
@@ -168,6 +171,7 @@ final class SyncHousehold {
      */
     String invite(String ip, int port) throws Exception {
         if (!isOwner()) throw new IllegalStateException("Only the owner phone can add phones.");
+        if (members().size() >= MAX_PHONES) throw new IllegalStateException(FULL);
         byte[] token = random(16);
         e.setMeta("pair_token", SyncWire.base32(token));
         e.setMeta("pair_until", String.valueOf(System.currentTimeMillis() + CODE_LIFE_MS));
@@ -226,6 +230,7 @@ final class SyncHousehold {
             if (!"join".equals(req.optString("op"))) return res.put("error", "Use the code to join first.");
             if (openPairingKey() == null || !isOwner()) return res.put("error", "That code has run out. Make a new one on the owner phone.");
             closeInvite(); // one use only
+            if (members().size() >= MAX_PHONES) return res.put("error", FULL);
             String name = req.optString("name", "Phone");
             JSONObject s = secrets();
             s.put(device, req.getString("secret"));
@@ -356,6 +361,11 @@ final class SyncHousehold {
             out.add(m);
         }
         return out;
+    }
+
+    /** Owner: renames the household (the other phones get the new name when they sync). */
+    void renameHousehold(String name) throws Exception {
+        if (isOwner()) setRow("name", name);
     }
 
     /** This phone's name changed: tell the household (its own member entry). */

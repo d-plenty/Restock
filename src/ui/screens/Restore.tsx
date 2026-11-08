@@ -72,7 +72,7 @@ export function RestoreSheet({
         if (!stop) return;
         const r = await RestockNative.syncLeave();
         if (!r.left) {
-          setError('This is the owner phone. Make another phone the owner first (Settings → Sync), or choose Restore for the household.');
+          setError('This is the owner phone. Make another phone the owner first (Settings → Local sync), or choose Restore for the household.');
           return;
         }
       }

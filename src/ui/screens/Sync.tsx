@@ -4,7 +4,7 @@ import { saveCopyInApp } from '../../lib/backup';
 import { confirmAction } from '../../lib/confirm';
 import { allGroups, getSettings, updateSettings } from '../../lib/db';
 import { RestockNative } from '../../lib/sql/native';
-import { agoText, pairingCode, strictBatteryMaker, syncAvailable, syncInfo, type SyncInfo } from '../../lib/sync';
+import { agoText, MAX_SYNC_PHONES, pairingCode, strictBatteryMaker, syncAvailable, syncInfo, type SyncInfo } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { syncBackgroundSchedule } from '../../lib/check';
 import { scheduleReminders } from '../../lib/notify';
@@ -225,7 +225,7 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
           {!expired && <CodeText code={code} />}
           <ol className="small" style={{ margin: 0, paddingLeft: 18 }}>
             <li>Put both phones on the same Wi-Fi, and keep this screen open.</li>
-            <li>On the other phone (Restock 0.8.2 or newer), tap Join your household on the first screen, or Settings → Sync → Join a household.</li>
+            <li>On the other phone (Restock 0.8.2 or newer), tap Join your household on the first screen, or Settings → Local sync → Join a household.</li>
             <li>Scan this code.</li>
           </ol>
           <button className="btn block" onClick={close}>
@@ -363,7 +363,7 @@ export async function scanPairingCode(): Promise<string | undefined> {
   const out = await scanBarcode('Scan the code on the owner phone', {
     accept: pairingCode,
     qr: true,
-    wrong: "That isn't a Restock sync code. On the owner phone, open Settings → Sync → Add a phone.",
+    wrong: "That isn't a Restock sync code. On the owner phone, open Settings → Local sync → Add a phone.",
     typeHint: 'Or paste the code',
   });
   return out.ok ? out.code : undefined;
@@ -494,7 +494,7 @@ export function SyncScreen() {
 
   return (
     <div className="screen">
-      <TopBar title="Sync" />
+      <TopBar title="Local sync" />
 
       {!syncAvailable() && (
         <div className="banner grey">
@@ -517,13 +517,30 @@ export function SyncScreen() {
         </div>
       )}
 
-      <div className="card" style={{ gap: 6 }}>
-        <strong>One pantry and list for the whole house</strong>
+      <div className="card" style={{ gap: 8 }}>
+        <strong>Local sync: one pantry and list for the whole house</strong>
         <span className="small">
-          Phones in the same household sync with each other when they're on the same Wi-Fi: pantry, shopping list (ticks too), prices, categories and
-          alerts. No server and no account; everything sent between them is encrypted with a key only your phones have.
+          Phones in your household sync <strong>straight from one phone to another</strong> on your own Wi-Fi: pantry, shopping list (ticks too),
+          prices, categories and alerts.
         </span>
-        <span className="small">Each phone keeps its own look, receipts, backups and shop sign-ins.</span>
+        <ul className="ticks">
+          <li>
+            <Icon name="check" size={16} />
+            <span>No account, no sign-up, no server.</span>
+          </li>
+          <li>
+            <Icon name="check" size={16} />
+            <span>Nothing leaves your phones: it never goes over the internet, and the makers of Restock never see it.</span>
+          </li>
+          <li>
+            <Icon name="check" size={16} />
+            <span>Encrypted with a key only your phones have.</span>
+          </li>
+          <li>
+            <Icon name="check" size={16} />
+            <span>Up to {MAX_SYNC_PHONES} phones. Each keeps its own look, receipts, backups and shop sign-ins.</span>
+          </li>
+        </ul>
       </div>
 
       {info && !info.paired && (
@@ -609,7 +626,11 @@ export function SyncScreen() {
                 </div>
               );
             })}
-            {info.isOwner ? (
+            {info.isOwner && (info.members?.length ?? 1) >= MAX_SYNC_PHONES ? (
+              <p className="small" style={{ padding: '4px 14px 12px', margin: 0 }}>
+                That's the most local sync allows ({MAX_SYNC_PHONES} phones). To add another, remove one first.
+              </p>
+            ) : info.isOwner ? (
               <button className="row" onClick={() => setInviting(true)}>
                 <Icon name="plus" size={18} />
                 <span className="grow">
@@ -703,7 +724,14 @@ export function SyncScreen() {
           If both phones change the same thing while apart, the later change wins. Restoring a backup on one phone changes the household's things to
           match it.
         </span>
-        <span className="small">Away from home (through a small server you run) is coming later.</span>
+      </div>
+
+      <div className="card" style={{ gap: 6 }}>
+        <strong>Hosted sync: coming later</strong>
+        <span className="small">
+          For syncing from anywhere, not just on the same Wi-Fi: through a small server you run yourself (a Docker container on a home server, NAS or
+          Raspberry Pi). Still no Restock account, and the server only ever sees encrypted data. Local sync keeps working either way.
+        </span>
       </div>
 
       {inviting && info && (

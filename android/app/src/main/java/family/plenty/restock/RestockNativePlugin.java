@@ -482,6 +482,9 @@ public class RestockNativePlugin extends Plugin {
                 String next = url;
                 java.net.HttpURLConnection c = null;
                 // GitHub sends the download on to its file server: follow up to five hops, https only.
+                // 0.8.3: GitHub's file server sometimes answers 502-504 for a moment; wait and try
+                // again (three times) before giving up.
+                int retries = 0;
                 for (int hop = 0; hop < 5; hop++) {
                     c = (java.net.HttpURLConnection) Net.url(next).openConnection();
                     c.setInstanceFollowRedirects(false);
@@ -496,7 +499,16 @@ public class RestockNativePlugin extends Plugin {
                         next = loc;
                         continue;
                     }
-                    if (code != 200) throw new java.io.IOException("GitHub answered " + code);
+                    if (code >= 500 && retries < 3) {
+                        c.disconnect();
+                        retries++;
+                        hop--;
+                        next = url;
+                        Thread.sleep(2000L * retries);
+                        continue;
+                    }
+                    if (code != 200)
+                        throw new java.io.IOException("GitHub answered " + code + (code >= 500 ? " (GitHub's download server is busy; try again in a few minutes)" : ""));
                     break;
                 }
                 try (java.io.InputStream in = c.getInputStream(); java.io.FileOutputStream out = new java.io.FileOutputStream(apk)) {
@@ -899,10 +911,12 @@ public class RestockNativePlugin extends Plugin {
         final String name = call.getString("name");
         final Boolean shareCards = call.getBoolean("shareCards");
         final Boolean keepReady = call.getBoolean("keepReady");
+        final String householdName = call.getString("household");
         syncThread.execute(() -> {
             try {
                 SyncHub hub = SyncHub.get(getContext());
                 if (name != null && !name.trim().isEmpty()) hub.household.rename(name.trim());
+                if (householdName != null && !householdName.trim().isEmpty() && hub.paired()) hub.household.renameHousehold(householdName.trim());
                 if (shareCards != null) hub.engine.setShareCards(shareCards);
                 if (keepReady != null) {
                     hub.engine.setMeta("keep_ready", keepReady ? "1" : "0");

@@ -17,6 +17,9 @@ export function pairingCode(text: string): string | undefined {
   return /^RESTOCK(-SYNC)?:\d+:/i.test(t) ? t : undefined;
 }
 
+/** Local sync is for a household: up to 6 phones (SyncHousehold.MAX_PHONES). */
+export const MAX_SYNC_PHONES = 6;
+
 export const syncAvailable = () => Capacitor.isNativePlatform();
 
 export async function syncInfo(): Promise<SyncInfo> {

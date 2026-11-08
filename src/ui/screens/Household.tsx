@@ -10,6 +10,8 @@ import {
   updateSettings,
 } from '../../lib/db';
 import { useLive } from '../../lib/useLive';
+import { RestockNative } from '../../lib/sql/native';
+import { MAX_SYNC_PHONES, syncInfo } from '../../lib/sync';
 import { Icon, TopBar } from '../components';
 import { useNav } from '../nav';
 import { activeSections, SECTION_NAMES, type Section } from '../../shops';
@@ -17,6 +19,7 @@ import { activeSections, SECTION_NAMES, type Section } from '../../shops';
 export function HouseholdScreen() {
   const nav = useNav();
   const settings = useLive(getSettings, []);
+  const sync = useLive(syncInfo, []);
   const allCats = useLive(allCategories, []);
   const [newCat, setNewCat] = useState('');
   const [section, setSection] = useState<Section>('pantry');
@@ -53,46 +56,54 @@ export function HouseholdScreen() {
         <input
           className="input"
           defaultValue={settings.household.name}
-          onBlur={(e) => updateSettings({ household: { name: e.target.value.trim() || 'Our house' } })}
+          onBlur={(e) => {
+            const name = e.target.value.trim() || 'Our house';
+            void updateSettings({ household: { name } });
+            // The owner's rename reaches the household's other phones (local sync).
+            if (sync?.paired && sync.isOwner) void RestockNative.syncSet({ household: name }).catch(() => undefined);
+          }}
         />
       </label>
       <p className="small">Made for you automatically. Rename it any time.</p>
 
-      <div className="eyebrow">Members</div>
+      <div className="eyebrow">Phones</div>
       <div className="card flush">
-        <div className="row">
-          <span
-            className="swatch"
-            style={{
-              background: 'var(--green-bg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              color: 'var(--green-ink)',
-              fontSize: 13,
-            }}
-          >
-            Y
-          </span>
-          <span className="grow">
-            <span className="title">You</span>
-            <span className="small">Owner · this phone</span>
-          </span>
-        </div>
-        <button className="row" onClick={() => nav.toast('Invites need the sync server, which comes in a later beta.')}>
-          <span style={{ color: 'var(--blue)' }}>
-            <Icon name="plus" />
-          </span>
-          <span className="grow">
-            <span className="title" style={{ color: 'var(--blue)' }}>
-              Invite with a QR code
+        {(sync?.paired ? (sync.members ?? []) : [{ device: 'me', name: 'This phone', owner: true, me: true }]).map((m) => (
+          <div key={m.device} className="row">
+            <Icon name="phone" size={18} />
+            <span className="grow">
+              <span className="title" style={{ fontSize: 14 }}>
+                {m.me ? `${m.name === 'This phone' ? 'This phone' : `${m.name} (this phone)`}` : m.name}
+              </span>
+              <span className="small">{m.owner ? 'Owner' : 'Member'}</span>
             </span>
-            <span className="small">Coming with the sync server</span>
+          </div>
+        ))}
+        <button className="row" onClick={() => nav.push({ name: 'sync' })}>
+          <Icon name="swap" size={18} />
+          <span className="grow">
+            <span className="title" style={{ fontSize: 14, color: 'var(--green)' }}>
+              {sync?.paired ? (sync.isOwner ? 'Add or remove phones' : 'Local sync') : 'Share with other phones: local sync'}
+            </span>
+            <span className="small">Phone to phone on your Wi-Fi. No account, and nothing leaves your phones. Up to {MAX_SYNC_PHONES} phones.</span>
           </span>
+          <Icon name="chevron" size={18} />
+        </button>
+        <button className="row" onClick={() => nav.push({ name: 'soon', id: 'sync' })}>
+          <Icon name="refresh" size={18} />
+          <span className="grow">
+            <span className="title" style={{ fontSize: 14 }}>
+              Hosted sync
+            </span>
+            <span className="small">Sync from anywhere, through a small server you run. Coming later.</span>
+          </span>
+          <Icon name="chevron" size={18} />
         </button>
       </div>
-      <p className="small">Once sync is on, the pantry and list are shared. Loyalty cards and alert settings stay on each phone.</p>
+      <p className="small">
+        With local sync on, the pantry, list, prices, categories and alerts are shared. Each phone keeps its own look, receipts, backups and shop
+        sign-ins.
+      </p>
 
       <div className="eyebrow">Categories</div>
       {sectionsOn.length > 1 && (
