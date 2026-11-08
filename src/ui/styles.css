@@ -752,30 +752,7 @@ details.dropdown[open] > summary {
   border-bottom: 1px solid var(--line-soft);
 }
 
-.seg {
-  display: flex;
-  gap: 4px;
-  background: var(--line);
-  border-radius: 12px;
-  padding: 4px;
-}
-.seg button {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: none;
-  color: var(--ink-2);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 9px 4px;
-  border-radius: 9px;
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  align-items: center;
-  white-space: nowrap;
-}
+/* .seg and .seg button are defined once, further down (forms). */
 .seg button.on {
   background: var(--surface);
   color: var(--ink);
@@ -914,12 +891,22 @@ details.dropdown[open] > summary {
 }
 
 .seg button {
+  flex: 1;
+  min-width: 0;
   height: 38px;
-  border-radius: 10px;
   border: none;
   background: transparent;
+  color: var(--ink-2);
+  font: inherit;
   font-size: 14px;
   font-weight: 600;
+  padding: 9px 4px;
+  border-radius: 10px;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .seg button[aria-pressed='true'] {
@@ -3356,4 +3343,17 @@ details.fold-inline {
   padding: 10px 14px;
   border-radius: 14px;
   background: var(--card);
+}
+
+/* 0.8.5: a choice in a list of rows, with the picked one (and a recommended one) in green. */
+.row.choice {
+  border: 2px solid transparent;
+  border-radius: 14px;
+}
+.row.choice.picked {
+  border-color: var(--green);
+  background: var(--green-bg);
+}
+.row.choice.picked .title {
+  color: var(--green-ink);
 }

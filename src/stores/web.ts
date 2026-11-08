@@ -16,7 +16,8 @@ interface Cached extends SearchInfo {
 }
 
 // "2": 0.7.6 added known search pages for most pharmacies, so older remembered guesses are dropped.
-const KV = (c: StoreChain) => `webShop2:${c}`;
+// "3": 0.8.5 fixed Priceline's (its old address now shows "No results"), so those are dropped too.
+const KV = (c: StoreChain) => `webShop3:${c}`;
 const DAY = 86_400_000;
 
 /** Where this shop's search page is: typed in by the person, known, remembered, or worked out from its homepage. */

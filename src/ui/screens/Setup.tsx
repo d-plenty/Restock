@@ -1,14 +1,17 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { BackupSummary } from '../../lib/backup';
 import { allCards, getSettings, updateSettings } from '../../lib/db';
 import { syncInfo } from '../../lib/sync';
 import legal from '../../lib/legal.json';
 import { downloadMarket, MARKET_SIZE_TEXT, MARKET_SOURCE } from '../../lib/market';
 import { useLive } from '../../lib/useLive';
-import { enabledIn } from '../../shops';
+import { enabledIn, sectionOn } from '../../shops';
+import { checkAll } from '../../lib/permissions';
+import { SELF_UPDATE } from '../../lib/updates';
+import { DEFAULT_SETTINGS } from '../../types';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
-import { Icon, Logo, TopBar } from '../components';
+import { Icon, Logo, TopBar, useBackHandler } from '../components';
 import { useNav } from '../nav';
 import { AutoBackupSettings } from './Backups';
 import { LegalSheet } from './Legal';
@@ -161,7 +164,7 @@ const ALL_TILES: Tile[] = [
     sub: 'Your household’s name',
     icon: 'home',
     heading: 'Name your household',
-    intro: 'Shown on Home and used for sync, so the phones in your house know they belong together.',
+    intro: "Your household's name, used by local sync so the phones in your house know they belong together.",
   },
   {
     id: 'sync',
@@ -222,16 +225,18 @@ const TILE_ORDER: TileId[] = [
   'widgets',
   'updates',
 ];
-export const TILES: Tile[] = TILE_ORDER.map((id) => ALL_TILES.find((t) => t.id === id)!);
+// The Updates tile only where Restock updates itself from GitHub (not F-Droid builds).
+export const TILES: Tile[] = TILE_ORDER.filter((id) => SELF_UPDATE || id !== 'updates').map((id) => ALL_TILES.find((t) => t.id === id)!);
 
 /** A tile's status, as shown on it. */
 export function tileStatus(s: Settings, id: TileId): { text: string; ok: boolean } {
   if (id === 'recalls') return { text: s.recalls.enabled ? 'On' : 'Off', ok: s.recalls.enabled };
-  if (id === 'backups' && s.setup.done.includes(id)) return { text: s.autoBackup.enabled ? 'On' : 'Off', ok: true };
-  if (id === 'receipts' && s.setup.done.includes(id)) return { text: s.receipts.enabled ? 'On' : 'Off', ok: true };
-  // Shop tiles count as done when the shops are there (after a restore, say), not only when set up here.
-  if (id === 'keg' && s.sections.keg) return { text: 'On', ok: true };
-  if (id === 'pharmacy' && s.sections.pharmacy) return { text: 'On', ok: true };
+  if (id === 'backups' && (s.autoBackup.enabled || s.setup.done.includes(id))) return { text: s.autoBackup.enabled ? 'On' : 'Off', ok: true };
+  if (id === 'receipts' && (s.receipts.enabled || s.setup.done.includes(id))) return { text: s.receipts.enabled ? 'On' : 'Off', ok: true };
+  // Shop tiles count as done when the tab is really on (shops picked), after a restore or joining a
+  // household, say, not only when set up here. Decided to leave it off: "Off", done.
+  if ((id === 'keg' || id === 'pharmacy') && sectionOn(s, id)) return { text: 'On', ok: true };
+  if ((id === 'keg' || id === 'pharmacy') && s.setup.done.includes(id)) return { text: 'Off', ok: true };
   if (id === 'pantry' && !s.setup.done.includes(id) && Object.values(s.stores).some((c) => c?.primary || c?.storeId))
     return { text: 'Done ✓', ok: true };
   if (s.setup.done.includes(id)) return { text: 'Done ✓', ok: true };
@@ -243,6 +248,36 @@ export function tileStatus(s: Settings, id: TileId): { text: string; ok: boolean
 // Tiles still to go: not done, skipped, or already showing as set up (Keg on after a restore, say).
 export const tilesLeft = (s: Settings) =>
   TILES.filter((t) => t.id !== 'recalls' && !s.setup.done.includes(t.id) && !s.setup.skipped.includes(t.id) && !tileStatus(s, t.id).ok);
+
+/**
+ * 0.8.5: tiles that are set up, whether or not anyone tapped Next on them: every permission
+ * allowed, auto backups, receipts or update alerts on, the look or accessibility changed, a
+ * loyalty card added or a shop signed in. Checked when Restock opens and on the tiles page.
+ */
+export async function noticeSetUpTiles(): Promise<void> {
+  try {
+    const s = await getSettings();
+    const found: TileId[] = [];
+    const differs = (a: unknown, b: unknown) => JSON.stringify(a) !== JSON.stringify(b);
+    if (s.autoBackup.enabled) found.push('backups');
+    if (s.receipts.enabled) found.push('receipts');
+    if (s.updates?.notify) found.push('updates');
+    if (differs(s.look, DEFAULT_SETTINGS.look) || s.theme !== DEFAULT_SETTINGS.theme) found.push('look');
+    if (differs(s.a11y, DEFAULT_SETTINGS.a11y)) found.push('a11y');
+    const signedIn = Object.values(s.accounts ?? {}).some((a) => a?.signedIn) || !!s.stores.coles?.branchStoreNo;
+    if (signedIn || (await allCards()).length) found.push('accounts');
+    if (isNative()) {
+      const p = await checkAll();
+      if (Object.values(p).every((v) => v === 'granted' || v === 'unsupported')) found.push('permissions');
+    }
+    const fresh = found.filter((t) => !s.setup.done.includes(t));
+    if (!fresh.length) return;
+    const done = [...s.setup.done, ...fresh];
+    await updateSettings({ setup: { ...s.setup, done, skipped: s.setup.skipped.filter((t) => !done.includes(t)) } });
+  } catch (e) {
+    console.error('setup check', e);
+  }
+}
 
 async function mark(id: TileId, how: 'done' | 'skipped') {
   const s = await getSettings();
@@ -368,7 +403,7 @@ function MarketSetup({ settings }: { settings: Settings }) {
         <li>
           <Icon name="check" size={16} />
           <span>
-            <strong>Testing:</strong> this is new. Turn it on or off any time in Settings → Shared price history.
+            <strong>Beta:</strong> this is new. Turn it on or off any time in Settings → Shared price history.
           </span>
         </li>
       </ul>
@@ -524,9 +559,19 @@ function TilePage({
   onNext: (how: 'done' | 'skipped') => void;
 }) {
   const needsShop = tile.id === 'pantry' && !enabledIn(settings.enabledChains, 'pantry').length;
+  // Changed something here and went back to the tiles without Next: that's set up, not skipped.
+  const [opened] = useState(() => JSON.stringify(settings));
+  const back = async () => {
+    if (JSON.stringify(await getSettings()) !== opened) await mark(tile.id, 'done');
+    onBack();
+  };
+  useBackHandler(() => {
+    void back();
+    return true;
+  });
   return (
     <>
-      <button className="btn ghost small" style={{ alignSelf: 'flex-start' }} onClick={onBack}>
+      <button className="btn ghost small" style={{ alignSelf: 'flex-start' }} onClick={() => void back()}>
         <span style={{ display: 'inline-flex', transform: 'rotate(180deg)' }}>
           <Icon name="chevron" size={16} />
         </span>
@@ -566,6 +611,9 @@ export function SetupTiles({
   inSettings?: boolean;
 }) {
   const doneCount = TILES.filter((t) => tileStatus(settings, t.id).ok).length;
+  useEffect(() => {
+    void noticeSetUpTiles();
+  }, []);
   return (
     <>
       {!inSettings && (
@@ -619,16 +667,27 @@ export function SetupTiles({
 
 /** Going through the tiles, one after another: in setup, and from Settings → Setup. */
 function useTileWalk(onFinished: () => void) {
-  const [open, setOpen] = useState<TileId>();
+  const [open, setOpenState] = useState<TileId>();
+  // Opened one tile from the page of tiles: Next or Skip goes back there. Continue goes through the rest.
+  const [single, setSingle] = useState(false);
+  const setOpen = (id: TileId | undefined) => {
+    setSingle(!!id);
+    setOpenState(id);
+  };
   const next = async (from: TileId | undefined, how?: 'done' | 'skipped') => {
     if (from && how) await mark(from, how);
+    if (from && single) {
+      setOpenState(undefined);
+      setSingle(false);
+      return;
+    }
     const s = await getSettings();
     const left = tilesLeft(s);
     const after = from ? TILES.findIndex((t) => t.id === from) : -1;
     const upcoming = left.find((t) => TILES.findIndex((x) => x.id === t.id) > after) ?? (from ? undefined : left[0]);
-    if (upcoming) setOpen(upcoming.id);
+    if (upcoming) setOpenState(upcoming.id);
     else {
-      setOpen(undefined);
+      setOpenState(undefined);
       onFinished();
     }
   };
@@ -665,6 +724,15 @@ export function Onboarding() {
     }
   };
   const walk = useTileWalk(() => void finish());
+  // Android's back button steps back through setup instead of closing Restock.
+  useBackHandler(() => {
+    if (walk.open) return false; // the tile page handles it
+    if (stage === 'privacy' || stage === 'tiles') {
+      setStage(stage === 'tiles' ? 'privacy' : 'welcome');
+      return true;
+    }
+    return false;
+  });
   if (!settings) return null;
 
   const restore = async (file: File) => {
@@ -839,7 +907,7 @@ export function Onboarding() {
             </div>
           )}
           <div className="spacer" />
-          <button className="btn primary block" onClick={() => updateSettings({ onboarded: true })}>
+          <button className="btn primary block" onClick={() => void noticeSetUpTiles().then(finish)}>
             Open Restock
           </button>
         </>
@@ -855,10 +923,9 @@ export function Onboarding() {
 export function SetupScreen() {
   const settings = useLive(getSettings, []);
   const nav = useNav();
-  // Nothing left to set up: back to Settings.
+  // Went through everything: back to the tiles, which show what's done and what was skipped.
   const walk = useTileWalk(() => {
-    nav.toast('All set up.');
-    nav.pop();
+    void getSettings().then((s) => nav.toast(s.setup.skipped.length ? "That's all of them. Skipped ones are still here when you want them." : 'All set up.'));
   });
   if (!settings) return <div className="screen" />;
   const tile = walk.open && TILES.find((t) => t.id === walk.open);

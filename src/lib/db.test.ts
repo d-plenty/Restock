@@ -43,7 +43,7 @@ const count = (table: string) => Number(raw.exec(`SELECT COUNT(*) FROM ${table}`
 
 describe('schema', () => {
   it('migrates to the latest version and creates every table', () => {
-    expect(raw.exec('PRAGMA user_version')[0].values[0][0]).toBe(15);
+    expect(raw.exec('PRAGMA user_version')[0].values[0][0]).toBe(16);
     const tables = raw.exec("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")[0].values.flat();
     expect(tables).toEqual(
       expect.arrayContaining(['cards', 'categories', 'items', 'kv', 'list_entries', 'prices', 'products', 'sync_log', 'sync_meta', 'sync_peers']),

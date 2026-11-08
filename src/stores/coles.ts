@@ -61,7 +61,9 @@ export function mapColes(p: Raw): StoreProduct | undefined {
   if (p.adId) return undefined;
   const pricing = (p.pricing ?? null) as Raw | null;
   if (!p.id || !pricing) return undefined;
-  const price = num(pricing.now);
+  // A price of $0 or less is a placeholder, not a price (it would read as 100% off). Same in StoreClient.java.
+  const now = num(pricing.now);
+  const price = now !== undefined && now > 0 ? now : undefined;
   const was = num(pricing.was);
   const brand = typeof p.brand === 'string' ? p.brand : undefined;
   const baseName = String(p.name ?? 'Unknown product');
@@ -95,11 +97,18 @@ export function flattenColes(data: Raw): StoreProduct[] {
   return results.map(mapColes).filter((x): x is StoreProduct => !!x);
 }
 
-async function searchOnce(term: string, storeId: string, key: string) {
+/**
+ * Coles hands out 24 results at a time; `start` is where the next lot begins (0.8.5). Its own
+ * page data says so: `{ noOfResults: 87, start: 0, pageSize: 24 }`.
+ */
+export const COLES_PAGE = 24;
+const startOf = (page: number) => String((Math.max(1, page) - 1) * COLES_PAGE);
+
+async function searchOnce(term: string, storeId: string, key: string, page = 1) {
   const params = new URLSearchParams({
     storeId,
     searchTerm: term,
-    start: '0',
+    start: startOf(page),
     sortBy: 'salesDescending',
     excludeAds: 'true',
     authenticated: 'false',
@@ -112,11 +121,11 @@ async function searchOnce(term: string, storeId: string, key: string) {
   return flattenColes(parseJson<Raw>(NAME, res));
 }
 
-export function colesSearchPath(term: string, storeId: string): string {
+export function colesSearchPath(term: string, storeId: string, page = 1): string {
   const params = new URLSearchParams({
     storeId,
     searchTerm: term,
-    start: '0',
+    start: startOf(page),
     sortBy: 'salesDescending',
     excludeAds: 'true',
     authenticated: 'false',
@@ -125,8 +134,8 @@ export function colesSearchPath(term: string, storeId: string): string {
 }
 
 /** On the phone: ask through a hidden browser page, which Coles' bot protection lets through. */
-async function searchViaBrowser(term: string, storeId: string): Promise<StoreProduct[]> {
-  const r = await viaBrowser('coles', 'GET', colesSearchPath(term, storeId));
+async function searchViaBrowser(term: string, storeId: string, page = 1): Promise<StoreProduct[]> {
+  const r = await viaBrowser('coles', 'GET', colesSearchPath(term, storeId, page));
   const body = r.text.trim();
   if (r.status <= 0 || r.status === 403 || r.status === 429 || body.startsWith('<')) throw new ColesCheckError();
   return flattenColes(parseJson<Raw>(NAME, { ...r, text: body }));
@@ -135,12 +144,14 @@ async function searchViaBrowser(term: string, storeId: string): Promise<StorePro
 export const coles: StoreAdapter = {
   chain: 'coles',
 
-  async search(term, storeId) {
+  pages: true,
+
+  async search(term, storeId, page = 1) {
     const store = storeId || DEFAULT_STORE;
     // Your own branch (testing): if Coles won't answer for it, or has nothing, ask its online store instead.
     if (store !== DEFAULT_STORE) {
       try {
-        const mine = await searchStore(term, store);
+        const mine = await searchStore(term, store, page);
         if (mine.length) return mine;
         noteFallback(store, `no results for "${term}"`);
       } catch (e) {
@@ -149,7 +160,7 @@ export const coles: StoreAdapter = {
         noteFallback(store, e instanceof Error ? e.message : String(e));
       }
     }
-    return searchStore(term, DEFAULT_STORE);
+    return searchStore(term, DEFAULT_STORE, page);
   },
 };
 
@@ -166,10 +177,10 @@ function noteFallback(store: string, why: string) {
   );
 }
 
-async function searchStore(term: string, store: string): Promise<StoreProduct[]> {
-  if (isNative()) return searchViaBrowser(term, store);
+async function searchStore(term: string, store: string, page = 1): Promise<StoreProduct[]> {
+  if (isNative()) return searchViaBrowser(term, store, page);
   try {
-    return await searchOnce(term, store, await ensureKey());
+    return await searchOnce(term, store, await ensureKey(), page);
   } catch (e) {
     // Usually an expired key or session. Start fresh, pause, and try once more.
     if (e instanceof BlockedError) {
@@ -177,6 +188,6 @@ async function searchStore(term: string, store: string): Promise<StoreProduct[]>
       apiKey = undefined;
       await sleep(1500);
     }
-    return searchOnce(term, store, await ensureKey(true));
+    return searchOnce(term, store, await ensureKey(true), page);
   }
 }

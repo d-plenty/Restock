@@ -66,13 +66,25 @@ export function median(values: number[]): number | undefined {
 /** How far back "normal price" and "lowest price" look. */
 export const HISTORY_DAYS = 183;
 
+/**
+ * The calendar day (yyyy-mm-dd) a time falls on where the phone is. Not the UTC day: in
+ * Australia that runs 10am to 10am, so an evening price and the next morning's sale would
+ * count as one day. Same as Deals.localDay in Java.
+ */
+export function localDay(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 /** Keep the last reading per calendar day, oldest first, within the history window. */
 export function normaliseReadings(readings: PriceReading[], now = Date.now()): PriceReading[] {
   const byDay = new Map<string, PriceReading>();
   const sorted = [...readings].sort((a, b) => a.date.localeCompare(b.date));
   for (const r of sorted) {
     if (now - Date.parse(r.date) > HISTORY_DAYS * DAY) continue;
-    byDay.set(r.date.slice(0, 10), r);
+    byDay.set(localDay(r.date), r);
   }
   return [...byDay.values()];
 }

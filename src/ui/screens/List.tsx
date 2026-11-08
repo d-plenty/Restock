@@ -42,6 +42,7 @@ import {
   ShopTotalsCard,
   stockWhere,
   Thumb,
+  useBackLayer,
 } from '../components';
 import { MemberInfoTag, MultiInfoTag, StockInfoTag, SwapInfoTag, VerdictInfoTag } from '../tagInfo';
 import { SendToShopSheet } from './SendToShop';
@@ -956,9 +957,13 @@ function ShoppingMode({
   const cards = useLive(allCards, []);
   const [card, setCard] = useState<LoyaltyCard>();
 
-  // Keep the screen on while shopping.
+  // Back (or Escape) closes shopping mode, unless a sheet is open on top of it.
+  useBackLayer(onClose);
+
+  // Keep the screen on while shopping: asked for once, let go when shopping mode closes.
   useEffect(() => {
     let lock: { release: () => Promise<void> } | undefined;
+    let done = false;
     const nav = navigator as Navigator & {
       wakeLock?: {
         request: (t: 'screen') => Promise<{ release: () => Promise<void> }>;
@@ -966,15 +971,16 @@ function ShoppingMode({
     };
     nav.wakeLock
       ?.request('screen')
-      .then((l) => (lock = l))
+      .then((l) => {
+        if (done) void l.release().catch(() => undefined);
+        else lock = l;
+      })
       .catch(() => undefined);
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
     return () => {
+      done = true;
       void lock?.release().catch(() => undefined);
-      window.removeEventListener('keydown', onKey);
     };
-  }, [onClose]);
+  }, []);
 
   const order = new Map(categories.map((cat, i) => [cat.id, i]));
   const catOf = (e: ListEntry) => recFor(c, e)?.group.categoryId ?? e.categoryId;

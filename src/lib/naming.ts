@@ -385,6 +385,10 @@ export const PRODUCT_NOUNS: ReadonlySet<string> = new Set([
     // Seen in real searches: "Milk Frother", "Cheese Kransky", "Milk Formula".
     'frother',
     'frothers',
+    // "Honey Wheats", "Honey Murcott Mandarins" (0.8.5).
+    'wheats',
+    'mandarins',
+    'mandarin',
     'kransky',
     'kranskys',
     'formula',

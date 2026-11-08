@@ -95,6 +95,19 @@ function filterSettings(root: HTMLElement, query: string): number {
 
 /** "Erase everything and start fresh" (0.8.2): asks twice, then wipes this phone and reopens Restock. */
 async function eraseAll() {
+  // 0.8.5: the owner phone can't just vanish, or nobody could add or remove phones again.
+  if (isNative()) {
+    const info = await syncInfo().catch(() => undefined);
+    if (info?.paired && info.isOwner && (info.members ?? []).some((m) => !m.me)) {
+      await confirmAction('Make another phone the owner first', {
+        detail:
+          'This is the household\'s owner phone. In Settings → Local sync, tap another phone and choose "Make this the owner phone", sync once, then erase this one. Or remove the other phones first.',
+        action: 'OK',
+        danger: false,
+      });
+      return;
+    }
+  }
   const first = await confirmAction('Erase everything on this phone?', {
     detail:
       "Every item, list, price, loyalty card, receipt and setting is deleted from this phone, and it leaves your household if it's in one. Other phones keep their things. Export a backup first if you might want any of it back.",
@@ -224,8 +237,8 @@ export function SettingsScreen() {
       </div>
       <div className="card flush">
         {row('Local sync', syncSummary(sync) || 'Phone to phone on your Wi-Fi · no account', () => nav.push({ name: 'sync' }))}
-        {row('Hosted sync', 'From anywhere, through your own server · coming later', () => nav.push({ name: 'soon', id: 'sync' }))}
-        {row('Household name', settings.household.name, () => nav.push({ name: 'household' }))}
+        {row('Hosted sync', 'From anywhere, through a small server you run yourself · coming later', () => nav.push({ name: 'soon', id: 'sync' }))}
+        {row('Household name', (sync?.paired && sync.household) || settings.household.name, () => nav.push({ name: 'household' }))}
       </div>
 
       <div className="eyebrow" id="s-checks">
@@ -422,7 +435,7 @@ export function SettingsScreen() {
         Troubleshooting
       </div>
       <div className="card flush">
-        {row('Test connections', 'Try a search at each store and see what happens', () => setTesting(true))}
+        {row('Test connections', 'Try a search at each shop and see what happens', () => setTesting(true))}
         {row('Diagnostics', 'What went wrong lately, and send search details', () => nav.push({ name: 'diagnostics' }))}
         {row('Permissions', 'Notifications, alarms, camera, location', () => nav.push({ name: 'permissions' }))}
         <details className="pick-more fold-inline">
@@ -488,7 +501,7 @@ export function SettingsScreen() {
       <div className="eyebrow" id="s-soon">
         Coming soon
       </div>
-      <Fold title="What's planned" sub="Stock at home, spending, sync, iPhone and more">
+      <Fold title="What's planned" sub="Stock at home, spending, hosted sync, iPhone and more">
         <ComingSoon />
       </Fold>
 
@@ -513,7 +526,7 @@ export function SettingsScreen() {
       <p className="small" style={{ textAlign: 'center' }}>
         Restock {version} beta · free and open source
         <br />
-        Your data stays on this phone
+        Your data stays on this phone, and your household's phones only if you share
         <br />
         <a href="https://github.com/d-plenty/Restock" target="_blank" rel="noreferrer">
           Source code and bug reports on GitHub
@@ -547,7 +560,7 @@ export function SettingsScreen() {
 }
 
 /**
- * Testing only: price history from hotprices.org, an open-source project that records Coles and
+ * Beta: price history from hotprices.org, an open-source project that records Coles and
  * Woolworths prices daily, so new items can be judged from day one.
  */
 function SharedHistory({ settings }: { settings: Settings }) {

@@ -1,5 +1,6 @@
 import { registerPlugin, type PermissionState, type PluginListenerHandle } from '@capacitor/core';
 import type { RunResult, SqlDriver, SqlOp, SqlValue } from './driver';
+import type { Section } from '../../shops';
 
 /** Bridge to the app's own Java code in android/app/src/main/java/family/plenty/restock. */
 export interface RestockNativePlugin {
@@ -74,27 +75,42 @@ export interface RestockNativePlugin {
   // ---------- 0.8.0: phone-to-phone sync (SyncHub.java) ----------
   syncInfo(): Promise<SyncInfo>;
   /** Starts (or reuses) the household; the code to show as a QR code. */
-  syncInvite(opts: { household: string; shareCards: boolean }): Promise<{ code: string; expiresInMs: number }>;
+  /** tabs (0.8.5): what a new household shares (only used when starting one). */
+  syncInvite(opts: { household: string; shareCards: boolean; tabs?: Section[] }): Promise<{ code: string; expiresInMs: number }>;
   /** The sheet showing a code was closed: the code stops working. */
   syncCloseInvite(): Promise<void>;
   /** Owner: take a phone out of the household (the household's key changes). */
   syncRemove(opts: { device: string }): Promise<SyncInfo>;
-  /** Owner: make another phone the owner. */
+  /** Owner: ask another phone to be the owner (it takes over at its next sync). */
   syncHandOver(opts: { device: string }): Promise<SyncInfo>;
+  /** Owner: never mind, stay the owner. */
+  syncCancelHandOver(): Promise<SyncInfo>;
+  /** 0.8.5: what a code's household is, before joining (doesn't use the code up). */
+  syncPeek(opts: { code: string }): Promise<{ household?: string; ownerName?: string; tabs: Section[]; settings?: string }>;
   syncDismissNotice(): Promise<void>;
   /** 0.8.2 "Erase everything": forget the household and stop background work on this phone. */
   eraseNative(): Promise<void>;
-  /** Joins with a scanned code. replace: start from the household's things instead of combining. */
-  /** settings: also ask for the owner's settings (joining from the first screen); they come back as JSON text. */
+  /**
+   * Joins with a scanned code. replace: start from the household's things (on the tabs this phone
+   * shares) instead of combining. tabs: what this phone shares. The owner's settings come back as JSON text.
+   */
   syncJoin(opts: {
     code: string;
     replace: boolean;
     shareCards: boolean;
-    settings?: boolean;
+    tabs?: Section[];
   }): Promise<SyncInfo & { reached: number; received: number; settings?: string; ownerName?: string }>;
   syncNow(): Promise<SyncInfo & { reached: number; received: number; sent: number }>;
   /** household: the household's name (owner only). */
-  syncSet(opts: { name?: string; household?: string; shareCards?: boolean; keepReady?: boolean }): Promise<SyncInfo>;
+  /** tabs: what this phone shares; householdTabs: what the household shares (owner only). */
+  syncSet(opts: {
+    name?: string;
+    household?: string;
+    shareCards?: boolean;
+    keepReady?: boolean;
+    tabs?: Section[];
+    householdTabs?: Section[];
+  }): Promise<SyncInfo>;
   /** left false: this is the owner and other phones are in the household; hand over first. */
   syncLeave(): Promise<SyncInfo & { left: boolean }>;
   requestBatteryExemption(): Promise<void>;
@@ -125,6 +141,12 @@ export interface SyncInfo {
   notice?: string | null;
   /** The phone's maker (some stop apps in the background regardless; see dontkillmyapp.com). */
   maker?: string;
+  /** 0.8.5: what the household shares, what this phone chose, and what it actually syncs. */
+  householdTabs?: Section[];
+  myTabs?: Section[];
+  tabs?: Section[];
+  /** Owner: the phone it asked to take over, until that phone does. */
+  handoverTo?: string | null;
 }
 
 /** Why Restock was opened: a share, an app icon shortcut, a widget or a notification. */

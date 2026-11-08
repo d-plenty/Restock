@@ -137,7 +137,7 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
     const ok = await askPermission('location');
     if (ok !== 'granted') {
       setBusy(undefined);
-      return setError("Location isn't allowed. Search by suburb or postcode instead, or allow it in Settings → Permissions.");
+      return setError("Location isn't allowed. Search by suburb or postcode instead, or allow it in Settings → Troubleshooting → Permissions.");
     }
     setBusy('Working out roughly where you are…');
     try {
@@ -1175,7 +1175,7 @@ function ColesStore({ settings }: { settings: Settings }) {
             <p className="small">
               Coles answers for any of its stores by store number, without signing in. With your store chosen, Restock shows that store's own prices
               and stock instead of the online store's. This is new, so it's marked Beta: if Coles doesn't answer for your store, Restock uses the
-              online prices and notes it in Settings → Diagnostics.
+              online prices and notes it in Settings → Troubleshooting → Diagnostics.
             </p>
             <p className="small">
               <strong>Choose your Coles store</strong> opens Coles' store finder inside Restock. Tap your store, and Restock picks up its number by
@@ -1183,7 +1183,8 @@ function ColesStore({ settings }: { settings: Settings }) {
             </p>
             <p className="small">
               <strong>Signing in to Coles</strong> isn't needed for prices. It's for sending your list into your Coles trolley, once Restock has
-              learned how: sign in, then go to Settings → Diagnostics → "Record adding to a trolley", add one item, and send the recording.
+              learned how: sign in, then go to Settings → Troubleshooting → Diagnostics → "Record adding to a trolley", add one item, and send the
+              recording.
             </p>
           </>
         ),

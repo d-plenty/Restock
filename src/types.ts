@@ -287,6 +287,8 @@ export interface Settings {
   privacyAccepted?: string;
   /** One-time hints already dismissed. */
   seenHints: string[];
+  /** 0.8.5: tabs the household started sharing that this phone was already asked about (yes or no). */
+  seenTabOffers?: Section[];
   /** When a backup was last exported, and when the reminder was last put off. */
   lastBackupAt?: string;
   backupNudgeAt?: string;

@@ -325,9 +325,22 @@ public final class Deals {
         Map<String, Reading> byDay = new LinkedHashMap<>();
         for (Reading r : sorted) {
             if (now - r.time() > HISTORY_DAYS * DAY) continue;
-            byDay.put(r.date.substring(0, 10), r);
+            byDay.put(localDay(r.date), r);
         }
         return new ArrayList<>(byDay.values());
+    }
+
+    /**
+     * The calendar day (yyyy-mm-dd) a time falls on where the phone is. Not the UTC day: in
+     * Australia that runs 10am to 10am, so an evening price and the next morning's sale would
+     * count as one day. Same as localDay in verdict.ts.
+     */
+    static String localDay(String iso) {
+        try {
+            return Instant.parse(iso).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString();
+        } catch (Exception e) {
+            return iso.length() >= 10 ? iso.substring(0, 10) : iso;
+        }
     }
 
     public static Stats computeStats(List<Reading> raw, long now) {

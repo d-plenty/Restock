@@ -322,12 +322,82 @@ export function Price({ value, was }: { value?: number; was?: number }) {
   );
 }
 
-export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+// ---------- Android back button ----------
+//
+// One back press (or Escape) does one thing. App.tsx works through, in order:
+//   1. the scanner, if it's open;
+//   2. the newest open layer: a Sheet, the confirm dialog, shopping mode (useBackLayer);
+//   3. the top screen on the screen stack (nav.pop);
+//   4. back handlers (useBackHandler), newest first: for steps that aren't on the screen
+//      stack, like first-run setup's welcome → privacy → tiles. Return true if you handled it
+//      (went back a step); return false to let the next one, then App, carry on;
+//   5. the Home tab, then leaving the app.
+// Usage, e.g. in Onboarding:
+//   useBackHandler(() => {
+//     if (stage === 'privacy') { setStage('welcome'); return true; }
+//     return false;
+//   });
+
+interface BackEntry {
+  fn: () => boolean;
+  layer: boolean;
+}
+const backEntries: BackEntry[] = [];
+
+function useBackEntry(fn: () => boolean, layer: boolean, active: boolean) {
+  const ref = useRef(fn);
+  ref.current = fn;
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    if (!active) return;
+    const entry: BackEntry = { fn: () => ref.current(), layer };
+    backEntries.push(entry);
+    // Escape (a desktop keyboard) closes only the top layer; the scanner handles its own.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !layer || document.querySelector('.scanner')) return;
+      if (backEntries.filter((x) => x.layer).pop() === entry) entry.fn();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      const i = backEntries.indexOf(entry);
+      if (i >= 0) backEntries.splice(i, 1);
+    };
+  }, [layer, active]);
+}
+
+/** An overlay (a sheet, shopping mode) that back or Escape closes, but only while it's the top one. */
+export function useBackLayer(onClose: () => void, active = true) {
+  useBackEntry(
+    () => {
+      onClose();
+      return true;
+    },
+    true,
+    active,
+  );
+}
+
+/** Handle the back button yourself (see above): return true if handled. The newest handler goes first. */
+export function useBackHandler(fn: () => boolean, active = true) {
+  useBackEntry(fn, false, active);
+}
+
+/** For App: close the newest open layer. False if none is open. */
+export function closeTopLayer(): boolean {
+  const top = backEntries.filter((x) => x.layer).pop();
+  return top ? (top.fn(), true) : false;
+}
+
+/** For App: give the back handlers a go, newest first. True once one has handled it. */
+export function runBackHandlers(): boolean {
+  return backEntries
+    .filter((x) => !x.layer)
+    .reverse()
+    .some((x) => x.fn());
+}
+
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  useBackLayer(onClose);
   return (
     <div className="sheet-back" onClick={onClose}>
       <div className="sheet" role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>

@@ -4,6 +4,7 @@ import { loadDemo, removeDemo } from '../lib/demo';
 import { useLive } from '../lib/useLive';
 import type { Settings } from '../types';
 import { useNav, type Tab } from './nav';
+import { sectionOn } from '../shops';
 
 // The guided tour: a card at the bottom of the screen that walks round the app, highlighting
 // each part it talks about. Sample items are added for the tour and taken away when it ends
@@ -54,7 +55,8 @@ const STEPS: Step[] = [
     find: '.screen h1',
     title: 'Bottle shops',
     text: 'Drinks live on their own Keg tab, so a search for chips never goes to a bottle shop.',
-    when: (s) => s.sections.keg && !s.hiddenTabs?.includes('keg'),
+    // Only when the Keg tab is really there: switched on, a bottle shop picked, and not hidden.
+    when: (s) => sectionOn(s, 'keg') && !s.hiddenTabs?.includes('keg'),
   },
   {
     tab: 'home',

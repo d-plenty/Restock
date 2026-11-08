@@ -25,7 +25,7 @@ export function WidgetSettings({ settings }: { settings: Settings }) {
     <div className="card">
       <p className="small" style={{ margin: 0 }}>
         Three widgets: <strong>Deals</strong>, <strong>Shopping list</strong> and <strong>Quick actions</strong> (Scan, List, Receipt). To add one,
-        press and hold your home screen, tap Widgets and find Restock.
+        press and hold an empty spot on your home screen, tap Widgets, and find Restock.
       </p>
       <div className="field">
         <span>Background</span>

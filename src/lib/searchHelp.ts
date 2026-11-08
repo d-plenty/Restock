@@ -1,4 +1,4 @@
-import { score, stem, tokens, type RankQuery } from '../stores/rank';
+import { score, stem, tokens, typedSize, type RankQuery } from '../stores/rank';
 import type { StoreProduct } from '../stores/types';
 import { formatUnitPrice, packSize, tidyUnitText, unitPrice } from './units';
 
@@ -87,6 +87,22 @@ const TYPOS: Record<string, string> = {
   vinager: 'vinegar',
   vinegre: 'vinegar',
   weetbix: 'weet-bix',
+  chiken: 'chicken',
+  chicen: 'chicken',
+  chikken: 'chicken',
+  banannas: 'bananas',
+  bannanas: 'bananas',
+  brocolli: 'broccoli',
+  sausuages: 'sausages',
+  sasuages: 'sausages',
+  yoghurts: 'yoghurt',
+  margerine: 'margarine',
+  parcetamol: 'paracetamol',
+  paracetemol: 'paracetamol',
+  ibuprofin: 'ibuprofen',
+  ibrupofen: 'ibuprofen',
+  shampoos: 'shampoo',
+  toothpast: 'toothpaste',
   weetbic: 'weet-bix',
 };
 
@@ -481,4 +497,54 @@ export function likeThis(anchor: StoreProduct, pool: StoreProduct[], kind: strin
     .sort((x, y) => y.s - x.s)
     .slice(0, max)
     .map((x) => x.sp);
+}
+
+// ---------- recommended results and sure picks for a typed search (0.8.5) ----------
+
+export interface Scored {
+  sp: StoreProduct;
+  s: number;
+}
+
+/** Every result scored and best first, counting where the shop itself put it. */
+export function scoreAll(q: RankQuery, items: StoreProduct[]): Scored[] {
+  return items.map((sp, i) => ({ sp, s: score(q, sp, i) })).sort((a, b) => b.s - a.s);
+}
+
+/** A result this good is the thing you searched for, not just something like it. */
+export const GOOD = 0.85;
+
+/**
+ * The results worth recommending at a shop: good matches in their own right and close to the
+ * best one there. Up to three; none when nothing there is a good match.
+ */
+export function topPicks(scored: Scored[], max = 3): StoreProduct[] {
+  const best = scored[0]?.s ?? -Infinity;
+  return scored
+    .filter((x) => x.s >= GOOD && x.s >= best - 0.1)
+    .slice(0, max)
+    .map((x) => x.sp);
+}
+
+/**
+ * A typed search specific enough to tick for you ("western star butter 500g"): the size or pack
+ * you typed matches, the name matches well, and nothing else at that shop comes close. The shop
+ * with the surest one; undefined when no shop is that sure, which is most of the time.
+ */
+export function surePick(q: RankQuery, byChain: Partial<Record<string, Scored[]>>): StoreProduct | undefined {
+  if (q.barcode) return undefined;
+  const typed = typedSize(q.text);
+  if (!typed.size && !typed.count) return undefined;
+  let best: Scored | undefined;
+  for (const scored of Object.values(byChain)) {
+    const [top, second] = scored ?? [];
+    if (!top || top.s < 1.1 || (second && second.s > top.s - 0.06)) continue;
+    const ps = packSize(top.sp.size, top.sp.name);
+    if (!ps) continue;
+    const sizeOk = !typed.size || (ps.unit === typed.size.unit && Math.abs(ps.qty / typed.size.qty - 1) <= 0.05);
+    const have = ps.count ?? (ps.unit === 'ea' ? ps.qty : undefined);
+    const countOk = !typed.count || have === typed.count;
+    if (sizeOk && countOk && (!best || top.s > best.s)) best = top;
+  }
+  return best?.sp;
 }

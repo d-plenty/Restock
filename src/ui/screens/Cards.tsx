@@ -143,9 +143,14 @@ function AddCard({ onClose, onAdded }: { onClose: () => void; onAdded: (c: Loyal
     if (out.ok) setNumber(out.code);
   };
 
+  // One save at a time, so a double tap doesn't add the card twice.
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const save = async () => {
     const clean = number.replace(/\s+/g, '');
-    if (!clean) return;
+    if (!clean || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     const card: LoyaltyCard = {
       id: uid(),
       program,
@@ -153,7 +158,12 @@ function AddCard({ onClose, onAdded }: { onClose: () => void; onAdded: (c: Loyal
       number: clean,
       createdAt: nowIso(),
     };
-    await addCard(card);
+    try {
+      await addCard(card);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
     nav.toast(`${card.label} added`);
     onAdded(card);
   };
@@ -186,8 +196,8 @@ function AddCard({ onClose, onAdded }: { onClose: () => void; onAdded: (c: Loyal
       <button className="btn" onClick={scan}>
         <Icon name="scan" /> Scan the card's barcode
       </button>
-      <p className="small">Stored only on this phone.</p>
-      <button className="btn primary" disabled={!number.trim()} onClick={save}>
+      <p className="small">Stored on this phone, and on your household's phones only if you chose to share cards in Local sync.</p>
+      <button className="btn primary" disabled={!number.trim() || saving} onClick={save}>
         Add card
       </button>
     </Sheet>

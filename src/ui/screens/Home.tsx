@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { checkPrices } from '../../lib/check';
+import { refreshText, useFullRefresh } from '../refresh';
 import { allCards, allListEntries, deleteListEntries, getSettings, updateSettings } from '../../lib/db';
 import { loadDemo } from '../../lib/demo';
 import { addGroupToList } from '../../lib/listActions';
@@ -11,9 +11,7 @@ import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { isBlockMessage, isNative } from '../../stores/http';
 import { WEEKDAYS, chainName, stockKnown } from '../../types';
-import { ChainDot, ChainName, Icon, LoadingBar, OpenStoreButton, Price, SectionMark, SwapBox, Thumb, timeAgo, usePullToRefresh } from '../components';
-import { RestockNative } from '../../lib/sql/native';
-import { syncInfo } from '../../lib/sync';
+import { ChainDot, ChainName, Icon, LoadingBar, OpenStoreButton, Price, SectionMark, SwapBox, Thumb, timeAgo } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { ActionInfoTag, MemberInfoTag, MultiInfoTag } from '../tagInfo';
 import { failingStores, getHealth } from '../../lib/health';
@@ -29,7 +27,6 @@ export function HomeScreen() {
   const allRecs = useLive(loadRecommendations, []);
   const settings = useLive(getSettings, []);
   const allEntries = useLive(allListEntries, []);
-  const [progress, setProgress] = useState<[number, number]>();
   const health = useLive(getHealth, []);
   const failingAll = health ? failingStores(health) : [];
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -49,21 +46,10 @@ export function HomeScreen() {
       // storage can be unavailable
     }
   };
-  // 0.8.2: pulling down (or Check now) syncs with the household first, then checks prices, then
-  // shares the new prices with the household.
-  const [syncing, setSyncing] = useState(false);
-  const fullRun = async () => {
-    if (progress || syncing) return;
-    const i = await syncInfo().catch(() => undefined);
-    if (i?.paired) {
-      setSyncing(true);
-      await RestockNative.syncNow().catch(() => undefined);
-      setSyncing(false);
-    }
-    await runCheck();
-    if (i?.paired) void RestockNative.syncNow().catch(() => undefined);
-  };
-  const refresh = usePullToRefresh(() => void fullRun(), !!progress || syncing, 'Pull to sync and check prices', 'Let go to sync and check prices');
+  // Pulling down (or Check now) syncs with the household first, then checks prices, then shares
+  // the new prices with the household. The same run as the other tabs, so only one goes at a time.
+  const refresh = useFullRefresh((res) => setErrors(res.errors as Record<string, string>));
+  const progress = refresh.stage === 'prices' ? (refresh.progress ?? [0, 1]) : undefined;
 
   const cards = useLive(allCards, []);
   const [testing, setTesting] = useState(false);
@@ -125,17 +111,11 @@ export function HomeScreen() {
   const worth = [...buys, ...altDeals];
   const saving = worth.reduce((sum, r) => sum + (r.saving ?? 0), 0);
 
-  async function runCheck() {
-    if (progress) return;
+  const runCheck = () => {
+    if (refresh.busy) return;
     setErrors({});
-    setProgress([0, 1]);
-    const res = await checkPrices((d, t) => setProgress([d, t]));
-    setProgress(undefined);
-    setErrors(res.errors as Record<string, string>);
-    if (res.nativeOnly) nav.toast('Live prices only work in the Android app.');
-    else if (!res.checked && !Object.keys(res.errors).length) nav.toast('Nothing to check yet. Add items with a store match first.');
-    else nav.toast(`Checked ${res.checked} · ${res.updated} updated`);
-  }
+    refresh.run();
+  };
 
   const today = new Date().toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
 
@@ -167,16 +147,16 @@ export function HomeScreen() {
           )}
         </div>
         <div className="checkline">
-          {syncing ? (
+          {refresh.stage && !progress ? (
             <>
-              <span>Syncing with your household…</span>
+              <span>{refreshText(refresh.stage)}</span>
               <div style={{ flex: 1 }}>
                 <LoadingBar seconds={6} />
               </div>
             </>
           ) : progress ? (
             <>
-              <span>Checking prices & stock…</span>
+              <span>{refreshText('prices', refresh.progress)}</span>
               <div className="progress" style={{ flex: 1 }}>
                 <div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} />
               </div>
@@ -191,16 +171,16 @@ export function HomeScreen() {
                     : 'Prices not checked yet'}
               </span>
               {isNative() && (
-                <button className="linkish" onClick={() => void fullRun()} aria-label="Check prices and stock now">
+                <button className="linkish" onClick={runCheck} aria-label="Check prices and stock now">
                   <Icon name="refresh" size={14} /> Check now
                 </button>
               )}
             </>
           )}
         </div>
-        {isNative() && !progress && (
+        {isNative() && !refresh.busy && (
           <span className="small">
-            Pull down to sync and check.{' '}
+            {refresh.paired ? 'Pull down to sync and check prices.' : 'Pull down to check prices.'}{' '}
             {settings.sync.backgroundActivity
               ? settings.checkIntervalHours >= 168
                 ? `Also checks every ${WEEKDAYS[settings.checkWeekday]}.`
@@ -276,7 +256,7 @@ export function HomeScreen() {
         </div>
       )}
 
-      {Object.entries(errors).map(([chain, msg]) => (
+      {Object.entries(refresh.busy ? {} : errors).map(([chain, msg]) => (
         <div key={chain} className="banner amber" role="alert">
           <strong>{chainName(chain)}</strong>
           <span style={{ fontSize: 13 }}>

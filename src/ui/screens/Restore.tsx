@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { confirmAction } from '../../lib/confirm';
 import { RestockNative } from '../../lib/sql/native';
 import { syncInfo } from '../../lib/sync';
@@ -52,33 +52,41 @@ export function RestoreSheet({
   const shown = showAll ? renames : renames.slice(0, 6);
   const renaming = tidy && (parts.pantry || parts.list) ? renames.filter((r) => !skip.has(r.groupId)) : [];
 
+  const going = useRef(false);
   const go = async () => {
+    // Busy from the first tap, so a second tap (or one behind a question) can't restore twice.
+    if (going.current) return;
+    going.current = true;
+    setBusy(true);
     setError(undefined);
-    // 0.8.2: in a household, restoring changes everyone's things. Ask first.
-    const sync = await syncInfo().catch(() => undefined);
-    if (sync?.paired) {
-      const send = await confirmAction(`This phone syncs with ${sync.household ?? 'your household'}`, {
-        detail:
-          "If you restore while it's syncing, the household's other phones get the restored things too: everyone's pantry and list will match this backup. To restore on this phone only, choose Stop syncing first.",
-        action: 'Restore for the household',
-        danger: false,
-      });
-      if (!send) {
-        const stop = await confirmAction('Stop syncing this phone, then restore?', {
+    const stop = () => {
+      going.current = false;
+      setBusy(false);
+    };
+    try {
+      // In a household, restoring changes everyone's things. Ask first.
+      const sync = await syncInfo().catch(() => undefined);
+      if (sync?.paired) {
+        const send = await confirmAction(`This phone syncs with ${sync.household ?? 'your household'}`, {
           detail:
-            'This phone leaves the household (it keeps everything), and the backup is restored here only. To sync again later, join with a new code.',
-          action: 'Stop syncing and restore',
+            "If you restore while it's syncing, the household's other phones get the restored things too: everyone's pantry and list will match this backup. To restore on this phone only, choose Stop syncing first.",
+          action: 'Restore for the household',
+          danger: false,
         });
-        if (!stop) return;
-        const r = await RestockNative.syncLeave();
-        if (!r.left) {
-          setError('This is the owner phone. Make another phone the owner first (Settings → Local sync), or choose Restore for the household.');
-          return;
+        if (!send) {
+          const leave = await confirmAction('Stop syncing this phone, then restore?', {
+            detail:
+              'This phone leaves the household (it keeps everything), and the backup is restored here only. To sync again later, join with a new code.',
+            action: 'Stop syncing and restore',
+          });
+          if (!leave) return stop();
+          const r = await RestockNative.syncLeave();
+          if (!r.left) {
+            setError('This is the owner phone. Make another phone the owner first (Settings → Local sync), or choose Restore for the household.');
+            return stop();
+          }
         }
       }
-    }
-    setBusy(true);
-    try {
       await restoreBackup(summary, parts, { stayInSetup: inSetup, renames: new Map(renaming.map((r) => [r.groupId, r.to])) });
       const what = [
         ...(parts.pantry ? (parts.sections ?? []).map((sec) => `${SECTION_NAMES[sec].toLowerCase()} items`) : []),
@@ -92,7 +100,7 @@ export function RestoreSheet({
         .join(', ');
       onDone(renaming.length ? `${what} (${renaming.length} name${renaming.length === 1 ? '' : 's'} tidied)` : String(what));
     } catch (e) {
-      setBusy(false);
+      stop();
       setError(e instanceof Error ? e.message : String(e));
     }
   };

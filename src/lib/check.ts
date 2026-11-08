@@ -1,10 +1,11 @@
 import { logProblem } from './diagnostics';
-import { kindOf, sectionOn, sectionOf, type StoreChain } from '../shops';
+import { kindOf, priceSource, sectionOn, sectionOf, type StoreChain } from '../shops';
 import { adapterFor } from '../stores';
 import { isNative } from '../stores/http';
 import type { Chain, Settings } from '../types';
 import { addReading, allProducts, getSettings, nowIso, readingsFor, refresh, updateProduct } from './db';
 import { RestockNative } from './sql/native';
+import { localDay } from './verdict';
 
 // Price checks run in the app's native Android code (PriceCheckWorker.java), both for
 // "Check now" and for the background schedule, so there's one implementation.
@@ -54,10 +55,12 @@ export const isPageless = (chain: Chain, storeProductId?: string) =>
  */
 async function refreshPagelessProducts(limit = 30): Promise<{ checked: number; updated: number }> {
   const settings = await getSettings();
+  const sources = settings.enabledChains.map(priceSource);
   const todo = (await allProducts())
     .filter(
       (p) =>
-        isPageless(p.chain, p.storeProductId) && settings.enabledChains.includes(p.chain as StoreChain) && sectionOn(settings, sectionOf(p.chain)),
+        // A product is saved under the shop whose website has its price (My Chemist's under Chemist Warehouse).
+        isPageless(p.chain, p.storeProductId) && sources.includes(p.chain as StoreChain) && sectionOn(settings, sectionOf(p.chain)),
     )
     .slice(0, limit);
   if (!todo.length) return { checked: 0, updated: 0 };
@@ -70,8 +73,8 @@ async function refreshPagelessProducts(limit = 30): Promise<{ checked: number; u
       checked++;
       if (!hit || hit.price === undefined) continue;
       const prev = (last.get(p.id) ?? []).slice(-1)[0];
-      const today = nowIso().slice(0, 10);
-      if (prev && prev.date.slice(0, 10) === today && prev.price === hit.price) continue;
+      // Same day on the phone's own calendar, not UTC's (verdict.ts localDay).
+      if (prev && localDay(prev.date) === localDay(nowIso()) && prev.price === hit.price) continue;
       await addReading({
         productId: p.id,
         date: nowIso(),

@@ -33,5 +33,37 @@ SHOPS=coles,bws WORDS="butter,beer" npx vitest run --config tools/live-search/vi
 
 Shops that only work through the phone's hidden browser say "Needs the phone"; the probe covers those.
 
+## Check saved probe pages (`tools/probe-check`)
+
+Reads the pages the probe saved with Restock's own page reader, offline, and writes what it would
+find on each (how many products, and the top few) to `tools/probe-check/out/report.txt`. Handy
+after changing how shop pages are read.
+
+```bash
+npx vitest run --config tools/probe-check/vitest.config.ts
+PROBE=/path/to/probe/out npx vitest run --config tools/probe-check/vitest.config.ts
+```
+
+## Ranking tests from real results
+
+`src/stores/rank.real.test.ts` holds real results saved by the big search test, and what should
+come first for each. It runs with `npm test`, so a ranking change that makes "milk" or "nutella"
+worse fails straight away. To add a case, copy the shop's results for that word from the big
+search test's `raw.json` into `src/stores/fixtures-search-real.json` and add a line to `CASES`.
+
 Both tools are gentle: one shop at a time, with a pause between searches. Neither sends anything
 anywhere except to the shops themselves.
+
+## Big search test (`tools/search-test`)
+
+Searches a long list of everyday words (plain, with brands and sizes, Aussie names, typos) at
+every shop the way Restock does, and saves everything that came back, how Restock ranked it, and
+what it would recommend at your other shops after you tick the top result. About an hour for
+everything; `TABS=pantry` (or `keg`, `pharmacy`) does one tab.
+
+```bash
+npx vitest run --config tools/search-test/vitest.config.ts
+```
+
+The files land in `tools/search-test/out`: `report.txt` to read, and `ranked.json`,
+`recommend.json` and `raw.json` for working on search.

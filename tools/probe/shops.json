@@ -127,7 +127,7 @@
   "website": "https://www.priceline.com.au",
   "kind": "web",
   "section": "pharmacy",
-  "search": "https://www.priceline.com.au/search?q={q}"
+  "search": "https://www.priceline.com.au/search/{q}"
  },
  {
   "id": "soulpattinson",

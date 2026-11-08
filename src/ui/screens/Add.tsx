@@ -44,6 +44,10 @@ import {
   clearRecentSearches,
   unitOf,
   unitTextOf,
+  scoreAll,
+  surePick,
+  topPicks,
+  type Scored,
 } from '../../lib/searchHelp';
 import { money, packSize, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
@@ -88,7 +92,24 @@ import {
 import { useNav } from '../nav';
 import { AlertPicker } from './Item';
 
-type ChainResult = { status: 'loading' } | { status: 'ok'; items: StoreProduct[] } | { status: 'error'; message: string; blocked?: boolean };
+type ChainResult =
+  | { status: 'loading' }
+  | {
+      status: 'ok';
+      items: StoreProduct[];
+      /** Best first, with how well each matched (0.8.5). */
+      scored?: Scored[];
+      /** The ones worth recommending (keys). */
+      top?: string[];
+      /** Pages fetched so far, and whether the shop has more. */
+      page?: number;
+      more?: boolean;
+      loadingMore?: boolean;
+    }
+  | { status: 'error'; message: string; blocked?: boolean };
+
+/** A shop sending back fewer than this on a page has no more to send. */
+const FULL_PAGE = 12;
 
 type SortKey = 'relevant' | 'unit' | 'low' | 'high';
 const SORTS: { id: SortKey; label: string }[] = [
@@ -277,7 +298,18 @@ export function AddScreen({
       const exact = coded.filter((p) => sameCode(p.barcode, rq.barcode));
       const seen = new Set(exact.map(keyOf));
       const items = [...exact, ...found.filter((p) => !seen.has(keyOf(p)))];
-      setResults((r) => ({ ...r, [chain]: { status: 'ok', items: rankAll(rq, items) } }));
+      const scored = scoreAll(rq, items);
+      setResults((r) => ({
+        ...r,
+        [chain]: {
+          status: 'ok',
+          items: scored.map((x) => x.sp),
+          scored,
+          top: topPicks(scored).map(keyOf),
+          page: 1,
+          more: !!a.pages && found.length >= FULL_PAGE,
+        },
+      }));
       void recordHealth({ [chain]: null }).catch(() => undefined);
     } catch (e) {
       if (!(e instanceof NativeOnlyError)) {
@@ -329,6 +361,8 @@ export function AddScreen({
     // A new scan is a new product: ticks left from an earlier search would block "ticked for you".
     if (rq.barcode && !attachGroup) setPicks(new Map());
     setShowing({});
+    setSureKey(undefined);
+    sureFor.current = undefined;
     setAuto(undefined);
     setCandidates(undefined);
     setShowUnlikely({});
@@ -373,6 +407,24 @@ export function AddScreen({
     void followUp(first, new Set(found.keys()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results, searched, rankQ, auto]);
+
+  // A typed search specific enough to be sure of ("western star butter 500g"): once every shop
+  // has answered, tick it and look for the same at your other shops (0.8.5).
+  const [sureKey, setSureKey] = useState<string>();
+  const sureFor = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (rankQ.barcode || attachTo || !searched.length || picks.size || recFor.current) return;
+    if (sureFor.current === rankQ.text) return;
+    const answers = searched.map((c) => results[c]);
+    if (answers.some((r) => !r || r.status === 'loading')) return;
+    sureFor.current = rankQ.text;
+    const byChain = Object.fromEntries(searched.map((c) => [c, results[c]?.status === 'ok' ? (results[c] as { scored?: Scored[] }).scored : []]));
+    const sp = surePick(rankQ, byChain);
+    if (!sp) return;
+    setSureKey(keyOf(sp));
+    toggle(sp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results, searched, rankQ]);
 
   /** Switch which kind of shop to search, and search again there. */
   const switchSection = (sec: Section) => {
@@ -445,10 +497,42 @@ export function AddScreen({
   const mergeInto = (chain: Chain, items: StoreProduct[]) =>
     setResults((r) => {
       const cur = r[chain];
-      const have = cur?.status === 'ok' ? cur.items : [];
+      const ok = cur?.status === 'ok' ? cur : undefined;
+      const have = ok?.items ?? [];
       const seen = new Set(have.map(keyOf));
-      return { ...r, [chain]: { status: 'ok', items: [...have, ...items.filter((p) => !seen.has(keyOf(p)))] } };
+      return { ...r, [chain]: { ...ok, status: 'ok', items: [...have, ...items.filter((p) => !seen.has(keyOf(p)))] } };
     });
+
+  /**
+   * The shop's next page of results, for "Show more" once everything already found is showing
+   * (0.8.5). Added after what's there, best first among themselves, so nothing jumps about.
+   */
+  const loadMore = async (chain: StoreChain) => {
+    const cur = results[chain];
+    if (cur?.status !== 'ok' || !cur.more || cur.loadingMore) return;
+    const a = adapterFor(chain);
+    if (!a?.pages) return;
+    const page = (cur.page ?? 1) + 1;
+    setResults((r) => ({ ...r, [chain]: { ...(r[chain] as typeof cur), loadingMore: true } }));
+    const s = settings ?? (await getSettings());
+    let found: StoreProduct[] = [];
+    try {
+      found = await a.search(lastText, searchStoreId(s, chain), page);
+    } catch {
+      found = [];
+    }
+    setResults((r) => {
+      const now = r[chain];
+      if (now?.status !== 'ok') return r;
+      const seen = new Set(now.items.map(keyOf));
+      const fresh = rankAll(rankQ, found.filter((p) => !seen.has(keyOf(p))));
+      return {
+        ...r,
+        [chain]: { ...now, items: [...now.items, ...fresh], page, loadingMore: false, more: fresh.length > 0 && found.length >= FULL_PAGE },
+      };
+    });
+    setShowing((m) => ({ ...m, [chain]: (m[chain] ?? FIRST_PAGE) + MORE_PAGE }));
+  };
 
   /**
    * Shops name the same thing differently ("Tough On Grease Green Tea & Lime" at one, "Dishwashing
@@ -1232,6 +1316,8 @@ export function AddScreen({
               bestScore(rankQ, pool) < UNLIKELY;
             const list = unlikely ? [] : firstTicked.slice(0, limit);
             const left = unlikely ? 0 : pool.length - list.length;
+            const top = new Set(r.status === 'ok' ? (r.top ?? []) : []);
+            const more = r.status === 'ok' && !!r.more && !unlikely && !specialsOnly;
             return (
               <section key={chain} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1321,6 +1407,10 @@ export function AddScreen({
                               {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
                               <span className="tags">
                                 {isExactBarcode(rankQ, sp) && <span className="tag good">EXACT MATCH</span>}
+                                {!isExactBarcode(rankQ, sp) && k === sureKey && <span className="tag good">BEST MATCH · TICKED FOR YOU</span>}
+                                {!isExactBarcode(rankQ, sp) && k !== sureKey && !rankQ.barcode && top.has(k) && (
+                                  <span className="tag good">RECOMMENDED</span>
+                                )}
                                 {tracked && <span className="tag normal">IN YOUR PANTRY</span>}
                                 {sp.isSpecial && !sp.memberOnly && (
                                   <span className="tag wait">
@@ -1364,6 +1454,11 @@ export function AddScreen({
                 {left > 0 && (
                   <button className="btn ghost small" onClick={() => setShowing((m) => ({ ...m, [chain]: limit + MORE_PAGE }))}>
                     Show more ({left})
+                  </button>
+                )}
+                {left <= 0 && more && r.status === 'ok' && (
+                  <button className="btn ghost small" disabled={r.loadingMore} onClick={() => void loadMore(chain)}>
+                    {r.loadingMore ? `Getting more from ${chainName(chain)}…` : `Get more from ${chainName(chain)}`}
                   </button>
                 )}
               </section>
@@ -1626,9 +1721,23 @@ function ManualSheet({
   const [price, setPrice] = useState('');
   const [special, setSpecial] = useState(false);
   const [categoryId, setCategoryId] = useState('');
+  // One save at a time, so a double tap doesn't add it twice.
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const save = async (target: Target) => {
-    if (!name.trim()) return;
+    if (!name.trim() || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await saveAs(target);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+
+  const saveAs = async (target: Target) => {
     const n = name.trim();
     if (target === 'list') {
       await addListEntry({ id: uid(), text: n, chain, categoryId: categoryId || undefined, section, checked: false, createdAt: nowIso() });
@@ -1676,7 +1785,7 @@ function ManualSheet({
       </label>
       <div className="two">
         <label className="field">
-          <span>Store</span>
+          <span>Shop</span>
           <select className="input" value={chain} onChange={(e) => setChain(e.target.value as Chain)}>
             {shops.map((c) => (
               <option key={c} value={c}>
@@ -1715,20 +1824,20 @@ function ManualSheet({
         </label>
       )}
       {attachTo ? (
-        <button className="btn primary" disabled={!name.trim()} onClick={() => save('pantry')}>
+        <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
           {as === 'alt' ? 'Add as alternative' : `Add to ${attachTo.name}`}
         </button>
       ) : (
         <>
           <div className="two">
-            <button className="btn primary" disabled={!name.trim()} onClick={() => save('pantry')}>
+            <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
               Add to {SECTION_NAMES[section].toLowerCase()}
             </button>
-            <button className="btn primary" disabled={!name.trim()} onClick={() => save('list')}>
+            <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('list')}>
               Shopping list
             </button>
           </div>
-          <button className="btn" disabled={!name.trim()} onClick={() => save('both')}>
+          <button className="btn" disabled={!name.trim() || saving} onClick={() => save('both')}>
             Add to both
           </button>
         </>

@@ -11,3 +11,5 @@ android/local.properties
 *.apk
 *.keystore
 dist-preview/
+# What the search tools save (shop answers): stays on your computer
+tools/*/out/

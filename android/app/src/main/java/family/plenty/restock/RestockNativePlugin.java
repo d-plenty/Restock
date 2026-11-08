@@ -511,25 +511,78 @@ public class RestockNativePlugin extends Plugin {
                         throw new java.io.IOException("GitHub answered " + code + (code >= 500 ? " (GitHub's download server is busy; try again in a few minutes)" : ""));
                     break;
                 }
+                // How big GitHub says the file is, so a download cut short isn't handed to the installer.
+                long expected = c.getContentLengthLong();
+                long got = 0;
                 try (java.io.InputStream in = c.getInputStream(); java.io.FileOutputStream out = new java.io.FileOutputStream(apk)) {
                     byte[] buf = new byte[64 * 1024];
                     int n;
-                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                        got += n;
+                    }
                 } finally {
                     c.disconnect();
+                }
+                if (expected > 0 && got != expected) {
+                    apk.delete();
+                    throw new java.io.IOException("The download stopped part way (" + (got / 1024) + " of " + (expected / 1024)
+                        + " KB). Check your connection and try again.");
                 }
                 android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
                 android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW);
                 i.setDataAndType(uri, "application/vnd.android.package-archive");
                 i.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION | android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                ctx.startActivity(i);
                 JSObject out = new JSObject();
                 out.put("started", true);
+                // Android 10 and later won't open the installer from the background (you switched apps
+                // while it downloaded), so then a notification opens it when you tap it instead.
+                if (android.os.Build.VERSION.SDK_INT >= 29 && !inForeground() && readyToInstall(ctx, i, url)) {
+                    out.put("notified", true);
+                } else {
+                    ctx.startActivity(i);
+                }
                 call.resolve(out);
             } catch (Exception e) {
                 call.reject(e.getMessage() != null ? e.getMessage() : e.toString());
             }
         });
+    }
+
+    /** Is Restock on screen right now? */
+    private static boolean inForeground() {
+        android.app.ActivityManager.RunningAppProcessInfo me = new android.app.ActivityManager.RunningAppProcessInfo();
+        android.app.ActivityManager.getMyMemoryState(me);
+        return me.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND;
+    }
+
+    private static final String UPDATES_CHANNEL = "updates";
+    private static final int UPDATE_NOTIFICATION_ID = 4250;
+
+    /** "Restock 0.8.5 is ready to install": tapping it opens the installer. False if notifications are off. */
+    private static boolean readyToInstall(android.content.Context ctx, android.content.Intent installer, String url) {
+        if (android.os.Build.VERSION.SDK_INT >= 33
+            && ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return false;
+        }
+        android.app.NotificationManager nm = ctx.getSystemService(android.app.NotificationManager.class);
+        if (nm == null) return false;
+        nm.createNotificationChannel(new android.app.NotificationChannel(UPDATES_CHANNEL, "App updates", android.app.NotificationManager.IMPORTANCE_DEFAULT));
+        // The version from the release address: .../releases/download/v0.8.5/restock-0.8.5.apk
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("/releases/download/v?([^/]+)/").matcher(url);
+        String version = m.find() ? m.group(1) : "update";
+        android.app.PendingIntent tap = android.app.PendingIntent.getActivity(ctx, UPDATE_NOTIFICATION_ID, installer,
+            android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+        android.app.Notification n = new android.app.Notification.Builder(ctx, UPDATES_CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_restock)
+            .setColor(0xFF00843D)
+            .setContentTitle("Restock " + version + " is ready to install")
+            .setContentText("Tap to install it.")
+            .setContentIntent(tap)
+            .setAutoCancel(true)
+            .build();
+        nm.notify(UPDATE_NOTIFICATION_ID, n);
+        return true;
     }
 
     // ---------- 0.6.0: automatic backups into a folder the person picks ----------
@@ -822,6 +875,11 @@ public class RestockNativePlugin extends Plugin {
                 if (hub.paired()) for (JSONObject m : hub.household.members()) members.put(m);
                 o.put("members", members);
                 o.put("shareCards", hub.engine.shareCards());
+                // 0.8.5: what the household shares, what this phone chose, and what it syncs.
+                o.put("householdTabs", tabsArray(hub.engine.householdTabs()));
+                o.put("myTabs", tabsArray(hub.engine.myTabs()));
+                o.put("tabs", tabsArray(hub.engine.tabs()));
+                o.put("handoverTo", hub.paired() ? hub.household.handingOverTo() : null);
                 o.put("keepReady", hub.keepReady());
                 JSArray peers = new JSArray();
                 for (JSONObject r : hub.engine.db.query("SELECT device, name, synced_at FROM sync_peers ORDER BY synced_at DESC")) {
@@ -844,6 +902,21 @@ public class RestockNativePlugin extends Plugin {
         return o;
     }
 
+    private static JSArray tabsArray(java.util.Set<String> tabs) {
+        JSArray a = new JSArray();
+        for (String t : SyncEngine.ALL_TABS) if (tabs.contains(t)) a.put(t);
+        return a;
+    }
+
+    /** Tabs from the screens (["pantry", "keg"]), or null when not given. */
+    private static java.util.Set<String> tabsFrom(PluginCall call, String key) {
+        JSArray a = call.getArray(key, null);
+        if (a == null) return null;
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < a.length(); i++) b.append(i == 0 ? "" : ",").append(a.optString(i));
+        return SyncEngine.parseTabs(b.toString());
+    }
+
     @PluginMethod
     public void syncInfo(PluginCall call) {
         syncThread.execute(() -> call.resolve(syncInfoObject(SyncHub.get(getContext()))));
@@ -854,13 +927,35 @@ public class RestockNativePlugin extends Plugin {
     public void syncInvite(PluginCall call) {
         final String household = call.getString("household", "");
         final boolean shareCards = Boolean.TRUE.equals(call.getBoolean("shareCards", false));
+        final java.util.Set<String> tabs = tabsFrom(call, "tabs");
         syncThread.execute(() -> {
             try {
                 SyncHub hub = SyncHub.get(getContext());
                 JSObject r = new JSObject();
-                r.put("code", hub.invite(household, shareCards));
+                r.put("code", hub.invite(household, shareCards, tabs));
                 r.put("expiresInMs", SyncHousehold.CODE_LIFE_MS);
                 SyncService.startIfWanted(getContext());
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** 0.8.5: what a code's household is, before joining (name, owner, what it shares, the owner's settings). */
+    @PluginMethod
+    public void syncPeek(PluginCall call) {
+        final String code = call.getString("code", "");
+        syncThread.execute(() -> {
+            try {
+                JSONObject got = SyncHub.get(getContext()).peek(code);
+                JSObject r = new JSObject();
+                r.put("household", got.optString("household", null));
+                r.put("ownerName", got.optString("ownerName", null));
+                // An owner on 0.8.4 or older doesn't say: it shares everything.
+                JSONArray tabs = got.optJSONArray("tabs");
+                r.put("tabs", tabs != null ? tabs : SyncEngine.tabsJson(SyncEngine.parseTabs((String) null)));
+                if (got.has("settings")) r.put("settings", got.getString("settings"));
                 call.resolve(r);
             } catch (Exception e) {
                 call.reject(e.getMessage(), e);
@@ -873,11 +968,11 @@ public class RestockNativePlugin extends Plugin {
         final String code = call.getString("code", "");
         final boolean replace = Boolean.TRUE.equals(call.getBoolean("replace", false));
         final boolean shareCards = Boolean.TRUE.equals(call.getBoolean("shareCards", false));
-        final boolean wantSettings = Boolean.TRUE.equals(call.getBoolean("settings", false));
+        final java.util.Set<String> tabs = tabsFrom(call, "tabs");
         syncThread.execute(() -> {
             try {
                 SyncHub hub = SyncHub.get(getContext());
-                JSONObject got = hub.join(code, replace, shareCards, wantSettings);
+                JSONObject got = hub.join(code, replace, shareCards, tabs);
                 SyncService.startIfWanted(getContext());
                 SyncHub.Summary s = hub.syncAll();
                 JSObject r = syncInfoObject(hub);
@@ -912,9 +1007,13 @@ public class RestockNativePlugin extends Plugin {
         final Boolean shareCards = call.getBoolean("shareCards");
         final Boolean keepReady = call.getBoolean("keepReady");
         final String householdName = call.getString("household");
+        final java.util.Set<String> myTabs = tabsFrom(call, "tabs");
+        final java.util.Set<String> householdTabs = tabsFrom(call, "householdTabs");
         syncThread.execute(() -> {
             try {
                 SyncHub hub = SyncHub.get(getContext());
+                if (myTabs != null && hub.paired()) hub.setMyTabs(myTabs);
+                if (householdTabs != null && hub.paired()) hub.setHouseholdTabs(householdTabs);
                 if (name != null && !name.trim().isEmpty()) hub.household.rename(name.trim());
                 if (householdName != null && !householdName.trim().isEmpty() && hub.paired()) hub.household.renameHousehold(householdName.trim());
                 if (shareCards != null) hub.engine.setShareCards(shareCards);
@@ -966,6 +1065,20 @@ public class RestockNativePlugin extends Plugin {
             try {
                 SyncHub hub = SyncHub.get(getContext());
                 hub.handOver(device);
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** Owner: never mind making another phone the owner. */
+    @PluginMethod
+    public void syncCancelHandOver(PluginCall call) {
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.cancelHandOver();
                 call.resolve(syncInfoObject(hub));
             } catch (Exception e) {
                 call.reject(e.getMessage(), e);

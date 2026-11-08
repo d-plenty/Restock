@@ -156,7 +156,7 @@ const inBrowser =
   (o) =>
     viaBrowser(chain, o.method ?? 'GET', o.url, o.body);
 
-async function browse(chain: 'danmurphys' | 'bws', location: string, headers: Record<string, string>, send: Send): Promise<StoreProduct[]> {
+async function browse(chain: 'danmurphys' | 'bws', location: string, headers: Record<string, string>, send: Send, page = 1): Promise<StoreProduct[]> {
   const e = ENDEAVOUR[chain];
   const path = new URL(location, e.site).pathname.replace(/\/$/, '');
   const [department, sub, category] = path.split('/').filter(Boolean);
@@ -164,7 +164,7 @@ async function browse(chain: 'danmurphys' | 'bws', location: string, headers: Re
   const q = new URLSearchParams({
     Location: path,
     department,
-    pageNumber: '1',
+    pageNumber: String(page),
     pageSize: '40',
     sortType: 'Browse_Relevance_LocalSales',
     banner: 'true',
@@ -189,7 +189,7 @@ async function browse(chain: 'danmurphys' | 'bws', location: string, headers: Re
   return lists.flat().filter((p) => (seen.has(p.storeProductId) ? false : seen.add(p.storeProductId)));
 }
 
-async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send = direct): Promise<StoreProduct[]> {
+async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send = direct, page = 1): Promise<StoreProduct[]> {
   const e = ENDEAVOUR[chain];
   const headers = {
     Accept: 'application/json, text/plain, */*',
@@ -200,7 +200,7 @@ async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send =
   const body = {
     SearchTerm: term,
     PageSize: 36,
-    PageNumber: 1,
+    PageNumber: page,
     SortType: 'Relevance',
     Location: `/search?searchTerm=${encodeURIComponent(term)}`,
     Filters: [],
@@ -224,7 +224,7 @@ async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send =
   let failed: unknown;
   if (moved === undefined) {
     try {
-      const q = new URLSearchParams({ searchTerm: term, pageSize: '36', pageNumber: '1', sortType: 'Relevance' });
+      const q = new URLSearchParams({ searchTerm: term, pageSize: '36', pageNumber: String(page), sortType: 'Relevance' });
       const res = await send({ url: `${e.api}/Search/products?${q}`, headers });
       if (!redirect(res)) {
         const out = flattenEndeavour(chain, parseJson<Raw>(e.name, res));
@@ -236,7 +236,7 @@ async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send =
   }
   // Sent to a category page, or nothing found for a category word: read that category.
   const where = moved || CATEGORY[term.trim().toLowerCase()];
-  if (where) return browse(chain, where, headers, send);
+  if (where) return browse(chain, where, headers, send, page);
   if (failed) throw failed;
   return [];
 }
@@ -244,21 +244,23 @@ async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send =
 export function endeavourAdapter(chain: 'danmurphys' | 'bws'): StoreAdapter {
   return {
     chain,
-    async search(term) {
+    pages: true,
+    async search(term, _storeId, page = 1) {
       try {
-        const out = await apiSearch(chain, term);
-        if (out.length) return out;
+        const out = await apiSearch(chain, term, direct, page);
+        if (out.length || page > 1) return out;
       } catch {
         // turned away: ask again from inside the shop's own page, the way the site itself does
         if (isNative())
           try {
-            const out = await apiSearch(chain, term, inBrowser(chain));
-            if (out.length) return out;
+            const out = await apiSearch(chain, term, inBrowser(chain), page);
+            if (out.length || page > 1) return out;
           } catch {
             // fall back to reading the website
           }
       }
-      return searchWeb(chain as StoreChain, term);
+      // The website's own page only has the first lot.
+      return page > 1 ? [] : searchWeb(chain as StoreChain, term);
     },
   };
 }

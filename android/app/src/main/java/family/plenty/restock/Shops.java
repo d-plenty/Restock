@@ -48,7 +48,8 @@ final class Shops {
         add("thirstycamel", "keg", "web", "https://www.thirstycamel.com.au", null);
         add("porters", "keg", "web", "https://www.portersliquor.com.au", null);
         add("chemistwarehouse", "pharmacy", "web", "https://www.chemistwarehouse.com.au", null);
-        add("mychemist", "pharmacy", "web", "https://www.mychemist.com.au", null);
+        // My Chemist is part of Chemist Warehouse and is priced from its website (shops.ts).
+        add("mychemist", "pharmacy", "web", "https://www.chemistwarehouse.com.au", "chemistwarehouse");
         add("amcal", "pharmacy", "web", "https://www.amcal.com.au", null);
         add("discountdrug", "pharmacy", "web", "https://www.discountdrugstores.com.au", null);
         add("guardian", "pharmacy", "web", "https://www.guardianpharmacies.com.au", null);

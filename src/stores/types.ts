@@ -21,8 +21,13 @@ export interface StoreProduct {
 
 export interface StoreAdapter {
   chain: Exclude<Chain, 'other'>;
-  /** Search the store by text (used when adding items). Price refreshes run in native code. */
-  search(term: string, storeId?: string): Promise<StoreProduct[]>;
+  /**
+   * Search the store by text (used when adding items). Price refreshes run in native code.
+   * `page` (from 1) asks for the next lot of results, for shops that can (see `pages`).
+   */
+  search(term: string, storeId?: string, page?: number): Promise<StoreProduct[]>;
   /** The same search through the store's own page in a hidden browser (the backup connection). */
-  searchBrowser?(term: string, storeId?: string): Promise<StoreProduct[]>;
+  searchBrowser?(term: string, storeId?: string, page?: number): Promise<StoreProduct[]>;
+  /** The shop can hand over more results, a page at a time (0.8.5). */
+  pages?: boolean;
 }

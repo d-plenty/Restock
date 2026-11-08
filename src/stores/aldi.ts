@@ -12,7 +12,9 @@ export function mapAldi(p: Raw): StoreProduct | undefined {
   const priceObj = (p.price ?? {}) as Raw;
   // Aldi reports prices in cents.
   const cents = num(priceObj.amountRelevant) ?? num(priceObj.amount) ?? num(p.priceAmountCents);
-  const price = cents !== undefined ? cents / 100 : num(priceObj.amountRelevantDisplay);
+  const amount = cents !== undefined ? cents / 100 : num(priceObj.amountRelevantDisplay);
+  // A price of $0 or less is a placeholder, not a price (it would read as 100% off). Same in StoreClient.java.
+  const price = amount !== undefined && amount > 0 ? amount : undefined;
   const wasDisplay = priceObj.wasPriceDisplay ?? priceObj.strikePriceDisplay;
   const was = num(wasDisplay);
   const brand = typeof p.brandName === 'string' ? p.brandName : undefined;
@@ -52,13 +54,16 @@ export function flattenAldi(data: Raw): StoreProduct[] {
   return items.map(mapAldi).filter((x): x is StoreProduct => !!x);
 }
 
-function searchUrl(term: string, storeId?: string): string {
+/** Results per page, as Aldi's own website asks (0.8.5: was 24). */
+export const ALDI_PAGE = 30;
+
+function searchUrl(term: string, storeId?: string, page = 1): string {
   const params = new URLSearchParams({
     currency: 'AUD',
     serviceType: 'walk-in',
     q: term,
-    limit: '24',
-    offset: '0',
+    limit: String(ALDI_PAGE),
+    offset: String((page - 1) * ALDI_PAGE),
     sort: 'relevance',
   });
   if (storeId) params.set('servicePoint', storeId);
@@ -66,12 +71,12 @@ function searchUrl(term: string, storeId?: string): string {
 }
 
 /** Backup: the same search, made from inside aldi.com.au in a hidden browser. */
-async function searchBrowser(term: string, storeId?: string): Promise<StoreProduct[]> {
-  return flattenAldi(parseJson<Raw>(NAME, await viaBrowser('aldi', 'GET', searchUrl(term, storeId))));
+async function searchBrowser(term: string, storeId?: string, page = 1): Promise<StoreProduct[]> {
+  return flattenAldi(parseJson<Raw>(NAME, await viaBrowser('aldi', 'GET', searchUrl(term, storeId, page))));
 }
 
-async function search(term: string, storeId?: string): Promise<StoreProduct[]> {
-  const url = searchUrl(term, storeId);
+async function search(term: string, storeId?: string, page = 1): Promise<StoreProduct[]> {
+  const url = searchUrl(term, storeId, page);
   let last: unknown;
   // Aldi's bot protection is picky. Try the style that worked last, then the other, pausing between.
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -103,4 +108,5 @@ export const aldi: StoreAdapter = {
   chain: 'aldi',
   search,
   searchBrowser,
+  pages: true,
 };

@@ -78,7 +78,7 @@ Automatic backups are off unless you turn them on. When they're on, Restock save
 
 ## Sync between your phones
 
-Local sync is off unless you turn it on (Settings → Local sync). When it's on, the phones in your household send each other your pantry, keg and pharmacy items, shopping list, prices, categories and alert settings, and loyalty card numbers if you choose to share them, directly over your own Wi-Fi. Nothing goes through the internet or any server, and the makers of Restock never see it.
+Local sync is off unless you turn it on (Settings → Local sync). When it's on, the phones in your household send each other the parts you choose to share (groceries, Keg and Pharmacy: their items, shopping list, prices, categories and alert settings), and loyalty card numbers if you choose to share them, directly over your own Wi-Fi. Parts you don't share stay on your phone. Nothing goes through the internet or any server, and the makers of Restock never see it.
 
 Everything sent between the phones is encrypted with a key made on the phone that started the household (the owner phone). The key is never shown or put in a code: a phone joins by scanning a one-time code that works once and only for 10 minutes, and is then given the key over the encrypted link. A device without the key can't read what's sent or join in. When the owner removes a phone, the household's key changes so that phone can't sync again.
 

@@ -50,7 +50,7 @@ export const SOON: Soon[] = [
     id: 'sync',
     icon: 'refresh',
     title: 'Hosted sync',
-    short: 'Sync from anywhere, through a small server you run',
+    short: 'Sync from anywhere, through a small server you run yourself',
     body: (
       <>
         <p>
@@ -58,7 +58,7 @@ export const SOON: Soon[] = [
           phones. This adds syncing from anywhere: tick something off at the shops and it's off the list at home straight away.
         </p>
         <p>
-          It would run on a small server you control: a Docker container on a home server, NAS or Raspberry Pi. There's no Restock account and no
+          It would run on a small server you run yourself: a Docker container on a home server, NAS or Raspberry Pi. There's no Restock account and no
           Restock server holding your data, and the server only ever sees encrypted data.
         </p>
       </>
@@ -71,7 +71,7 @@ export const SOON: Soon[] = [
     short: 'Restock on iOS, working with the Android version',
     body: (
       <>
-        <p>The same Restock on iPhone, so a household with both kinds of phone can share a pantry and list once sync arrives.</p>
+        <p>The same Restock on iPhone, so a household with both kinds of phone can share a pantry and list with local sync.</p>
         <p>
           Restock is built so most of it already works on iPhone; the parts that talk to Android (background checks, widgets, alerts) need an iPhone
           version of their own.
@@ -90,7 +90,7 @@ export const SOON: Soon[] = [
           Connect Restock to Home Assistant, so your shopping list shows there and changes go both ways: add milk from a kitchen tablet or by voice,
           and it's on your Restock list.
         </p>
-        <p>Deals and recall alerts could show up in Home Assistant too. This comes after sync, as it uses the same server.</p>
+        <p>Deals and recall alerts could show up in Home Assistant too. This comes after hosted sync, as it uses the same server.</p>
       </>
     ),
   },

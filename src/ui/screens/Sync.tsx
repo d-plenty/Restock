@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { scanBarcode } from '../../lib/barcode';
 import { saveCopyInApp } from '../../lib/backup';
 import { confirmAction } from '../../lib/confirm';
-import { allGroups, getSettings, updateSettings } from '../../lib/db';
+import { allGroups, allProducts, getSettings, updateSettings } from '../../lib/db';
+import { CARRIED_TILES, householdSettingsFor } from '../../lib/household';
+import { SECTIONS, sectionOn, shopDef, type Section } from '../../shops';
+import type { Settings } from '../../types';
 import { RestockNative } from '../../lib/sql/native';
 import { agoText, MAX_SYNC_PHONES, pairingCode, strictBatteryMaker, syncAvailable, syncInfo, type SyncInfo } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
@@ -136,15 +139,18 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
   const [code, setCode] = useState<string>();
   const [until, setUntil] = useState<number>();
   const [error, setError] = useState<string>();
-  const [members, setMembers] = useState(info.members?.length ?? 1);
+  const [known, setKnown] = useState<string[]>(info.members?.map((m) => m.device) ?? []);
   const [joined, setJoined] = useState<string>();
+  const [tabs, setTabs] = useState<Section[]>();
   const name = household ?? info.household ?? settings?.household.name ?? 'Our house';
   const left = useCountdown(until);
+  // Starting a household: share groceries, and Keg and Pharmacy if this phone uses them.
+  const shared = tabs ?? (settings ? SECTIONS.filter((t) => t === 'pantry' || sectionOn(settings, t)) : ['pantry' as Section]);
 
   const make = async (shareCards: boolean) => {
     setError(undefined);
     try {
-      const r = await RestockNative.syncInvite({ household: name, shareCards });
+      const r = await RestockNative.syncInvite({ household: name, shareCards, tabs: shared });
       if (!info.paired) await updateSettings({ household: { name } });
       setCode(r.code);
       setUntil(Date.now() + r.expiresInMs);
@@ -158,21 +164,25 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
     if (info.paired) void make(!!info.shareCards);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Notice when the other phone has joined.
+  // Notice when the other phone has joined: a phone that wasn't in the household before, or one
+  // rejoining whose old entry was still there (it has just synced).
   useEffect(() => {
     if (!code) return;
+    const started = new Date().toISOString();
     const t = setInterval(() => {
       void syncInfo().then((i) => {
-        const n = i.members?.length ?? 0;
-        if (n > members) {
-          setJoined(i.members?.find((m) => !m.me && !info.members?.some((x) => x.device === m.device))?.name ?? 'the other phone');
-          setMembers(n);
+        const fresh = i.members?.find((m) => !m.me && !known.includes(m.device));
+        const back = i.members?.find((m) => !m.me && (i.peers?.find((p) => p.device === m.device)?.syncedAt ?? '') > started && !fresh);
+        const who = fresh ?? (i.lastSyncAt && i.lastSyncAt > started ? back : undefined);
+        if (who) {
+          setJoined(who.name);
+          setKnown(i.members?.map((m) => m.device) ?? []);
           setCode(undefined);
         }
       });
     }, 2000);
     return () => clearInterval(t);
-  }, [code, members, info.members]);
+  }, [code, known]);
   const close = () => {
     void RestockNative.syncCloseInvite().catch(() => undefined);
     onClose();
@@ -187,7 +197,12 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
             <span>Household name</span>
             <input className="input" value={name} onChange={(e) => setHousehold(e.target.value)} />
           </label>
-          <CardsQuestion onAnswer={(share) => void make(share)} />
+          <div className="eyebrow">What the household shares</div>
+          <TabsPicker offered={SECTIONS} value={shared} onChange={setTabs} />
+          <p className="small" style={{ marginTop: -4 }}>
+            Each phone that joins picks from these. Not shared stays on each phone, like bottle shops in a share house. You can change it later.
+          </p>
+          {shared.length ? <CardsQuestion onAnswer={(share) => void make(share)} /> : <div className="banner amber">Pick at least one thing to share.</div>}
         </>
       )}
       {error && <div className="banner amber">{error}</div>}
@@ -225,7 +240,7 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
           {!expired && <CodeText code={code} />}
           <ol className="small" style={{ margin: 0, paddingLeft: 18 }}>
             <li>Put both phones on the same Wi-Fi, and keep this screen open.</li>
-            <li>On the other phone (Restock 0.8.2 or newer), tap Join your household on the first screen, or Settings → Local sync → Join a household.</li>
+            <li>On the other phone (Restock 0.8.5 or newer), tap Join your household on the first screen, or Settings → Local sync → Join a household.</li>
             <li>Scan this code.</li>
           </ol>
           <button className="btn block" onClick={close}>
@@ -237,46 +252,102 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
   );
 }
 
-/** The household's settings worth copying to a phone joining from the first screen. */
-export const COPIED_SETTINGS = [
-  'enabledChains',
-  'stores',
-  'sections',
-  'customShops',
-  'hiddenTabs',
-  'checkIntervalHours',
-  'checkWeekday',
-  'alerts',
-  'historyWeeks',
-  'defaultThresholdPct',
-  'listCompare',
-  'productOrder',
-  'marketData',
-  'household',
-  'recalls',
-] as const;
+/** The tabs a household can share, in plain words. */
+export const SHARE_TABS: { tab: Section; title: string; sub: string }[] = [
+  { tab: 'pantry', title: 'Groceries', sub: 'Pantry, its shopping list and prices' },
+  { tab: 'keg', title: 'Bottle shops', sub: 'Keg tab · 18+' },
+  { tab: 'pharmacy', title: 'Pharmacy', sub: 'Pharmacy tab' },
+];
 
-/** Copies the owner's shop choices and settings (as JSON text) into this phone's settings. */
-export async function copyHouseholdSettings(json: string | undefined): Promise<void> {
-  if (!json) return;
+/** Ask "18 or over?" before anything Keg is shared to or from this phone. */
+export async function askAdult(): Promise<boolean> {
+  const s = await getSettings();
+  if (s.adultConfirmed) return true;
+  const yes = await confirmAction('Are you 18 or over?', {
+    detail: 'The Keg tab tracks bottle shops, so it is only for adults.',
+    action: "Yes, I'm 18 or over",
+    danger: false,
+  });
+  if (yes) await updateSettings({ adultConfirmed: true });
+  return yes;
+}
+
+/** Checkboxes for what to share: `offered` are the choices, `value` the ones ticked. */
+export function TabsPicker({ offered, value, onChange, disabled }: { offered: Section[]; value: Section[]; onChange: (v: Section[]) => void; disabled?: boolean }) {
+  return (
+    <div className="card flush">
+      {SHARE_TABS.filter((t) => offered.includes(t.tab)).map((t) => (
+        <label key={t.tab} className="check">
+          <input
+            type="checkbox"
+            disabled={disabled}
+            checked={value.includes(t.tab)}
+            onChange={async (e) => {
+              if (e.target.checked && t.tab === 'keg' && !(await askAdult())) return;
+              onChange(e.target.checked ? SECTIONS.filter((x) => x === t.tab || value.includes(x)) : value.filter((x) => x !== t.tab));
+            }}
+          />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 14 }}>
+              {t.title}
+            </span>
+            <span className="small">{t.sub}</span>
+          </span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/** After joining: take the household's shops and settings, and start what they turn on. */
+export async function applyHouseholdSettings(json: string | undefined, opts: { tabs: Section[]; replace: boolean }): Promise<void> {
   try {
-    const theirs = JSON.parse(json) as Record<string, unknown>;
-    const patch: Record<string, unknown> = {};
-    for (const k of COPIED_SETTINGS) if (theirs[k] !== undefined) patch[k] = theirs[k];
-    // Price checks in the background follow the household's choice too.
-    const sync = theirs.sync as { backgroundActivity?: boolean } | undefined;
-    const mine = await getSettings();
-    if (typeof sync?.backgroundActivity === 'boolean') patch.sync = { ...mine.sync, backgroundActivity: sync.backgroundActivity };
-    const s = await updateSettings(patch as never);
+    const current = await getSettings();
+    const next = json ? householdSettingsFor(current, JSON.parse(json) as Partial<Settings>, opts) : current;
+    if (!json) {
+      // An owner on 0.8.4 or older didn't send its settings: still mark the shared tiles done.
+      const done = new Set([...current.setup.done, ...CARRIED_TILES, ...opts.tabs]);
+      next.setup = { ...current.setup, done: [...done], skipped: current.setup.skipped.filter((t) => !done.has(t)) };
+      for (const t of opts.tabs) if (t !== 'pantry') next.sections = { ...next.sections, [t]: true };
+    }
+    const s = await updateSettings(next);
     await syncBackgroundSchedule(s).catch(() => undefined);
     await scheduleReminders(s).catch(() => undefined);
     if (syncAvailable()) await RestockNative.scheduleRecalls({ enabled: s.recalls.enabled }).catch(() => undefined);
   } catch (e) {
-    console.error('copy settings', e);
+    console.error('household settings', e);
   }
 }
 
-/** Joining with a code: combine or replace (if this phone has things), cards, then join. */
+/**
+ * This phone starts sharing `tab` (0.8.5): turns the tab on here, with the shops the household's
+ * things on it come from, so it shows up without picking shops by hand.
+ */
+export async function shareTab(info: SyncInfo, tab: Section): Promise<SyncInfo | undefined> {
+  if (tab === 'keg' && !(await askAdult())) return undefined;
+  const mine = SECTIONS.filter((t) => t === tab || (info.tabs ?? info.myTabs ?? []).includes(t));
+  const next = await RestockNative.syncSet({ tabs: mine });
+  const s = await getSettings();
+  const used = [...new Set((await allProducts()).map((p) => p.chain))].filter((c) => (shopDef(c)?.section ?? customShopTab(s, c)) === tab);
+  await updateSettings({
+    sections: tab === 'pantry' ? s.sections : { ...s.sections, [tab]: true },
+    hiddenTabs: (s.hiddenTabs ?? []).filter((t) => t !== tab),
+    enabledChains: [...new Set([...s.enabledChains, ...(used as Settings['enabledChains'])])],
+    seenTabOffers: [...new Set([...(s.seenTabOffers ?? []), tab])],
+  });
+  return next;
+}
+
+const customShopTab = (s: Settings, chain: string) => s.customShops.find((c) => c.id === chain)?.section;
+
+type JoinStep = 'look' | 'age' | 'tabs' | 'things' | 'cards';
+
+/**
+ * Joining with a code (0.8.5): asks the owner phone what the household shares, then
+ * 18 or over (if it shares Keg), what this phone shares, what to do with this phone's own
+ * things on those tabs, and whether to share loyalty cards. Then joins and takes the
+ * household's shops and settings for the tabs it shares.
+ */
 export function JoinSheet({
   code,
   fresh,
@@ -284,31 +355,70 @@ export function JoinSheet({
   onJoined,
 }: {
   code: string;
-  /** From the first screen: take the household's things and settings, no questions about this phone's things. */
+  /** From the first screen: nothing here yet, so no question about this phone's things. */
   fresh?: boolean;
   onClose: () => void;
   onJoined: (msg: string) => void;
 }) {
   const groups = useLive(allGroups, []);
-  const [replace, setReplace] = useState<boolean>();
+  const [step, setStep] = useState<JoinStep>('look');
+  const [peek, setPeek] = useState<{ household?: string; ownerName?: string; tabs: Section[]; settings?: string }>();
+  const [tabs, setTabs] = useState<Section[]>([]);
+  const [replace, setReplace] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const hasThings = !fresh && (groups?.length ?? 0) > 0;
-  const mode = fresh ? true : hasThings ? replace : false;
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const p = await RestockNative.syncPeek({ code });
+        if (!alive) return;
+        setPeek(p);
+        const s = await getSettings();
+        const offered = p.tabs.length ? p.tabs : SECTIONS;
+        setTabs(offered);
+        setStep(offered.includes('keg') && !s.adultConfirmed ? 'age' : 'tabs');
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [code]);
+
+  const offered = peek?.tabs.length ? peek.tabs : SECTIONS;
+  const mineInTabs = (groups ?? []).filter((g) => tabs.includes(g.section ?? 'pantry')).length;
+  const where = peek?.household ?? 'the household';
+
+  const answerAge = async (adult: boolean) => {
+    if (adult) await updateSettings({ adultConfirmed: true });
+    else {
+      // Not 18: no Keg on this phone, whatever the household does.
+      const s = await getSettings();
+      await updateSettings({ sections: { ...s.sections, keg: false } });
+      setTabs((t) => t.filter((x) => x !== 'keg'));
+    }
+    setStep('tabs');
+  };
 
   const join = async (shareCards: boolean) => {
     setBusy(true);
     setError(undefined);
+    const useTheirs = fresh || !mineInTabs || replace;
     try {
-      // "Use the household's things" empties this phone first: keep a copy, just in case.
-      if (mode && !fresh) await saveCopyInApp('backups/before-joining.json');
-      const r = await RestockNative.syncJoin({ code, replace: !!mode, shareCards, settings: !!fresh });
-      if (fresh) await copyHouseholdSettings(r.settings);
-      const where = r.household ?? 'the household';
+      // "Use the household's things" empties this phone's shared tabs first: keep a copy, just in case.
+      if (useTheirs && !fresh && mineInTabs) await saveCopyInApp('backups/before-joining.json');
+      const r = await RestockNative.syncJoin({ code, replace: useTheirs, shareCards, tabs });
+      await applyHouseholdSettings(r.settings ?? peek?.settings, { tabs, replace: useTheirs });
+      // What the household shared when joining was answered here: don't ask again on Home.
+      const s = await getSettings();
+      await updateSettings({ seenTabOffers: [...new Set([...(s.seenTabOffers ?? []), ...offered])] });
       onJoined(
         r.reached > 0
-          ? `Joined ${where}. Synced with ${r.ownerName ?? 'the owner phone'}.`
-          : `Joined ${where}. Syncing as soon as the phones find each other.`,
+          ? `Joined ${r.household ?? where}. Synced with ${r.ownerName ?? 'the owner phone'}.`
+          : `Joined ${r.household ?? where}. Syncing as soon as the phones find each other.`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -316,44 +426,89 @@ export function JoinSheet({
     }
   };
 
+  const keg = offered.includes('keg');
   return (
-    <Sheet title="Join your household" onClose={busy ? () => undefined : onClose}>
+    <Sheet title={peek?.household ? `Join ${peek.household}` : 'Join your household'} onClose={busy ? () => undefined : onClose}>
       {busy ? (
         <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span className="small">Joining and syncing with the owner phone…</span>
           <LoadingBar seconds={15} />
         </div>
-      ) : hasThings && replace === undefined ? (
-        <div className="card flush">
-          <p className="small" style={{ padding: '12px 14px 0', margin: 0 }}>
-            This phone already has {groups!.length} item{groups!.length === 1 ? '' : 's'}. What should happen to them?
-          </p>
-          <button className="row" onClick={() => setReplace(false)}>
-            <Icon name="plus" size={18} />
-            <span className="grow">
-              <span className="title" style={{ fontSize: 14 }}>
-                Combine with the household
-              </span>
-              <span className="small">Both phones keep their things and get each other's. You might see a few doubles to tidy up.</span>
-            </span>
-          </button>
-          <button className="row" onClick={() => setReplace(true)}>
-            <Icon name="refresh" size={18} />
-            <span className="grow">
-              <span className="title" style={{ fontSize: 14 }}>
-                Use the household's things
-              </span>
-              <span className="small">
-                This phone's pantry, list and prices are replaced with the household's. A backup of them is saved first. The other phones aren't
-                changed.
-              </span>
-            </span>
-          </button>
+      ) : step === 'look' ? (
+        !error && (
+          <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span className="small">Finding the owner phone…</span>
+            <LoadingBar seconds={8} />
+          </div>
+        )
+      ) : step === 'age' ? (
+        <div className="card" style={{ gap: 10 }}>
+          <strong>Are you 18 or over?</strong>
+          <span className="small">
+            {peek?.ownerName ?? 'The owner phone'} shares bottle shops (the Keg tab), which is only for adults. If not, this phone joins without it.
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn primary" style={{ flex: 1 }} onClick={() => void answerAge(true)}>
+              Yes, 18 or over
+            </button>
+            <button className="btn" style={{ flex: 1 }} onClick={() => void answerAge(false)}>
+              No
+            </button>
+          </div>
         </div>
+      ) : step === 'tabs' ? (
+        <>
+          <p className="small" style={{ margin: 0 }}>
+            {where} shares {offered.map((t) => SHARE_TABS.find((x) => x.tab === t)!.title.toLowerCase()).join(', ')}. Pick what this phone shares; the
+            rest stays on this phone only. You can change it later in Settings → Local sync.
+          </p>
+          <TabsPicker offered={keg ? offered : offered.filter((t) => t !== 'keg')} value={tabs} onChange={setTabs} />
+          <button className="btn primary block" disabled={!tabs.length} onClick={() => setStep(!fresh && mineInTabs ? 'things' : 'cards')}>
+            Continue
+          </button>
+        </>
+      ) : step === 'things' ? (
+        <>
+          <p className="small" style={{ margin: 0 }}>
+            This phone already has {mineInTabs} item{mineInTabs === 1 ? '' : 's'} in what it will share. What should happen to them?
+          </p>
+          <div className="card flush">
+            <button className={`row choice${replace ? ' picked' : ''}`} aria-pressed={replace} onClick={() => setReplace(true)}>
+              <Icon name="refresh" size={18} />
+              <span className="grow">
+                <span className="title" style={{ fontSize: 14, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  Use the household's things <span className="tag great">Recommended</span>
+                </span>
+                <span className="small">
+                  No doubles. This phone's items, lists and prices in what it shares are swapped for the household's. A backup is saved first, and
+                  the other phones aren't changed. Loyalty cards stay.
+                </span>
+              </span>
+              {replace && <Icon name="check" size={18} stroke={3} />}
+            </button>
+            <button className={`row choice${!replace ? ' picked' : ''}`} aria-pressed={!replace} onClick={() => setReplace(false)}>
+              <Icon name="plus" size={18} />
+              <span className="grow">
+                <span className="title" style={{ fontSize: 14 }}>
+                  Combine with the household
+                </span>
+                <span className="small">Both keep their things and get each other's. You might see a few doubles to tidy up.</span>
+              </span>
+              {!replace && <Icon name="check" size={18} stroke={3} />}
+            </button>
+          </div>
+          <button className="btn primary block" onClick={() => setStep('cards')}>
+            Continue
+          </button>
+        </>
       ) : (
         <CardsQuestion onAnswer={(share) => void join(share)} />
       )}
-      {error && <div className="banner amber">{error}</div>}
+      {error && (
+        <div className="banner amber" role="alert">
+          {error}
+        </div>
+      )}
     </Sheet>
   );
 }
@@ -385,7 +540,7 @@ function MemberSheet({
       detail:
         what === 'remove'
           ? "It stops syncing straight away, and the household's key changes so it can't sync again, even with an old code. It keeps what it has now. The other phones get the new key next time they sync with this one."
-          : 'It will be the one that adds and removes phones. This phone becomes an ordinary member. The change takes effect when the two phones next sync.',
+          : 'It will be the one that adds and removes phones, and this phone becomes an ordinary member. That happens when the two phones next sync; until then this phone stays the owner, and you can cancel.',
       action: what === 'remove' ? 'Remove' : 'Make owner',
       danger: what === 'remove',
     });
@@ -393,7 +548,7 @@ function MemberSheet({
     try {
       const info =
         what === 'remove' ? await RestockNative.syncRemove({ device: member.device }) : await RestockNative.syncHandOver({ device: member.device });
-      onDone(info, what === 'remove' ? `${member.name} removed` : `${member.name} will be the owner after the next sync`);
+      onDone(info, what === 'remove' ? `${member.name} removed` : `${member.name} takes over as owner at the next sync`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -466,13 +621,21 @@ export function SyncScreen() {
     }
   };
 
-  const set = async (patch: { name?: string; shareCards?: boolean; keepReady?: boolean }) => setInfo(await RestockNative.syncSet(patch));
+  const set = async (patch: { name?: string; shareCards?: boolean; keepReady?: boolean; tabs?: Section[]; householdTabs?: Section[] }) => {
+    try {
+      setInfo(await RestockNative.syncSet(patch));
+    } catch (e) {
+      nav.toast(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   const leave = async () => {
     const others = (info?.members ?? []).filter((m) => !m.me);
     if (info?.isOwner && others.length) {
       await confirmAction('Make another phone the owner first', {
-        detail: `This is the owner phone. Tap ${others[0].name} in the list above and choose "Make this the owner phone", sync once, then stop syncing this phone.`,
+        detail: info.handoverTo
+          ? `Waiting for ${others.find((m) => m.device === info.handoverTo)?.name ?? 'the other phone'} to take over. Sync with it once (both phones on the same Wi-Fi), then stop syncing this phone.`
+          : `This is the owner phone. Tap ${others[0].name} in the list above and choose "Make this the owner phone", sync once, then stop syncing this phone.`,
         action: 'OK',
         danger: false,
       });
@@ -598,6 +761,22 @@ export function SyncScreen() {
             </button>
           </div>
 
+          {info.isOwner && info.handoverTo && (
+            <div className="banner grey" role="status" style={{ gap: 8 }}>
+              <strong>Waiting for {info.members?.find((m) => m.device === info.handoverTo)?.name ?? 'the other phone'} to take over</strong>
+              <span style={{ fontSize: 13 }}>
+                It becomes the owner next time it syncs with this phone. Until then, this phone stays the owner.
+              </span>
+              <button
+                className="btn small"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => void RestockNative.syncCancelHandOver().then(setInfo, (e) => nav.toast(e instanceof Error ? e.message : String(e)))}
+              >
+                Cancel, stay the owner
+              </button>
+            </div>
+          )}
+
           <div className="eyebrow">The household's phones</div>
           <div className="card flush">
             {(info.members ?? []).map((m) => {
@@ -609,6 +788,7 @@ export function SyncScreen() {
                     <span className="title" style={{ fontSize: 14, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                       {m.name}
                       {m.owner && <span className="tag great">Owner</span>}
+                      {m.device === info.handoverTo && <span className="tag normal">Taking over</span>}
                       {m.me && <span className="tag normal">This phone</span>}
                     </span>
                     {!m.me && <span className="small">Last synced {agoText(synced(m.device))}</span>}
@@ -646,6 +826,37 @@ export function SyncScreen() {
               </p>
             )}
           </div>
+
+          <div className="eyebrow">What's shared</div>
+          {info.isOwner && (
+            <>
+              <span className="small">The household shares:</span>
+              <TabsPicker
+                offered={SECTIONS}
+                value={info.householdTabs ?? SECTIONS}
+                onChange={(v) => {
+                  if (!v.length) return nav.toast('Pick at least one thing to share.');
+                  void set({ householdTabs: v });
+                }}
+              />
+            </>
+          )}
+          <span className="small">
+            {info.isOwner ? 'This phone shares:' : `${info.household ?? 'The household'} shares these. This phone shares the ticked ones:`}
+          </span>
+          <TabsPicker
+            offered={info.householdTabs ?? SECTIONS}
+            value={(info.myTabs ?? SECTIONS).filter((t) => (info.householdTabs ?? SECTIONS).includes(t))}
+            onChange={(v) => {
+              if (!v.length) return nav.toast('Pick at least one, or stop syncing this phone.');
+              const added = v.find((t) => !(info.tabs ?? []).includes(t));
+              if (added) void shareTab(info, added).then((i) => i && setInfo(i));
+              else void set({ tabs: v });
+            }}
+          />
+          <p className="small" style={{ marginTop: -4 }}>
+            What isn't shared stays on this phone only. Turning one on brings the household's things for it across at the next sync.
+          </p>
 
           <label className="field">
             <span>This phone's name</span>

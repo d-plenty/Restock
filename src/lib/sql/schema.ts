@@ -69,6 +69,31 @@ const SYNC_MIGRATION: string[] = [
   ...SYNCED.filter((t) => t.table !== 'household').flatMap(syncTriggers),
 ];
 
+/**
+ * 0.8.5: a change is always stamped at least a millisecond after the newest one this phone has
+ * taken in, so two phones can never disagree over a tie.
+ */
+const STAMP_AFTER = `MAX(CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), COALESCE((SELECT CAST(value AS INTEGER) FROM sync_meta WHERE key = 'clock'), 0) + 1)`;
+
+/**
+ * Products' stock (in stock at your branch, and when it was checked) belongs to each phone: it
+ * depends on the phone's own store, so changing only those doesn't count as a change to sync.
+ * New product columns that should sync go in this list too.
+ */
+export const PRODUCT_SYNCED_COLUMNS = ['chain', 'name', 'brand', 'size', 'barcode', 'store_product_id', 'image_url', 'qty', 'qty_unit', 'created_at'];
+
+/** 0.8.5: every sync trigger again, with STAMP_AFTER, and products' update trigger leaving stock out. */
+const SYNC_TRIGGERS_085: string[] = SYNCED.flatMap((t) => {
+  const names = [`sync_${t.table}_ins`, ...(t.deletes ? [`sync_${t.table}_upd`, `sync_${t.table}_del`] : [])];
+  const fresh = syncTriggers(t).map((sql) =>
+    sql
+      .split(STAMP)
+      .join(STAMP_AFTER)
+      .replace(/AFTER UPDATE ON products /, `AFTER UPDATE OF ${PRODUCT_SYNCED_COLUMNS.join(', ')} ON products `),
+  );
+  return [...names.map((n) => `DROP TRIGGER IF EXISTS ${n}`), ...fresh];
+});
+
 /** 0.8.2: the synced household record (owner, members), with its own change notes. */
 const HOUSEHOLD_MIGRATION: string[] = [
   `CREATE TABLE household (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
@@ -214,6 +239,8 @@ export const MIGRATIONS: string[][] = [
   SYNC_MIGRATION,
   // 0.8.2: owner phone and members, one-time pairing codes (SyncHousehold.java).
   HOUSEHOLD_MIGRATION,
+  // 0.8.5: no ties between phones' changes, and products' stock stays on each phone.
+  SYNC_TRIGGERS_085,
 ];
 
 /** The database version before sync was added, for "back up before updating" (0.8.0). */

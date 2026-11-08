@@ -284,7 +284,7 @@ export async function putKV(key: string, value: unknown): Promise<void> {
   await write([{ sql: 'INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', params: [key, JSON.stringify(value)] }]);
 }
 
-function mergeSettings(stored: Partial<Settings> | undefined): Settings {
+export function mergeSettings(stored: Partial<Settings> | undefined): Settings {
   const s = stored ?? {};
   return {
     ...DEFAULT_SETTINGS,
@@ -854,7 +854,7 @@ export function mergeRestoredSettings(
  * stay exactly as they are on this phone. A shop the backup picked without a branch keeps the
  * branch this phone already has for it.
  */
-function mergeShopsFor(current: Settings, from: Settings, incoming: Partial<Settings>, tabs: Section[]): Partial<Settings> {
+export function mergeShopsFor(current: Settings, from: Settings, incoming: Partial<Settings>, tabs: Section[]): Partial<Settings> {
   const tabOf = (c: string) => shopDef(c)?.section ?? [...from.customShops, ...current.customShops].find((x) => x.id === c)?.section ?? 'pantry';
   const ours = (c: string) => tabs.includes(tabOf(c));
   const enabledChains = [...current.enabledChains.filter((c) => !ours(c)), ...from.enabledChains.filter((c) => ours(c))];
@@ -931,10 +931,20 @@ export async function restoreParts(s: Snapshot, parts: RestoreParts, renames: Ma
     );
     // Prices for products another tab still uses stay as they are, rather than doubling up.
     s.prices.filter((r) => incomingIds.has(r.productId) && !keepIds.has(r.productId)).forEach((r) => ops.push(insertReadingOp(r)));
-    // Categories from the backup, keeping any extra ones made on this phone.
-    s.categories
-      .filter((c) => secs.includes(c.section ?? 'pantry'))
-      .forEach((c) => ops.push({ ...insertCategoryOp(c), sql: insertCategoryOp(c).sql.replace('INSERT INTO', 'INSERT OR REPLACE INTO') }));
+    // Categories from the backup. First take out this phone's categories on those tabs that no
+    // item or list line uses (a new phone's starting ones), or every category would be there twice.
+    // Only for tabs the backup has categories for, so an old backup doesn't leave a tab with none.
+    const cats = s.categories.filter((c) => secs.includes(c.section ?? 'pantry'));
+    const catSecs = [...new Set(cats.map((c) => c.section ?? 'pantry'))];
+    if (catSecs.length)
+      ops.push({
+        sql:
+          `DELETE FROM categories WHERE section IN (${placeholders(catSecs.length)})` +
+          ' AND id NOT IN (SELECT category_id FROM items WHERE category_id IS NOT NULL)' +
+          ' AND id NOT IN (SELECT category_id FROM list_entries WHERE category_id IS NOT NULL)',
+        params: catSecs,
+      });
+    cats.forEach((c) => ops.push({ ...insertCategoryOp(c), sql: insertCategoryOp(c).sql.replace('INSERT INTO', 'INSERT OR REPLACE INTO') }));
   }
   if (parts.list) {
     const groupIds = new Set([...(await allGroups()).map((g) => g.id), ...(parts.pantry ? s.groups.map((g) => g.id) : [])]);

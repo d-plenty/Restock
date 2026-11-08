@@ -11,7 +11,7 @@ import { setConnectionMode } from '../stores/http';
 import { applyTheme, syncInsets } from '../lib/theme';
 import { scheduleReminders } from '../lib/notify';
 import { useLive } from '../lib/useLive';
-import { Icon } from './components';
+import { closeTopLayer, Icon, runBackHandlers } from './components';
 import { isSectionTab, NavContext, type Nav, type Screen, type Tab } from './nav';
 import { activeSections, type Section } from '../shops';
 import { ConfirmHost } from './ConfirmHost';
@@ -134,16 +134,19 @@ export default function App() {
     [tab, section, toast],
   );
 
-  // Android back button: close the top screen, then go Home, then leave.
+  // Android back button: one thing per press. The scanner, then the top sheet or shopping mode,
+  // then the top screen, then setup's own steps (useBackHandler), then Home, then leave.
   const stateRef = useRef({ stack, tab });
   stateRef.current = { stack, tab };
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     const sub = CapApp.addListener('backButton', () => {
       const { stack: st, tab: t } = stateRef.current;
-      if (document.querySelector('.scanner, .sheet-back')) {
+      if (document.querySelector('.scanner')) {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-      } else if (st.length) setStack(st.slice(0, -1));
+      } else if (closeTopLayer()) return;
+      else if (st.length) setStack(st.slice(0, -1));
+      else if (runBackHandlers()) return;
       else if (t !== 'home') setTab('home');
       else CapApp.exitApp();
     });
@@ -159,13 +162,14 @@ export default function App() {
   useEffect(() => {
     if (!onboarded || !Capacitor.isNativePlatform()) return;
     const run = async (a: { action?: string; text?: string }) => {
+      // nav.setTab also closes any open screens, so the tab asked for is what shows.
       if (a.action === 'share' && a.text) {
-        setTab('list');
+        nav.setTab('list');
         toast(await addShared(a.text));
-      } else if (a.action === 'list') setTab('list');
+      } else if (a.action === 'list') nav.setTab('list');
       else if (a.action === 'receipt') setStack((st) => [...st, { name: 'receipt' }]);
       else if (a.action === 'recalls') setStack((st) => [...st, { name: 'recalls' }]);
-      else if (a.action === 'deals') setTab('home');
+      else if (a.action === 'deals') nav.setTab('home');
       else if (a.action === 'scan') {
         const out = await scanBarcode();
         if (out.ok) setStack((st) => [...st, { name: 'add', barcode: out.code }]);
@@ -238,13 +242,15 @@ export default function App() {
         <div className="app">
           <div className="status-shade" aria-hidden />
           <Onboarding />
-          {/* 0.8.0: setup tiles can open these (cards, shop accounts, sync) before setup is finished. */}
+          {/* Setup tiles can open these (cards, shop accounts, sync) before setup is finished. */}
           {stack.length > 0 && (
             <div className="overlay">
               {stack[stack.length - 1].name === 'stores' && <StoresScreen section={(stack[stack.length - 1] as { section?: Section }).section} />}
               {stack[stack.length - 1].name === 'cards' && <CardsScreen />}
               {stack[stack.length - 1].name === 'sync' && <SyncScreen />}
               {stack[stack.length - 1].name === 'household' && <HouseholdScreen />}
+              {stack[stack.length - 1].name === 'diagnostics' && <DiagnosticsScreen />}
+              {stack[stack.length - 1].name === 'soon' && <SoonScreen id={(stack[stack.length - 1] as { id: string }).id} />}
             </div>
           )}
           <ScannerHost />

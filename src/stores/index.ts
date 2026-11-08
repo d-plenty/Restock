@@ -35,14 +35,14 @@ function withBackup(a: StoreAdapter): StoreAdapter {
   if (!backup) return a;
   return {
     ...a,
-    async search(term, storeId) {
+    async search(term, storeId, page) {
       // Browser mode, or signed in to Woolworths: ask from inside its website, as you, for your store.
-      if (connectionMode() === 'browser' || (a.chain === 'woolworths' && wooliesAccount(cachedSettings()))) return backup(term, storeId);
+      if (connectionMode() === 'browser' || (a.chain === 'woolworths' && wooliesAccount(cachedSettings()))) return backup(term, storeId, page);
       try {
-        return await a.search(term, storeId);
+        return await a.search(term, storeId, page);
       } catch (e) {
         if (e instanceof NativeOnlyError) throw e;
-        return backup(term, storeId);
+        return backup(term, storeId, page);
       }
     },
   };
@@ -83,8 +83,25 @@ function fakeAdapter(chain: StoreChain): StoreAdapter {
   });
   return {
     chain,
-    search: async (term: string) => {
+    pages: ['woolworths', 'coles', 'aldi'].includes(chain),
+    search: async (term: string, _storeId?: string, page = 1) => {
       const grocer = chain === 'woolworths' || chain === 'coles';
+      // "milk": two pages of results, to try "Show more" and "Get more" (0.8.5).
+      if (/^milk$/i.test(term.trim())) {
+        const kinds = ['Full Cream Milk', 'Light Milk', 'Skim Milk', 'Lactose Free Milk', 'Oat Milk', 'Almond Milk', 'Chocolate Milk', 'Farmhouse Unhomogenised Milk'];
+        const sizes = ['1L', '2L', '3L'];
+        const all = kinds.flatMap((k, i) => sizes.map((sz, j) => ({ k, sz, n: i * 3 + j })));
+        const per = 14;
+        return all.slice((page - 1) * per, page * per).map(({ k, sz, n }) => ({
+          chain,
+          storeProductId: `${chain}-milk-${n}`,
+          name: `${brand} ${k} ${sz}`.trim(),
+          size: sz,
+          price: 1.6 + n * 0.21,
+          isSpecial: n === 4,
+          memberOnly: false,
+        }));
+      }
       // localStorage fakeNoBarcode=1: the shops can't find it by barcode (like the real Woolworths sometimes).
       const noCode = (() => {
         try {

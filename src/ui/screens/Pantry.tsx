@@ -1,7 +1,7 @@
 import { useFullRefresh } from '../refresh';
-import { useState } from 'react';
-import { addListEntry, allCategories, allListEntries, deleteGroup, deleteListEntries, nowIso, uid, updateGroup } from '../../lib/db';
-import { buzz } from '../../lib/listActions';
+import { useRef, useState } from 'react';
+import { allCategories, allListEntries, deleteGroup, deleteListEntries, updateGroup } from '../../lib/db';
+import { addGroupToList, buzz } from '../../lib/listActions';
 import { groupRows, undoable } from '../../lib/undo';
 import { loadRecommendations } from '../../lib/recs';
 import { money } from '../../lib/units';
@@ -76,6 +76,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   const [sort, setSortState] = useState<Sort>(loadSort);
   const [filterSheet, setFilterSheet] = useState(false);
   const [preview, setPreview] = useState<Recommendation>();
+  const adding = useRef(false);
   const setSort = (v: Sort) => {
     setSortState(v);
     try {
@@ -89,7 +90,8 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   if (!recs || !categories || !entries) return <div className="screen" />;
 
   const onList = new Map(entries.filter((e) => !e.checked && e.groupId).map((e) => [e.groupId!, e.id]));
-  const onSale = (r: Recommendation) => r.action === 'buy' || r.action === 'alt' || r.action === 'small' || r.action === 'wait';
+  // The same deals Home counts ("wait" isn't a deal yet).
+  const onSale = (r: Recommendation) => r.action === 'buy' || r.action === 'alt' || r.action === 'small';
   const shown = recs.filter((r) => {
     if (q && !r.group.name.toLowerCase().includes(q.toLowerCase())) return false;
     if (filter === 'sale') return onSale(r);
@@ -117,18 +119,15 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       await deleteListEntries([existing]);
       nav.toast(`${r.group.name} taken off your shopping list`);
     } else {
-      await addListEntry({
-        id: uid(),
-        text: r.group.name,
-        groupId: r.group.id,
-        categoryId: r.group.categoryId,
-        qty: 1,
-        section,
-        checked: false,
-        createdAt: nowIso(),
-      });
-      buzz();
-      nav.toast(`${r.group.name} added to your shopping list`);
+      // Checks the list itself (not what's on screen), and one add at a time, so a double tap adds it once.
+      if (adding.current) return;
+      adding.current = true;
+      try {
+        const added = await addGroupToList(r.group);
+        nav.toast(added ? `${r.group.name} added to your shopping list` : 'Already on your shopping list');
+      } finally {
+        adding.current = false;
+      }
     }
   };
 
@@ -151,23 +150,17 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
     setPicked(new Set());
   };
 
-  const selected = recs.filter((r) => picked.has(r.group.id));
+  // Only what's ticked and still showing: a search can hide things ticked earlier.
+  const selected = shown.filter((r) => picked.has(r.group.id));
 
   const addSelectedToList = async () => {
+    if (adding.current) return;
+    adding.current = true;
     let added = 0;
-    for (const r of selected) {
-      if (onList.has(r.group.id)) continue;
-      await addListEntry({
-        id: uid(),
-        text: r.group.name,
-        groupId: r.group.id,
-        categoryId: r.group.categoryId,
-        qty: 1,
-        section,
-        checked: false,
-        createdAt: nowIso(),
-      });
-      added++;
+    try {
+      for (const r of selected) if (await addGroupToList(r.group)) added++;
+    } finally {
+      adding.current = false;
     }
     nav.toast(added ? `${added} added to your shopping list` : 'Already on your shopping list');
     stopEditing();
@@ -345,19 +338,19 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
 
       {editing && (
         <SelectBar
-          count={picked.size}
+          count={selected.length}
           total={shown.length}
           onAll={() => setPicked(new Set(shown.map((r) => r.group.id)))}
           onNone={() => setPicked(new Set())}
           onDone={stopEditing}
         >
-          <button className="btn small" disabled={!picked.size} onClick={addSelectedToList}>
+          <button className="btn small" disabled={!selected.length} onClick={addSelectedToList}>
             <Icon name="cartPlus" size={18} /> Shopping list
           </button>
-          <button className="btn small" disabled={!picked.size} onClick={() => setCategorySheet(true)}>
+          <button className="btn small" disabled={!selected.length} onClick={() => setCategorySheet(true)}>
             Category
           </button>
-          <button className="btn small danger" disabled={!picked.size} onClick={deleteSelected}>
+          <button className="btn small danger" disabled={!selected.length} onClick={deleteSelected}>
             <Icon name="trash" size={18} /> Delete
           </button>
         </SelectBar>
@@ -416,7 +409,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       )}
 
       {categorySheet && (
-        <Sheet title={`Move ${picked.size} to…`} onClose={() => setCategorySheet(false)}>
+        <Sheet title={`Move ${selected.length} to…`} onClose={() => setCategorySheet(false)}>
           <div className="card flush">
             {categories.map((c) => (
               <button key={c.id} className="row" onClick={() => moveSelected(c.id)}>

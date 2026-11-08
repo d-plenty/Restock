@@ -1,7 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { groupRows, productRows, undoable } from '../../lib/undo';
 import {
-  addListEntry,
   addReading,
   allCategories,
   deleteGroup,
@@ -11,10 +10,11 @@ import {
   openEntryForGroup,
   readingsFor,
   removeProductFromGroup,
-  uid,
   updateGroup,
   updateProduct,
 } from '../../lib/db';
+import { addGroupToList } from '../../lib/listActions';
+import { MARKET_SOURCE } from '../../lib/market';
 import { genericName } from '../../lib/naming';
 import { orderOptions, PRODUCT_ORDERS, shopRank } from '../../lib/productOrder';
 import { ensureNotificationPermission, notificationsAllowed, scheduleReminders } from '../../lib/notify';
@@ -191,9 +191,12 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       allCategories(),
       openEntryForGroup(groupId),
     ]);
+    // Deleted on another phone (or a moment ago): show "Item removed".
+    const rec = recs.find((r) => r.group.id === groupId);
+    if (!rec) return null;
     return {
       group,
-      rec: recs.find((r) => r.group.id === groupId)!,
+      rec,
       readings,
       categories: categories.filter((c) => c.section === (group.section ?? 'pantry')),
       onList,
@@ -204,6 +207,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   const appSettings = useLive(getSettings, []);
   const [preview, setPreview] = useState<Option>();
   const [rangeWeeks, setRangeWeeks] = useState<number>();
+  const adding = useRef(false);
 
   if (data === undefined) return <div className="screen" />;
   if (data === null) {
@@ -235,11 +239,16 @@ export function ItemScreen({ groupId }: { groupId: string }) {
     : [];
   const searchName = mains[0]?.product.name ?? group.name;
 
+  // Checks the list itself, so a double tap adds it once (with its tab's list and a qty).
   const addToList = async () => {
-    if (!onList) {
-      await addListEntry({ id: uid(), text: group.name, groupId: group.id, categoryId: group.categoryId, checked: false, createdAt: nowIso() });
+    if (adding.current) return;
+    adding.current = true;
+    try {
+      const added = !onList && (await addGroupToList(group));
+      nav.toast(added ? 'Added to your shopping list' : 'Already on your shopping list');
+    } finally {
+      adding.current = false;
     }
-    nav.toast(onList ? 'Already on your shopping list' : 'Added to your shopping list');
   };
 
   const row = (o: Option, tag?: 'cheapest' | 'swap') => (
@@ -338,7 +347,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           </strong>
           <span>
             Restock has only {learning} day{learning === 1 ? '' : 's'} of its own prices for this, so the verdict uses months of history from
-            hotprices.org. After about 4 weeks it switches to the prices this phone has seen.
+            {MARKET_SOURCE}. After about 4 weeks it switches to the prices this phone has seen.
           </span>
         </div>
       )}
@@ -355,7 +364,21 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           {appSettings &&
             !appSettings.marketData.enabled &&
             rec.options.some((o) => o.product.chain === 'coles' || o.product.chain === 'woolworths') && (
-              <button className="linkish small" style={{ alignSelf: 'flex-start' }} onClick={() => nav.push({ name: 'settings' })}>
+              <button
+                className="linkish small"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => {
+                  nav.push({ name: 'settings' });
+                  // Open Settings at Shared price history, once that section has drawn.
+                  let tries = 0;
+                  const t = window.setInterval(() => {
+                    const el = document.getElementById('s-shared');
+                    if (!el && ++tries < 30) return;
+                    window.clearInterval(t);
+                    el?.scrollIntoView({ block: 'start' });
+                  }, 50);
+                }}
+              >
                 Judge it from day one with shared price history (Beta)
               </button>
             )}
@@ -1274,8 +1297,8 @@ function PriceHistory({
       {why &&
         (market ? (
           <p className="small" style={{ margin: 0 }}>
-            Normal, usual sale and lowest come from shared price history (hotprices.org): {market.days} days at {chainName(o.product.chain)}, on sale{' '}
-            {Math.round(market.saleShare * 100)}% of the time{stats.cycleWeeks ? `, about every ${stats.cycleWeeks} weeks` : ''}.
+            Normal, usual sale and lowest come from shared price history ({MARKET_SOURCE}): {market.days} days at {chainName(o.product.chain)}, on
+            sale {Math.round(market.saleShare * 100)}% of the time{stats.cycleWeeks ? `, about every ${stats.cycleWeeks} weeks` : ''}.
             {stats.marketScale && stats.marketScale !== 1
               ? ` Adjusted ${Math.round(Math.abs(stats.marketScale - 1) * 100)}% ${stats.marketScale > 1 ? 'up' : 'down'} to match your store's prices.`
               : ''}{' '}

@@ -68,13 +68,16 @@ final class PriceChecker {
             JSONObject sync = settings.optJSONObject("sync");
             if (sync != null && !sync.optBoolean("backgroundActivity", true)) return result;
             // Weekly checks: the worker wakes daily, but only checks on the chosen day.
+            // On the days it doesn't check, the catalogue-day summary still goes out (from the last prices).
             if (settings.optInt("checkIntervalHours", 12) >= 168) {
                 int want = settings.optInt("checkWeekday", 3); // 0 = Sunday, as in the app
                 int today = java.time.LocalDate.now().getDayOfWeek().getValue() % 7;
-                if (today != want) return result;
+                if (today != want) return summaryOnly(context, db, settings, result);
                 String lastWeekly = settings.optString("lastCheck", "");
                 try {
-                    if (!lastWeekly.isEmpty() && Instant.now().toEpochMilli() - Instant.parse(lastWeekly).toEpochMilli() < 3 * 86_400_000L) return result;
+                    if (!lastWeekly.isEmpty() && Instant.now().toEpochMilli() - Instant.parse(lastWeekly).toEpochMilli() < 3 * 86_400_000L) {
+                        return summaryOnly(context, db, settings, result);
+                    }
                 } catch (Exception ignored) {
                     // Unreadable date: just check.
                 }
@@ -83,7 +86,7 @@ final class PriceChecker {
             String last = settings.optString("lastCheck", "");
             if (!last.isEmpty() && !"null".equals(last)) {
                 try {
-                    if (Instant.now().toEpochMilli() - Instant.parse(last).toEpochMilli() < 30 * 60_000L) return result;
+                    if (Instant.now().toEpochMilli() - Instant.parse(last).toEpochMilli() < 30 * 60_000L) return summaryOnly(context, db, settings, result);
                 } catch (Exception ignored) {
                     // Unreadable date: just check.
                 }
@@ -137,7 +140,8 @@ final class PriceChecker {
         JSONObject woolies = accounts != null ? accounts.optJSONObject("woolworths") : null;
         client.useWoolworthsAccount(woolies != null && woolies.optBoolean("signedIn", false));
         int done = 0;
-        String today = now().substring(0, 10);
+        // The phone's own calendar day, not UTC's (Deals.localDay).
+        String today = Deals.localDay(now());
         for (Map.Entry<String, List<String[]>> entry : byChain.entrySet()) {
             String chain = entry.getKey();
             String storeId = null;
@@ -231,18 +235,33 @@ final class PriceChecker {
             Log.w(TAG, "store health not saved", e);
         }
 
-        // Re-read so a setting changed in the app during the check isn't overwritten.
+        // Re-read so a setting changed in the app during the check isn't overwritten. No settings
+        // means everything was erased during the check: write nothing back and send nothing.
         JSONObject latest = readKv(db, "settings");
-        if (latest == null) latest = settings;
+        if (latest == null) return result;
         latest.put("lastCheck", now());
         writeKv(db, "settings", latest);
         settings = latest;
 
-        // Shared price history (testing): refresh weekly from the background, if it's switched on.
-        if (fromBackground) MarketData.maybeRefresh(context, db, settings);
-
+        // Alerts first: the shared price history download can be slow, and the worker only gets about 10 minutes.
         JSONObject alerts = settings.optJSONObject("alerts");
-        if (alerts == null || alerts.optBoolean("greatDeals", true)) alertDeals(context, db, settings);
+        try {
+            // With deal alerts off this still works out the catalogue-day summary.
+            alertDeals(context, db, settings, alerts == null || alerts.optBoolean("greatDeals", true));
+        } finally {
+            // Shared price history (testing): refresh weekly from the background, if it's switched on.
+            if (fromBackground) MarketData.maybeRefresh(context, db, settings);
+        }
+        return result;
+    }
+
+    /** A background wake-up that doesn't check prices: just the catalogue-day summary, if it's due. */
+    private static Result summaryOnly(Context context, SQLiteDatabase db, JSONObject settings, Result result) {
+        try {
+            if (summaryDue(db, settings)) alertDeals(context, db, settings, false);
+        } catch (Exception e) {
+            Log.w(TAG, "weekly summary failed", e);
+        }
         return result;
     }
 
@@ -254,7 +273,7 @@ final class PriceChecker {
         try (Cursor c = db.rawQuery("SELECT date, price, is_special FROM prices WHERE product_id = ? ORDER BY date DESC LIMIT 1",
             new String[] {productId})) {
             if (c.moveToFirst()) {
-                boolean sameDay = c.getString(0).startsWith(today);
+                boolean sameDay = Deals.localDay(c.getString(0)).equals(today);
                 boolean unchanged = sameDay && Math.abs(c.getDouble(1) - q.price) < 0.0001 && (c.getInt(2) == 1) == q.special;
                 if (unchanged) return false;
             }
@@ -293,7 +312,8 @@ final class PriceChecker {
         return false;
     }
 
-    static void alertDeals(Context context, SQLiteDatabase db, JSONObject settings) throws Exception {
+    /** Deal alerts (when dealAlerts is on) and the catalogue-day summary (whatever dealAlerts says). */
+    static void alertDeals(Context context, SQLiteDatabase db, JSONObject settings, boolean dealAlerts) throws Exception {
         Set<String> cardChains = new HashSet<>();
         try (Cursor c = db.rawQuery("SELECT program FROM cards", null)) {
             while (c.moveToNext()) {
@@ -399,10 +419,13 @@ final class PriceChecker {
                     onSpecial++;
                     if (onSale.stats.typical != null && onSale.stats.typical > onSale.price) weekSaving += onSale.stats.typical - onSale.price;
                 }
+                if (!dealAlerts) continue;
                 // Under the item's target price at its cheapest shop.
                 Double target = c.isNull(9) ? null : c.getDouble(9);
                 if (target != null && rec.best != null && rec.best.price != null && rec.best.price <= target + 0.004 && rec.best.stats.current != null) {
-                    String tkey = "target:" + item.id + ":" + String.format(Locale.ROOT, "%.2f", rec.best.price) + ":" + rec.best.stats.current.date.substring(0, 10);
+                    // Once per price, not once per day it stays there (see priceSince).
+                    String tkey = "target:" + item.id + ":" + rec.best.product.id + ":" + String.format(Locale.ROOT, "%.2f", rec.best.price) + ":"
+                        + priceSince(readings.get(rec.best.product.id), rec.best.stats.current);
                     if (!seen.contains(tkey)) {
                         seenList.add(tkey);
                         seen.add(tkey);
@@ -413,7 +436,9 @@ final class PriceChecker {
                 if (!Deals.worthAlerting(rec)) continue;
                 Deals.Option deal = Deals.dealOption(rec);
                 Deals.Reading cur = deal.stats.current;
-                String key = item.id + ":" + deal.product.id + ":" + String.format(Locale.ROOT, "%.2f", deal.price) + ":" + cur.date.substring(0, 10);
+                // A week-long special alerts once: the key is the day this price showed up, not today's reading.
+                String key = item.id + ":" + deal.product.id + ":" + String.format(Locale.ROOT, "%.2f", deal.price) + ":"
+                    + priceSince(readings.get(deal.product.id), cur);
                 if (seen.contains(key)) continue;
                 seenList.add(key);
                 // Swaps name the product to get, so it's clear what "swap" means.
@@ -433,6 +458,7 @@ final class PriceChecker {
             }
         }
         weeklySummary(context, db, settings, onSpecial, weekSaving);
+        if (!dealAlerts) return;
         if (lines.isEmpty()) {
             if (!seenList.isEmpty()) writeKvRaw(db, "notified", new JSONArray(seenList).toString());
             return;
@@ -448,21 +474,50 @@ final class PriceChecker {
      * day: "4 of your items are on special this week, saving about $18."
      */
     static void weeklySummary(Context context, SQLiteDatabase db, JSONObject settings, int onSpecial, double saving) {
-        JSONObject alerts = settings.optJSONObject("alerts");
-        if (alerts != null && !alerts.optBoolean("catalogueDay", true)) return;
-        int weekday = alerts == null ? 3 : alerts.optInt("catalogueWeekday", 3); // 0 = Sunday
-        java.time.LocalDate today = java.time.LocalDate.now();
-        if (today.getDayOfWeek().getValue() % 7 != weekday) return;
-        JSONObject last = readKvRaw(db, "weeklySummary");
-        String done = last == null ? null : last.optString("v", null);
-        if (today.toString().equals(done)) return;
-        writeKvRaw(db, "weeklySummary", JSONObject.quote(today.toString()));
-        if (onSpecial == 0) return;
-        String title = onSpecial == 1 ? "1 of your items is on special this week" : onSpecial + " of your items are on special this week";
+        if (!summaryDue(db, settings)) return;
+        writeKvRaw(db, "weeklySummary", JSONObject.quote(java.time.LocalDate.now().toString()));
         List<String> lines = new ArrayList<>();
+        if (onSpecial == 0) {
+            // With background activity on, the app doesn't schedule its plain catalogue-day reminder
+            // (notify.ts), so this stands in for it.
+            lines.add("Open Restock to see what's worth buying this week.");
+            notify(context, "New specials are out", lines, NOTIFICATION_ID + 1);
+            return;
+        }
+        String title = onSpecial == 1 ? "1 of your items is on special this week" : onSpecial + " of your items are on special this week";
         lines.add(saving >= 0.5 ? String.format(Locale.ROOT, "Saving about $%.0f against normal prices. Open Restock to see them.", saving)
             : "Open Restock to see what's worth buying.");
         notify(context, title, lines, NOTIFICATION_ID + 1);
+    }
+
+    /** Is today catalogue day, with the summary switched on and not sent yet today? */
+    static boolean summaryDue(SQLiteDatabase db, JSONObject settings) {
+        JSONObject alerts = settings.optJSONObject("alerts");
+        if (alerts != null && !alerts.optBoolean("catalogueDay", true)) return false;
+        int weekday = alerts == null ? 3 : alerts.optInt("catalogueWeekday", 3); // 0 = Sunday
+        java.time.LocalDate today = java.time.LocalDate.now();
+        if (today.getDayOfWeek().getValue() % 7 != weekday) return false;
+        JSONObject last = readKvRaw(db, "weeklySummary");
+        String done = last == null ? null : last.optString("v", null);
+        return !today.toString().equals(done);
+    }
+
+    /**
+     * The day (on the phone's calendar) a product's current price first showed up: walk back
+     * through its readings while the price is the same. A deal keyed on this alerts once, however
+     * many days it lasts; the same price back again after a change alerts again.
+     */
+    static String priceSince(List<Deals.Reading> list, Deals.Reading cur) {
+        String since = cur.date;
+        if (list != null) {
+            for (int i = list.size() - 1; i >= 0; i--) {
+                Deals.Reading r = list.get(i);
+                if (r.date.compareTo(cur.date) > 0) continue;
+                if (Math.abs(r.price - cur.price) >= 0.005) break;
+                since = r.date;
+            }
+        }
+        return Deals.localDay(since);
     }
 
     static boolean hasColumn(SQLiteDatabase db, String table, String column) {

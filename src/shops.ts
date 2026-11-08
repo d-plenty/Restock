@@ -198,7 +198,7 @@ export const SHOPS: ShopDef[] = [
     name: 'Priceline Pharmacy',
     color: '#e5006d',
     website: 'https://www.priceline.com.au',
-    search: 'https://www.priceline.com.au/search?q={q}',
+    search: 'https://www.priceline.com.au/search/{q}',
     map: /priceline/i,
   }),
   P({ id: 'soulpattinson', name: 'Soul Pattinson', color: '#0067b1', website: 'https://www.soulpattinson.com.au', map: /soul pattinson/i }),

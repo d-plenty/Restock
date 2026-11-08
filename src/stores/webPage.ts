@@ -195,7 +195,8 @@ export function repairName(name: string, url: string | undefined): string {
 
 function product(chain: Chain, p: Partial<StoreProduct> & { name?: string; url?: string; id?: string }): StoreProduct | undefined {
   const name = p.name && repairName(cleanName(p.name), p.url);
-  if (!name || name.length < 2 || p.price === undefined) return undefined;
+  // A page's empty placeholder ("null", "undefined") isn't a product (0.8.5).
+  if (!name || name.length < 2 || /^(null|undefined)$/i.test(name) || p.price === undefined) return undefined;
   const id = p.url ?? p.id;
   if (!id) return undefined;
   let price = p.price;
@@ -706,6 +707,9 @@ export function cardPrice(card: Element): { price?: number; was?: number } {
   const labelled = priceEl?.getAttribute('content') ?? priceEl?.textContent?.match(MONEY)?.[1];
   const fromLabel = labelled ? parseFloat(labelled.replace(/,/g, '')) : undefined;
   const price = fromLabel !== undefined && fromLabel > 0 && fromLabel !== was ? fromLabel : found[0];
+  // Only an "RRP" or crossed-out style price and nothing else (Priceline shows its everyday
+  // price in an "rrp-price" box when there's no special): that one is the price (0.8.5).
+  if (price === undefined && was !== undefined && was > 0) return { price: was, was: undefined };
   return { price, was: was && price && was > price ? was : undefined };
 }
 

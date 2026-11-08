@@ -54,8 +54,11 @@ export function HouseholdScreen() {
       <label className="field">
         <span>Household name</span>
         <input
+          key={sync?.paired ? (sync.household ?? '') : settings.household.name}
           className="input"
-          defaultValue={settings.household.name}
+          // With local sync, the household's name is the owner phone's to change (0.8.5).
+          disabled={!!sync?.paired && !sync.isOwner}
+          defaultValue={sync?.paired && sync.household ? sync.household : settings.household.name}
           onBlur={(e) => {
             const name = e.target.value.trim() || 'Our house';
             void updateSettings({ household: { name } });
@@ -64,7 +67,11 @@ export function HouseholdScreen() {
           }}
         />
       </label>
-      <p className="small">Made for you automatically. Rename it any time.</p>
+      <p className="small">
+        {sync?.paired && !sync.isOwner
+          ? `Shared by your household. Only the owner phone${sync.members?.find((m) => m.owner) ? ` (${sync.members.find((m) => m.owner)!.name})` : ''} can rename it.`
+          : 'Made for you automatically. Rename it any time.'}
+      </p>
 
       <div className="eyebrow">Phones</div>
       <div className="card flush">

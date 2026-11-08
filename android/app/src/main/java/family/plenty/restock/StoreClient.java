@@ -377,8 +377,8 @@ final class StoreClient {
     }
 
     static Quote mapWoolworths(JSONObject p) {
-        Double price = num(p.opt("Price"));
-        if (price == null) price = num(p.opt("InstorePrice"));
+        Double price = positive(num(p.opt("Price")));
+        if (price == null) price = positive(num(p.opt("InstorePrice")));
         if (price == null) return null;
         Double was = num(p.opt("WasPrice"));
         if (was == null) was = num(p.opt("InstoreWasPrice"));
@@ -388,8 +388,15 @@ final class StoreClient {
         q.special = p.optBoolean("IsOnSpecial") || p.optBoolean("IsHalfPrice") || p.optBoolean("InstoreIsOnSpecial") || q.was != null;
         String promo = str(p, "PromotionDescription");
         if (promo == null && p.optBoolean("IsHalfPrice")) promo = "1/2 price";
+        // The tag on the product tile ("<b>Member Price</b>"), without its markup (woolworths.ts).
+        JSONObject centreTag = p.optJSONObject("CentreTag");
+        Object tagContent = centreTag != null ? centreTag.opt("TagContent") : null;
+        if (promo == null && tagContent instanceof String) {
+            String t = ((String) tagContent).replaceAll("<[^>]+>", "").trim();
+            if (!t.isEmpty()) promo = t;
+        }
         q.promo = promo;
-        q.member = p.optBoolean("IsMemberPrice") || (q.promo != null && MEMBER_TEXT.matcher(q.promo).find());
+        q.member = p.optBoolean("IsMemberPrice") || (q.promo != null && MEMBER_TEXT.matcher(q.promo).find()) || looksMember(p.opt("MemberPriceData"));
         String img = str(p, "MediumImageFile");
         q.imageUrl = img != null ? img : str(p, "SmallImageFile");
         q.inStock = Boolean.FALSE.equals(bool(p, "IsInStock")) || Boolean.FALSE.equals(bool(p, "IsAvailable")) ? Boolean.FALSE : first(bool(p, "IsInStock"), bool(p, "IsAvailable"));
@@ -453,7 +460,7 @@ final class StoreClient {
     static Quote mapColes(JSONObject p) {
         JSONObject pricing = p.optJSONObject("pricing");
         if (pricing == null) return null;
-        Double price = num(pricing.opt("now"));
+        Double price = positive(num(pricing.opt("now")));
         if (price == null) return null;
         Double was = num(pricing.opt("was"));
         Quote q = new Quote();
@@ -527,7 +534,11 @@ final class StoreClient {
         if (items == null) return null;
         for (int i = 0; i < items.length(); i++) {
             JSONObject p = items.optJSONObject(i);
-            if (p != null && sku.equals(String.valueOf(p.opt("sku")))) return mapAldi(p);
+            if (p == null) continue;
+            // Some answers carry only "id" (aldi.ts: sku ?? id).
+            Object id = p.opt("sku");
+            if (id == null || id == JSONObject.NULL) id = p.opt("id");
+            if (sku.equals(String.valueOf(id))) return mapAldi(p);
         }
         return null;
     }
@@ -538,7 +549,7 @@ final class StoreClient {
         Double cents = num(priceObj.opt("amountRelevant"));
         if (cents == null) cents = num(priceObj.opt("amount"));
         if (cents == null) cents = num(p.opt("priceAmountCents"));
-        Double price = cents != null ? cents / 100.0 : num(priceObj.opt("amountRelevantDisplay"));
+        Double price = positive(cents != null ? cents / 100.0 : num(priceObj.opt("amountRelevantDisplay")));
         if (price == null) return null;
         Object wasDisplay = priceObj.opt("wasPriceDisplay");
         if (wasDisplay == null || wasDisplay == JSONObject.NULL) wasDisplay = priceObj.opt("strikePriceDisplay");
@@ -595,6 +606,28 @@ final class StoreClient {
             if (v != null) return v;
         }
         return null;
+    }
+
+    /** A price of $0 or less is a placeholder, not a price (otherwise it reads as a 100% off deal). */
+    static Double positive(Double price) {
+        return price != null && price > 0 ? price : null;
+    }
+
+    private static final Pattern MEMBER_VALUE = Pattern.compile("member price|members? only|flybuys member", Pattern.CASE_INSENSITIVE);
+
+    /** Does a store's member price details say it's members only? Mirrors looksMemberOnly in http.ts. */
+    private static boolean looksMember(Object v) {
+        if (v instanceof String) return MEMBER_TEXT.matcher((String) v).find();
+        if (!(v instanceof JSONObject)) return false;
+        JSONObject o = (JSONObject) v;
+        Iterator<String> keys = o.keys();
+        while (keys.hasNext()) {
+            String k = keys.next();
+            Object x = o.opt(k);
+            if (k.toLowerCase().contains("member") && Boolean.TRUE.equals(x)) return true;
+            if (x instanceof String && MEMBER_VALUE.matcher((String) x).find()) return true;
+        }
+        return false;
     }
 
     private static boolean hasMemberFlag(JSONObject o) {

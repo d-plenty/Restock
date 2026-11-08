@@ -24,7 +24,9 @@ type Raw = Record<string, unknown>;
 export function mapWoolworths(p: Raw): StoreProduct | undefined {
   const id = p.Stockcode ?? p.stockcode;
   if (id === undefined || id === null) return undefined;
-  const price = num(p.Price) ?? num(p.InstorePrice);
+  // A price of $0 or less is a placeholder, not a price (it would read as 100% off). Same in StoreClient.java.
+  const positive = (n?: number) => (n !== undefined && n > 0 ? n : undefined);
+  const price = positive(num(p.Price)) ?? positive(num(p.InstorePrice));
   const was = num(p.WasPrice) ?? num(p.InstoreWasPrice);
   const isSpecial = p.IsOnSpecial === true || p.IsHalfPrice === true || p.InstoreIsOnSpecial === true || (!!was && !!price && was > price);
   const centreTag = (p.CentreTag as Raw | undefined)?.TagContent;
@@ -71,14 +73,17 @@ export function flattenWoolworths(data: Raw): StoreProduct[] {
   return out;
 }
 
-function searchBody(term: string) {
+/** Results per page; "Show more" asks for the next page (0.8.5). */
+export const WOOLWORTHS_PAGE = 36;
+
+function searchBody(term: string, page = 1) {
   const location = `/shop/search/products?searchTerm=${encodeURIComponent(term)}`;
   return {
     location,
     body: {
       SearchTerm: term,
-      PageNumber: 1,
-      PageSize: 36,
+      PageNumber: page,
+      PageSize: WOOLWORTHS_PAGE,
       SortType: 'TraderRelevance',
       Location: location,
       IsSpecial: false,
@@ -91,33 +96,34 @@ function searchBody(term: string) {
   };
 }
 
-async function searchOnce(term: string): Promise<StoreProduct[]> {
-  const { location, body } = searchBody(term);
+async function searchOnce(term: string, page = 1): Promise<StoreProduct[]> {
+  const { location, body } = searchBody(term, page);
   const res = await request({ url: `${BASE}/apis/ui/Search/products`, method: 'POST', headers: apiHeaders(`${BASE}${location}`), body });
   return flattenWoolworths(parseJson<Raw>(NAME, res));
 }
 
 /** Backup: the same search, made from inside woolworths.com.au in a hidden browser. */
-async function searchBrowser(term: string): Promise<StoreProduct[]> {
-  const res = await viaBrowser('woolworths', 'POST', '/apis/ui/Search/products', searchBody(term).body);
+async function searchBrowser(term: string, _storeId?: string, page = 1): Promise<StoreProduct[]> {
+  const res = await viaBrowser('woolworths', 'POST', '/apis/ui/Search/products', searchBody(term, page).body);
   return flattenWoolworths(parseJson<Raw>(NAME, res));
 }
 
 export const woolworths: StoreAdapter = {
   chain: 'woolworths',
 
-  async search(term) {
+  async search(term, _storeId, page = 1) {
     await ensureSession();
     try {
-      return await searchOnce(term);
+      return await searchOnce(term, page);
     } catch (e) {
       // Cookies expire; get a fresh session and try once more.
       await ensureSession(true);
       void e;
-      return searchOnce(term);
+      return searchOnce(term, page);
     }
   },
   searchBrowser,
+  pages: true,
 };
 
 // ---------- this week's half price ----------

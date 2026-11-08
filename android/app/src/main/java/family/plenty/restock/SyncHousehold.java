@@ -23,7 +23,7 @@ import org.json.JSONObject;
  * Stored on this phone only (sync_meta): key, keyv, oldkey and oldkey_until (owner), secret,
  * owner_secrets (owner), pair_token and pair_until (owner, while a code is open).
  * Shared by all phones (the synced household table): name, owner, member:<device>,
- * removed:<device>, handover:<device>.
+ * removed:<device>, handover:<device>, and tabs (0.8.5: which tabs the household shares).
  *
  * No Android classes here, so it's tested on a computer too (with SyncEngine and SyncWire).
  */
@@ -139,6 +139,11 @@ final class SyncHousehold {
 
     /** Starts a household with this phone as its owner. */
     void create(String name, String myName) throws Exception {
+        create(name, myName, null);
+    }
+
+    /** As above, sharing `tabs` (null: all three). */
+    void create(String name, String myName, java.util.Set<String> tabs) throws Exception {
         if (paired()) return;
         e.setMeta("key", SyncWire.encodeKey(SyncWire.newKey()));
         e.setMeta("keyv", "1");
@@ -149,6 +154,18 @@ final class SyncHousehold {
         setRow("name", name == null || name.trim().isEmpty() ? "Our house" : name.trim());
         setRow("owner", me);
         setRow("member:" + me, member(e.name()));
+        java.util.Set<String> t = tabs == null || tabs.isEmpty() ? SyncEngine.parseTabs((String) null) : tabs;
+        setRow("tabs", SyncEngine.joinTabs(t));
+        e.setMeta("tabs", null);
+        e.noteTabs();
+    }
+
+    /** Owner: which tabs the household shares. */
+    void setHouseholdTabs(java.util.Set<String> tabs) throws Exception {
+        if (!isOwner()) throw new IllegalStateException("Only the owner phone can change what the household shares.");
+        if (tabs.isEmpty()) throw new IllegalArgumentException("Pick at least one thing to share.");
+        setRow("tabs", SyncEngine.joinTabs(tabs));
+        e.noteTabs();
     }
 
     private static String member(String name) throws Exception {
@@ -202,6 +219,26 @@ final class SyncHousehold {
      * household key, and leaves this phone's secret with the owner. Answers what the owner sent
      * (household name, owner, its settings when asked for).
      */
+    /** Thrown with what the owner phone said (a full household, a used code), not a connection problem. */
+    static final class OwnerSaid extends IllegalStateException {
+        OwnerSaid(String m) {
+            super(m);
+        }
+    }
+
+    /**
+     * 0.8.5: before joining, asks the owner what the household is: its name, the owner's name, what
+     * it shares and the owner's settings. Doesn't use the code up.
+     */
+    JSONObject peek(SyncEngine.Transport t) throws Exception {
+        JSONObject m = new JSONObject();
+        m.put("op", "peek");
+        m.put("device", e.device());
+        JSONObject r = t.send(m);
+        if (r.has("error")) throw new OwnerSaid(r.getString("error"));
+        return r;
+    }
+
     JSONObject join(SyncEngine.Transport t, boolean wantSettings) throws Exception {
         String secret = b64(random(32));
         JSONObject m = new JSONObject();
@@ -211,7 +248,7 @@ final class SyncHousehold {
         m.put("secret", secret);
         m.put("settings", wantSettings);
         JSONObject r = t.send(m);
-        if (r.has("error")) throw new IllegalStateException(r.getString("error"));
+        if (r.has("error")) throw new OwnerSaid(r.getString("error"));
         SyncWire.decodeKey(r.getString("key"));
         e.setMeta("key", r.getString("key"));
         e.setMeta("keyv", String.valueOf(r.optInt("keyv", 1)));
@@ -227,10 +264,21 @@ final class SyncHousehold {
         String device = req.optString("device");
         JSONObject res = new JSONObject();
         if (which == PAIRING) {
-            if (!"join".equals(req.optString("op"))) return res.put("error", "Use the code to join first.");
+            String op = req.optString("op");
+            if (!"join".equals(op) && !"peek".equals(op)) return res.put("error", "Use the code to join first.");
             if (openPairingKey() == null || !isOwner()) return res.put("error", "That code has run out. Make a new one on the owner phone.");
-            closeInvite(); // one use only
             if (members().size() >= MAX_PHONES) return res.put("error", FULL);
+            if ("peek".equals(op)) {
+                res.put("household", e.householdValue("name"));
+                res.put("ownerName", e.name());
+                res.put("tabs", SyncEngine.tabsJson(e.householdTabs()));
+                if (settings != null) {
+                    String st = settings.settings();
+                    if (st != null) res.put("settings", st);
+                }
+                return res;
+            }
+            closeInvite(); // one use only
             String name = req.optString("name", "Phone");
             JSONObject s = secrets();
             s.put(device, req.getString("secret"));
@@ -261,7 +309,8 @@ final class SyncHousehold {
             res.put("rekey", b64(SyncWire.seal(unb64(secret), k)));
             return res;
         }
-        if (e.householdValue("removed:" + device) != null) {
+        // Only the owner says a phone was removed: another phone may not have heard it was let back in.
+        if (isOwner() && e.householdValue("removed:" + device) != null) {
             res.put("device", e.device());
             return res.put("removed", true);
         }
@@ -298,8 +347,9 @@ final class SyncHousehold {
     }
 
     /**
-     * Owner: makes another phone the owner. The phones' secrets go to it sealed with its own
-     * secret, inside the household record, so only it can open them.
+     * Owner: asks another phone to be the owner (0.8.5: this phone stays the owner until that one
+     * takes over at its next sync, so nothing is stuck if it never does; cancelHandOver() undoes it).
+     * The phones' secrets go to it sealed with its own secret, inside the household record.
      */
     void handOver(String device) throws Exception {
         if (!isOwner()) throw new IllegalStateException("Only the owner phone can do that.");
@@ -317,26 +367,51 @@ final class SyncHousehold {
         }
         String blob = b64(SyncWire.seal(unb64(theirs), give));
         e.db.transaction(() -> {
+            for (JSONObject r : e.db.query("SELECT k FROM household WHERE k LIKE 'handover:%'")) deleteRow(r.getString("k"));
             setRow("handover:" + device, blob);
-            setRow("owner", device);
-            e.setMeta("owner_secrets", null);
-            e.setMeta("oldkey", null);
             closeInvite();
         });
     }
 
-    /** After a sync: if this phone was just made the owner, take over the phones' secrets. */
+    /** The phone the owner asked to take over, while it hasn't yet. */
+    String handingOverTo() throws Exception {
+        for (JSONObject r : e.db.query("SELECT k FROM household WHERE k LIKE 'handover:%'")) return r.getString("k").substring("handover:".length());
+        return null;
+    }
+
+    /** Owner: never mind, stay the owner. */
+    void cancelHandOver() throws Exception {
+        if (!isOwner()) throw new IllegalStateException("Only the owner phone can do that.");
+        for (JSONObject r : e.db.query("SELECT k FROM household WHERE k LIKE 'handover:%'")) deleteRow(r.getString("k"));
+    }
+
+    /**
+     * After a sync: if the owner asked this phone to take over, take the phones' secrets and
+     * become the owner. And a phone that was the owner lets go of the secrets once another took over.
+     */
     boolean takeHandover() throws Exception {
         String me = e.device();
         String blob = e.householdValue("handover:" + me);
-        if (blob == null || !me.equals(owner())) return false;
-        JSONObject give = SyncWire.open(unb64(e.meta("secret")), unb64(blob));
-        e.setMeta("owner_secrets", give.getJSONObject("secrets").toString());
-        if (give.has("oldkey")) {
-            e.setMeta("oldkey", give.getString("oldkey"));
-            e.setMeta("oldkey_until", give.optString("oldkey_until"));
+        if (blob == null || me.equals(owner())) {
+            if (!me.equals(owner()) && e.meta("owner_secrets") != null && owner() != null) {
+                // Another phone took over from this one.
+                e.setMeta("owner_secrets", null);
+                e.setMeta("oldkey", null);
+                closeInvite();
+                return true;
+            }
+            return false;
         }
-        deleteRow("handover:" + me);
+        JSONObject give = SyncWire.open(unb64(e.meta("secret")), unb64(blob));
+        e.db.transaction(() -> {
+            e.setMeta("owner_secrets", give.getJSONObject("secrets").toString());
+            if (give.has("oldkey")) {
+                e.setMeta("oldkey", give.getString("oldkey"));
+                e.setMeta("oldkey_until", give.optString("oldkey_until"));
+            }
+            setRow("owner", me);
+            deleteRow("handover:" + me);
+        });
         return true;
     }
 
@@ -387,9 +462,19 @@ final class SyncHousehold {
         return true;
     }
 
-    /** Forgets the household on this phone (keys, secrets, phones), keeping everything else. */
+    /**
+     * Forgets the household on this phone (keys, secrets, phones, and the household record, so a
+     * new household starts clean), keeping everything else.
+     */
     void forget() throws Exception {
-        for (String k : new String[] { "key", "keyv", "oldkey", "oldkey_until", "secret", "owner_secrets", "pair_token", "pair_until", "invite" }) e.setMeta(k, null);
+        for (String k : new String[] { "key", "keyv", "oldkey", "oldkey_until", "secret", "owner_secrets", "pair_token", "pair_until", "invite", "household", "tabs", "tabs_eff" })
+            e.setMeta(k, null);
+        e.db.transaction(() -> {
+            e.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
+            e.db.exec("DELETE FROM household");
+            e.db.exec("DELETE FROM sync_log WHERE tbl = 'household'");
+            e.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
+        });
         e.db.exec("DELETE FROM sync_peers");
     }
 
