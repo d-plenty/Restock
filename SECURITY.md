@@ -1,6 +1,6 @@
 # Security
 
-Restock keeps everything on your phone, but it still handles things worth protecting: loyalty card numbers, receipts, backups and, if you use it, a shop sign-in for sending your list to Woolworths.
+Restock keeps everything on your phone, but it still handles things worth protecting: loyalty card numbers, receipts, backups, a Woolworths sign-in if you use one, and the encrypted link between your household's phones if you use local sync.
 
 ## Reporting a problem
 
@@ -17,6 +17,7 @@ You'll get a reply as soon as possible, usually within a week. Once it's fixed, 
 - A way for another app, website or person to read Restock's data, backups or receipt photos.
 - Restock sending anything somewhere the privacy policy doesn't say it does.
 - A shop's page or a backup file being able to run code or change the app.
+- A way to read or change what local sync sends between phones, join a household without the owner's one-time code, or keep syncing after being removed.
 - Problems in how official releases are signed or published.
 
 A shop's website blocking Restock, or wrong prices, aren't security problems: please use the normal issue forms for those.

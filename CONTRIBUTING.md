@@ -10,9 +10,10 @@ Use the [issue forms](../../issues/new/choose):
 
 - **Bug**: something in the app doesn't work or looks wrong.
 - **Store stopped working**: searching or price checks fail for a supermarket, bottle shop or pharmacy.
+- **Local sync problem**: phones won't pair, can't find each other, or something doesn't sync.
 - **Wrong product or price**: a search result, barcode match or price that doesn't match the shelf.
 
-Please include the app version (Settings, at the very bottom), your phone and Android version, and a screenshot if you can.
+Please include the app version (Settings, at the very bottom), your phone and Android version, and a screenshot if you can. Not sure if it's a bug? Ask in [Discussions → Q&A](../../discussions/categories/q-a) first.
 
 ### A shop isn't working? Send its search details
 
@@ -30,7 +31,7 @@ Issues are public. Leave out loyalty card numbers, backup files, your address an
 
 ## Ideas
 
-Start a thread in [Discussions → Ideas](../../discussions/categories/ideas). Say what you'd like to do in the shop and why; the "why" helps most. The plan is in the README under **What's next**.
+Start a thread in [Discussions → Ideas](../../discussions/categories/ideas). Say what you'd like to do in the shop and why; the "why" helps most. The plan is in the README under **[Coming soon](README.md#coming-soon)**.
 
 ## Know the Apple side?
 
@@ -69,6 +70,7 @@ npm test
 - **Ask for permissions just in time.** A permission is asked for the first time its feature is used, with a plain reason.
 - **Keep the twins in step.** `Deals.java` mirrors `src/lib/verdict.ts`, `StoreClient.java` mirrors `src/stores/`, and `Shops.java` mirrors `src/shops.ts`. Change both together.
 - **Migrations are append-only.** Add new entries at the end of `MIGRATIONS` in `src/lib/sql/schema.ts`; never edit a shipped one.
+- **Mind local sync.** Tables that sync between phones are listed in `SYNCED` in `src/lib/sql/schema.ts` and in `TABLES` in `SyncEngine.java`; keep the two in step. Phone-only things (look, receipts, backups, shop sign-ins) must never be added to them.
 - **Be gentle with the shops.** Requests go one at a time with a pause between them, and only for items people track. No bulk scraping, and nothing from paywalled or private price databases.
 - **Plain words.** Interface text should be short, friendly and free of jargon. Australian spelling.
 

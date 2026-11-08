@@ -1,0 +1,49 @@
+name: Local sync problem
+description: Phones won't pair, can't find each other, or something doesn't sync
+labels: [sync]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Most "can't find each other" problems are the Wi-Fi: both phones need to be on the same network at the same time, and guest networks or "client isolation" / "AP isolation" on some routers stop phones seeing each other.
+        Please leave out loyalty card numbers, backup files, pairing codes and anything else personal.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What's going wrong?
+      options:
+        - The phones won't pair (the code doesn't work)
+        - Paired, but they never find each other
+        - Something doesn't sync, or syncs wrongly
+        - Adding, removing or changing the owner phone
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead. Any message Restock showed helps.
+    validations:
+      required: true
+  - type: textarea
+    id: phones
+    attributes:
+      label: The phones
+      description: For each phone, the Restock version (Settings, at the very bottom), the phone and Android version, and whether it's the owner.
+      placeholder: |
+        Owner: Restock 0.8.4, Pixel 8, Android 16
+        Member: Restock 0.8.4, Galaxy S23, Android 15
+    validations:
+      required: true
+  - type: input
+    id: wifi
+    attributes:
+      label: Wi-Fi
+      description: Same network on both? Router brand or mesh system if you know it. Guest network, VPN or Private DNS on either phone?
+      placeholder: Same network, TP-Link Deco mesh, no VPN
+  - type: textarea
+    id: shots
+    attributes:
+      label: Screenshots
+      description: The Local sync screen on each phone helps. Crop out anything private.
