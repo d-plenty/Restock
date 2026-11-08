@@ -79,13 +79,23 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
       if (!busy && video.readyState >= 2 && video.videoWidth) {
         busy = true;
         try {
-          // Scale big frames down: faster to decode, still plenty of detail.
-          const scale = Math.min(1, 1000 / video.videoWidth);
-          canvas.width = Math.round(video.videoWidth * scale);
-          canvas.height = Math.round(video.videoHeight * scale);
           const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const text = await decodeFrame(ctx.getImageData(0, 0, canvas.width, canvas.height));
+          let text: string | undefined;
+          if (kind?.qr) {
+            // A QR code on another phone's screen: the middle of the picture at full detail (0.8.1).
+            const side = Math.round(Math.min(video.videoWidth, video.videoHeight) * 0.9);
+            canvas.width = side;
+            canvas.height = side;
+            ctx.drawImage(video, (video.videoWidth - side) / 2, (video.videoHeight - side) / 2, side, side, 0, 0, side, side);
+            text = await decodeFrame(ctx.getImageData(0, 0, side, side), true);
+          } else {
+            // Scale big frames down: faster to decode, still plenty of detail.
+            const scale = Math.min(1, 1000 / video.videoWidth);
+            canvas.width = Math.round(video.videoWidth * scale);
+            canvas.height = Math.round(video.videoHeight * scale);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            text = await decodeFrame(ctx.getImageData(0, 0, canvas.width, canvas.height));
+          }
           if (text) {
             const code = read(text);
             if (code) {
@@ -115,8 +125,8 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
           audio: false,
           video: {
             facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: kind?.qr ? 1920 : 1280 },
+            height: { ideal: kind?.qr ? 1080 : 720 },
           },
         });
         if (stopped) return stream.getTracks().forEach((t) => t.stop());
@@ -193,7 +203,7 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
           <span style={{ width: 44 }} />
         )}
       </div>
-      <div className="scanner-frame" aria-hidden="true" />
+      <div className={`scanner-frame${kind?.qr ? ' square' : ''}`} aria-hidden="true" />
       <div className="scanner-bottom">
         {notice ? (
           <p className="scanner-msg warn" role="status">

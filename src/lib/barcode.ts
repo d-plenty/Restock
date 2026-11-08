@@ -95,12 +95,13 @@ export function productCode(raw: string): string | undefined {
   return undefined;
 }
 
-/** Decode the first barcode in a camera frame, if there is one. */
-export async function decodeFrame(image: ImageData): Promise<string | undefined> {
+/** Decode the first barcode in a camera frame, if there is one. qrOnly: just QR codes (sync pairing), trying harder. */
+export async function decodeFrame(image: ImageData, qrOnly = false): Promise<string | undefined> {
   const { readBarcodes } = await loadReader();
   const results = await readBarcodes(image, {
-    formats: [...SCAN_FORMATS],
+    formats: qrOnly ? ['QRCode'] : [...SCAN_FORMATS],
     tryHarder: true,
+    ...(qrOnly ? { tryInvert: true, tryRotate: true, tryDownscale: true } : {}),
     maxNumberOfSymbols: 1,
   });
   const hit = results.find((r) => r.isValid && r.text);
@@ -150,6 +151,8 @@ export interface ScanKind {
   wrong: string;
   /** Hint in the "type it" box. */
   typeHint: string;
+  /** A QR code rather than a barcode: square box, sharper look at the middle of the picture. */
+  qr?: boolean;
 }
 
 export type ScanRequest = { title: string; kind?: ScanKind; resolve: (o: ScanOutcome) => void };

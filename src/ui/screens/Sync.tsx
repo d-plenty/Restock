@@ -20,7 +20,7 @@ function PairingQr({ code }: { code: string }) {
     void (async () => {
       const [mod, { default: wasmUrl }] = await Promise.all([import('zxing-wasm/writer'), import('zxing-wasm/writer/zxing_writer.wasm?url')]);
       mod.prepareZXingModule({ overrides: { locateFile: (path: string, prefix: string) => (path.endsWith('.wasm') ? wasmUrl : prefix + path) } });
-      const r = await mod.writeBarcode(code, { format: 'QRCode', options: 'ecLevel=M', scale: 6 } as never);
+      const r = await mod.writeBarcode(code, { format: 'QRCode', options: 'ecLevel=M', scale: 8 } as never);
       if (alive && r.svg) setSvg(r.svg);
     })().catch((e) => console.error('qr', e));
     return () => {
@@ -31,6 +31,48 @@ function PairingQr({ code }: { code: string }) {
     <div className="sync-qr" role="img" aria-label="Pairing QR code">
       {svg ? <span dangerouslySetInnerHTML={{ __html: svg }} /> : <LoadingBar seconds={3} />}
     </div>
+  );
+}
+
+/**
+ * The pairing code as text, for when the camera won't read the QR code (0.8.1): send it to the
+ * other phone in a message and paste it into Join a household → "Or paste the code".
+ */
+function CodeText({ code }: { code: string }) {
+  const nav = useNav();
+  const share = async () => {
+    try {
+      const { Share } = await import('@capacitor/share');
+      await Share.share({ title: 'Restock sync code', text: code });
+    } catch {
+      // cancelled
+    }
+  };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      nav.toast('Code copied');
+    } catch {
+      void share();
+    }
+  };
+  return (
+    <details className="sync-code">
+      <summary className="small">Can't scan it? Send the code instead</summary>
+      <p className="small">
+        Send this to the other phone (a text message to yourself is fine), copy it, then on that phone tap Join a household and paste it into "Or
+        paste the code". Keep it private, like a Wi-Fi password.
+      </p>
+      <code className="sync-code-text">{code}</code>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn small" onClick={() => void copy()}>
+          Copy
+        </button>
+        <button className="btn small" onClick={() => void share()}>
+          <Icon name="share" size={16} /> Send
+        </button>
+      </div>
+    </details>
   );
 }
 
@@ -110,9 +152,10 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
       {code && (
         <>
           <PairingQr code={code} />
+          <CodeText code={code} />
           <ol className="small" style={{ margin: 0, paddingLeft: 18 }}>
             <li>Put both phones on the same Wi-Fi.</li>
-            <li>On the other phone, update to Restock 0.8.0 or newer, then open Settings → Sync → Join a household.</li>
+            <li>On the other phone, update to Restock 0.8.1 or newer, then open Settings → Sync → Join a household.</li>
             <li>Scan this code. The phones sync straight away, then whenever they're both on this Wi-Fi.</li>
           </ol>
           {joined ? (
@@ -229,6 +272,7 @@ export function SyncScreen() {
   const scan = async () => {
     const out = await scanBarcode('Scan the other phone’s sync code', {
       accept: pairingCode,
+      qr: true,
       wrong: "That isn't a Restock sync code. On the other phone, open Settings → Sync → Start a household (or Add a phone).",
       typeHint: 'Or paste the code',
     });

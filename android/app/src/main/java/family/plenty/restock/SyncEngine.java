@@ -307,6 +307,7 @@ final class SyncEngine {
         switch (op) {
             case "hello":
                 notePeer(peer, req.optString("name", null), fromHost, req.optInt("port", 0));
+                res.put("household", meta("household"));
                 res.put("got", gotFrom(peer));
                 return res;
             case "pull": {
@@ -335,6 +336,7 @@ final class SyncEngine {
     static final class Result {
         String peer;
         String peerName;
+        String household;
         int received;
         int sent;
     }
@@ -354,6 +356,7 @@ final class SyncEngine {
         Result r = new Result();
         r.peer = h.optString("device");
         r.peerName = h.optString("name", null);
+        r.household = h.isNull("household") ? null : h.optString("household", null);
         if (r.peer.isEmpty() || r.peer.equals(me)) return r;
         notePeer(r.peer, r.peerName, null, 0);
 

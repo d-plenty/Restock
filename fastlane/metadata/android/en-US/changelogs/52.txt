@@ -1,0 +1,3 @@
+• Sync pairing: a smaller, easier QR code and a square scanner that reads it from another phone's screen
+• Can't scan? Copy or send the code and paste it on the other phone
+• Both phones need 0.8.1 to pair

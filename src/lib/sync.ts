@@ -9,12 +9,14 @@ export type { SyncInfo };
 
 /** A sync pairing code, or undefined if the scanned text isn't one. */
 export function pairingCode(text: string): string | undefined {
-  const t = text.trim();
-  return /^RESTOCK-SYNC:\d+:[A-Za-z0-9_-]{43}:/.test(t) ? t : undefined;
+  const t = text.trim().replace(/\s+/g, '');
+  if (/^RESTOCK:\d+:[A-Z2-7]{52}(:|$)/i.test(t)) return t.toUpperCase(); // 0.8.1's short code
+  return /^RESTOCK-SYNC:\d+:[A-Za-z0-9_-]{43}:/.test(t) ? t : undefined; // 0.8.0's
 }
 
 /** The household name inside a pairing code. */
 export function householdIn(code: string): string {
+  if (!code.startsWith('RESTOCK-SYNC:')) return ''; // the short code doesn't carry it; the first sync does
   try {
     return decodeURIComponent(code.split(':').slice(5).join(':').replace(/\+/g, ' '));
   } catch {

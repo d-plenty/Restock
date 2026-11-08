@@ -118,28 +118,50 @@ final class SyncHub {
         return pairingCode();
     }
 
-    /** RESTOCK-SYNC:1:key:ip:port:household — scanned by the other phone (Settings → Sync). */
+    /**
+     * RESTOCK:2:KEY:IP:PORT, scanned by the other phone (0.8.1). Only capitals, digits and
+     * punctuation a QR code packs tightly, so the code is small and easy to scan off a screen.
+     * The household's name comes over in the first sync instead.
+     */
     String pairingCode() throws Exception {
         String ip = localIp();
-        String household = engine.meta("household");
-        return "RESTOCK-SYNC:1:" + engine.meta("key") + ":" + (ip == null ? "" : ip) + ":" + (server == null ? 0 : server.port()) + ":"
-            + URLEncoder.encode(household == null ? "" : household, "UTF-8");
+        return "RESTOCK:2:" + SyncWire.base32(SyncWire.decodeKey(engine.meta("key"))) + ":" + (ip == null ? "" : ip) + ":"
+            + (server == null ? 0 : server.port());
     }
 
     /** Joins the household in a scanned code. `replace`: this phone starts from the household's things. */
     void join(String code, boolean replace, boolean shareCards) throws Exception {
-        String[] p = code.trim().split(":", 6);
-        if (p.length < 6 || !"RESTOCK-SYNC".equals(p[0])) throw new IllegalArgumentException("That isn't a Restock sync code.");
-        if (!"1".equals(p[1])) throw new IllegalArgumentException("That code is from a newer Restock. Update this phone first.");
-        SyncWire.decodeKey(p[2]); // throws if it's damaged
+        String c = code.trim();
+        String key;
+        String host = "";
+        String port = "0";
+        String household = "";
+        String[] p = c.split(":", 6);
+        if (p.length >= 3 && "RESTOCK".equalsIgnoreCase(p[0]) && "2".equals(p[1])) {
+            key = SyncWire.encodeKey(SyncWire.unbase32(p[2]));
+            if (p.length >= 5) {
+                host = p[3];
+                port = p[4];
+            }
+        } else if (p.length >= 6 && "RESTOCK-SYNC".equals(p[0]) && "1".equals(p[1])) {
+            // 0.8.0's longer code
+            key = p[2];
+            host = p[3];
+            port = p[4];
+            household = URLDecoder.decode(p[5], "UTF-8");
+        } else if (p.length >= 2 && p[0].toUpperCase(Locale.ROOT).startsWith("RESTOCK")) {
+            throw new IllegalArgumentException("That code is from a newer Restock. Update this phone first.");
+        } else {
+            throw new IllegalArgumentException("That isn't a Restock sync code.");
+        }
+        SyncWire.decodeKey(key); // throws if it's damaged
         stop();
         if (replace) engine.clearForJoin();
-        engine.setMeta("key", p[2]);
-        String household = URLDecoder.decode(p[5], "UTF-8");
+        engine.setMeta("key", key);
         if (!household.isEmpty()) engine.setMeta("household", household);
         engine.setShareCards(shareCards);
         if (engine.meta("name") == null) engine.setMeta("name", defaultName());
-        if (!p[3].isEmpty()) engine.setMeta("invite", p[3] + ":" + p[4]);
+        if (!host.isEmpty() && !"0".equals(port)) engine.setMeta("invite", host + ":" + port);
         start();
     }
 
@@ -397,6 +419,8 @@ final class SyncHub {
                     SyncEngine.Result r = engine.syncWith(c, nowIso(), port());
                     if (r.peer == null || r.peer.isEmpty() || r.peer.equals(engine.device()) || !done.add(r.peer)) continue;
                     engine.notePeer(r.peer, r.peerName, host, port);
+                    // A phone that joined with a short code learns the household's name here.
+                    if (engine.meta("household") == null && r.household != null && !r.household.isEmpty()) engine.setMeta("household", r.household);
                     s.reached++;
                     s.received += r.received;
                     s.sent += r.sent;

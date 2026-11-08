@@ -3321,3 +3321,27 @@ details.fold-inline {
   height: 100%;
   display: block;
 }
+/* 0.8.1: a square box for QR codes (the sync pairing code). */
+.scanner-frame.square {
+  width: min(70vw, 300px);
+  height: min(70vw, 300px);
+}
+.sync-code {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sync-code summary {
+  cursor: pointer;
+  color: var(--green);
+  font-weight: 700;
+}
+.sync-code-text {
+  display: block;
+  word-break: break-all;
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--card-2, rgba(0, 0, 0, 0.05));
+  user-select: all;
+}

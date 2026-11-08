@@ -51,6 +51,42 @@ final class SyncWire {
         return k;
     }
 
+    private static final String B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+    /** The key as capitals and digits (RFC 4648 base32, no padding), for a compact QR code. */
+    static String base32(byte[] b) {
+        StringBuilder sb = new StringBuilder();
+        int buffer = 0;
+        int bits = 0;
+        for (byte x : b) {
+            buffer = (buffer << 8) | (x & 0xff);
+            bits += 8;
+            while (bits >= 5) {
+                sb.append(B32.charAt((buffer >> (bits - 5)) & 31));
+                bits -= 5;
+            }
+        }
+        if (bits > 0) sb.append(B32.charAt((buffer << (5 - bits)) & 31));
+        return sb.toString();
+    }
+
+    static byte[] unbase32(String s) {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        int buffer = 0;
+        int bits = 0;
+        for (char ch : s.trim().toUpperCase(java.util.Locale.ROOT).toCharArray()) {
+            int v = B32.indexOf(ch);
+            if (v < 0) throw new IllegalArgumentException("That code is damaged. Scan it again.");
+            buffer = (buffer << 5) | v;
+            bits += 5;
+            if (bits >= 8) {
+                out.write((buffer >> (bits - 8)) & 0xff);
+                bits -= 8;
+            }
+        }
+        return out.toByteArray();
+    }
+
     /** A short, public name for the household, so phones can find each other without showing the key. */
     static String householdId(byte[] key) {
         try {
