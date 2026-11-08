@@ -753,11 +753,6 @@ details.dropdown[open] > summary {
 }
 
 /* .seg and .seg button are defined once, further down (forms). */
-.seg button.on {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-}
 .seg .count {
   font-size: 12px;
   color: var(--muted);
@@ -775,7 +770,7 @@ details.dropdown[open] > summary {
 .chip {
   height: 36px;
   padding: 0 14px;
-  border-radius: 18px;
+  border-radius: 12px;
   border: 1px solid var(--line-2);
   background: var(--surface);
   color: var(--ink);
@@ -785,10 +780,15 @@ details.dropdown[open] > summary {
   flex-shrink: 0;
 }
 
+.chip:active:not([aria-pressed='true']):not(.selectbar .chip) {
+  background: var(--line);
+}
+
 .chip[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--on-ink);
-  border-color: var(--ink);
+  background: var(--surface);
+  color: var(--green-ink);
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
 }
 
 .chip.add {
@@ -885,9 +885,11 @@ details.dropdown[open] > summary {
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   gap: 4px;
-  padding: 4px;
+  padding: 3px;
   border-radius: 14px;
-  background: var(--seg);
+  /* A white track like the Home tiles, with the picked one outlined in the accent (0.8.9). */
+  background: var(--surface);
+  border: 1px solid var(--line-2);
 }
 
 .seg button {
@@ -909,9 +911,13 @@ details.dropdown[open] > summary {
   white-space: nowrap;
 }
 
-.seg button[aria-pressed='true'] {
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+.seg button[aria-pressed='true'],
+.seg button[aria-checked='true'],
+.seg button[aria-selected='true'],
+.seg button.on {
+  background: var(--green-bg);
+  color: var(--green-ink);
+  box-shadow: inset 0 0 0 1.5px var(--green);
 }
 
 /* ---------- forms ---------- */
@@ -1989,11 +1995,8 @@ table.nutrition td.num {
   padding-bottom: calc(var(--bottom) + 24px);
 }
 
-/* Australian style: gold-tinted chips. */
-:root:not([data-style='plain']) .chip:not([aria-pressed='true']):not(.add) {
-  background: var(--gold-bg);
-  border-color: color-mix(in srgb, var(--gold) 75%, transparent);
-}
+/* Chips are plain surface buttons in every style, like the Home tiles (0.8.9: the gold-tinted
+   ones are gone). */
 
 /* Shop colour dots stay the shop's own colour; in dark mode a thin ring keeps dark ones (Aldi's navy) visible. */
 :root[data-theme='dark'] .chain-dot {
@@ -3315,11 +3318,6 @@ details.fold-inline {
   gap: 6px;
   flex-shrink: 0;
 }
-.deal-shops .chip[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--surface);
-  border-color: var(--ink);
-}
 .deal-shops .chip[aria-pressed='true'] .ph-count {
   color: inherit;
   opacity: 0.8;
@@ -3406,4 +3404,46 @@ details.fold-inline {
 }
 .row.choice.picked .title {
   color: var(--green-ink);
+}
+
+/* An item's size setting (This size / Any size) and its shops with none of your picks (0.8.9). */
+.size-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 14px 10px;
+}
+.size-choice .small {
+  margin: 0;
+}
+.row.shop-gap {
+  gap: 8px;
+}
+.row.shop-gap .btn.small {
+  flex-shrink: 0;
+}
+
+/* True black in dark mode, for OLED screens (0.8.9): every background is black, so those pixels are
+   off. Cards keep a faint edge so they still read as cards. Works with both styles; the navy
+   bars go black too (the gold line and savings banner keep their colour). */
+:root[data-black='1'][data-theme][data-style] {
+  --bg: #000000;
+  --surface: #0a0a0a;
+  --sunken: #141414;
+  --line: #262626;
+  --line-2: #333333;
+  --line-soft: #1a1a1a;
+  --dash: #4a4a4a;
+  --seg: #141414;
+  --on-ink: #000000;
+  --bar: #262626;
+  --tabbar-bg: #000000;
+  --shade-bg: #000000;
+  --shadow: rgba(0, 0, 0, 0);
+}
+:root[data-black='1'][data-contrast='high'][data-theme][data-style] {
+  --muted: var(--ink-2);
+  --line: #4d4d4d;
+  --line-2: #4d4d4d;
+  --dash: var(--ink-2);
 }

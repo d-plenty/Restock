@@ -101,6 +101,14 @@ export interface Group {
   section?: Section;
   /** "Alert me under $X": tell me when any of my shops has it at or below this price. */
   targetPrice?: number;
+  /**
+   * Any size (0.8.9): any pack and any number of them will do, so at each shop Restock works out
+   * the cheapest way to get the amount you usually buy (three 500 g bags instead of a 1.5 kg one).
+   * Off ("This size") means one of your picks, as many as are on the list.
+   */
+  anySize?: boolean;
+  /** Shops you don't buy this at ("Not at this shop", 0.8.9): Restock stops asking you to find it there. */
+  notAt?: string[];
   createdAt: string;
 }
 
@@ -298,7 +306,8 @@ export interface Settings {
   lastCheck?: string;
   demoLoaded?: boolean;
   /** Colours: the Australian style (navy bars, green and gold) or plain; an accent colour; the app icon colour. */
-  look: { style: 'australia' | 'plain'; accent?: string; icon: string };
+  /** `black`: true black in dark mode, for OLED screens (0.8.9). */
+  look: { style: 'australia' | 'plain'; accent?: string; icon: string; black?: boolean };
   /** Accessibility: text size (1 = normal), high contrast, less motion, bigger buttons. */
   a11y: { text: number; contrast: boolean; motion: boolean; big: boolean };
   /** Setup tiles finished or skipped, and whether the "Finish setting up" card was dismissed. */

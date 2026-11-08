@@ -58,10 +58,10 @@ function untilReadable(c: string, against: string, target: number, towards: 'bla
 }
 
 /** The CSS variables for an accent colour, in light or dark mode. Exported for the tests. */
-export function accentVars(accent: string, dark: boolean): Record<string, string> {
+export function accentVars(accent: string, dark: boolean, black = false): Record<string, string> {
   const base = toHex(hex(accent));
-  const surface = dark ? '#111b30' : '#ffffff';
-  const bg = dark ? '#0a1120' : '#f6f4ea';
+  const surface = black ? '#0a0a0a' : dark ? '#111b30' : '#ffffff';
+  const bg = black ? '#000000' : dark ? '#0a1120' : '#f6f4ea';
   // Text-coloured uses (links, labels, active tab) need 4.5:1 against cards and the page.
   const ink = untilReadable(untilReadable(base, surface, 4.5, dark ? 'white' : 'black'), bg, 4.5, dark ? 'white' : 'black');
   return {
@@ -83,8 +83,12 @@ function paint() {
   root.dataset.theme = theme;
   root.dataset.style = look.style;
   const dark = isDark(theme);
+  // True black (0.8.9): only while dark, so "System" still goes light in the day.
+  const black = dark && !!look.black;
+  if (black) root.dataset.black = '1';
+  else delete root.dataset.black;
   for (const k of ACCENT_KEYS) root.style.removeProperty(k);
-  if (look.accent) for (const [k, v] of Object.entries(accentVars(look.accent, dark))) root.style.setProperty(k, v);
+  if (look.accent) for (const [k, v] of Object.entries(accentVars(look.accent, dark, black))) root.style.setProperty(k, v);
   // Accessibility.
   if (a11y.text && a11y.text !== 1) {
     root.dataset.text = String(a11y.text);

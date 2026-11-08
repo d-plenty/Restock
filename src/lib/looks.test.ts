@@ -15,6 +15,14 @@ describe('colours people can pick', () => {
     }
   });
 
+  it('keeps every accent readable on true black (0.8.9)', () => {
+    for (const a of ACCENTS) {
+      const v = accentVars(a.hex, true, true);
+      expect(contrast(v['--green'], '#0a0a0a'), a.name).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(v['--green'], '#000000'), a.name).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it('puts black text on gold and white text on navy', () => {
     expect(textOn('#ffcd00')).toBe('#111111');
     expect(textOn('#012169')).toBe('#ffffff');

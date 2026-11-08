@@ -804,16 +804,23 @@ export function AddScreen({
     try {
       const ids = await saveProducts();
       const all = new Set([attachGroup.usualProductId, ...attachGroup.sameProductIds, ...attachGroup.altProductIds]);
-      const fresh = ids.filter((id) => !all.has(id));
       if (as === 'alt') {
+        const fresh = ids.filter((id) => !all.has(id));
         await updateGroup(attachGroup.id, { altProductIds: [...attachGroup.altProductIds, ...fresh] });
       } else {
+        // One you'd also take, ticked as a pick, moves to My picks (0.8.9).
+        const mains = new Set([attachGroup.usualProductId, ...attachGroup.sameProductIds]);
+        const fresh = ids.filter((id) => !mains.has(id));
+        // A pick ticked at a shop marked "Not at this shop" puts the shop back in (0.8.9).
+        const at = new Set([...picks.values()].map((p) => p.chain));
         await updateGroup(attachGroup.id, {
+          notAt: (attachGroup.notAt ?? []).filter((c) => !at.has(c as Chain)),
           usualProductId: attachGroup.usualProductId ?? fresh[0],
           sameProductIds: [...attachGroup.sameProductIds, ...fresh.filter((id) => id !== (attachGroup.usualProductId ?? fresh[0]))],
+          altProductIds: attachGroup.altProductIds.filter((id) => !fresh.includes(id)),
         });
       }
-      nav.toast(as === 'alt' ? `Alternative added to ${attachGroup.name}` : `Added to ${attachGroup.name}`);
+      nav.toast(as === 'alt' ? `Added to Would also take for ${attachGroup.name}` : `Added to My picks for ${attachGroup.name}`);
       nav.pop();
     } finally {
       setSaving(false);
@@ -918,10 +925,12 @@ export function AddScreen({
     ? as === 'alt'
       ? onlyChain
         ? `Find one at ${chainName(onlyChain)}`
-        : 'Find an alternative'
+        : 'Would also take'
       : another
-        ? 'Add another product'
-        : 'Find at another store'
+        ? 'Add another pick'
+        : onlyChain
+          ? `Find it at ${chainName(onlyChain)}`
+          : 'Find at another store'
     : forList
       ? 'Find the cheapest'
       : 'Add an item';
@@ -933,7 +942,7 @@ export function AddScreen({
         : `Tick ${attachGroup.name} at each store that sells it. Restock then shows you whichever store is cheapest.`
     : forList
       ? 'Tick the ones you’d buy, at any shop. The cheapest of them goes on your shopping list for this trip only.'
-      : 'Tick your product at each store that sells it, so Restock can tell you where it’s cheapest. You can add alternatives later from the item’s page.';
+      : 'Tick what you buy at each store (it can be a different product at each one), so Restock can tell you where it’s cheapest. You can add ones you’d also take later, from the item’s page.';
 
   return (
     <div className="screen">
@@ -1674,7 +1683,7 @@ export function AddScreen({
             </>
           ) : attachGroup ? (
             <button className="btn primary" onClick={saveAttach} disabled={saving}>
-              {as === 'alt' ? `Add as alternative${picks.size > 1 ? 's' : ''}` : `Add to ${attachGroup.name}`}
+              {as === 'alt' ? 'Add to Would also take' : `Add to ${attachGroup.name}`}
             </button>
           ) : (
             <>
@@ -1706,8 +1715,8 @@ export function AddScreen({
                     Swap for bulk packs to save money
                   </span>
                   <span className="small">
-                    Let Restock suggest a bigger pack (like a 6-pack instead of one) when it's cheaper per 100 g. Leave it off if you only ever want
-                    this size.
+                    Let Restock suggest a bigger pack you'd also take (like a 6-pack instead of one) as a swap when it's cheaper per 100 g. Leave it
+                    off if you only ever want this size.
                   </span>
                 </span>
               </label>
@@ -1855,8 +1864,11 @@ function ManualSheet({
     if (p > 0) await addReading({ productId: id, date: nowIso(), price: p, isSpecial: special, memberOnly: false, source: 'manual' });
     if (attachTo) {
       if (as === 'alt') await updateGroup(attachTo.id, { altProductIds: [...attachTo.altProductIds, id] });
-      else if (!attachTo.usualProductId) await updateGroup(attachTo.id, { usualProductId: id });
-      else await updateGroup(attachTo.id, { sameProductIds: [...attachTo.sameProductIds, id] });
+      else {
+        const notAt = (attachTo.notAt ?? []).filter((c) => c !== chain);
+        if (!attachTo.usualProductId) await updateGroup(attachTo.id, { usualProductId: id, notAt });
+        else await updateGroup(attachTo.id, { sameProductIds: [...attachTo.sameProductIds, id], notAt });
+      }
       nav.toast(`Added to ${attachTo.name}`);
       onDone(attachTo.id);
       return;
@@ -1929,7 +1941,7 @@ function ManualSheet({
       )}
       {attachTo ? (
         <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
-          {as === 'alt' ? 'Add as alternative' : `Add to ${attachTo.name}`}
+          {as === 'alt' ? 'Add to Would also take' : `Add to ${attachTo.name}`}
         </button>
       ) : (
         <>

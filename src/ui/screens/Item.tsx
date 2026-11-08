@@ -15,7 +15,7 @@ import {
 } from '../../lib/db';
 import { addGroupToList } from '../../lib/listActions';
 import { MARKET_SOURCE } from '../../lib/market';
-import { genericName } from '../../lib/naming';
+import { genericName, nameHasSize } from '../../lib/naming';
 import { orderOptions, PRODUCT_ORDERS, shopRank } from '../../lib/productOrder';
 import { ensureNotificationPermission, notificationsAllowed, scheduleReminders } from '../../lib/notify';
 import { isNative } from '../../stores/http';
@@ -62,7 +62,8 @@ import {
 } from '../components';
 import { CheapestInfoTag, MemberInfoTag, MultiInfoTag, StockInfoTag, SwapInfoTag, VerdictInfoTag } from '../tagInfo';
 import { useNav } from '../nav';
-import { SECTION_PLACE, searchChainsIn } from '../../shops';
+import { SECTION_PLACE, searchChainsIn, type StoreChain } from '../../shops';
+import { notAtChains } from '../../lib/picks';
 
 const BANNER: Record<Recommendation['action'], string> = {
   buy: 'green',
@@ -176,6 +177,33 @@ function AlertsPrompt({ name }: { name: string }) {
   );
 }
 
+/** The usual amount, for "Any size": "300 g", or the usual product when its amount isn't known. */
+function amountOf(rec: Recommendation): string {
+  const u = usualOption(rec);
+  if (!u) return 'the amount you usually buy';
+  const q = productQty(u.product);
+  if (!q.qty || !q.unit) return `the amount in ${u.product.name}`;
+  if (q.unit === 'ea' && u.product.size) return tidySize(u.product.size, u.product.name) ?? u.product.size;
+  return q.unit === 'g'
+    ? q.qty >= 1000
+      ? `${+(q.qty / 1000).toFixed(2)} kg`
+      : `${Math.round(q.qty)} g`
+    : q.unit === 'ml'
+      ? q.qty >= 1000
+        ? `${+(q.qty / 1000).toFixed(2)} L`
+        : `${Math.round(q.qty)} ml`
+      : `${Math.round(q.qty)} of them`;
+}
+/** Where "This size" takes its amount from: the usual product, with its size when the name doesn't say. */
+function amountFrom(rec: Recommendation): string {
+  const u = usualOption(rec);
+  if (!u) return 'your usual product';
+  const { name, size } = u.product;
+  return size && !nameHasSize(name, size) ? `${name} (${tidySize(size, name) ?? size})` : name;
+}
+const usualOption = (rec: Recommendation) =>
+  rec.options.find((o) => o.product.id === rec.group.usualProductId) ?? rec.options.find((o) => o.role === 'main');
+
 function unitText(o: Option) {
   return [o.unitPrice !== undefined ? formatUnitPrice(o.unitPrice, productQty(o.product).unit) : '', eachText(o)].filter(Boolean).join(' · ');
 }
@@ -233,10 +261,26 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   const from = Date.now() - weeks * 7 * 86_400_000;
   const chartReadings = allReadings.filter((r) => Date.parse(r.date) >= from);
   const stats = chartOption ? withMarket(computeStats(chartReadings), chartOption.product.market) : undefined;
-  // Shops on this item's tab that don't have your product yet (one per website).
+  // Shops you've said you don't buy it at (0.8.9), and the ones on this item's tab with none of
+  // your picks yet (one per website).
+  const chainOf = (id: string) => rec.options.find((o) => o.product.id === id)?.product.chain;
+  const notAt = notAtChains(group, chainOf) as StoreChain[];
   const missingChains = appSettings
-    ? searchChainsIn(appSettings.enabledChains, group.section ?? 'pantry').filter((c) => !mains.some((o) => o.product.chain === c))
+    ? searchChainsIn(appSettings.enabledChains, group.section ?? 'pantry').filter(
+        (c) => !mains.some((o) => o.product.chain === c) && !notAt.includes(c),
+      )
     : [];
+  // "Not at this shop": it stops asking, the shop counts as not having it, and any you'd also take
+  // there go (they'd never come up), with Undo.
+  const notAtShop = async (c: StoreChain) => {
+    const there = alts.filter((o) => o.product.chain === c);
+    const undo = await undoable(async () => {
+      for (const o of there) await removeProductFromGroup((await getGroup(group.id)) ?? group, o.product.id);
+      const now = (await getGroup(group.id)) ?? group;
+      await updateGroup(group.id, { notAt: [...new Set([...(now.notAt ?? []), c])] });
+    }, groupRows([group.id]));
+    nav.toast(`${group.name}: not at ${chainName(c)}`, undo);
+  };
   const searchName = mains[0]?.product.name ?? group.name;
 
   // Checks the list itself, so a double tap adds it once (with its tab's list and a qty).
@@ -446,7 +490,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       <div className="card flush">
         <div className="section-head">
           <span className="title">
-            Your product <HowItWorks />
+            My picks <HowItWorks />
           </span>
           {mains.length > 2 ? (
             <select
@@ -471,6 +515,28 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             {productsAndShops(mains)}
           </p>
         )}
+        {mains.length > 0 && (
+          <div className="size-choice">
+            <div className="seg" role="radiogroup" aria-label="Which sizes">
+              {[false, true].map((any) => (
+                <button
+                  key={String(any)}
+                  role="radio"
+                  aria-checked={!!group.anySize === any}
+                  aria-pressed={!!group.anySize === any}
+                  onClick={() => void updateGroup(group.id, { anySize: any })}
+                >
+                  {any ? 'Any size' : 'This size'}
+                </button>
+              ))}
+            </div>
+            <p className="small">
+              {group.anySize
+                ? `Any of your picks, any size and as many as it takes: at each shop Restock works out the cheapest way to get ${amountOf(rec)}.`
+                : `Amount: from ${amountFrom(rec)}. Shops are compared on that amount, buying one of your picks for each on your list.`}
+            </p>
+          </div>
+        )}
         {mains.map((o) => row(o, mains.length > 1 && o === rec.best && !tiedWithBest(rec).length ? 'cheapest' : undefined))}
         {mains.length > 1 && tiedWithBest(rec).length > 0 && (
           <p className="small" style={{ padding: '0 14px 12px' }}>
@@ -482,25 +548,52 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             Not linked to a store product yet.
           </p>
         )}
-        {missingChains.length > 0 && (
-          <button className="row" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'main', query: searchName })}>
-            <Icon name="plus" size={18} />
+        {missingChains.map((c) => (
+          // A shop on this tab with none of your picks: find it there, or say you don't buy it there.
+          <div className="row shop-gap" key={c}>
+            <ChainDot chain={c} />
             <span className="grow">
-              <span className="title" style={{ fontSize: 14, color: 'var(--green)' }}>
-                Find it at {missingChains.map((c) => chainName(c)).join(' or ')}
+              <span className="title" style={{ fontSize: 14 }}>
+                Not added at {chainName(c)}
               </span>
-              <span className="small">So Restock can tell you which store is cheapest</span>
+              <span className="small">So Restock can tell you which shop is cheapest</span>
             </span>
-          </button>
-        )}
+            <button className="btn small" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'main', chain: c, query: searchName })}>
+              <Icon name="search" size={16} /> Find
+            </button>
+            <button className="btn small" onClick={() => void notAtShop(c)}>
+              Not here
+            </button>
+          </div>
+        ))}
+        {notAt.map((c) => (
+          <div className="row shop-gap" key={c}>
+            <ChainDot chain={c} />
+            <span className="grow">
+              <span className="title" style={{ fontSize: 14 }}>
+                Not at {chainName(c)}
+              </span>
+              <span className="small">You don't buy it there, so {chainName(c)} counts as not having it</span>
+            </span>
+            <button
+              className="btn small"
+              onClick={async () => {
+                const g = (await getGroup(group.id)) ?? group;
+                await updateGroup(group.id, { notAt: (g.notAt ?? []).filter((x) => x !== c) });
+              }}
+            >
+              Buy it here again
+            </button>
+          </div>
+        ))}
         {mains.length > 0 && (
-          // Another product you buy as this item (a second scent of conditioner, say), at any shop,
-          // including ones it's already ticked at.
+          // Another product you buy as this item (a second scent of conditioner, or the Aldi one at
+          // Aldi), at any shop, including ones it's already ticked at.
           <button className="row" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'main', another: true, query: group.name })}>
             <Icon name="plus" size={18} />
             <span className="grow">
               <span className="title" style={{ fontSize: 14, color: 'var(--green)' }}>
-                Add another product
+                Add another pick
               </span>
               <span className="small">
                 Another one you buy as {group.name}, at any shop ({kindOfVariety(group, data.categories)}, say)
@@ -513,18 +606,21 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       <div className="card flush">
         <div className="section-head">
           <span className="title">
-            Alternatives <HowItWorks />
+            Would also take <HowItWorks />
           </span>
           <span className="small">{alts.length || 'None yet'}</span>
         </div>
+        <p className="small" style={{ padding: '0 14px 6px' }}>
+          Only for Swap &amp; save: Restock tells you when one of these is on sale for less than your pick. They don't count when shops are compared.
+        </p>
         {alts.map((o) => row(o, rec.alt === o ? 'swap' : undefined))}
         <button className="row" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'alt', query: group.name })}>
           <Icon name="swap" size={18} />
           <span className="grow">
             <span className="title" style={{ fontSize: 14, color: 'var(--green)' }}>
-              Find an alternative
+              Find one you'd also take
             </span>
-            <span className="small">Another brand or size you'd happily buy instead</span>
+            <span className="small">Another brand or size you'd happily buy instead, when it's cheaper</span>
           </span>
         </button>
       </div>
@@ -583,7 +679,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
         </Sheet>
       )}
       {sheet === 'price' && <PriceSheet options={rec.options} onClose={() => setSheet(undefined)} />}
-      {typeof sheet === 'object' && <OptionSheet group={group} option={sheet.option} onClose={() => setSheet(undefined)} />}
+      {typeof sheet === 'object' && <OptionSheet group={group} option={sheet.option} options={rec.options} onClose={() => setSheet(undefined)} />}
     </div>
   );
 }
@@ -672,7 +768,7 @@ function EditSheet({
           <span className="title" style={{ fontSize: 14 }}>
             Swap for bulk packs to save money
           </span>
-          <span className="small">Off: bigger packs are never suggested, here or on your shopping list.</span>
+          <span className="small">Off: a bigger pack you'd also take is never suggested as a swap. Your own picks always count.</span>
         </span>
       </label>
       <label className="check" style={{ padding: '4px 0' }}>
@@ -770,15 +866,16 @@ function PriceSheet({ options, onClose }: { options: Option[]; onClose: () => vo
   );
 }
 
-function OptionSheet({ group, option, onClose }: { group: Group; option: Option; onClose: () => void }) {
+function OptionSheet({ group, option, options, onClose }: { group: Group; option: Option; options: Option[]; onClose: () => void }) {
   const id = option.product.id;
   const nav = useNav();
   const [looking, setLooking] = useState(false);
   const [qty, setQty] = useState(option.product.qty?.toString() ?? '');
   const [unit, setUnit] = useState(option.product.qtyUnit ?? productQty(option.product).unit ?? 'ea');
   const isAlt = option.role === 'alt';
+  const lastAtShop = !isAlt && options.filter((o) => o.role === 'main' && o.product.chain === option.product.chain).length === 1;
 
-  /** Move between "your product" and "alternatives". */
+  /** Move between My picks and Would also take. */
   const move = async () => {
     const mains = [group.usualProductId, ...group.sameProductIds].filter((x): x is string => !!x && x !== id);
     const alts = group.altProductIds.filter((x) => x !== id);
@@ -808,7 +905,7 @@ function OptionSheet({ group, option, onClose }: { group: Group; option: Option;
         <Icon name="info" size={18} /> Photo and product details
       </button>
       <p className="small">
-        {isAlt ? 'Alternative' : 'Your product'} at {chainName(option.product.chain)}
+        {isAlt ? 'Would also take' : 'My pick'} at {chainName(option.product.chain)}
         {option.product.size ? ` · ${tidySize(option.product.size, option.product.name)}` : ''}
         {option.product.barcode ? ` · barcode ${option.product.barcode}` : ''}
       </p>
@@ -840,8 +937,14 @@ function OptionSheet({ group, option, onClose }: { group: Group; option: Option;
         </button>
       </div>
       <button className="btn" onClick={move}>
-        <Icon name="swap" size={18} /> {isAlt ? 'This is actually my product' : 'Make this an alternative'}
+        <Icon name="swap" size={18} /> {isAlt ? 'Make this one of my picks' : 'Move to Would also take'}
       </button>
+      {!isAlt && lastAtShop && (
+        <p className="small" style={{ marginTop: -6 }}>
+          It's your only pick at {chainName(option.product.chain)}, so moving it means {chainName(option.product.chain)} won't count as having{' '}
+          {group.name} when shops are compared.
+        </p>
+      )}
       <button className="btn danger" onClick={remove}>
         <Icon name="trash" size={18} /> Remove from this item
       </button>
@@ -861,25 +964,34 @@ const isSample = (o: Option) => /\(sample\)/i.test(o.product.name);
  * A picture of the statistics: where today's price sits between the lowest, the usual sale
  * and the normal price, and how much of the time it's on sale.
  */
-/** The "how your product and alternatives work" explanation, from a small ⓘ by the section titles. */
+/** The "how My picks and Would also take work" explanation, from a small ⓘ by the section titles. */
 function HowItWorks() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className="icon-btn inline-info" aria-label="How your product and alternatives work" onClick={() => setOpen(true)}>
+      <button className="icon-btn inline-info" aria-label="How My picks and Would also take work" onClick={() => setOpen(true)}>
         <Icon name="info" size={16} />
       </button>
       {open && (
-        <Sheet title="Your product and alternatives" onClose={() => setOpen(false)}>
+        <Sheet title="My picks and Would also take" onClose={() => setOpen(false)}>
           <p>
-            <strong>Your product</strong> is the thing you actually buy. Link it at every store that sells it, and Restock always shows you the
-            cheapest one. It doesn't matter which shop you normally go to.
+            <strong>My picks</strong> are what you buy at each shop. They can be different at each one: Heinz at Coles and Woolworths, Aldi's own
+            at Aldi. Shops are compared using your picks only, so a shop with none of them counts as not having it.
           </p>
           <p>
-            <strong>Alternatives</strong> are other products you'd be happy with, like a home brand. When your product isn't on sale but an
-            alternative is, and it works out cheaper (per 100 g, per litre or per item), it shows up next to yours as Swap & save.
+            <strong>Would also take</strong> are others you'd happily buy when they're cheaper, like another home brand. They're only for Swap
+            &amp; save: when one is on sale for less than your pick (per 100 g, per litre or per item), it shows up next to yours.
           </p>
-          <p>If both are on sale, your product comes first. Bigger packs only count if you've said yes to bulk packs for this item (Edit).</p>
+          <p>
+            <strong>This size</strong> compares shops on the amount of your usual product, buying one of your picks for each on your list.{' '}
+            <strong>Any size</strong> lets any of your picks, in any size and any number, do: at each shop Restock works out the cheapest way to get
+            that amount, say three small bags instead of one big one.
+          </p>
+          <p>
+            <strong>Not here</strong>, on a shop with none of your picks, tells Restock you don't buy it there. It stops asking you to find it, and
+            that shop counts as not having it.
+          </p>
+          <p>If a pick and one you'd also take are both on sale, your pick comes first. Bigger packs only come up as swaps if you've said yes to bulk packs (Edit).</p>
         </Sheet>
       )}
     </>

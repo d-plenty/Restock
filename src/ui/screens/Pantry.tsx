@@ -269,7 +269,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                 Math.max(...mains.map((o) => o.stats.spanDays)) < LEARNING_DAYS
                   ? 'still learning prices'
                   : '',
-                altCount ? `${altCount} alternative${altCount === 1 ? '' : 's'}` : '',
+                altCount ? `${altCount} would also take` : '',
               ]
                 .filter(Boolean)
                 .join(' · ');

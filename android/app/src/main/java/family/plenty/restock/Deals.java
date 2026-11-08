@@ -210,6 +210,7 @@ public final class Deals {
     private static final Pattern COUNT = Pattern.compile(
         "(\\d+)\\s*(packs?|pk|cans?|bottles?|sheets?|rolls?|ea|each|count|ct|tablets?|tabs|capsules?|pods?|bags?|pieces?|pce|wipes?)\\b");
     private static final Pattern EACH = Pattern.compile("\\b(each|ea)\\b");
+    private static final Pattern SHEETS = Pattern.compile("\\bsheets?\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern PACK_WORD = Pattern.compile("^(packs?|pk|cans?|bottles?)$");
 
     private static Size toBase(double amount, String unit) {
@@ -636,7 +637,9 @@ public final class Deals {
         Set<String> units = new HashSet<>();
         boolean allUnitPrices = true;
         for (Option o : priced) {
-            units.add(o.unit);
+            // Sheets and packs both count, but not the same thing (verdict.ts, 0.8.9).
+            boolean sheets = o.product.qty == null && o.product.size != null && SHEETS.matcher(o.product.size).find();
+            units.add(sheets ? "sheet" : o.unit);
             if (o.unitPrice == null) allUnitPrices = false;
         }
         final boolean byUnit = units.size() == 1 && !units.contains(null) && allUnitPrices;

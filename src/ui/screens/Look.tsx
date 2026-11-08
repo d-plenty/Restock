@@ -48,6 +48,19 @@ export function LookSettings({ settings }: { settings: Settings }) {
         <ThemePicker value={settings.theme} onChange={(theme) => updateSettings({ theme })} />
       </div>
 
+      <label className="check" style={{ padding: 0 }}>
+        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <span className="title" style={{ fontSize: 15 }}>
+            True black in dark mode
+          </span>
+          <span className="small">
+            For OLED screens: the background is pure black, so those pixels switch off. Saves battery and gives deeper contrast.
+            {settings.theme === 'light' ? ' Shows when Light or dark is set to Dark or System.' : ''}
+          </span>
+        </span>
+        <input type="checkbox" checked={!!look.black} onChange={(e) => void setLook({ black: e.target.checked })} />
+      </label>
+
       <div className="field">
         <span>Style</span>
         <div className="seg" role="group" aria-label="Style">
@@ -58,7 +71,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
             Plain
           </button>
         </div>
-        <span className="small">Australian has navy bars with a gold line, gold chips and a navy savings banner. Plain is simpler.</span>
+        <span className="small">Australian has navy bars with a gold line and a navy savings banner. Plain is simpler.</span>
       </div>
 
       {/* The colour grids are tucked away until you want them (0.7.3). */}

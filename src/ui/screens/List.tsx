@@ -21,7 +21,7 @@ import { buzz } from '../../lib/listActions';
 import { loadRecommendations } from '../../lib/recs';
 import { lineCost, type Option } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
-import { recommendedStores, shopTotals, type ShopTotals } from '../../lib/shopTotals';
+import { cheaperThan, recommendedStores, shopTotals, type ShopTotals } from '../../lib/shopTotals';
 import { entryRows, undoable } from '../../lib/undo';
 import { money, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
@@ -66,15 +66,21 @@ interface Ctx {
 export const entrySection = (e: ListEntry, groups: Map<string, Section>): Section =>
   (e.groupId ? groups.get(e.groupId) : undefined) ?? e.section ?? 'pantry';
 const recFor = (c: Ctx, e: ListEntry) => (e.groupId ? c.recs.find((r) => r.group.id === e.groupId) : undefined);
-/** What to buy: the cheapest of your product and its alternatives, in stock, by the chosen measure. */
+/** What to buy: the cheapest of your picks, in stock, by the chosen measure (with "Any size", as many packs as it takes). */
 const lineFor = (c: Ctx, e: ListEntry) => (e.groupId ? c.totals.pickFor.get(e.groupId) : undefined);
 const dealFor = (c: Ctx, e: ListEntry) => lineFor(c, e)?.pick;
 const shopOf = (c: Ctx, e: ListEntry): ShopKey => e.chain ?? dealFor(c, e)?.product.chain ?? 'any';
 const qtyOf = (e: ListEntry) => Math.max(1, e.qty ?? 1);
+/** "3 × " for an Any size item that takes several packs (0.8.9). */
+const packsOf = (c: Ctx, e: ListEntry) => {
+  const n = lineFor(c, e)?.packs;
+  return n && n > 1 ? `${n} × ` : '';
+};
 const priceOf = (c: Ctx, e: ListEntry) => {
-  const d = dealFor(c, e);
+  const l = lineFor(c, e);
+  const d = l?.pick;
   if (!d && e.price !== undefined) return Math.round(e.price * qtyOf(e) * 100) / 100;
-  return d?.price === undefined ? undefined : lineCost(d, qtyOf(e));
+  return d?.price === undefined ? undefined : lineCost(d, l?.qty ?? qtyOf(e));
 };
 
 /** The list as plain text, for sending to someone. */
@@ -89,7 +95,7 @@ function listAsText(c: Ctx, open: ListEntry[], only?: ShopKey): string {
       const d = dealFor(c, e);
       const name = recFor(c, e)?.group.name ?? e.text;
       const q = qtyOf(e) > 1 ? `${qtyOf(e)} × ` : '';
-      lines.push(`- ${q}${name}${d ? ` (${d.product.name}, ${money(d.price)})` : ''}`);
+      lines.push(`- ${q}${name}${d ? ` (${packsOf(c, e)}${d.product.name}, ${money(d.price)})` : ''}`);
     }
     lines.push('');
   }
@@ -293,6 +299,9 @@ export function ListScreen() {
       deal?.product.size && !nameHasSize(deal.product.name, deal.product.size) ? ` · ${tidySize(deal.product.size, deal.product.name)}` : '';
     const onSale = deal && (deal.verdict.kind === 'great' || deal.verdict.kind === 'good' || deal.verdict.kind === 'small');
     const line = lineFor(c, e);
+    // Swap & save (0.8.9): one you'd also take is on sale for less than your pick. Your pick stays on the list.
+    const swap =
+      rec?.alt && deal && rec.alt.product.id !== deal.product.id && cheaperThan(rec.alt, deal, c.totals.by, qtyOf(e)) ? rec.alt : undefined;
     // Pantry items open their page, so you can see exactly which product, brand and size to buy.
     const openRow = () => {
       if (selecting) pick(e.id);
@@ -348,22 +357,23 @@ export function ListScreen() {
               {deal && (
                 <span className="small">
                   {view === 'all' ? `${chainName(deal.product.chain)} · ` : ''}
+                  {line?.packs && line.packs > 1 ? <span className="num">{line.packs} × </span> : null}
                   {deal.product.name}
                   {size}
                 </span>
               )}
               {!deal && view === 'all' && shop !== 'any' && <span className="small">{chainName(shop)}</span>}
               {!deal && rec && <span className="small">No price yet</span>}
-              {deal?.multi && qtyOf(e) < deal.multi.n && !e.checked && (
+              {deal?.multi && !line?.packs && qtyOf(e) < deal.multi.n && !e.checked && (
                 <span className="small" style={{ color: 'var(--green)' }}>
                   Get {deal.multi.n} for {money(deal.multi.total)}: tap + to add {deal.multi.n - qtyOf(e)} more
                 </span>
               )}
             </button>
-            {deal && (deal.role === 'alt' || line?.outOfStock || onSale || member || deal.multi) && (
+            {deal && (swap || line?.outOfStock || onSale || member || deal.multi) && (
               <span className="tags" style={{ marginTop: -3 }}>
                 {line?.outOfStock ? <StockInfoTag o={deal} /> : onSale ? <VerdictInfoTag o={deal} /> : null}
-                {deal.role === 'alt' && line && <SwapInfoTag line={line} />}
+                {swap && line && <SwapInfoTag label="SWAP & SAVE" line={{ ...line, pick: swap, yours: deal, packs: undefined, qty: qtyOf(e) }} />}
                 <MultiInfoTag o={deal} />
                 {member && <MemberInfoTag chain={deal.product.chain} hasCard={!deal.locked} />}
               </span>
@@ -456,8 +466,8 @@ export function ListScreen() {
         <div className="card hint">
           <span style={{ flex: 1 }}>
             <strong>How this list works.</strong> Your pantry is everything Restock watches; this list is just this trip. Each line shows the cheapest
-            version to get, and where. <strong>Best value</strong> picks the cheapest per 100 g, litre or item (it can pick a bigger pack for items
-            that allow it). <strong>Lowest price</strong> picks the cheapest on the shelf. Tap any tag to see why.
+            of your picks to get, and where. <strong>Best value</strong> picks the cheapest per 100 g, litre or item (for Any size items, as many
+            packs as it takes). <strong>Lowest price</strong> picks the cheapest on the shelf. Tap any tag to see why.
           </span>
           <button className="icon-btn" aria-label="Got it" onClick={() => updateSettings({ seenHints: [...settings.seenHints, 'list'] })}>
             <Icon name="close" size={16} />
@@ -580,7 +590,7 @@ export function ListScreen() {
             nav.push({
               name: 'add',
               attachTo: groupId,
-              as: 'alt',
+              as: 'main',
               chain,
               query,
             })
@@ -684,7 +694,8 @@ export function ListScreen() {
               const d = dealFor(c, e);
               return {
                 name: recFor(c, e)?.group.name ?? e.text,
-                qty: qtyOf(e),
+                // With "Any size", the number of packs it takes.
+                qty: lineFor(c, e)?.qty ?? qtyOf(e),
                 id: d && d.product.chain === sending ? d.product.storeProductId : undefined,
                 productName: d?.product.name,
               };
@@ -758,7 +769,7 @@ export function ListScreen() {
   );
 }
 
-/** Each item's products at these shops only (your product and alternatives), for shopping at just those. */
+/** Each item's products at these shops only, for shopping at just those. */
 const onlyAt = (recs: Recommendation[], chains: StoreChain[]): Recommendation[] =>
   recs.map((r) => ({ ...r, options: r.options.filter((o) => chains.includes(o.product.chain as StoreChain)) }));
 
@@ -898,7 +909,7 @@ function PickShops({
               <li key={m}>{m}</li>
             ))}
           </ul>
-          <span>No alternative there either. They'll be listed separately while you shop, so you don't forget them.</span>
+          <span>None of your picks are there. They'll be listed separately while you shop, so you don't forget them.</span>
         </div>
       )}
       {plan && <StockCheck entries={entries} recs={recs} plan={plan} skip={skip} onSkip={setSkip} />}
@@ -1094,7 +1105,12 @@ function ShoppingMode({
                         {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}
                         {name}
                       </span>
-                      {d ? <span className="small">{d.product.name}</span> : e.product && <span className="small">{e.product.name}</span>}
+                      {d ? (
+                        <span className="small">
+                          {packsOf(c, e)}
+                          {d.product.name}
+                        </span>
+                      ) : e.product && <span className="small">{e.product.name}</span>}
                       {stockNote(c, e) && (
                         <span
                           className="small"
@@ -1140,8 +1156,7 @@ function ShoppingMode({
               Not at {chosen.map((x) => chainName(x)).join(' or ')}
             </div>
             <p className="small" style={{ padding: '0 16px', margin: 0 }}>
-              {chosen.length === 1 ? `${chainName(chosen[0])} doesn't` : "These shops don't"} sell these, and you haven't added an alternative that{' '}
-              {chosen.length === 1 ? 'it does' : 'they do'}. Tick them off if you find them anyway.
+              {chosen.length === 1 ? `${chainName(chosen[0])} doesn't` : "These shops don't"} sell any of your picks for these. Tick them off if you find them anyway.
             </p>
             {notHere.map((e) => {
               const best = dealFor(all, e);

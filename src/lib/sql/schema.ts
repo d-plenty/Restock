@@ -1,4 +1,5 @@
-import type { SqlDriver } from './driver';
+import { toPicks } from '../picks';
+import type { SqlDriver, SqlOp } from './driver';
 
 // The database layout. The Android background worker (PriceCheckWorker.java) reads and
 // writes these same tables, so any change here must be mirrored there.
@@ -99,6 +100,9 @@ const HOUSEHOLD_MIGRATION: string[] = [
   `CREATE TABLE household (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
   ...syncTriggers(SYNCED.find((t) => t.table === 'household')!),
 ];
+
+/** 0.8.9: "Any size" and "Not at this shop" (picks.ts); the move to My picks is in DATA_STEPS. */
+const PICKS_089 = ['ALTER TABLE items ADD COLUMN any_size INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE items ADD COLUMN not_at TEXT'];
 
 export const MIGRATIONS: string[][] = [
   [
@@ -241,7 +245,60 @@ export const MIGRATIONS: string[][] = [
   HOUSEHOLD_MIGRATION,
   // 0.8.5: no ties between phones' changes, and products' stock stays on each phone.
   SYNC_TRIGGERS_085,
+  // 0.8.9: My picks and Would also take, "Any size" and "Not at this shop" (picks.ts). The data
+  // part is in DATA_STEPS.
+  PICKS_089,
 ];
+
+/**
+ * Data changes that go with a migration, worked out in code and written in the same transaction,
+ * by its place in MIGRATIONS.
+ */
+const DATA_STEPS: Record<number, (d: SqlDriver) => Promise<SqlOp[]>> = {
+  // 0.8.9: an alternative that was an item's only product at a shop becomes one of its picks there,
+  // so every store comparison comes out as it did before. Each phone does this itself, so it isn't
+  // noted for sync ('applying'): a paired phone's newer edit to the same item still wins.
+  [MIGRATIONS.indexOf(PICKS_089)]: async (d) => {
+    type P = { id: string; chain: string; name: string; size: string | null; qty: number | null; qty_unit: string | null };
+    const products = new Map((await d.query<P>('SELECT id, chain, name, size, qty, qty_unit FROM products')).map((p) => [p.id, p]));
+    const rows = await d.query<{
+      id: string;
+      usual_product_id: string | null;
+      same_product_ids: string | null;
+      alt_product_ids: string | null;
+      allow_bulk: number | null;
+    }>('SELECT id, usual_product_id, same_product_ids, alt_product_ids, allow_bulk FROM items');
+    const ops: SqlOp[] = [];
+    for (const r of rows) {
+      const before = {
+        usualProductId: r.usual_product_id ?? undefined,
+        sameProductIds: JSON.parse(r.same_product_ids || '[]') as string[],
+        altProductIds: JSON.parse(r.alt_product_ids || '[]') as string[],
+        allowBulk: r.allow_bulk === null ? undefined : Number(r.allow_bulk) === 1,
+      };
+      const after = toPicks(
+        before,
+        (id) => products.get(id)?.chain,
+        (id) => {
+          const p = products.get(id);
+          return p && { name: p.name, size: p.size ?? undefined, qty: p.qty ?? undefined, qtyUnit: (p.qty_unit ?? undefined) as never };
+        },
+      );
+      if (after === before) continue;
+      ops.push({
+        sql: 'UPDATE items SET usual_product_id = ?, same_product_ids = ?, alt_product_ids = ? WHERE id = ?',
+        params: [after.usualProductId ?? null, JSON.stringify(after.sameProductIds), JSON.stringify(after.altProductIds), r.id],
+      });
+    }
+    return ops.length
+      ? [
+          { sql: "INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')" },
+          ...ops,
+          { sql: "DELETE FROM sync_meta WHERE key = 'applying'" },
+        ]
+      : [];
+  },
+};
 
 /** The database version before sync was added, for "back up before updating" (0.8.0). */
 export const SYNC_VERSION = MIGRATIONS.indexOf(SYNC_MIGRATION);
@@ -249,6 +306,7 @@ export const SYNC_VERSION = MIGRATIONS.indexOf(SYNC_MIGRATION);
 export async function migrate(driver: SqlDriver): Promise<void> {
   const [{ user_version }] = await driver.query<{ user_version: number }>('PRAGMA user_version');
   for (let v = Number(user_version); v < MIGRATIONS.length; v++) {
-    await driver.batch([...MIGRATIONS[v].map((sql) => ({ sql })), { sql: `PRAGMA user_version = ${v + 1}` }]);
+    const data = DATA_STEPS[v] ? await DATA_STEPS[v](driver) : [];
+    await driver.batch([...MIGRATIONS[v].map((sql) => ({ sql })), ...data, { sql: `PRAGMA user_version = ${v + 1}` }]);
   }
 }

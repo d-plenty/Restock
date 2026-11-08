@@ -15,6 +15,7 @@ import { changed } from './live';
 import { DEFAULT_SECTION_CATEGORIES, SECTIONS, setCustomShops, shopDef, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
 import { migrate } from './sql/schema';
+import { toPicks } from './picks';
 
 // All reads and writes to the on-device SQLite database go through this file.
 
@@ -88,6 +89,8 @@ const toGroup = (r: Row): Group => ({
   allowMulti: r.allow_multi === undefined || r.allow_multi === null ? undefined : Number(r.allow_multi) === 1,
   targetPrice: r.target_price === undefined || r.target_price === null ? undefined : Number(r.target_price),
   section: asSection(r.section),
+  anySize: Number(r.any_size ?? 0) === 1,
+  notAt: JSON.parse((r.not_at as string) || '[]'),
   createdAt: r.created_at as string,
 });
 
@@ -188,8 +191,8 @@ export const insertProductOp = (p: Product, replace = false): SqlOp => ({
 });
 
 export const insertGroupOp = (g: Group, replace = false): SqlOp => ({
-  sql: `INSERT ${replace ? 'OR REPLACE ' : ''}INTO items (id, name, category_id, usual_product_id, same_product_ids, alt_product_ids, threshold_pct, alert_level, allow_bulk, allow_multi, section, target_price, created_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  sql: `INSERT ${replace ? 'OR REPLACE ' : ''}INTO items (id, name, category_id, usual_product_id, same_product_ids, alt_product_ids, threshold_pct, alert_level, allow_bulk, allow_multi, section, target_price, any_size, not_at, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   params: [
     g.id,
     g.name,
@@ -203,6 +206,8 @@ export const insertGroupOp = (g: Group, replace = false): SqlOp => ({
     g.allowMulti === false ? 0 : 1,
     g.section ?? 'pantry',
     n(g.targetPrice),
+    g.anySize ? 1 : 0,
+    g.notAt?.length ? JSON.stringify(g.notAt) : null,
     g.createdAt,
   ],
 });
@@ -468,6 +473,8 @@ const GROUP_COLS = {
   allowMulti: 'allow_multi',
   section: 'section',
   targetPrice: 'target_price',
+  anySize: 'any_size',
+  notAt: 'not_at',
 };
 
 /** Product ids an item uses: yours, the same product at other shops, and alternatives. */
@@ -518,9 +525,9 @@ export async function removeProductFromGroup(group: Group, productId: string): P
   let same = group.sameProductIds.filter((x) => x !== productId);
   let alts = group.altProductIds.filter((x) => x !== productId);
   if (usualProductId === productId) {
-    usualProductId = same[0] ?? alts[0];
+    // The next pick becomes the usual one. One you'd only also take never does (0.8.9).
+    usualProductId = same[0];
     same = same.filter((x) => x !== usualProductId);
-    alts = alts.filter((x) => x !== usualProductId);
   }
   const ops: SqlOp[] = [updateOp('items', group.id, { usualProductId, sameProductIds: same, altProductIds: alts }, GROUP_COLS)!];
   const usedElsewhere = (await allGroups()).some((g) => g.id !== group.id && groupProductIds(g).includes(productId));
@@ -753,13 +760,28 @@ export async function snapshot(): Promise<Snapshot> {
   };
 }
 
+/**
+ * An item from a backup. One from before 0.8.9 (it has no "Any size" setting) gets the same move to
+ * My picks as an update does (picks.ts), so restoring an old backup gives the same results.
+ */
+function fromBackup(g: Group, s: Snapshot): Group {
+  const full = { ...g, sameProductIds: g.sameProductIds ?? [], altProductIds: g.altProductIds ?? [] };
+  if (g.anySize !== undefined) return full;
+  const products = new Map(s.products.map((p) => [p.id, p]));
+  return toPicks(
+    full,
+    (id) => products.get(id)?.chain,
+    (id) => products.get(id),
+  );
+}
+
 export async function restoreSnapshot(s: Snapshot): Promise<void> {
   const ops: SqlOp[] = ['prices', 'products', 'items', 'list_entries', 'cards', 'categories', 'kv', 'receipts'].map((t) => ({
     sql: `DELETE FROM ${t}`,
   }));
   (s.receipts ?? []).forEach((r) => ops.push(insertReceiptOp(r)));
   s.products.forEach((p) => ops.push(insertProductOp(p)));
-  s.groups.forEach((g) => ops.push(insertGroupOp({ ...g, sameProductIds: g.sameProductIds ?? [], altProductIds: g.altProductIds ?? [] })));
+  s.groups.forEach((g) => ops.push(insertGroupOp(fromBackup(g, s))));
   s.prices.forEach((r) => ops.push(insertReadingOp(r)));
   s.list.forEach((e) => ops.push(insertEntryOp(e)));
   s.cards.forEach((c) => ops.push(insertCardOp(c)));
@@ -924,7 +946,7 @@ export async function restoreParts(s: Snapshot, parts: RestoreParts, renames: Ma
     incoming.forEach((g) =>
       ops.push(
         insertGroupOp(
-          { ...g, name: renames.get(g.id) ?? g.name, sameProductIds: g.sameProductIds ?? [], altProductIds: g.altProductIds ?? [] },
+          { ...fromBackup(g, s), name: renames.get(g.id) ?? g.name },
           true,
         ),
       ),

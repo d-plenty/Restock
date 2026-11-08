@@ -10,7 +10,7 @@ import {
   type Product,
 } from '../types';
 import { nameHasSize } from './naming';
-import { formatUnitPrice, packSize, unitPrice } from './units';
+import { formatUnitPrice, inSheets, packSize, unitPrice } from './units';
 import { chainName } from '../shops';
 
 export type VerdictKind = 'great' | 'good' | 'small' | 'wait' | 'fake' | 'normal' | 'nodata';
@@ -419,7 +419,8 @@ export function recommend(
 
   const priced = options.filter((o) => o.price !== undefined);
   // Compare by unit price when every priced option shares a unit, otherwise by shelf price.
-  const units = new Set(priced.map((o) => productQty(o.product).unit));
+  // Sheets ("4,320 sheets") and packs ("48 pack") both count, but not the same thing (0.8.9).
+  const units = new Set(priced.map((o) => (!o.product.qty && inSheets(o.product.size) ? 'sheet' : productQty(o.product).unit)));
   const byUnit = priced.length > 0 && units.size === 1 && !units.has(undefined) && priced.every((o) => o.unitPrice !== undefined);
   const cost = (o: Option) => (byUnit ? o.unitPrice! : o.price!);
   const cheapest = (list: Option[]) => list.reduce<Option | undefined>((b, o) => (!b || cost(o) < cost(b) ? o : b), undefined);

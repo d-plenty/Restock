@@ -1,13 +1,16 @@
 import type { Chain, ListEntry } from '../types';
+import { inSheets, rollsIn } from './units';
+import { notAtChains } from './picks';
 import { isBulk, lineCost, productQty, type Option, type Recommendation } from './verdict';
 
 // What to buy for each item on the shopping list, and "what would it cost if I only went to
 // one store?".
 //
-// Every pantry item can be bought as your product or any of its alternatives. At each store we
-// take the cheapest one that store has, so a store counts for an item as long as it has *some*
-// version of it (an alternative is fine when it's the only one there). Out-of-stock products are
-// used only when the store has nothing else. "Cheapest" is either best value (per 100 g / per
+// Each pantry item has its picks at each shop (picks.ts, 0.8.9). At each store we take the cheapest
+// of your picks there, so a store counts for an item when it has one of them. "Would also take"
+// products never count here: they're for Swap & save. With "Any size", any of your picks there in
+// any number will do, and we take the cheapest way to get the amount you usually buy. Out-of-stock
+// products are used only when the store has nothing else. "Cheapest" is either best value (per 100 g / per
 // litre / per item) or lowest shelf price, as picked at the top of the shopping list.
 
 type Chain3 = Exclude<Chain, 'other'>;
@@ -25,6 +28,8 @@ export interface ShopLine {
   qty: number;
   /** Your own product (at this store if it's sold here), to explain a swap. */
   yours?: Option;
+  /** With "Any size": how many of this pack to buy (already in qty), to get the amount you usually buy. */
+  packs?: number;
   /**
    * Like for like: the amount you usually buy, at this store's closest regular-sized pack (never
    * a bulk pack), so the same shopping can be compared store against store.
@@ -37,7 +42,10 @@ export interface MissingLine {
   groupId: string;
   /** The cheapest version at another store, if there is one. */
   elsewhere?: Option;
+  /** How many to buy there: as many as are on the list, or with "Any size" the packs it takes. */
   qty: number;
+  /** You've said you don't buy it at this store ("Not at this shop"). */
+  notHere?: boolean;
 }
 
 export interface ShopTotal {
@@ -79,24 +87,60 @@ export interface ShopTotals {
   by: CompareBy;
 }
 
-/** Is `a` a better buy than `b`? */
-export function cheaperThan(a: Option, b: Option, by: CompareBy): boolean {
-  const ua = productQty(a.product).unit;
-  const ub = productQty(b.product).unit;
-  const byUnit = by === 'unit' && a.unitPrice !== undefined && b.unitPrice !== undefined && ua !== undefined && ua === ub;
-  const ca = byUnit ? a.unitPrice! : a.price!;
-  const cb = byUnit ? b.unitPrice! : b.price!;
+/**
+ * Is `a` a better buy than `b`, for `qty` of them? A multi-buy ("2 for $6") only counts when the
+ * list has enough to get it (0.8.9): for one Ritz, Coles' $3.50 shelf price is what you pay, not
+ * the $2.80 each of buying two, so the $3 at Woolworths is the better buy.
+ */
+export function cheaperThan(a: Option, b: Option, by: CompareBy, qty = 1): boolean {
+  const [qa, qb] = alike(a, b);
+  const each = (o: Option) => lineCost(o, qty) / qty;
+  const perUnit = (o: Option, q: Qty) => (q.qty ? each(o) / q.qty : undefined);
+  const pa = perUnit(a, qa);
+  const pb = perUnit(b, qb);
+  const byUnit = by === 'unit' && pa !== undefined && pb !== undefined && qa.unit !== undefined && qa.unit === qb.unit;
+  const ca = byUnit ? pa! : each(a);
+  const cb = byUnit ? pb! : each(b);
   if (Math.abs(ca - cb) > 1e-9) return ca < cb;
   return a.role === 'main' && b.role !== 'main'; // a tie goes to your own product
 }
 
-function best(opts: Option[], by: CompareBy): { pick?: Option; outOfStock: boolean } {
+type Got = { pick?: Option; outOfStock: boolean; packs?: number };
+
+function best(opts: Option[], by: CompareBy, qty = 1): Got {
   const priced = opts.filter((o) => o.price !== undefined);
-  const pickFrom = (list: Option[]) => list.reduce<Option | undefined>((b, o) => (!b || cheaperThan(o, b, by) ? o : b), undefined);
+  const pickFrom = (list: Option[]) => list.reduce<Option | undefined>((b, o) => (!b || cheaperThan(o, b, by, qty) ? o : b), undefined);
   const inStock = pickFrom(priced.filter((o) => o.product.inStock !== false));
   if (inStock) return { pick: inStock, outOfStock: false };
   const any = pickFrom(priced);
   return { pick: any, outOfStock: !!any };
+}
+
+/**
+ * "Any size": the cheapest way to get at least `qty` times the amount you usually buy, from any one
+ * of these packs, as many as it takes (three 500 g bags for 1.5 kg). A pack whose amount can't be
+ * set against your usual one counts as one per item on the list, as it would on "This size", so a
+ * shop's total and the list's pick always agree. With your usual amount unknown, it's best().
+ */
+function anySize(opts: Option[], ref: Option | undefined, by: CompareBy, qty: number): Got {
+  const want = ref && productQty(ref.product);
+  const priced = opts.filter((o) => o.price !== undefined);
+  if (!ref || !want?.qty) return best(opts, by, qty);
+  const ways = priced.map((o) => {
+    const [q, r] = alike(o, ref);
+    if (!q.qty || !r.qty || q.unit !== r.unit) return { o, packs: qty, cost: lineCost(o, qty), sized: false };
+    const packs = Math.max(1, Math.ceil((r.qty * qty) / q.qty - 1e-9));
+    return { o, packs, cost: lineCost(o, packs), sized: true };
+  });
+  if (!ways.length) return best(opts, by, qty);
+  const pickFrom = (list: typeof ways) =>
+    list.reduce<(typeof ways)[number] | undefined>(
+      (b, w) => (!b || w.cost < b.cost - 1e-9 || (Math.abs(w.cost - b.cost) <= 1e-9 && w.packs < b.packs) ? w : b),
+      undefined,
+    );
+  const inStock = pickFrom(ways.filter((w) => w.o.product.inStock !== false));
+  const way = inStock ?? pickFrom(ways);
+  return { pick: way!.o, outOfStock: !inStock, packs: way!.sized ? way!.packs : undefined };
 }
 
 /** Your usual product for an item (to size the best-value comparison). */
@@ -104,12 +148,33 @@ function usual(rec: Recommendation): Option | undefined {
   return rec.options.find((o) => o.product.id === rec.group.usualProductId) ?? rec.options.find((o) => o.role === 'main');
 }
 
+type Qty = ReturnType<typeof productQty>;
+
+/**
+ * Two products' amounts, measured the same way. Toilet paper is the catch (0.8.9): one shop says
+ * "4,320 sheets", another "48 pack", and both read as a count, so a 48-pack came out as costing
+ * 90 times the 24-pack. A size in sheets set against one in packs is counted in rolls on both
+ * sides ("… 24 Pack"); when the rolls can't be told, they aren't compared by amount at all.
+ */
+export function alike(a: Option, b: Option): [Qty, Qty] {
+  const qa = productQty(a.product);
+  const qb = productQty(b.product);
+  const sheets = (o: Option) => !o.product.qty && inSheets(o.product.size);
+  const sa = sheets(a);
+  const sb = sheets(b);
+  if (sa === sb) return [qa, qb];
+  const rolls = (o: Option, q: Qty, isSheets: boolean): Qty =>
+    isSheets ? { qty: rollsIn(o.product.name), unit: rollsIn(o.product.name) ? 'ea' : undefined } : q;
+  const ra = rolls(a, qa, sa);
+  const rb = rolls(b, qb, sb);
+  return ra.qty && rb.qty ? [ra, rb] : [{}, {}];
+}
+
 /** The cost of the amount you usually buy, at this pick's price per gram, litre or item. */
 export function sameAmountCost(pick: Option, ref: Option | undefined, qty: number): number {
   const cost = lineCost(pick, qty);
   if (!ref) return cost;
-  const p = productQty(pick.product);
-  const r = productQty(ref.product);
+  const [p, r] = alike(pick, ref);
   if (!p.qty || !r.qty || p.unit !== r.unit) return cost;
   return (cost * r.qty) / p.qty;
 }
@@ -222,10 +287,14 @@ export function recommendedStores(t: ShopTotals, by: CompareBy = t.by): Recommen
     list.reduce<ShopTotal | undefined>((b, s) => (!b || f(s) < f(b) - 0.005 ? s : b), undefined);
   // A store missing a few more items can still be the one to go to: if, after buying those few at
   // their next best store, it clearly beats the store that has the most (by over $2, or 3%).
+  // Only a few (0.8.9): a store missing a third of the list, bought at two other shops, isn't
+  // "one store" any more, so it can't be recommended as one.
   const withRest = (s: ShopTotal) => measure(s, by) + (by === 'unit' ? s.elsewhereFair : s.totalWithElsewhere - s.total);
   const base = out.recommended;
   const challenger = lowestOf(
-    withLines.filter((s) => s.missing.length > fewestMissing && s.missing.every((m) => m.elsewhere)),
+    withLines.filter(
+      (s) => s.missing.length > fewestMissing && s.missing.length <= fewMissing(t.linked) && s.missing.every((m) => m.elsewhere),
+    ),
     withRest,
   );
   if (base && challenger) {
@@ -244,6 +313,9 @@ export function recommendedStores(t: ShopTotals, by: CompareBy = t.by): Recommen
   return out;
 }
 
+/** How many missing items still count as "a quick stop elsewhere": 2, or a tenth of the list. */
+export const fewMissing = (items: number) => Math.max(2, Math.round(items * 0.1));
+
 /** What a store comes to with its missing items bought at their next best store, for how the list is set. */
 export function withElsewhere(s: ShopTotal, by: CompareBy): number {
   return by === 'unit' ? s.fair + s.elsewhereFair : s.totalWithElsewhere;
@@ -251,10 +323,24 @@ export function withElsewhere(s: ShopTotal, by: CompareBy): number {
 
 export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains: Chain3[], by: CompareBy = 'unit'): ShopTotals {
   const open = entries.filter((e) => !e.checked);
-  // Items that don't want bulk packs never get one picked for them.
-  const usable = (rec: Recommendation) =>
-    rec.group.allowBulk === false ? rec.options.filter((o) => o.role === 'main' || !isBulk(o, rec.options, rec.group)) : rec.options;
+  // My picks only (0.8.9), at shops you buy it at. Would also take is for Swap & save.
+  const usable = (rec: Recommendation) => {
+    const notAt = new Set(notAtChains(rec.group, (id) => rec.options.find((o) => o.product.id === id)?.product.chain));
+    return rec.options.filter((o) => o.role === 'main' && !notAt.has(o.product.chain));
+  };
   const byGroup = new Map(recs.map((r) => [r.group.id, { ...r, options: usable(r) }]));
+  // One item's buy from these products: your pick for as many as are on the list, or with
+  // "Any size" the cheapest way to get that amount.
+  const buy = (rec: Recommendation, opts: Option[], qty: number) =>
+    rec.group.anySize ? anySize(opts, usual(rec), by, qty) : best(opts, by, qty);
+  const line = (rec: Recommendation, got: Got, qty: number) => ({
+    item: rec.group.name,
+    groupId: rec.group.id,
+    pick: got.pick!,
+    outOfStock: got.outOfStock,
+    qty: got.packs ?? qty,
+    packs: got.packs,
+  });
   const linked = open
     .map((e) => ({ rec: e.groupId ? byGroup.get(e.groupId) : undefined, qty: Math.max(1, e.qty ?? 1) }))
     .filter((x): x is { rec: Recommendation; qty: number } => !!x.rec);
@@ -275,37 +361,35 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains:
       cheapestForTill: 0,
     };
     for (const { rec, qty } of linked) {
-      const here = best(
+      const here = buy(
+        rec,
         rec.options.filter((o) => o.product.chain === chain),
-        by,
+        qty,
       );
       if (here.pick) {
-        const yours =
-          best(
-            rec.options.filter((o) => o.role === 'main' && o.product.chain === chain),
-            by,
-          ).pick ??
-          best(
-            rec.options.filter((o) => o.role === 'main'),
-            by,
-          ).pick;
-        const fair = fairCost(rec, chain, qty) ?? sameAmountCost(here.pick, usual(rec), qty);
-        t.lines.push({ item: rec.group.name, groupId: rec.group.id, pick: here.pick, outOfStock: here.outOfStock, qty, yours, fair });
-        t.total += lineCost(here.pick, qty);
+        const l = line(rec, here, qty);
+        // With "Any size" the cost of getting your amount is the like-for-like cost.
+        const fair = here.packs ? lineCost(l.pick, l.qty) : (fairCost(rec, chain, qty) ?? sameAmountCost(here.pick, usual(rec), qty));
+        t.lines.push({ ...l, yours: here.pick, fair });
+        t.total += lineCost(l.pick, l.qty);
         t.fair += fair;
-        t.value += sameAmountCost(here.pick, usual(rec), qty);
-        if (here.pick.role === 'alt') t.alternatives++;
+        t.value += here.packs ? fair : sameAmountCost(here.pick, usual(rec), qty);
       } else {
-        const elsewhere = best(
+        const got = buy(
+          rec,
           rec.options.filter((o) => o.product.chain !== chain),
-          by,
-        ).pick;
-        t.missing.push({ item: rec.group.name, groupId: rec.group.id, elsewhere, qty });
+          qty,
+        );
+        const elsewhere = got.pick;
+        const notHere = (rec.group.notAt ?? []).includes(chain);
+        t.missing.push({ item: rec.group.name, groupId: rec.group.id, elsewhere, qty: got.packs ?? qty, ...(notHere ? { notHere } : {}) });
         if (elsewhere) {
-          t.totalWithElsewhere += lineCost(elsewhere, qty);
-          t.elsewhereFair +=
-            (elsewhere.product.chain !== 'other' ? fairCost(rec, elsewhere.product.chain, qty) : undefined) ??
-            sameAmountCost(elsewhere, usual(rec), qty);
+          const cost = lineCost(elsewhere, got.packs ?? qty);
+          t.totalWithElsewhere += cost;
+          t.elsewhereFair += got.packs
+            ? cost
+            : ((elsewhere.product.chain !== 'other' ? fairCost(rec, elsewhere.product.chain, qty) : undefined) ??
+              sameAmountCost(elsewhere, usual(rec), qty));
         }
       }
     }
@@ -316,27 +400,17 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains:
   const around: ShopTotals['around'] = { total: 0, lines: [], missing: [], chains: [] };
   const pickFor = new Map<string, ShopLine>();
   for (const { rec, qty } of linked) {
-    const { pick, outOfStock } = best(rec.options, by);
-    if (!pick) {
+    const got = buy(rec, rec.options, qty);
+    if (!got.pick) {
       around.missing.push(rec.group.name);
       continue;
     }
-    const line: ShopLine = {
-      fair: sameAmountCost(pick, usual(rec), qty),
-      item: rec.group.name,
-      groupId: rec.group.id,
-      pick,
-      outOfStock,
-      qty,
-      yours: best(
-        rec.options.filter((o) => o.role === 'main'),
-        by,
-      ).pick,
-    };
-    around.lines.push(line);
-    pickFor.set(rec.group.id, line);
-    around.total += lineCost(pick, qty);
-    const c = pick.product.chain as Chain3;
+    const l = line(rec, got, qty);
+    const one: ShopLine = { ...l, fair: got.packs ? lineCost(l.pick, l.qty) : sameAmountCost(l.pick, usual(rec), qty), yours: l.pick };
+    around.lines.push(one);
+    pickFor.set(rec.group.id, one);
+    around.total += lineCost(l.pick, l.qty);
+    const c = l.pick.product.chain as Chain3;
     if (!around.chains.includes(c)) around.chains.push(c);
   }
 

@@ -42,7 +42,7 @@ const STEPS: Step[] = [
     tab: 'add',
     find: { text: 'Scan a barcode' },
     title: 'Adding things',
-    text: 'Scan a barcode or search, tick your product at each shop that sells it, and Restock does the rest.',
+    text: 'Scan a barcode or search, tick what you buy at each shop that sells it, and Restock does the rest.',
   },
   {
     tab: 'list',

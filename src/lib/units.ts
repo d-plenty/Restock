@@ -131,6 +131,16 @@ export function packSize(size: string | undefined | null, name: string | undefin
   return p && { qty: p.qty, unit: p.unit, count: p.kind === 'multi' && p.count && p.count > 1 ? p.count : undefined };
 }
 
+/** A size given in sheets ("4,320 sheets"): toilet paper, tissues, paper towel. */
+export const inSheets = (size: string | undefined | null) => /\bsheets?\b/i.test(size ?? '');
+
+/** "24 Pack", "12 rolls" or "6pk" in a name: how many rolls (more than one). */
+export function rollsIn(name: string | undefined | null): number | undefined {
+  const m = name?.toLowerCase().match(/(\d+)\s*(packs?|pk|rolls?)\b/);
+  const n = m ? parseInt(m[1], 10) : 0;
+  return n > 1 ? n : undefined;
+}
+
 /**
  * A shop's size label, tidied for showing: "1 Each" → "1 each", "3 Pack" → "3 pack", and "1 each"
  * on something named "… 70 Pack" → "70 pack".

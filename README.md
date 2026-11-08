@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Public beta 0.8.8" src="https://img.shields.io/badge/status-public%20beta%200.8.8-ffcd00">
+  <img alt="Public beta 0.8.9" src="https://img.shields.io/badge/status-public%20beta%200.8.9-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -80,7 +80,7 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Bottle shops**: Dan Murphy's, BWS, Liquorland, Liquorland Warehouse, Liquorland Cellars, The Bottle-O, Cellarbrations, Thirsty Camel and Porters Liquor. Beers say whether they're a single, a 6 pack or a case.
 - **Pharmacies**: Chemist Warehouse, My Chemist (with Chemist Warehouse's prices), Amcal, Discount Drug Stores, Guardian / PharmaSave, Priceline Pharmacy, Soul Pattinson, TerryWhite Chemmart, Blooms The Chemist, Good Price Pharmacy, Pharmacy 4 Less, Direct Chemist Outlet, Star Discount Chemist, Capital Chemist, National Pharmacies and Chempro.
 - **Any other shop**: add its website and Restock finds its search page and reads the products and prices, with Save and test to check it works.
-- **Pantry**: each item is your product (linked at every store that sells it) plus alternatives you'd accept, listed by shop then size, cheapest first, or A to Z. Swipe to add to your list or delete (with undo).
+- **Pantry**: each item has My picks (what you buy at each shop, which can differ shop to shop) and Would also take (others you'd buy when they're cheaper, for Swap & save), on This size or Any size, and shops marked Not at this shop. Listed by shop then size, cheapest first, or A to Z. Swipe to add to your list or delete (with undo).
 - **Scanning**: zxing-cpp inside the app. Normal barcodes, GS1 QR codes, Data Matrix and DataBar, from the camera or a photo, or type the number. **Scan several** walks your cupboard and fills your shopping list. Unknown barcodes fall back to the supermarkets' own data, a generic search (an ingredient and strength for medicines) or reading the front of the pack.
 - **Picked for you**: tick a product from a search and Restock searches your other shops again for the same product, or the ones most like it in kind, size and price, ready to tick.
 - **Best match**: after a scan, the same product (brand, variant and size) is ticked at each shop. If the barcode only names the brand, you pick which one it is once and Restock ticks it everywhere and remembers.
@@ -104,7 +104,7 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Start fresh, restore, or join your household** on the first screen; **Erase everything and start fresh** at the bottom of Settings (it asks twice).
 - **Setup tiles for everything**: sync, price checks, notifications, loyalty cards and shop accounts, widgets, updates and your household name, as well as shops, permissions, look, backups and the rest. Skip any of them.
 - **Backups**: export and restore exactly the parts you pick, plus optional automatic backups into a folder you choose.
-- **Look and colours**: Light, Dark or System; Australian or Plain; 24 accent colours; 16 app icon colours.
+- **Look and colours**: Light, Dark or System, with true black for OLED screens; Australian or Plain; 24 accent colours; 16 app icon colours.
 - **Accessibility**: bigger text, high contrast, less motion and bigger buttons, checked with an automatic accessibility audit.
 - **Updates**: Settings → About and updates → Check for updates, or a weekly check if you turn it on. Android shows its own Install screen, and Restock tries again if GitHub is busy. Or install through [Restock's F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium and let them handle updates.
 - **Shared price history (Beta)**: optionally download months of Coles and Woolworths history from [hotprices.org](https://hotprices.org) ([source](https://github.com/Javex/hotprices-au), MIT) so new items get a fair verdict from day one. Off by default.

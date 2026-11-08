@@ -214,13 +214,13 @@ export function ActionInfoTag({ rec, action, great }: { rec: Recommendation; act
   );
 }
 
-/** "CHEAPEST": your product at each store, cheapest first. */
+/** "CHEAPEST": your picks at each store, cheapest first. */
 export function CheapestInfoTag({ o, options }: { o: Option; options: Option[] }) {
   const priced = options.filter((x) => x.price !== undefined).sort((a, b) => a.price! - b.price!);
   return (
     <InfoTag className="best" label="CHEAPEST" title="Why it's the cheapest">
       <p className="small" style={{ fontSize: 14, margin: 0 }}>
-        Of the stores that sell your product, {chainName(o.product.chain)} is cheapest for you today
+        Of the stores with your picks, {chainName(o.product.chain)} is cheapest for you today
         {o.multi ? `, when you buy ${o.multi.n} (${multiText(o.multi)})` : ''}.
       </p>
       <div className="card flush">
@@ -296,7 +296,7 @@ export function StockInfoTag({ o, label }: { o: Option; label?: string }) {
         {where === 'online'
           ? "Online stock is checked at the shop's default online store, not your branch, so your local shop may still have it."
           : "This is Coles' own stock count for your store, from its website. It can be a little behind the shelf."}{' '}
-        Restock picks an alternative or another store while it's out, and checks again at the next price check.
+        Restock picks another of your picks or another store while it's out, and checks again at the next price check.
       </p>
     </InfoTag>
   );

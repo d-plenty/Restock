@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Group, ListEntry, PriceReading, Product } from '../types';
+import { toPicks } from './picks';
 import { recommendedStores, shopTotals } from './shopTotals';
 import { recommend } from './verdict';
 
@@ -15,7 +16,7 @@ const reading = (productId: string, price: number): PriceReading => ({
 });
 
 describe('one-shop totals', () => {
-  it('prices the list at each store using your product or an alternative', () => {
+  it('prices the list at each store using your picks there', () => {
     const products = [prod('tom-ww', 'woolworths'), prod('tom-aldi-alt', 'aldi'), prod('tp-coles', 'coles'), prod('tp-ww', 'woolworths')];
     const groups: Group[] = [
       {
@@ -36,7 +37,8 @@ describe('one-shop totals', () => {
       ['tp-ww', [reading('tp-ww', 10)]],
     ]);
     const pm = new Map(products.map((p) => [p.id, p]));
-    const recs = groups.map((g) => recommend(g, pm, readings, new Set(), NOW));
+    // As the 0.8.9 update moves them: the Aldi alternative is the only product at Aldi, so it's a pick there.
+    const recs = groups.map((g) => recommend(toPicks(g, (id) => pm.get(id)?.chain), pm, readings, new Set(), NOW));
     const entries: ListEntry[] = [
       { id: '1', text: 'Diced tomatoes', groupId: 'tom', checked: false, createdAt: '' },
       { id: '2', text: 'Toilet paper', groupId: 'tp', checked: false, createdAt: '' },
@@ -49,12 +51,12 @@ describe('one-shop totals', () => {
     expect(by.woolworths.missing).toEqual([]);
     expect(by.coles.total).toBeCloseTo(9);
     expect(by.coles.missing.map((m) => m.item)).toEqual(['Diced tomatoes']);
-    // The next best place for the tomatoes is the Aldi alternative.
+    // The next best place for the tomatoes is the Aldi one.
     expect(by.coles.missing[0].elsewhere?.product.id).toBe('tom-aldi-alt');
     expect(by.coles.totalWithElsewhere).toBeCloseTo(9.85);
     expect(by.woolworths.lines.map((l) => l.pick.product.id)).toEqual(['tom-ww', 'tp-ww']);
     expect(by.aldi.total).toBeCloseTo(0.85);
-    expect(by.aldi.alternatives).toBe(1);
+    expect(by.aldi.lines[0].pick.role).toBe('main');
     expect(t.stores[0].chain).toBe('woolworths'); // the only store with everything
     expect(t.around.total).toBeCloseTo(9.85);
     expect(t.around.chains.sort()).toEqual(['aldi', 'coles']);
@@ -95,7 +97,8 @@ describe('one-shop totals: value, price and stock', () => {
     ['fourpack-coles', [reading('fourpack-coles', 6)]],
     ['aldi-alt', [reading('aldi-alt', 0.9)]],
   ]);
-  const recs = [recommend(group, new Map(products.map((x) => [x.id, x])), readings, new Set(), NOW)];
+  const pm = new Map(products.map((x) => [x.id, x]));
+  const recs = [recommend(toPicks(group, (id) => pm.get(id)?.chain), pm, readings, new Set(), NOW)];
   const entries: ListEntry[] = [{ id: '1', text: 'Spaghetti', groupId: 'spag', checked: false, createdAt: '' }];
 
   it('best value picks the multipack when it works out cheaper per 100 g; lowest price picks the single tin', () => {
@@ -116,7 +119,7 @@ describe('one-shop totals: value, price and stock', () => {
 });
 
 describe('bulk packs', () => {
-  it("skips bigger packs for items that don't want them", async () => {
+  it('never counts a Would also take for a store, even a cheaper bigger pack (0.8.9)', async () => {
     const { shopTotals } = await import('./shopTotals');
     const { recommend } = await import('./verdict');
     const NOW2 = Date.parse('2026-11-05T09:00:00+10:00');
@@ -150,7 +153,7 @@ describe('bulk packs', () => {
     };
     const entries = [{ id: 'e', text: 'Tomatoes', groupId: 'g', qty: 1, checked: false, createdAt: '' }];
     const yes = shopTotals(entries, [recommend({ ...base, allowBulk: true }, products, readings, new Set(), NOW2)], ['coles'], 'unit');
-    expect(yes.pickFor.get('g')?.pick.product.id).toBe('six');
+    expect(yes.pickFor.get('g')?.pick.product.id).toBe('one');
     const no = shopTotals(entries, [recommend({ ...base, allowBulk: false }, products, readings, new Set(), NOW2)], ['coles'], 'unit');
     expect(no.pickFor.get('g')?.pick.product.id).toBe('one');
   });

@@ -7,7 +7,7 @@ import { isNative, promoLabel } from '../stores/http';
 import { describe, eachText, lineCost, productQty, VERDICT_LABEL, type ActionKind, type Option, type VerdictKind } from '../lib/verdict';
 import { chainName, stockAtBranch, type Chain, type PriceReading } from '../types';
 import { cachedSettings } from '../lib/db';
-import { lineMeasure, recommendedStores } from '../lib/shopTotals';
+import { fewMissing, lineMeasure, recommendedStores } from '../lib/shopTotals';
 import { SECTION_NAMES, shopColor, websiteOf, type Section, type StoreChain } from '../shops';
 import { useNav } from './nav';
 
@@ -605,7 +605,7 @@ export function OpenStoreButton({ chain = 'coles', onDone, label }: { chain?: Ex
 }
 
 /** The product line for something you'd buy: name, size, store and price. */
-/** Why the list picked an alternative instead of your product, side by side. */
+/** Swap & save: one you'd also take instead of your pick, side by side. */
 export function SwapWhy({
   line,
   chainName: storeLabel,
@@ -625,9 +625,9 @@ export function SwapWhy({
   const sameUnit = yours && unitA !== undefined && unitB !== undefined && productQty(pick.product).unit === productQty(yours.product).unit;
   const where = storeLabel ?? chainName(pick.product.chain);
   let why: string;
-  if (!yours) why = `Your product has no price yet, so this is the one you can get.`;
+  if (!yours) why = `Your pick has no price yet, so this is the one you can get.`;
   else if (yours.product.chain !== pick.product.chain && storeLabel)
-    why = `Your product isn't sold at ${where}, so this is the closest you can get there.`;
+    why = `Your pick isn't sold at ${where}, so this is the closest you can get there.`;
   else if (yours.product.inStock === false) why = `Yours is out of stock ${stockWhere(yours.product.chain, true)}, so this is the next best.`;
   else if (sameUnit && unitA! < unitB!) {
     const a = productQty(pick.product).qty ?? 0;
@@ -638,7 +638,7 @@ export function SwapWhy({
   return (
     <Sheet title={line.item} onClose={onClose}>
       <p style={{ margin: 0, fontWeight: 600 }}>
-        Swapped {yours ? describe(yours) : 'your product'} for {describe(pick)}
+        Swap {yours ? describe(yours) : 'your pick'} for {describe(pick)}
       </p>
       <div className="two">
         <SwapBox label="Instead of yours" option={yours} />
@@ -717,7 +717,7 @@ function PickRow({
         {pick && (pick.role === 'alt' || note) && (
           <span className="tags" style={{ marginTop: 2 }}>
             {note && <span className="tag normal">{note}</span>}
-            {pick.role === 'alt' && <span className="tag alt">ALTERNATIVE</span>}
+            {pick.role === 'alt' && <span className="tag alt">WOULD ALSO TAKE</span>}
           </span>
         )}
       </span>
@@ -775,7 +775,7 @@ function StoreDetail({
             <span className="title">Not at {name}</span>
           </div>
           <p className="small" style={{ padding: '0 14px' }}>
-            None of your products or alternatives for these are at {name}. Here's the next best place, or find one at {name} to add as an alternative.
+            None of your picks for these are at {name}. Here's the next best place, or find one at {name} to add as a pick there.
           </p>
           {s.missing.map((m) => (
             <div key={m.groupId}>
@@ -784,9 +784,12 @@ function StoreDetail({
                 pick={m.elsewhere}
                 qty={m.qty}
                 onOpen={open(m.groupId)}
-                note={m.elsewhere ? `Next best: ${chainName(m.elsewhere.product.chain)}` : 'No price anywhere yet'}
+                note={
+                  (m.notHere ? `You don't buy it at ${name} · ` : '') +
+                  (m.elsewhere ? `Next best: ${chainName(m.elsewhere.product.chain)}` : 'No price anywhere yet')
+                }
               />
-              {onFindAt && (
+              {onFindAt && !m.notHere && (
                 <div style={{ padding: '0 14px 10px 38px' }}>
                   <button
                     className="btn small"
@@ -814,8 +817,7 @@ function StoreDetail({
         </div>
       )}
       <p className="small">
-        Today's prices and online stock. Tap an item to see it in your pantry, or press and hold it to see what was swapped and why. Uses your product
-        or an alternative, whichever is cheaper at {name}.
+        Today's prices and online stock. Tap an item to see it in your pantry. Uses the cheapest of your picks at {name}.
       </p>
     </Sheet>
   );
@@ -870,7 +872,8 @@ function HowPicked({ totals, onClose }: { totals: Totals; onClose: () => void })
       {by === 'unit' ? (
         <p className="small">
           Your list is on <strong>Best value</strong>, so Restock prices <strong>the same shopping</strong> at each store: every item at the size you
-          usually buy, from each store's regular packs. A bulk pack, or a store only selling a bigger or smaller size, can't tip it.
+          usually buy, from your picks at each store and its regular packs (Any size items: the cheapest way to get that amount). A bulk pack,
+          or a store only selling a bigger or smaller size, can't tip it. Ones you'd also take don't count here.
         </p>
       ) : (
         <p className="small">
@@ -883,8 +886,8 @@ function HowPicked({ totals, onClose }: { totals: Totals; onClose: () => void })
         cheapest for more of your items is recommended instead, so one big special at a store that's dearer for everything else doesn't decide it.
       </p>
       <p className="small">
-        A store that's missing a few items can still be recommended, if it's clearly cheaper (by over $2, or 3%) even after buying those few at the
-        next cheapest shop.
+        A store that's missing a few items (up to {fewMissing(n)} of your {n}) can still be recommended, if it's clearly cheaper (by over $2, or 3%)
+        even after buying those few at the next cheapest shop. A store missing more than that isn't one store any more, so it isn't recommended as one.
       </p>
       <div className="card flush">
         <div className="row small" style={{ fontWeight: 700 }}>
@@ -1489,7 +1492,7 @@ export function ProductPreview({ product: p, onClose, action }: { product: Previ
         </div>
       )}
       <div className="tags">
-        {p.role && <span className={`tag ${p.role === 'alt' ? 'alt' : 'normal'}`}>{p.role === 'alt' ? 'ALTERNATIVE' : 'YOUR PRODUCT'}</span>}
+        {p.role && <span className={`tag ${p.role === 'alt' ? 'alt' : 'normal'}`}>{p.role === 'alt' ? 'WOULD ALSO TAKE' : 'MY PICK'}</span>}
         {p.isSpecial && !p.memberOnly && <span className="tag good">SPECIAL</span>}
         {promoLabel(p.promo) && <span className="tag normal">{promoLabel(p.promo)}</span>}
         {p.memberOnly && <MemberTag chain={p.chain} />}

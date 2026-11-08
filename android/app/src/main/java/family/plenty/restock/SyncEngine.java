@@ -453,6 +453,19 @@ final class SyncEngine {
                 for (int i = 0; i < n2.size(); i++) q2.append(i == 0 ? "?" : ", ?");
                 db.exec("INSERT INTO products (" + String.join(", ", n2) + ") VALUES (" + q2 + ")", v2.toArray());
             }
+        } else if ("items".equals(tbl) && !db.query("SELECT 1 FROM items WHERE id = ?", row.optString("id")).isEmpty()) {
+            // Update in place (0.8.9): an older Restock on the other phone doesn't send the columns it
+            // doesn't know (any_size, not_at), and replacing the row would reset them here.
+            List<String> sets = new ArrayList<>();
+            List<Object> vals = new ArrayList<>();
+            for (int i = 0; i < names.size(); i++) {
+                if ("id".equals(names.get(i))) continue;
+                sets.add(names.get(i) + " = ?");
+                vals.add(values.get(i));
+            }
+            if (sets.isEmpty()) return;
+            vals.add(row.optString("id"));
+            db.exec("UPDATE items SET " + String.join(", ", sets) + " WHERE id = ?", vals.toArray());
         } else {
             db.exec("INSERT OR REPLACE INTO " + tbl + " (" + list + ") VALUES (" + q + ")", values.toArray());
         }
