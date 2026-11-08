@@ -32,6 +32,10 @@ Issues are public. Leave out loyalty card numbers, backup files, your address an
 
 Start a thread in [Discussions → Ideas](../../discussions/categories/ideas). Say what you'd like to do in the shop and why; the "why" helps most. The plan is in the README under **What's next**.
 
+## Know the Apple side?
+
+Restock is looking for someone to bring it to iPhone and publish it on the App Store, ideally someone who already has an Apple developer account and knows Xcode, TestFlight and App Store review. The details are in the README: [Wanted: someone to bring Restock to iPhone](README.md#wanted-someone-to-bring-restock-to-iphone).
+
 ## Working on the code
 
 Setup and build steps are in [BUILD.md](BUILD.md). In short:

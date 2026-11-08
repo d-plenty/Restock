@@ -18,8 +18,15 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/d-plenty/Restock/releases/latest/download/restock.apk"><img alt="Download the APK from GitHub" src="docs/badge-download-apk.svg" height="54"></a>
+  <a href="https://d-plenty.github.io/Restock/"><img alt="Get it on F-Droid (Restock repo)" src="docs/badge-fdroid-repo.svg" height="54"></a>
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/d-plenty/Restock"><img alt="Get it on Obtainium" src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" height="54"></a>
+</p>
+
+<p align="center">
   <a href="#get-it">Get it</a> ·
   <a href="#how-you-can-help">How you can help</a> ·
+  <a href="#wanted-someone-to-bring-restock-to-iphone">iPhone</a> ·
   <a href="BUILD.md">Build it</a> ·
   <a href="PRIVACY.md">Privacy</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
@@ -90,7 +97,7 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Catalogues**: a link to the catalogue of every shop you use.
 - **Home screen widgets**: Deals, Shopping list and Quick actions, with your choice of background, transparency and text colour.
 - **App icon shortcuts** (Scan, List, Receipt) and **Share to Restock** from any app.
-- **Local sync** (0.8.0): up to 6 phones in a household pair by scanning a one-time QR code from the owner phone (it works once, for 10 minutes, and never contains the household's key), then sync straight to each other whenever they're on the same Wi-Fi: when you open Restock, shortly after a change, and every 15 minutes or so in the background. Pantry, list (ticks too), prices, categories and alerts, plus loyalty cards if you choose. Encrypted with a key only your phones have; no server and no account. If both phones change the same thing, the later change wins. The owner phone adds and removes phones (removing one changes the household's key) and can hand ownership to another phone. Pull down on Home, Pantry, Keg, Pharmacy or the list to sync and check prices.
+- **Local sync**: up to 6 phones in a household pair by scanning a one-time QR code from the owner phone (it works once, for 10 minutes, and never contains the household's key), then sync straight to each other whenever they're on the same Wi-Fi: when you open Restock, shortly after a change, and every 15 minutes or so in the background. Pantry, list (ticks too), prices, categories and alerts, plus loyalty cards if you choose. Encrypted with a key only your phones have; no server and no account. If both phones change the same thing, the later change wins. The owner phone adds and removes phones (removing one changes the household's key) and can hand ownership to another phone. Pull down on Home, Pantry, Keg, Pharmacy or the list to sync and check prices.
 - **Start fresh, restore, or join your household** on the first screen; **Erase everything and start fresh** at the bottom of Settings (it asks twice).
 - **Setup tiles for everything**: sync, price checks, notifications, loyalty cards and shop accounts, widgets, updates and your household name, as well as shops, permissions, look, backups and the rest. Skip any of them.
 - **Backups**: export and restore exactly the parts you pick, plus optional automatic backups into a folder you choose.
@@ -112,27 +119,20 @@ Read the full **[privacy policy](PRIVACY.md)** and the **[fine print](DISCLAIMER
 
 ## Get it
 
-**Download: [restock.apk](https://github.com/d-plenty/Restock/releases/latest/download/restock.apk)** (always the newest version), or pick a version from **[Releases](../../releases)**. Open it on your phone and allow the install. Android 8.0 or newer.
+Android 8.0 or newer, including de-Googled phones. Pick one:
 
-> **Updating to 0.8.0? Back up first.** Settings → Data and backup → Export a backup, and keep the file somewhere safe. 0.8.0 adds sync to Restock's database; it's a normal update and keeps everything, and Restock saves its own copy just before the upgrade too, but a backup of your own is the safe way to do any big update.
-
-Already have Restock? From 0.7.3 it can update itself from here: **Settings → About and updates → Check for updates** (or turn on *Tell me when there's an update*). Android shows its own Install screen; nothing is lost.
-
-**Stay up to date:** get Restock through F-Droid or Obtainium and they'll install new versions for you.
+- **Download the APK:** **[restock.apk](https://github.com/d-plenty/Restock/releases/latest/download/restock.apk)** is always the newest version, or pick one from **[Releases](../../releases)**. Open it on your phone and allow the install. Restock can then update itself: **Settings → About and updates → Check for updates** (or turn on *Tell me when there's an update*).
+- **F-Droid (Restock repo):** open **[d-plenty.github.io/Restock](https://d-plenty.github.io/Restock/)** on your phone and tap *Add to F-Droid*, or scan its QR code in F-Droid → Settings → Repositories. Then install Restock from F-Droid and it keeps it up to date. Works with F-Droid, Droid-ify and Neo Store.
+- **Obtainium:** tap the Obtainium badge at the top on your phone, or add `https://github.com/d-plenty/Restock` in [Obtainium](https://github.com/ImranR98/Obtainium).
 
 <p>
   <a href="https://d-plenty.github.io/Restock/"><img alt="Get it on F-Droid (Restock repo)" src="docs/badge-fdroid-repo.svg" height="54"></a>
   <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/d-plenty/Restock"><img alt="Get it on Obtainium" src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" height="54"></a>
 </p>
 
-- **F-Droid (Restock repo):** Restock's own F-Droid repository, built from these releases. Open **[d-plenty.github.io/Restock](https://d-plenty.github.io/Restock/)** on your phone and tap *Add to F-Droid* (or scan its QR code in F-Droid → Settings → Repositories), then install Restock from F-Droid. Works with F-Droid, Droid-ify and Neo Store.
-- **Obtainium:** tap the badge on your phone, or add `https://github.com/d-plenty/Restock` in Obtainium.
-
-Both give you the same APK as this page, signed with the same key, so they update a copy you already installed from here. Nothing is lost.
+All three are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
 **Build it yourself:** see **[BUILD.md](BUILD.md)**. About 20 minutes the first time, on Linux, macOS or Windows.
-
-Restock is on its way to the main [F-Droid](https://f-droid.org) repository too.
 
 ## How you can help
 
@@ -145,11 +145,24 @@ Restock is built by one person in their spare time. Prices, shops and websites a
 | **See the wrong product or price** | Opening a [**Wrong product or price**](../../issues/new?template=product-mismatch.yml) issue with the barcode and what the shelf says. |
 | **Use a bottle shop or pharmacy** | Testing it! These connections are the newest and least tested. |
 | **Have a computer** | Running the [search test tools](tools/README.md): they search every shop from your computer and save what came back, so searches can be checked and fixed against real results. |
+| **Know your way around Apple** | Bringing Restock to iPhone and the App Store. See [Wanted: someone to bring Restock to iPhone](#wanted-someone-to-bring-restock-to-iphone). |
 | **Write code** | Picking up an issue labelled [`good first issue`](../../labels/good%20first%20issue) or [`help wanted`](../../labels/help%20wanted). Shop connections, accessibility and the coming features below are all open. Start with [CONTRIBUTING.md](CONTRIBUTING.md). |
 | **Have an idea** | Starting a thread in [Discussions → Ideas](../../discussions/categories/ideas). |
 | **Like it** | Starring the repo and telling a mate. That's how a free app gets found. |
 
 Please don't post anything private (loyalty card numbers, backup files, your address) in issues. Crop screenshots if you need to.
+
+## Wanted: someone to bring Restock to iPhone
+
+I'd love Restock on iPhone too, so households with both kinds of phone can share a pantry and list. I'm looking for a developer who knows their way around the Apple side and is willing to build it and put it on the App Store.
+
+Why I'm asking: publishing on the App Store means paying Apple every year for a developer account, and beta testing means getting everyone onto TestFlight. As one person doing this for free, I'm not keen to take that on myself. If you already have an Apple developer account (or are happy to), this could be a good fit.
+
+**What's there already:** Restock is a [Capacitor](https://capacitorjs.com) app, so the screens, database, shop connections and verdicts are shared TypeScript that mostly runs on iPhone as it is. What needs iPhone versions of their own is the Android-only native side: background price checks, notifications, widgets, local sync between phones, and the barcode scanner.
+
+**What I'll do:** help with the code, explain how everything fits together, test, and keep the shared parts working on both. It stays free, open source, with no ads, no account and no tracking, and we'd sort out the details (name, licence wording for the App Store, who publishes it) together.
+
+Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issue](../../issues?q=is%3Aissue+label%3Aios).
 
 ## Coming soon
 
@@ -162,10 +175,10 @@ Tell Restock roughly how much of something you've got (a full bottle, two left, 
 A simple month-by-month look at what you spent at each shop (from your kept receipts) and what Restock's deals saved you. It stays on your phone like everything else. Full budgeting is planned as a separate app that works with Restock, so this stays light.
 
 ### Hosted sync
-Phones in a household already sync on the same Wi-Fi (0.8.0). Next is syncing from anywhere, through a small server you control, such as a Docker container on a home server, NAS or Raspberry Pi: tick something off at the shops and it's off the list at home straight away. There's no Restock account and no Restock server holding your data, and the server only ever sees encrypted data.
+Phones in a household already sync on the same Wi-Fi. Next is syncing from anywhere, through a small server you control, such as a Docker container on a home server, NAS or Raspberry Pi: tick something off at the shops and it's off the list at home straight away. There's no Restock account and no Restock server holding your data, and the server only ever sees encrypted data.
 
 ### iPhone version
-The same Restock on iOS, so a household with both kinds of phone can share a pantry and list. Most of Restock already works on iPhone; the parts that talk to Android (background price checks, widgets and alerts) need iPhone versions of their own.
+The same Restock on iOS, so a household with both kinds of phone can share a pantry and list. This needs a developer with an Apple developer account: see [Wanted: someone to bring Restock to iPhone](#wanted-someone-to-bring-restock-to-iphone).
 
 ### Home Assistant
 Connect Restock to [Home Assistant](https://www.home-assistant.io) and your shopping list shows up there, with changes going both ways: add milk from a kitchen tablet or by voice and it's on your Restock list. Deals and recall alerts can show up in Home Assistant too. This comes after sync, since it uses the same server.
