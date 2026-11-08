@@ -118,7 +118,9 @@ Read the full **[privacy policy](PRIVACY.md)** and the **[fine print](DISCLAIMER
 
 Already have Restock? From 0.7.3 it can update itself from here: **Settings → About and updates → Check for updates** (or turn on *Tell me when there's an update*). Android shows its own Install screen; nothing is lost.
 
-**Stay up to date:** add this repository to [Obtainium](https://github.com/ImranR98/Obtainium) and it'll tell you when a new version is out.
+**Stay up to date with Obtainium:** tap the badge on your phone and Restock is added to [Obtainium](https://github.com/ImranR98/Obtainium), which tells you when a new version is out.
+
+<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22family.plenty.restock%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fd-plenty%2FRestock%22%2C%22author%22%3A%22d-plenty%22%2C%22name%22%3A%22Restock%22%7D"><img src="docs/badge_obtainium.png" alt="Get it on Obtainium" height="48"></a>
 
 **Build it yourself:** see **[BUILD.md](BUILD.md)**. About 20 minutes the first time, on Linux, macOS or Windows.
 
