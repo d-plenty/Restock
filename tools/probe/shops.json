@@ -1,0 +1,209 @@
+[
+ {
+  "id": "woolworths",
+  "name": "Woolworths",
+  "website": "https://www.woolworths.com.au",
+  "kind": "woolworths",
+  "section": "pantry",
+  "search": "https://www.woolworths.com.au/shop/search/products?searchTerm={q}"
+ },
+ {
+  "id": "coles",
+  "name": "Coles",
+  "website": "https://www.coles.com.au",
+  "kind": "coles",
+  "section": "pantry",
+  "search": "https://www.coles.com.au/search/products?q={q}"
+ },
+ {
+  "id": "aldi",
+  "name": "Aldi",
+  "website": "https://www.aldi.com.au",
+  "kind": "aldi",
+  "section": "pantry",
+  "search": "https://www.aldi.com.au/results?q={q}"
+ },
+ {
+  "id": "danmurphys",
+  "name": "Dan Murphy's",
+  "website": "https://www.danmurphys.com.au",
+  "search": "https://www.danmurphys.com.au/search?searchTerm={q}",
+  "kind": "endeavour",
+  "section": "keg"
+ },
+ {
+  "id": "bws",
+  "name": "BWS",
+  "website": "https://bws.com.au",
+  "search": "https://bws.com.au/search?searchTerm={q}",
+  "kind": "endeavour",
+  "section": "keg"
+ },
+ {
+  "id": "liquorland",
+  "name": "Liquorland",
+  "website": "https://www.liquorland.com.au",
+  "search": "https://www.liquorland.com.au/search?q={q}",
+  "kind": "web",
+  "section": "keg"
+ },
+ {
+  "id": "liquorlandwarehouse",
+  "name": "Liquorland Warehouse",
+  "website": "https://www.liquorland.com.au",
+  "kind": "web",
+  "section": "keg"
+ },
+ {
+  "id": "liquorlandcellars",
+  "name": "Liquorland Cellars",
+  "website": "https://www.liquorland.com.au",
+  "kind": "web",
+  "section": "keg"
+ },
+ {
+  "id": "bottleo",
+  "name": "The Bottle-O",
+  "website": "https://www.thebottle-o.com.au",
+  "kind": "web",
+  "section": "keg"
+ },
+ {
+  "id": "cellarbrations",
+  "name": "Cellarbrations",
+  "website": "https://www.cellarbrations.com.au",
+  "kind": "web",
+  "section": "keg"
+ },
+ {
+  "id": "thirstycamel",
+  "name": "Thirsty Camel",
+  "website": "https://www.thirstycamel.com.au",
+  "kind": "web",
+  "section": "keg",
+  "search": "https://www.thirstycamel.com.au/search?q={q}"
+ },
+ {
+  "id": "porters",
+  "name": "Porters Liquor",
+  "website": "https://www.portersliquor.com.au",
+  "kind": "web",
+  "section": "keg"
+ },
+ {
+  "id": "chemistwarehouse",
+  "name": "Chemist Warehouse",
+  "website": "https://www.chemistwarehouse.com.au",
+  "kind": "web",
+  "section": "pharmacy",
+  "search": "https://www.chemistwarehouse.com.au/search?query={q}"
+ },
+ {
+  "id": "amcal",
+  "name": "Amcal",
+  "website": "https://www.amcal.com.au",
+  "kind": "web",
+  "section": "pharmacy",
+  "search": "https://www.amcal.com.au/?s={q}"
+ },
+ {
+  "id": "discountdrug",
+  "name": "Discount Drug Stores",
+  "website": "https://www.discountdrugstores.com.au",
+  "kind": "web",
+  "section": "pharmacy",
+  "search": "https://www.discountdrugstores.com.au/?s={q}"
+ },
+ {
+  "id": "guardian",
+  "name": "Guardian / PharmaSave",
+  "website": "https://www.guardianpharmacies.com.au",
+  "kind": "web",
+  "section": "pharmacy"
+ },
+ {
+  "id": "priceline",
+  "name": "Priceline Pharmacy",
+  "website": "https://www.priceline.com.au",
+  "kind": "web",
+  "section": "pharmacy",
+  "search": "https://www.priceline.com.au/search?q={q}"
+ },
+ {
+  "id": "soulpattinson",
+  "name": "Soul Pattinson",
+  "website": "https://www.soulpattinson.com.au",
+  "kind": "web",
+  "section": "pharmacy"
+ },
+ {
+  "id": "terrywhite",
+  "name": "TerryWhite Chemmart",
+  "website": "https://terrywhitechemmart.com.au",
+  "kind": "web",
+  "section": "pharmacy",
+  "search": "https://terrywhitechemmart.com.au/search?q={q}"
+ },
+ {
+  "id": "blooms",
+  "name": "Blooms The Chemist",
+  "website": "https://www.bloomsthechemist.com.au",
+  "kind": "web",
+  "section": "pharmacy",
+  "search": "https://www.bloomsthechemist.com.au/shop/?search_query={q}"
+ },
+ {
+  "id": "goodprice",
+  "name": "Good Price Pharmacy",
+  "website": "https://www.goodpricepharmacy.com.au",
+  "kind": "web",
+  "section": "pharmacy",
+  "search": "https://www.goodpricepharmacy.com.au/catalogsearch/result/?q={q}"
+ },
+ {
+  "id": "pharmacy4less",
+  "name": "Pharmacy 4 Less",
+  "website": "https://www.pharmacy4less.com.au",
+  "kind": "web",
+  "section": "pharmacy",
+  "search": "https://www.pharmacy4less.com.au/?s={q}"
+ },
+ {
+  "id": "directchemist",
+  "name": "Direct Chemist Outlet",
+  "website": "https://www.directchemistoutlet.com.au",
+  "kind": "web",
+  "section": "pharmacy",
+  "search": "https://www.directchemistoutlet.com.au/search?q={q}"
+ },
+ {
+  "id": "stardiscount",
+  "name": "Star Discount Chemist",
+  "website": "https://www.stardiscountchemist.com.au",
+  "kind": "web",
+  "section": "pharmacy"
+ },
+ {
+  "id": "capitalchemist",
+  "name": "Capital Chemist",
+  "website": "https://www.capitalchemist.com.au",
+  "kind": "web",
+  "section": "pharmacy",
+  "search": "https://www.capitalchemist.com.au/products?search={q}"
+ },
+ {
+  "id": "nationalpharmacies",
+  "name": "National Pharmacies",
+  "website": "https://www.nationalpharmacies.com.au",
+  "kind": "web",
+  "section": "pharmacy"
+ },
+ {
+  "id": "chempro",
+  "name": "Chempro",
+  "website": "https://www.chempro.com.au",
+  "kind": "web",
+  "section": "pharmacy",
+  "search": "https://www.chempro.com.au/index.php?route=product/search&search={q}"
+ }
+]

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Beta 0.7.5" src="https://img.shields.io/badge/status-beta%200.7.5-ffcd00">
+  <img alt="Beta 0.7.6" src="https://img.shields.io/badge/status-beta%200.7.6-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -66,17 +66,18 @@ The **normal price** is the middle of the non-sale prices over the history you k
 <summary><strong>Every feature, in detail</strong></summary>
 
 - **Three tabs, kept apart**: **Pantry** for supermarkets, **Keg** for bottle shops and **Pharmacy** for pharmacies. Keg and Pharmacy only appear if you switch them on. Each tab has its own items, categories, list and shops, and a search only goes to that tab's shops. Keg asks once that you're 18 or over.
-- **Bottle shops**: Dan Murphy's, BWS, Liquorland, Liquorland Warehouse, Liquorland Cellars, The Bottle-O, Cellarbrations, Thirsty Camel and Porters Liquor.
-- **Pharmacies**: Chemist Warehouse, My Chemist, Amcal, Discount Drug Stores, Guardian / PharmaSave, Priceline Pharmacy, Soul Pattinson, TerryWhite Chemmart, Blooms The Chemist, Good Price Pharmacy, Pharmacy 4 Less, Direct Chemist Outlet, Star Discount Chemist, Capital Chemist, National Pharmacies and Chempro.
+- **Bottle shops**: Dan Murphy's, BWS, Liquorland, Liquorland Warehouse, Liquorland Cellars, The Bottle-O, Cellarbrations, Thirsty Camel and Porters Liquor. Beers say whether they're a single, a 6 pack or a case.
+- **Pharmacies**: Chemist Warehouse, My Chemist (with Chemist Warehouse's prices), Amcal, Discount Drug Stores, Guardian / PharmaSave, Priceline Pharmacy, Soul Pattinson, TerryWhite Chemmart, Blooms The Chemist, Good Price Pharmacy, Pharmacy 4 Less, Direct Chemist Outlet, Star Discount Chemist, Capital Chemist, National Pharmacies and Chempro.
 - **Any other shop**: add its website and Restock finds its search page and reads the products and prices, with Save and test to check it works.
-- **Pantry**: each item is your product (linked at every store that sells it) plus alternatives you'd accept. Swipe to add to your list or delete (with undo).
+- **Pantry**: each item is your product (linked at every store that sells it) plus alternatives you'd accept, listed by shop then size, cheapest first, or A to Z. Swipe to add to your list or delete (with undo).
 - **Scanning**: zxing-cpp inside the app. Normal barcodes, GS1 QR codes, Data Matrix and DataBar, from the camera or a photo, or type the number. **Scan several** walks your cupboard and fills your shopping list. Unknown barcodes fall back to the supermarkets' own data, a generic search (an ingredient and strength for medicines) or reading the front of the pack.
+- **Picked for you**: tick a product from a search and Restock searches your other shops again for the same product, or the ones most like it in kind, size and price, ready to tick.
 - **Best match**: after a scan, the same product (brand, variant and size) is ticked at each shop. If the barcode only names the brand, you pick which one it is once and Restock ticks it everywhere and remembers.
 - **Your store's prices and stock**: Woolworths shows your own store's prices and stock, and Restock can fill your Woolworths trolley, once you sign in to your Woolworths account inside Restock. You sign in on Woolworths' own page in Restock's built-in browser, so your password only ever goes to Woolworths; Restock just remembers that you're signed in and which store. For Coles, tap Choose your Coles store in My shops and tap your store in Coles' own store finder; Restock picks up its store number by itself (you can add a second store for its stock, or type the number by hand). Without these, Restock shows online prices and leaves stock out, since online stock isn't reliable for your shop.
 - **Hold to preview**: press and hold any product for a bigger photo, its full name, size, price, ingredients, allergens and nutrition.
-- **Search**: all your stores at once, ranked by what you most likely mean: type "butter" and butter comes first, with peanut butter, butter chicken sauce and butter-flavoured popcorn further down. Unit prices worked out the same way everywhere, a best-value sort, "On special only", recent searches, and fixes for Aussie names (snags, loo paper).
+- **Search**: all your stores at once, ranked by what you most likely mean: type "butter" and butter comes first, with peanut butter, butter chicken sauce and butter-flavoured popcorn further down; children's medicines only when you ask for them. Slower shops show a loading bar. Unit prices worked out the same way everywhere, a best-value sort, "On special only", recent searches, and fixes for Aussie names (snags, loo paper).
 - **Shopping list**: quantities, by shop or all together, A to Z, Best value / Lowest price, one-store totals with a "why this one?", share as text, or send to the Coles or Woolworths app. Type in the list and your pantry items come up first; or add a plain name, or **Find cheapest** to search the shops for a one-off buy without adding it to your pantry.
-- **Price history**: a tab for each shop, then that shop's products by size, so you always know which one you're looking at. A chart over 1 month to 6 months, where today's price sits against the lowest, usual sale and normal price, how often it's on special and when the next sale is likely, and multi-buys counted at their price each.
+- **Price history**: a tab for each shop (always in the same order), then that shop's products smallest first, so you always know which one you're looking at. A chart over 1 month to 6 months, where today's price sits against the lowest, usual sale and normal price, how often it's on special and when the next sale is likely, and multi-buys counted at their price each.
 - **This week**: deals, small savings and "wait for a better sale" for all your shops, or one shop at a time.
 - **Alert me under $X** per item, and **stock-up tips** for things that rarely go on sale.
 - **Near me**: find every supermarket, bottle shop or pharmacy nearby from OpenStreetMap and pick your branch.
@@ -127,6 +128,7 @@ Restock is built by one person in their spare time. Prices, shops and websites a
 | **Notice a shop isn't working** | Opening a [**Store stopped working**](../../issues/new?template=store-broken.yml) issue. In the app, Settings → Troubleshooting → Diagnostics → **Send search details** saves exactly what the shop sent back. Attach that file and it can usually be fixed fast. |
 | **See the wrong product or price** | Opening a [**Wrong product or price**](../../issues/new?template=product-mismatch.yml) issue with the barcode and what the shelf says. |
 | **Use a bottle shop or pharmacy** | Testing it! These connections are the newest and least tested. |
+| **Have a computer** | Running the [search test tools](tools/README.md): they search every shop from your computer and save what came back, so searches can be checked and fixed against real results. |
 | **Write code** | Picking up an issue labelled [`good first issue`](../../labels/good%20first%20issue) or [`help wanted`](../../labels/help%20wanted). Shop connections, accessibility and the coming features below are all open. Start with [CONTRIBUTING.md](CONTRIBUTING.md). |
 | **Have an idea** | Starting a thread in [Discussions → Ideas](../../discussions/categories/ideas). |
 | **Like it** | Starring the repo and telling a mate. That's how a free app gets found. |

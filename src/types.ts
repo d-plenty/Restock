@@ -222,6 +222,8 @@ export interface HomeArea {
   lon: number;
 }
 
+export type ProductOrder = 'size' | 'cheapest' | 'name';
+
 export interface Settings {
   onboarded: boolean;
   /** Your store at each shop, by shop id. Look up with storeChoice(). */
@@ -277,6 +279,8 @@ export interface Settings {
   theme: 'system' | 'light' | 'dark';
   /** Shopping list: cheapest by best value (per 100 g / litre / item) or by lowest shelf price. */
   listCompare: 'unit' | 'price';
+  /** The order of an item's products (0.7.6): by shop then size, cheapest first, or A to Z. */
+  productOrder?: ProductOrder;
   /** New versions on GitHub (0.7.3): tell me once a week, when I last looked, and the last one I was told about. */
   updates?: { notify: boolean; lastCheck?: string; told?: string };
   /** Date of the privacy policy the person accepted. */

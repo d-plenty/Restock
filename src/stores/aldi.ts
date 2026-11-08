@@ -22,7 +22,7 @@ export function mapAldi(p: Raw): StoreProduct | undefined {
     .map((b) => b.displayText ?? b.text)
     .filter(Boolean)
     .join(', ');
-  const img = assets?.[0]?.url?.replace('{width}', '300').replace('{slug}', String(p.urlSlugText ?? 'product'));
+  const img = assets?.[0]?.url?.replace('{width}', '600').replace('{slug}', String(p.urlSlugText ?? 'product'));
   return {
     chain: 'aldi',
     storeProductId: String(sku),

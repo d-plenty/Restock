@@ -35,4 +35,4 @@ body:
     id: version
     attributes:
       label: Restock version
-      placeholder: 0.7.5
+      placeholder: 0.7.6

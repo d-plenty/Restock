@@ -91,6 +91,8 @@ export function cleanName(raw: string): string {
     .replace(/^(new|sale|special|hot price|online only|clearance|best seller|exclusive)[\s:!-]+(?=[A-Z0-9])/i, '')
     // A price is never part of a product's name.
     .replace(/\s*\$\s?\d[\d,]*(\.\d{1,2})?\b/g, ' ')
+    // The brand shown above the name and again at its start ("ApoHealth ApoHealth Paracetamol").
+    .replace(/^\s*((?:[\w'&.-]+\s){1,3}?)\1/i, '$1')
     .replace(/\s+/g, ' ')
     .replace(/([a-z])\.?(\d)([A-Z])/g, '$1.$2 $3') // "No.7Tennessee" → "No.7 Tennessee"
     .trim();
@@ -224,7 +226,13 @@ function product(chain: Chain, p: Partial<StoreProduct> & { name?: string; url?:
 
 /** Drop placeholder images (spacers, "loading" pictures, tiny gifs and svgs). */
 function goodImage(url?: string): string | undefined {
-  if (!url || /^data:|placeholder|spacer|blank\.|loading|lazy[-_]?load|1x1|pixel\.gif|\.svg(\?|$)/i.test(url)) return undefined;
+  if (
+    !url ||
+    /^data:|placeholder|no[-_]?image|image[-_]coming|Product-Image-and-Receipt|spacer|blank\.|loading|lazy[-_]?load|1x1|pixel\.gif|\.svg(\?|$)/i.test(
+      url,
+    )
+  )
+    return undefined;
   return url;
 }
 
@@ -525,7 +533,7 @@ export function fromCards(chain: Chain, html: string, base: string, parse: Parse
     const link = [...card.querySelectorAll('a[href]')].find((a) => (a.textContent ?? '').trim().length > 3) ?? card.querySelector('a[href]');
     const url = absolute(link?.getAttribute('href'), base);
     const heading = card.querySelector('h1,h2,h3,h4,h5,[class*="name" i],[class*="title" i],[itemprop="name"]');
-    const img = [...card.querySelectorAll('img')].find((i) => goodImage(cardImage(i))) ?? card.querySelector('img');
+    const img = cardPicture(card);
     const name = bestName([
       text(spaced(heading)),
       text(link?.getAttribute('title')),
@@ -540,7 +548,7 @@ export function fromCards(chain: Chain, html: string, base: string, parse: Parse
       url,
       price,
       wasPrice: was,
-      imageUrl: absolute(cardImage(img) ?? backgroundImage(card), base),
+      imageUrl: unwrapImage(absolute(cardImage(img) ?? backgroundImage(card), base)),
       inStock: sold ? false : undefined,
     });
     if (p && !seen.has(p.storeProductId)) {
@@ -599,6 +607,42 @@ function backgroundImage(card: Element): string | undefined {
     if (goodImage(v)) return v;
   }
   return undefined;
+}
+
+/**
+ * The card's picture. Some sites put the picture beside the name-and-price block rather than in
+ * it, so look one or two levels up as long as that still holds just this one product.
+ */
+function cardPicture(card: Element): Element | null {
+  const find = (el: Element) => [...el.querySelectorAll('img')].find((i) => goodImage(cardImage(i)));
+  const own = find(card);
+  if (own) return own;
+  const prices = ((card.textContent ?? '').match(MONEY_ALL) ?? []).length;
+  let el = card.parentElement;
+  for (let i = 0; i < 3 && el; i++, el = el.parentElement) {
+    if (((el.textContent ?? '').match(MONEY_ALL) ?? []).length > prices) break;
+    const hit = find(el);
+    if (hit) return hit;
+  }
+  return card.querySelector('img');
+}
+
+/**
+ * The real picture behind an image resizer (Next.js "/_next/image?url=")
+ * so photos load straight from the shop's own picture at full size.
+ */
+export function unwrapImage(url: string | undefined): string | undefined {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    if (/\/_next\/image\/?$|\/_vercel\/image\/?$/.test(u.pathname)) {
+      const inner = u.searchParams.get('url');
+      if (inner) return absolute(inner, u.origin) ?? url;
+    }
+    return url;
+  } catch {
+    return url;
+  }
 }
 
 /** The image a card shows, including lazy-loaded ones. */
@@ -720,7 +764,14 @@ export function findSearch(html: string, base: string, parse: ParseHtml = defaul
   // 2. The search box on the page.
   try {
     const doc = parse(html);
-    for (const form of [...doc.querySelectorAll('form')]) {
+    // Prefer a box that searches products over one for services, stores, articles or recipes.
+    const forms = [...doc.querySelectorAll('form')];
+    const rank = (f: Element) => {
+      const a = (f.getAttribute('action') ?? '').toLowerCase();
+      return /product|shop|catalog/.test(a) ? 0 : /service|store-?locat|stores|blog|article|recipe|help|faq/.test(a) ? 2 : 1;
+    };
+    forms.sort((a, b) => rank(a) - rank(b));
+    for (const form of forms) {
       const input = form.querySelector(
         'input[type="search"], input[name="q"], input[name="s"], input[name="query"], input[name="search"], input[name="searchTerm"], input[name="searchtext"], input[name="text"], input[name="keyword"], input[name="keywords"], input[name="term"]',
       );

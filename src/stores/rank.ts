@@ -160,11 +160,15 @@ function asModifier(q: string[], name: string): boolean {
   });
 }
 
+const KIDS =
+  /\b(child(ren)?'?s?|kids?|infants?|baby|babies|toddlers?|junior|paediatric|pediatric|follow[- ]on|formula|\d+\s*(months?|years?)?\s*(-|to|–)\s*\d+\s*(months?|years?)|\d+\s*years?\s*\+|\d+\+?\s*years)\b/i;
+
 /** "… Butter Flavour", "… with Butter": the word is a flavour or an ingredient, not the thing. */
 function asFlavour(q: string[], name: string): boolean {
   const words = name
     .toLowerCase()
     .replace(/['’]/g, '')
+    .replace(/&|\+/g, ' and ')
     .split(/[^a-z0-9]+/)
     .filter(Boolean)
     .map(stem);
@@ -210,7 +214,9 @@ export function score(q: RankQuery, p: StoreProduct, index = 0): number {
   if (!q.barcode && qTokens.length <= 3) {
     // "Cheese Twisties" names cheese, but it's Twisties: then the kind found doesn't count.
     const modifier = asModifier(qTokens, name);
-    const kind = modifier ? undefined : kindOf(p.name);
+    // "Macaroni & Cheese": an ingredient of something else, so its kind doesn't count either.
+    const flavour = asFlavour(qTokens, name);
+    const kind = modifier || flavour ? undefined : kindOf(p.name);
     const kt = tokens(kind);
     if (kt.length) {
       const inKind = qTokens.filter((t) => kt.some((u) => close(t, u))).length;
@@ -218,8 +224,10 @@ export function score(q: RankQuery, p: StoreProduct, index = 0): number {
       // "Tasty cheese" for cheese, "peanut butter" for butter: a kind of it, so neither up nor down.
       else if (inKind === 0 && matched > 0) s -= 0.3;
     }
-    if (asFlavour(qTokens, name)) s -= 0.3;
+    if (flavour) s -= 0.3;
     if (modifier) s -= 0.35;
+    // Made for children ("6 Years - 12 Years", "Kids", "Infant", "Junior"), when you didn't ask (0.7.6).
+    if (KIDS.test(name) && !KIDS.test(q.text)) s -= 0.4;
   }
 
   const qt = typesIn(q.text);

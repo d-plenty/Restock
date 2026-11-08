@@ -450,3 +450,35 @@ export function clearRecentSearches(): void {
     // ignore
   }
 }
+
+// ---------- like the one you ticked, at another shop (0.7.6) ----------
+
+/**
+ * Products at another shop most like the one you ticked: the same kind of thing first (by its
+ * type and by what you searched for), then a similar size, then a similar price, and a little
+ * extra for the same brand. Best first. Used when that shop doesn't sell the very same product.
+ */
+export function likeThis(anchor: StoreProduct, pool: StoreProduct[], kind: string, searched?: string, max = 3): StoreProduct[] {
+  const kindQ: RankQuery = { text: kind };
+  const typedQ: RankQuery | undefined = searched ? { text: searched } : undefined;
+  const a = packSize(anchor.size, anchor.name);
+  const near = (x: number, y: number, spread: number) => (x > 0 && y > 0 ? 1 - Math.min(1, Math.abs(Math.log(x / y)) / Math.log(spread)) : 0);
+  const brand = anchor.brand?.toLowerCase();
+  const seen = new Set<string>();
+  const scored: { sp: StoreProduct; s: number }[] = [];
+  for (const p of pool) {
+    if (p.chain === anchor.chain || p.price === undefined || seen.has(p.storeProductId)) continue;
+    seen.add(p.storeProductId);
+    const rel = Math.max(score(kindQ, p), typedQ ? score(typedQ, p) : 0);
+    if (rel < 0.45) continue;
+    const b = packSize(p.size, p.name);
+    const size = a && b && a.unit === b.unit ? near(a.qty, b.qty, 3) : 0.3;
+    const price = anchor.price !== undefined ? near(anchor.price, p.price, 2.5) : 0.3;
+    const sameBrand = brand && (p.brand?.toLowerCase() === brand || p.name.toLowerCase().includes(brand)) ? 0.15 : 0;
+    scored.push({ sp: p, s: Math.min(1.2, rel) * 0.5 + size * 0.25 + price * 0.25 + sameBrand });
+  }
+  return scored
+    .sort((x, y) => y.s - x.s)
+    .slice(0, max)
+    .map((x) => x.sp);
+}

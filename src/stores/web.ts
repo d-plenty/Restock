@@ -15,15 +15,16 @@ interface Cached extends SearchInfo {
   at: string;
 }
 
-const KV = (c: StoreChain) => `webShop:${c}`;
+// "2": 0.7.6 added known search pages for most pharmacies, so older remembered guesses are dropped.
+const KV = (c: StoreChain) => `webShop2:${c}`;
 const DAY = 86_400_000;
 
 /** Where this shop's search page is: typed in by the person, known, remembered, or worked out from its homepage. */
-export async function searchInfo(chain: StoreChain, fresh = false): Promise<SearchInfo> {
+export async function searchInfo(chain: StoreChain, fresh = false, ignoreKnown = false): Promise<SearchInfo> {
   const typed = customShop(chain)?.search;
   if (typed && typed.includes('{q}')) return { search: typed, platform: 'other', how: 'the search address you typed in' };
-  const known = shopDef(chain)?.search;
-  const cached = fresh ? undefined : await getKV<Cached>(KV(chain)).catch(() => undefined);
+  const known = ignoreKnown ? undefined : shopDef(chain)?.search;
+  const cached = fresh || ignoreKnown ? undefined : await getKV<Cached>(KV(chain)).catch(() => undefined);
   if (cached?.search && Date.now() - Date.parse(cached.at) < 14 * DAY) return cached;
   const site = websiteOf(chain);
   if (!site) throw new Error(`${chainName(chain)} has no website set.`);
@@ -39,7 +40,7 @@ export async function searchInfo(chain: StoreChain, fresh = false): Promise<Sear
     ? findSearch(html, site)
     : { search: new URL(SEARCH_GUESSES.other[0], site).toString(), platform: 'other' as const, how: 'a guess' };
   const info: SearchInfo = known ? { ...found, search: known, how: 'Restock’s saved address for this shop' } : found;
-  await putKV(KV(chain), { ...info, at: new Date().toISOString() } satisfies Cached).catch(() => undefined);
+  if (!ignoreKnown) await putKV(KV(chain), { ...info, at: new Date().toISOString() } satisfies Cached).catch(() => undefined);
   return info;
 }
 
@@ -122,11 +123,26 @@ export async function searchWeb(chain: StoreChain, term: string): Promise<StoreP
   };
   let out = await attempt(info.search!);
   if (!out.items.length && !customShop(chain)?.search) {
-    // The remembered page may be out of date: look again once.
-    const again = await searchInfo(chain, true);
-    if (again.search && again.search !== info.search) {
-      info = again;
-      out = await attempt(again.search);
+    // Nothing on that page: look for the search box on the homepage again, then try the usual
+    // search pages. Slower, but better than no results. A blocked site stops here.
+    const tried = new Set([info.search]);
+    const again = await searchInfo(chain, true, true).catch(() => undefined);
+    const site = websiteOf(chain)!;
+    const more = [again?.search, ...SEARCH_GUESSES.other.slice(0, 3).map((g) => new URL(g, site).toString())].filter(
+      (u): u is string => !!u && !tried.has(u),
+    );
+    for (const next of more.slice(0, 2)) {
+      if (out.blocked) break;
+      tried.add(next);
+      const got = await attempt(next);
+      out = { items: got.items, blocked: got.blocked };
+      if (got.items.length) {
+        // Remember the page that worked.
+        await putKV(KV(chain), { search: next, platform: info.platform, how: 'a search page that worked', at: new Date().toISOString() }).catch(
+          () => undefined,
+        );
+        break;
+      }
     }
   }
   if (!out.items.length && out.blocked) throw new BlockedError(name);

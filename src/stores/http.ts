@@ -47,7 +47,12 @@ export function setConnectionMode(m: ConnectionMode) {
 export const connectionMode = () => mode;
 
 /** Make a request from inside the store's own website, the way the site itself does. */
-export async function viaBrowser(chain: 'coles' | 'woolworths' | 'aldi', method: 'GET' | 'POST', url: string, body?: unknown): Promise<HttpResult> {
+export async function viaBrowser(
+  chain: 'coles' | 'woolworths' | 'aldi' | 'danmurphys' | 'bws',
+  method: 'GET' | 'POST',
+  url: string,
+  body?: unknown,
+): Promise<HttpResult> {
   if (!isNative()) throw new NativeOnlyError();
   const r = await RestockNative.storeFetch({ chain, method, url, body: body === undefined ? undefined : JSON.stringify(body) });
   capture('browser fetch', url, r.status, r.body ?? '');

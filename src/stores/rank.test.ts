@@ -102,3 +102,33 @@ describe('what you most likely mean (0.7.5)', () => {
     expect(r[0]).toBe('Coles Free Range Eggs 12 Pack 700g');
   });
 });
+
+describe('medicines (0.7.6)', () => {
+  const sp = (name: string): StoreProduct => ({ chain: 'directchemist', storeProductId: name, name, price: 5, isSpecial: false, memberOnly: false });
+  it("puts adults' paracetamol before children's", () => {
+    const r = rankAll({ text: 'paracetamol' }, [
+      sp('ApoHealth Paracetamol 6 Years - 12 Years 200mL'),
+      sp('Panamax 500mg 100 Tablets - Paracetamol (S3)'),
+      sp('Chemists Own Paracetamol Soft Gel Capsules 500mg 30'),
+    ]).map((p) => p.name);
+    expect(r[r.length - 1]).toBe('ApoHealth Paracetamol 6 Years - 12 Years 200mL');
+    expect(
+      rankAll({ text: 'kids paracetamol' }, [sp('Panamax 500mg 100 Tablets'), sp('Panadol Children 5-12 Years Suspension 200mL')])[0].name,
+    ).toContain('Children');
+  });
+});
+
+describe('real search results (0.7.6)', () => {
+  const sp = (name: string): StoreProduct => ({ chain: 'aldi', storeProductId: name, name, price: 5, isSpecial: false, memberOnly: false });
+  const top = (q: string, names: string[]) => rankAll({ text: q }, names.map(sp))[0].name;
+  it('milk is milk, not a frother or formula', () => {
+    expect(top('milk', ['Ambiano Milk Frother', 'Mamia Infant Formula Milk Stage 1 900g', 'Farmdale Full Cream Milk 2L'])).toBe(
+      'Farmdale Full Cream Milk 2L',
+    );
+  });
+  it('cheese is cheese, not macaroni & cheese or kransky', () => {
+    expect(top('cheese', ['Macaroni & Cheese 220g', 'Cheese Kransky 500g', 'Emporium Selection Tasty Cheese Block 500g'])).toBe(
+      'Emporium Selection Tasty Cheese Block 500g',
+    );
+  });
+});

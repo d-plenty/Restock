@@ -35,6 +35,7 @@ import {
   type Candidate,
   whichOne,
   UNLIKELY,
+  likeThis,
   matchesFor,
   normaliseQuery,
   queryChanged,
@@ -52,7 +53,17 @@ import { BlockedError, isNative, NativeOnlyError, promoLabel } from '../../store
 import { recordHealth } from '../../lib/health';
 import { isExactBarcode, rankAll, score, tokens, type RankQuery } from '../../stores/rank';
 import { chainName, mainProductIds, searchStoreId, stockKnown, type AlertLevel, type Chain, type Group, type Product } from '../../types';
-import { activeSections, enabledIn, SECTION_NAMES, SECTION_PLACE, SECTION_SHOPS, searchChainsIn, type Section, type StoreChain } from '../../shops';
+import {
+  activeSections,
+  enabledIn,
+  SECTION_NAMES,
+  SECTION_PLACE,
+  SECTION_SHOPS,
+  searchChainsIn,
+  shopDef,
+  type Section,
+  type StoreChain,
+} from '../../shops';
 
 const SEARCH_PLACEHOLDER: Record<Section, string> = {
   pantry: 'Or search a product name',
@@ -222,6 +233,13 @@ export function AddScreen({
   const [following, setFollowing] = useState<Chain[]>([]);
   const [similar, setSimilar] = useState<Partial<Record<Chain, StoreProduct[]>>>({});
   const followFor = useRef<string | undefined>(undefined);
+  // After you tick your first product from a typed search (0.7.6): the other shops searched again
+  // for it, with the same product or the ones most like it (kind, size, price) picked out for you.
+  const [recAnchor, setRecAnchor] = useState<StoreProduct>();
+  const [recs, setRecs] = useState<Partial<Record<Chain, { same?: StoreProduct; like: StoreProduct[] }>>>({});
+  const [recBusy, setRecBusy] = useState<Chain[]>([]);
+  const recFor = useRef<string | undefined>(undefined);
+  const recCard = useRef<HTMLDivElement>(null);
   // Products already in your pantry, so search results can say so.
   const pantry = useLive(async () => {
     const [products, groups] = await Promise.all([allProducts(), allGroups()]);
@@ -317,6 +335,10 @@ export function AddScreen({
     setFollowing([]);
     setSimilar({});
     followFor.current = undefined;
+    setRecAnchor(undefined);
+    setRecs({});
+    setRecBusy([]);
+    recFor.current = undefined;
     const chains = chainsToSearch(s.enabledChains, sec);
     setSearched(chains);
     setResults(Object.fromEntries(chains.map((c) => [c, { status: 'loading' }])));
@@ -491,6 +513,53 @@ export function AddScreen({
     void followUp(c.sp, new Set(m.keys()));
   };
 
+  /**
+   * You ticked your first product: search your other shops again for it (by brand and type, as
+   * shops name things differently) and pick out the same product, or the ones most like it in
+   * kind, size and price. You can still scroll each shop's list and tick your own.
+   */
+  const recommend = async (anchor: StoreProduct) => {
+    const s = settings ?? (await getSettings());
+    const kind = genericName(anchor.name, anchor.brand) || lastText;
+    const todo = searched.filter((c) => c !== anchor.chain) as Chain[];
+    const tag = keyOf(anchor);
+    if (!todo.length || recFor.current === tag) return;
+    recFor.current = tag;
+    setRecAnchor(anchor);
+    setRecs({});
+    setRecBusy(todo);
+    setTimeout(() => recCard.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 200);
+    const typed = lastText.toLowerCase().trim();
+    const terms = [...new Set([anchor.brand ? `${anchor.brand} ${kind}` : '', kind].map((t) => t.toLowerCase().trim()))].filter(
+      (t) => t && t !== typed,
+    );
+    await Promise.all(
+      todo.map(async (chain) => {
+        try {
+          const a = adapterFor(chain);
+          const cur = results[chain];
+          const have = cur?.status === 'ok' ? cur.items : [];
+          const extra: StoreProduct[] = [];
+          if (a) for (const t of terms) extra.push(...(await a.search(t, searchStoreId(s, chain as StoreChain)).catch(() => [] as StoreProduct[])));
+          if (recFor.current !== tag) return;
+          if (extra.length) mergeInto(chain, extra);
+          const pool = [...have, ...extra];
+          const same = matchesFor(anchor, pool, 0.6)[0];
+          const like = likeThis(
+            anchor,
+            pool.filter((p) => !same || keyOf(p) !== keyOf(same)),
+            kind,
+            lastText,
+            same ? 2 : 3,
+          );
+          setRecs((m) => ({ ...m, [chain]: { same, like } }));
+        } finally {
+          if (recFor.current === tag) setRecBusy((b) => b.filter((c) => c !== chain));
+        }
+      }),
+    );
+  };
+
   const toggle = (sp: StoreProduct) => {
     setPicks((prev) => {
       const next = new Map(prev);
@@ -515,6 +584,13 @@ export function AddScreen({
       choose({ sp, at: [sp, ...matchesFor(sp, others, 0.6)] });
       return;
     }
+    // Your first tick from a typed search: recommend it, or the closest thing, at every other shop.
+    if (!picks.size && !rankQ.barcode && !attachTo && !recFor.current) {
+      setSuggest([]);
+      void recommend(sp);
+      return;
+    }
+    if (recAnchor) return;
     const pickedChains = new Set([...picks.values()].map((p) => p.chain).concat(sp.chain));
     setSuggest(matchesFor(sp, others).filter((m) => !pickedChains.has(m.chain)));
   };
@@ -1043,6 +1119,66 @@ export function AddScreen({
         </div>
       )}
 
+      {recAnchor && picks.size > 0 && (
+        <div className="card best-match" ref={recCard} style={{ scrollMarginTop: 12 }}>
+          <div className="eyebrow green">Picked for you at your other shops</div>
+          <span className="small">
+            Like the {recAnchor.name} you ticked at {chainName(recAnchor.chain)} ({money(recAnchor.price)}). Tick the ones you want, or keep scrolling
+            to pick your own.
+          </span>
+          {recBusy.length > 0 && (
+            <span className="small" role="status">
+              Searching {recBusy.map((c) => chainName(c)).join(' and ')} for it…
+              <LoadingBar seconds={15} />
+            </span>
+          )}
+          {searched
+            .filter((c) => c !== recAnchor.chain && recs[c as Chain])
+            .map((c) => {
+              const r = recs[c as Chain]!;
+              const rows = [...(r.same ? [r.same] : []), ...r.like];
+              return (
+                <div key={c} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span className="small" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <ChainDot chain={c} />{' '}
+                    {r.same
+                      ? `Same product at ${chainName(c)}`
+                      : rows.length
+                        ? `Most like it at ${chainName(c)}`
+                        : `Nothing like it at ${chainName(c)}`}
+                  </span>
+                  {rows.length > 0 && (
+                    <div className="card flush" style={{ boxShadow: 'none' }}>
+                      {rows.map((sp) => (
+                        <label key={keyOf(sp)} className={`row${picks.has(keyOf(sp)) ? ' selected' : ''}`}>
+                          <input
+                            type="checkbox"
+                            checked={picks.has(keyOf(sp))}
+                            onChange={() => toggle(sp)}
+                            aria-label={`Tick ${sp.name} at ${chainName(sp.chain)}`}
+                          />
+                          <MoreInfo src={sp.imageUrl ?? photoFor(sp)} name={sp.name} onOpen={() => setPreview(sp)} />
+                          <span className="grow">
+                            <span className="title" style={{ fontSize: 14 }}>
+                              {sp.name}
+                            </span>
+                            {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
+                            {unitTextOf(sp) && <span className="small">{unitTextOf(sp)}</span>}
+                            {sp === r.same && <span className="tag great">Same product</span>}
+                          </span>
+                          <span className="num" style={{ fontWeight: 700 }}>
+                            {money(sp.price)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      )}
+
       {anyResults && (
         <div className="chips" role="group" aria-label="Filter results">
           <button className="chip" aria-pressed={specialsOnly} onClick={() => setSpecialsOnly((v) => !v)}>
@@ -1118,7 +1254,15 @@ export function AddScreen({
                     </select>
                   )}
                 </div>
-                {r.status === 'loading' && <p className="small">Searching {chainName(chain)}…</p>}
+                {r.status === 'loading' && (
+                  <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <p className="small">
+                      Searching {chainName(chain)}…
+                      {(shopDef(chain)?.kind ?? 'web') === 'web' ? ' Reading the shop’s own website can take up to half a minute.' : ''}
+                    </p>
+                    <LoadingBar seconds={(shopDef(chain)?.kind ?? 'web') === 'web' ? 25 : 8} />
+                  </div>
+                )}
                 {r.status === 'error' && (
                   <div className="banner amber" style={{ fontSize: 13 }}>
                     {r.message}

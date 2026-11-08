@@ -1,5 +1,5 @@
 import type { StoreChain } from '../shops';
-import { looksMemberOnly, num, parseJson, request, stockFlag } from './http';
+import { isNative, looksMemberOnly, num, parseJson, request, stockFlag, viaBrowser, type HttpResult } from './http';
 import type { StoreAdapter, StoreProduct } from './types';
 import { searchWeb } from './web';
 import { cleanName } from './webPage';
@@ -75,12 +75,17 @@ export function mapEndeavour(chain: 'danmurphys' | 'bws', p: Raw): StoreProduct 
     detail(p, 'image1', 'webimage1', 'image') ??
     (typeof p.MediumImageFile === 'string' ? p.MediumImageFile : undefined) ??
     (typeof p.SmallImageFile === 'string' ? p.SmallImageFile : undefined);
-  const size = detail(p, 'webliquorsize', 'liquorsize', 'webpacksize') ?? (typeof p.PackageSize === 'string' ? p.PackageSize : undefined);
+  const one = detail(p, 'webliquorsize', 'liquorsize', 'webpacksize') ?? (typeof p.PackageSize === 'string' ? p.PackageSize : undefined);
+  // The same beer comes as a single, a pack and a case under one name: say which this is.
+  const qty = num(detail(p, 'displayunitquantity', 'productunitquantity')) ?? 1;
+  const kind = detail(p, 'webpacktype')?.toLowerCase();
+  const pack = qty > 1 ? (kind === 'case' ? `Case of ${qty}` : `${qty} Pack`) : undefined;
+  const size = pack && one ? `${qty} x ${one}` : one;
   const before = was ?? (promo !== undefined && single !== undefined && single > promo ? single : undefined);
   return {
     chain,
     storeProductId: String(id),
-    name: cleanName(brand && !baseName.toLowerCase().startsWith(brand.toLowerCase()) ? `${brand} ${baseName}` : baseName) || baseName,
+    name: withPack(cleanName(brand && !baseName.toLowerCase().startsWith(brand.toLowerCase()) ? `${brand} ${baseName}` : baseName) || baseName, pack),
     brand,
     size,
     barcode: typeof p.Barcode === 'string' && p.Barcode ? p.Barcode : undefined,
@@ -97,10 +102,13 @@ export function mapEndeavour(chain: 'danmurphys' | 'bws', p: Raw): StoreProduct 
   };
 }
 
+const withPack = (name: string, pack: string | undefined) =>
+  pack && !new RegExp(`\\b${pack.replace(/\s+/g, '\\s*')}\\b`, 'i').test(name) ? `${name} · ${pack}` : name;
+
 /** Search answers nest products inside bundles; flatten them. */
 export function flattenEndeavour(chain: 'danmurphys' | 'bws', data: Raw): StoreProduct[] {
   const out: StoreProduct[] = [];
-  const outer = (data.Products ?? data.products ?? data.Bundles ?? []) as Raw[];
+  const outer = (data.Products ?? data.products ?? data.Bundles ?? data.Items ?? []) as Raw[];
   if (!Array.isArray(outer)) return out;
   for (const entry of outer) {
     const inner = Array.isArray(entry.Products) ? (entry.Products as Raw[]) : [entry];
@@ -112,7 +120,76 @@ export function flattenEndeavour(chain: 'danmurphys' | 'bws', data: Raw): StoreP
   return out;
 }
 
-async function apiSearch(chain: 'danmurphys' | 'bws', term: string): Promise<StoreProduct[]> {
+/**
+ * Category words ("beer", "shiraz") aren't searched: the shop sends you to the category page
+ * instead. These are the pages it uses, for when it doesn't say where.
+ */
+const CATEGORY: Record<string, string> = {
+  beer: '/beer',
+  cider: '/beer/cider',
+  wine: '/wine',
+  'red wine': '/wine/red-wine',
+  'white wine': '/wine/white-wine',
+  shiraz: '/wine/red-wine/shiraz',
+  'cabernet sauvignon': '/wine/red-wine/cabernet-sauvignon',
+  merlot: '/wine/red-wine/merlot',
+  'pinot noir': '/wine/red-wine/pinot-noir',
+  'sauvignon blanc': '/wine/white-wine/sauvignon-blanc',
+  chardonnay: '/wine/white-wine/chardonnay',
+  'pinot grigio': '/wine/white-wine/pinot-grigio-pinot-gris',
+  moscato: '/wine/white-wine/moscato',
+  rose: '/wine/rose',
+  rosé: '/wine/rose',
+  sparkling: '/wine/sparkling-wine',
+  champagne: '/wine/champagne',
+  spirits: '/spirits',
+  premix: '/spirits/premix',
+};
+
+const TIMEOUT = 12_000;
+
+/** How a request goes out: straight from the app, or from inside the shop's own page in the hidden browser. */
+type Send = (o: { url: string; method?: 'GET' | 'POST'; headers: Record<string, string>; body?: unknown }) => Promise<HttpResult>;
+const direct: Send = (o) => request({ ...o, timeoutMs: TIMEOUT });
+const inBrowser =
+  (chain: 'danmurphys' | 'bws'): Send =>
+  (o) =>
+    viaBrowser(chain, o.method ?? 'GET', o.url, o.body);
+
+async function browse(chain: 'danmurphys' | 'bws', location: string, headers: Record<string, string>, send: Send): Promise<StoreProduct[]> {
+  const e = ENDEAVOUR[chain];
+  const path = new URL(location, e.site).pathname.replace(/\/$/, '');
+  const [department, sub, category] = path.split('/').filter(Boolean);
+  if (!department || /search|resource-not-found/.test(department)) return [];
+  const q = new URLSearchParams({
+    Location: path,
+    department,
+    pageNumber: '1',
+    pageSize: '40',
+    sortType: 'Browse_Relevance_LocalSales',
+    banner: 'true',
+  });
+  if (sub) q.set('subDepartment', sub.replace(/-/g, ' '));
+  if (category) q.set('category', category);
+  const res = await send({ url: `${e.api}/Browse?${q}`, headers });
+  const out = flattenEndeavour(chain, parseJson<Raw>(e.name, res));
+  if (out.length || sub) return out;
+  // A whole department's page ("/beer") is made of lists: best sellers and specials.
+  const lists = await Promise.all(
+    ['bestsellers', 'specials'].map((kind) =>
+      send({
+        url: `${e.api}/ProductGroup/Products/${department}-${kind}?Location=${encodeURIComponent(path)}&pageNumber=0&pageSize=24&showOnlyAvailable=true&sortType=ProductGroup_Relevance`,
+        headers,
+      })
+        .then((r) => flattenEndeavour(chain, parseJson<Raw>(e.name, r)))
+        .catch(() => [] as StoreProduct[]),
+    ),
+  );
+  const seen = new Set<string>();
+  return lists.flat().filter((p) => (seen.has(p.storeProductId) ? false : seen.add(p.storeProductId)));
+}
+
+async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send = direct): Promise<StoreProduct[]> {
   const e = ENDEAVOUR[chain];
   const headers = {
     Accept: 'application/json, text/plain, */*',
@@ -122,22 +199,46 @@ async function apiSearch(chain: 'danmurphys' | 'bws', term: string): Promise<Sto
   };
   const body = {
     SearchTerm: term,
-    PageSize: 24,
+    PageSize: 36,
     PageNumber: 1,
     SortType: 'Relevance',
     Location: `/search?searchTerm=${encodeURIComponent(term)}`,
     Filters: [],
   };
+  let moved: string | undefined;
+  const redirect = (res: { status: number; headers: Record<string, string> }) => {
+    if (res.status < 300 || res.status >= 400) return false;
+    const where = Object.entries(res.headers).find(([k]) => k.toLowerCase() === 'location')?.[1];
+    moved = where || moved || CATEGORY[term.trim().toLowerCase()] || '';
+    return true;
+  };
   try {
-    const res = await request({ url: `${e.api}/Search/products`, method: 'POST', headers, body });
-    const out = flattenEndeavour(chain, parseJson<Raw>(e.name, res));
-    if (out.length) return out;
+    const res = await send({ url: `${e.api}/Search/products`, method: 'POST', headers, body });
+    if (!redirect(res)) {
+      const out = flattenEndeavour(chain, parseJson<Raw>(e.name, res));
+      if (out.length) return out;
+    }
   } catch {
     // try the other way of asking
   }
-  const q = new URLSearchParams({ searchTerm: term, pageSize: '24', pageNumber: '1', sortType: 'Relevance' });
-  const res = await request({ url: `${e.api}/Search/products?${q}`, headers });
-  return flattenEndeavour(chain, parseJson<Raw>(e.name, res));
+  let failed: unknown;
+  if (moved === undefined) {
+    try {
+      const q = new URLSearchParams({ searchTerm: term, pageSize: '36', pageNumber: '1', sortType: 'Relevance' });
+      const res = await send({ url: `${e.api}/Search/products?${q}`, headers });
+      if (!redirect(res)) {
+        const out = flattenEndeavour(chain, parseJson<Raw>(e.name, res));
+        if (out.length) return out;
+      }
+    } catch (err) {
+      failed = err;
+    }
+  }
+  // Sent to a category page, or nothing found for a category word: read that category.
+  const where = moved || CATEGORY[term.trim().toLowerCase()];
+  if (where) return browse(chain, where, headers, send);
+  if (failed) throw failed;
+  return [];
 }
 
 export function endeavourAdapter(chain: 'danmurphys' | 'bws'): StoreAdapter {
@@ -148,7 +249,14 @@ export function endeavourAdapter(chain: 'danmurphys' | 'bws'): StoreAdapter {
         const out = await apiSearch(chain, term);
         if (out.length) return out;
       } catch {
-        // fall back to the website
+        // turned away: ask again from inside the shop's own page, the way the site itself does
+        if (isNative())
+          try {
+            const out = await apiSearch(chain, term, inBrowser(chain));
+            if (out.length) return out;
+          } catch {
+            // fall back to reading the website
+          }
       }
       return searchWeb(chain as StoreChain, term);
     },

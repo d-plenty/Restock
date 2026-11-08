@@ -1,0 +1,5 @@
+• Tick a product and Restock finds it, or the closest thing in size and price, at your other shops
+• Pharmacies: Chemist Warehouse, Blooms, Chempro, Priceline and more now search properly, with photos
+• Dan Murphy's and BWS: "beer" and "shiraz" give results, labelled single, 6 pack or case
+• Better ranking, sharper photos, a loading bar for slow shops
+• An item's products are in order: by shop then size, cheapest, or A to Z

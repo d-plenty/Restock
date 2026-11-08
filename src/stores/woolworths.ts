@@ -32,8 +32,10 @@ export function mapWoolworths(p: Raw): StoreProduct | undefined {
     (typeof p.PromotionDescription === 'string' && p.PromotionDescription) ||
     (p.IsHalfPrice === true ? '1/2 price' : undefined) ||
     (typeof centreTag === 'string' ? centreTag.replace(/<[^>]+>/g, '').trim() || undefined : undefined);
+  // The large picture is sharper on a phone screen (0.7.6).
   const image =
-    (typeof p.MediumImageFile === 'string' && p.MediumImageFile) ||
+    (typeof p.LargeImageFile === 'string' && p.LargeImageFile) ||
+    (typeof p.MediumImageFile === 'string' && p.MediumImageFile.replace('/wowproductimages/medium/', '/wowproductimages/large/')) ||
     (typeof p.SmallImageFile === 'string' && p.SmallImageFile) ||
     ((p.ImageUris as Raw | undefined)?.medium as string | undefined);
   return {

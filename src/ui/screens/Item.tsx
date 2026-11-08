@@ -16,6 +16,7 @@ import {
   updateProduct,
 } from '../../lib/db';
 import { genericName } from '../../lib/naming';
+import { orderOptions, PRODUCT_ORDERS, shopRank } from '../../lib/productOrder';
 import { ensureNotificationPermission, notificationsAllowed, scheduleReminders } from '../../lib/notify';
 import { isNative } from '../../stores/http';
 import { getSettings, updateSettings } from '../../lib/db';
@@ -214,8 +215,11 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   }
 
   const { group, rec, readings, categories, onList } = data;
-  const mains = rec.options.filter((o) => o.role === 'main');
-  const alts = rec.options.filter((o) => o.role === 'alt');
+  // Listed in the order picked on this page (0.7.6): by shop then size, cheapest first, or A to Z.
+  const order = appSettings?.productOrder ?? 'size';
+  const ordered = orderOptions(rec.options, order);
+  const mains = ordered.filter((o) => o.role === 'main');
+  const alts = ordered.filter((o) => o.role === 'alt');
   const chartId = selected ?? rec.best?.product.id ?? group.usualProductId;
   const chartOption = rec.options.find((o) => o.product.id === chartId) ?? rec.options[0];
   const allReadings = chartOption ? (readings.get(chartOption.product.id) ?? []) : [];
@@ -386,7 +390,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
 
       {chartOption && stats && (
         <PriceHistory
-          options={rec.options}
+          options={ordered}
           option={chartOption}
           onPick={setSelected}
           stats={stats}
@@ -421,8 +425,29 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           <span className="title">
             Your product <HowItWorks />
           </span>
-          <span className="small">{productsAndShops(mains)}</span>
+          {mains.length > 2 ? (
+            <select
+              className="input"
+              style={{ width: 'auto', height: 34, padding: '0 8px', fontSize: 13 }}
+              value={order}
+              onChange={(e) => void updateSettings({ productOrder: e.target.value as typeof order })}
+              aria-label="Order of products"
+            >
+              {PRODUCT_ORDERS.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="small">{productsAndShops(mains)}</span>
+          )}
         </div>
+        {mains.length > 2 && (
+          <p className="small" style={{ padding: '0 14px 4px' }}>
+            {productsAndShops(mains)}
+          </p>
+        )}
         {mains.map((o) => row(o, mains.length > 1 && o === rec.best && !tiedWithBest(rec).length ? 'cheapest' : undefined))}
         {mains.length > 1 && tiedWithBest(rec).length > 0 && (
           <p className="small" style={{ padding: '0 14px 12px' }}>
@@ -904,7 +929,7 @@ function nameWithoutSize(o: Option): string {
  * name ("Brita Maxtra Pro", 1 filter or 3 pack) are easy to tell apart.
  */
 function HistoryPicker({ options, picked, onPick }: { options: Option[]; picked: Option; onPick: (id: string) => void }) {
-  const chains = [...new Set(options.map((x) => x.product.chain))];
+  const chains = [...new Set(options.map((x) => x.product.chain))].sort((a, b) => shopRank(a) - shopRank(b));
   const [shop, setShop] = useState(picked.product.chain);
   useEffect(() => setShop(picked.product.chain), [picked.product.chain]);
   const rows = options.filter((x) => x.product.chain === shop);

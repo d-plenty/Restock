@@ -1,0 +1,12 @@
+{
+  "name": "restock-shop-probe",
+  "private": true,
+  "type": "module",
+  "description": "Saves what each shop's search sends back, to build and test Restock's shop connections.",
+  "scripts": {
+    "probe": "node probe.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.49.1"
+  }
+}
