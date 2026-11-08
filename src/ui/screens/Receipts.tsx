@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 
 import { confirmAction } from '../../lib/confirm';
 import { allReceipts, getReceipt, getSettings, nowIso, saveReceipt, uid, updateSettings } from '../../lib/db';
 import { dataUrl, photoPath, photosSize, readPhoto, writePhoto } from '../../lib/receiptFiles';
-import { ADDON_SIZE_TEXT, ADDON_SOURCE, installReader, readerInstalled, readText, removeReader } from '../../lib/receiptReader';
+import { readerInstalled, readText, removeOldDownload } from '../../lib/receiptReader';
 import { deleteOn, expired, itemLines, joinPages, KEEP_MONTHS, keepLabel, parseReceipt, removeReceipts } from '../../lib/receipts';
 import { blackAndWhite, findPaper, fullQuad, greyscale, rotate, shrink, warp, type Img, type Quad } from '../../lib/scan';
 import { money } from '../../lib/units';
@@ -24,57 +24,15 @@ const dayText = (d: Date | string) =>
     year: new Date(d).getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
   });
 
-/** Download (or remove) the receipt reader, with a progress bar. */
+/** The receipt reader is built in since 0.7.4: switching on just marks it ready (and clears any old download). */
 function useReader() {
-  const [installed, setInstalled] = useState<boolean>();
-  const [progress, setProgress] = useState<number>();
-  const [error, setError] = useState<string>();
-  useEffect(() => {
-    void readerInstalled().then(setInstalled);
-  }, []);
   const install = async () => {
-    setError(undefined);
-    setProgress(0);
-    try {
-      await installReader(setProgress);
-      const s = await getSettings();
-      await updateSettings({ receipts: { ...s.receipts, installed: true } });
-      setInstalled(true);
-      return true;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      return false;
-    } finally {
-      setProgress(undefined);
-    }
-  };
-  const remove = async () => {
-    await removeReader();
+    await removeOldDownload();
     const s = await getSettings();
-    await updateSettings({ receipts: { ...s.receipts, installed: false } });
-    setInstalled(false);
+    await updateSettings({ receipts: { ...s.receipts, installed: true } });
+    return true;
   };
-  return { installed, progress, error, install, remove };
-}
-
-function DownloadBar({ progress }: { progress: number }) {
-  return (
-    <div style={{ display: 'grid', gap: 6 }}>
-      <span className="small" role="status">
-        Downloading the receipt reader… {Math.round(progress * 100)}%
-      </span>
-      <div
-        className="loading-bar"
-        role="progressbar"
-        aria-label="Download"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(progress * 100)}
-      >
-        <span style={{ width: `${Math.round(progress * 100)}%` }} />
-      </div>
-    </div>
-  );
+  return { installed: true as boolean | undefined, progress: undefined as number | undefined, error: undefined as string | undefined, install };
 }
 
 /** Settings → Receipts (and the Receipts setup tile). */
@@ -132,10 +90,7 @@ export function ReceiptsSettings({ settings, inSetup }: { settings: Settings; in
           </li>
           <li>
             <Icon name="download" size={16} />
-            <span>
-              The reader is a one-off download of {ADDON_SIZE_TEXT} from {ADDON_SOURCE}. Reading happens on your phone; receipts are never sent
-              anywhere.
-            </span>
+            <span>The reader is built into Restock and works offline. Reading happens on your phone; receipts are never sent anywhere.</span>
           </li>
         </ul>
       )}
@@ -145,19 +100,10 @@ export function ReceiptsSettings({ settings, inSetup }: { settings: Settings; in
             <span className="title" style={{ fontSize: 15 }}>
               Receipts
             </span>
-            <span className="small">
-              {reader.installed === false && !r.enabled
-                ? `Scan and keep receipts. Switching on downloads the reader (${ADDON_SIZE_TEXT}).`
-                : 'Scan and keep receipts.'}
-            </span>
+            <span className="small">Scan and keep receipts.</span>
           </span>
           <input type="checkbox" checked={r.enabled} disabled={reader.progress !== undefined} onChange={(e) => void turnOn(e.target.checked)} />
         </label>
-        {reader.progress !== undefined && (
-          <div style={{ padding: '0 14px 12px' }}>
-            <DownloadBar progress={reader.progress} />
-          </div>
-        )}
         {reader.error && (
           <div style={{ padding: '0 14px 12px', display: 'grid', gap: 8 }}>
             <div className="banner amber">Couldn't download the reader: {reader.error}</div>
@@ -200,22 +146,6 @@ export function ReceiptsSettings({ settings, inSetup }: { settings: Settings; in
               </span>
               <Icon name="chevron" size={18} />
             </button>
-            {reader.installed && !r.enabled && (
-              <button
-                className="row"
-                onClick={async () => {
-                  await reader.remove();
-                  nav.toast('Receipt reader removed');
-                }}
-              >
-                <span className="grow">
-                  <span className="title" style={{ color: 'var(--red-ink)' }}>
-                    Remove the receipt reader
-                  </span>
-                  <span className="small">Frees {ADDON_SIZE_TEXT}. Your receipts stay.</span>
-                </span>
-              </button>
-            )}
           </>
         )}
       </div>
@@ -768,23 +698,8 @@ export function ReceiptScreen({ id }: { id?: string }) {
             Corners
           </button>
         </div>
-        {reader.installed === false && settings.receipts.enabled && (
-          <div className="card">
-            <p className="small" style={{ margin: 0 }}>
-              The receipt reader isn't downloaded, so you'll type the details in. Download it ({ADDON_SIZE_TEXT}) to have them read for you.
-            </p>
-            {reader.progress !== undefined ? (
-              <DownloadBar progress={reader.progress} />
-            ) : (
-              <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => void reader.install()}>
-                <Icon name="download" size={16} /> Download the reader
-              </button>
-            )}
-            {reader.error && <div className="banner amber">{reader.error}</div>}
-          </div>
-        )}
         <button className="btn primary block" disabled={!!busy || !result} onClick={() => void read([...pages.map((x) => x.ocr), warp(src, quad)])}>
-          {reader.installed === false ? 'Next' : pages.length ? `Read all ${pages.length + 1} photos` : 'Read the receipt'}
+          {pages.length ? `Read all ${pages.length + 1} photos` : 'Read the receipt'}
         </button>
         <button
           className="btn block"

@@ -1,0 +1,6 @@
+• The receipt reader is built in: works offline, nothing to download
+• Shopping list: your pantry items show up as you type, plus a quick search button
+• Home: see deals at one shop
+• Pantry and shopping list sorted A to Z
+• Clearer "how often it's on sale", and when the next sale is likely
+• Slim undo message that no longer covers the screen

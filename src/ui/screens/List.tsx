@@ -222,6 +222,29 @@ export function ListScreen() {
     setText('');
   };
 
+  // Typing in "Add anything": your own pantry items that match come first (0.7.4), so "Nescafe"
+  // adds the Nescafe you track, with its photo and cheapest shop, not a blank line.
+  const typed = text.trim().toLowerCase();
+  const words = typed.split(/\s+/).filter((w) => w.length > 1);
+  const pantryMatches = typed
+    ? recs
+        .filter((r) => {
+          const hay = `${r.group.name} ${r.options.map((o) => o.product.name).join(' ')}`.toLowerCase();
+          return words.length ? words.every((w) => hay.includes(w)) : hay.includes(typed);
+        })
+        .sort(
+          (a, b) =>
+            Number(!a.group.name.toLowerCase().startsWith(typed)) - Number(!b.group.name.toLowerCase().startsWith(typed)) ||
+            a.group.name.localeCompare(b.group.name),
+        )
+        .slice(0, 4)
+    : [];
+  const exactPantry = recs.find((r) => r.group.name.trim().toLowerCase() === typed);
+  const addFromPantry = async (r: (typeof recs)[number]) => {
+    await add(r.group.name, r.group.id);
+    nav.toast(`${r.group.name} added from your pantry`);
+  };
+
   const scanToList = async () => {
     const out = await scanBarcode('Scan to add to your shopping list');
     if (!out.ok) return;
@@ -239,8 +262,11 @@ export function ListScreen() {
     nav.toast(info.name ? `${info.name} added` : 'Added. Tap it to rename.');
   };
 
-  const open = entries.filter((e) => !e.checked);
-  const done = entries.filter((e) => e.checked);
+  // A to Z by default (0.7.4), within each shop.
+  const az = (a: ListEntry, b: ListEntry) => labelOf(a).localeCompare(labelOf(b), undefined, { sensitivity: 'base' });
+  const labelOf = (e: ListEntry) => recs.find((r) => r.group.id === e.groupId)?.group.name ?? e.text;
+  const open = entries.filter((e) => !e.checked).sort(az);
+  const done = entries.filter((e) => e.checked).sort(az);
   const total = open.reduce((s, e) => s + (priceOf(c, e) ?? 0), 0);
   const firstTime = !settings.seenHints.includes('list');
 
@@ -351,6 +377,17 @@ export function ListScreen() {
               {money(p)}
             </span>
           )}
+          {/* Not a pantry item: search the shops for it in one tap (also in the ⋯ menu). 0.7.4 */}
+          {!selecting && !e.groupId && (
+            <button
+              className="icon-btn"
+              aria-label={`Find the cheapest ${title}`}
+              onClick={() => nav.push({ name: 'add', query: e.text, forList: true, replaceEntry: e.id, section: e.section })}
+              style={{ width: 36, height: 36 }}
+            >
+              <Icon name="search" size={18} />
+            </button>
+          )}
           {!selecting && (
             <button
               className="icon-btn"
@@ -426,7 +463,8 @@ export function ListScreen() {
       <form
         onSubmit={(ev) => {
           ev.preventDefault();
-          void add(text);
+          // A name you already track adds that item, not a blank copy of it.
+          void (exactPantry ? addFromPantry(exactPantry) : add(text));
         }}
         style={{ display: 'flex', gap: 8 }}
       >
@@ -436,6 +474,29 @@ export function ListScreen() {
         </button>
       </form>
       {/* Typed something: add just the name, or look it up at your shops for this trip (0.7.3). */}
+      {pantryMatches.length > 0 && (
+        <div className="card flush pantry-matches" role="list" aria-label="In your pantry">
+          {pantryMatches.map((r) => (
+            <button key={r.group.id} role="listitem" className="row" onClick={() => void addFromPantry(r)}>
+              <Thumb src={(r.best ?? r.options[0])?.product.imageUrl} />
+              <span className="grow">
+                <span className="title clip" style={{ fontSize: 14 }}>
+                  {r.group.name}
+                </span>
+                <span className="small clip">
+                  In your pantry
+                  {(r.best ?? r.options[0])
+                    ? ` · ${chainName((r.best ?? r.options[0])!.product.chain)} ${money((r.best ?? r.options[0])!.price)}`
+                    : ''}
+                </span>
+              </span>
+              <span className="btn small primary" aria-hidden>
+                <Icon name="plus" size={16} /> Add
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       {text.trim() && (
         <div className="two add-choices">
           <button className="btn" onClick={() => void add(text)}>

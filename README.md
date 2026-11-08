@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Beta 0.7.3" src="https://img.shields.io/badge/status-beta%200.7.3-ffcd00">
+  <img alt="Beta 0.7.4" src="https://img.shields.io/badge/status-beta%200.7.4-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -81,7 +81,7 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Near me**: find every supermarket, bottle shop or pharmacy nearby from OpenStreetMap and pick your branch.
 - **Store health**: Home tells you if a store hasn't worked for a day, and Settings → Troubleshooting → Test connections shows what went wrong.
 - **Diagnostics**: what went wrong lately, shop by shop, **Send search details** to capture exactly what a shop sent back, and a recording of what a shop's website does when you add something to its trolley yourself (sign-in and personal details left out), so connections can be fixed.
-- **Receipts** (optional add-on): finds the receipt's edges, straightens it, makes it crisp black and white, and reads the shop, date and total with Tesseract on the phone. A one-off download of about 7 MB. Photos stay inside Restock, not in your gallery.
+- **Receipts** (optional): finds the receipt's edges, straightens it, makes it crisp black and white, and reads the shop, date and total with Tesseract on the phone. The reader is built in and works offline. Photos stay inside Restock, not in your gallery.
 - **Recall alerts**: on by default, checked every 24 hours separately from price checks, matched against your Pantry, Keg, Pharmacy, list and kept receipts, with the official notice one tap away.
 - **Loyalty cards**: member prices only count if you've added the card.
 - **Catalogues**: a link to the catalogue of every shop you use.
@@ -99,7 +99,7 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - Everything lives in a database **on your phone**. No account, no ads, no analytics, no tracking.
 - No Google Play services, Firebase or ML Kit, so it runs on de-Googled phones (GrapheneOS, CalyxOS, /e/OS).
 - Every permission is optional and explained, and asked for only when a feature needs it.
-- The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists, and jsDelivr once if you download the receipt reader). **Nothing goes to the people who make Restock.**
+- The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists, and GitHub if you check for updates). **Nothing goes to the people who make Restock.**
 
 Read the full **[privacy policy](PRIVACY.md)** and the **[fine print](DISCLAIMER.md)**.
 

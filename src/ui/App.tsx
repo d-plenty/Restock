@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openDatabase } from '../lib/boot';
 import { checkPrices, syncBackgroundSchedule } from '../lib/check';
 import { getSettings, pruneHistory, refresh, updateSettings } from '../lib/db';
-import { checkForUpdate, weeklyCheckDue } from '../lib/updates';
+import { checkForUpdate, SELF_UPDATE, weeklyCheckDue } from '../lib/updates';
 import { version as appVersion } from '../../package.json';
 import { setConnectionMode } from '../stores/http';
 import { applyTheme, syncInsets } from '../lib/theme';
@@ -80,7 +80,7 @@ export default function App() {
     const t = window.setTimeout(() => {
       void (async () => {
         const s = await getSettings();
-        if (!weeklyCheckDue(s.updates)) return;
+        if (!SELF_UPDATE || !weeklyCheckDue(s.updates)) return;
         const info = await checkForUpdate(appVersion).catch(() => undefined);
         const told = info?.newer && s.updates?.told !== info.version ? info.version : undefined;
         await updateSettings({ updates: { notify: true, ...s.updates, lastCheck: new Date().toISOString(), ...(told ? { told } : {}) } });
@@ -109,7 +109,7 @@ export default function App() {
         setToastMsg(undefined);
         setToastUndo(undefined);
       },
-      undo ? 6000 : 2800,
+      undo ? 4000 : 2800,
     );
   }, []);
 

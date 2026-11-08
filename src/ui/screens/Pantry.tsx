@@ -15,8 +15,8 @@ import { SECTION_NAMES, type Section } from '../../shops';
 type Filter = 'all' | 'sale' | string; // string = category id
 type Sort = 'sale' | 'az' | 'recent';
 const SORTS: { id: Sort; label: string }[] = [
-  { id: 'sale', label: 'Deals first' },
   { id: 'az', label: 'A to Z' },
+  { id: 'sale', label: 'Deals first' },
   { id: 'recent', label: 'Recently added' },
 ];
 // Deals first: the order Home uses, best saving at the top.
@@ -29,7 +29,8 @@ function loadSort(): Sort {
   } catch {
     // storage can be unavailable
   }
-  return 'sale';
+  // A to Z unless you picked another order (0.7.4).
+  return 'az';
 }
 
 function seenSwipe(): boolean {

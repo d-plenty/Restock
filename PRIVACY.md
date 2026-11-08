@@ -60,7 +60,7 @@ OpenStreetMap (Nominatim and Overpass): when you look for nearby stores, the sub
 
 The official recall lists (Food Standards Australia New Zealand, Product Safety Australia and the Therapeutic Goods Administration), while recall alerts are on: once a day, and when you tap Check now, Restock downloads their public lists of recent recalls, the same for everyone. Matching them against your items, list and receipts happens on your phone; nothing about you is sent.
 
-jsDelivr (cdn.jsdelivr.net), once, only if you switch on receipts: the receipt reader (Tesseract, open-source text recognition, and its English model) is downloaded from there, like any app download. Receipts are read on your phone and never sent anywhere.
+No service, for receipts: the receipt reader (Tesseract, open-source text recognition, and its English model) is built into Restock since version 0.7.4, so nothing is downloaded. Receipts are read on your phone and never sent anywhere.
 
 Store catalogue links open in your phone's web browser, under that website's own policy.
 

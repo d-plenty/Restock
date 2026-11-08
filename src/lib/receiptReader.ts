@@ -1,85 +1,29 @@
-import { Capacitor } from '@capacitor/core';
 import workerUrl from 'tesseract.js/dist/worker.min.js?url';
 import { RestockNative } from './sql/native';
 import { isNative } from '../stores/http';
 
-// The receipt reader: Tesseract (open-source text recognition) running on the phone. Its engine
-// and its English model are a one-off download of about 7 MB, kept in Restock's own storage, so
-// the app itself stays small and nobody downloads it who doesn't use receipts. Nothing is sent
-// anywhere to read a receipt.
+// The receipt reader: Tesseract (open-source text recognition) running on the phone. Since 0.7.4
+// its engine and English model ship inside the app (about 7 MB), so nothing is downloaded and it
+// works offline. Nothing is sent anywhere to read a receipt. Both come from npm packages
+// (tesseract.js-core, Apache-2.0; @tesseract.js-data/eng, MIT), so F-Droid builds them from source.
+import coreFile from 'tesseract.js-core/tesseract-core-simd-lstm.wasm.js?url';
+import langFile from '@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz?url';
 
-const CORE_VERSION = '7.0.0';
-const DATA_VERSION = '1.0.0';
-
-export const ADDON_FILES = [
-  {
-    path: 'receipt-reader/tesseract-core.wasm.js',
-    url: `https://cdn.jsdelivr.net/npm/tesseract.js-core@${CORE_VERSION}/tesseract-core-simd-lstm.wasm.js`,
-    bytes: 3_899_472,
-  },
-  {
-    path: 'receipt-reader/eng.traineddata.gz',
-    url: `https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@${DATA_VERSION}/4.0.0_best_int/eng.traineddata.gz`,
-    bytes: 2_952_873,
-  },
-];
-
-export const ADDON_BYTES = ADDON_FILES.reduce((n, f) => n + f.bytes, 0);
-export const ADDON_SIZE_TEXT = `about ${Math.round(ADDON_BYTES / 1_000_000)} MB`;
-export const ADDON_SOURCE = 'jsDelivr, a free host for open-source files';
-
-// In a desktop browser (testing) the files come straight from the web, or from VITE_READER_BASE.
-const webBase = (import.meta.env.VITE_READER_BASE as string | undefined)?.replace(/\/$/, '');
-const webUrl = (f: (typeof ADDON_FILES)[number]) => (webBase ? `${webBase}/${f.path.split('/').pop()}` : f.url);
-
-/** Whether the reader's files are on the phone. */
+/** The reader is part of the app: always there. Kept so older screens and settings keep working. */
 export async function readerInstalled(): Promise<boolean> {
-  if (!isNative()) return true;
-  try {
-    const all = await Promise.all(ADDON_FILES.map((f) => RestockNative.appFileInfo({ path: f.path })));
-    return all.every((i, n) => i.exists && i.bytes === ADDON_FILES[n].bytes);
-  } catch {
-    return false;
-  }
+  return true;
 }
 
-/** Downloads the reader. `onProgress` gets 0–1. */
-export async function installReader(onProgress?: (fraction: number) => void): Promise<void> {
-  if (!isNative()) {
-    onProgress?.(1);
-    return;
-  }
-  const done = new Map<string, number>();
-  const report = () => onProgress?.(Math.min(1, [...done.values()].reduce((a, b) => a + b, 0) / ADDON_BYTES));
-  const sub = await RestockNative.addListener('downloadProgress', (e) => {
-    done.set(e.path, e.bytes);
-    report();
-  });
-  try {
-    for (const f of ADDON_FILES) {
-      const have = await RestockNative.appFileInfo({ path: f.path }).catch(() => undefined);
-      if (!have?.exists || have.bytes !== f.bytes) await RestockNative.downloadAppFile({ url: f.url, path: f.path });
-      done.set(f.path, f.bytes);
-      report();
-    }
-  } finally {
-    await sub.remove();
-  }
-  stopReader();
+/**
+ * Before 0.7.4 the reader was a separate download into Restock's storage. Clears that old copy (it
+ * isn't used any more) to free the space. Safe to call any time.
+ */
+export async function removeOldDownload(): Promise<void> {
+  if (!isNative()) return;
+  await RestockNative.deleteAppDir({ path: 'receipt-reader' }).catch(() => undefined);
 }
 
-export async function removeReader(): Promise<void> {
-  stopReader();
-  if (isNative()) await RestockNative.deleteAppDir({ path: 'receipt-reader' });
-}
-
-async function fileBytes(f: (typeof ADDON_FILES)[number]): Promise<ArrayBuffer> {
-  let url = webUrl(f);
-  if (isNative()) {
-    const info = await RestockNative.appFileInfo({ path: f.path });
-    if (!info.exists) throw new Error('The receipt reader isn’t downloaded yet.');
-    url = Capacitor.convertFileSrc(info.uri);
-  }
+async function fileBytes(url: string): Promise<ArrayBuffer> {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`Couldn't load the receipt reader (${r.status}).`);
   return r.arrayBuffer();
@@ -95,7 +39,7 @@ function getWorker(onStatus?: (s: string) => void): Promise<TWorker> {
   if (!worker) {
     worker = (async () => {
       onStatus?.('Starting the receipt reader…');
-      const [{ createWorker, OEM }, core, lang] = await Promise.all([import('tesseract.js'), fileBytes(ADDON_FILES[0]), fileBytes(ADDON_FILES[1])]);
+      const [{ createWorker, OEM }, core, lang] = await Promise.all([import('tesseract.js'), fileBytes(coreFile), fileBytes(langFile)]);
       // Everything is handed to Tesseract from memory, so nothing is fetched by its worker: the
       // engine as a blob (the "#.js" tells Tesseract it's the file itself, not a folder), and the
       // English model through a small wrapper that answers the worker's request for it.

@@ -31,6 +31,22 @@ export function HomeScreen() {
   const health = useLive(getHealth, []);
   const failingAll = health ? failingStores(health) : [];
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [dealShop, setDealShopState] = useState<string | undefined>(() => {
+    try {
+      return localStorage.getItem('homeDealShop') ?? undefined;
+    } catch {
+      return undefined;
+    }
+  });
+  const setDealShop = (c: string | undefined) => {
+    setDealShopState(c);
+    try {
+      if (c) localStorage.setItem('homeDealShop', c);
+      else localStorage.removeItem('homeDealShop');
+    } catch {
+      // storage can be unavailable
+    }
+  };
   const refresh = usePullToRefresh(() => void runCheck());
 
   const cards = useLive(allCards, []);
@@ -76,9 +92,16 @@ export function HomeScreen() {
   }, 0);
   const next = nextCheck(settings);
 
-  const buys = recs.filter((r) => r.action === 'buy');
-  const altDeals = recs.filter((r) => r.action === 'alt');
-  const smalls = recs.filter((r) => r.action === 'small');
+  // Deals at one shop only, or all of them (0.7.4). The shop each deal is at: the swap's for a swap.
+  const dealChain = (r: (typeof recs)[number]) => (r.action === 'alt' ? r.alt : r.best)?.product.chain;
+  const dealRecs = recs.filter((r) => r.action === 'buy' || r.action === 'alt' || r.action === 'small');
+  const dealShops = [...new Set(dealRecs.map(dealChain).filter((c): c is NonNullable<typeof c> => !!c))].sort((a, b) =>
+    chainName(a).localeCompare(chainName(b)),
+  );
+  const atShop = (r: (typeof recs)[number]) => !dealShop || !dealShops.includes(dealShop as never) || dealChain(r) === dealShop;
+  const buys = recs.filter((r) => r.action === 'buy' && atShop(r));
+  const altDeals = recs.filter((r) => r.action === 'alt' && atShop(r));
+  const smalls = recs.filter((r) => r.action === 'small' && atShop(r));
   const waits = recs.filter((r) => r.action === 'wait');
   const skips = recs.filter((r) => r.action === 'skip');
   const normal = recs.filter((r) => r.action === 'none');
@@ -315,6 +338,25 @@ export function HomeScreen() {
         </div>
       )}
 
+      {dealShops.length > 1 && (
+        <div className="chips deal-shops" role="tablist" aria-label="Deals at">
+          <button
+            role="tab"
+            className="chip"
+            aria-selected={!dealShop || !dealShops.includes(dealShop as never)}
+            aria-pressed={!dealShop || !dealShops.includes(dealShop as never)}
+            onClick={() => setDealShop(undefined)}
+          >
+            All shops
+          </button>
+          {dealShops.map((c) => (
+            <button key={c} role="tab" className="chip" aria-selected={dealShop === c} aria-pressed={dealShop === c} onClick={() => setDealShop(c)}>
+              <ChainDot chain={c} /> {chainName(c)}
+              <span className="ph-count">{dealRecs.filter((r) => dealChain(r) === c).length}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {buys.length > 0 && <div className="eyebrow green">On sale now</div>}
       {buys.map((r) => (
         <DealCard key={r.group.id} rec={r} listed={listed.get(r.group.id)} />

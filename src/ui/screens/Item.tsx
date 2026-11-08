@@ -1099,6 +1099,19 @@ function PriceHistory({
               ? 'About a quarter of the time'
               : `${Math.round(share * 100)}% of the time`;
 
+  // When it was last on sale (from this phone's own price checks), to say if another is due (0.7.4).
+  const lastSaleAt = [...allReadings].reverse().find((r) => onSale(r, stats.typical, allowMulti))?.date;
+  const onSaleNow = !!allReadings.length && onSale(allReadings[allReadings.length - 1], stats.typical, allowMulti);
+  const weeksSinceSale = lastSaleAt ? Math.floor((now - Date.parse(lastSaleAt)) / WEEK) : undefined;
+  const nextSaleText =
+    onSaleNow || weeksSinceSale === undefined || weeksSinceSale < 1
+      ? undefined
+      : stats.cycleWeeks && weeksSinceSale >= stats.cycleWeeks * 0.8
+        ? `Last on sale ${weeksSinceSale === 1 ? 'a week' : `${weeksSinceSale} weeks`} ago, so another sale is likely soon.`
+        : stats.cycleWeeks
+          ? `Last on sale ${weeksSinceSale === 1 ? 'a week' : `${weeksSinceSale} weeks`} ago. Sales usually come round every ~${stats.cycleWeeks} weeks.`
+          : `Last on sale ${weeksSinceSale === 1 ? 'a week' : `${weeksSinceSale} weeks`} ago.`;
+
   const ownWeeks = allReadings.length ? Math.max(1, Math.round((now - Date.parse(allReadings[0].date)) / WEEK)) : 0;
   const source = market
     ? `From shared price history · ${market.days} days`
@@ -1198,15 +1211,20 @@ function PriceHistory({
       {shareText && (
         <>
           <div className="ph-sec">How often it's on sale</div>
+          {/* The bar is the share of the time it's been on sale, not a countdown (0.7.4). */}
           <div className="ph-often">
-            <div className="ph-meter">
+            <div className="ph-meter" role="img" aria-label={`On sale ${Math.round((share ?? 0) * 100)}% of the time`}>
               <i style={{ width: `${Math.max(3, Math.round((share ?? 0) * 100))}%` }} />
             </div>
             <span>
               <b>{shareText}</b>
               {stats.cycleWeeks ? <br /> : null}
-              {stats.cycleWeeks ? `every ~${stats.cycleWeeks} weeks` : null}
+              {stats.cycleWeeks ? `a sale about every ${stats.cycleWeeks} weeks` : null}
             </span>
+          </div>
+          <div className="small" style={{ marginTop: -4 }}>
+            The bar shows how much of the time it's been on sale ({Math.round((share ?? 0) * 100)}%).
+            {nextSaleText ? ` ${nextSaleText}` : ''}
           </div>
           {ownShare !== undefined && (
             <div className="ph-weeks" aria-label={`On sale ${saleWeeks} of the last ${known} weeks with prices`}>

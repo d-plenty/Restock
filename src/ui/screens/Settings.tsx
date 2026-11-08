@@ -21,7 +21,7 @@ import { startTour } from '../Tour';
 import { downloadMarket, MARKET_SIZE_TEXT, MARKET_SOURCE, marketInfo, megabytes, removeMarket } from '../../lib/market';
 import { getHealth, testConnections, type ConnectionTest, type StoreChain } from '../../lib/health';
 import { useNav } from '../nav';
-import { checkForUpdate, installUpdate, RELEASES, type UpdateInfo } from '../../lib/updates';
+import { checkForUpdate, installUpdate, RELEASES, SELF_UPDATE, type UpdateInfo } from '../../lib/updates';
 import { activeSections, searchChainsIn, type Section } from '../../shops';
 import { shopSummary } from './Stores';
 import { ExportSheet } from './BackupParts';
@@ -815,6 +815,11 @@ function Fold({ title, sub, children }: { title: string; sub?: string; children:
  * screen), and an optional weekly check when Restock opens. Nothing is sent but the request itself.
  */
 function UpdateRows({ settings }: { settings: Settings }) {
+  if (!SELF_UPDATE) return null;
+  return <UpdateRowsOn settings={settings} />;
+}
+
+function UpdateRowsOn({ settings }: { settings: Settings }) {
   const nav = useNav();
   const [busy, setBusy] = useState<'check' | 'install'>();
   const [found, setFound] = useState<UpdateInfo>();

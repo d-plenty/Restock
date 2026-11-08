@@ -3267,3 +3267,40 @@ details.fold-inline {
     transform: translateY(-8px);
   }
 }
+
+/* Home: deals at one shop (0.7.4). */
+.deal-shops {
+  margin: 4px 0 -2px;
+}
+.deal-shops .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.deal-shops .chip[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--surface);
+  border-color: var(--ink);
+}
+.deal-shops .chip[aria-pressed='true'] .ph-count {
+  color: inherit;
+  opacity: 0.8;
+}
+.pantry-matches {
+  margin-top: -4px;
+}
+.pantry-matches .btn.small {
+  pointer-events: none;
+  flex: none;
+}
+
+/* 0.7.4: one slim bar at the top, on every screen. The shopping list's old "above Start shopping"
+   position pinned the bottom too, which stretched the message into a huge box. */
+.toast,
+.app:has(.sticky-cta) .toast {
+  top: calc(var(--top) + 10px);
+  bottom: auto;
+  height: auto;
+  max-height: 30vh;
+}

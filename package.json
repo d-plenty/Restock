@@ -1,7 +1,7 @@
 {
   "name": "restock",
   "private": true,
-  "version": "0.7.3",
+  "version": "0.7.4",
   "type": "module",
   "description": "Restock (working name) — local-first grocery price tracker for Coles, Woolworths and Aldi.",
   "scripts": {
@@ -21,11 +21,13 @@
     "@capacitor/filesystem": "8.1.5",
     "@capacitor/local-notifications": "8.3.1",
     "@capacitor/share": "8.0.3",
+    "@tesseract.js-data/eng": "1.0.0",
     "jsbarcode": "3.12.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "sql.js": "^1.15.2",
     "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0",
     "zxing-wasm": "^3.1.6"
   },
   "devDependencies": {

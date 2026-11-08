@@ -15,7 +15,6 @@ import { AccessibilitySettings, LookSettings } from './Look';
 import { PermissionList } from './Permissions';
 import { RecallSettings } from './Recalls';
 import { ReceiptsSettings } from './Receipts';
-import { ADDON_SIZE_TEXT } from '../../lib/receiptReader';
 import { readBackupFile, RestoreSheet } from './Restore';
 import { StoreFields } from './Stores';
 
@@ -70,7 +69,7 @@ const ALL_TILES: Tile[] = [
   {
     id: 'receipts',
     title: 'Receipts',
-    sub: `Scan and keep · ${ADDON_SIZE_TEXT.replace('about ', '')}`,
+    sub: 'Scan and keep, read on your phone',
     icon: 'receipt',
     heading: 'Keep your receipts?',
     intro: 'Scan receipts into Restock and keep them for as long as you choose.',

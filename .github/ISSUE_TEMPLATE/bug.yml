@@ -24,7 +24,7 @@ body:
     attributes:
       label: Restock version
       description: Settings, at the very bottom.
-      placeholder: 0.7.3
+      placeholder: 0.7.4
     validations:
       required: true
   - type: input
