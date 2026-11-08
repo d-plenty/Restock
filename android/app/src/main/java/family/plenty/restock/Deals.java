@@ -296,6 +296,8 @@ public final class Deals {
         if (s != null && "single".equals(s.kind) && "ml".equals(s.unit) && s.qty <= 600 && named != null && (n == null || !"multi".equals(n.kind))) {
             return new Size(s.qty * named, "ml", named);
         }
+        // Size "1 each", name "… Tablets 70 Pack": the name has how many (units.ts packSize).
+        if (s != null && "ea".equals(s.unit) && s.qty <= 1 && n != null && "count".equals(n.kind) && n.qty > 1) return new Size(n.qty, "ea");
         Parts p = s != null ? s : n;
         if (p == null) return null;
         return new Size(p.qty, p.unit, "multi".equals(p.kind) && p.count != null && p.count > 1 ? p.count : null);

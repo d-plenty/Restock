@@ -52,6 +52,8 @@ export interface RestockNativePlugin {
   checkRecalls(): Promise<{ checked: number; found: number; fresh: number; errors: Record<string, string> }>;
   /** Show a notification right away (recalls found by "Check now", the weekly summary). */
   notify(opts: { id: number; title: string; body: string }): Promise<void>;
+  /** 0.7.3: download an official release APK and open Android's installer. */
+  installUpdate(opts: { url: string }): Promise<{ started?: boolean; needsPermission?: boolean }>;
   /** Pick a folder for automatic backups (Android's folder picker). Rejects if cancelled. */
   pickFolder(): Promise<{ uri: string; name: string }>;
   /** Write a backup file into the picked folder, keeping the newest `keep` Restock backups there. */

@@ -125,8 +125,8 @@ export function SendToShopSheet({ chain, lines, onClose }: { chain: 'woolworths'
         <div className="card hint" style={{ flexDirection: 'column', gap: 6 }}>
           <strong>Skip the tapping: sign in to Woolworths</strong>
           <span className="small">
-            Sign in to your Woolworths account in Restock (Settings → Supermarkets → Check your stores) and Restock puts the whole list in your
-            Woolworths trolley in one go. It's waiting in the Woolworths app when you open it.
+            Sign in to your Woolworths account in Restock (Settings → My shops) and Restock puts the whole list in your Woolworths trolley in one go.
+            It's waiting in the Woolworths app when you open it.
           </span>
           <button
             className="btn small"

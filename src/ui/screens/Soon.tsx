@@ -67,7 +67,7 @@ export const SOON: Soon[] = [
   },
   {
     id: 'iphone',
-    icon: 'plus',
+    icon: 'phone',
     title: 'iPhone version',
     short: 'Restock on iOS, working with the Android version',
     body: (
@@ -97,7 +97,7 @@ export const SOON: Soon[] = [
   },
   {
     id: 'github',
-    icon: 'external',
+    icon: 'download',
     title: 'F-Droid',
     short: 'Install and update Restock from F-Droid',
     body: (
@@ -121,7 +121,7 @@ export const SOON: Soon[] = [
     id: 'sharedprices',
     icon: 'tag',
     title: 'Shared prices',
-    short: 'Opt-in: pool prices so new items have a history from day one',
+    short: 'A free public website of price history, so new items are judged from day one',
     body: (
       <>
         <p>
@@ -163,9 +163,7 @@ export function ComingSoon() {
               </span>
               <span className="small">{s.short}</span>
             </span>
-            <span className="info-dot" aria-hidden="true">
-              i
-            </span>
+            <Icon name="chevron" size={18} />
           </button>
         ))}
       </div>

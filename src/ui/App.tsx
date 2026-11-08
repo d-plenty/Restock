@@ -3,7 +3,9 @@ import { Capacitor } from '@capacitor/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openDatabase } from '../lib/boot';
 import { checkPrices, syncBackgroundSchedule } from '../lib/check';
-import { getSettings, pruneHistory, refresh } from '../lib/db';
+import { getSettings, pruneHistory, refresh, updateSettings } from '../lib/db';
+import { checkForUpdate, weeklyCheckDue } from '../lib/updates';
+import { version as appVersion } from '../../package.json';
 import { setConnectionMode } from '../stores/http';
 import { applyTheme, syncInsets } from '../lib/theme';
 import { scheduleReminders } from '../lib/notify';
@@ -72,6 +74,26 @@ export default function App() {
     };
   }, []);
 
+  // "Tell me when there's an update": once a week, when Restock opens (0.7.3).
+  useEffect(() => {
+    if (!ready) return;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        const s = await getSettings();
+        if (!weeklyCheckDue(s.updates)) return;
+        const info = await checkForUpdate(appVersion).catch(() => undefined);
+        const told = info?.newer && s.updates?.told !== info.version ? info.version : undefined;
+        await updateSettings({ updates: { notify: true, ...s.updates, lastCheck: new Date().toISOString(), ...(told ? { told } : {}) } });
+        if (!told) return;
+        const msg = `Restock ${told} is out. Update it in Settings → About and updates.`;
+        if (Capacitor.isNativePlatform())
+          await RestockNative.notify({ id: 4390, title: 'A Restock update is ready', body: msg }).catch(() => undefined);
+        else setToastMsg(msg);
+      })();
+    }, 4000);
+    return () => window.clearTimeout(t);
+  }, [ready]);
+
   useEffect(() => {
     openDatabase()
       .then(() => setReady(true))
@@ -87,7 +109,7 @@ export default function App() {
         setToastMsg(undefined);
         setToastUndo(undefined);
       },
-      undo ? 6000 : 3200,
+      undo ? 6000 : 2800,
     );
   }, []);
 
@@ -215,7 +237,7 @@ export default function App() {
           <ScannerHost />
           <ConfirmHost />
           {toastMsg && (
-            <div className="toast" role="status">
+            <div className="toast" role="status" onClick={() => setToastMsg(undefined)}>
               {toastMsg}
             </div>
           )}
@@ -279,6 +301,8 @@ export default function App() {
                 query={top.query}
                 onlyChain={top.chain}
                 section={top.section ?? addSection}
+                forList={top.forList}
+                replaceEntry={top.replaceEntry}
                 overlay
               />
             )}
@@ -303,7 +327,16 @@ export default function App() {
         <TourHost />
         <ConfirmHost />
         {toastMsg && (
-          <div className="toast" role="status">
+          <div
+            className="toast"
+            role="status"
+            // Tap it to make it go away, so it never sits over a button you need (0.7.3).
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest('.toast-undo')) return;
+              setToastMsg(undefined);
+              setToastUndo(undefined);
+            }}
+          >
             <span style={{ flex: 1 }}>{toastMsg}</span>
             {toastUndo && (
               <button

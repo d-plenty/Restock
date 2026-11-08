@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatUnitPrice, packSize, parseSize, unitPrice } from './units';
+import { formatUnitPrice, packSize, parseSize, tidySize, tidyUnitText, unitPrice } from './units';
 import packCases from './packCases.json';
 
 describe('parseSize', () => {
@@ -51,7 +51,23 @@ describe('unit prices', () => {
   it('formats like shelf labels', () => {
     expect(formatUnitPrice(0.005, 'g')).toBe('$0.50 / 100g');
     expect(formatUnitPrice(0.0016, 'ml')).toBe('$1.60 / L');
-    expect(formatUnitPrice(0.0028, 'ea')).toBe('$0.28 / 100');
-    expect(formatUnitPrice(1.25, 'ea')).toBe('$1.25 / ea');
+    expect(formatUnitPrice(0.0028, 'ea')).toBe('$0.28 per 100');
+    expect(formatUnitPrice(1.25, 'ea')).toBe('$1.25 each');
+  });
+});
+
+describe('sizes and unit prices shown to people (0.7.3)', () => {
+  it('takes the count from the name when the shop says 1 each', () => {
+    expect(packSize('1 each', 'Finish Dishwashing Tablets 70 Pack')).toEqual({ qty: 70, unit: 'ea' });
+    expect(tidySize('1 each', 'Dishwashing Tablets 70 Pack')).toBe('70 pack');
+    expect(tidySize('1 Each', 'Brita Water Filter')).toBe('1 each');
+    expect(tidySize('3 Pack')).toBe('3 pack');
+    expect(tidySize('500mL')).toBe('500mL');
+  });
+  it('tidies shop unit prices', () => {
+    expect(tidyUnitText('$31.99 per 1 each')).toBe('$31.99 each');
+    expect(tidyUnitText('$0.87 / 1EA')).toBe('$0.87 each');
+    expect(tidyUnitText('$0.96 per 100 each')).toBe('$0.96 per 100');
+    expect(tidyUnitText('$2.50 per 1L')).toBe('$2.50 per 1L');
   });
 });

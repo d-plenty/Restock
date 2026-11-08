@@ -66,6 +66,8 @@ Store catalogue links open in your phone's web browser, under that website's own
 
 hotprices.org, only if you choose shared price history during setup or turn it on in Settings. It's an open-source project that records Coles and Woolworths prices every day. Restock downloads its public price files, the same for everyone, and keeps a short summary per product. Nothing about you or what you track is sent. Restock is testing this and plans to ask the project for permission before any public release.
 
+GitHub (github.com), only when you tap Check for updates in Settings, or once a week if you turn on "Tell me when there's an update". Restock asks for the latest release's version number and notes, and if you tap Update, downloads the new APK from there. Nothing about you or what you track is sent.
+
 ## Backups
 
 "Export a backup" makes one file with the parts you pick: each tab's items (with or without price history), shopping lists, loyalty cards (including their numbers), receipts (with or without their photos) and settings. You choose where it goes through Android's share menu. Keep it somewhere private, and don't post it publicly.

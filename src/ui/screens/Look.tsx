@@ -61,72 +61,89 @@ export function LookSettings({ settings }: { settings: Settings }) {
         <span className="small">Australian has navy bars with a gold line, gold chips and a navy savings banner. Plain is simpler.</span>
       </div>
 
-      <div className="field">
-        <span>Accent colour</span>
-        <div className="swatches" role="radiogroup" aria-label="Accent colour">
-          {ACCENTS.map((a) => {
-            const on = (look.accent ?? AUS_GREEN).toLowerCase() === a.hex.toLowerCase();
-            return (
-              <button
-                key={a.id}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                aria-label={a.name}
-                className={`swatch${on ? ' on' : ''}`}
-                style={{ background: a.hex, color: textOn(a.hex) }}
-                onClick={() => void setAccent(a.id === 'green' ? undefined : a.hex)}
-              >
-                {on && <Icon name="check" size={16} stroke={3} />}
-              </button>
-            );
-          })}
-          <label
-            className={`swatch wheel${ACCENTS.some((a) => a.hex.toLowerCase() === accent.toLowerCase()) ? '' : ' on'}`}
-            aria-label="Pick any colour"
-          >
-            <input type="color" value={accent} onChange={(e) => void setAccent(e.target.value)} />
-          </label>
+      {/* The colour grids are tucked away until you want them (0.7.3). */}
+      <details className="pick-more">
+        <summary>
+          <span className="grow">Accent colour</span>
+          <span className="small">{ACCENTS.find((a) => a.hex.toLowerCase() === accent.toLowerCase())?.name ?? 'Your own colour'}</span>
+          <span className="pick-dot" style={{ background: accent }} aria-hidden />
+          <Icon name="chevron" size={18} />
+        </summary>
+        <div className="field">
+          <div className="swatches" role="radiogroup" aria-label="Accent colour">
+            {ACCENTS.map((a) => {
+              const on = (look.accent ?? AUS_GREEN).toLowerCase() === a.hex.toLowerCase();
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  aria-label={a.name}
+                  className={`swatch${on ? ' on' : ''}`}
+                  style={{ background: a.hex, color: textOn(a.hex) }}
+                  onClick={() => void setAccent(a.id === 'green' ? undefined : a.hex)}
+                >
+                  {on && <Icon name="check" size={16} stroke={3} />}
+                </button>
+              );
+            })}
+            <label
+              className={`swatch wheel${ACCENTS.some((a) => a.hex.toLowerCase() === accent.toLowerCase()) ? '' : ' on'}`}
+              aria-label="Pick any colour"
+            >
+              <input type="color" value={accent} onChange={(e) => void setAccent(e.target.value)} />
+            </label>
+          </div>
+          <span className="small">
+            Text on buttons switches between white and black by itself, so it stays readable. Shops keep their own colours.
+          </span>
         </div>
-        <span className="small">Text on buttons switches between white and black by itself, so it stays readable. Shops keep their own colours.</span>
-      </div>
+      </details>
 
-      <div className="field">
-        <span>App icon colour</span>
-        <label className="check" style={{ padding: 0 }}>
-          <input
-            type="checkbox"
-            checked={look.icon === 'match'}
-            onChange={(e) => void setIcon(e.target.checked ? 'match' : iconId)}
-            disabled={iconBusy}
-          />
-          <span>Match my accent colour</span>
-        </label>
-        <div className="swatches" role="radiogroup" aria-label="App icon colour">
-          {ICON_COLOURS.map((c) => {
-            const on = iconId === c.id;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                aria-label={`${c.name} icon`}
-                disabled={iconBusy}
-                className={`swatch icon${on ? ' on' : ''}`}
-                style={{ background: c.hex, color: textOn(c.hex) }}
-                onClick={() => void setIcon(c.id)}
-              >
-                <Icon name="scan" size={16} stroke={2.6} />
-              </button>
-            );
-          })}
+      <details className="pick-more">
+        <summary>
+          <span className="grow">App icon colour</span>
+          <span className="small">{look.icon === 'match' ? 'Matches accent' : (ICON_COLOURS.find((c) => c.id === iconId)?.name ?? '')}</span>
+          <span className="pick-dot" style={{ background: ICON_COLOURS.find((c) => c.id === iconId)?.hex }} aria-hidden />
+          <Icon name="chevron" size={18} />
+        </summary>
+        <div className="field">
+          <label className="check" style={{ padding: 0 }}>
+            <input
+              type="checkbox"
+              checked={look.icon === 'match'}
+              onChange={(e) => void setIcon(e.target.checked ? 'match' : iconId)}
+              disabled={iconBusy}
+            />
+            <span>Match my accent colour</span>
+          </label>
+          <div className="swatches" role="radiogroup" aria-label="App icon colour">
+            {ICON_COLOURS.map((c) => {
+              const on = iconId === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  aria-label={`${c.name} icon`}
+                  disabled={iconBusy}
+                  className={`swatch icon${on ? ' on' : ''}`}
+                  style={{ background: c.hex, color: textOn(c.hex) }}
+                  onClick={() => void setIcon(c.id)}
+                >
+                  <Icon name="scan" size={16} stroke={2.6} />
+                </button>
+              );
+            })}
+          </div>
+          <span className="small">
+            The basket on the icon turns light or dark to suit the colour. On some phones changing the icon closes Restock for a moment, and you may
+            need to put the icon back on your home screen.
+          </span>
         </div>
-        <span className="small">
-          The basket on the icon turns light or dark to suit the colour. On some phones changing the icon closes Restock for a moment, and you may
-          need to put the icon back on your home screen.
-        </span>
-      </div>
+      </details>
     </div>
   );
 }

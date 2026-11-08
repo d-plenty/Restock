@@ -76,3 +76,10 @@ describe('Coles store pages (0.7.2)', () => {
     expect(colesStoreFromPage('https://www.coles.com.au/find-stores')).toBeUndefined();
   });
 });
+
+describe('baking chips (0.7.3)', () => {
+  it('keeps chocolate chips as chocolate chips', () => {
+    expect(genericName('Woolworths White Chocolate Chips 200g', 'Woolworths')).toBe('White chocolate chips');
+    expect(genericName("Smith's Crinkle Cut Chips Original 170g", "Smith's")).toBe('Chips');
+  });
+});

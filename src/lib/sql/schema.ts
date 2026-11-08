@@ -135,6 +135,8 @@ export const MIGRATIONS: string[][] = [
         AND product_id IN (SELECT id FROM products WHERE chain = 'coles')`,
     'ALTER TABLE products ADD COLUMN in_stock_2 INTEGER',
   ],
+  // 0.7.3: a one-off buy found at a shop keeps what it is (photo, size, brand) for the list.
+  ['ALTER TABLE list_entries ADD COLUMN product TEXT'],
 ];
 
 export async function migrate(driver: SqlDriver): Promise<void> {

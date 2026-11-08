@@ -50,7 +50,8 @@
           "The official recall lists (Food Standards Australia New Zealand, Product Safety Australia and the Therapeutic Goods Administration), while recall alerts are on: once a day, and when you tap Check now, Restock downloads their public lists of recent recalls, the same for everyone. Matching them against your items, list and receipts happens on your phone; nothing about you is sent.",
           "jsDelivr (cdn.jsdelivr.net), once, only if you switch on receipts: the receipt reader (Tesseract, open-source text recognition, and its English model) is downloaded from there, like any app download. Receipts are read on your phone and never sent anywhere.",
           "Store catalogue links open in your phone's web browser, under that website's own policy.",
-          "hotprices.org, only if you choose shared price history during setup or turn it on in Settings. It's an open-source project that records Coles and Woolworths prices every day. Restock downloads its public price files, the same for everyone, and keeps a short summary per product. Nothing about you or what you track is sent. Restock is testing this and plans to ask the project for permission before any public release."
+          "hotprices.org, only if you choose shared price history during setup or turn it on in Settings. It's an open-source project that records Coles and Woolworths prices every day. Restock downloads its public price files, the same for everyone, and keeps a short summary per product. Nothing about you or what you track is sent. Restock is testing this and plans to ask the project for permission before any public release.",
+          "GitHub (github.com), only when you tap Check for updates in Settings, or once a week if you turn on \"Tell me when there's an update\". Restock asks for the latest release's version number and notes, and if you tap Update, downloads the new APK from there. Nothing about you or what you track is sent."
         ]
       },
       {

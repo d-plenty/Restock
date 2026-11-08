@@ -1,0 +1,8 @@
+Tidy-ups and fixes.
+• Price history: shop tabs, then each product by size
+• Shopping list: add a name, or find the cheapest just for this trip
+• Product info (ⓘ) for every item while you shop
+• Check for updates in Settings, with an optional weekly check
+• Simpler Settings; colour grids fold away
+• Pack counts and "$x each" prices fixed
+• Lots of small layout and wording fixes

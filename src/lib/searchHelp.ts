@@ -1,6 +1,6 @@
 import { score, stem, tokens, type RankQuery } from '../stores/rank';
 import type { StoreProduct } from '../stores/types';
-import { formatUnitPrice, packSize, unitPrice } from './units';
+import { formatUnitPrice, packSize, tidyUnitText, unitPrice } from './units';
 
 // Small helpers that make searching friendlier: everyday Australian names for things,
 // common misspellings, matching the same product across stores, and unit prices.
@@ -123,8 +123,8 @@ export function unitOf(sp: StoreProduct): { per: number; unit: 'g' | 'ml' | 'ea'
 export function unitTextOf(sp: StoreProduct): string {
   const u = unitOf(sp);
   const ours = u ? formatUnitPrice(u.per, u.unit) : '';
-  if (u && u.unit !== 'ea' && (!sp.unitPriceText || /ea\b|each/i.test(sp.unitPriceText))) return ours;
-  return sp.unitPriceText || ours;
+  if (u && (!sp.unitPriceText || /ea\b|each/i.test(sp.unitPriceText))) return ours;
+  return tidyUnitText(sp.unitPriceText) || ours;
 }
 
 // Words that only say which store's version it is, so "Coles Diced Tomatoes" can match "Woolworths Diced Tomatoes".

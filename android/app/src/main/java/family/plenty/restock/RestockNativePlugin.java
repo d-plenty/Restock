@@ -449,6 +449,77 @@ public class RestockNativePlugin extends Plugin {
         call.resolve();
     }
 
+    /**
+     * 0.7.3: updates from GitHub. Downloads an official release's APK into the app's cache and opens
+     * Android's installer, which shows its own Install screen. Only Restock's own release addresses
+     * are allowed. The first time, Android needs "Install unknown apps" allowed for Restock: this
+     * opens that page instead and resolves needsPermission.
+     */
+    @PluginMethod
+    public void installUpdate(final PluginCall call) {
+        final String url = call.getString("url");
+        if (url == null || !(url.startsWith("https://github.com/d-plenty/Restock/releases/download/")
+                || url.startsWith("https://github.com/d-plenty/restock/releases/download/"))) {
+            call.reject("Not a Restock release");
+            return;
+        }
+        final android.content.Context ctx = getContext();
+        if (!ctx.getPackageManager().canRequestPackageInstalls()) {
+            android.content.Intent i = new android.content.Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                android.net.Uri.parse("package:" + ctx.getPackageName()));
+            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            ctx.startActivity(i);
+            JSObject out = new JSObject();
+            out.put("needsPermission", true);
+            call.resolve(out);
+            return;
+        }
+        webThread.execute(() -> {
+            try {
+                java.io.File dir = new java.io.File(ctx.getCacheDir(), "updates");
+                if (!dir.exists() && !dir.mkdirs()) throw new java.io.IOException("Couldn't make a folder for the download");
+                java.io.File apk = new java.io.File(dir, "restock-update.apk");
+                String next = url;
+                java.net.HttpURLConnection c = null;
+                // GitHub sends the download on to its file server: follow up to five hops, https only.
+                for (int hop = 0; hop < 5; hop++) {
+                    c = (java.net.HttpURLConnection) Net.url(next).openConnection();
+                    c.setInstanceFollowRedirects(false);
+                    c.setConnectTimeout(20000);
+                    c.setReadTimeout(60000);
+                    c.setRequestProperty("User-Agent", "Restock");
+                    int code = c.getResponseCode();
+                    if (code >= 300 && code < 400) {
+                        String loc = c.getHeaderField("Location");
+                        c.disconnect();
+                        if (loc == null || !loc.startsWith("https://")) throw new java.io.IOException("GitHub sent an unexpected address");
+                        next = loc;
+                        continue;
+                    }
+                    if (code != 200) throw new java.io.IOException("GitHub answered " + code);
+                    break;
+                }
+                try (java.io.InputStream in = c.getInputStream(); java.io.FileOutputStream out = new java.io.FileOutputStream(apk)) {
+                    byte[] buf = new byte[64 * 1024];
+                    int n;
+                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                } finally {
+                    c.disconnect();
+                }
+                android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
+                android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+                i.setDataAndType(uri, "application/vnd.android.package-archive");
+                i.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION | android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+                JSObject out = new JSObject();
+                out.put("started", true);
+                call.resolve(out);
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : e.toString());
+            }
+        });
+    }
+
     // ---------- 0.6.0: automatic backups into a folder the person picks ----------
 
     @PluginMethod

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { groupRows, productRows, undoable } from '../../lib/undo';
 import {
   addListEntry,
@@ -20,7 +20,7 @@ import { ensureNotificationPermission, notificationsAllowed, scheduleReminders }
 import { isNative } from '../../stores/http';
 import { getSettings, updateSettings } from '../../lib/db';
 import { loadRecommendations } from '../../lib/recs';
-import { formatUnitPrice, money } from '../../lib/units';
+import { formatUnitPrice, money, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import {
   ALERT_LEVELS,
@@ -245,12 +245,12 @@ export function ItemScreen({ groupId }: { groupId: string }) {
         <button className="row-main" style={{ color: 'inherit', font: 'inherit' }} onClick={() => setSheet({ option: o })}>
           <ChainDot chain={o.product.chain} />
           <span className="grow">
-            <span className="title clip" style={{ fontSize: 14 }}>
+            <span className="title two-lines" style={{ fontSize: 14 }}>
               {o.product.name}
             </span>
             <span className="small">
               {chainName(o.product.chain)}
-              {o.product.size ? ` · ${o.product.size}` : ''}
+              {o.product.size ? ` · ${tidySize(o.product.size, o.product.name)}` : ''}
               {unitText(o) ? ` · ${unitText(o)}` : ''}
               {o.stats.current && ' · '}
               <CheckedAgo date={o.stats.current?.date} source={o.stats.current?.source} />
@@ -329,10 +329,12 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       )}
       {learning !== undefined && usingShared && (
         <div className="card hint" style={{ flexDirection: 'column', gap: 4 }}>
-          <strong>Judged with shared price history</strong>
+          <strong>
+            Judged with shared price history <span className="tag normal beta">Beta</span>
+          </strong>
           <span>
             Restock has only {learning} day{learning === 1 ? '' : 's'} of its own prices for this, so the verdict uses months of history from
-            hotprices.org (testing). After about 4 weeks it switches to the prices this phone has seen.
+            hotprices.org. After about 4 weeks it switches to the prices this phone has seen.
           </span>
         </div>
       )}
@@ -350,7 +352,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             !appSettings.marketData.enabled &&
             rec.options.some((o) => o.product.chain === 'coles' || o.product.chain === 'woolworths') && (
               <button className="linkish small" style={{ alignSelf: 'flex-start' }} onClick={() => nav.push({ name: 'settings' })}>
-                Judge it from day one with shared price history (testing)
+                Judge it from day one with shared price history (Beta)
               </button>
             )}
         </div>
@@ -361,7 +363,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           {group.alertLevel === 'custom' ? ` (${group.alertPct ?? 30}%+)` : ''}
         </button>
         <button className="chip" onClick={() => setSheet('edit')} aria-label="Set a target price">
-          <Icon name="tag" size={14} /> {group.targetPrice !== undefined ? `Under ${money(group.targetPrice)}` : 'Alert me under $…'}
+          <Icon name="tag" size={14} /> {group.targetPrice !== undefined ? `Under ${money(group.targetPrice)}` : 'Set a price alert'}
         </button>
       </div>
       {group.targetPrice !== undefined && rec.best?.price !== undefined && rec.best.price <= group.targetPrice + 0.004 && (
@@ -419,15 +421,12 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           <span className="title">
             Your product <HowItWorks />
           </span>
-          <span className="small">
-            {mains.length} store{mains.length === 1 ? '' : 's'}
-          </span>
+          <span className="small">{productsAndShops(mains)}</span>
         </div>
         {mains.map((o) => row(o, mains.length > 1 && o === rec.best && !tiedWithBest(rec).length ? 'cheapest' : undefined))}
         {mains.length > 1 && tiedWithBest(rec).length > 0 && (
           <p className="small" style={{ padding: '0 14px 12px' }}>
-            {tiedWithBest(rec).length + 1 === mains.length ? 'Same price at every store' : `Same price at ${tiedWithBest(rec).length + 1} stores`} —
-            buy it wherever suits you.
+            {sameAt(rec.best!, tiedWithBest(rec), mains)} — buy it wherever suits you.
           </p>
         )}
         {!mains.length && (
@@ -455,7 +454,9 @@ export function ItemScreen({ groupId }: { groupId: string }) {
               <span className="title" style={{ fontSize: 14, color: 'var(--green)' }}>
                 Add another product
               </span>
-              <span className="small">Another one you buy as {group.name}, at any shop (another scent or flavour, say)</span>
+              <span className="small">
+                Another one you buy as {group.name}, at any shop ({kindOfVariety(group, data.categories)}, say)
+              </span>
             </span>
           </button>
         )}
@@ -760,7 +761,7 @@ function OptionSheet({ group, option, onClose }: { group: Group; option: Option;
       </button>
       <p className="small">
         {isAlt ? 'Alternative' : 'Your product'} at {chainName(option.product.chain)}
-        {option.product.size ? ` · ${option.product.size}` : ''}
+        {option.product.size ? ` · ${tidySize(option.product.size, option.product.name)}` : ''}
         {option.product.barcode ? ` · barcode ${option.product.barcode}` : ''}
       </p>
       <p className="small">
@@ -873,16 +874,103 @@ function StockUpTip({ stats, readings }: { stats: PriceStats; readings: { date: 
 const WEEK = 7 * 86_400_000;
 const near = (a: number | undefined, b: number | undefined) => a !== undefined && b !== undefined && Math.abs(a - b) < 0.015;
 
-/** What each product is called on the chips: the shop and price, or the product when one shop has two of them. */
-function chipLabel(o: Option, all: Option[]): string {
-  const sameShop = all.filter((x) => x.product.chain === o.product.chain);
-  if (sameShop.length < 2)
-    return `${chainName(o.product.chain)}${o.price !== undefined ? ` · ${money(o.price)}` : ''}${o.role === 'alt' ? ' · alt' : ''}`;
-  // Two products at one shop (two scents of conditioner): the words that tell them apart.
-  const words = (x: Option) => x.product.name.split(/\s+/);
-  const common = new Set(words(sameShop[0]).filter((w) => sameShop.every((x) => words(x).includes(w))));
-  const own = words(o).filter((w) => !common.has(w) && !/^\d/.test(w));
-  return (own.length ? own.slice(0, 3).join(' ') : o.product.name) + (o.role === 'alt' ? ' · alt' : '');
+/** "8 products · 3 shops", or "2 shops" when it's one product per shop. */
+function productsAndShops(list: Option[]): string {
+  const shops = new Set(list.map((x) => x.product.chain)).size;
+  const s = `${shops} shop${shops === 1 ? '' : 's'}`;
+  return list.length === shops ? s : `${list.length} products · ${s}`;
+}
+
+/** "Same price at Coles and Woolworths", or "at every shop", naming shops rather than counting products. */
+function sameAt(best: Option, tied: Option[], all: Option[]): string {
+  const shops = [...new Set([best, ...tied].map((x) => x.product.chain))];
+  if (shops.length === new Set(all.map((x) => x.product.chain)).size && shops.length > 1) return 'Same price at every shop';
+  if (shops.length === 1) return `Same price for ${tied.length + 1} products at ${chainName(shops[0])}`;
+  const names = shops.map((c) => chainName(c));
+  return `Same price at ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** The product's name without its size, for the second line of a price history row. */
+function nameWithoutSize(o: Option): string {
+  const size = o.product.size?.trim();
+  let n = o.product.name;
+  if (size) n = n.replace(new RegExp(`\\s*[|·-]?\\s*${size.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i'), '');
+  return n.replace(/\s*\|\s*$/, '').trim() || o.product.name;
+}
+
+/**
+ * Which product the price history is for (0.7.3): a tab for each shop, then that shop's products,
+ * each with its size in bold, the name underneath, today's price and any sale, so two that share a
+ * name ("Brita Maxtra Pro", 1 filter or 3 pack) are easy to tell apart.
+ */
+function HistoryPicker({ options, picked, onPick }: { options: Option[]; picked: Option; onPick: (id: string) => void }) {
+  const chains = [...new Set(options.map((x) => x.product.chain))];
+  const [shop, setShop] = useState(picked.product.chain);
+  useEffect(() => setShop(picked.product.chain), [picked.product.chain]);
+  const rows = options.filter((x) => x.product.chain === shop);
+  const priced = options.filter((x) => x.unitPrice !== undefined && x.role !== 'alt');
+  const low = priced.length > 1 ? Math.min(...priced.map((x) => x.unitPrice!)) : undefined;
+  const off = (x: Option) =>
+    x.unitPrice !== undefined && x.normalUnitPrice && x.unitPrice < x.normalUnitPrice * 0.97
+      ? Math.round((1 - x.unitPrice / x.normalUnitPrice) * 100)
+      : 0;
+  return (
+    <div className="ph-pick">
+      {chains.length > 1 && (
+        <div className="seg ph-shops" role="tablist" aria-label="Shop">
+          {chains.map((c) => (
+            <button
+              key={c}
+              role="tab"
+              aria-selected={c === shop}
+              aria-pressed={c === shop}
+              onClick={() => {
+                setShop(c);
+                const first = options.find((x) => x.product.chain === c);
+                if (first && picked.product.chain !== c) onPick(first.product.id);
+              }}
+            >
+              <ChainDot chain={c} /> {chainName(c)}
+              {options.filter((x) => x.product.chain === c).length > 1 && (
+                <span className="ph-count">{options.filter((x) => x.product.chain === c).length}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="ph-rows" role="radiogroup" aria-label={`Products at ${chainName(shop)}`}>
+        {rows.map((x) => {
+          const pct = off(x);
+          return (
+            <button
+              key={x.product.id}
+              role="radio"
+              aria-checked={x.product.id === picked.product.id}
+              className="ph-row"
+              onClick={() => onPick(x.product.id)}
+            >
+              <span className="ph-radio" aria-hidden />
+              <span className="ph-row-text">
+                <span className="ph-size">
+                  {tidySize(x.product.size, x.product.name) || 'Size not given'}
+                  {low !== undefined && x.unitPrice !== undefined && x.role !== 'alt' && Math.abs(x.unitPrice - low) < 1e-9 && (
+                    <span className="tag great">Cheapest</span>
+                  )}
+                  {x.role === 'alt' && <span className="tag normal">Alternative</span>}
+                </span>
+                <span className="ph-name">{nameWithoutSize(x)}</span>
+              </span>
+              <span className="ph-row-price num">
+                {x.price !== undefined ? money(x.price) : '—'}
+                {pct >= 3 && <small>{pct}% off</small>}
+                {x.product.inStock === false && <small className="out">Out of stock</small>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 /** Is this reading a sale? (A multi-buy alone doesn't count when the item has multi-buys off.) */
@@ -927,7 +1015,6 @@ function PriceHistory({
     : chartReadings;
   const v = o.verdict;
   const today = o.price;
-  const byProduct = options.some((x) => options.filter((y) => y.product.chain === x.product.chain).length > 1);
 
   // The tag by today's price.
   const off = v.discount !== undefined && v.discount > 0.004 ? `${Math.round(v.discount * 100)}% OFF` : undefined;
@@ -954,15 +1041,13 @@ function PriceHistory({
           ? { cls: 'green', title: 'A small saving', body: v.detail }
           : v.kind === 'wait'
             ? { cls: 'amber', title: 'Worth waiting', body: v.detail }
-            : v.kind === 'fake'
-              ? { cls: 'red', title: 'Not really a sale', body: v.detail }
-              : v.kind === 'normal' && stats.usualSale !== undefined && saleOff >= 0.1
-                ? {
-                    cls: 'amber',
-                    title: 'Worth waiting',
-                    body: `${saleOff >= 0.45 && saleOff <= 0.55 ? `It's half price (${money(stats.usualSale)})` : `It's usually ${money(stats.usualSale)} on sale (${Math.round(saleOff * 100)}% off)`}${cycle}.`,
-                  }
-                : undefined;
+            : v.kind === 'normal' && stats.usualSale !== undefined && saleOff >= 0.1
+              ? {
+                  cls: 'amber',
+                  title: 'Worth waiting',
+                  body: `${saleOff >= 0.45 && saleOff <= 0.55 ? `It's half price (${money(stats.usualSale)})` : `It's usually ${money(stats.usualSale)} on sale (${Math.round(saleOff * 100)}% off)`}${cycle}.`,
+                }
+              : undefined;
 
   // Where today's price sits, between the lowest and the normal price.
   const marks = [
@@ -1027,17 +1112,8 @@ function PriceHistory({
         <span className="title" style={{ fontSize: 17 }}>
           Price history
         </span>
-        <span className="small">{byProduct ? chainName(o.product.chain) : genericName(o.product.name, o.product.brand) || ''}</span>
       </div>
-      {options.length > 1 && (
-        <div className="ph-chips" role="group" aria-label="Show history for">
-          {options.map((x) => (
-            <button key={x.product.id} className="ph-chip" aria-pressed={x.product.id === o.product.id} onClick={() => onPick(x.product.id)}>
-              <ChainDot chain={x.product.chain} /> {chipLabel(x, options)}
-            </button>
-          ))}
-        </div>
-      )}
+      {options.length > 1 && <HistoryPicker options={options} picked={o} onPick={onPick} />}
 
       <div className="ph-now">
         <div>
@@ -1052,7 +1128,7 @@ function PriceHistory({
       <div className="ph-sub">
         {o.multi
           ? `${o.multi.n} for ${money(o.multi.total)} · one on its own is ${money(o.shelfPrice)}`
-          : [o.product.size, unitText(o)].filter(Boolean).join(' · ')}
+          : [tidySize(o.product.size, o.product.name), unitText(o)].filter(Boolean).join(' · ')}
       </div>
       {tip && (
         <div className={`ph-tip ${tip.cls}`}>
@@ -1171,4 +1247,13 @@ function PriceHistory({
         ))}
     </div>
   );
+}
+
+/** "another scent or size" for cleaning and toiletries, "another flavour or size" for food and drink (0.7.3). */
+function kindOfVariety(group: Group, categories: { id: string; name: string }[]): string {
+  const cat = categories.find((c) => c.id === group.categoryId)?.name ?? '';
+  const scented =
+    group.section === 'pharmacy' ||
+    /clean|laundry|wash|bath|toilet|personal|beauty|hair|skin|body|deodor|soap|shampoo|condition/i.test(`${cat} ${group.name}`);
+  return scented ? 'another scent or size' : 'another flavour or size';
 }

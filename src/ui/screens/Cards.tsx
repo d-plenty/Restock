@@ -45,7 +45,7 @@ export function CardsScreen() {
 
   return (
     <div className="screen">
-      <TopBar title="Cards" />
+      <TopBar title="Loyalty cards" />
 
       {selected && (
         <div className={`loyalty ${selected.program}`}>

@@ -6,6 +6,7 @@ import { logProblem } from '../../lib/diagnostics';
 import {
   addGroup,
   addListEntry,
+  deleteListEntries,
   addProduct,
   addReading,
   allCategories,
@@ -43,7 +44,7 @@ import {
   unitOf,
   unitTextOf,
 } from '../../lib/searchHelp';
-import { money, packSize } from '../../lib/units';
+import { money, packSize, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import { adapterFor, type StoreProduct } from '../../stores';
 import { shopDetails } from '../../stores/details';
@@ -149,6 +150,8 @@ export function AddScreen({
   query,
   onlyChain,
   section: sectionProp = 'pantry',
+  forList,
+  replaceEntry,
   overlay,
 }: {
   barcode?: string;
@@ -160,6 +163,9 @@ export function AddScreen({
   onlyChain?: StoreChain;
   /** Which tab's shops to search. Adding to an existing item always uses that item's tab. */
   section?: Section;
+  /** From the shopping list: only "add to the list for this trip", nothing goes in the pantry. */
+  forList?: boolean;
+  replaceEntry?: string;
   overlay?: boolean;
 }) {
   const nav = useNav();
@@ -189,7 +195,8 @@ export function AddScreen({
   const [showing, setShowing] = useState<Partial<Record<Chain, number>>>({});
   const [sortBy, setSortBy] = useState<Partial<Record<Chain, SortKey>>>({});
   const [picks, setPicks] = useState<Map<string, StoreProduct>>(new Map());
-  const [name, setName] = useState('');
+  // From the shopping list, keep the name you typed there ("Nescafe").
+  const [name, setName] = useState(forList && query ? query : '');
   const [categoryId, setCategoryId] = useState('');
   const [alertLevel, setAlertLevel] = useState<AlertLevel>('good');
   const [allowBulk, setAllowBulk] = useState(false);
@@ -338,7 +345,8 @@ export function AddScreen({
     const first = [...found.values()][0].sp;
     if (!name && !attachTo) {
       const sc = scanned as (BarcodeInfo & { kindOnly?: boolean }) | undefined;
-      setName(sc?.name && !weakName(sc) && !sc.kindOnly ? genericName(sc.name, sc.brand) : genericName(first.name, first.brand));
+      if (!(forList && query))
+        setName(sc?.name && !weakName(sc) && !sc.kindOnly ? genericName(sc.name, sc.brand) : genericName(first.name, first.brand));
     }
     void followUp(first, new Set(found.keys()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -606,17 +614,31 @@ export function AddScreen({
         groupId = group.id;
       }
       if (target !== 'pantry') {
+        const one = groupId ? undefined : cheapestPick();
         await addListEntry({
           id: uid(),
           text: itemName,
           groupId,
           chain: groupId ? undefined : cheapestChain(),
-          price: groupId ? undefined : cheapestPick()?.price,
+          price: one?.price,
           categoryId: categoryId || undefined,
           section,
+          // What it is, so the list can show its photo and details (0.7.3).
+          product: one
+            ? {
+                chain: one.chain,
+                name: one.name,
+                brand: one.brand,
+                size: one.size,
+                imageUrl: one.imageUrl,
+                storeProductId: one.storeProductId,
+                unitText: unitTextOf(one) || undefined,
+              }
+            : undefined,
           checked: false,
           createdAt: nowIso(),
         });
+        if (replaceEntry) await deleteListEntries([replaceEntry]);
       }
       nav.toast(
         target === 'list'
@@ -667,14 +689,18 @@ export function AddScreen({
       : another
         ? 'Add another product'
         : 'Find at another store'
-    : 'Add an item';
+    : forList
+      ? 'Find the cheapest'
+      : 'Add an item';
   const hint = attachGroup
     ? as === 'alt'
       ? `Tick products you'd happily buy instead of ${attachGroup.name}. They'll show up when they're on sale and cheaper than yours.`
       : another
         ? `Tick another product you buy as ${attachGroup.name}, at any shop. It's kept alongside the ones you have, and Restock shows whichever is cheapest.`
         : `Tick ${attachGroup.name} at each store that sells it. Restock then shows you whichever store is cheapest.`
-    : 'Tick your product at each store that sells it, so Restock can tell you where it’s cheapest. You can add alternatives later from the item’s page.';
+    : forList
+      ? 'Tick the ones you’d buy, at any shop. The cheapest of them goes on your shopping list for this trip only.'
+      : 'Tick your product at each store that sells it, so Restock can tell you where it’s cheapest. You can add alternatives later from the item’s page.';
 
   return (
     <div className="screen">
@@ -811,7 +837,7 @@ export function AddScreen({
           <div style={{ flex: 1 }}>
             <div className="eyebrow green">Scanned {scanned.barcode}</div>
             <div className="title">{scanned.name ? displayName(scanned) : lookingUp ? 'Looking it up…' : "We don't know this barcode yet."}</div>
-            {scanned.size && <div className="small">{scanned.size}</div>}
+            {scanned.size && <div className="small">{tidySize(scanned.size, scanned.name)}</div>}
             {(scanned as { source?: string }).source && <div className="small">Found on {(scanned as { source?: string }).source}</div>}
           </div>
         </div>
@@ -908,7 +934,7 @@ export function AddScreen({
                   <span className="title" style={{ fontSize: 14 }}>
                     {sp.name}
                   </span>
-                  {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{sp.size}</span>}
+                  {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
                   <span className="tags">
                     <span className={`tag ${sure === 'closest' ? 'wait' : sure === 'name' ? 'normal' : 'good'}`}>{MATCH_LABEL[sure]}</span>
                     {sp.isSpecial && <span className="tag wait">SPECIAL</span>}
@@ -957,7 +983,7 @@ export function AddScreen({
                         <span className="title" style={{ fontSize: 14 }}>
                           {sp.name}
                         </span>
-                        {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{sp.size}</span>}
+                        {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
                         {unitTextOf(sp) && <span className="small">{unitTextOf(sp)}</span>}
                       </span>
                       <span className="num" style={{ fontWeight: 700 }}>
@@ -997,7 +1023,7 @@ export function AddScreen({
                       {c.sp.name}
                     </span>
                     <span className="small">
-                      {c.sp.size && !nameHasSize(c.sp.name, c.sp.size) ? `${c.sp.size} · ` : ''}
+                      {c.sp.size && !nameHasSize(c.sp.name, c.sp.size) ? `${tidySize(c.sp.size, c.sp.name)} · ` : ''}
                       {c.at.map((p) => chainName(p.chain)).join(c.at.length === 2 ? ' and ' : ', ')} · from{' '}
                       {money(Math.min(...c.at.map((p) => p.price ?? Infinity)))}
                     </span>
@@ -1148,7 +1174,7 @@ export function AddScreen({
                               <span className="title" style={{ fontSize: 14 }}>
                                 {sp.name}
                               </span>
-                              {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{sp.size}</span>}
+                              {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
                               <span className="tags">
                                 {isExactBarcode(rankQ, sp) && <span className="tag good">EXACT MATCH</span>}
                                 {tracked && <span className="tag normal">IN YOUR PANTRY</span>}
@@ -1264,10 +1290,13 @@ export function AddScreen({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            <div className="small grow" style={{ minWidth: 0 }}>
+            {/* Its own scrolling list, so 15 ticked cans never push the arrow or the buttons away. */}
+            <div className="small grow picked-list" style={{ minWidth: 0 }}>
               {[...picks.values()].map((p) => (
-                <div key={keyOf(p)} className="clip">
-                  <ChainDot chain={p.chain} /> {p.name} · {money(p.price)}
+                <div key={keyOf(p)} className="picked-line">
+                  <ChainDot chain={p.chain} />
+                  <span className="clip grow">{p.name}</span>
+                  <span className="num picked-price">{money(p.price)}</span>
                 </div>
               ))}
             </div>
@@ -1287,7 +1316,20 @@ export function AddScreen({
               </span>
             </button>
           </div>
-          {attachGroup ? (
+          {forList && !attachGroup ? (
+            <>
+              <label className="field">
+                <span>Name on your shopping list</span>
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Coffee" />
+              </label>
+              <button className="btn primary" onClick={() => save('list')} disabled={saving}>
+                <Icon name="cart" size={18} /> Add to shopping list
+              </button>
+              <p className="small" style={{ margin: 0 }}>
+                Just for this trip, at the cheapest of what you ticked. It doesn't go in your pantry, and Restock won't keep watching its price.
+              </p>
+            </>
+          ) : attachGroup ? (
             <button className="btn primary" onClick={saveAttach} disabled={saving}>
               {as === 'alt' ? `Add as alternative${picks.size > 1 ? 's' : ''}` : `Add to ${attachGroup.name}`}
             </button>

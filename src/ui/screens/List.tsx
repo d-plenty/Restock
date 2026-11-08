@@ -22,7 +22,7 @@ import { lineCost, type Option } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
 import { recommendedStores, shopTotals, type ShopTotals } from '../../lib/shopTotals';
 import { entryRows, undoable } from '../../lib/undo';
-import { money } from '../../lib/units';
+import { money, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
 import { chainName, secondBranch, stockAtBranch, type Category, type Chain, type ListEntry, type LoyaltyCard } from '../../types';
@@ -34,6 +34,7 @@ import {
   Icon,
   MoreInfo,
   previewFromOption,
+  type PreviewProduct,
   ProductPreview,
   SelectBar,
   Sheet,
@@ -243,6 +244,13 @@ export function ListScreen() {
   const total = open.reduce((s, e) => s + (priceOf(c, e) ?? 0), 0);
   const firstTime = !settings.seenHints.includes('list');
 
+  /** What a list line is, for its photo and the product sheet: its pantry item's product, or a one-off buy's snapshot. */
+  const previewOf = (e: ListEntry): PreviewProduct | undefined => {
+    const o = dealFor(c, e) ?? recFor(c, e)?.options[0];
+    if (o) return previewFromOption(o);
+    return e.product ? { ...e.product, price: e.price } : undefined;
+  };
+
   const renderRow = (e: ListEntry) => {
     const rec = recFor(c, e);
     // Pantry items always show their current name, so renaming in the pantry renames here too.
@@ -252,7 +260,8 @@ export function ListScreen() {
     const shop = shopOf(c, e);
     const member = deal?.stats.current?.memberOnly;
     const isPicked = picked.has(e.id);
-    const size = deal?.product.size && !nameHasSize(deal.product.name, deal.product.size) ? ` · ${deal.product.size}` : '';
+    const size =
+      deal?.product.size && !nameHasSize(deal.product.name, deal.product.size) ? ` · ${tidySize(deal.product.size, deal.product.name)}` : '';
     const onSale = deal && (deal.verdict.kind === 'great' || deal.verdict.kind === 'good' || deal.verdict.kind === 'small');
     const line = lineFor(c, e);
     // Pantry items open their page, so you can see exactly which product, brand and size to buy.
@@ -262,7 +271,7 @@ export function ListScreen() {
       else setEditing(e);
     };
     return (
-      <Hold key={e.id} onLong={() => (deal ?? rec?.options[0]) && !selecting && setPreview(e)}>
+      <Hold key={e.id} onLong={() => previewOf(e) && !selecting && setPreview(e)}>
         <div className={`row${isPicked ? ' selected' : ''}`} style={e.checked && !selecting ? { opacity: 0.55 } : undefined}>
           {selecting ? (
             <button className={`pick${isPicked ? ' on' : ''}`} onClick={() => pick(e.id)} aria-pressed={isPicked} aria-label={`Select ${title}`}>
@@ -276,9 +285,13 @@ export function ListScreen() {
               aria-label={`Got ${title}`}
             />
           )}
-          {(deal ?? rec?.options[0]) && !selecting && (
-            <MoreInfo src={(deal ?? rec!.options[0]).product.imageUrl} name={(deal ?? rec!.options[0]).product.name} onOpen={() => setPreview(e)} />
-          )}
+          {!selecting &&
+            (previewOf(e) ? (
+              <MoreInfo src={previewOf(e)!.imageUrl} name={previewOf(e)!.name} onOpen={() => setPreview(e)} />
+            ) : (
+              // No photo: keep the space, so every name on the list lines up (0.7.3).
+              <span className="thumb-space" aria-hidden />
+            ))}
           <div className="grow" style={{ gap: 6 }}>
             <button
               style={{
@@ -422,6 +435,23 @@ export function ListScreen() {
           <Icon name="scan" />
         </button>
       </form>
+      {/* Typed something: add just the name, or look it up at your shops for this trip (0.7.3). */}
+      {text.trim() && (
+        <div className="two add-choices">
+          <button className="btn" onClick={() => void add(text)}>
+            <Icon name="plus" size={18} /> <span className="clip">Add "{text.trim()}"</span>
+          </button>
+          <button
+            className="btn primary"
+            onClick={() => {
+              nav.push({ name: 'add', query: text.trim(), forList: true, section });
+              setText('');
+            }}
+          >
+            <Icon name="search" size={18} /> Find cheapest
+          </button>
+        </div>
+      )}
 
       {!entries.length && (
         <div className="empty">
@@ -596,9 +626,9 @@ export function ListScreen() {
         />
       )}
 
-      {preview && (dealFor(c, preview) ?? recFor(c, preview)?.options[0]) && (
+      {preview && previewOf(preview) && (
         <ProductPreview
-          product={previewFromOption((dealFor(c, preview) ?? recFor(c, preview)?.options[0])!)}
+          product={previewOf(preview)!}
           onClose={() => setPreview(undefined)}
           action={
             preview.groupId ? (
@@ -760,7 +790,7 @@ function PickShops({
       <div className="chips">
         {recommended && (
           <button className="chip" aria-pressed={chosen.length === 1 && chosen[0] === recommended} onClick={() => setChosen([recommended])}>
-            Just {chainName(recommended)} (recommended)
+            Just {chainName(recommended)}
           </button>
         )}
         <button className="chip" aria-pressed={chosen.length === shops.length} onClick={() => setChosen(shops)}>
@@ -840,6 +870,8 @@ function ShoppingMode({
   onChangeShops: () => void;
   onClose: () => void;
 }) {
+  // ⓘ on a line: what the product looks like, to find it on the shelf (0.7.3).
+  const [info, setInfo] = useState<PreviewProduct>();
   // Everything priced at only the shops picked (ticked rows too, so they keep their shop and price).
   const entries = allEntries.filter((e) => !skip.has(e.id));
   const skipped = allEntries.filter((e) => skip.has(e.id));
@@ -909,6 +941,12 @@ function ShoppingMode({
     else toast(`${name} ticked${want?.price !== undefined ? `, ${money(want.price)}` : ''}.`);
   };
 
+  const shelfLook = (e: ListEntry): PreviewProduct | undefined => {
+    const o = dealFor(c, e) ?? recFor(c, e)?.options[0];
+    if (o) return previewFromOption(o);
+    return e.product ? { ...e.product, price: e.price } : undefined;
+  };
+
   return (
     <div className="shopmode" role="dialog" aria-label="Shopping">
       <div className="shopmode-top">
@@ -942,6 +980,7 @@ function ShoppingMode({
         </div>
       )}
       <div className="shopmode-list">
+        {info && <ProductPreview product={info} onClose={() => setInfo(undefined)} />}
         {c.order.map((shop) => {
           const items = entries.filter((e) => !elsewhere(e) && shopOf(c, e) === shop).sort(byAisle);
           if (!items.length) return null;
@@ -984,7 +1023,7 @@ function ShoppingMode({
                         {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}
                         {name}
                       </span>
-                      {d && <span className="small">{d.product.name}</span>}
+                      {d ? <span className="small">{d.product.name}</span> : e.product && <span className="small">{e.product.name}</span>}
                       {stockNote(c, e) && (
                         <span
                           className="small"
@@ -998,6 +1037,20 @@ function ShoppingMode({
                       <span className="num" style={{ fontWeight: 700, fontSize: 16 }}>
                         {money(priceOf(c, e))}
                       </span>
+                    )}
+                    {shelfLook(e) && (
+                      <button
+                        type="button"
+                        className="info-btn shop-info"
+                        aria-label={`What ${name} looks like`}
+                        onClick={(ev) => {
+                          ev.preventDefault();
+                          ev.stopPropagation();
+                          setInfo(shelfLook(e));
+                        }}
+                      >
+                        <Icon name="info" size={22} />
+                      </button>
                     )}
                   </label>
                 );
@@ -1100,7 +1153,10 @@ function EditEntry({
     });
     onClose();
   };
+  // A one-off buy found at a shop keeps what it is, so it has a photo and details too (0.7.3).
+  const oneOff = !deal && entry.product ? { ...entry.product, price: entry.price } : undefined;
   if (looking && deal) return <ProductPreview product={previewFromOption(deal)} onClose={() => setLooking(false)} />;
+  if (looking && oneOff) return <ProductPreview product={oneOff} onClose={() => setLooking(false)} />;
   return (
     <Sheet title={name ?? entry.text} onClose={onClose}>
       {deal ? (
@@ -1129,9 +1185,20 @@ function EditEntry({
           </label>
         )
       )}
-      {deal && (
+      {(deal || oneOff) && (
         <button className="btn" onClick={() => setLooking(true)}>
           <Icon name="info" size={18} /> Product details
+        </button>
+      )}
+      {!linked && (
+        <button
+          className="btn"
+          onClick={() => {
+            onClose();
+            nav.push({ name: 'add', query: entry.text, forList: true, replaceEntry: entry.id, section: entry.section });
+          }}
+        >
+          <Icon name="search" size={18} /> {oneOff ? 'Find a cheaper one' : 'Find the cheapest'}
         </button>
       )}
       <div className="two">

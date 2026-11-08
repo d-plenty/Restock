@@ -146,6 +146,13 @@ const KINDS = [
   'crackers',
   'rice cakes',
   'corn chips',
+  // baking: "White Chocolate Chips" is chocolate chips, not chips
+  'white chocolate chips',
+  'dark chocolate chips',
+  'milk chocolate chips',
+  'chocolate chips',
+  'choc chips',
+  'baking bits',
   'chips',
   'pretzels',
   'popcorn',

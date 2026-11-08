@@ -4,6 +4,7 @@ import {
   type Chain,
   type Group,
   type ListEntry,
+  type ListProduct,
   type LoyaltyCard,
   type PriceReading,
   type Product,
@@ -108,9 +109,20 @@ const toEntry = (r: Row): ListEntry => ({
   qty: Math.max(1, Number(r.qty ?? 1) || 1),
   price: r.price === null || r.price === undefined ? undefined : Number(r.price),
   section: r.section === null || r.section === undefined ? undefined : asSection(r.section),
+  product: parseListProduct(r.product),
   checked: Number(r.checked) === 1,
   createdAt: r.created_at as string,
 });
+
+function parseListProduct(v: unknown): ListProduct | undefined {
+  if (typeof v !== 'string' || !v) return undefined;
+  try {
+    const p = JSON.parse(v) as ListProduct;
+    return p && typeof p.name === 'string' && typeof p.chain === 'string' ? p : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 const toCard = (r: Row): LoyaltyCard => ({
   id: r.id as string,
@@ -196,8 +208,20 @@ export const insertReadingOp = (r: Omit<PriceReading, 'id'>): SqlOp => ({
 });
 
 export const insertEntryOp = (e: ListEntry, replace = false): SqlOp => ({
-  sql: `INSERT ${replace ? 'OR REPLACE ' : ''}INTO list_entries (id, text, item_id, chain, category_id, qty, price, section, checked, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-  params: [e.id, e.text, n(e.groupId), n(e.chain), n(e.categoryId), Math.max(1, e.qty ?? 1), n(e.price), n(e.section), b(e.checked), e.createdAt],
+  sql: `INSERT ${replace ? 'OR REPLACE ' : ''}INTO list_entries (id, text, item_id, chain, category_id, qty, price, section, product, checked, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+  params: [
+    e.id,
+    e.text,
+    n(e.groupId),
+    n(e.chain),
+    n(e.categoryId),
+    Math.max(1, e.qty ?? 1),
+    n(e.price),
+    n(e.section),
+    e.product ? JSON.stringify(e.product) : null,
+    b(e.checked),
+    e.createdAt,
+  ],
 });
 
 const insertCardOp = (c: LoyaltyCard): SqlOp => ({

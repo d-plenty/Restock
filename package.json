@@ -1,7 +1,7 @@
 {
   "name": "restock",
   "private": true,
-  "version": "0.7.2",
+  "version": "0.7.3",
   "type": "module",
   "description": "Restock (working name) — local-first grocery price tracker for Coles, Woolworths and Aldi.",
   "scripts": {

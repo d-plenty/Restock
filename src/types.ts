@@ -156,8 +156,21 @@ export interface ListEntry {
   price?: number;
   /** Which list it's on, for lines that aren't linked to a pantry item. Linked lines follow their item. */
   section?: Section;
+  /** For a one-off buy found at a shop (0.7.3): what it is, so the list can show its photo and details. */
+  product?: ListProduct;
   checked: boolean;
   createdAt: string;
+}
+
+/** A snapshot of the shop's product behind a one-off list line. */
+export interface ListProduct {
+  chain: Chain;
+  name: string;
+  brand?: string;
+  size?: string;
+  imageUrl?: string;
+  storeProductId?: string;
+  unitText?: string;
 }
 
 export type CardProgram = 'flybuys' | 'everyday' | 'other';
@@ -264,6 +277,8 @@ export interface Settings {
   theme: 'system' | 'light' | 'dark';
   /** Shopping list: cheapest by best value (per 100 g / litre / item) or by lowest shelf price. */
   listCompare: 'unit' | 'price';
+  /** New versions on GitHub (0.7.3): tell me once a week, when I last looked, and the last one I was told about. */
+  updates?: { notify: boolean; lastCheck?: string; told?: string };
   /** Date of the privacy policy the person accepted. */
   privacyAccepted?: string;
   /** One-time hints already dismissed. */

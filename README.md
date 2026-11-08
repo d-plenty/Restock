@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Beta 0.7.2" src="https://img.shields.io/badge/status-beta%200.7.2-ffcd00">
+  <img alt="Beta 0.7.3" src="https://img.shields.io/badge/status-beta%200.7.3-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -106,6 +106,8 @@ Read the full **[privacy policy](PRIVACY.md)** and the **[fine print](DISCLAIMER
 ## Get it
 
 **Download: [restock.apk](https://github.com/d-plenty/Restock/releases/latest/download/restock.apk)** (always the newest version), or pick a version from **[Releases](../../releases)**. Open it on your phone and allow the install. Android 8.0 or newer.
+
+Already have Restock? From 0.7.3 it can update itself from here: **Settings → About and updates → Check for updates** (or turn on *Tell me when there's an update*). Android shows its own Install screen; nothing is lost.
 
 **Stay up to date:** add this repository to [Obtainium](https://github.com/ImranR98/Obtainium) and it'll tell you when a new version is out.
 

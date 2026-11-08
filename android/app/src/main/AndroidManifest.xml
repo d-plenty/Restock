@@ -290,6 +290,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 0.7.3: "Check for updates" hands a new Restock release to Android's installer (you tap Install). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- A short buzz when something is added to the shopping list. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- The open-source barcode scanner uses the camera inside the app. -->

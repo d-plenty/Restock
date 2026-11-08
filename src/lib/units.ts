@@ -123,8 +123,34 @@ export function packSize(size: string | undefined | null, name: string | undefin
   if (s?.kind === 'single' && s.unit === 'ml' && s.qty <= 600 && named && n?.kind !== 'multi') {
     return { qty: s.qty * named, unit: 'ml', count: named };
   }
+  // Size "1 each", name "… Tablets 70 Pack": the name has how many (Aldi does this). Mirrored in Deals.java.
+  if (s && s.unit === 'ea' && s.qty <= 1 && n?.kind === 'count' && n.qty > 1) return { qty: n.qty, unit: 'ea' };
   const p = s ?? n;
   return p && { qty: p.qty, unit: p.unit, count: p.kind === 'multi' && p.count && p.count > 1 ? p.count : undefined };
+}
+
+/**
+ * A shop's size label, tidied for showing: "1 Each" → "1 each", "3 Pack" → "3 pack", and "1 each"
+ * on something named "… 70 Pack" → "70 pack".
+ */
+export function tidySize(size: string | undefined | null, name?: string | null): string | undefined {
+  const t = size?.trim();
+  if (!t) return undefined;
+  const s = parseParts(t);
+  const n = parseParts(name);
+  if (s && s.unit === 'ea' && s.qty <= 1 && n?.kind === 'count' && n.qty > 1)
+    return `${n.qty} ${/pack|pk/.test(n.word ?? '') ? 'pack' : (n.word ?? 'pack')}`;
+  return t.replace(/\b(Each|EA|Ea|Pack|PACK|Pk|PK)\b/g, (w) => (/^e/i.test(w) ? 'each' : 'pack'));
+}
+
+/** A shop's own unit price label, tidied: "$31.99 per 1 each" → "$31.99 each", "$0.87 / 1EA" → "$0.87 each". */
+export function tidyUnitText(t: string | undefined | null): string | undefined {
+  if (!t) return undefined;
+  return t
+    .replace(/\s*(?:per|\/)\s*1\s*(?:each|ea)\b/i, ' each')
+    .replace(/\s*(?:per|\/)\s*(?:each|ea)\b/i, ' each')
+    .replace(/\s*(?:per|\/)\s*(\d+)\s*(?:each|ea)\b/i, ' per $1')
+    .trim();
 }
 
 /** Price per base unit (per g, per ml or per each). */
@@ -138,7 +164,7 @@ export function formatUnitPrice(perBase: number | undefined, unit?: BaseUnit): s
   if (perBase === undefined || !unit) return '';
   if (unit === 'g') return `${money(perBase * 100)} / 100g`;
   if (unit === 'ml') return perBase * 1000 >= 1 ? `${money(perBase * 1000)} / L` : `${money(perBase * 100)} / 100ml`;
-  return perBase < 0.1 ? `${money(perBase * 100)} / 100` : `${money(perBase)} / ea`;
+  return perBase < 0.1 ? `${money(perBase * 100)} per 100` : `${money(perBase)} each`;
 }
 
 export function money(n: number | undefined): string {

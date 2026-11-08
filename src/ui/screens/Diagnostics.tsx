@@ -206,8 +206,8 @@ function TrolleyRecorder() {
       <div className="eyebrow">Record adding to a trolley</div>
       <div className="card">
         <p className="small" style={{ margin: 0 }}>
-          Teaches Restock to fill your trolley. Sign in to the shop first (Settings → Supermarkets). Then tap Record, add any one item to your trolley
-          on the shop's page, and tap Done. Restock saves only the shop's own trolley and search calls, with names, emails, addresses and card numbers
+          Teaches Restock to fill your trolley. Sign in to the shop first (Settings → My shops). Then tap Record, add any one item to your trolley on
+          the shop's page, and tap Done. Restock saves only the shop's own trolley and search calls, with names, emails, addresses and card numbers
           removed, into a file for you to send. You can open it and check before sending.
         </p>
         <div className="seg" role="radiogroup" aria-label="Which shop">

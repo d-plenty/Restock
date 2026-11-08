@@ -333,20 +333,46 @@ export function HomeScreen() {
       {smalls.length > 0 && (
         <div className="card flush">
           {smalls.map((r) => (
-            <button key={r.group.id} className="row" onClick={() => nav.push({ name: 'item', groupId: r.group.id })}>
-              <span className="grow">
-                <span className="title clip" style={{ fontSize: 14 }}>
-                  <SectionMark section={r.group.section} />
-                  {r.group.name}
+            <div key={r.group.id} className="row" style={{ gap: 8 }}>
+              <button
+                className="row-main"
+                style={{ color: 'inherit', font: 'inherit' }}
+                onClick={() => nav.push({ name: 'item', groupId: r.group.id })}
+              >
+                <span className="grow">
+                  <span className="title clip" style={{ fontSize: 14 }}>
+                    <SectionMark section={r.group.section} />
+                    {r.group.name}
+                  </span>
+                  <span className="small clip">
+                    {chainName(r.best!.product.chain)} · {r.detail}
+                  </span>
                 </span>
-                <span className="small clip">
-                  {chainName(r.best!.product.chain)} · {r.detail}
+                <span className="num" style={{ fontWeight: 600 }}>
+                  {money(r.best?.price)}
                 </span>
-              </span>
-              <span className="num" style={{ fontWeight: 600 }}>
-                {money(r.best?.price)}
-              </span>
-            </button>
+              </button>
+              {/* The same add-to-list button as every other deal (0.7.3). */}
+              <button
+                className={`cart-btn${listed.get(r.group.id) ? ' on' : ''}`}
+                aria-label={
+                  listed.get(r.group.id) ? `${r.group.name} is on your shopping list. Tap to take it off` : `Add ${r.group.name} to shopping list`
+                }
+                aria-pressed={!!listed.get(r.group.id)}
+                onClick={async () => {
+                  const id = listed.get(r.group.id);
+                  if (id) {
+                    await deleteListEntries([id]);
+                    nav.toast(`${r.group.name} taken off your shopping list`);
+                    return;
+                  }
+                  const added = await addGroupToList(r.group);
+                  nav.toast(added ? `${r.group.name} added to your shopping list` : `${r.group.name} is already on your list`);
+                }}
+              >
+                <Icon name={listed.get(r.group.id) ? 'cartCheck' : 'cartPlus'} size={22} />
+              </button>
+            </div>
           ))}
         </div>
       )}

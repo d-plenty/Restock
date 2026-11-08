@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { nameHasSize } from '../lib/naming';
 import { RestockNative } from '../lib/sql/native';
-import { formatUnitPrice, money } from '../lib/units';
+import { formatUnitPrice, money, tidySize, tidyUnitText } from '../lib/units';
 import { fetchDetails, type ProductDetails } from '../stores/details';
 import { isNative, promoLabel } from '../stores/http';
 import { describe, eachText, lineCost, productQty, VERDICT_LABEL, type ActionKind, type Option, type VerdictKind } from '../lib/verdict';
@@ -104,6 +104,7 @@ const paths: Record<string, ReactNode> = {
   ),
   book: <path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5M8 7h7M8 11h5" />,
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  phone: <path d="M8 2.5h8a1.5 1.5 0 0 1 1.5 1.5v16a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 20V4A1.5 1.5 0 0 1 8 2.5zM11 18.5h2" />,
   info: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -1386,7 +1387,7 @@ export function ProductPreview({ product: p, onClose, action }: { product: Previ
           {p.name}
         </span>
         <span className="small" style={{ fontSize: 14 }}>
-          {[p.size, p.unitText].filter(Boolean).join(' · ')}
+          {[tidySize(p.size, p.name), tidyUnitText(p.unitText)].filter(Boolean).join(' · ')}
         </span>
       </div>
       {p.price !== undefined && (

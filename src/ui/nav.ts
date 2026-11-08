@@ -21,6 +21,10 @@ export type Screen =
       chain?: StoreChain;
       /** Which tab's shops to search (when not adding to an item that already has one). */
       section?: Section;
+      /** From the shopping list (0.7.3): find the cheapest and add it to the list for this trip only. */
+      forList?: boolean;
+      /** With forList: the plain list line this replaces ("Nescafe" becomes the product found). */
+      replaceEntry?: string;
     }
   | { name: 'settings' }
   | { name: 'catalogues' }

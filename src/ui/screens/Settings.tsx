@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { version } from '../../../package.json';
 import legal from '../../lib/legal.json';
 import { confirmAction } from '../../lib/confirm';
@@ -21,6 +21,7 @@ import { startTour } from '../Tour';
 import { downloadMarket, MARKET_SIZE_TEXT, MARKET_SOURCE, marketInfo, megabytes, removeMarket } from '../../lib/market';
 import { getHealth, testConnections, type ConnectionTest, type StoreChain } from '../../lib/health';
 import { useNav } from '../nav';
+import { checkForUpdate, installUpdate, RELEASES, type UpdateInfo } from '../../lib/updates';
 import { activeSections, searchChainsIn, type Section } from '../../shops';
 import { shopSummary } from './Stores';
 import { ExportSheet } from './BackupParts';
@@ -100,7 +101,10 @@ export function SettingsScreen() {
   const [matches, setMatches] = useState<number>();
   const screen = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (screen.current) setMatches(filterSettings(screen.current, query));
+    if (!screen.current) return;
+    // Searching looks inside the rows that fold away too.
+    if (query.trim()) screen.current.querySelectorAll('details').forEach((d) => (d.open = true));
+    setMatches(filterSettings(screen.current, query));
   }, [query, settings, cardCount]);
   if (!settings) return <div className="screen" />;
 
@@ -138,7 +142,7 @@ export function SettingsScreen() {
         <input
           className="input"
           type="search"
-          placeholder="Search settings, e.g. backup, text size"
+          placeholder="Search settings"
           aria-label="Search settings"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -157,17 +161,17 @@ export function SettingsScreen() {
       <nav className="chips jump" aria-label="Jump to" data-search-hide="1">
         {[
           ['s-stores', 'Shops'],
-          ['s-look', 'Colours'],
-          ['s-a11y', 'Accessibility'],
           ['s-checks', 'Price checks'],
           ['s-alerts', 'Alerts'],
+          ['s-look', 'Colours'],
+          ['s-a11y', 'Accessibility'],
           ['s-recalls', 'Recalls'],
           ['s-receipts', 'Receipts'],
           ['s-data', 'Backup'],
           ['s-widgets', 'Widgets'],
           ['s-shared', 'Shared history'],
           ['s-help', 'Help'],
-          ['s-about', 'Privacy'],
+          ['s-about', 'About and updates'],
           ['s-soon', 'Coming soon'],
         ].map(([id, label]) => (
           <button key={id} className="chip" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
@@ -176,27 +180,13 @@ export function SettingsScreen() {
         ))}
       </nav>
 
-      <div className="eyebrow" id="s-look">
-        Look and colours
-      </div>
-      <LookSettings settings={settings} />
-
-      <div className="eyebrow" id="s-a11y">
-        Accessibility
-      </div>
-      <AccessibilitySettings settings={settings} />
-
       <div className="eyebrow" id="s-stores">
         My shops
       </div>
       <div className="card flush">
         {row('Setup', `${TILES.filter((t) => tileStatus(settings, t.id).ok).length} of ${TILES.length} done`, () => nav.push({ name: 'setup' }))}
         {row('Supermarkets', shopSummary(settings, 'pantry'), () => nav.push({ name: 'stores', section: 'pantry' }))}
-        {row(
-          'Shop accounts and stock',
-          `Woolworths: ${settings.accounts?.woolworths?.signedIn ? `signed in${settings.accounts.woolworths.storeName ? ` (${settings.accounts.woolworths.storeName})` : ''}` : 'not signed in'} · Coles: ${settings.accounts?.coles?.signedIn ? 'signed in' : 'not signed in'}. Sign in, check your stores`,
-          () => nav.push({ name: 'stores', section: 'pantry' }),
-        )}
+        {row('Shop accounts and stock', shopAccountsSummary(settings), () => nav.push({ name: 'stores', section: 'pantry' }))}
         {row('Bottle shops (Keg tab)', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
         {row('Pharmacies (Pharmacy tab)', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
         {row('Loyalty cards', cardCount ? `${cardCount} added` : 'Flybuys, Everyday Rewards', () => nav.push({ name: 'cards' }))}
@@ -355,6 +345,16 @@ export function SettingsScreen() {
         </p>
       </Explain>
 
+      <div className="eyebrow" id="s-look">
+        Look and colours
+      </div>
+      <LookSettings settings={settings} />
+
+      <div className="eyebrow" id="s-a11y">
+        Accessibility
+      </div>
+      <AccessibilitySettings settings={settings} />
+
       <div className="eyebrow" id="s-recalls">
         Recall alerts
       </div>
@@ -483,12 +483,16 @@ export function SettingsScreen() {
       <div className="eyebrow" id="s-widgets">
         Home screen widgets
       </div>
-      <WidgetSettings settings={settings} />
+      <Fold title="Home screen widgets" sub="Deals, shopping list and quick actions">
+        <WidgetSettings settings={settings} />
+      </Fold>
 
       <div className="eyebrow" id="s-shared">
-        Shared price history (testing)
+        Shared price history <span className="tag normal beta">Beta</span>
       </div>
-      <SharedHistory settings={settings} />
+      <Fold title="Judge new items from day one" sub={settings.marketData.enabled ? 'On' : 'Off'}>
+        <SharedHistory settings={settings} />
+      </Fold>
 
       <div className="eyebrow" id="s-help">
         Troubleshooting
@@ -497,50 +501,62 @@ export function SettingsScreen() {
         {row('Test connections', 'Try a search at each store and see what happens', () => setTesting(true))}
         {row('Diagnostics', 'What went wrong lately, and send search details', () => nav.push({ name: 'diagnostics' }))}
         {row('Permissions', 'Notifications, alarms, camera, location', () => nav.push({ name: 'permissions' }))}
-        <label className="check">
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
-              Store connections
+        <details className="pick-more fold-inline">
+          <summary>
+            <span className="grow">Advanced: store connections</span>
+            <Icon name="chevron" size={18} />
+          </summary>
+          <label className="check">
+            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <span className="title" style={{ fontSize: 14 }}>
+                Store connections
+              </span>
+              <span className="small">
+                Automatic asks stores directly and switches to a hidden in-app browser if that fails. Coles always uses the browser.
+              </span>
             </span>
-            <span className="small">
-              Automatic asks stores directly and switches to a hidden in-app browser if that fails. Coles always uses the browser.
-            </span>
-          </span>
-          <select
-            className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
-            value={settings.connection}
-            onChange={(e) => updateSettings({ connection: e.target.value as Settings['connection'] })}
-            aria-label="Store connections"
-          >
-            <option value="auto">Automatic</option>
-            <option value="browser">Always browser</option>
-          </select>
-        </label>
-        <div className="row" style={{ flexWrap: 'wrap' }}>
-          <span className="grow" style={{ minWidth: 200 }}>
-            <span className="title">Store keeps saying it's blocked?</span>
-            <span className="small">Open its website here once and tick its "I'm a person" box.</span>
-          </span>
-        </div>
-        {shopGroups(settings).map(({ section, chains }) => (
-          <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 14px 12px' }}>
-            <span className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Icon name={section} size={15} /> {GROUP_LABEL[section]}
-            </span>
-            <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {chains.map((c) => (
-                <OpenStoreButton key={c} chain={c} label={chainName(c)} onDone={() => nav.toast(`Thanks. ${chainName(c)} should work again now.`)} />
-              ))}
+            <select
+              className="input"
+              style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+              value={settings.connection}
+              onChange={(e) => updateSettings({ connection: e.target.value as Settings['connection'] })}
+              aria-label="Store connections"
+            >
+              <option value="auto">Automatic</option>
+              <option value="browser">Always browser</option>
+            </select>
+          </label>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <span className="grow" style={{ minWidth: 200 }}>
+              <span className="title">Store keeps saying it's blocked?</span>
+              <span className="small">Open its website here once and tick its "I'm a person" box.</span>
             </span>
           </div>
-        ))}
+          {shopGroups(settings).map(({ section, chains }) => (
+            <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 14px 12px' }}>
+              <span className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name={section} size={15} /> {GROUP_LABEL[section]}
+              </span>
+              <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {chains.map((c) => (
+                  <OpenStoreButton
+                    key={c}
+                    chain={c}
+                    label={chainName(c)}
+                    onDone={() => nav.toast(`Thanks. ${chainName(c)} should work again now.`)}
+                  />
+                ))}
+              </span>
+            </div>
+          ))}
+        </details>
       </div>
 
       <div className="eyebrow" id="s-about">
-        About
+        About and updates
       </div>
       <div className="card flush">
+        <UpdateRows settings={settings} />
         {row('Privacy policy', `Updated ${legal.updated}`, () => setReading('privacy'))}
         {row('Fine print', 'Not affiliated with the stores, no warranty', () => setReading('disclaimer'))}
       </div>
@@ -548,7 +564,9 @@ export function SettingsScreen() {
       <div className="eyebrow" id="s-soon">
         Coming soon
       </div>
-      <ComingSoon />
+      <Fold title="What's planned" sub="Stock at home, spending, sync, iPhone and more">
+        <ComingSoon />
+      </Fold>
 
       <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
         <Logo size={40} />
@@ -762,5 +780,127 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
         with the error above.
       </p>
     </Sheet>
+  );
+}
+
+/** A short line for "Shop accounts and stock": who you're signed in to and your Coles store. */
+function shopAccountsSummary(settings: Settings): string {
+  const w = settings.accounts?.woolworths;
+  const coles = settings.stores?.coles;
+  const parts = [
+    w?.signedIn ? `Woolworths: ${w.storeName ?? 'signed in'}` : 'Woolworths: online prices',
+    settings.localPrices && coles?.branchStoreNo ? `Coles: store ${coles.branchStoreNo}` : 'Coles: online prices',
+  ];
+  return parts.join(' · ');
+}
+
+/** A settings card that folds away until you open it (0.7.3), so the page isn't a wall of options. */
+function Fold({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
+  return (
+    <details className="card flush fold">
+      <summary className="row">
+        <span className="grow">
+          <span className="title">{title}</span>
+          {sub && <span className="small">{sub}</span>}
+        </span>
+        <Icon name="chevron" size={18} />
+      </summary>
+      <div className="fold-body">{children}</div>
+    </details>
+  );
+}
+
+/**
+ * Updates from GitHub (0.7.3): check now, install a newer release (Android shows its own Install
+ * screen), and an optional weekly check when Restock opens. Nothing is sent but the request itself.
+ */
+function UpdateRows({ settings }: { settings: Settings }) {
+  const nav = useNav();
+  const [busy, setBusy] = useState<'check' | 'install'>();
+  const [found, setFound] = useState<UpdateInfo>();
+  const [error, setError] = useState<string>();
+  const [notes, setNotes] = useState(false);
+  const u = settings.updates;
+  const check = async () => {
+    setBusy('check');
+    setError(undefined);
+    try {
+      const info = await checkForUpdate(version);
+      setFound(info);
+      await updateSettings({ updates: { notify: !!u?.notify, ...u, lastCheck: new Date().toISOString() } });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(undefined);
+    }
+  };
+  const install = async () => {
+    if (!found?.apkUrl) return;
+    setBusy('install');
+    setError(undefined);
+    try {
+      const r = await installUpdate(found.apkUrl);
+      if (r === 'permission') nav.toast('Allow Restock to install apps, then come back and tap Update again.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(undefined);
+    }
+  };
+  return (
+    <>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
+        <span className="grow" style={{ minWidth: 180 }}>
+          <span className="title">Check for updates</span>
+          <span className="small">
+            {found
+              ? found.newer
+                ? `Restock ${found.version} is ready. You have ${version}.`
+                : `You have the latest version (${version}).`
+              : `You have ${version}. New versions come from GitHub.`}
+          </span>
+        </span>
+        {found?.newer && found.apkUrl ? (
+          <button className="btn primary small" disabled={!!busy} onClick={() => void install()}>
+            {busy === 'install' ? 'Downloading…' : 'Update'}
+          </button>
+        ) : (
+          <button className="btn small" disabled={!!busy} onClick={() => void check()}>
+            {busy === 'check' ? 'Checking…' : 'Check'}
+          </button>
+        )}
+      </div>
+      {found?.newer && (
+        <div style={{ padding: '0 14px 12px', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          {found.notes && (
+            <button className="linkish small" style={{ padding: 0 }} onClick={() => setNotes(true)}>
+              What's new in {found.version}
+            </button>
+          )}
+          <a className="small" href={found.pageUrl} target="_blank" rel="noreferrer">
+            Open the release on GitHub
+          </a>
+        </div>
+      )}
+      {error && (
+        <div className="banner amber" style={{ margin: '0 14px 12px', fontSize: 13 }}>
+          {error} You can also download it from <a href={RELEASES}>GitHub Releases</a>.
+        </div>
+      )}
+      <label className="check">
+        <input type="checkbox" checked={!!u?.notify} onChange={(e) => void updateSettings({ updates: { ...u, notify: e.target.checked } })} />
+        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <span className="title" style={{ fontSize: 14 }}>
+            Tell me when there's an update
+          </span>
+          <span className="small">Once a week, when you open Restock, it asks GitHub if there's a newer version.</span>
+        </span>
+      </label>
+      {notes && found && (
+        <Sheet title={`What's new in ${found.version}`} onClose={() => setNotes(false)}>
+          <div className="small release-notes">{found.notes}</div>
+        </Sheet>
+      )}
+    </>
   );
 }
