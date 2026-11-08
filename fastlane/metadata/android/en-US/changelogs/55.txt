@@ -1,0 +1,1 @@
+Restock now has its own F-Droid repository, built automatically from every GitHub release: add it from d-plenty.github.io/Restock and F-Droid (or Droid-ify, Neo Store) installs and updates Restock for you. Same APK and signing key as GitHub, so it updates your current copy. Obtainium badge on the GitHub page too.

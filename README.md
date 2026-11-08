@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Beta 0.8.3" src="https://img.shields.io/badge/status-beta%200.8.3-ffcd00">
+  <img alt="Beta 0.8.4" src="https://img.shields.io/badge/status-beta%200.8.4-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -118,13 +118,21 @@ Read the full **[privacy policy](PRIVACY.md)** and the **[fine print](DISCLAIMER
 
 Already have Restock? From 0.7.3 it can update itself from here: **Settings → About and updates → Check for updates** (or turn on *Tell me when there's an update*). Android shows its own Install screen; nothing is lost.
 
-**Stay up to date with Obtainium:** tap the badge on your phone and Restock is added to [Obtainium](https://github.com/ImranR98/Obtainium), which tells you when a new version is out.
+**Stay up to date:** get Restock through F-Droid or Obtainium and they'll install new versions for you.
 
-<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22family.plenty.restock%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fd-plenty%2FRestock%22%2C%22author%22%3A%22d-plenty%22%2C%22name%22%3A%22Restock%22%7D"><img src="docs/badge_obtainium.png" alt="Get it on Obtainium" height="48"></a>
+<p>
+  <a href="https://d-plenty.github.io/Restock/"><img alt="Get it on F-Droid (Restock repo)" src="docs/badge-fdroid-repo.svg" height="54"></a>
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/d-plenty/Restock"><img alt="Get it on Obtainium" src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" height="54"></a>
+</p>
+
+- **F-Droid (Restock repo):** Restock's own F-Droid repository, built from these releases. Open **[d-plenty.github.io/Restock](https://d-plenty.github.io/Restock/)** on your phone and tap *Add to F-Droid* (or scan its QR code in F-Droid → Settings → Repositories), then install Restock from F-Droid. Works with F-Droid, Droid-ify and Neo Store.
+- **Obtainium:** tap the badge on your phone, or add `https://github.com/d-plenty/Restock` in Obtainium.
+
+Both give you the same APK as this page, signed with the same key, so they update a copy you already installed from here. Nothing is lost.
 
 **Build it yourself:** see **[BUILD.md](BUILD.md)**. About 20 minutes the first time, on Linux, macOS or Windows.
 
-Restock is on its way to [F-Droid](https://f-droid.org) too.
+Restock is on its way to the main [F-Droid](https://f-droid.org) repository too.
 
 ## How you can help
 
@@ -172,7 +180,7 @@ Sharing is **off unless you turn it on**. If you do, Restock sends:
 It **never** sends what you searched for, what's in your pantry, what's on your list or ticked off, receipt photos or totals, or anything that says who you are or where you live. There's no account and no phone ID. Restock will ask the shops and data sources for permission before this goes live.
 
 ### F-Droid
-Restock on [F-Droid](https://f-droid.org), the app store for free and open-source Android apps, so it installs and updates without downloading APKs by hand.
+Restock in the main [F-Droid](https://f-droid.org) repository, built by F-Droid from the source. Until then, [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) has every release.
 
 ## How it works
 

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Restock F-Droid repo</title>
+    <style>
+      :root {
+        --bg: #f5f1e6;
+        --card: #fff;
+        --ink: #13213f;
+        --sub: #4b5568;
+        --green: #00843d;
+        --line: #e4dcc8;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1626;
+          --card: #18213a;
+          --ink: #eef1f7;
+          --sub: #b5bdcc;
+          --green: #3fbf74;
+          --line: #2a3555;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      main {
+        max-width: 560px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      header img {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 26px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .btn {
+        display: block;
+        text-align: center;
+        background: var(--green);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 700;
+        padding: 14px;
+        border-radius: 14px;
+      }
+      .qr {
+        align-self: center;
+        width: min(240px, 70vw);
+        background: #fff;
+        border-radius: 12px;
+      }
+      code {
+        word-break: break-all;
+        font-size: 13px;
+      }
+      .sub {
+        color: var(--sub);
+        font-size: 14px;
+        margin: 0;
+      }
+      ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="icon.png" alt="" />
+        <div>
+          <h1>Restock</h1>
+          <p class="sub">Its own F-Droid repository</p>
+        </div>
+      </header>
+
+      <div class="card">
+        <strong>Install and update Restock with F-Droid</strong>
+        <p class="sub">
+          The same APKs as Restock's GitHub releases, signed with the same key, so it updates over a copy installed from GitHub or Obtainium.
+        </p>
+        <a class="btn" href="{{APP_URL}}">Add to F-Droid</a>
+        <p class="sub">On your phone, with F-Droid (or Droid-ify, Neo Store) installed. Then search for Restock in F-Droid.</p>
+      </div>
+
+      <div class="card">
+        <strong>Or scan this in F-Droid</strong>
+        <img class="qr" src="repo-qr.svg" alt="QR code of the repository address" />
+        <ol class="sub">
+          <li>In F-Droid, open Settings → Repositories, and tap +.</li>
+          <li>Scan the code, or paste the address below.</li>
+          <li>Check the fingerprint matches, then add it.</li>
+        </ol>
+        <code>{{ADD_URL}}</code>
+        <p class="sub">Fingerprint (SHA-256):</p>
+        <code>{{FINGERPRINT}}</code>
+      </div>
+
+      <div class="card">
+        <strong>About this repo</strong>
+        <p class="sub">
+          Built automatically from each <a href="https://github.com/d-plenty/Restock/releases">GitHub release</a> of
+          <a href="https://github.com/d-plenty/Restock">Restock</a>. It's separate from the main F-Droid repository.
+        </p>
+      </div>
+    </main>
+  </body>
+</html>

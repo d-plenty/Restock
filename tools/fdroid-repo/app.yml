@@ -1,0 +1,15 @@
+# Restock's listing in its own F-Droid repo (tools/fdroid-repo/build.sh). The store text,
+# screenshots and changelogs come from fastlane/metadata/android/en-US.
+Categories:
+  - Money
+  - Shopping
+License: GPL-3.0-only
+AuthorName: Plenty Technologies
+WebSite: https://github.com/d-plenty/Restock
+SourceCode: https://github.com/d-plenty/Restock
+IssueTracker: https://github.com/d-plenty/Restock/issues
+Changelog: https://github.com/d-plenty/Restock/releases
+AutoName: Restock
+AntiFeatures:
+  NonFreeNet:
+    en-US: Reads prices from the shops' own websites (Coles, Woolworths, Aldi and others), which aren't free services.

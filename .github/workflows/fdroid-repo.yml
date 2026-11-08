@@ -1,0 +1,80 @@
+name: F-Droid repo
+
+# Rebuilds Restock's own F-Droid repository (https://d-plenty.github.io/Restock/) from the
+# newest GitHub releases and publishes it on GitHub Pages. Runs after each release, or by hand
+# from the Actions tab. Needs the FDROID_KEYSTORE and FDROID_KEYSTORE_PASS secrets.
+#
+# A release only starts a run on main: GitHub Pages won't take a deployment from a tag.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fdroid-repo-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  start:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run fdroid-repo.yml --repo "$GITHUB_REPOSITORY" --ref main
+
+  build:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install fdroidserver segno
+
+      - name: Download the newest release APKs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p apks
+          # The last 5 releases, one APK each (the versioned one if there is one, otherwise restock.apk).
+          for tag in $(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --exclude-pre-releases --limit 5 --json tagName --jq '.[].tagName'); do
+            name=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '[.assets[].name | select(endswith(".apk"))] | (map(select(. != "restock.apk")) + map(select(. == "restock.apk"))) | .[0] // empty')
+            if [ -z "$name" ]; then echo "No APK in $tag, skipping"; continue; fi
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$name" --output "apks/restock-$tag.apk"
+          done
+          ls -l apks
+
+      - name: Build the repo
+        env:
+          FDROID_KEYSTORE: ${{ secrets.FDROID_KEYSTORE }}
+          FDROID_KEYSTORE_PASS: ${{ secrets.FDROID_KEYSTORE_PASS }}
+          APK_DIR: ${{ github.workspace }}/apks
+          SITE_DIR: ${{ github.workspace }}/site
+          REPO_URL: https://d-plenty.github.io/Restock/repo
+        run: bash tools/fdroid-repo/build.sh
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

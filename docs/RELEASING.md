@@ -58,7 +58,9 @@ tar czf ~/restock-signing-key-backup.tar.gz -C ~ .restock
    sha256sum ~/restock-$VERSION.apk
    ```
 
-Obtainium picks up new releases from the Releases page automatically. Name the APK the same way every time (`restock-0.x.y.apk`).
+Obtainium picks up new releases from the Releases page automatically.
+
+**Restock's own F-Droid repo** (https://d-plenty.github.io/Restock/) updates itself too: publishing a release starts the *F-Droid repo* action (`.github/workflows/fdroid-repo.yml`), which takes the APKs from the last 5 releases, builds the repo with `tools/fdroid-repo/build.sh` and puts it on GitHub Pages. It can also be run by hand from the Actions tab. It signs the repo's index with its own key (not the app's), kept in `~/.restock/fdroid-repo.p12` and in the repo's `FDROID_KEYSTORE` and `FDROID_KEYSTORE_PASS` secrets. Back that key up with the rest of `~/.restock`: if it changes, everyone who added the repo has to remove it and add it again. Name the APK the same way every time (`restock-0.x.y.apk`).
 
 ## Before 1.0
 
