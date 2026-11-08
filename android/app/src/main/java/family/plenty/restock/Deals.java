@@ -224,6 +224,7 @@ public final class Deals {
     private static Parts parseParts(String input) {
         if (input == null || input.isEmpty()) return null;
         String s = input.toLowerCase()
+            .replaceAll("(\\d),(?=\\d{3}(?!\\d))", "$1") // "1,120 sheets" is 1120 (0.7.6)
             .replaceAll("litres?|liters?", "l")
             .replaceAll("millilitres?|milliliters?", "ml")
             .replaceAll("kilograms?|kilos?", "kg")

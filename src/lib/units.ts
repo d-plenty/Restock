@@ -34,6 +34,8 @@ function parseParts(input: string | undefined | null): SizeParts | undefined {
   if (!input) return undefined;
   const s = input
     .toLowerCase()
+    // Thousands written with a comma: "1,120 sheets" is 1120, not 120 (0.7.6).
+    .replace(/(\d),(?=\d{3}(?!\d))/g, '$1')
     .replace(/litres?|liters?/g, 'l')
     .replace(/millilitres?|milliliters?/g, 'ml')
     .replace(/kilograms?|kilos?/g, 'kg')

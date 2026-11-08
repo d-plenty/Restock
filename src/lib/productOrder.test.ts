@@ -27,3 +27,14 @@ describe('product order (0.7.6)', () => {
     expect(show(orderOptions(l, 'size'))).toEqual(['woolworths 100g', 'woolworths 100g x 4 pack']);
   });
 });
+
+describe('sizes with a thousands comma (0.7.6)', () => {
+  it('reads "1,120 sheets" as 1120 and orders and prices by it', async () => {
+    const { parseSize } = await import('./units');
+    expect(parseSize('1,120 sheets')).toEqual({ qty: 1120, unit: 'ea' });
+    expect(parseSize('4,320 sheets')?.qty).toBe(4320);
+    expect(parseSize('1,5 kg')).not.toEqual({ qty: 15, unit: 'g' });
+    const l = [o('aldi', 'TT 24 Pack', '4,320 sheets', 8.39), o('aldi', 'TT 8 Pack', '1,120 sheets', 4.99), o('aldi', 'TT DL 4 Pack', '1,440 sheets', 3.59)];
+    expect(orderOptions(l, 'size').map((x) => x.product.size)).toEqual(['1,120 sheets', '1,440 sheets', '4,320 sheets']);
+  });
+});
