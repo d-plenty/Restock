@@ -2,6 +2,8 @@ import { useFullRefresh } from '../refresh';
 import { useEffect, useMemo, useState } from 'react';
 import { nameHasSize } from '../../lib/naming';
 import { lookupBarcode, scanBarcode } from '../../lib/barcode';
+import { serverMode } from '../../server-mode/flag';
+import { PhoneOnlyNote } from '../../server-mode/ui/PhoneOnly';
 import {
   addListEntry,
   allCards,
@@ -504,9 +506,11 @@ export function ListScreen() {
         style={{ display: 'flex', gap: 8 }}
       >
         <input className="input" placeholder={ADD_HINT[section]} aria-label="Add an item" value={text} onChange={(e) => setText(e.target.value)} />
-        <button type="button" className="btn" aria-label="Scan a barcode to add" style={{ width: 52, padding: 0 }} onClick={scanToList}>
-          <Icon name="scan" />
-        </button>
+        {!serverMode && (
+          <button type="button" className="btn" aria-label="Scan a barcode to add" style={{ width: 52, padding: 0 }} onClick={scanToList}>
+            <Icon name="scan" />
+          </button>
+        )}
       </form>
       {/* Typed something: add just the name, or look it up at your shops for this trip (0.7.3). */}
       {pantryMatches.length > 0 && (
@@ -537,15 +541,19 @@ export function ListScreen() {
           <button className="btn" onClick={() => void add(text)}>
             <Icon name="plus" size={18} /> <span className="clip">Add "{text.trim()}"</span>
           </button>
-          <button
-            className="btn primary"
-            onClick={() => {
-              nav.push({ name: 'add', query: text.trim(), forList: true, section });
-              setText('');
-            }}
-          >
-            <Icon name="search" size={18} /> Find cheapest
-          </button>
+          {serverMode ? (
+            <PhoneOnlyNote compact />
+          ) : (
+            <button
+              className="btn primary"
+              onClick={() => {
+                nav.push({ name: 'add', query: text.trim(), forList: true, section });
+                setText('');
+              }}
+            >
+              <Icon name="search" size={18} /> Find cheapest
+            </button>
+          )}
         </div>
       )}
 
@@ -1127,9 +1135,11 @@ function ShoppingMode({
             </button>
           )}
         </div>
-        <button className="icon-btn" aria-label="Scan to tick off" onClick={() => void scanToTick()}>
-          <Icon name="scan" size={20} />
-        </button>
+        {!serverMode && (
+          <button className="icon-btn" aria-label="Scan to tick off" onClick={() => void scanToTick()}>
+            <Icon name="scan" size={20} />
+          </button>
+        )}
         <button className="btn small primary" onClick={onClose}>
           Done
         </button>

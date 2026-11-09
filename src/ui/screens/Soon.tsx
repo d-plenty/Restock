@@ -47,24 +47,6 @@ export const SOON: Soon[] = [
     ),
   },
   {
-    id: 'sync',
-    icon: 'refresh',
-    title: 'Hosted sync',
-    short: 'Sync from anywhere, through a small server you run yourself',
-    body: (
-      <>
-        <p>
-          Phones in a household already sync on the same Wi-Fi with local sync (Settings → Sync and backups → Local sync), with no account and nothing leaving your
-          phones. This adds syncing from anywhere: tick something off at the shops and it's off the list at home straight away.
-        </p>
-        <p>
-          It would run on a small server you run yourself: a Docker container on a home server, NAS or Raspberry Pi. There's no Restock account and no
-          Restock server holding your data, and the server only ever sees encrypted data.
-        </p>
-      </>
-    ),
-  },
-  {
     id: 'iphone',
     icon: 'phone',
     title: 'iPhone version',

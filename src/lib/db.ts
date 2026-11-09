@@ -741,16 +741,49 @@ export async function rowsForGroups(ids: string[]): Promise<RowSet[]> {
 /**
  * Deletes prices older than the history setting. Each product's latest price is always kept,
  * and so is the sample items' made-up history. Returns how many prices were removed.
+ * 0.9.2: not with a Restock server: the phone moves older prices there itself (ServerOffload.java)
+ * and deletes its own copy only once the server has them, so nothing is deleted here.
  */
 export async function pruneHistory(weeks: number, now = Date.now()): Promise<number> {
   // 0.9.0: only ever one of the real choices (1 to 12 months since 0.9.1). A nonsense number (from
   // a damaged setting) deletes nothing, rather than every price but the latest.
   if (!HISTORY_WEEKS.includes(weeks) || !Number.isFinite(now)) return 0;
+  if (await serverKeepsHistory()) return 0;
   const cutoff = new Date(now - weeks * 7 * 86_400_000).toISOString();
   const where = `date < ? AND source <> 'demo' AND date < (SELECT MAX(q.date) FROM prices q WHERE q.product_id = prices.product_id)`;
   const [{ n }] = await sql().query<{ n: number }>(`SELECT COUNT(*) AS n FROM prices WHERE ${where}`, [cutoff]);
   if (Number(n) > 0) await write([{ sql: `DELETE FROM prices WHERE ${where}`, params: [cutoff] }]);
   return Number(n);
+}
+
+/** 0.9.2: whether this phone uses a Restock server (it then keeps older prices there, see pruneHistory). */
+export async function serverKeepsHistory(): Promise<boolean> {
+  try {
+    const [{ n }] = await sql().query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM sync_meta WHERE key IN ('server_home', 'server_away') AND EXISTS (SELECT 1 FROM sync_meta WHERE key = 'server_dev_priv')",
+    );
+    return Number(n) > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 0.9.2: which of these receipt photos are kept on the Restock server rather than on this phone
+ * (moved there because they're older than "Keep price history for").
+ */
+export async function photosOnServer(paths: string[]): Promise<string[]> {
+  const real = paths.filter(isPhotoPath);
+  if (!real.length) return [];
+  try {
+    const rows = await sql().query<{ key: string }>(
+      `SELECT key FROM sync_meta WHERE key IN (${placeholders(real.length)})`,
+      real.map((p) => 'photo_off:' + p),
+    );
+    return rows.map((r) => r.key.slice('photo_off:'.length));
+  } catch {
+    return [];
+  }
 }
 
 /**

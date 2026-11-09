@@ -126,6 +126,16 @@ export interface RestockNativePlugin {
    */
   syncNextcloud(opts: { server: string; folder?: string }): Promise<SyncInfo & { cancelled?: boolean }>;
   syncNextcloudCancel(): Promise<void>;
+  /** 0.9.2: join a Restock server with the code from its Add a phone page (restock-server:2?…). */
+  syncJoinServer(opts: { code: string }): Promise<SyncInfo>;
+  /** 0.9.2: stop using the Restock server. bringBack: its receipt photos come back first (rejects if they can't). */
+  syncStopServer(opts: { bringBack?: boolean }): Promise<SyncInfo>;
+  /** 0.9.2: a web page's code (restock-link:2 or restock-login:2), checked: what it asks for. */
+  syncWebCode(opts: { code: string }): Promise<{ kind: 'link' | 'login'; host: string }>;
+  /** 0.9.2: the person said yes: the household's server keys go to that browser, sealed to it. */
+  syncWebApprove(opts: { code: string }): Promise<{ kind: 'link' | 'login'; host: string }>;
+  /** 0.9.2: a receipt photo kept on the Restock server (base64 JPEG), fetched to show; not saved on the phone. */
+  syncServerPhoto(opts: { path: string }): Promise<{ data: string }>;
   /** The search test with the screen off (0.8.6): a notification with progress and a Stop button. */
   searchTestStart(opts: { total: number }): Promise<void>;
   searchTestProgress(opts: { done: number; total: number; text: string }): Promise<{ stop: boolean }>;
@@ -219,6 +229,20 @@ export interface SyncInfo {
   shareReceipts?: boolean;
   /** 0.9.1: on Wi-Fi or Ethernet (phones only sync with each other there). */
   onWifi?: boolean;
+  /** 0.9.2: the Restock server: joined, its addresses, the one that answered last, the last sync through it and any problem (in words). */
+  server?: boolean;
+  serverHome?: string | null;
+  serverAway?: string | null;
+  serverReached?: string | null;
+  serverAt?: string | null;
+  serverError?: string | null;
+  /** 0.9.2: other phones' files on the server that couldn't be opened, and how many files it has. */
+  serverUnread?: number;
+  serverFiles?: number;
+  /** 0.9.2: prices and receipt photos moved off this phone to the server, and ones saved there but not confirmed yet. */
+  serverPrices?: number;
+  serverPhotos?: number;
+  serverWaiting?: number;
 }
 
 /** Why Restock was opened: a share, an app icon shortcut, a widget or a notification. */

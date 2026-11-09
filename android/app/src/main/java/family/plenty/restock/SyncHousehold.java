@@ -1005,14 +1005,19 @@ final class SyncHousehold implements SyncEngine.Household {
         for (String k : new String[] { "key", "keyv", "oldkey", "oldkey_until", "secret", "owner_secrets", "pair_token", "pair_until", "invite", "household", "tabs", "tabs_eff",
             "recovery", "recovery_saved", "owner_priv", "owner_pubkey", "owner_pin", "folder", "folder_top", "folder_keys", "folder_at", "folder_unread", "clock_warn", "rehousehold",
             // 0.9.1: the WebDAV or Nextcloud sign-in (only ever on this phone), receipts and tidying.
-            "dav_user", "dav_pass", "dav_kind", "receipts_eff", "compact_at" })
+            "dav_user", "dav_pass", "dav_kind", "receipts_eff", "compact_at",
+            // 0.9.2: the Restock server connection (this phone's key for it, its addresses and notes).
+            // What the phone moved there (photo_off:…) and the keys that open it (server_filekeys)
+            // stay, so the photos can still come back if it connects again.
+            "server_dev_priv", "server_home", "server_away", "server_top", "server_keys", "server_at", "server_unread", "server_files", "server_webs",
+            "server_webkeys", "server_off_at", "server_off_prices", "server_off_waiting" })
             e.setMeta(k, null);
         e.db.transaction(() -> {
             e.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
             List<JSONObject> top = e.db.query("SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log");
             e.db.exec("DELETE FROM household");
             e.db.exec("DELETE FROM sync_log WHERE tbl = 'household'");
-            e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'folder_got:%'");
+            e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'folder_got:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%' OR key LIKE 'server_webpub:%' OR key LIKE 'server_photorefs:%'");
             // A marker that keeps the highest number (not a record: sync skips it).
             e.db.exec("INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq) VALUES ('_seq', 'floor', 0, '', 1, ?)", top.get(0).optLong("top", 0));
             e.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");

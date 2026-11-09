@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { confirmAction } from '../../lib/confirm';
-import { allReceipts, getReceipt, getSettings, nowIso, saveReceipt, uid, updateSettings } from '../../lib/db';
+import { allReceipts, getReceipt, getSettings, nowIso, photosOnServer, saveReceipt, uid, updateSettings } from '../../lib/db';
+import { serverPhoto } from '../../lib/sync';
 import { dataUrl, photoPath, photosSize, readPhoto, writePhoto } from '../../lib/receiptFiles';
 import { readerInstalled, readText, removeOldDownload } from '../../lib/receiptReader';
 import { deleteOn, expired, itemLines, joinPages, KEEP_MONTHS, keepLabel, parseReceipt, removeReceipts } from '../../lib/receipts';
@@ -422,6 +423,10 @@ export function ReceiptScreen({ id }: { id?: string }) {
   const [photo, setPhoto] = useState<string>();
   // A saved receipt's other photos (a long receipt taken in several).
   const [morePhotos, setMorePhotos] = useState<string[]>([]);
+  // 0.9.2: photos kept on the Restock server (older than "Keep price history for"), and ones fetched from it to show.
+  const [onServer, setOnServer] = useState<string[]>([]);
+  const [fetched, setFetched] = useState<string[]>([]);
+  const [fetching, setFetching] = useState(false);
   // Photos already taken of this receipt, before the one being lined up now: what's read, and what's kept.
   const [pages, setPages] = useState<{ ocr: Img; shown: Img }[]>([]);
   const [step, setStep] = useState<'pick' | 'corners' | 'look' | 'details'>(id ? 'details' : 'pick');
@@ -443,16 +448,20 @@ export function ReceiptScreen({ id }: { id?: string }) {
       if (!r) return;
       setExisting(r);
       setFields(fieldsOf(r));
+      const missing: string[] = [];
       if (r.photo) {
         const b = await readPhoto(r.photo);
         if (b) setPhoto(dataUrl(b));
+        else missing.push(r.photo);
       }
       const more: string[] = [];
       for (const path of r.pages ?? []) {
         const b = await readPhoto(path);
         if (b) more.push(dataUrl(b));
+        else missing.push(path);
       }
       setMorePhotos(more);
+      setOnServer(await photosOnServer(missing));
     });
   }, [id]);
 
@@ -738,6 +747,32 @@ export function ReceiptScreen({ id }: { id?: string }) {
             .map((u, i, all) => (
               <img key={i} src={u} alt={all.length > 1 ? `The receipt, photo ${i + 1} of ${all.length}` : 'The receipt'} className="receipt-photo" />
             ))}
+      {!result && !pages.length && fetched.map((u, i) => <img key={`s${i}`} src={u} alt="The receipt, from your Restock server" className="receipt-photo" />)}
+      {!result && !pages.length && onServer.length > fetched.length && (
+        <div className="card" style={{ gap: 6 }}>
+          <span className="small">{onServer.length === 1 ? 'Photo kept on your Restock server' : `${onServer.length} photos kept on your Restock server`}</span>
+          <button
+            className="btn small"
+            style={{ alignSelf: 'flex-start' }}
+            disabled={fetching}
+            onClick={async () => {
+              setFetching(true);
+              setError(undefined);
+              try {
+                const got: string[] = [];
+                for (const path of onServer) got.push(dataUrl(await serverPhoto(path)));
+                setFetched(got);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : String(e));
+              } finally {
+                setFetching(false);
+              }
+            }}
+          >
+            {fetching ? 'Getting it…' : onServer.length === 1 ? 'Show it' : 'Show them'}
+          </button>
+        </div>
+      )}
       {errorBox}
       {!existing && fields.text && <p className="small">Check what was read and fix anything that's wrong.</p>}
       <div className="card">

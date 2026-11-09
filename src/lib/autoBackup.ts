@@ -38,7 +38,7 @@ export async function maybeAutoBackup(force = false): Promise<string | undefined
   running = true;
   try {
     // 0.9.0: locked with the automatic backups' password, if one is set.
-    const json = await backupJson({ ...EVERYTHING, receiptPhotos: s.autoBackup.receiptPhotos !== false, password: s.autoBackup.password || undefined });
+    const json = await backupJson({ ...EVERYTHING, receiptPhotos: s.autoBackup.receiptPhotos !== false, serverPhotos: false, password: s.autoBackup.password || undefined });
     const name = autoName();
     await RestockNative.writeBackup({ uri: s.autoBackup.folder, name, json, keep: s.autoBackup.keep });
     const now = new Date().toISOString();

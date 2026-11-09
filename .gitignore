@@ -13,3 +13,7 @@ android/local.properties
 dist-preview/
 # What the search tools save (shop answers): stays on your computer
 tools/*/out/
+
+# The Restock server has its own repo (github.com/d-plenty/restock-server). A copy here, or
+# the server web build (npm run build:server-web writes server/public/app), stays out of this one.
+/server/

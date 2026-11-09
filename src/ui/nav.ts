@@ -40,7 +40,9 @@ export type Screen =
   | { name: 'specials' }
   | { name: 'recalls' }
   | { name: 'diagnostics' }
-  | { name: 'soon'; id: string };
+  | { name: 'soon'; id: string }
+  /** 0.9.2: the web app on a Restock server: its Phones, Activity and Account pages. */
+  | { name: 'server'; page: 'phones' | 'activity' | 'account' };
 
 export interface Nav {
   tab: Tab;

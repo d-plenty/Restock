@@ -9,6 +9,10 @@ export { isPhotoPath };
 
 const memory = new Map<string, string>();
 
+/** 0.9.2: in the web app on a Restock server, photos come from the server (src/server-mode/live.ts). */
+let photoSource: ((path: string) => Promise<string | undefined>) | undefined;
+export const setPhotoSource = (fn: (path: string) => Promise<string | undefined>) => (photoSource = fn);
+
 export const photoPath = (id: string, page = 1) => (page > 1 ? `receipts/${id}-${page}.jpg` : `receipts/${id}.jpg`);
 
 /** Save a photo (base64 JPEG, no "data:" prefix). 0.9.0: only at a receipt photo's own path (receiptPaths.ts). */
@@ -21,6 +25,7 @@ export async function writePhoto(path: string, base64: string): Promise<void> {
 export async function readPhoto(path: string): Promise<string | undefined> {
   if (!isPhotoPath(path)) return undefined;
   try {
+    if (!isNative() && photoSource && !memory.has(path)) return await photoSource(path);
     return isNative() ? (await RestockNative.readAppFile({ path })).data : memory.get(path);
   } catch {
     return undefined;

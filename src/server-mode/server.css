@@ -1,0 +1,211 @@
+/* 0.9.2 server mode: the web app on a Restock server. The phone layout stays; on a wide screen it
+   sits in the middle as a column, with the page around it a shade darker. */
+
+.server-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: calc(var(--top) + 6px) 12px 4px;
+  background: var(--navy);
+  color: #fff;
+  border-bottom: 3px solid var(--gold);
+  position: relative;
+  z-index: 9;
+}
+.server-strip.trouble {
+  border-bottom-color: var(--amber-bg);
+}
+.strip-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.strip-top .strip-name {
+  flex: 1;
+  min-width: 0;
+}
+.strip-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: none;
+  background: none;
+  color: inherit;
+  padding: 2px 0;
+  text-align: left;
+}
+.strip-name {
+  font-weight: 700;
+  font-size: 15px;
+  max-width: 100%;
+}
+.strip-sub {
+  font-size: 13px;
+  opacity: 0.88;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.strip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  animation: strip-pulse 1s ease-in-out infinite alternate;
+  flex-shrink: 0;
+}
+@keyframes strip-pulse {
+  to {
+    opacity: 0.3;
+  }
+}
+.strip-links {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.strip-links button {
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 9px;
+  border-radius: 8px;
+  min-height: 32px;
+}
+.strip-links button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+/* The app's screens already leave room for the phone's status bar; under the strip they don't need to. */
+.server-mode .server-strip ~ .screen {
+  padding-top: 16px;
+}
+
+.phone-only {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--sunken);
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.4;
+}
+.phone-only svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.phone-only.compact {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.server-gate .screen {
+  max-width: 440px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.gate-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.gate-form,
+.add-phone {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-title {
+  margin: 0;
+  font-size: 18px;
+}
+.steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.server-qr {
+  max-width: 280px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: -4px;
+}
+.meter-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--sunken);
+  overflow: hidden;
+}
+.meter-bar span {
+  display: block;
+  height: 100%;
+  transition: width 0.2s;
+  background: var(--red-ink);
+}
+.meter.s2 .meter-bar span {
+  background: var(--amber-ink);
+}
+.meter.s3 .meter-bar span,
+.meter.s4 .meter-bar span {
+  background: var(--green);
+}
+
+/* Loyalty cards, as the web shows them: the shop's look, greyed, no number. */
+.card-locked {
+  filter: grayscale(0.85);
+  opacity: 0.75;
+}
+.card-locked-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding: 18px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1b1f1d;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+details.card > summary {
+  cursor: pointer;
+}
+
+/* A wide screen: the phone-width app in the middle. */
+@media (min-width: 700px) {
+  html.server-mode body {
+    background: var(--sunken);
+  }
+  html.server-mode .app {
+    background: var(--bg);
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 8px 40px var(--shadow);
+  }
+  html.server-mode .status-shade {
+    display: none;
+  }
+}

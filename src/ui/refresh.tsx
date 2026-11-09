@@ -6,6 +6,7 @@ import { syncInfo } from '../lib/sync';
 import { isNative } from '../stores/http';
 import { LoadingBar, usePullToRefresh } from './components';
 import { useNav } from './nav';
+import { serverMode, serverUi } from '../server-mode/flag';
 
 // Check now on Home does a full update (0.8.2): sync with the household, check prices, then sync
 // again so the other phones get the new prices. Pulling down on Home, Pantry, Keg, Pharmacy or
@@ -27,19 +28,26 @@ export function refreshText(stage: RefreshStage, progress?: [number, number]): s
         : 'Checking prices…';
 }
 
+async function serverRefresh(setStage: (s: RefreshStage | undefined) => void, toast: (m: string) => void): Promise<void> {
+  setStage('sync');
+  if (serverUi.current) toast(await serverUi.current.refresh());
+}
+
 /** `onChecked` gets the price check's result (Home uses it to show shops that didn't work). */
 export function useFullRefresh(onChecked?: (res: CheckResult) => void) {
   const nav = useNav();
   const [stage, setStage] = useState<RefreshStage>();
   const [progress, setProgress] = useState<[number, number]>();
   // Only mention sync when this phone is in a household.
-  const paired = !!useLive(() => syncInfo().catch(() => undefined), [])?.paired;
+  const paired = !!useLive(() => syncInfo().catch(() => undefined), [])?.paired || serverMode;
   const checkedRef = useRef(onChecked);
   checkedRef.current = onChecked;
 
   const run = () => {
     if (running) return;
     running = (async () => {
+      // On a Restock server: get the phones' latest (prices are checked on the phones).
+      if (serverMode) return serverRefresh(setStage, nav.toast);
       if (!isNative()) {
         nav.toast('Prices and sync work in the Android app.');
         return;
@@ -80,6 +88,7 @@ export function useFullRefresh(onChecked?: (res: CheckResult) => void) {
   const syncOnly = () => {
     if (running) return;
     running = (async () => {
+      if (serverMode) return serverRefresh(setStage, nav.toast);
       if (!isNative()) return;
       setStage('sync');
       const r = await RestockNative.syncNow().catch(() => undefined);

@@ -110,7 +110,9 @@ final class SyncEngine {
 
     /** The sync_meta values that are secrets: never shown, never synced, sealed on the phone. */
     static final Set<String> SECRET_KEYS = new HashSet<>(java.util.Arrays.asList(
-        "key", "oldkey", "secret", "owner_secrets", "owner_priv", "my_priv", "recovery", "pair_token", "dav_pass"));
+        "key", "oldkey", "secret", "owner_secrets", "owner_priv", "my_priv", "recovery", "pair_token", "dav_pass",
+        // 0.9.2: the phone's own key for the Restock server, and the serverKeys it has known.
+        "server_dev_priv", "server_filekeys"));
 
     Secrets secrets = PLAIN;
     /** Set when a secret couldn't be opened (the key store's key is gone): SyncHub treats the phone as not paired. */
@@ -352,7 +354,7 @@ final class SyncEngine {
                 db.exec("UPDATE sync_peers SET got = 0");
                 db.exec("UPDATE sync_log SET seq = seq + (SELECT COALESCE(MAX(seq), 0) FROM sync_log)");
                 // And the folder's files are read again, for what this phone left out before.
-                db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'");
+                db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%'");
             });
         }
         String j = joinTabs(now);
@@ -1178,6 +1180,8 @@ final class SyncEngine {
             if (tab != null && !mine.contains(tab)) continue;
             for (String path : photoPaths(row)) {
                 if (photos.size(path) >= 0) continue;
+                // 0.9.2: moved to the Restock server on purpose (ServerOffload): not fetched back.
+                if (meta("photo_off:" + path) != null) continue;
                 if (asked++ >= PHOTOS_PER_SYNC) return got;
                 JSONObject m = new JSONObject();
                 m.put("op", "photo");

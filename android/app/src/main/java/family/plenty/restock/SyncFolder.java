@@ -12,6 +12,7 @@ import java.util.zip.GZIPOutputStream;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
@@ -35,6 +36,11 @@ import org.json.JSONObject;
  * - 0.9.1: a folder is tried out before it's used (check(): a test file written, read back, listed
  *   and deleted), so one an app can't really hold is turned down straight away. Each file also says
  *   how far its phone has got through the others' changes ("seen"), so they can tidy old deletes.
+ * - 0.9.2: a Restock server (ServerFolder) is a folder too, with its own notes in sync_meta
+ *   ("server_…" rather than "folder_…") so a phone can use both. Its files are sealed with the
+ *   serverKey (made from the household's key, so the web app can be given it without the household's
+ *   key, which also opens Wi-Fi sync and picked folders), and carry prices changed in the last 60
+ *   days and the photos the phone moved to the server (ServerOffload).
  *
  * No Android classes here (the folder is an interface), so it's tested on a computer too.
  */
@@ -117,10 +123,36 @@ final class SyncFolder {
 
     final SyncEngine e;
     final SyncHousehold h;
+    /** 0.9.2: where this folder's notes are kept in sync_meta: "folder" (a picked folder or WebDAV) or "server". */
+    final String p;
+    /** 0.9.2: prices changed within this long go in too (0: none, as for a picked folder). */
+    final long pricesMs;
 
     SyncFolder(SyncEngine e, SyncHousehold h) {
+        this(e, h, "folder", 0);
+    }
+
+    SyncFolder(SyncEngine e, SyncHousehold h, String prefix, long pricesMs) {
         this.e = e;
         this.h = h;
+        this.p = prefix;
+        this.pricesMs = pricesMs;
+    }
+
+    boolean server() {
+        return "server".equals(p);
+    }
+
+    /** 0.9.2: the key this folder's files are sealed with: the serverKey on a Restock server, else the household's. */
+    byte[] fileKey(byte[] householdKey) throws Exception {
+        return server() ? serverKey(householdKey) : householdKey;
+    }
+
+    /** serverKey = HMAC-SHA256(householdKey, "restock-server-files-v1"). */
+    static byte[] serverKey(byte[] householdKey) throws Exception {
+        javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(householdKey, "HmacSHA256"));
+        return mac.doFinal("restock-server-files-v1".getBytes(StandardCharsets.UTF_8));
     }
 
     static String fileFor(String device) {
@@ -192,7 +224,7 @@ final class SyncFolder {
             if (names.contains(keys)) res.rekeyed = takeKeys(f.read(keys));
             if (!res.rekeyed && !keys.equals(KEYS) && names.contains(KEYS)) res.rekeyed = takeKeys(f.read(KEYS));
         }
-        byte[] key = h.key();
+        byte[] key = fileKey(h.key());
         String me = e.device();
         e.noteTabs();
         readOthers(f, names, key, me, now, res);
@@ -204,8 +236,8 @@ final class SyncFolder {
         writeOwn(f, names, me, now, res);
         if (h.isOwner()) writeKeys(f, names);
         // "Synced through the folder" only when another phone's file was read.
-        if (res.phones > 0) e.setMeta("folder_at", now);
-        e.setMeta("folder_unread", res.unread > 0 ? String.valueOf(res.unread) : null);
+        if (res.phones > 0) e.setMeta(p + "_at", now);
+        e.setMeta(p + "_unread", res.unread > 0 ? String.valueOf(res.unread) : null);
         return res;
     }
 
@@ -216,11 +248,11 @@ final class SyncFolder {
             if (!name.startsWith(PREFIX) || !name.endsWith(SUFFIX) || name.equals(fileFor(me))) continue;
             // Not changed since last time: nothing to read.
             String ver = f.version(name);
-            String verKey = "folder_ver:" + name;
+            String verKey = p + "_ver:" + name;
             if (ver != null && ver.equals(e.meta(verKey))) continue;
             byte[] data = f.read(name);
             if (data == null) continue;
-            String seenKey = "folder_seen:" + name;
+            String seenKey = p + "_seen:" + name;
             String sum = hash(data);
             if (sum.equals(e.meta(seenKey))) {
                 if (ver != null) e.setMeta(verKey, ver);
@@ -236,11 +268,27 @@ final class SyncFolder {
             }
             if (ver != null) e.setMeta(verKey, ver);
             String device = m.optString("device", "");
+            // 0.9.2: on a server each file is its writer's own (the server lets a phone or browser write only
+            // its own name), so a file that names another device inside is passed over: a browser can't pose
+            // as a phone (or as another browser) by what it puts in its file.
+            if (server() && !name.equals(fileFor(device))) {
+                e.setMeta(seenKey, sum);
+                continue;
+            }
+            // 0.9.2: the web app's file names its public key; only a browser with the serverKey could write it, so
+            // SyncHub trusts that key for webkeys/ after a rekey (docs/server-protocol.md, Changes).
+            if (server() && device.startsWith("web-") && m.optString("webPub", "").length() > 0) e.setMeta("server_webpub:" + device.substring(4), m.optString("webPub"));
             if (device.isEmpty() || device.equals(me) || e.householdValue("removed:" + device) != null) {
                 e.setMeta(seenKey, sum);
                 continue;
             }
-            int n = e.apply(m.optJSONArray("entries"));
+            // 0.9.2: the photos that phone moved to the server (another phone mustn't delete one it uses).
+            if (server()) notePhotoRefs(device, m.optJSONObject("photos"));
+            JSONArray entries = m.optJSONArray("entries");
+            // 0.9.2: a browser's file never changes the household, loyalty cards or prices (it has none of its
+            // own to give; docs/server-protocol.md): any such entry in it is left out.
+            if (device.startsWith("web-")) entries = webEntries(entries);
+            int n = e.apply(entries);
             if (n > 0) e.tidyCategories();
             e.notePeer(device, m.optString("name", null), null, 0);
             // 0.9.1: how far this phone has now got through that one's changes (for its own file),
@@ -260,14 +308,39 @@ final class SyncFolder {
         }
     }
 
+    /** What a browser's file can change: everything but the household, loyalty cards and prices. */
+    static final java.util.Set<String> WEB_LEAVES_OUT = new java.util.HashSet<>(java.util.Arrays.asList("household", "cards", "prices"));
+
+    static JSONArray webEntries(JSONArray entries) {
+        if (entries == null) return null;
+        JSONArray out = new JSONArray();
+        for (int i = 0; i < entries.length(); i++) {
+            JSONObject x = entries.optJSONObject(i);
+            if (x != null && !WEB_LEAVES_OUT.contains(x.optString("tbl"))) out.put(x);
+        }
+        return out;
+    }
+
+    /** 0.9.2: notes the photo files (sha256) another device's server file says it uses, or forgets them. */
+    private void notePhotoRefs(String device, JSONObject photos) throws Exception {
+        StringBuilder b = new StringBuilder();
+        if (photos != null) for (java.util.Iterator<String> i = photos.keys(); i.hasNext(); ) {
+            String sha = photos.optString(i.next(), "");
+            if (sha.matches("[0-9a-f]{64}")) b.append(b.length() == 0 ? "" : ",").append(sha);
+        }
+        e.setMeta("server_photorefs:" + device, b.length() == 0 ? null : b.toString());
+    }
+
     /** This phone's own file, when something changed since it was last written. */
     private void writeOwn(Folder f, List<String> names, String me, String now, Result res) throws Exception {
         List<JSONObject> top = e.db.query("SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log");
         String mark = top.get(0).optLong("top", 0) + "/" + keyv() + "/" + String.join(",", e.tabs()) + "/" + e.shareCards() + "/" + e.shareReceipts();
-        if (!mark.equals(e.meta("folder_top")) || !names.contains(fileFor(me))) {
-            // Everything but prices; deletes older than half a year are left out to keep it small.
+        if (!mark.equals(e.meta(p + "_top")) || !names.contains(fileFor(me))) {
+            // Everything but prices (0.9.2: a server takes recent prices too); deletes older than half
+            // a year are left out to keep it small.
             long oldest = System.currentTimeMillis() - SyncEngine.OLD_DELETE_MS;
-            JSONObject c = e.collect(0, null, 5_000_000, null, " AND tbl <> 'prices'", true, oldest);
+            String prices = pricesMs > 0 ? " AND (tbl <> 'prices' OR stamp > " + (System.currentTimeMillis() - pricesMs) + ")" : " AND tbl <> 'prices'";
+            JSONObject c = e.collect(0, null, 5_000_000, null, prices, true, oldest);
             // 0.9.1: how far a phone reading this file gets through this phone's changes: all of
             // them, except it stops short of the first old delete left out above.
             long fileTop = top.get(0).optLong("top", 0);
@@ -291,8 +364,10 @@ final class SyncFolder {
             out.put("keyv", keyv());
             out.put("at", now);
             out.put("entries", c.getJSONArray("entries"));
-            f.write(fileFor(me), seal(h.key(), out));
-            e.setMeta("folder_top", mark);
+            // 0.9.2: on a server, the receipt photos this phone moved there ({ path: sha256 }).
+            if (server()) out.put("photos", ServerOffload.photosMap(e));
+            f.write(fileFor(me), seal(fileKey(h.key()), out));
+            e.setMeta(p + "_top", mark);
             res.wrote = true;
         }
     }
@@ -307,7 +382,7 @@ final class SyncFolder {
         StringBuilder who = new StringBuilder();
         for (String d : SyncHousehold.keysOf(s)) if (e.householdValue("member:" + d) != null) who.append(d).append(',');
         String mark = v + ":" + who;
-        if (mark.equals(e.meta("folder_keys")) && names.contains(keys)) {
+        if (mark.equals(e.meta(p + "_keys")) && names.contains(keys)) {
             // Still the file this phone wrote? (Someone could have put an old one back.)
             byte[] there = f.read(keys);
             try {
@@ -327,7 +402,7 @@ final class SyncFolder {
         out.put("keyv", v);
         out.put("phones", phones);
         f.write(keys, out.toString().getBytes(StandardCharsets.UTF_8));
-        e.setMeta("folder_keys", mark);
+        e.setMeta(p + "_keys", mark);
     }
 
     /** A phone away from home: takes a newer household key from the owner's keys file. */

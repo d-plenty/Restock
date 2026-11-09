@@ -45,6 +45,7 @@ import { PantryScreen } from './screens/Pantry';
 import { SettingsScreen } from './screens/Settings';
 import { StoresScreen } from './screens/Stores';
 import { SyncScreen } from './screens/Sync';
+import { serverMode, serverUi } from '../server-mode/flag';
 
 const ALL_TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'home' },
@@ -89,7 +90,7 @@ function RestockApp() {
 
   // "Tell me when there's an update": once a week, when Restock opens (0.7.3).
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || serverMode) return;
     const t = window.setTimeout(() => {
       void (async () => {
         const s = await getSettings();
@@ -198,7 +199,8 @@ function RestockApp() {
   }, [onboarded]);
   // Tidy away prices older than the history setting, once per launch.
   useEffect(() => {
-    if (!onboarded) return;
+    // On a Restock server the web keeps the whole history (the phones tidy their own).
+    if (!onboarded || serverMode) return;
     void getSettings()
       .then((s) => pruneHistory(s.historyWeeks))
       .catch((e) => console.error('history tidy-up failed', e));
@@ -289,7 +291,8 @@ function RestockApp() {
   const on = activeSections(settings);
   // A tab can also be left out of the bar while its shops stay in use (Add, shopping list).
   const inBar = on.filter((sec) => sec === 'pantry' || !settings.hiddenTabs?.includes(sec));
-  const tabs = ALL_TABS.filter((t) => !isSectionTab(t.id) || inBar.includes(t.id));
+  // On a Restock server there's no Add tab: adding is by shop search, which only phones can do.
+  const tabs = ALL_TABS.filter((t) => (!isSectionTab(t.id) || inBar.includes(t.id)) && !(serverMode && t.id === 'add'));
   const shownTab: Tab = isSectionTab(tab) && !inBar.includes(tab) ? 'pantry' : tab;
   const addSection: Section = on.includes(section) ? section : 'pantry';
 
@@ -298,9 +301,10 @@ function RestockApp() {
       <div className="app">
         {/* Covers the status bar, so pages don't scroll up underneath the clock and battery. */}
         <div className="status-shade" aria-hidden />
+        {serverMode && serverUi.current && <serverUi.current.Strip />}
         {shownTab === 'home' && <HomeScreen />}
         {isSectionTab(shownTab) && <PantryScreen key={shownTab} section={shownTab} />}
-        {shownTab === 'add' && <AddScreen key={`add-tab-${addSection}`} section={addSection} />}
+        {shownTab === 'add' && (serverMode && serverUi.current ? <serverUi.current.Tab /> : <AddScreen key={`add-tab-${addSection}`} section={addSection} />)}
         {shownTab === 'list' && <ListScreen />}
 
         <nav className="tabs" aria-label="Main" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
@@ -328,6 +332,8 @@ function RestockApp() {
 
         {top && (
           <div className="overlay">
+            {(serverMode && serverUi.current?.screen(top)) || (
+              <>
             {top.name === 'item' && <ItemScreen key={top.groupId} groupId={top.groupId} />}
             {top.name === 'add' && (
               <AddScreen
@@ -359,6 +365,8 @@ function RestockApp() {
             {top.name === 'receipt' && <ReceiptScreen key={top.id ?? 'new'} id={top.id} />}
             {top.name === 'recalls' && <RecallsScreen />}
             {top.name === 'soon' && <SoonScreen id={top.id} />}
+              </>
+            )}
           </div>
         )}
 

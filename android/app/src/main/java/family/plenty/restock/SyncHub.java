@@ -56,6 +56,11 @@ import org.json.JSONObject;
  *   WebDAV server (SyncDav), or a folder picked on the phone. Each is tried out before it's used.
  * - Secrets in sync_meta are sealed with a key in Android's key store (SyncKeystore).
  * - Receipt photos travel over the Wi-Fi (AndroidPhotos), and old deletes are tidied away once a day.
+ *
+ * 0.9.2: a Restock server (ServerFolder, docs/server-protocol.md) as well, on a card of its own: a
+ * phone can use it alongside Wi-Fi sync and the away-from-home choice. With it, older prices and
+ * receipt photos move there (ServerOffload), the web app is given the household's server key when a
+ * phone scans its code (ServerLink), and again after the key changes (webkeys/).
  */
 final class SyncHub {
     private static final String TAG = "RestockSync";
@@ -75,6 +80,9 @@ final class SyncHub {
     volatile String lastSyncAt;
     /** 0.9.0: folder sync's last problem, or null. */
     volatile String folderError;
+    /** 0.9.2: the Restock server's last problem in words, or null; and the address that answered last. */
+    volatile String serverError;
+    volatile String serverReached;
 
     static synchronized SyncHub get(Context context) {
         if (instance == null) instance = new SyncHub(context.getApplicationContext());
@@ -299,6 +307,7 @@ final class SyncHub {
         syncAll(); // let the others see it go, if they're here
         stop();
         letGoOfServer();
+        letGoOfRestockServer(true);
         household.forget();
         context.stopService(new android.content.Intent(context, SyncService.class));
         WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME);
@@ -797,6 +806,7 @@ final class SyncHub {
                     // The owner removed this phone. It keeps its things, but stops syncing.
                     stop();
                     letGoOfServer();
+                    letGoOfRestockServer(true);
                     household.forget();
                     engine.setMeta("notice", "removed");
                     context.stopService(new android.content.Intent(context, SyncService.class));
@@ -846,6 +856,7 @@ final class SyncHub {
                         } catch (SyncHousehold.RemovedException gone) {
                             stop();
                             letGoOfServer();
+                            letGoOfRestockServer(true);
                             household.forget();
                             engine.setMeta("notice", "removed");
                             context.stopService(new android.content.Intent(context, SyncService.class));
@@ -864,8 +875,14 @@ final class SyncHub {
                 s.received += fr.received;
                 if (fr.rekeyed) readvertise();
             }
-            // The folder only counts when another phone's file was there to read.
-            boolean viaFolder = fr != null && folderError == null && fr.phones > 0;
+            // 0.9.2: then the Restock server, if this phone uses one.
+            SyncFolder.Result sr = syncServer();
+            if (sr != null) {
+                s.received += sr.received;
+                if (sr.rekeyed) readvertise();
+            }
+            // The folder (or server) only counts when another phone's file was there to read.
+            boolean viaFolder = (fr != null && folderError == null && fr.phones > 0) || (sr != null && serverError == null && sr.phones > 0);
             if (s.reached > 0 || viaFolder) lastSyncAt = nowIso();
             lastSummary = s;
             lastError = s.reached > 0 || viaFolder
@@ -1031,6 +1048,100 @@ final class SyncHub {
             Log.w(TAG, "syncFolder", e);
         }
         return new SyncFolder.Result();
+    }
+
+    // ---------- 0.9.2: sync through a Restock server (ServerSync) ----------
+
+    private ServerSync server() {
+        return new ServerSync(engine, household);
+    }
+
+    List<String> serverAddresses() {
+        return server().addresses();
+    }
+
+    boolean serverOn() {
+        return ready() && server().on();
+    }
+
+    int offloadedPhotos() {
+        return server().offloadedPhotos();
+    }
+
+    /**
+     * Joining and stopping wait for a round that's going (in the background, say) to finish: one
+     * mid-way could otherwise move photos off the phone after Stop brought them back, or write notes
+     * for the server just forgotten.
+     */
+    private void lockForServer() throws Exception {
+        boolean got;
+        try {
+            got = syncing.tryLock(3, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            got = false;
+        }
+        if (!got) throw new IllegalStateException("Restock is still syncing. Try again in a minute.");
+    }
+
+    /** Joins a Restock server with the code from its Add a phone page. Throws with words. */
+    void joinServer(String code) throws Exception {
+        lockForServer();
+        try {
+            serverReached = server().join(code);
+            serverError = null;
+        } finally {
+            syncing.unlock();
+        }
+    }
+
+    /** Stop using the server (bringBack: its receipt photos come back first; throws if they can't). */
+    void stopServer(boolean bringBack) throws Exception {
+        lockForServer();
+        try {
+            server().stop(bringBack);
+            serverError = null;
+            serverReached = null;
+        } finally {
+            syncing.unlock();
+        }
+    }
+
+    /** Leaving the household (or removed from it): photos back if the server can be reached, then off the server. */
+    void letGoOfRestockServer(boolean bringBack) {
+        try {
+            if (serverOn()) stopServer(bringBack);
+        } catch (Exception e) {
+            Log.w(TAG, "letGoOfRestockServer", e);
+            try {
+                stopServer(false);
+            } catch (Exception ignored) {
+                // forget() clears the rest
+            }
+        }
+    }
+
+    /** One round with the server, if this phone uses one; null when it doesn't. */
+    SyncFolder.Result syncServer() {
+        if (!serverOn() || key() == null) return null;
+        ServerSync.Round r = server().round(nowIso(), System.currentTimeMillis());
+        serverReached = r.reached;
+        serverError = r.error;
+        if (r.error != null && r.cause != null) Log.w(TAG, "syncServer", r.cause);
+        if (r.offload != null && (r.offload.changed || r.offload.pruned > 0)) changed();
+        return r.result;
+    }
+
+    JSONObject webCode(String code) throws Exception {
+        return server().webCode(code);
+    }
+
+    JSONObject approveWeb(String code) throws Exception {
+        return server().approveWeb(code);
+    }
+
+    byte[] serverPhoto(String path) throws Exception {
+        return server().photo(path);
     }
 
     /** 0.9.1: tidies old deletes from sync_log, at most once a day. */

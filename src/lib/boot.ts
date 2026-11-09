@@ -26,7 +26,12 @@ function idb<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<
   });
 }
 
+/** 0.9.2: the web app on a Restock server opens its own copy (src/server-mode/live.ts). */
+let opener: (() => Promise<void>) | undefined;
+export const setDatabaseOpener = (fn: () => Promise<void>) => (opener = fn);
+
 export async function openDatabase(): Promise<void> {
+  if (opener) return opener();
   if (Capacitor.isNativePlatform()) {
     const d = createNativeDriver();
     const updated = await backupBeforeUpdate(d);

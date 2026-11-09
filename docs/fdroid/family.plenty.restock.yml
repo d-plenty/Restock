@@ -295,7 +295,23 @@ Builds:
     gradle:
       - yes
 
+  - versionName: 0.9.2
+    versionCode: 63
+    commit: v0.9.2
+    subdir: android/app
+    sudo:
+      - apt-get update
+      - apt-get install -y npm
+    init: cd ../.. && npm ci
+    prebuild:
+      - cd ../..
+      - sed -i '/REQUEST_INSTALL_PACKAGES/d' android/app/src/main/AndroidManifest.xml
+      - VITE_FDROID=1 npm run build
+      - npx cap sync android
+    gradle:
+      - yes
+
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.9.1
-CurrentVersionCode: 62
+CurrentVersion: 0.9.2
+CurrentVersionCode: 63

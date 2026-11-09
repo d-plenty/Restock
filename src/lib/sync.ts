@@ -17,6 +17,52 @@ export function pairingCode(text: string): string | undefined {
   return /^RESTOCK(-SYNC)?:\d+:/i.test(t) ? t : undefined;
 }
 
+/**
+ * 0.9.2: a Restock server's Add a phone code (restock-server:2?h=…&a=…&i=…), or undefined. An older
+ * server's code (restock-server:1) is passed on too, so the phone can say to update the server.
+ */
+export function serverCode(text: string): string | undefined {
+  const t = text.trim();
+  if (/^restock-server:1\?/i.test(t)) return t;
+  return /^restock-server:2\?/i.test(t) && /[?&]i=[A-Za-z0-9_-]{20,128}(&|$)/.test(t) ? t : undefined;
+}
+
+/**
+ * 0.9.2: the server addresses in an Add a phone code, as they're shown before joining ("192.168.1.10:8787"),
+ * home first. Empty for a code that has none (the phone then says what's wrong).
+ */
+export function serverCodeAddresses(code: string): string[] {
+  const q = code.trim().replace(/^restock-server:\d+\?/i, '');
+  const out: string[] = [];
+  for (const part of q.split('&')) {
+    const eq = part.indexOf('=');
+    const k = part.slice(0, eq);
+    if (eq <= 0 || (k !== 'h' && k !== 'a')) continue;
+    let v: string;
+    try {
+      v = decodeURIComponent(part.slice(eq + 1).replace(/\+/g, ' ')).trim();
+    } catch {
+      continue;
+    }
+    // Only what a person can read: no scheme, at most 100 characters, no control characters.
+    v = v.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/\/+$/, '');
+    if (!v || /[\u0000-\u001f\u007f]/.test(v)) continue;
+    out[k === 'h' ? 0 : 1] = v.length > 100 ? v.slice(0, 100) + '…' : v;
+  }
+  return out.filter(Boolean);
+}
+
+/** 0.9.2: a code from the Restock server's web page: link the browser (restock-link:2) or sign in (restock-login:2). */
+export function webPageCode(text: string): string | undefined {
+  const t = text.trim();
+  return /^restock-(link|login):2\?/i.test(t) && /[?&]s=[A-Za-z0-9_-]{8,128}(&|$)/.test(t) && /[?&]k=/.test(t) ? t : undefined;
+}
+
+/** 0.9.2: a receipt photo from the Restock server (base64 JPEG), to show. Rejects with words (offline, say). */
+export async function serverPhoto(path: string): Promise<string> {
+  return (await RestockNative.syncServerPhoto({ path })).data;
+}
+
 /** Local sync is for a household: up to 6 phones (SyncHousehold.MAX_PHONES). */
 export const MAX_SYNC_PHONES = 6;
 

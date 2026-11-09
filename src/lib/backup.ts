@@ -5,6 +5,7 @@ import type { Group, Product, Settings } from '../types';
 import {
   getSettings,
   mergeSettings,
+  photosOnServer,
   pickSnapshot,
   restoreParts,
   restoreSnapshot,
@@ -40,6 +41,11 @@ export interface ExportParts extends RestoreParts {
   prices: boolean;
   /** Include the receipt photos Restock keeps (not the phone's own photos). */
   receiptPhotos?: boolean;
+  /**
+   * 0.9.2: with receiptPhotos, also the ones this phone moved to its Restock server (fetched from
+   * there). Off for the automatic backups, which would fetch them all every time.
+   */
+  serverPhotos?: boolean;
   /** 0.9.0: lock the file with this password (backupLock.ts). */
   password?: string;
 }
@@ -81,7 +87,7 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
     app: 'restock',
     version: 2,
     exportedAt: new Date().toISOString(),
-    parts: { ...picked, password: undefined },
+    parts: { ...picked, password: undefined, serverPhotos: undefined },
     tables: withoutSecrets(pickSnapshot(all, picked, { prices: parts.prices })),
   };
   // With "Share prices" on (the default) and price history in the file. 0.9.0: made from what's in
@@ -89,10 +95,21 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
   if (parts.prices && (await getSettings()).sharePrices !== 'no') file.sharedPrices = sharedPrices(file.tables);
   if (parts.receipts && parts.receiptPhotos) {
     const photos: Record<string, string> = {};
+    const missing: string[] = [];
     for (const r of file.tables.receipts ?? []) {
       for (const path of [r.photo, ...(r.pages ?? [])]) {
         const data = path ? await readPhoto(path) : undefined;
         if (path && data) photos[path] = data;
+        else if (path) missing.push(path);
+      }
+    }
+    // 0.9.2: photos this phone moved to the Restock server come from there, so the backup still has
+    // them (if the server can't be reached, the backup goes without them rather than waiting).
+    for (const path of parts.serverPhotos === false ? [] : await photosOnServer(missing)) {
+      try {
+        photos[path] = (await RestockNative.syncServerPhoto({ path })).data;
+      } catch {
+        break;
       }
     }
     if (Object.keys(photos).length) file.photos = photos;

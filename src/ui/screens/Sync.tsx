@@ -7,7 +7,7 @@ import { CARRIED_TILES, householdSettingsFor } from '../../lib/household';
 import { SECTIONS, sectionOn, shopDef, type Section } from '../../shops';
 import type { Settings } from '../../types';
 import { RestockNative } from '../../lib/sql/native';
-import { agoText, MAX_SYNC_PHONES, pairingCode, strictBatteryMaker, syncAvailable, syncInfo, type SyncInfo } from '../../lib/sync';
+import { agoText, MAX_SYNC_PHONES, pairingCode, serverCode, serverCodeAddresses, strictBatteryMaker, syncAvailable, syncInfo, webPageCode, type SyncInfo } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { syncBackgroundSchedule } from '../../lib/check';
 import { scheduleReminders } from '../../lib/notify';
@@ -665,10 +665,13 @@ function TakeOverSheet({ ownerName, onClose, onDone }: { ownerName?: string; onC
 /** What the owner can do with another phone. */
 function MemberSheet({
   member,
+  server,
   onClose,
   onDone,
 }: {
   member: { device: string; name: string };
+  /** 0.9.2: this phone uses a Restock server. */
+  server?: boolean;
   onClose: () => void;
   onDone: (info: SyncInfo, msg: string) => void;
 }) {
@@ -677,7 +680,8 @@ function MemberSheet({
     const ok = await confirmAction(what === 'remove' ? `Remove ${member.name} from the household?` : `Make ${member.name} the owner?`, {
       detail:
         what === 'remove'
-          ? "It stops syncing straight away, and the household's key changes so it can't sync again, even with an old code. It keeps what it has now. The other phones get the new key next time they sync with this one."
+          ? "It stops syncing straight away, and the household's key changes so it can't sync again, even with an old code. It keeps what it has now. The other phones get the new key next time they sync with this one." +
+            (server ? " It can't open anything new on your Restock server either; to take it off the server's list too, remove it on the server's Phones page." : '')
           : 'It will be the one that adds and removes phones, and this phone becomes an ordinary member. That happens when the two phones next sync; until then this phone stays the owner, and you can cancel.',
       action: what === 'remove' ? 'Remove' : 'Make owner',
       danger: what === 'remove',
@@ -918,6 +922,205 @@ function WebDavSheet({ onClose, onDone }: { onClose: () => void; onDone: (info: 
   );
 }
 
+// ---------- 0.9.2: the Restock server ----------
+
+const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+const addressText = (a?: string | null) => (a ?? '').replace(/^https?:\/\//i, '');
+
+/**
+ * The Restock server: a card of its own, so a phone can use it alongside Wi-Fi sync and the
+ * away-from-home choice. Join with the code on the server's Add a phone page; once joined, scan the
+ * web page's code to let a browser see the household (or sign in there).
+ */
+function ServerCard({ info, busy, onInfo }: { info: SyncInfo; busy: boolean; onInfo: (i: SyncInfo) => void }) {
+  const nav = useNav();
+  const [working, setWorking] = useState<string>();
+  const [error, setError] = useState<string>();
+  const run = async (what: string, job: () => Promise<void>) => {
+    setError(undefined);
+    setWorking(what);
+    try {
+      await job();
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setWorking(undefined);
+    }
+  };
+
+  const join = async () => {
+    setError(undefined);
+    const out = await scanBarcode("Scan the code on your server's Add a phone page", {
+      accept: serverCode,
+      qr: true,
+      wrong: "That isn't a Restock server code. On a computer, sign in to your server's page and choose Add a phone.",
+      typeHint: 'Or paste the code',
+    });
+    if (!out.ok) return;
+    // Say where it goes first: a code someone else made could point at their server.
+    const where = serverCodeAddresses(out.code);
+    if (where.length) {
+      const sure = await confirmAction(`Connect to the Restock server at ${where[0]}?`, {
+        detail:
+          (where[1] ? `Away from home: ${where[1]}. ` : '') +
+          "Your household's list, pantry and recent prices go there, sealed so the server can't read them, and older prices and receipt photos move there. Only connect to a server you or your household run.",
+        action: 'Connect',
+        danger: false,
+      });
+      if (!sure) return;
+    }
+    await run('Joining your Restock server…', async () => {
+      const i = await RestockNative.syncJoinServer({ code: out.code });
+      onInfo(i);
+      nav.toast(i.serverError ?? 'Connected to your Restock server');
+    });
+  };
+
+  const scanWeb = async () => {
+    setError(undefined);
+    const out = await scanBarcode("Scan the code on your server's web page", {
+      accept: webPageCode,
+      qr: true,
+      wrong: "That isn't a code from your Restock server's web page. Open the page on the computer and scan the code it shows.",
+      typeHint: 'Or paste the code',
+    });
+    if (!out.ok) return;
+    let w: { kind: 'link' | 'login'; host: string };
+    try {
+      w = await RestockNative.syncWebCode({ code: out.code });
+    } catch (e) {
+      setError(errText(e));
+      return;
+    }
+    const ok = await confirmAction(w.kind === 'link' ? 'Let this browser see your household?' : `Sign in to Restock on ${w.host}?`, {
+      detail:
+        w.kind === 'link'
+          ? `The browser showing the code (at ${w.host}) gets the key to your household's files on the server, so it can show and change your list, pantry and prices. It keeps it, locked with your passphrase. Only say yes for a browser you're using right now. If someone sent you this code or asked you to scan it, say no.`
+          : `The browser showing the code (at ${w.host}) can see and change your household's list, pantry and prices until it signs out. Only say yes if you're signing in on that page yourself, right now. If someone sent you this code or asked you to scan it, say no.`,
+      action: w.kind === 'link' ? 'Let it see' : 'Sign in',
+    });
+    if (!ok) return;
+    await run(w.kind === 'link' ? 'Passing the key to the browser…' : 'Signing the browser in…', async () => {
+      await RestockNative.syncWebApprove({ code: out.code });
+      nav.toast(w.kind === 'link' ? 'Done. That browser can see your household now' : `Signed in on ${w.host}`);
+    });
+  };
+
+  const stop = async () => {
+    const photos = info.serverPhotos ?? 0;
+    const ok = await confirmAction('Stop syncing through the Restock server?', {
+      detail:
+        (photos ? `${plural(photos, 'receipt photo')} kept on the server come back onto this phone first. ` : '') +
+        "Older prices this phone moved there stay on the server. This phone comes off the server's list; Wi-Fi sync and sync away from home carry on.",
+      action: 'Stop',
+    });
+    if (!ok) return;
+    setError(undefined);
+    setWorking(photos ? 'Bringing the photos back…' : 'Stopping…');
+    try {
+      onInfo(await RestockNative.syncStopServer({ bringBack: true }));
+      nav.toast('Stopped using the Restock server');
+    } catch (e) {
+      setWorking(undefined);
+      const anyway = await confirmAction("Couldn't bring the photos back", {
+        detail: `${errText(e)} If you stop anyway, those photos stay on the server and this phone can't show them.`,
+        action: 'Stop anyway',
+        danger: true,
+      });
+      if (anyway) {
+        try {
+          onInfo(await RestockNative.syncStopServer({ bringBack: false }));
+          nav.toast('Stopped using the Restock server');
+        } catch (e2) {
+          setError(errText(e2));
+        }
+      }
+    } finally {
+      setWorking(undefined);
+    }
+  };
+
+  const moved = [info.serverPrices ? plural(info.serverPrices, 'older price') : '', info.serverPhotos ? plural(info.serverPhotos, 'receipt photo') : '']
+    .filter(Boolean)
+    .join(' and ');
+  return (
+    <div className="card" style={{ gap: 8 }}>
+      {info.server ? (
+        <>
+          <span className="title" style={{ fontSize: 15 }}>
+            Syncing through your Restock server
+          </span>
+          <span className="small">
+            {info.serverError ??
+              (info.serverAt
+                ? `Last synced through the server ${agoText(info.serverAt)}${info.serverReached && info.serverReached === info.serverAway ? ' (away address)' : ''}.`
+                : "Connected. No other phone's file there yet: add each phone in the household on the server's Add a phone page.")}
+          </span>
+          <span className="small">
+            At home: {addressText(info.serverHome) || 'not set'}
+            {info.serverAway ? ` · Away: ${addressText(info.serverAway)}` : ''}
+            {info.serverFiles ? ` · ${plural(info.serverFiles, 'file')} there` : ''}
+          </span>
+          <span className="small">
+            {moved
+              ? `${moved} moved there from this phone. `
+              : ''}
+            Prices and receipt photos older than your "Keep price history for" setting move to the server, and only come off this phone once
+            the server has them. Receipts stay here.
+          </span>
+          {!!info.serverWaiting && !info.serverError && (
+            <span className="small">{plural(info.serverWaiting, 'thing')} saved on the server, waiting for it to confirm before they come off this phone.</span>
+          )}
+          {!!info.serverUnread && !info.serverError && (
+            <span className="small">
+              {info.serverUnread === 1 ? "1 file on the server couldn't be opened" : `${info.serverUnread} files on the server couldn't be opened`}: from a phone
+              that needs the household's new key (it gets it next time it syncs).
+            </span>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn small primary" disabled={busy || !!working} onClick={() => void scanWeb()}>
+              <Icon name="scan" size={16} /> Scan the web page's code
+            </button>
+            <button className="btn small" disabled={busy || !!working} onClick={() => void stop()}>
+              Stop
+            </button>
+          </div>
+          <span className="small">
+            On a computer, open your server's page. To see your household there, link it once with this phone; any time after, you can sign in by
+            scanning its code instead of typing your passphrase.
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="title" style={{ fontSize: 15 }}>
+            Restock server
+          </span>
+          <span className="small">
+            A small server you run yourself (a Docker container on a NAS, home server or Raspberry Pi). Phones sync through it at home and away,
+            prices included, and you can use Restock in a browser too. It only ever keeps sealed files: still no account, and the makers of
+            Restock never see any of it. It works alongside Wi-Fi sync and sync away from home.
+          </span>
+          <button className="btn primary" disabled={!syncAvailable() || busy || !!working} onClick={() => void join()}>
+            <Icon name="scan" size={18} /> Scan the code from your server's Add a phone page
+          </button>
+          <span className="small">On a computer, open your server's page, sign in and choose Add a phone. Each code works once, for 10 minutes.</span>
+        </>
+      )}
+      {working && (
+        <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span className="small">{working}</span>
+          <LoadingBar seconds={8} />
+        </div>
+      )}
+      {error && (
+        <div className="banner amber" role="alert">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** "Syncing through Nextcloud", "… a WebDAV server", "… <folder>". */
 function awayTitle(info: SyncInfo): string {
   if (info.folderKind === 'nextcloud') return 'Syncing through Nextcloud';
@@ -967,7 +1170,9 @@ export function SyncScreen() {
       nav.toast(
         r.reached
           ? `Synced with ${r.reached === 1 ? (r.peers?.[0]?.name ?? 'the other phone') : `${r.reached} phones`}${r.received ? `: ${r.received} change${r.received === 1 ? '' : 's'} came in` : ''}`
-          : (r.lastError ?? "Couldn't find the other phone."),
+          : r.server && !r.serverError && r.serverAt && Date.now() - Date.parse(r.serverAt) < 120_000
+            ? `Synced through your Restock server${r.received ? `: ${r.received} change${r.received === 1 ? '' : 's'} came in` : ''}`
+            : (r.serverError ?? r.lastError ?? "Couldn't find the other phone."),
       );
     } finally {
       setBusy(false);
@@ -1001,12 +1206,27 @@ export function SyncScreen() {
       });
       return;
     }
+    // 0.9.2: receipt photos this phone moved to the Restock server come back first (it can't reach them after).
+    const photos = info?.server ? (info.serverPhotos ?? 0) : 0;
     const ok = await confirmAction('Stop syncing this phone?', {
       detail:
-        "This phone keeps everything it has now, and nothing is deleted on the household's other phones. Changes just stop going between them. To join again, you'll need a new code from the owner phone.",
+        "This phone keeps everything it has now, and nothing is deleted on the household's other phones. Changes just stop going between them. To join again, you'll need a new code from the owner phone." +
+        (info?.server ? ` It stops using your Restock server too${photos ? `: the ${plural(photos, 'receipt photo')} kept there come back onto this phone first` : ''}.` : ''),
       action: 'Stop syncing',
     });
     if (!ok) return;
+    if (photos) {
+      try {
+        setInfo(await RestockNative.syncStopServer({ bringBack: true }));
+      } catch (e) {
+        const anyway = await confirmAction("Couldn't bring the photos back", {
+          detail: `${errText(e)} If you stop anyway, those photos stay on the server and this phone can't show them.`,
+          action: 'Stop anyway',
+          danger: true,
+        });
+        if (!anyway) return;
+      }
+    }
     const r = await RestockNative.syncLeave();
     setInfo(r);
     if (r.left) nav.toast('This phone has stopped syncing');
@@ -1093,12 +1313,13 @@ export function SyncScreen() {
         <strong>Local sync: one pantry and list for the whole house</strong>
         <span className="small">
           Phones in your household sync <strong>straight from one phone to another</strong> on your own Wi-Fi: pantry, shopping list (ticks too),
-          prices, categories and alerts. Away from home, they can also sync through your Nextcloud, another WebDAV server or a folder you choose.
+          prices, categories and alerts. Away from home, they can also sync through your Nextcloud, another WebDAV server, a folder you choose, or a
+          Restock server you run yourself.
         </span>
         <ul className="ticks">
           <li>
             <Icon name="check" size={16} />
-            <span>No account, no sign-up, no server.</span>
+            <span>No account and no sign-up. No server, unless you run your own.</span>
           </li>
           <li>
             <Icon name="check" size={16} />
@@ -1344,6 +1565,9 @@ export function SyncScreen() {
           </div>
           {(!info.folder || choosing) && <AwayChoices disabled={!syncAvailable() || busy} onPick={pickAway} />}
 
+          <div className="eyebrow">Restock server</div>
+          <ServerCard info={info} busy={busy} onInfo={setInfo} />
+
           <div className="eyebrow">What's shared</div>
           {info.isOwner && (
             <>
@@ -1476,15 +1700,6 @@ export function SyncScreen() {
         </span>
       </div>
 
-      <div className="card" style={{ gap: 6 }}>
-        <strong>Hosted sync: coming later</strong>
-        <span className="small">
-          A small server you run yourself (a Docker container on a home server, NAS or Raspberry Pi) that keeps the household's changes for phones
-          away from home, like the folder does. Still no Restock account, and the server only ever sees sealed data. Wi-Fi and folder sync keep
-          working either way.
-        </span>
-      </div>
-
       {inviting && info && (
         <InviteSheet
           info={info}
@@ -1554,6 +1769,7 @@ export function SyncScreen() {
       {member && (
         <MemberSheet
           member={member}
+          server={!!info?.server}
           onClose={() => setMember(undefined)}
           onDone={(i, msg) => {
             setMember(undefined);

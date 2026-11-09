@@ -20,6 +20,7 @@ import { confirmAction } from '../../lib/confirm';
 import { useNav } from '../nav';
 import { RecallBanner } from './Recalls';
 import { SetupNudges } from './SetupNudges';
+import { serverMode } from '../../server-mode/flag';
 import { ConnectionsSheet } from './Settings';
 
 export function HomeScreen() {
@@ -176,7 +177,9 @@ export function HomeScreen() {
           ) : (
             <>
               <span>
-                {!isNative()
+                {serverMode
+                  ? 'Prices come from your phones'
+                  : !isNative()
                   ? 'Live prices work in the Android app'
                   : settings.lastCheck
                     ? `${settings.enabledChains.some((c) => stockKnown(settings, c)) ? 'Prices & stock' : 'Prices'} updated ${timeAgo(settings.lastCheck)}${next ? ` · next ${next}` : ''}`
@@ -194,7 +197,7 @@ export function HomeScreen() {
 
       <RecallBanner />
 
-      {!settings.tour.active && <SetupNudges settings={settings} />}
+      {!settings.tour.active && !serverMode && <SetupNudges settings={settings} />}
 
       {totals.linked > 0 && (
         <button
@@ -275,7 +278,7 @@ export function HomeScreen() {
         </div>
       ))}
 
-      {recs.length > 0 && needsBackupNudge(settings, recs.length, oldest) && (
+      {!serverMode && recs.length > 0 && needsBackupNudge(settings, recs.length, oldest) && (
         <div className="card hint" style={{ flexDirection: 'column', gap: 8 }}>
           <strong>Back up your pantry</strong>
           <span>

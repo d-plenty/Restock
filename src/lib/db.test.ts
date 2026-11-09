@@ -17,9 +17,11 @@ import {
   addProduct,
   addReading,
   initDb,
+  photosOnServer,
   pruneHistory,
   readingsFor,
   restoreSnapshot,
+  serverKeepsHistory,
   snapshot,
   uid,
   updateGroup,
@@ -335,6 +337,22 @@ describe('price history setting', () => {
     ).toEqual([3, 5, 9]);
     expect(left.get('p2')!.length).toBe(1);
     expect(await pruneHistory(8, now)).toBe(0);
+  });
+  it('0.9.2: with a Restock server, deletes nothing (the phone moves old prices there itself)', async () => {
+    const now = Date.parse('2026-11-06T00:00:00Z');
+    const day = 86_400_000;
+    await addProduct({ id: 'p1', chain: 'coles', name: 'Old thing', createdAt: new Date(now - 200 * day).toISOString() });
+    for (const d of [120, 90, 2]) await addReading({ productId: 'p1', date: new Date(now - d * day).toISOString(), price: d, isSpecial: false, memberOnly: false, source: 'auto' });
+    raw.run("INSERT INTO sync_meta (key, value) VALUES ('server_home', 'http://192.168.1.10:8787'), ('server_dev_priv', 'x')");
+    raw.run("INSERT INTO sync_meta (key, value) VALUES ('photo_off:receipts/r1.jpg', '{}')");
+    expect(await serverKeepsHistory()).toBe(true);
+    expect(await pruneHistory(8, now)).toBe(0);
+    expect((await readingsFor(['p1'])).get('p1')!.length).toBe(3);
+    expect(await photosOnServer(['receipts/r1.jpg', 'receipts/r2.jpg', '../x'])).toEqual(['receipts/r1.jpg']);
+    // Stopped using the server: tidied as before.
+    raw.run("DELETE FROM sync_meta WHERE key LIKE 'server_%'");
+    expect(await serverKeepsHistory()).toBe(false);
+    expect(await pruneHistory(8, now)).toBe(2);
   });
   it('defaults to 8 weeks', async () => {
     expect((await getSettings()).historyWeeks).toBe(8);

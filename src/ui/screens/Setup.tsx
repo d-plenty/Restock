@@ -474,10 +474,10 @@ function SyncTile() {
         <Icon name="refresh" size={18} />
         <span className="grow">
           <span className="title" style={{ fontSize: 15 }}>
-            Hosted sync
+            Restock server
           </span>
           <span className="small">
-            Sync from anywhere through a small server you run, for when the phones aren't on the same Wi-Fi. Coming later.
+            Sync from anywhere through a small server you run yourself, for when the phones aren't on the same Wi-Fi. Set it up later in Local sync.
           </span>
         </span>
       </div>

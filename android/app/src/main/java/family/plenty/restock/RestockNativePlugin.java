@@ -1091,6 +1091,22 @@ public class RestockNativePlugin extends Plugin {
                 // 0.9.0: other phones' files in the folder that couldn't be opened, and a phone whose date looks wrong.
                 String unread = hub.engine.meta("folder_unread");
                 o.put("folderUnread", unread == null ? 0 : Integer.parseInt(unread));
+                // 0.9.2: the Restock server.
+                o.put("server", hub.serverOn());
+                o.put("serverHome", hub.engine.meta("server_home"));
+                o.put("serverAway", hub.engine.meta("server_away"));
+                o.put("serverReached", hub.serverReached);
+                o.put("serverAt", hub.engine.meta("server_at"));
+                o.put("serverError", hub.serverError);
+                String sUnread = hub.engine.meta("server_unread");
+                o.put("serverUnread", sUnread == null ? 0 : Integer.parseInt(sUnread));
+                String sFiles = hub.engine.meta("server_files");
+                o.put("serverFiles", sFiles == null ? 0 : Integer.parseInt(sFiles));
+                String offPrices = hub.engine.meta("server_off_prices");
+                o.put("serverPrices", offPrices == null ? 0 : Long.parseLong(offPrices));
+                o.put("serverPhotos", hub.offloadedPhotos());
+                String waiting = hub.engine.meta("server_off_waiting");
+                o.put("serverWaiting", waiting == null ? 0 : Integer.parseInt(waiting));
                 String warn = hub.engine.meta("clock_warn");
                 if (warn != null) {
                     String who = null;
@@ -1479,6 +1495,84 @@ public class RestockNativePlugin extends Plugin {
         call.resolve();
     }
 
+    // ---------- 0.9.2: the Restock server ----------
+
+    /** Join a Restock server with the code from its Add a phone page (scanned or pasted). */
+    @PluginMethod
+    public void syncJoinServer(PluginCall call) {
+        final String code = call.getString("code", "");
+        new Thread(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.joinServer(code);
+                syncThread.execute(() -> {
+                    hub.schedule();
+                    hub.syncAll(); // the server straight away (and any phones on this Wi-Fi)
+                    call.resolve(syncInfoObject(hub));
+                });
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Couldn't join the Restock server." : e.getMessage(), e);
+            }
+        }, "restock-server-join").start();
+    }
+
+    /** Stop using the Restock server. bringBack: its receipt photos come back onto this phone first. */
+    @PluginMethod
+    public void syncStopServer(PluginCall call) {
+        final boolean bringBack = Boolean.TRUE.equals(call.getBoolean("bringBack", false));
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.stopServer(bringBack);
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** A web page's code (scanned): what it asks for, { kind: "link" | "login", host }, before asking the person. */
+    @PluginMethod
+    public void syncWebCode(PluginCall call) {
+        final String code = call.getString("code", "");
+        syncThread.execute(() -> {
+            try {
+                call.resolve(new JSObject(SyncHub.get(getContext()).webCode(code).toString()));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** The person said yes: give that browser the household's server keys, sealed to it. */
+    @PluginMethod
+    public void syncWebApprove(PluginCall call) {
+        final String code = call.getString("code", "");
+        new Thread(() -> {
+            try {
+                call.resolve(new JSObject(SyncHub.get(getContext()).approveWeb(code).toString()));
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Couldn't reach your Restock server." : e.getMessage(), e);
+            }
+        }, "restock-server-web").start();
+    }
+
+    /** A receipt photo kept on the Restock server, fetched to show (base64 JPEG; not saved on the phone). */
+    @PluginMethod
+    public void syncServerPhoto(PluginCall call) {
+        final String path = call.getString("path", "");
+        new Thread(() -> {
+            try {
+                byte[] b = SyncHub.get(getContext()).serverPhoto(path);
+                JSObject o = new JSObject();
+                o.put("data", android.util.Base64.encodeToString(b, android.util.Base64.NO_WRAP));
+                call.resolve(o);
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        }, "restock-server-photo").start();
+    }
+
     /** Erase everything (0.8.2): forget the household on this phone and stop all background work. */
     @PluginMethod
     public void eraseNative(PluginCall call) {
@@ -1488,11 +1582,15 @@ public class RestockNativePlugin extends Plugin {
                 hub.stop();
                 hub.cancelNextcloud();
                 if (hub.ready()) hub.letGoOfServer();
+                if (hub.ready()) hub.letGoOfRestockServer(false); // 0.9.2: off the Restock server's list
                 if (hub.ready()) hub.household.forget(); // 0.9.1: the WebDAV or Nextcloud sign-in too
                 // 0.9.1: and this phone's signing key, and the key store's key that sealed the secrets.
                 if (hub.ready()) {
                     hub.engine.setMeta("my_priv", null);
                     hub.engine.setMeta("my_pub", null);
+                    // 0.9.2: and the Restock server's keys and where its photos were.
+                    hub.engine.setMeta("server_filekeys", null);
+                    hub.engine.db.exec("DELETE FROM sync_meta WHERE key LIKE 'photo_off:%'");
                 }
                 hub.keystore.forgetKey();
                 getContext().stopService(new Intent(getContext(), SyncService.class));

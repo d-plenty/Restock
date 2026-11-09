@@ -1,0 +1,753 @@
+// Server mode (0.9.2): taking in the phones' changes, and writing the web's own, with the same
+// rules as the phones (SyncEngine.java apply/collect, SyncFolder.java readOthers/writeOwn,
+// SyncHousehold.java allowed). Ported line by line; tools/sync-test/web-parity.sh checks that a
+// set of files gives the same rows here as on a phone, and that phones take in the web's file.
+//
+// Differences from a phone, on purpose:
+// - The web never makes household changes (it has no signing key) and leaves the household's and
+//   loyalty cards' entries out of its own file. Household changes from the phones are checked
+//   like on a phone: owner-only ones must carry the owner key's signature (pinned from the link,
+//   or the first one seen, as a phone that has just joined does).
+// - Loyalty card numbers are blanked as they come in: they never reach the browser's storage.
+// - No receipt photos are kept here (they're fetched from the server when a receipt is opened).
+//
+// Synchronous on purpose (the sql.js database itself, not the async driver), so nothing the
+// screens do can land in the middle of taking changes in.
+
+import { shopDef } from '../shops';
+
+export type Row = Record<string, unknown>;
+
+/** The database as the engine needs it (sql.js in the browser). */
+export interface SyncDb {
+  query(sql: string, args?: unknown[]): Row[];
+  exec(sql: string, args?: unknown[]): void;
+  transaction(body: () => void): void;
+}
+
+export interface Entry {
+  tbl: string;
+  pk: string;
+  stamp: number;
+  device?: string;
+  deleted?: boolean | string;
+  created?: number;
+  row?: Row | null;
+  sig?: string | null;
+  moved?: boolean | string;
+}
+
+export interface SyncFileMessage {
+  format?: string;
+  v?: number;
+  device?: string;
+  name?: string;
+  keyv?: number;
+  at?: string;
+  top?: number;
+  seen?: Record<string, number>;
+  entries?: Entry[];
+  photos?: Record<string, string>;
+}
+
+/** Mirrors SyncEngine.TABLES. */
+export const TABLES: [string, string][] = [
+  ['categories', 'id'],
+  ['products', 'id'],
+  ['items', 'id'],
+  ['list_entries', 'id'],
+  ['cards', 'id'],
+  ['prices', "product_id || '|' || date"],
+  ['household', 'k'],
+  ['receipts', 'id'],
+];
+export const CLOCK_SLACK_MS = 24 * 3600 * 1000;
+export const OLD_DELETE_MS = 180 * 24 * 3600 * 1000;
+export const DELETE_WINS = new Set(['items', 'list_entries', 'products', 'categories', 'cards', 'receipts']);
+export const ALL_TABS = ['pantry', 'keg', 'pharmacy'];
+export const LOCAL_PRODUCT_COLUMNS = new Set(['in_stock', 'stock_at', 'in_stock_2']);
+/** What the web's own file never carries (SyncFolder.writeOwn leaves prices out; the rest is the web's choice). */
+export const WEB_LEAVES_OUT = ['prices', 'household', 'cards'];
+const PREFIX = 'restock-sync-';
+const SUFFIX = '.bin';
+
+const keyOf = (tbl: string) => TABLES.find((t) => t[0] === tbl)?.[1];
+const truthy = (v: unknown) => v === true || v === 'true';
+const num = (v: unknown) => (v === null || v === undefined || v === '' ? 0 : Number(v) || 0);
+
+function str(row: Row | null | undefined, k: string): string | null {
+  if (!row) return null;
+  const v = row[k];
+  if (v === null || v === undefined) return null;
+  const s = String(v);
+  return s === '' ? null : s;
+}
+
+/** SyncEngine.newer: the later stamp wins; a tie goes to the larger device id. */
+export const newer = (stamp: number, device: string, mineStamp: number, mineDevice: string) =>
+  stamp > mineStamp || (stamp === mineStamp && device > mineDevice);
+
+export function parseTabs(s: string | null | undefined): Set<string> {
+  const out = new Set<string>();
+  if (s === null || s === undefined) {
+    ALL_TABS.forEach((t) => out.add(t));
+    return out;
+  }
+  for (const t of s.split(',')) {
+    const x = t.trim();
+    if (ALL_TABS.includes(x)) out.add(x);
+  }
+  return out;
+}
+
+export const joinTabs = (tabs: Set<string>) => ALL_TABS.filter((t) => tabs.has(t)).join(',');
+
+/** The one way the web asks whether a household change may come in (SyncHousehold.allowed). */
+export type SigCheck = (pub: string, text: string, sig: string) => boolean;
+
+export class WebSyncEngine {
+  private customTabs?: Map<string, string>;
+
+  constructor(
+    readonly db: SyncDb,
+    private readonly verify: SigCheck,
+    private readonly signedText: (e: Entry) => string,
+    private readonly now: () => number = () => Date.now(),
+  ) {}
+
+  // ---------- this browser ----------
+
+  meta(key: string): string | null {
+    const r = this.db.query('SELECT value FROM sync_meta WHERE key = ?', [key]);
+    return r.length ? (r[0].value as string | null) : null;
+  }
+
+  setMeta(key: string, value: string | null): void {
+    if (value === null) this.db.exec('DELETE FROM sync_meta WHERE key = ?', [key]);
+    else this.db.exec('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)', [key, value]);
+  }
+
+  device(): string {
+    return this.meta('device') ?? '';
+  }
+
+  householdValue(k: string): string | null {
+    const r = this.db.query('SELECT v FROM household WHERE k = ?', [k]);
+    return r.length ? (r[0].v as string | null) : null;
+  }
+
+  shareCards(): boolean {
+    return this.meta('share_cards') === '1';
+  }
+
+  shareReceipts(): boolean {
+    return this.householdValue('receipts') === '1';
+  }
+
+  householdTabs(): Set<string> {
+    return parseTabs(this.householdValue('tabs'));
+  }
+
+  tabs(): Set<string> {
+    const t = parseTabs(this.meta('tabs'));
+    const h = this.householdTabs();
+    return new Set([...t].filter((x) => h.has(x)));
+  }
+
+  /** SyncEngine.noteTabs: sharing more now? Go through everything again. */
+  noteTabs(): boolean {
+    const now = this.tabs();
+    const was = this.meta('tabs_eff');
+    const before = was === null ? null : parseTabs(was);
+    const receipts = this.shareReceipts();
+    const rwas = this.meta('receipts_eff');
+    const receiptsOn = receipts && rwas !== '1';
+    const again = (before !== null && ![...now].every((t) => before.has(t))) || receiptsOn;
+    if (again) {
+      this.db.transaction(() => {
+        this.db.exec('UPDATE sync_peers SET got = 0');
+        this.db.exec('UPDATE sync_log SET seq = seq + (SELECT COALESCE(MAX(seq), 0) FROM sync_log)');
+        this.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'");
+      });
+    }
+    const j = joinTabs(now);
+    if (j !== was) this.setMeta('tabs_eff', j);
+    const r = receipts ? '1' : '0';
+    if (r !== rwas) this.setMeta('receipts_eff', r);
+    return again;
+  }
+
+  chainTab(chain: string | null): string | null {
+    if (!chain) return null;
+    const def = shopDef(chain);
+    if (def) return def.section;
+    if (!this.customTabs) {
+      this.customTabs = new Map();
+      try {
+        const r = this.db.query("SELECT value FROM kv WHERE key = 'settings'");
+        const list = r.length ? (JSON.parse(String(r[0].value)) as { customShops?: { id?: string; section?: string }[] }).customShops : undefined;
+        if (Array.isArray(list)) for (const c of list) if (c && typeof c === 'object') this.customTabs.set(String(c.id ?? ''), c.section ?? 'pantry');
+      } catch {
+        // no settings yet
+      }
+    }
+    return this.customTabs.get(chain) ?? null;
+  }
+
+  tabOf(tbl: string, row: Row | null | undefined): string | null {
+    switch (tbl) {
+      case 'categories':
+      case 'items':
+        return str(row, 'section') ?? 'pantry';
+      case 'list_entries': {
+        const s = str(row, 'section');
+        if (s !== null) return s;
+        const item = str(row, 'item_id');
+        if (item !== null) {
+          const r = this.db.query('SELECT section FROM items WHERE id = ?', [item]);
+          return r.length ? str(r[0], 'section') : null;
+        }
+        const chain = str(row, 'chain');
+        return chain !== null ? this.chainTab(chain) : 'pantry';
+      }
+      case 'products':
+        return this.chainTab(str(row, 'chain'));
+      case 'receipts':
+        return str(row, 'section') ?? 'pantry';
+      case 'prices': {
+        const r = this.db.query('SELECT chain FROM products WHERE id = ?', [str(row, 'product_id')]);
+        return r.length ? this.chainTab(str(r[0], 'chain')) : null;
+      }
+      default:
+        return null;
+    }
+  }
+
+  // ---------- other devices ----------
+
+  notePeer(peer: string, name: string | null): void {
+    if (!peer) return;
+    this.db.exec('INSERT OR IGNORE INTO sync_peers (device, got) VALUES (?, 0)', [peer]);
+    if (name !== null) this.db.exec('UPDATE sync_peers SET name = ? WHERE device = ?', [name, peer]);
+  }
+
+  setSeen(peer: string, seen: number): void {
+    if (!peer || seen <= 0) return;
+    const max = num(this.db.query('SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log')[0].top);
+    const v = Math.min(seen, max);
+    this.db.exec('INSERT OR IGNORE INTO sync_peers (device, got) VALUES (?, 0)', [peer]);
+    this.db.exec('UPDATE sync_peers SET seen = ? WHERE device = ? AND seen < ?', [v, peer, v]);
+  }
+
+  markSynced(peer: string, when: string): void {
+    this.db.exec('UPDATE sync_peers SET synced_at = ? WHERE device = ?', [when, peer]);
+  }
+
+  // ---------- what changed here ----------
+
+  /** SyncEngine.collect (the full version). */
+  collect(since: number, exclude: string | null, limit: number, allowed: Set<string> | null, where: string, moves: boolean, oldestDelete: number) {
+    if (!allowed) allowed = this.tabs();
+    let rows = this.db.query(`SELECT tbl, pk, stamp, device, deleted, seq, sig, created FROM sync_log WHERE seq > ?${where} ORDER BY seq LIMIT ?`, [since, limit + 1]);
+    const more = rows.length > limit;
+    if (more) rows = rows.slice(0, limit);
+    const cards = this.shareCards();
+    const receipts = this.shareReceipts();
+    const entries: Entry[] = [];
+    let top = since;
+    for (const r of rows) {
+      top = Math.max(top, num(r.seq));
+      const tbl = String(r.tbl);
+      const key = keyOf(tbl);
+      const pk = String(r.pk);
+      if (!key || (exclude !== null && exclude === r.device)) continue;
+      if (tbl === 'cards' && !cards) continue;
+      if (tbl === 'receipts' && !receipts) continue;
+      if (pk.startsWith('demo-')) continue;
+      const e: Entry = { tbl, pk, stamp: num(r.stamp), device: String(r.device), created: num(r.created) };
+      const deleted = num(r.deleted) !== 0;
+      if (deleted && oldestDelete > 0 && num(r.stamp) < oldestDelete) continue;
+      e.deleted = deleted;
+      if (!deleted) {
+        const row = this.db.query(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]);
+        if (!row.length) continue;
+        const data = { ...row[0] };
+        const tab = this.tabOf(tbl, data);
+        if (tab !== null && !allowed.has(tab)) {
+          if (!moves || tbl === 'prices') continue;
+          e.deleted = true;
+          e.moved = true;
+          entries.push(e);
+          continue;
+        }
+        if (tbl === 'prices') delete data.id;
+        if (tbl === 'products') for (const c of LOCAL_PRODUCT_COLUMNS) delete data[c];
+        e.row = data;
+      }
+      if (tbl === 'household') {
+        const sig = r.sig === null || r.sig === undefined ? null : String(r.sig);
+        if (sig !== null) e.sig = sig;
+      }
+      entries.push(e);
+    }
+    return { entries, top, more };
+  }
+
+  private logEntry(tbl: string, pk: string, stamp: number, device: string, deleted: boolean, sig: string | null, created: number): void {
+    this.db.exec(
+      'INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq, sig, created) VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log), ?, ?)',
+      [tbl, pk, stamp, device, deleted ? 1 : 0, sig, created],
+    );
+  }
+
+  // ---------- taking in another device's changes ----------
+
+  /** SyncEngine.apply. Returns how many records changed here. */
+  apply(entries: Entry[] | null | undefined): number {
+    let changed = 0;
+    if (!entries || !entries.length) return 0;
+    const columns = new Map<string, Set<string>>();
+    const mine = this.tabs();
+    const now = this.now();
+    const receipts = this.shareReceipts();
+    this.db.transaction(() => {
+      this.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
+      let clock = 0;
+      for (const e of entries) {
+        if (!e || typeof e !== 'object') continue;
+        const tbl = typeof e.tbl === 'string' ? e.tbl : '';
+        const key = keyOf(tbl);
+        if (!key) continue;
+        if (typeof e.pk !== 'string') throw new Error('an entry without pk');
+        const pk = e.pk;
+        if (pk.startsWith('demo-')) continue;
+        const stamp = Math.trunc(Number(e.stamp));
+        if (!Number.isFinite(stamp)) throw new Error('an entry without stamp');
+        const device = typeof e.device === 'string' ? e.device : e.device === undefined || e.device === null ? '' : String(e.device);
+        const deleted = truthy(e.deleted);
+        if (tbl === 'household' && !this.householdChangeAllowed(pk, device, e)) continue;
+        if (tbl === 'receipts' && !receipts) continue;
+        if (stamp > now + CLOCK_SLACK_MS) this.setMeta('clock_warn', device);
+        else clock = Math.max(clock, stamp);
+        const hadRows = this.db.query('SELECT stamp, device, deleted, created FROM sync_log WHERE tbl = ? AND pk = ?', [tbl, pk]);
+        const had = hadRows.length ? hadRows[0] : null;
+        let wins = had === null || newer(stamp, device, num(had.stamp), String(had.device ?? ''));
+        const created = Math.trunc(num(e.created));
+        const hadDeleted = had !== null && num(had.deleted) !== 0;
+        if (had !== null && DELETE_WINS.has(tbl)) {
+          if (deleted && !hadDeleted) wins = stamp > num(had.created);
+          else if (!deleted && hadDeleted) wins = created > num(had.stamp);
+        }
+        if (tbl === 'list_entries' && !deleted && had !== null && !hadDeleted) {
+          if (this.mergeListLine(e, stamp, device, created, wins, had, mine, columns)) changed++;
+          continue;
+        }
+        if (!wins) continue;
+        if (deleted && truthy(e.moved)) {
+          const cur = this.db.query(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]);
+          if (!cur.length) continue;
+          const tab = this.tabOf(tbl, cur[0]);
+          if (tab === null || !mine.has(tab)) continue;
+        }
+        const row = e.row && typeof e.row === 'object' ? e.row : null;
+        if (!deleted) {
+          const tab = this.tabOf(tbl, row);
+          if (tab !== null && !mine.has(tab)) continue;
+        }
+        if (deleted) {
+          this.db.exec(`DELETE FROM ${tbl} WHERE ${key} = ?`, [pk]);
+        } else {
+          if (row === null) continue;
+          this.writeRow(tbl, tbl === 'cards' ? stripCard(row) : row, this.columnsOf(tbl, columns));
+        }
+        this.logEntry(tbl, pk, stamp, device, deleted, e.sig === null || e.sig === undefined ? null : String(e.sig), created);
+        changed++;
+      }
+      const was = this.meta('clock');
+      let cur = was === null ? 0 : Number(was) || 0;
+      if (cur > now + CLOCK_SLACK_MS) cur = 0;
+      this.setMeta('clock', String(Math.min(Math.max(clock, cur), now + CLOCK_SLACK_MS)));
+      this.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
+    });
+    return changed;
+  }
+
+  private columnsOf(tbl: string, cache: Map<string, Set<string>>): Set<string> {
+    let cols = cache.get(tbl);
+    if (!cols) {
+      cols = new Set(this.db.query(`PRAGMA table_info(${tbl})`).map((c) => String(c.name)));
+      cache.set(tbl, cols);
+    }
+    return cols;
+  }
+
+  /** SyncEngine.mergeListLine: the tick and the quantity each keep whichever changed last. */
+  private mergeListLine(e: Entry, stamp: number, device: string, created: number, wins: boolean, had: Row, mine: Set<string>, columns: Map<string, Set<string>>): boolean {
+    const inRow = e.row && typeof e.row === 'object' ? e.row : null;
+    if (!inRow) return false;
+    const pk = e.pk;
+    const curRows = this.db.query('SELECT * FROM list_entries WHERE id = ?', [pk]);
+    if (!curRows.length) return false;
+    const cur = curRows[0];
+    const tab = this.tabOf('list_entries', inRow);
+    if (tab !== null && !mine.has(tab)) return false;
+    const lc = num(cur.checked_at),
+      ic = num(inRow.checked_at),
+      lq = num(cur.qty_at),
+      iq = num(inRow.qty_at);
+    let merged: Row;
+    let ours: boolean;
+    if (wins) {
+      merged = { ...inRow };
+      ours = false;
+      if (lc > ic) {
+        merged.checked = cur.checked;
+        merged.checked_at = lc;
+        ours = true;
+      }
+      if (lq > iq) {
+        merged.qty = cur.qty;
+        merged.qty_at = lq;
+        ours = true;
+      }
+    } else {
+      merged = { ...cur };
+      let any = false;
+      if (ic > lc) {
+        merged.checked = inRow.checked;
+        merged.checked_at = ic;
+        any = true;
+      }
+      if (iq > lq) {
+        merged.qty = inRow.qty;
+        merged.qty_at = iq;
+        any = true;
+      }
+      if (!any) return false;
+      ours = true;
+    }
+    this.writeRow('list_entries', merged, this.columnsOf('list_entries', columns));
+    if (!ours) this.logEntry('list_entries', pk, stamp, device, false, null, created);
+    else this.logEntry('list_entries', pk, Math.max(stamp, num(had.stamp)) + 1, this.device(), false, null, Math.max(created, num(had.created)));
+    return true;
+  }
+
+  /** SyncEngine.householdChangeAllowed with SyncHousehold.allowed: signatures checked once the owner key is known. */
+  householdChangeAllowed(pk: string, byDevice: string, entry: Entry): boolean {
+    const pin = this.meta('owner_pin');
+    const deleted = truthy(entry.deleted);
+    const row = entry.row && typeof entry.row === 'object' ? entry.row : null;
+    const v = row === null || row.v === null || row.v === undefined ? null : String(row.v);
+    if (pin === null) {
+      const ok = this.legacyAllowed(pk, byDevice, entry);
+      if (ok && pk === 'owner_pub' && !deleted && v !== null) this.setMeta('owner_pin', v);
+      return ok;
+    }
+    const sig = entry.sig === null || entry.sig === undefined ? null : String(entry.sig);
+    const byOwner = sig !== null && this.verify(pin, this.signedText(entry), sig);
+    if (ownerOnly(pk)) {
+      if (!byOwner) return false;
+      if (pk === 'owner_pub' && !deleted && v !== null) this.setMeta('owner_pin', v);
+      return true;
+    }
+    if (pk.startsWith('member:')) {
+      if (byOwner) return true;
+      const cur = this.householdValue(pk);
+      let pub: string | null = null;
+      if (cur !== null) {
+        try {
+          const m = JSON.parse(cur) as { pub?: unknown };
+          pub = typeof m.pub === 'string' ? m.pub : null;
+        } catch {
+          // an odd entry
+        }
+      }
+      if (pub) return sig !== null && this.verify(pub, this.signedText(entry), sig);
+      return byDevice === pk.slice('member:'.length);
+    }
+    return this.legacyAllowed(pk, byDevice, entry);
+  }
+
+  /**
+   * Could only the household have written this file? A phone's (not a web's, not a removed phone's)
+   * file that carries a household change signed by the owner key this browser pinned, or, before an
+   * owner key is known, a household change exactly as this browser already has it. Nobody without
+   * the household's data can make either, so a new serverKey that opens such a file is the real one
+   * (webkeys/ files are sealed to the web's public key, which anyone can do).
+   */
+  vouches(m: SyncFileMessage): boolean {
+    const device = typeof m.device === 'string' ? m.device : '';
+    if (!device || device.startsWith('web-') || this.householdValue('removed:' + device) !== null) return false;
+    const pin = this.meta('owner_pin');
+    for (const x of Array.isArray(m.entries) ? m.entries : []) {
+      if (!x || typeof x !== 'object' || x.tbl !== 'household' || typeof x.pk !== 'string') continue;
+      if (pin !== null) {
+        const sig = x.sig === null || x.sig === undefined ? null : String(x.sig);
+        if (sig !== null && this.verify(pin, this.signedText(x), sig)) return true;
+        continue;
+      }
+      const had = this.db.query("SELECT stamp, device FROM sync_log WHERE tbl = 'household' AND pk = ?", [x.pk]);
+      if (had.length && num(had[0].stamp) === Math.trunc(Number(x.stamp)) && String(had[0].device ?? '') === String(x.device ?? '')) return true;
+    }
+    return false;
+  }
+
+  legacyAllowed(pk: string, byDevice: string, entry: Entry): boolean {
+    const owner = this.householdValue('owner');
+    if (owner === null || owner === byDevice || pk === 'member:' + byDevice) return true;
+    if (this.householdValue('handover:' + byDevice) === null) return false;
+    if (pk === 'handover:' + byDevice) return true;
+    if (pk !== 'owner' || truthy(entry.deleted)) return false;
+    const row = entry.row && typeof entry.row === 'object' ? entry.row : null;
+    return row !== null && byDevice === String(row.v ?? '');
+  }
+
+  private writeRow(tbl: string, row: Row, cols: Set<string>): void {
+    const names: string[] = [];
+    const values: unknown[] = [];
+    for (const c of Object.keys(row)) {
+      if (!cols.has(c) || (tbl === 'prices' && c === 'id')) continue;
+      names.push(c);
+      values.push(sqlValue(row[c]));
+    }
+    if (!names.length) return;
+    const q = names.map(() => '?').join(', ');
+    const list = names.join(', ');
+    if (tbl === 'prices') {
+      this.db.exec(`INSERT INTO prices (${list}) SELECT ${q} WHERE NOT EXISTS (SELECT 1 FROM prices WHERE product_id = ? AND date = ?)`, [
+        ...values,
+        String(row.product_id ?? ''),
+        String(row.date ?? ''),
+      ]);
+    } else if (tbl === 'products') {
+      const sets: string[] = [];
+      const vals: unknown[] = [];
+      names.forEach((n, i) => {
+        if (LOCAL_PRODUCT_COLUMNS.has(n) || n === 'id') return;
+        sets.push(`${n} = ?`);
+        vals.push(values[i]);
+      });
+      const id = String(row.id ?? '');
+      if (this.db.query('SELECT 1 FROM products WHERE id = ?', [id]).length) {
+        if (sets.length) this.db.exec(`UPDATE products SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
+      } else {
+        const n2: string[] = [];
+        const v2: unknown[] = [];
+        names.forEach((n, i) => {
+          if (LOCAL_PRODUCT_COLUMNS.has(n)) return;
+          n2.push(n);
+          v2.push(values[i]);
+        });
+        this.db.exec(`INSERT INTO products (${n2.join(', ')}) VALUES (${n2.map(() => '?').join(', ')})`, v2);
+      }
+    } else if (tbl === 'items' && this.db.query('SELECT 1 FROM items WHERE id = ?', [String(row.id ?? '')]).length) {
+      const sets: string[] = [];
+      const vals: unknown[] = [];
+      names.forEach((n, i) => {
+        if (n === 'id') return;
+        sets.push(`${n} = ?`);
+        vals.push(values[i]);
+      });
+      if (!sets.length) return;
+      this.db.exec(`UPDATE items SET ${sets.join(', ')} WHERE id = ?`, [...vals, String(row.id ?? '')]);
+    } else {
+      this.db.exec(`INSERT OR REPLACE INTO ${tbl} (${list}) VALUES (${q})`, values);
+    }
+  }
+
+  /** SyncEngine.tidyCategories: one of each name per tab (the smaller id), as ordinary changes. */
+  tidyCategories(): number {
+    let merged = 0;
+    this.db.transaction(() => {
+      const rows = this.db.query('SELECT id, name, section FROM categories ORDER BY section, lower(trim(name)), id');
+      let lastKey: string | null = null;
+      let keep: string | null = null;
+      for (const r of rows) {
+        // Java's toLowerCase(Locale.ROOT) and trim(); SQLite's lower() only does ASCII, as before.
+        const k = `${String(r.section ?? '')}|${javaTrim(String(r.name ?? '')).toLowerCase()}`;
+        if (k !== lastKey) {
+          lastKey = k;
+          keep = String(r.id);
+          continue;
+        }
+        const gone = String(r.id);
+        this.db.exec('UPDATE items SET category_id = ? WHERE category_id = ?', [keep, gone]);
+        this.db.exec('UPDATE list_entries SET category_id = ? WHERE category_id = ?', [keep, gone]);
+        this.db.exec('DELETE FROM categories WHERE id = ?', [gone]);
+        merged++;
+      }
+    });
+    return merged;
+  }
+
+  // ---------- the folder (SyncFolder) ----------
+
+  /**
+   * Takes in one device's file (SyncFolder.readOthers, for one file already opened). `sum` is
+   * the file's hash, so the same file isn't taken in twice. Returns the number of changes, or -1
+   * when the file was passed over (this browser's own, an empty device, a removed phone).
+   */
+  takeFile(name: string, sum: string, m: SyncFileMessage, at: string): number {
+    const me = this.device();
+    const seenKey = 'folder_seen:' + name;
+    const device = typeof m.device === 'string' ? m.device : '';
+    if (!device || device === me || this.householdValue('removed:' + device) !== null) {
+      this.setMeta(seenKey, sum);
+      return -1;
+    }
+    const n = this.apply(m.entries);
+    if (n > 0) this.tidyCategories();
+    this.notePeer(device, typeof m.name === 'string' ? m.name : null);
+    const theirTop = Math.trunc(num(m.top));
+    if (theirTop > 0) {
+      const gotKey = 'folder_got:' + device;
+      const had = this.meta(gotKey);
+      if (had === null || Number(had) < theirTop) this.setMeta(gotKey, String(theirTop));
+    }
+    if (m.seen && typeof m.seen === 'object') this.setSeen(device, Math.trunc(num(m.seen[me])));
+    this.markSynced(device, at);
+    this.setMeta(seenKey, sum);
+    return n;
+  }
+
+  /** Whether a file needs reading again (SyncFolder: same version or same contents as last time: no). */
+  fresh(name: string, version: string | null): boolean {
+    return version === null || version !== this.meta('folder_ver:' + name);
+  }
+
+  noteVersion(name: string, version: string | null): void {
+    if (version !== null) this.setMeta('folder_ver:' + name, version);
+  }
+
+  seenSum(name: string): string | null {
+    return this.meta('folder_seen:' + name);
+  }
+
+  /**
+   * This browser's own file, when something changed since it was last written (SyncFolder.writeOwn),
+   * or null. `keyv` is the key version it will be sealed with.
+   */
+  ownFile(keyv: number, at: string, present: boolean): { msg: SyncFileMessage; mark: string } | null {
+    const top = num(this.db.query('SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log')[0].top);
+    const mark = `${top}/${keyv}/${[...this.tabs()].join(',')}/${this.shareCards()}/${this.shareReceipts()}`;
+    if (mark === this.meta('folder_top') && present) return null;
+    const oldest = this.now() - OLD_DELETE_MS;
+    const where = ` AND tbl NOT IN (${WEB_LEAVES_OUT.map((t) => `'${t}'`).join(', ')})`;
+    const c = this.collect(0, null, 5_000_000, null, where, true, oldest);
+    let fileTop = top;
+    const left = this.db.query("SELECT MIN(seq) AS s FROM sync_log WHERE deleted = 1 AND tbl <> '_seq' AND stamp < ?", [oldest]);
+    if (left.length && left[0].s !== null && left[0].s !== undefined) fileTop = Math.min(fileTop, num(left[0].s) - 1);
+    const seen: Record<string, number> = {};
+    for (const r of this.db.query("SELECT key, value FROM sync_meta WHERE key LIKE 'folder_got:%'")) {
+      const v = Number(r.value);
+      if (Number.isFinite(v) && /^-?\d+$/.test(String(r.value))) seen[String(r.key).slice('folder_got:'.length)] = v;
+    }
+    const msg: SyncFileMessage = {
+      top: fileTop,
+      seen,
+      format: 'restock-sync',
+      v: 1,
+      device: this.device(),
+      name: this.meta('name') ?? 'Web',
+      keyv,
+      at,
+      entries: c.entries,
+    };
+    return { msg, mark };
+  }
+
+  /** After the own file was written (the mark ownFile gave, so edits made meanwhile still go next time). */
+  wroteOwn(mark: string): void {
+    this.setMeta('folder_top', mark);
+  }
+
+  /**
+   * archive/<device>/<month>.bin: prices (only added, once per product and time) and receipts a
+   * phone moved off itself. Not noted as changes here: they belong to the phone that kept them.
+   */
+  takeArchive(m: { prices?: Row[]; receipts?: Row[] }): number {
+    let n = 0;
+    const columns = new Map<string, Set<string>>();
+    this.db.transaction(() => {
+      this.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
+      for (const p of Array.isArray(m.prices) ? m.prices : []) {
+        if (!p || typeof p !== 'object' || typeof p.product_id !== 'string' || typeof p.date !== 'string') continue;
+        const before = this.db.query('SELECT 1 FROM prices WHERE product_id = ? AND date = ?', [p.product_id, p.date]).length;
+        if (before) continue;
+        this.writeRow('prices', p, this.columnsOf('prices', columns));
+        n++;
+      }
+      for (const r of Array.isArray(m.receipts) ? m.receipts : []) {
+        if (!r || typeof r !== 'object' || typeof r.id !== 'string' || r.id.startsWith('demo-')) continue;
+        if (this.db.query('SELECT 1 FROM receipts WHERE id = ?', [r.id]).length) continue;
+        // A receipt deleted on a phone since stays deleted.
+        const log = this.db.query("SELECT deleted FROM sync_log WHERE tbl = 'receipts' AND pk = ?", [r.id]);
+        if (log.length && num(log[0].deleted) !== 0) continue;
+        this.writeRow('receipts', r, this.columnsOf('receipts', columns));
+        n++;
+      }
+      this.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
+    });
+    return n;
+  }
+}
+
+/** SyncHousehold.ownerOnly. */
+export function ownerOnly(pk: string): boolean {
+  return (
+    pk === 'name' ||
+    pk === 'owner' ||
+    pk === 'tabs' ||
+    pk === 'owner_pub' ||
+    pk === 'recovery' ||
+    pk === 'hid' ||
+    pk === 'receipts' ||
+    pk.startsWith('removed:') ||
+    pk.startsWith('handover:')
+  );
+}
+
+/** A loyalty card as the web keeps it: its shop and name, never its number. */
+export function stripCard(row: Row): Row {
+  const out: Row = {};
+  for (const [k, v] of Object.entries(row)) {
+    if (k === 'number' || /barcode|code|number|pin/i.test(k)) continue;
+    out[k] = v;
+  }
+  out.number = '';
+  return out;
+}
+
+function sqlValue(v: unknown): unknown {
+  if (v === undefined || v === null) return null;
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  if (typeof v === 'object') return JSON.stringify(v);
+  return v;
+}
+
+/** Java's String.trim(): strips characters up to U+0020 only. */
+function javaTrim(s: string): string {
+  let a = 0;
+  let b = s.length;
+  while (a < b && s.charCodeAt(a) <= 0x20) a++;
+  while (b > a && s.charCodeAt(b - 1) <= 0x20) b--;
+  return s.slice(a, b);
+}
+
+/** Is this a phone's (or another browser's) changes file? */
+export function isSyncFile(name: string): boolean {
+  return name.startsWith(PREFIX) && name.endsWith(SUFFIX) && !name.startsWith('restock-sync-keys');
+}
+
+/** The file names the server allows (docs/server-protocol.md "Files"). */
+export function allowedName(name: string): boolean {
+  return (
+    /^restock-sync-[A-Za-z0-9_-]{1,80}\.bin$/.test(name) ||
+    /^restock-sync-keys-[A-Za-z0-9_-]{1,80}\.json$/.test(name) ||
+    /^archive\/[A-Za-z0-9_-]{1,80}\/\d{4}-(0[1-9]|1[0-2])\.bin$/.test(name) ||
+    /^photos\/[0-9a-f]{64}\.bin$/.test(name) ||
+    /^webkeys\/[A-Za-z0-9_-]{1,80}\.bin$/.test(name)
+  );
+}
+
+export const webFileName = (webId: string) => `${PREFIX}web-${webId}${SUFFIX}`;

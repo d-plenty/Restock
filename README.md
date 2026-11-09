@@ -64,6 +64,7 @@ The **normal price** is the middle of the non-sale prices over the history you k
 
 - **Your shops, your items.** Coles, Woolworths and Aldi, plus bottle shops (Keg tab, 18+) and pharmacies if you want them, and any other shop's website.
 - **Scan to add.** An open-source barcode scanner built in, with Open Food Facts lookup. Restock finds the same product at each of your shops and ticks it for you.
+- **Your own Restock server** (optional). Run [Restock server](https://github.com/d-plenty/restock-server) on your NAS or home server with one `docker run` command. Phones sync through it from anywhere, older prices and receipt photos move off the phone onto it, and you can use Restock on your computer in a browser. It's end-to-end encrypted: the server only ever holds sealed files.
 - **Other sizes of this.** Tick a product and Restock shows the same thing in other packs (375mL cans × 10, × 24, × 30), compared per litre or per 100g, so a 10-pack on special doesn't slip past your usual 30-pack. Bottles and other container sizes only if you switch them on.
 - **Local sync with your household.** Up to 6 phones in the same house share one pantry and shopping list, straight from one phone to another on your Wi-Fi. No account and no server. Away from home, phones can also sync through your Nextcloud, another WebDAV server (ownCloud, Synology, QNAP, TrueNAS and others) or a folder Syncthing keeps the same, sealed so only your phones can read it. The owner can also share kept receipts with the household. A recovery key lets another phone take over if the owner phone is lost. You pick what's shared: groceries, bottle shops (Keg) and pharmacy, each on or off, so a share house can share groceries and keep the rest separate. (Hosted sync, from anywhere through your own server, comes later.) Tick something off and it's off everyone's list.
 - **My catalogue.** A catalogue made only from the things you buy: a page for each shop with this week's sales on your items (40% OFF, HALF PRICE, 2 FOR $5), and for a shop with no sales, a page of what it's cheapest for. Add one or all of them to your list.
@@ -186,7 +187,7 @@ Your phone asks each shop's own website, the same way you would by visiting it, 
 <details>
 <summary><strong>Can my partner and I share one list?</strong></summary>
 
-Yes, with **local sync**: up to 6 phones share one pantry and shopping list, straight from phone to phone on your home Wi-Fi. No account and no server. Start a household on one phone (Settings → Sync and backups → Local sync), pick what it shares (groceries, Keg, Pharmacy), and scan its one-time code with the others. Each phone can take all of it or just some, like groceries only. Changes made away from home catch up when you're both back on the Wi-Fi, or straight away through your Nextcloud, another WebDAV server or a Syncthing folder if you set one up. A sync server you run yourself is [coming in 0.9.3](#roadmap).
+Yes, with **local sync**: up to 6 phones share one pantry and shopping list, straight from phone to phone on your home Wi-Fi. No account and no server. Start a household on one phone (Settings → Sync and backups → Local sync), pick what it shares (groceries, Keg, Pharmacy), and scan its one-time code with the others. Each phone can take all of it or just some, like groceries only. Changes made away from home catch up when you're both back on the Wi-Fi, or straight away through your Nextcloud, another WebDAV server or a Syncthing folder if you set one up. Or run your own [Restock server](https://github.com/d-plenty/restock-server): phones sync through it from anywhere, and you can use Restock in a browser.
 </details>
 
 <details>
@@ -250,33 +251,31 @@ Restock is in its **release candidate** stage. Each new feature is followed by a
 **✅ 0.9.0: Release candidate**
 My catalogue, Shop around first, sync through a folder, a household recovery key, backup passwords, and a full security and privacy review.
 
-**✅ 0.9.1: Your cloud drive (now)**
+**✅ 0.9.1: Your cloud drive**
 - Sign in to Nextcloud, or use WebDAV for your own NAS and other drives.
 - Receipts sync, and Sync and backups in one place in Settings.
 - Clearer pack sizes, and 12 months of price history.
 - Fixes and tighter security.
 
-**🔧 0.9.2: Fixes**
-Fixes and polish for drive sync, receipts and anything else testers find. Found something? [Report a problem](../../issues/new/choose).
-
-**🏠 0.9.3: Your own sync server**
-- **A small server you run yourself:** a Docker container on a NAS, home server or Raspberry Pi.
-- **Works anywhere:** on your home network first, then through your own domain or a tunnel (Tailscale, Cloudflare) when you're out.
+**✅ 0.9.2: Your own Restock server (now)**
+- **A small server you run yourself** with one `docker run` command: [Restock server](https://github.com/d-plenty/restock-server).
 - **End-to-end encrypted:** the server only holds sealed files, never the key.
+- **Works anywhere:** your home address first, then Tailscale or your own domain when you're out.
+- **Older prices and receipt photos live on the server,** and leave the phone only once the server has them.
+- **Restock in your computer's browser,** signed in with your passphrase or by scanning a code with your phone.
 - **Restock never waits for it.** If the server is down, everything works as normal and catches up later.
-- **Restock in your computer's browser,** served by the same container, which joins your household like another phone.
 
-**🔧 0.9.4: Fixes**
-Fixes and polish for the sync server.
+**🔧 0.9.3: Fixes**
+Fixes and polish for the server, drive sync, receipts and anything else testers find. Found something? [Report a problem](../../issues/new/choose).
 
-**🏡 0.9.5: Home Assistant**
+**🏡 0.9.4: Home Assistant**
 - **Your shopping list in Home Assistant, both ways:** add milk from a kitchen tablet or by voice and it's on everyone's list.
 - **Deals and recall alerts** can show up in Home Assistant too.
 
-**🔧 0.9.6: Fixes**
+**🔧 0.9.5: Fixes**
 Fixes and polish for Home Assistant.
 
-**✨ 0.9.7 and later: Final polish**
+**✨ 0.9.6 and later: Final polish**
 - The last fixes and adjustments before 1.0.
 - Permission from the price-history sources, and a final read-through of the privacy policy.
 
@@ -304,14 +303,11 @@ Tell Restock roughly how much of something you've got (a full bottle, two left, 
 ### Spending summary
 A simple month-by-month look at what you spent at each shop (from your kept receipts) and what Restock's deals saved you. It stays on your phone like everything else. Full budgeting is planned as a separate app that works with Restock, so this stays light.
 
-### Hosted sync
-Phones in a household already sync on the same Wi-Fi, and away from home through Nextcloud, another WebDAV drive or a folder you pick. Next is a small server you control, such as a Docker container on a home server, NAS or Raspberry Pi: tick something off at the shops and it's off the list at home straight away. There's no Restock account and no Restock server holding your data, and the server only ever sees encrypted data. Planned for 0.9.3 (see the [Roadmap](#roadmap)).
-
 ### iPhone version
 The same Restock on iOS, so a household with both kinds of phone can share a pantry and list. This needs a developer with an Apple developer account: see [Wanted: someone to bring Restock to iPhone](#wanted-someone-to-bring-restock-to-iphone).
 
 ### Home Assistant
-Connect Restock to [Home Assistant](https://www.home-assistant.io) and your shopping list shows up there, with changes going both ways: add milk from a kitchen tablet or by voice and it's on your Restock list. Deals and recall alerts can show up in Home Assistant too. Planned for 0.9.5, after the sync server it builds on (see the [Roadmap](#roadmap)).
+Connect Restock to [Home Assistant](https://www.home-assistant.io) and your shopping list shows up there, with changes going both ways: add milk from a kitchen tablet or by voice and it's on your Restock list. Deals and recall alerts can show up in Home Assistant too. Planned for 0.9.4, using the Restock server (see the [Roadmap](#roadmap)).
 
 ### Shared prices, free for everyone
 Every price a phone sees can help everyone else. With shared prices, a new item arrives with months of history, so you know straight away whether its "special" is real. Restock will run a **free public price website** that anyone can browse and that every Restock phone can download history from, with no account and no ads.
@@ -343,6 +339,8 @@ docs/         screenshots, the F-Droid recipe, the release guide
 ```
 
 **Local sync**, briefly: every change to a synced table is logged in the phone's database with a time and the phone it came from. Phones find each other on the Wi-Fi with Android's network service discovery (under a random name and a tag that changes every day, so a phone can't be followed from place to place), swap whatever the other hasn't seen over a direct connection encrypted with AES-256-GCM, and the later change wins; ticks and amounts are merged separately, and a delete wins over an edit that didn't know about it. The household key is made on the owner phone and handed over only through a one-time, 10-minute pairing code, with a fresh key exchange (ECDH) so even someone who saw the code can't read the hand-over; removing a phone changes the key. Changes only the owner may make (who's in the household, what it shares, who owns it) are signed by the owner phone, and each phone checks the signature. Folder and WebDAV sync use the same sealed format, one file per phone, through Restock's own small WebDAV client (https only, except for servers at home or on Tailscale); a Nextcloud sign-in uses Nextcloud's Login Flow v2, so Restock gets an app password of its own. The household's keys, secrets and any drive password are sealed with a key in Android's Keystore. Phones only listen for each other on Wi-Fi or Ethernet, and old deletes are tidied from the sync log after 90 days once every phone has seen them. `tools/sync-test` runs whole households of phones through the real Java code.
+
+**Restock server**, briefly: a small Node server ([d-plenty/restock-server](https://github.com/d-plenty/restock-server)) that stores the same sealed one-file-per-device format as folder sync, sealed with a key derived from the household's key. Each phone joins with a one-time invite and signs every request with its own ECDSA key; the server keeps only public keys. The web app is Restock's own web build in a "server mode" that merges every device's file with a TypeScript port of the phones' merge rules (checked against the Java code in `tools/sync-test`) and writes its own edits as another device. The protocol is in [docs/server-protocol.md](docs/server-protocol.md).
 
 **Restock's F-Droid repo** is built by a GitHub Action ([`fdroid-repo.yml`](.github/workflows/fdroid-repo.yml)) from each release's APK and published on GitHub Pages.
 

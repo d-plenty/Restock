@@ -9,7 +9,7 @@ import { RestockNative } from '../../lib/sql/native';
 import { syncInfo } from '../../lib/sync';
 import { isNative } from '../../stores/http';
 import { syncSummary } from './Sync';
-import { allCards, eraseEverything, getSettings, priceHistorySpan, pruneHistory, updateSettings } from '../../lib/db';
+import { allCards, eraseEverything, getSettings, priceHistorySpan, pruneHistory, serverKeepsHistory, updateSettings } from '../../lib/db';
 import { loadDemo, removeDemo } from '../../lib/demo';
 import { syncBackgroundSchedule } from '../../lib/check';
 import { ensureNotificationPermission, scheduleReminders } from '../../lib/notify';
@@ -116,7 +116,7 @@ async function eraseAll() {
   }
   const first = await confirmAction('Erase everything on this phone?', {
     detail:
-      "Every item, list, price, loyalty card, receipt and setting is deleted from this phone, you're signed out of the shops inside Restock, and it leaves your household if it's in one. Other phones keep their things. Export a backup first if you might want any of it back.",
+      "Every item, list, price, loyalty card, receipt and setting is deleted from this phone, you're signed out of the shops inside Restock, and it leaves your household if it's in one (and your Restock server, where what it moved stays). Other phones keep their things. Export a backup first if you might want any of it back.",
     action: 'Continue',
   });
   if (!first) return;
@@ -126,6 +126,8 @@ async function eraseAll() {
   });
   if (!second) return;
   if (isNative()) {
+    // 0.9.2: off the Restock server first, without bringing its photos back (they'd only be erased).
+    await RestockNative.syncStopServer({ bringBack: false }).catch(() => undefined);
     // Tell the household this phone is going, if it's here; then stop everything in the background.
     await RestockNative.syncLeave().catch(() => undefined);
     await RestockNative.eraseNative().catch(() => undefined);
@@ -249,7 +251,7 @@ export function SettingsScreen() {
       <h3 className="group-head">Sync with your household</h3>
       <div className="card flush">
         {row('Local sync', syncSummary(sync) || 'Phone to phone on your Wi-Fi · no account', () => nav.push({ name: 'sync' }))}
-        {row('Hosted sync', 'From anywhere, through a small server you run yourself · coming later', () => nav.push({ name: 'soon', id: 'sync' }))}
+        {row('Restock server', 'Sync at home and away through a small server you run yourself, and use Restock in a browser', () => nav.push({ name: 'sync' }))}
         {row('Household name', (sync?.paired && sync.household) || settings.household.name, () => nav.push({ name: 'household' }))}
       </div>
       <p className="small group-note">Sync keeps your phones the same, mistakes included. Backups let you go back, so set up automatic backups too.</p>
@@ -369,10 +371,14 @@ export function SettingsScreen() {
             onChange={async (e) => {
               const weeks = parseInt(e.target.value, 10);
               if (weeks < settings.historyWeeks) {
-                const ok = await confirmAction(`Keep only ${historyLabel(weeks)} of prices?`, {
-                  detail: `Prices older than ${historyLabel(weeks)} are deleted now. Each item keeps its latest price, and sample items aren't touched.`,
-                  action: 'Delete older prices',
-                  danger: true,
+                // 0.9.2: with a Restock server, older prices move there instead of being deleted.
+                const onServer = await serverKeepsHistory();
+                const ok = await confirmAction(`Keep only ${historyLabel(weeks)} of prices on this phone?`, {
+                  detail: onServer
+                    ? `Prices older than ${historyLabel(weeks)} move to your Restock server, and come off this phone once it has them. Each item keeps its latest price. Prices from shops on tabs this phone doesn't sync are deleted, as without a server.`
+                    : `Prices older than ${historyLabel(weeks)} are deleted now. Each item keeps its latest price, and sample items aren't touched.`,
+                  action: onServer ? 'Move older prices' : 'Delete older prices',
+                  danger: !onServer,
                 });
                 if (!ok) return;
               }
