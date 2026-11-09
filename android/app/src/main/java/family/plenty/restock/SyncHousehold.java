@@ -32,7 +32,8 @@ import org.json.JSONObject;
  * Stored on this phone only (sync_meta): key, keyv, oldkey and oldkey_until (owner), secret,
  * owner_secrets (owner), pair_token and pair_until (owner, while a code is open).
  * Shared by all phones (the synced household table): name, owner, member:<device>,
- * removed:<device>, handover:<device>, and tabs (0.8.5: which tabs the household shares).
+ * removed:<device>, handover:<device>, tabs (0.8.5: which tabs the household shares) and
+ * receipts (0.9.1: "1" when the household shares receipts; signed by the owner like tabs).
  *
  * 0.9.0, signed household changes: the household has an owner key (owner_pub in the household
  * record; the private half, owner_priv, only on the owner phone). Every phone remembers it
@@ -255,7 +256,7 @@ final class SyncHousehold implements SyncEngine.Household {
     /** Entries only the owner changes. */
     static boolean ownerOnly(String pk) {
         return "name".equals(pk) || "owner".equals(pk) || "tabs".equals(pk) || "owner_pub".equals(pk) || "recovery".equals(pk) || "hid".equals(pk)
-            || pk.startsWith("removed:") || pk.startsWith("handover:");
+            || "receipts".equals(pk) || pk.startsWith("removed:") || pk.startsWith("handover:");
     }
 
     @Override
@@ -519,6 +520,13 @@ final class SyncHousehold implements SyncEngine.Household {
         if (!isOwner()) throw new IllegalStateException("Only the owner phone can change what the household shares.");
         if (tabs.isEmpty()) throw new IllegalArgumentException("Pick at least one thing to share.");
         setRow("tabs", SyncEngine.joinTabs(tabs));
+        e.noteTabs();
+    }
+
+    /** 0.9.1, owner: whether the household shares receipts (off by default). */
+    void setHouseholdReceipts(boolean on) throws Exception {
+        if (!isOwner()) throw new IllegalStateException("Only the owner phone can change what the household shares.");
+        setRow("receipts", on ? "1" : "0");
         e.noteTabs();
     }
 
@@ -995,14 +1003,16 @@ final class SyncHousehold implements SyncEngine.Household {
      */
     void forget() throws Exception {
         for (String k : new String[] { "key", "keyv", "oldkey", "oldkey_until", "secret", "owner_secrets", "pair_token", "pair_until", "invite", "household", "tabs", "tabs_eff",
-            "recovery", "recovery_saved", "owner_priv", "owner_pubkey", "owner_pin", "folder", "folder_top", "folder_keys", "folder_at", "folder_unread", "clock_warn", "rehousehold" })
+            "recovery", "recovery_saved", "owner_priv", "owner_pubkey", "owner_pin", "folder", "folder_top", "folder_keys", "folder_at", "folder_unread", "clock_warn", "rehousehold",
+            // 0.9.1: the WebDAV or Nextcloud sign-in (only ever on this phone), receipts and tidying.
+            "dav_user", "dav_pass", "dav_kind", "receipts_eff", "compact_at" })
             e.setMeta(k, null);
         e.db.transaction(() -> {
             e.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
             List<JSONObject> top = e.db.query("SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log");
             e.db.exec("DELETE FROM household");
             e.db.exec("DELETE FROM sync_log WHERE tbl = 'household'");
-            e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'");
+            e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'folder_got:%'");
             // A marker that keeps the highest number (not a record: sync skips it).
             e.db.exec("INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq) VALUES ('_seq', 'floor', 0, '', 1, ?)", top.get(0).optLong("top", 0));
             e.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");

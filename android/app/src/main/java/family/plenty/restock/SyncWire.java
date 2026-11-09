@@ -30,6 +30,11 @@ import org.json.JSONObject;
  * stop it. The household's public tag changes every day (dayTag), so a phone can't be followed
  * from place to place by it.
  *
+ * 0.9.1: the listener can be tied to one address (the phone's address on the Wi-Fi), so it can't
+ * be reached through mobile data or a VPN; SyncHub only listens while on Wi-Fi or Ethernet. A
+ * "photo" message's answer can be a receipt photo (up to 8 MB, about 11 MB once encoded), well
+ * inside MAX.
+ *
  * No Android classes here, so it's tested on a computer too.
  */
 final class SyncWire {
@@ -261,13 +266,18 @@ final class SyncWire {
         private volatile boolean running = true;
 
         Server(Keys keys, Handler handler) throws IOException {
+            this(keys, handler, null);
+        }
+
+        /** 0.9.1: `bind`: listen only on this address (null: every address). */
+        Server(Keys keys, Handler handler, java.net.InetAddress bind) throws IOException {
             this.keys = keys;
             this.handler = handler;
             ServerSocket s;
             try {
-                s = new ServerSocket(PORT);
+                s = new ServerSocket(PORT, 50, bind);
             } catch (IOException taken) {
-                s = new ServerSocket(0); // any free port; other phones find it by discovery
+                s = new ServerSocket(0, 50, bind); // any free port; other phones find it by discovery
             }
             socket = s;
             Thread t = new Thread(this::loop, "restock-sync-server");

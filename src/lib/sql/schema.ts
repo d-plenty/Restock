@@ -118,7 +118,8 @@ const STAMP_090 = (t: { table: string; key: string }, row: 'NEW' | 'OLD') => {
   const key = t.key.replace(/\b(id|product_id|date|k)\b/g, `${row}.$1`);
   return `MAX(CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), COALESCE((SELECT CAST(value AS INTEGER) FROM sync_meta WHERE key = 'clock'), 0) + 1, COALESCE((SELECT stamp FROM sync_log WHERE tbl = '${t.table}' AND pk = ${key}), 0) + 1)`;
 };
-const SYNC_TRIGGERS_090: string[] = SYNCED.flatMap((t) => {
+/** One table's 0.9.0 sync triggers (0.9.1: also used for receipts). */
+function syncTriggers090(t: { table: string; key: string; deletes: boolean }): string[] {
   const key = (row: 'NEW' | 'OLD') => t.key.replace(/\b(id|product_id|date|k)\b/g, `${row}.$1`);
   const names = [`sync_${t.table}_ins`, `sync_${t.table}_upd`, `sync_${t.table}_del`];
   const keep = (row: 'NEW' | 'OLD') => `COALESCE((SELECT created FROM sync_log WHERE tbl = '${t.table}' AND pk = ${key(row)}), 0)`;
@@ -137,7 +138,8 @@ const SYNC_TRIGGERS_090: string[] = SYNCED.flatMap((t) => {
     out.push(`CREATE TRIGGER sync_${t.table}_del AFTER DELETE ON ${t.table} BEGIN DELETE FROM sync_log WHERE tbl = '${t.table}' AND pk = ${key('OLD')}; END`);
   }
   return out;
-});
+}
+const SYNC_TRIGGERS_090: string[] = SYNCED.flatMap(syncTriggers090);
 const SYNC_090: string[] = [
   'ALTER TABLE sync_log ADD COLUMN sig TEXT',
   'ALTER TABLE sync_log ADD COLUMN created INTEGER NOT NULL DEFAULT 0',
@@ -146,6 +148,35 @@ const SYNC_090: string[] = [
   `CREATE INDEX IF NOT EXISTS prices_sync_key ON prices(product_id || '|' || date)`,
   `DELETE FROM sync_log WHERE tbl = 'prices' AND NOT EXISTS (SELECT 1 FROM prices WHERE product_id || '|' || date = sync_log.pk)`,
   ...SYNC_TRIGGERS_090,
+];
+
+/**
+ * 0.9.1:
+ * - Receipts are noted for sync like everything else (they only go to the other phones when the
+ *   household shares them: SyncEngine checks the household's "receipts" setting). The ones already
+ *   here count as made now, by this phone. Photos travel separately, over the Wi-Fi only.
+ * - sync_peers.seen: how far each other phone has got through this phone's own changes, so old
+ *   deletes everyone has seen can be tidied away (SyncEngine.compact).
+ */
+export const RECEIPTS_SYNCED = { table: 'receipts', key: 'id', deletes: true };
+/** Every synced table from 0.9.1 on (SYNCED, then receipts). Mirrored in SyncEngine.java's TABLES. */
+export const SYNCED_091 = [...SYNCED, RECEIPTS_SYNCED];
+const STAMP_NOW = `MAX(CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), COALESCE((SELECT CAST(value AS INTEGER) FROM sync_meta WHERE key = 'clock'), 0) + 1)`;
+const SYNC_091: string[] = [
+  'ALTER TABLE sync_peers ADD COLUMN seen INTEGER NOT NULL DEFAULT 0',
+  `INSERT OR IGNORE INTO sync_log (tbl, pk, stamp, device, deleted, seq, sig, created)
+   SELECT 'receipts', id, ${STAMP_NOW}, ${DEVICE}, 0, (SELECT COALESCE(MAX(seq), 0) FROM sync_log) + rowid, NULL, ${STAMP_NOW} FROM receipts`,
+  // Receipts are saved with INSERT OR REPLACE (db.ts saveReceipt), so an edit looks like an insert:
+  // it keeps when the receipt was made, unless it was deleted here first, so a delete on another
+  // phone still beats an edit made without knowing about it.
+  ...syncTriggers090(RECEIPTS_SYNCED).map((sql) =>
+    sql.startsWith('CREATE TRIGGER sync_receipts_ins')
+      ? sql.replace(
+          `NULL, ${STAMP_090(RECEIPTS_SYNCED, 'NEW')});`,
+          `NULL, CASE WHEN (SELECT deleted FROM sync_log WHERE tbl = 'receipts' AND pk = NEW.id) = 0 THEN (SELECT created FROM sync_log WHERE tbl = 'receipts' AND pk = NEW.id) ELSE ${STAMP_090(RECEIPTS_SYNCED, 'NEW')} END);`,
+        )
+      : sql,
+  ),
 ];
 
 /** 0.8.9: "Any size" and "Not at this shop" (picks.ts); the move to My picks is in DATA_STEPS. */
@@ -297,6 +328,8 @@ export const MIGRATIONS: string[][] = [
   PICKS_089,
   // 0.9.0: sturdier sync (stamps, deletes, signed household changes, prices, ticks).
   SYNC_090,
+  // 0.9.1: receipts sync (when the household shares them), and tidying old deletes.
+  SYNC_091,
 ];
 
 /**

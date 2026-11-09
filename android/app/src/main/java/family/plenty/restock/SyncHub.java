@@ -47,6 +47,15 @@ import org.json.JSONObject;
  *
  * One per app process, used by the screens (RestockNativePlugin), the "ready to sync" service
  * (SyncService) and the background job (SyncWorker).
+ *
+ * 0.9.1:
+ * - Listens only while the phone is on Wi-Fi or Ethernet (a ConnectivityManager callback), on
+ *   that network's own address. On mobile data it doesn't listen or look for phones; sync away
+ *   from home (a WebDAV server or a folder) still works.
+ * - Sync away from home can be a Nextcloud (signed in with Nextcloud's Login Flow v2), another
+ *   WebDAV server (SyncDav), or a folder picked on the phone. Each is tried out before it's used.
+ * - Secrets in sync_meta are sealed with a key in Android's key store (SyncKeystore).
+ * - Receipt photos travel over the Wi-Fi (AndroidPhotos), and old deletes are tidied away once a day.
  */
 final class SyncHub {
     private static final String TAG = "RestockSync";
@@ -72,10 +81,16 @@ final class SyncHub {
         return instance;
     }
 
+    final SyncKeystore keystore = new SyncKeystore();
+
     private SyncHub(Context context) {
         this.context = context;
         this.engine = new SyncEngine(new AndroidDb(RestockDatabase.get(context)));
+        // 0.9.1: secrets sealed in Android's key store; receipt photos from Restock's own storage.
+        engine.secrets = keystore;
+        engine.photos = new AndroidPhotos(context);
         this.household = new SyncHousehold(engine);
+        watchNetworks();
         // A phone joining from the first screen gets the owner's shop choices and settings once.
         household.settings = () -> {
             try (Cursor c = RestockDatabase.get(context).rawQuery("SELECT value FROM kv WHERE key = 'settings'", null)) {
@@ -130,6 +145,19 @@ final class SyncHub {
      */
     void upgradeOldPairing() {
         try {
+            // 0.9.1: secrets this phone can't open any more (its data was copied onto another phone,
+            // or Android's key store was reset): like a phone that isn't in a household, and say so.
+            if (ready() && (!secretsChecked || engine.secretsLost)) {
+                boolean lost = engine.checkSecrets(); // a passing key store problem throws: try again next time
+                secretsChecked = true;
+                if (lost) {
+                    stop();
+                    household.forget();
+                    engine.secretsLost = false;
+                    engine.setMeta("notice", "keys");
+                    return;
+                }
+            }
             if (ready() && household.legacy()) {
                 household.forget();
                 engine.setMeta("notice", "repair");
@@ -145,6 +173,7 @@ final class SyncHub {
      */
     String invite(String householdName, boolean shareCards, Set<String> tabs) throws Exception {
         upgradeOldPairing();
+        if (!onLan()) throw new IllegalStateException(OFF_WIFI);
         if (!household.paired()) {
             if (engine.meta("name") == null) engine.setMeta("name", defaultName());
             household.create(householdName, null, tabs);
@@ -161,6 +190,9 @@ final class SyncHub {
         household.closeInvite();
         readvertise();
     }
+
+    /** 0.9.1: phones only pair (and sync with each other) on Wi-Fi or Ethernet. */
+    static final String OFF_WIFI = "Connect this phone to your Wi-Fi first. Phones join a household on the same Wi-Fi.";
 
     /** Something the joining phone sends the owner over the code's sealed link. */
     interface PairingStep {
@@ -202,6 +234,7 @@ final class SyncHub {
     /** 0.8.5: what a code's household is (name, owner, what it shares, the owner's settings), before joining. */
     JSONObject peek(String code) throws Exception {
         upgradeOldPairing();
+        if (!onLan()) throw new IllegalStateException(OFF_WIFI);
         if (household.paired()) throw new IllegalStateException("This phone is already in a household. Stop syncing it first.");
         return withOwner(code, household::peek);
     }
@@ -253,12 +286,19 @@ final class SyncHub {
         new Thread(this::syncAll).start();
     }
 
+    /** 0.9.1, owner: whether the household shares receipts (and, over the Wi-Fi, their photos). */
+    void setHouseholdReceipts(boolean on) throws Exception {
+        household.setHouseholdReceipts(on);
+        new Thread(this::syncAll).start();
+    }
+
     /** This phone leaves the household (keeping its things). False: the owner must hand over first. */
     boolean leave() throws Exception {
         if (!household.paired()) return true;
         if (!household.startLeaving()) return false;
         syncAll(); // let the others see it go, if they're here
         stop();
+        letGoOfServer();
         household.forget();
         context.stopService(new android.content.Intent(context, SyncService.class));
         WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME);
@@ -289,14 +329,107 @@ final class SyncHub {
         return m.isEmpty() ? "Android phone" : m;
     }
 
+    private volatile boolean secretsChecked;
+
+    // ---------- 0.9.1: Wi-Fi and Ethernet only ----------
+
+    /** The Wi-Fi and Ethernet networks the phone is on now, with their addresses. */
+    private final Map<Network, LinkProperties> lans = new java.util.concurrent.ConcurrentHashMap<>();
+    private volatile boolean lansKnown;
+    /** Whether something asked to listen (start()) and nothing asked to stop since. */
+    private volatile boolean wanted;
+    /** The address the listener is tied to. */
+    private volatile InetAddress boundTo;
+
+    private void watchNetworks() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return;
+            android.net.NetworkRequest req = new android.net.NetworkRequest.Builder()
+                .addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+                .addTransportType(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
+                // A home network without the internet still counts.
+                .removeCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build();
+            cm.registerNetworkCallback(req, new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network n) {
+                    LinkProperties lp = cm.getLinkProperties(n);
+                    if (lp != null) lans.put(n, lp);
+                    lansKnown = true;
+                    networksChanged();
+                }
+
+                @Override
+                public void onLinkPropertiesChanged(Network n, LinkProperties lp) {
+                    lans.put(n, lp);
+                    lansKnown = true;
+                    networksChanged();
+                }
+
+                @Override
+                public void onLost(Network n) {
+                    lans.remove(n);
+                    networksChanged();
+                }
+            });
+        } catch (Exception e) {
+            Log.w(TAG, "watchNetworks", e);
+        }
+    }
+
+    /** Whether the phone is on Wi-Fi or Ethernet now. */
+    boolean onLan() {
+        if (!lans.isEmpty()) return true;
+        if (lansKnown) return false;
+        // Before the first callback: what Android says about the active network.
+        try {
+            ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            Network n = cm == null ? null : cm.getActiveNetwork();
+            android.net.NetworkCapabilities c = n == null ? null : cm.getNetworkCapabilities(n);
+            return c != null && (c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) || c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** This phone's IPv4 address on the Wi-Fi or Ethernet, or null. */
+    private InetAddress lanAddress() {
+        for (LinkProperties lp : lans.values()) {
+            for (LinkAddress a : lp.getLinkAddresses()) {
+                InetAddress ip = a.getAddress();
+                if (ip instanceof Inet4Address && !ip.isLoopbackAddress()) return ip;
+            }
+        }
+        return null;
+    }
+
+    /** Wi-Fi came or went, or its address changed: listen, stop, or listen on the new address. */
+    private void networksChanged() {
+        new Thread(() -> {
+            synchronized (SyncHub.this) {
+                boolean on = onLan();
+                InetAddress at = lanAddress();
+                if (server != null && (!on || (at != null && !at.equals(boundTo)))) pause();
+                if (on && wanted && server == null) start();
+            }
+        }, "restock-sync-net").start();
+    }
+
     // ---------- listening ----------
 
-    /** Listens for the household's other phones and tells the Wi-Fi this phone is here. */
+    /**
+     * Listens for the household's other phones and tells the Wi-Fi this phone is here. 0.9.1: only
+     * on Wi-Fi or Ethernet (it starts by itself when the phone gets there), on its address there.
+     */
     synchronized void start() {
         upgradeOldPairing();
-        if (key() == null || server != null) return;
+        if (key() == null) return;
+        wanted = true;
+        if (server != null || !onLan()) return;
         try {
-            server = new SyncWire.Server(household::serverKeys, new SyncWire.Handler() {
+            InetAddress at = lanAddress();
+            SyncWire.Handler handler = new SyncWire.Handler() {
                 volatile boolean took;
                 volatile boolean real;
 
@@ -329,7 +462,15 @@ final class SyncHub {
                         changed();
                     }
                 }
-            });
+            };
+            try {
+                server = new SyncWire.Server(household::serverKeys, handler, at);
+                boundTo = at;
+            } catch (java.io.IOException cantBind) {
+                // That address can't be listened on (it's just changed): every address, for now.
+                server = new SyncWire.Server(household::serverKeys, handler, null);
+                boundTo = null;
+            }
             advertise();
             schedule();
         } catch (Exception e) {
@@ -339,11 +480,18 @@ final class SyncHub {
     }
 
     synchronized void stop() {
+        wanted = false;
+        pause();
+    }
+
+    /** Stops listening for now (off the Wi-Fi); start() or the Wi-Fi coming back starts it again. */
+    private synchronized void pause() {
         unadvertise();
         if (server != null) {
             server.stop();
             server = null;
         }
+        boundTo = null;
     }
 
     int port() {
@@ -564,6 +712,8 @@ final class SyncHub {
 
     /** This phone's address on the Wi-Fi, for the pairing code. */
     String localIp() {
+        InetAddress lan = lanAddress();
+        if (lan != null) return lan.getHostAddress();
         try {
             ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
             Network n = cm == null ? null : cm.getActiveNetwork();
@@ -609,13 +759,15 @@ final class SyncHub {
         try {
             start();
             Set<String> where = new LinkedHashSet<>();
+            // 0.9.1: the other phones only on the Wi-Fi (or Ethernet), never over mobile data.
+            boolean lan = onLan();
             // Where they were last time (quickest), the phone that invited this one, then a fresh look.
-            try (Cursor c = RestockDatabase.get(context).rawQuery("SELECT host, port FROM sync_peers WHERE host IS NOT NULL AND port > 0", null)) {
+            if (lan) try (Cursor c = RestockDatabase.get(context).rawQuery("SELECT host, port FROM sync_peers WHERE host IS NOT NULL AND port > 0", null)) {
                 while (c.moveToNext()) where.add(c.getString(0) + ":" + c.getInt(1));
             }
             String invite = engine.meta("invite");
-            if (invite != null && !invite.endsWith(":0")) where.add(invite);
-            where.addAll(discover(4000));
+            if (lan && invite != null && !invite.endsWith(":0")) where.add(invite);
+            if (lan) where.addAll(discover(4000));
             String mine = localIp();
             String error = null;
             Set<String> done = new LinkedHashSet<>();
@@ -644,6 +796,7 @@ final class SyncHub {
                 if (r.removed) {
                     // The owner removed this phone. It keeps its things, but stops syncing.
                     stop();
+                    letGoOfServer();
                     household.forget();
                     engine.setMeta("notice", "removed");
                     context.stopService(new android.content.Intent(context, SyncService.class));
@@ -657,7 +810,7 @@ final class SyncHub {
                     // A phone that joined with a short code learns the household's name here.
                     if (engine.meta("household") == null && r.household != null && !r.household.isEmpty()) engine.setMeta("household", r.household);
                     s.reached++;
-                    s.received += r.received;
+                    s.received += r.received + r.photos;
                     s.sent += r.sent;
                     if (r.peerName != null) s.names.add(r.peerName);
                     if (invite != null && invite.equals(hp)) engine.setMeta("invite", null);
@@ -671,7 +824,7 @@ final class SyncHub {
             // 0.9.0: no phone answered with the key this phone has: maybe it missed key changes
             // (phones removed while it was away). Ask the owner with this phone's own secret, now
             // and then.
-            if (key() != null && s.reached == 0 && !household.isOwner()) {
+            if (lan && key() != null && s.reached == 0 && !household.isOwner()) {
                 long last = 0;
                 try {
                     last = Long.parseLong(String.valueOf(engine.meta("asked_key_at")));
@@ -692,6 +845,7 @@ final class SyncHub {
                             }
                         } catch (SyncHousehold.RemovedException gone) {
                             stop();
+                            letGoOfServer();
                             household.forget();
                             engine.setMeta("notice", "removed");
                             context.stopService(new android.content.Intent(context, SyncService.class));
@@ -716,8 +870,12 @@ final class SyncHub {
             lastSummary = s;
             lastError = s.reached > 0 || viaFolder
                 ? null
-                : (where.isEmpty() ? "No other phones found on this Wi-Fi." : "Couldn't reach the other phone" + (error == null ? "." : ": " + error));
+                : !lan
+                    ? "This phone isn't on Wi-Fi, so it can't reach the other phones right now."
+                    : (where.isEmpty() ? "No other phones found on this Wi-Fi." : "Couldn't reach the other phone" + (error == null ? "." : ": " + error));
             if (s.received > 0) changed();
+            // 0.9.1: now and then (once a day at most), tidy away old deletes everyone has seen.
+            if (s.reached > 0 || viaFolder) compactNow();
         } catch (Exception e) {
             lastError = e.getMessage();
             Log.w(TAG, "syncAll", e);
@@ -738,32 +896,155 @@ final class SyncHub {
         }
     }
 
+    /** 0.9.1: what sync away from home goes through: "nextcloud", "webdav", "folder", or null. */
+    String folderKind() {
+        String f = folder();
+        if (f == null) return null;
+        if (!f.startsWith("https://") && !f.startsWith("http://")) return "folder";
+        try {
+            return "nextcloud".equals(engine.meta("dav_kind")) ? "nextcloud" : "webdav";
+        } catch (Exception e) {
+            return "webdav";
+        }
+    }
+
+    /**
+     * Where sync away from home goes (a picked folder's address, or 0.9.1: a WebDAV folder's), or
+     * stop (null). Stopping, or changing, forgets the WebDAV sign-in on this phone.
+     */
     void setFolder(String uri) throws Exception {
+        if (uri == null || !(uri.startsWith("https://") || uri.startsWith("http://"))) letGoOfServer();
         engine.setMeta("folder", uri == null || uri.isEmpty() ? null : uri);
         engine.setMeta("folder_top", null);
         engine.setMeta("folder_keys", null);
-        engine.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%'");
+        engine.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'");
+        if (uri == null || !(uri.startsWith("https://") || uri.startsWith("http://"))) {
+            engine.setMeta("dav_user", null);
+            engine.setMeta("dav_pass", null);
+            engine.setMeta("dav_kind", null);
+        }
         if (uri == null) {
             engine.setMeta("folder_at", null);
             folderError = null;
         }
     }
 
+    static final String CANT_HOLD = "That app can't hold a folder for Restock. Try Nextcloud, Syncthing or a folder on this phone.";
+
+    /** 0.9.1: a folder picked on the phone, tried out first (a test file written, read back and deleted). */
+    void setPickedFolder(String uri) throws Exception {
+        try {
+            SyncFolder.check(new AndroidFolder(context, android.net.Uri.parse(uri)), CANT_HOLD);
+        } catch (SyncFolder.Unusable u) {
+            Log.w(TAG, "folder check", u.getCause());
+            throw new IllegalStateException(CANT_HOLD);
+        }
+        setFolder(uri);
+        folderError = null;
+    }
+
+    /**
+     * 0.9.1: a WebDAV folder (`url`, made if it isn't there), tried out first. `kind`: "nextcloud"
+     * or "webdav". The password stays on this phone only, sealed (SyncKeystore).
+     */
+    void setWebDav(String url, String user, String password, String kind) throws Exception {
+        SyncDav.DavFolder f = new SyncDav.DavFolder(url, user, password);
+        f.ensure();
+        try {
+            SyncFolder.check(f, "");
+        } catch (SyncFolder.Unusable u) {
+            Throwable c = u.getCause();
+            throw new IllegalStateException(c instanceof SyncDav.Problem ? c.getMessage() : "Restock couldn't save a test file in that folder" + (c == null || c.getMessage() == null ? "." : ": " + c.getMessage()));
+        }
+        // Signed in to Nextcloud again (or somewhere else): Nextcloud can forget the old app password.
+        if (!java.util.Objects.equals(password, engine.meta("dav_pass"))) letGoOfServer();
+        engine.setMeta("dav_user", user == null ? "" : user);
+        engine.setMeta("dav_pass", password == null ? "" : password);
+        engine.setMeta("dav_kind", kind);
+        setFolder(f.base.toString());
+        folderError = null;
+    }
+
+    /**
+     * 0.9.1: this phone is letting go of its Nextcloud sign-in (Stop, signing in again, leaving the
+     * household, Erase everything): ask Nextcloud to delete Restock's app password, in the
+     * background. Only Nextcloud has a way to do that; other servers' passwords are the person's own.
+     */
+    void letGoOfServer() {
+        try {
+            if (!"nextcloud".equals(folderKind())) return;
+            final String url = folder(), user = engine.meta("dav_user"), pass = engine.meta("dav_pass");
+            if (pass == null || pass.isEmpty()) return;
+            new Thread(() -> SyncDav.revokeNextcloud(url, user, pass), "restock-nextcloud-bye").start();
+        } catch (Exception e) {
+            Log.w(TAG, "letGoOfServer", e);
+        }
+    }
+
+    private volatile boolean signInCancelled;
+
+    /**
+     * 0.9.1, "Sign in to Nextcloud": Nextcloud's Login Flow v2. Opens Nextcloud's sign-in page in the
+     * browser (`open`), waits for the person to finish (asking every 2 seconds, for up to 20
+     * minutes, until cancelNextcloud()), then uses the app password Nextcloud gave Restock for a
+     * folder named `folder` (made if it isn't there). False if cancelled.
+     */
+    boolean signInNextcloud(String server, String folder, java.util.function.Consumer<String> open) throws Exception {
+        signInCancelled = false;
+        String name = SyncDav.folderName(folder);
+        SyncDav.Login l = SyncDav.startLogin(server);
+        open.accept(l.login.toString());
+        SyncDav.Signin s = SyncDav.pollLogin(l, () -> signInCancelled, 2000, 20 * 60 * 1000L);
+        if (s == null) return false;
+        setWebDav(SyncDav.nextcloudFolderUrl(s.server, s.loginName, name), s.loginName, s.appPassword, "nextcloud");
+        return true;
+    }
+
+    void cancelNextcloud() {
+        signInCancelled = true;
+    }
+
+    /** The folder to sync through, as SyncFolder needs it. */
+    private SyncFolder.Folder openFolder(String uri) throws Exception {
+        if (uri.startsWith("https://") || uri.startsWith("http://")) return new SyncDav.DavFolder(uri, engine.meta("dav_user"), engine.meta("dav_pass"));
+        return new AndroidFolder(context, android.net.Uri.parse(uri));
+    }
+
     /** One round with the folder, if there is one; null when there isn't. */
     SyncFolder.Result syncFolder() {
         String uri = folder();
         if (uri == null || key() == null) return null;
+        boolean dav = uri.startsWith("https://") || uri.startsWith("http://");
         try {
-            SyncFolder.Result r = new SyncFolder(engine, household).sync(new AndroidFolder(context, android.net.Uri.parse(uri)), nowIso());
+            SyncFolder.Result r = new SyncFolder(engine, household).sync(openFolder(uri), nowIso());
             folderError = null;
             return r;
         } catch (SecurityException e) {
             folderError = "Restock can't open the sync folder any more. Pick it again in Settings → Local sync.";
+        } catch (SyncDav.Problem e) {
+            boolean nc = "nextcloud".equals(folderKind());
+            folderError = e.getMessage().contains("user name or password")
+                ? (nc ? "Nextcloud didn't accept Restock's sign-in any more. Tap Change and sign in again." : "The server didn't accept the user name or password. Tap Change and enter them again.")
+                : e.getMessage();
         } catch (Exception e) {
-            folderError = "Couldn't sync through the folder" + (e.getMessage() == null ? "." : ": " + e.getMessage());
+            folderError = "Couldn't sync " + (dav ? "with the server" : "through the folder") + (e.getMessage() == null ? "." : ": " + e.getMessage());
             Log.w(TAG, "syncFolder", e);
         }
         return new SyncFolder.Result();
+    }
+
+    /** 0.9.1: tidies old deletes from sync_log, at most once a day. */
+    private void compactNow() {
+        try {
+            long now = System.currentTimeMillis();
+            String at = engine.meta("compact_at");
+            if (at != null && now - Long.parseLong(at) < 24L * 3600 * 1000) return;
+            engine.setMeta("compact_at", String.valueOf(now));
+            int n = engine.compact(now);
+            if (n > 0) Log.i(TAG, "tidied " + n + " old deletes");
+        } catch (Exception e) {
+            Log.w(TAG, "compact", e);
+        }
     }
 
     /** A folder picked with Android's folder picker, as SyncFolder needs it. */
@@ -796,7 +1077,7 @@ final class SyncHub {
                     String n = c.getString(1);
                     if (n == null || !n.startsWith(SyncFolder.PREFIX)) continue;
                     long t = c.isNull(2) ? 0 : c.getLong(2);
-                    // Two files with the same name (Google Drive allows it): the newest.
+                    // Two files with the same name (some apps allow it): the newest.
                     if (ids.containsKey(n) && when.getOrDefault(n, 0L) >= t) continue;
                     ids.put(n, c.getString(0));
                     when.put(n, t);
@@ -853,6 +1134,70 @@ final class SyncHub {
                 out.write(data);
             }
             if (id == null) ids.put(name, android.provider.DocumentsContract.getDocumentId(file));
+        }
+
+        @Override
+        public void delete(String name) throws Exception {
+            String id = ids.get(name);
+            if (id == null) return;
+            if (!android.provider.DocumentsContract.deleteDocument(cr, android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, id)))
+                throw new Exception("the folder didn't let Restock delete " + name);
+            ids.remove(name);
+        }
+    }
+
+    /**
+     * 0.9.1: receipt photos in Restock's private storage, for sync. Only real receipt photo paths
+     * (receipts/<id>.jpg), only inside the receipts folder, at most SyncEngine.MAX_PHOTO bytes.
+     */
+    static final class AndroidPhotos implements SyncEngine.Photos {
+        private final Context context;
+
+        AndroidPhotos(Context context) {
+            this.context = context;
+        }
+
+        private java.io.File file(String path) throws Exception {
+            if (!SyncEngine.isPhotoPath(path)) throw new SecurityException("not a receipt photo");
+            java.io.File dir = new java.io.File(context.getFilesDir(), "receipts").getCanonicalFile();
+            java.io.File f = new java.io.File(dir, path.substring("receipts/".length())).getCanonicalFile();
+            if (!dir.equals(f.getParentFile())) throw new SecurityException("not a receipt photo");
+            return f;
+        }
+
+        @Override
+        public long size(String path) throws Exception {
+            java.io.File f = file(path);
+            return f.isFile() && f.length() > 0 ? f.length() : -1;
+        }
+
+        @Override
+        public byte[] read(String path) throws Exception {
+            java.io.File f = file(path);
+            if (!f.isFile() || f.length() > SyncEngine.MAX_PHOTO) return null;
+            return java.nio.file.Files.readAllBytes(f.toPath());
+        }
+
+        @Override
+        public void write(String path, byte[] data) throws Exception {
+            if (data.length > SyncEngine.MAX_PHOTO) throw new SecurityException("too big");
+            java.io.File f = file(path);
+            java.io.File dir = f.getParentFile();
+            if (dir != null && !dir.exists() && !dir.mkdirs()) throw new java.io.IOException("Couldn't make the receipts folder");
+            java.io.File tmp = new java.io.File(dir, f.getName() + ".part");
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(tmp)) {
+                out.write(data);
+            }
+            if (!tmp.renameTo(f)) {
+                tmp.delete();
+                throw new java.io.IOException("Couldn't save the photo");
+            }
+        }
+
+        @Override
+        public void delete(String path) throws Exception {
+            java.io.File f = file(path);
+            if (f.exists() && !f.delete()) throw new java.io.IOException("Couldn't delete the photo");
         }
     }
 

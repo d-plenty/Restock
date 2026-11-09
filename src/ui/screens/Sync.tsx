@@ -240,7 +240,7 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
           {!expired && <CodeText code={code} />}
           <ol className="small" style={{ margin: 0, paddingLeft: 18 }}>
             <li>Put both phones on the same Wi-Fi, and keep this screen open.</li>
-            <li>On the other phone (Restock 0.8.5 or newer), tap Join your household on the first screen, or Settings → Local sync → Join a household.</li>
+            <li>On the other phone (Restock 0.8.5 or newer), tap Join your household on the first screen, or Settings → Sync and backups → Local sync → Join a household.</li>
             <li>Scan this code.</li>
           </ol>
           <button className="btn block" onClick={close}>
@@ -460,7 +460,7 @@ export function JoinSheet({
         <>
           <p className="small" style={{ margin: 0 }}>
             {where} shares {offered.map((t) => SHARE_TABS.find((x) => x.tab === t)!.title.toLowerCase()).join(', ')}. Pick what this phone shares; the
-            rest stays on this phone only. You can change it later in Settings → Local sync.
+            rest stays on this phone only. You can change it later in Settings → Sync and backups → Local sync.
           </p>
           <TabsPicker offered={keg ? offered : offered.filter((t) => t !== 'keg')} value={tabs} onChange={setTabs} />
           <button className="btn primary block" disabled={!tabs.length} onClick={() => setStep(!fresh && mineInTabs ? 'things' : 'cards')}>
@@ -518,7 +518,7 @@ export async function scanPairingCode(): Promise<string | undefined> {
   const out = await scanBarcode('Scan the code on the owner phone', {
     accept: pairingCode,
     qr: true,
-    wrong: "That isn't a Restock sync code. On the owner phone, open Settings → Local sync → Add a phone.",
+    wrong: "That isn't a Restock sync code. On the owner phone, open Settings → Sync and backups → Local sync → Add a phone.",
     typeHint: 'Or paste the code',
   });
   return out.ok ? out.code : undefined;
@@ -716,6 +716,215 @@ function MemberSheet({
   );
 }
 
+// ---------- 0.9.1: sync away from home ----------
+
+/** The three ways to sync away from home. */
+function AwayChoices({ disabled, onPick }: { disabled?: boolean; onPick: (kind: 'nextcloud' | 'webdav' | 'folder') => void }) {
+  return (
+    <div className="card flush">
+      <button className="row" disabled={disabled} onClick={() => onPick('nextcloud')}>
+        <Icon name="external" size={18} />
+        <span className="grow">
+          <span className="title" style={{ fontSize: 15 }}>
+            Sign in to Nextcloud
+          </span>
+          <span className="small">Your own Nextcloud, or one from a provider. Restock gets a password of its own.</span>
+        </span>
+        <Icon name="chevron" size={18} />
+      </button>
+      <button className="row" disabled={disabled} onClick={() => onPick('webdav')}>
+        <Icon name="box" size={18} />
+        <span className="grow">
+          <span className="title" style={{ fontSize: 15 }}>
+            Other WebDAV server
+          </span>
+          <span className="small">ownCloud, Synology, QNAP, TrueNAS, Koofr, pCloud, kDrive, Box and others.</span>
+        </span>
+        <Icon name="chevron" size={18} />
+      </button>
+      <button className="row" disabled={disabled} onClick={() => onPick('folder')}>
+        <Icon name="folder" size={18} />
+        <span className="grow">
+          <span className="title" style={{ fontSize: 15 }}>
+            Pick a folder on this phone
+          </span>
+          <span className="small">One that Syncthing (or a similar app) keeps the same on every phone.</span>
+        </span>
+        <Icon name="chevron" size={18} />
+      </button>
+    </div>
+  );
+}
+
+/** The folder name field, the same for Nextcloud and other servers. */
+function FolderField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="field">
+      <span>Folder for Restock</span>
+      <input className="input" value={value} autoCapitalize="off" autoCorrect="off" spellCheck={false} onChange={(e) => onChange(e.target.value)} />
+    </label>
+  );
+}
+
+/**
+ * "Sign in to Nextcloud" (Nextcloud's Login Flow v2): Restock opens the sign-in page in the
+ * browser, the person signs in there and allows Restock, and Nextcloud gives Restock an app
+ * password of its own.
+ */
+function NextcloudSheet({ onClose, onDone }: { onClose: () => void; onDone: (info: SyncInfo) => void }) {
+  const [server, setServer] = useState('');
+  const [folder, setFolder] = useState('Restock');
+  const [waiting, setWaiting] = useState(false);
+  const [error, setError] = useState<string>();
+  const go = async () => {
+    setError(undefined);
+    setWaiting(true);
+    try {
+      const r = await RestockNative.syncNextcloud({ server: server.trim(), folder: folder.trim() });
+      if (r.cancelled) setWaiting(false);
+      else onDone(r);
+    } catch (e) {
+      setError(errText(e));
+      setWaiting(false);
+    }
+  };
+  const cancel = () => void RestockNative.syncNextcloudCancel().catch(() => undefined);
+  return (
+    <Sheet
+      title="Sign in to Nextcloud"
+      onClose={() => {
+        if (waiting) cancel();
+        onClose();
+      }}
+    >
+      {waiting ? (
+        <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <strong>Finish signing in in your browser</strong>
+          <span className="small">Sign in to your Nextcloud there and tap Grant access. Then come back to Restock; it carries on by itself.</span>
+          <LoadingBar seconds={60} />
+          <button className="btn" onClick={cancel}>
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <>
+          <p className="small" style={{ margin: 0 }}>
+            Restock opens your Nextcloud's sign-in page in your browser. Nextcloud then gives Restock a password of its own, so your own password
+            never reaches Restock. You can take it away any time in Nextcloud's settings, under Security.
+          </p>
+          <label className="field">
+            <span>Your Nextcloud's address</span>
+            <input
+              className="input"
+              value={server}
+              inputMode="url"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="cloud.example.com"
+              onChange={(e) => setServer(e.target.value)}
+            />
+          </label>
+          <FolderField value={folder} onChange={setFolder} />
+          <p className="small" style={{ marginTop: -4 }}>
+            Made if it isn't there. Every phone in the household needs the same folder: sign in with the same Nextcloud account, or share the folder
+            with each other in Nextcloud.
+          </p>
+          {error && (
+            <div className="banner amber" role="alert">
+              {error}
+            </div>
+          )}
+          <button className="btn primary" disabled={!server.trim()} onClick={() => void go()}>
+            <Icon name="external" size={18} /> Sign in
+          </button>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+/** Other WebDAV servers: an address, a user name and a password. */
+function WebDavSheet({ onClose, onDone }: { onClose: () => void; onDone: (info: SyncInfo) => void }) {
+  const [url, setUrl] = useState('');
+  const [user, setUser] = useState('');
+  const [password, setPassword] = useState('');
+  const [folder, setFolder] = useState('Restock');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const go = async () => {
+    setError(undefined);
+    setBusy(true);
+    try {
+      onDone(await RestockNative.syncSetWebDav({ url: url.trim(), user: user.trim(), password, folder: folder.trim() }));
+    } catch (e) {
+      setError(errText(e));
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet title="Other WebDAV server" onClose={busy ? () => undefined : onClose}>
+      <p className="small" style={{ margin: 0 }}>
+        For ownCloud, Synology, QNAP, TrueNAS, Koofr, pCloud, kDrive, Box and other servers with WebDAV. Your server's or provider's help pages give
+        its WebDAV address.
+      </p>
+      <label className="field">
+        <span>WebDAV address</span>
+        <input
+          className="input"
+          value={url}
+          inputMode="url"
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder="https://dav.example.com/"
+          onChange={(e) => setUrl(e.target.value)}
+        />
+      </label>
+      <label className="field">
+        <span>User name</span>
+        <input
+          className="input"
+          value={user}
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          autoComplete="username"
+          onChange={(e) => setUser(e.target.value)}
+        />
+      </label>
+      <label className="field">
+        <span>Password</span>
+        <input className="input" type="password" value={password} autoComplete="current-password" onChange={(e) => setPassword(e.target.value)} />
+      </label>
+      <p className="small" style={{ marginTop: -4 }}>
+        Many providers want an app password here (you make one in their settings), not your main one. It stays on this phone only, locked away,
+        and is never synced or put in a backup.
+      </p>
+      <FolderField value={folder} onChange={setFolder} />
+      <p className="small" style={{ marginTop: -4 }}>
+        Made if it isn't there. Use https:// unless the server is at home (like 192.168.1.20) or on Tailscale.
+      </p>
+      {error && (
+        <div className="banner amber" role="alert">
+          {error}
+        </div>
+      )}
+      <button className="btn primary" disabled={busy || !url.trim() || !user.trim()} onClick={() => void go()}>
+        {busy ? 'Checking the server…' : 'Connect'}
+      </button>
+      {busy && <LoadingBar seconds={10} />}
+    </Sheet>
+  );
+}
+
+/** "Syncing through Nextcloud", "… a WebDAV server", "… <folder>". */
+function awayTitle(info: SyncInfo): string {
+  if (info.folderKind === 'nextcloud') return 'Syncing through Nextcloud';
+  if (info.folderKind === 'webdav') return 'Syncing through a WebDAV server';
+  return `Syncing through ${info.folderName ?? 'a folder'}`;
+}
+
 export function SyncScreen() {
   const nav = useNav();
   const [info, setInfo] = useState<SyncInfo>();
@@ -725,6 +934,10 @@ export function SyncScreen() {
   const [busy, setBusy] = useState(false);
   const [recovery, setRecovery] = useState(false);
   const [takeOver, setTakeOver] = useState(false);
+  // 0.9.1: sync away from home: the choice being set up, the chooser (Change), and a problem setting it up.
+  const [away, setAway] = useState<'nextcloud' | 'webdav'>();
+  const [choosing, setChoosing] = useState(false);
+  const [awayError, setAwayError] = useState<string>();
   const [, tick] = useState(0);
 
   const refresh = () => void syncInfo().then(setInfo);
@@ -761,7 +974,14 @@ export function SyncScreen() {
     }
   };
 
-  const set = async (patch: { name?: string; shareCards?: boolean; keepReady?: boolean; tabs?: Section[]; householdTabs?: Section[] }) => {
+  const set = async (patch: {
+    name?: string;
+    shareCards?: boolean;
+    keepReady?: boolean;
+    tabs?: Section[];
+    householdTabs?: Section[];
+    householdReceipts?: boolean;
+  }) => {
     try {
       setInfo(await RestockNative.syncSet(patch));
     } catch (e) {
@@ -793,24 +1013,44 @@ export function SyncScreen() {
   };
 
   const pickFolder = async () => {
+    setAwayError(undefined);
     try {
       const f = await RestockNative.pickFolder();
       setBusy(true);
+      // 0.9.1: the folder is tried out first; one an app can't really hold is turned down.
       const i = await RestockNative.syncSetFolder({ uri: f.uri });
       setInfo(i);
+      setChoosing(false);
       nav.toast(i.folderError ?? `Syncing through ${f.name}`);
     } catch (e) {
-      if (errText(e) !== 'No folder picked') nav.toast(errText(e));
+      if (errText(e) !== 'No folder picked') setAwayError(errText(e));
     } finally {
       setBusy(false);
     }
   };
+  const pickAway = (kind: 'nextcloud' | 'webdav' | 'folder') => {
+    setAwayError(undefined);
+    if (kind === 'folder') void pickFolder();
+    else setAway(kind);
+  };
+  const awayDone = (i: SyncInfo) => {
+    setAway(undefined);
+    setChoosing(false);
+    setInfo(i);
+    nav.toast(i.folderError ?? (i.folderKind === 'nextcloud' ? 'Signed in. Syncing through Nextcloud' : `Syncing through ${i.folderName ?? 'the server'}`));
+  };
   const stopFolder = async () => {
-    const ok = await confirmAction('Stop syncing through the folder?', {
-      detail: "This phone stops reading and writing the folder. Its file stays there; delete it yourself if you like. Wi-Fi sync carries on.",
+    const server = info?.folderKind === 'nextcloud' || info?.folderKind === 'webdav';
+    const ok = await confirmAction(server ? 'Stop syncing through the server?' : 'Stop syncing through the folder?', {
+      detail: server
+        ? "This phone stops using the server and forgets its sign-in. Its file stays there; delete it yourself if you like. Wi-Fi sync carries on."
+        : "This phone stops reading and writing the folder. Its file stays there; delete it yourself if you like. Wi-Fi sync carries on.",
       action: 'Stop',
     });
-    if (ok) setInfo(await RestockNative.syncSetFolder({}));
+    if (ok) {
+      setInfo(await RestockNative.syncSetFolder({}));
+      setChoosing(false);
+    }
   };
 
   const synced = (device: string) => info?.peers?.find((p) => p.device === device)?.syncedAt;
@@ -829,11 +1069,19 @@ export function SyncScreen() {
 
       {info?.notice && !info.paired && (
         <div className="banner amber" role="status">
-          <strong>{info.notice === 'removed' ? 'This phone was removed from the household' : 'Pair your phones again'}</strong>
+          <strong>
+            {info.notice === 'removed'
+              ? 'This phone was removed from the household'
+              : info.notice === 'keys'
+                ? 'Join your household again'
+                : 'Pair your phones again'}
+          </strong>
           <span style={{ fontSize: 13 }}>
             {info.notice === 'removed'
               ? 'The owner phone took it out. It kept everything it had. To join again, ask the owner for a new code.'
-              : 'Restock 0.8.2 adds an owner phone and one-time codes. Everything is still on this phone. On the phone that will be the owner, tap Start a household; on the other, tap Join a household and scan the code. Choose "Combine" so nothing is lost.'}
+              : info.notice === 'keys'
+                ? 'This phone couldn\'t open its sync keys. That happens when Restock\'s data is moved to another phone. Everything else is still here. Ask the owner phone for a new code and join again, and choose "Combine" so nothing is lost.'
+                : 'Restock 0.8.2 adds an owner phone and one-time codes. Everything is still on this phone. On the phone that will be the owner, tap Start a household; on the other, tap Join a household and scan the code. Choose "Combine" so nothing is lost.'}
           </span>
           <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => void RestockNative.syncDismissNotice().then(refresh)}>
             OK
@@ -845,7 +1093,7 @@ export function SyncScreen() {
         <strong>Local sync: one pantry and list for the whole house</strong>
         <span className="small">
           Phones in your household sync <strong>straight from one phone to another</strong> on your own Wi-Fi: pantry, shopping list (ticks too),
-          prices, categories and alerts. Away from home, they can also sync through a folder you choose.
+          prices, categories and alerts. Away from home, they can also sync through your Nextcloud, another WebDAV server or a folder you choose.
         </span>
         <ul className="ticks">
           <li>
@@ -854,7 +1102,10 @@ export function SyncScreen() {
           </li>
           <li>
             <Icon name="check" size={16} />
-            <span>On your Wi-Fi it never goes over the internet. Through a folder, it's sealed so only your phones can read it. The makers of Restock never see it.</span>
+            <span>
+              On your Wi-Fi it never goes over the internet. Away from home, it's sealed so only your phones can read it, wherever it's kept. The
+              makers of Restock never see it.
+            </span>
           </li>
           <li>
             <Icon name="check" size={16} />
@@ -862,7 +1113,9 @@ export function SyncScreen() {
           </li>
           <li>
             <Icon name="check" size={16} />
-            <span>Up to {MAX_SYNC_PHONES} phones. Each keeps its own look, receipts, backups and shop sign-ins.</span>
+            <span>
+              Up to {MAX_SYNC_PHONES} phones. Each keeps its own look, backups and shop sign-ins, and its receipts unless the household shares them.
+            </span>
           </li>
         </ul>
       </div>
@@ -1050,13 +1303,16 @@ export function SyncScreen() {
             {info.folder ? (
               <>
                 <span className="title" style={{ fontSize: 15 }}>
-                  Syncing through {info.folderName ?? 'a folder'}
+                  {awayTitle(info)}
                 </span>
+                {info.folderKind !== 'folder' && info.folderName && <span className="small">{info.folderName}</span>}
                 <span className="small">
                   {info.folderError ??
                     (info.folderAt
-                      ? `Last synced through the folder ${agoText(info.folderAt)}. Each phone in the household needs to pick the same folder.`
-                      : "No other phone's file here yet. Pick the same folder on each phone in the household.")}
+                      ? `Last synced away from home ${agoText(info.folderAt)}.`
+                      : info.folderKind === 'folder'
+                        ? "No other phone's file here yet. Pick the same folder on each phone in the household."
+                        : "No other phone's file here yet. Set up the same folder on each phone in the household.")}
                 </span>
                 {!!info.folderUnread && !info.folderError && (
                   <span className="small">
@@ -1065,8 +1321,8 @@ export function SyncScreen() {
                   </span>
                 )}
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn small" disabled={busy} onClick={() => void pickFolder()}>
-                    Change folder
+                  <button className="btn small" disabled={busy} onClick={() => setChoosing((c) => !c)}>
+                    Change
                   </button>
                   <button className="btn small" onClick={() => void stopFolder()}>
                     Stop
@@ -1074,18 +1330,19 @@ export function SyncScreen() {
                 </div>
               </>
             ) : (
-              <>
-                <span className="small">
-                  Pick a folder every phone in the household can reach, like one in <strong>Nextcloud</strong>, <strong>Syncthing</strong> or{' '}
-                  <strong>Google Drive</strong>, and pick the same folder on each phone. Each phone leaves its changes there, sealed with the
-                  household's key, and picks up the others'. Your list, pantry and ticks go through it; prices stay on the Wi-Fi to keep it small.
-                </span>
-                <button className="btn" disabled={!syncAvailable() || busy} onClick={() => void pickFolder()}>
-                  <Icon name="folder" size={18} /> Pick a folder
-                </button>
-              </>
+              <span className="small">
+                For phones away from home. Each phone leaves its changes in one place every phone in the household can reach, sealed with the
+                household's key, and picks up the others'. Your list, pantry and ticks go this way; prices and photos stay on the Wi-Fi to keep it
+                small.
+              </span>
+            )}
+            {awayError && (
+              <div className="banner amber" role="alert">
+                {awayError}
+              </div>
             )}
           </div>
+          {(!info.folder || choosing) && <AwayChoices disabled={!syncAvailable() || busy} onPick={pickAway} />}
 
           <div className="eyebrow">What's shared</div>
           {info.isOwner && (
@@ -1117,6 +1374,27 @@ export function SyncScreen() {
           <p className="small" style={{ marginTop: -4 }}>
             What isn't shared stays on this phone only. Turning one on brings the household's things for it across at the next sync.
           </p>
+          <div className="card flush">
+            <label className="check">
+              <input
+                type="checkbox"
+                className="switch"
+                checked={!!info.shareReceipts}
+                disabled={!info.isOwner}
+                onChange={(e) => void set({ householdReceipts: e.target.checked })}
+              />
+              <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <span className="title" style={{ fontSize: 15 }}>
+                  Share receipts with the household
+                </span>
+                <span className="small">
+                  {info.isOwner
+                    ? 'Kept receipts go to every phone, for the tabs each one shares. Photos only go over the Wi-Fi; until one arrives, the receipt shows without it.'
+                    : `Only the owner phone${owner ? ` (${owner.name})` : ''} can change this.${info.shareReceipts ? ' Photos only go over the Wi-Fi.' : ''}`}
+                </span>
+              </span>
+            </label>
+          </div>
 
           <label className="field">
             <span>This phone's name</span>
@@ -1184,8 +1462,8 @@ export function SyncScreen() {
       <div className="card" style={{ gap: 6 }}>
         <strong>Good to know</strong>
         <span className="small">
-          On the Wi-Fi, both phones need to be there at the same time; whatever changed while apart catches up then (or through the folder, if you
-          use one). Some routers and guest networks
+          On the Wi-Fi, both phones need to be there at the same time; whatever changed while apart catches up then (or away from home, if you've
+          set that up). Phones only look for each other on Wi-Fi (or a network cable), never over mobile data. Some routers and guest networks
           keep devices from seeing each other ("client isolation" or "AP isolation"); if the phones never find each other, that's the usual reason.
         </span>
         <span className="small">
@@ -1271,6 +1549,8 @@ export function SyncScreen() {
           }}
         />
       )}
+      {away === 'nextcloud' && <NextcloudSheet onClose={() => setAway(undefined)} onDone={awayDone} />}
+      {away === 'webdav' && <WebDavSheet onClose={() => setAway(undefined)} onDone={awayDone} />}
       {member && (
         <MemberSheet
           member={member}

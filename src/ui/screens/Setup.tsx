@@ -891,7 +891,7 @@ export function Onboarding() {
             <div className="card" style={{ gap: 6 }}>
               <strong>Share with your household again?</strong>
               <span className="small">
-                Backups don't include the household. To sync this phone, join with a new code from the owner phone (Settings → Local sync → Add a phone
+                Backups don't include the household. To sync this phone, join with a new code from the owner phone (Settings → Sync and backups → Local sync → Add a phone
                 there).
               </span>
               <button

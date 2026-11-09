@@ -27,13 +27,20 @@ export function extractColesKey(html: string): string | undefined {
   return m?.[1];
 }
 
-async function ensureKey(force = false): Promise<string> {
-  if (!force && apiKey && Date.now() - keyAt < 60 * 60_000) return apiKey;
-  const res = await request({ url: `${BASE}/`, headers: { Accept: 'text/html' } });
+/** 0.9.1: the key as fetched on an anonymous cookie jar, by jar (that visit also sets its cookies). */
+const anonKeys = new Map<string, { key: string; at: number }>();
+
+async function ensureKey(force = false, jar = ''): Promise<string> {
+  const had = jar ? anonKeys.get(jar) : apiKey ? { key: apiKey, at: keyAt } : undefined;
+  if (!force && had && Date.now() - had.at < 60 * 60_000) return had.key;
+  const res = await request({ url: `${BASE}/`, headers: { Accept: 'text/html' }, anonymous: jar || undefined });
   const key = extractColesKey(res.text);
   if (!key) throw new BlockedError(NAME, 'bot protection');
-  apiKey = key;
-  keyAt = Date.now();
+  if (jar) anonKeys.set(jar, { key, at: Date.now() });
+  else {
+    apiKey = key;
+    keyAt = Date.now();
+  }
   return key;
 }
 
@@ -104,7 +111,7 @@ export function flattenColes(data: Raw): StoreProduct[] {
 export const COLES_PAGE = 24;
 const startOf = (page: number) => String((Math.max(1, page) - 1) * COLES_PAGE);
 
-async function searchOnce(term: string, storeId: string, key: string, page = 1) {
+async function searchOnce(term: string, storeId: string, key: string, page = 1, jar = '') {
   const params = new URLSearchParams({
     storeId,
     searchTerm: term,
@@ -117,6 +124,7 @@ async function searchOnce(term: string, storeId: string, key: string, page = 1) 
   const res = await request({
     url: `${BASE}/api/bff/products/search?${params}`,
     headers: { Accept: 'application/json', Referer: `${BASE}/search/products?q=${encodeURIComponent(term)}` },
+    anonymous: jar || undefined,
   });
   return flattenColes(parseJson<Raw>(NAME, res));
 }
@@ -161,6 +169,16 @@ export const coles: StoreAdapter = {
       }
     }
     return searchStore(term, DEFAULT_STORE, page);
+  },
+
+  /**
+   * 0.9.1: barcode lookups. A direct request on its own cookies, once. On the phone Coles' bot check
+   * often turns those away, and the hidden browser (which carries the browser's cookies, and any
+   * Coles sign-in) isn't used instead: the lookup just carries on without Coles.
+   */
+  async searchAnonymous(term, jar) {
+    if (!jar) throw new Error('An anonymous search needs a cookie jar');
+    return searchOnce(term, DEFAULT_STORE, await ensureKey(false, jar), 1, jar);
   },
 };
 

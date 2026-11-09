@@ -77,12 +77,41 @@ async function openDb(db: OpenDb, code: string): Promise<Identified | undefined>
   }
 }
 
+/** 0.9.1: the cookie jar barcode lookups use at the shops (in memory only; see searchAnonymous). */
+export const LOOKUP_JAR = 'lookup';
+
+/** Signed in to this shop inside Restock (Settings → accounts)? */
+async function signedInTo(chain: 'woolworths' | 'coles'): Promise<boolean> {
+  const s = await getSettings().catch(() => undefined);
+  return !!s?.accounts?.[chain]?.signedIn;
+}
+
+/**
+ * 0.9.1: a barcode search at a shop that never goes with your account there. First a direct
+ * request on cookies of its own (searchAnonymous). If that's turned away and you're NOT signed in
+ * to that shop in Restock, the 0.9.0 way as a backup (the hidden browser, which then carries no
+ * account). If you ARE signed in, never the hidden browser or the usual search: it'd go as you,
+ * so the anonymous request's error is passed on instead.
+ */
+export async function searchForBarcode(chain: 'woolworths' | 'coles', code: string) {
+  const a = adapterFor(chain);
+  if (!a) return [];
+  const signedIn = await signedInTo(chain);
+  if (a.searchAnonymous) {
+    try {
+      return await a.searchAnonymous(code, LOOKUP_JAR);
+    } catch (e) {
+      if (signedIn) throw e;
+    }
+  }
+  if (signedIn) return [];
+  return a.searchBrowser ? a.searchBrowser(code) : a.search(code);
+}
+
 /** Woolworths and Coles can be searched by barcode: take the name of an exact match. */
 async function supermarket(chain: 'woolworths' | 'coles', code: string): Promise<Identified | undefined> {
   try {
-    const a = adapterFor(chain);
-    if (!a) return undefined;
-    const found = await a.search(code);
+    const found = await searchForBarcode(chain, code);
     const hit = found.find((p) => sameCode(p.barcode, code));
     if (!hit) return undefined;
     return {
@@ -116,9 +145,11 @@ export async function identifyBarcode(code: string, section: Section): Promise<I
   if (open && !weakName(open) && !open.kindOnly) return open;
   // 3. The supermarkets, for the name only. 0.9.0: only the ones you've switched on (they're the
   // Pantry tab's shops, whichever tab you're scanning on); a shop that's off is never asked.
-  // They're searched the usual way, so if you're signed in to Woolworths inside Restock, the
-  // search goes with your sign-in, as every Woolworths search does: the phone's requests share
-  // one set of cookies with Restock's browser, so there isn't a simple way to ask without it.
+  // 0.9.1: they're never asked with your account there (searchForBarcode). First a direct request
+  // on cookies of its own (the "lookup" jar, kept only in the phone's memory until Restock closes),
+  // not the in-app browser's. If the shop turns that away (Coles' bot check often does): when you
+  // aren't signed in to that shop in Restock, the hidden browser as before (it has no account to
+  // send); when you are, that shop just isn't asked this time.
   for (const c of await supermarketsOn()) {
     const hit = await supermarket(c, code);
     if (hit) return { ...hit, imageUrl: hit.imageUrl ?? open?.imageUrl, size: hit.size ?? open?.size };

@@ -86,7 +86,10 @@ The files land in `tools/search-test/out`: `report.txt` to read, and `ranked.jso
 
 The recovery key and sync through a folder (0.9.0), tested on a computer: several pretend phones,
 each with a real SQLite database in Restock's own layout (through Python's sqlite3), pairing,
-taking over as owner, removing a phone, and syncing through a shared folder. Needs Java 17 or
+taking over as owner, removing a phone, and syncing through a shared folder. 0.9.1 adds
+(`SyncTest091`): receipts on and off, deletes and photos (and which photo paths a phone may ask
+for), WebDAV and Nextcloud sign-in against small stand-in servers on this computer, trying a folder
+out, tidying old deletes, and sealed secrets. Nothing goes over the internet. Needs Java 17 or
 newer, Python 3 and the [org.json](https://github.com/stleary/JSON-java) jar:
 
 ```bash

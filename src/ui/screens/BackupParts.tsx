@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { EVERYTHING, exportBackup, exportCounts, type ExportParts } from '../../lib/backup';
 import { confirmAction } from '../../lib/confirm';
+import { getSettings, priceHistorySpan } from '../../lib/db';
 import { SECTION_NAMES, SECTIONS, type Section } from '../../shops';
+import { historyLabel, type Settings } from '../../types';
 import { Icon, Sheet } from '../components';
 
 /** What can be picked in a backup, and how many of each there are. */
@@ -11,6 +13,8 @@ export interface PartCounts {
   cards: number;
   /** Saved prices; only offered when exporting. */
   prices?: number;
+  /** Exporting (0.9.1): "Includes all the prices on this phone, back to …", for the price history tick. */
+  pricesNote?: string;
   hasSettings: boolean;
   /** Kept receipts, and how many have a photo. */
   receipts?: number;
@@ -20,6 +24,18 @@ export interface PartCounts {
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
+/**
+ * 0.9.1: what a backup holds of the price history, said plainly: "Includes all the prices on this
+ * phone, back to 3 May 2026 (you keep 6 months)." `span` from priceHistorySpan() (sample items don't count).
+ */
+export function pricesIn(settings: Pick<Settings, 'historyWeeks'>, span?: { count: number; oldest?: string }): string {
+  const keep = `you keep ${historyLabel(settings.historyWeeks)}`;
+  const t = span?.oldest ? Date.parse(span.oldest) : NaN;
+  if (!span?.count || Number.isNaN(t)) return `Includes all the prices on this phone (${keep}).`;
+  const day = new Date(t).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `Includes all the prices on this phone, back to ${day} (${keep}).`;
+}
 
 /**
  * Ticks for each part of a backup: items per tab (Pantry, Keg, Pharmacy), price history,
@@ -101,7 +117,7 @@ export function PartsPicker({
         row(
           'prices',
           'Price history',
-          `${plural(counts.prices, 'saved price')} for the items above. Leave out for a much smaller file.`,
+          `${counts.pricesNote ? `${counts.pricesNote} ` : ''}${plural(counts.prices, 'saved price')} for the items above. Leave out for a much smaller file.`,
           counts.prices > 0 && tabsWithItems.some((s) => sections.includes(s)),
           !!pricesOn,
           onPrices,
@@ -179,8 +195,8 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
   const [pw2, setPw2] = useState('');
   const pwProblem = !lock ? undefined : pw.length < 8 ? 'At least 8 characters.' : pw !== pw2 ? 'The two don’t match yet.' : undefined;
   useEffect(() => {
-    void exportCounts().then((c) => {
-      setCounts({ ...c, hasSettings: true });
+    void Promise.all([exportCounts(), getSettings(), priceHistorySpan().catch(() => undefined)]).then(([c, s, span]) => {
+      setCounts({ ...c, hasSettings: true, pricesNote: pricesIn(s, span) });
       setParts((p) => ({
         ...p,
         sections: SECTIONS.filter((s) => c.bySection[s] > 0),

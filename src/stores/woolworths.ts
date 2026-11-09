@@ -3,13 +3,14 @@ import type { StoreAdapter, StoreProduct } from './types';
 
 const BASE = 'https://www.woolworths.com.au';
 const NAME = 'Woolworths';
-let sessionAt = 0;
+/** When each cookie jar last visited the homepage: "" is the usual one, others are anonymous (0.9.1). */
+const sessionAt = new Map<string, number>();
 
-async function ensureSession(force = false) {
+async function ensureSession(force = false, jar = '') {
   // Woolworths hands out the cookies its API needs on the homepage.
-  if (!force && Date.now() - sessionAt < 20 * 60_000) return;
-  await request({ url: `${BASE}/`, headers: { Accept: 'text/html' } });
-  sessionAt = Date.now();
+  if (!force && Date.now() - (sessionAt.get(jar) ?? 0) < 20 * 60_000) return;
+  await request({ url: `${BASE}/`, headers: { Accept: 'text/html' }, anonymous: jar || undefined });
+  sessionAt.set(jar, Date.now());
 }
 
 const apiHeaders = (referer: string) => ({
@@ -96,9 +97,15 @@ function searchBody(term: string, page = 1) {
   };
 }
 
-async function searchOnce(term: string, page = 1): Promise<StoreProduct[]> {
+async function searchOnce(term: string, page = 1, jar = ''): Promise<StoreProduct[]> {
   const { location, body } = searchBody(term, page);
-  const res = await request({ url: `${BASE}/apis/ui/Search/products`, method: 'POST', headers: apiHeaders(`${BASE}${location}`), body });
+  const res = await request({
+    url: `${BASE}/apis/ui/Search/products`,
+    method: 'POST',
+    headers: apiHeaders(`${BASE}${location}`),
+    body,
+    anonymous: jar || undefined,
+  });
   return flattenWoolworths(parseJson<Raw>(NAME, res));
 }
 
@@ -124,6 +131,18 @@ export const woolworths: StoreAdapter = {
   },
   searchBrowser,
   pages: true,
+
+  /** 0.9.1: barcode lookups. Its own session on its own cookies; no hidden browser to fall back on. */
+  async searchAnonymous(term, jar) {
+    if (!jar) throw new Error('An anonymous search needs a cookie jar');
+    await ensureSession(false, jar);
+    try {
+      return await searchOnce(term, 1, jar);
+    } catch {
+      await ensureSession(true, jar);
+      return searchOnce(term, 1, jar);
+    }
+  },
 };
 
 // ---------- this week's half price ----------

@@ -9,7 +9,7 @@ import { RestockNative } from '../../lib/sql/native';
 import { syncInfo } from '../../lib/sync';
 import { isNative } from '../../stores/http';
 import { syncSummary } from './Sync';
-import { allCards, eraseEverything, getSettings, pruneHistory, updateSettings } from '../../lib/db';
+import { allCards, eraseEverything, getSettings, priceHistorySpan, pruneHistory, updateSettings } from '../../lib/db';
 import { loadDemo, removeDemo } from '../../lib/demo';
 import { syncBackgroundSchedule } from '../../lib/check';
 import { ensureNotificationPermission, scheduleReminders } from '../../lib/notify';
@@ -32,7 +32,7 @@ import { useNav } from '../nav';
 import { checkForUpdate, installUpdate, RELEASES, SELF_UPDATE, type UpdateInfo } from '../../lib/updates';
 import { activeSections, searchChainsIn, type Section } from '../../shops';
 import { shopSummary } from './Stores';
-import { ExportSheet } from './BackupParts';
+import { ExportSheet, pricesIn } from './BackupParts';
 import { LegalSheet } from './Legal';
 import { readBackupFile, RestoreSheet } from './Restore';
 
@@ -107,7 +107,7 @@ async function eraseAll() {
     if (info?.paired && info.isOwner && (info.members ?? []).some((m) => !m.me)) {
       await confirmAction('Make another phone the owner first', {
         detail:
-          'This is the household\'s owner phone. In Settings → Local sync, tap another phone and choose "Make this the owner phone", sync once, then erase this one. Or remove the other phones first.',
+          'This is the household\'s owner phone. In Settings → Sync and backups → Local sync, tap another phone and choose "Make this the owner phone", sync once, then erase this one. Or remove the other phones first.',
         action: 'OK',
         danger: false,
       });
@@ -149,6 +149,8 @@ export function SettingsScreen() {
   const settings = useLive(getSettings, []);
   const cardCount = useLive(async () => (await allCards()).length, []);
   const sync = useLive(syncInfo, []);
+  // 0.9.1: how much price history a backup holds.
+  const span = useLive(priceHistorySpan, []);
   // 0.8.0: the copy saved just before the upgrade, if there is one.
   const beforeUpgrade = useLive(async () => (isNative() ? (await RestockNative.appFileInfo({ path: BEFORE_UPGRADE_FILE })).exists : false), []);
   // 0.9.0: the copies saved just before each update (the last two).
@@ -206,7 +208,7 @@ export function SettingsScreen() {
       <nav className="chips jump" aria-label="Jump to" data-search-hide="1">
         {[
           ['s-stores', 'Shops'],
-          ['s-sync', 'Sync'],
+          ['s-sync', 'Sync and backups'],
           ['s-checks', 'Price checks'],
           ['s-list', 'Shopping list'],
           ['s-alerts', 'Alerts'],
@@ -214,7 +216,6 @@ export function SettingsScreen() {
           ['s-a11y', 'Accessibility'],
           ['s-recalls', 'Recalls'],
           ['s-receipts', 'Receipts'],
-          ['s-data', 'Backup'],
           ['s-widgets', 'Widgets'],
           ['s-shared', 'Shared prices'],
           ['s-help', 'Help'],
@@ -241,19 +242,154 @@ export function SettingsScreen() {
         {row('Catalogues', 'This week at Coles, Woolworths and Aldi', () => nav.push({ name: 'catalogues' }))}
       </div>
 
+      {/* 0.9.1: sync and backups in one place. Sync keeps phones the same; backups are how you go back. */}
       <div className="eyebrow" id="s-sync">
-        Sync
+        Sync and backups
       </div>
+      <h3 className="group-head">Sync with your household</h3>
       <div className="card flush">
         {row('Local sync', syncSummary(sync) || 'Phone to phone on your Wi-Fi · no account', () => nav.push({ name: 'sync' }))}
         {row('Hosted sync', 'From anywhere, through a small server you run yourself · coming later', () => nav.push({ name: 'soon', id: 'sync' }))}
         {row('Household name', (sync?.paired && sync.household) || settings.household.name, () => nav.push({ name: 'household' }))}
+      </div>
+      <p className="small group-note">Sync keeps your phones the same, mistakes included. Backups let you go back, so set up automatic backups too.</p>
+
+      <h3 className="group-head" id="s-backups">
+        Backups
+      </h3>
+      <div className="card flush">
+        <button className="row" onClick={() => setExporting(true)}>
+          <span className="grow">
+            <span className="title">Export a backup</span>
+            <span className="small">
+              Pick what goes in: everything, or just some tabs, lists, cards or settings. {pricesIn(settings, span)} Keep it private.
+            </span>
+          </span>
+        </button>
+      </div>
+      <AutoBackupSettings settings={settings} />
+      <div className="card flush">
+        {beforeUpgrade && (
+          <button
+            className="row"
+            onClick={async () => {
+              const json = await readCopyInApp(BEFORE_UPGRADE_FILE);
+              if (json) await shareTextFile('restock-before-0.8.0.json', json);
+              else nav.toast("Couldn't read that copy");
+            }}
+          >
+            <span className="grow">
+              <span className="title">Backup from before 0.8.0</span>
+              <span className="small">Saved automatically just before the update. Share it to keep it somewhere safe, or restore it from there.</span>
+            </span>
+          </button>
+        )}
+        {(beforeUpdate ?? []).map((c) => (
+          <button
+            key={c.path}
+            className="row"
+            onClick={async () => {
+              const json = await readCopyInApp(c.path);
+              if (!json) return nav.toast("Couldn't read that copy");
+              try {
+                setPicking(readBackup(json));
+              } catch (e) {
+                nav.toast(e instanceof Error ? e.message : String(e));
+              }
+            }}
+          >
+            <span className="grow">
+              <span className="title">Backup from before {c.to}</span>
+              <span className="small">
+                Saved {new Date(c.at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                {c.from ? `, on ${c.from}` : ''}, just before the update. Tap to restore from it, if the update changed something it shouldn't have.
+              </span>
+            </span>
+          </button>
+        ))}
+        <button className="row" onClick={() => fileRef.current?.click()}>
+          <span className="grow">
+            <span className="title">Restore a backup</span>
+            <span className="small">Pick what to bring back: pantry, shopping list, cards or settings</span>
+          </span>
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          hidden
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (!file) return;
+            try {
+              setPicking(await readBackupFile(file));
+            } catch (err) {
+              nav.toast(err instanceof Error ? err.message : 'Could not read that file');
+            }
+          }}
+        />
+        <button
+          className="row"
+          onClick={async () => {
+            try {
+              await shareCsv();
+            } catch (e) {
+              nav.toast(`Couldn't make the spreadsheets: ${e instanceof Error ? e.message : e}`);
+            }
+          }}
+        >
+          <span className="grow">
+            <span className="title">Export as spreadsheets (CSV)</span>
+            <span className="small">Your pantry, shopping list and price history, for Excel, Google Sheets, LibreOffice or Numbers.</span>
+          </span>
+        </button>
       </div>
 
       <div className="eyebrow" id="s-checks">
         Price checks
       </div>
       <PriceCheckSettings settings={settings} />
+      <div className="card flush">
+        <label className="check">
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              Keep price history for
+            </span>
+            <span className="small">
+              Longer means Restock knows each item's normal price and sale pattern better. It only takes a few megabytes on your phone either way,
+              and backups include all of it.
+            </span>
+          </span>
+          <select
+            className="input"
+            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+            value={settings.historyWeeks}
+            aria-label="Keep price history for"
+            onChange={async (e) => {
+              const weeks = parseInt(e.target.value, 10);
+              if (weeks < settings.historyWeeks) {
+                const ok = await confirmAction(`Keep only ${historyLabel(weeks)} of prices?`, {
+                  detail: `Prices older than ${historyLabel(weeks)} are deleted now. Each item keeps its latest price, and sample items aren't touched.`,
+                  action: 'Delete older prices',
+                  danger: true,
+                });
+                if (!ok) return;
+              }
+              await updateSettings({ historyWeeks: weeks });
+              const removed = await pruneHistory(weeks);
+              nav.toast(removed ? `Removed ${removed} older price${removed === 1 ? '' : 's'}` : `Keeping ${historyLabel(weeks)} of prices`);
+            }}
+          >
+            {HISTORY_WEEKS.map((w) => (
+              <option key={w} value={w}>
+                {historyLabel(w)}
+                {w === 8 ? ' (default)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       <div className="eyebrow" id="s-list">
         Shopping list
@@ -330,174 +466,6 @@ export function SettingsScreen() {
       </div>
       <ReceiptsSettings settings={settings} />
 
-      <div className="eyebrow" id="s-data">
-        Data and backup
-      </div>
-      <div className="card flush">
-        <label className="check">
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 15 }}>
-              Keep price history for
-            </span>
-            <span className="small">
-              Longer means Restock knows each item's normal price and sale pattern better. It only takes a few megabytes on your phone either way.
-            </span>
-          </span>
-          <select
-            className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
-            value={settings.historyWeeks}
-            aria-label="Keep price history for"
-            onChange={async (e) => {
-              const weeks = parseInt(e.target.value, 10);
-              if (weeks < settings.historyWeeks) {
-                const ok = await confirmAction(`Keep only ${historyLabel(weeks)} of prices?`, {
-                  detail: `Prices older than ${historyLabel(weeks)} are deleted now. Each item keeps its latest price, and sample items aren't touched.`,
-                  action: 'Delete older prices',
-                  danger: true,
-                });
-                if (!ok) return;
-              }
-              await updateSettings({ historyWeeks: weeks });
-              const removed = await pruneHistory(weeks);
-              nav.toast(removed ? `Removed ${removed} older price${removed === 1 ? '' : 's'}` : `Keeping ${historyLabel(weeks)} of prices`);
-            }}
-          >
-            {HISTORY_WEEKS.map((w) => (
-              <option key={w} value={w}>
-                {historyLabel(w)}
-                {w === 8 ? ' (default)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="row" onClick={() => setExporting(true)}>
-          <span className="grow">
-            <span className="title">Export a backup</span>
-            <span className="small">Pick what goes in: everything, or just some tabs, lists, cards or settings. Keep it private.</span>
-          </span>
-        </button>
-        {beforeUpgrade && (
-          <button
-            className="row"
-            onClick={async () => {
-              const json = await readCopyInApp(BEFORE_UPGRADE_FILE);
-              if (json) await shareTextFile('restock-before-0.8.0.json', json);
-              else nav.toast("Couldn't read that copy");
-            }}
-          >
-            <span className="grow">
-              <span className="title">Backup from before 0.8.0</span>
-              <span className="small">Saved automatically just before the update. Share it to keep it somewhere safe, or restore it from there.</span>
-            </span>
-          </button>
-        )}
-        {(beforeUpdate ?? []).map((c) => (
-          <button
-            key={c.path}
-            className="row"
-            onClick={async () => {
-              const json = await readCopyInApp(c.path);
-              if (!json) return nav.toast("Couldn't read that copy");
-              try {
-                setPicking(readBackup(json));
-              } catch (e) {
-                nav.toast(e instanceof Error ? e.message : String(e));
-              }
-            }}
-          >
-            <span className="grow">
-              <span className="title">Backup from before {c.to}</span>
-              <span className="small">
-                Saved {new Date(c.at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                {c.from ? `, on ${c.from}` : ''}, just before the update. Tap to restore from it, if the update changed something it shouldn't have.
-              </span>
-            </span>
-          </button>
-        ))}
-        <button
-          className="row"
-          onClick={async () => {
-            try {
-              await shareCsv();
-            } catch (e) {
-              nav.toast(`Couldn't make the spreadsheets: ${e instanceof Error ? e.message : e}`);
-            }
-          }}
-        >
-          <span className="grow">
-            <span className="title">Export as spreadsheets (CSV)</span>
-            <span className="small">Your pantry, shopping list and price history, for Excel, Google Sheets, LibreOffice or Numbers.</span>
-          </span>
-        </button>
-        <button className="row" onClick={() => fileRef.current?.click()}>
-          <span className="grow">
-            <span className="title">Restore a backup</span>
-            <span className="small">Pick what to bring back: pantry, shopping list, cards or settings</span>
-          </span>
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          hidden
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            e.target.value = '';
-            if (!file) return;
-            try {
-              setPicking(await readBackupFile(file));
-            } catch (err) {
-              nav.toast(err instanceof Error ? err.message : 'Could not read that file');
-            }
-          }}
-        />
-        {settings.demoLoaded ? (
-          <button
-            className="row"
-            onClick={async () => {
-              await removeDemo();
-              nav.toast('Sample items removed');
-            }}
-          >
-            <span className="grow">
-              <span className="title" style={{ color: 'var(--red-ink)' }}>
-                Remove sample items
-              </span>
-              <span className="small">Your own items stay</span>
-            </span>
-          </button>
-        ) : (
-          <button
-            className="row"
-            onClick={async () => {
-              await loadDemo();
-              nav.toast('Sample items added');
-            }}
-          >
-            <span className="grow">
-              <span className="title">Add sample items</span>
-              <span className="small">Seven made-up items with price history, to see how verdicts work</span>
-            </span>
-          </button>
-        )}
-        <button
-          className="row"
-          onClick={async () => {
-            nav.pop();
-            await startTour();
-          }}
-        >
-          <span className="grow">
-            <span className="title">Take the tour again</span>
-            <span className="small">A look round with sample items, removed when it ends</span>
-          </span>
-        </button>
-      </div>
-
-      <div className="eyebrow">Automatic backups</div>
-      <AutoBackupSettings settings={settings} />
-
       <div className="eyebrow" id="s-widgets">
         Home screen widgets
       </div>
@@ -569,6 +537,49 @@ export function SettingsScreen() {
             </div>
           ))}
         </details>
+      </div>
+      <div className="card flush">
+        {settings.demoLoaded ? (
+          <button
+            className="row"
+            onClick={async () => {
+              await removeDemo();
+              nav.toast('Sample items removed');
+            }}
+          >
+            <span className="grow">
+              <span className="title" style={{ color: 'var(--red-ink)' }}>
+                Remove sample items
+              </span>
+              <span className="small">Your own items stay</span>
+            </span>
+          </button>
+        ) : (
+          <button
+            className="row"
+            onClick={async () => {
+              await loadDemo();
+              nav.toast('Sample items added');
+            }}
+          >
+            <span className="grow">
+              <span className="title">Add sample items</span>
+              <span className="small">Seven made-up items with price history, to see how verdicts work</span>
+            </span>
+          </button>
+        )}
+        <button
+          className="row"
+          onClick={async () => {
+            nav.pop();
+            await startTour();
+          }}
+        >
+          <span className="grow">
+            <span className="title">Take the tour again</span>
+            <span className="small">A look round with sample items, removed when it ends</span>
+          </span>
+        </button>
       </div>
 
       <div className="eyebrow" id="s-about">

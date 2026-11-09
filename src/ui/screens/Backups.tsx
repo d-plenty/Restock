@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { BACKUP_EVERY, BACKUP_KEEP, everyLabel, maybeAutoBackup } from '../../lib/autoBackup';
 import { askPassword, confirmAction } from '../../lib/confirm';
-import { getSettings, updateSettings } from '../../lib/db';
+import { getSettings, priceHistorySpan, updateSettings } from '../../lib/db';
+import { useLive } from '../../lib/useLive';
 import { RestockNative } from '../../lib/sql/native';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
 import { Icon, timeAgo } from '../components';
+import { pricesIn } from './BackupParts';
 import { useNav } from '../nav';
 
 /**
@@ -17,6 +19,8 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
   const nav = useNav();
   const b = settings.autoBackup;
   const [busy, setBusy] = useState(false);
+  // 0.9.1: say how much price history goes in.
+  const span = useLive(priceHistorySpan, []);
   const set = async (patch: Partial<Settings['autoBackup']>) => {
     const latest = await getSettings();
     return updateSettings({ autoBackup: { ...latest.autoBackup, ...patch } });
@@ -87,7 +91,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
             Back up automatically
           </span>
           <span className="small">
-            Saves a whole backup into a folder you choose, such as Documents, or a folder your cloud app (Google Drive, Nextcloud) keeps in sync.
+            Saves a whole backup into a folder you choose (Nextcloud, Syncthing or a folder on this phone). {pricesIn(settings, span)}
             {inSetup ? ' Off unless you turn it on.' : ''}
           </span>
         </span>

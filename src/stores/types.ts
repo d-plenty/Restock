@@ -30,4 +30,10 @@ export interface StoreAdapter {
   searchBrowser?(term: string, storeId?: string, page?: number): Promise<StoreProduct[]>;
   /** The shop can hand over more results, a page at a time (0.8.5). */
   pages?: boolean;
+  /**
+   * 0.9.1: the same search (first page), without your sign-in: on the cookies in its own jar only
+   * (http.ts request's `anonymous`), never the in-app browser's, and never through the hidden
+   * browser, even if a direct request is turned away. For barcode lookups (jar "lookup").
+   */
+  searchAnonymous?(term: string, jar: string): Promise<StoreProduct[]>;
 }

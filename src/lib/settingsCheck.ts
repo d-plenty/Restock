@@ -193,6 +193,7 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     listCompare: oneOf(s.listCompare, ['unit', 'price'] as const, D.listCompare),
     shopAroundMin: number(s.shopAroundMin, D.shopAroundMin, 0, 1000),
     productOrder: maybeOneOf(s.productOrder, ['size', 'cheapest', 'name'] as const),
+    otherContainerSizes: bool(s.otherContainerSizes, D.otherContainerSizes),
     updates: isObj(s.updates)
       ? compact({ notify: bool(s.updates.notify, false), lastCheck: when(s.updates.lastCheck), told: text(s.updates.told, 40) })
       : undefined,

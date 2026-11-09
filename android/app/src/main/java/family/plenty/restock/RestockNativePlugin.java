@@ -371,6 +371,54 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
+    /** 0.9.1: plain requests on their own cookies (barcode lookups), in order, off the screen's thread. */
+    private final java.util.concurrent.ExecutorService plainThread = Executors.newSingleThreadExecutor();
+
+    /**
+     * 0.9.1: a plain request (not through a shop's page) that doesn't go with the in-app browser's
+     * cookies, so not with any shop account signed in to in Restock. It uses the cookies in its own
+     * jar (`jar`: "lookup" for barcode lookups), kept in memory until Restock closes (Net.Cookies).
+     * Resolves {status, body, headers}.
+     */
+    @PluginMethod
+    public void plainFetch(PluginCall call) {
+        final String url = call.getString("url");
+        final String method = call.getString("method", "GET");
+        final String jar = call.getString("jar", "");
+        final String body = call.getString("body");
+        final int timeout = Math.max(1000, Math.min(60_000, call.getInt("timeoutMs", 20_000)));
+        java.net.URI u = Net.strictUri(url);
+        String scheme = u == null || u.getScheme() == null ? "" : u.getScheme().toLowerCase(Locale.ROOT);
+        if (u == null || u.getHost() == null || !(scheme.equals("https") || scheme.equals("http"))) {
+            call.reject("Not a web address");
+            return;
+        }
+        if (jar == null || !jar.matches("[a-z]{1,20}") || !("GET".equals(method) || "POST".equals(method))) {
+            call.reject("plainFetch needs a jar name and GET or POST");
+            return;
+        }
+        final java.util.Map<String, String> headers = new java.util.LinkedHashMap<>();
+        JSObject h = call.getObject("headers");
+        if (h != null) for (java.util.Iterator<String> k = h.keys(); k.hasNext(); ) {
+            String name = k.next();
+            headers.put(name, h.optString(name, ""));
+        }
+        plainThread.execute(() -> {
+            try {
+                Net.Answer a = Net.plainFetch(jar, method, url, headers, body, timeout);
+                JSObject got = new JSObject();
+                for (Map.Entry<String, String> e : a.headers.entrySet()) got.put(e.getKey(), e.getValue());
+                JSObject out = new JSObject();
+                out.put("status", a.status);
+                out.put("body", a.body);
+                out.put("headers", got);
+                call.resolve(out);
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : e.toString());
+            }
+        });
+    }
+
     /** Opens a page of a shop's website in the hidden browser and returns it once drawn. Resolves {status, html, url}. */
     @PluginMethod
     public void storeRender(PluginCall call) {
@@ -501,6 +549,11 @@ public class RestockNativePlugin extends Plugin {
      * 0.9.0: the downloaded file is only handed to the installer if it's Restock, signed with the
      * same key as the Restock on this phone, and a newer version (see notOurUpdate); otherwise it's
      * deleted. Every address on the way is read properly (see updateAddress).
+     *
+     * 0.9.1: `sha256`, the file's SHA-256 as GitHub published it (src/lib/updates.ts), is checked
+     * against the download before anything else looks at it; a file that doesn't match is deleted.
+     * Older releases published none: they're still installed after the checks above, and the log
+     * says so. The download goes without the in-app browser's cookies (Net.anonymous).
      */
     @PluginMethod
     public void installUpdate(final PluginCall call) {
@@ -510,6 +563,12 @@ public class RestockNativePlugin extends Plugin {
             call.reject("Not a Restock release");
             return;
         }
+        final String sha = call.getString("sha256");
+        if (sha != null && !sha.matches("[0-9a-fA-F]{64}")) {
+            call.reject("Not a Restock release");
+            return;
+        }
+        final String want = sha == null ? null : sha.toLowerCase(Locale.ROOT);
         final android.content.Context ctx = getContext();
         if (!ctx.getPackageManager().canRequestPackageInstalls()) {
             android.content.Intent i = new android.content.Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -522,7 +581,7 @@ public class RestockNativePlugin extends Plugin {
             return;
         }
         webThread.execute(() -> {
-            try {
+            try (Net.Scope noCookies = Net.anonymous(Net.NO_COOKIES)) {
                 java.io.File dir = new java.io.File(ctx.getCacheDir(), "updates");
                 if (!dir.exists() && !dir.mkdirs()) throw new java.io.IOException("Couldn't make a folder for the download");
                 java.io.File apk = new java.io.File(dir, "restock-update.apk");
@@ -534,7 +593,7 @@ public class RestockNativePlugin extends Plugin {
                 // again (three times) before giving up.
                 int retries = 0;
                 for (int hop = 0; hop < 5; hop++) {
-                    c = (java.net.HttpURLConnection) next.toURL().openConnection();
+                    c = Net.open(next.toURL());
                     c.setInstanceFollowRedirects(false);
                     c.setConnectTimeout(20000);
                     c.setReadTimeout(60000);
@@ -572,11 +631,14 @@ public class RestockNativePlugin extends Plugin {
                 // How big GitHub says the file is, so a download cut short isn't handed to the installer.
                 long expected = c.getContentLengthLong();
                 long got = 0;
+                // 0.9.1: the file's SHA-256, worked out as it arrives.
+                java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
                 try (java.io.InputStream in = c.getInputStream(); java.io.FileOutputStream out = new java.io.FileOutputStream(apk)) {
                     byte[] buf = new byte[64 * 1024];
                     int n;
                     while ((n = in.read(buf)) > 0) {
                         out.write(buf, 0, n);
+                        digest.update(buf, 0, n);
                         got += n;
                     }
                 } finally {
@@ -587,6 +649,14 @@ public class RestockNativePlugin extends Plugin {
                     throw new java.io.IOException("The download stopped part way (" + (got / 1024) + " of " + (expected / 1024)
                         + " KB). Check your connection and try again.");
                 }
+                // 0.9.1: exactly the file GitHub published?
+                String sha256 = hex(digest.digest());
+                if (want != null && !want.equals(sha256)) {
+                    if (!apk.delete()) apk.deleteOnExit();
+                    android.util.Log.w("Restock", "update: SHA-256 " + sha256 + " isn't the published " + want + "; deleted");
+                    throw new java.io.IOException(DOWNLOAD_MISMATCH);
+                }
+                if (want == null) android.util.Log.w("Restock", "update: GitHub published no SHA-256 for this release, so only its signature and version were checked");
                 // 0.9.0: before Android's installer sees it: is it a newer Restock, signed like this one?
                 String wrong = notOurUpdate(ctx, apk);
                 if (wrong != null) {
@@ -599,6 +669,7 @@ public class RestockNativePlugin extends Plugin {
                 i.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION | android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
                 JSObject out = new JSObject();
                 out.put("started", true);
+                out.put("sha256Checked", want != null);
                 // Android 10 and later won't open the installer from the background (you switched apps
                 // while it downloaded), so then a notification opens it when you tap it instead.
                 if (android.os.Build.VERSION.SDK_INT >= 29 && !inForeground() && readyToInstall(ctx, i, url)) {
@@ -611,6 +682,16 @@ public class RestockNativePlugin extends Plugin {
                 call.reject(e.getMessage() != null ? e.getMessage() : e.toString());
             }
         });
+    }
+
+    /** 0.9.1: what you see when the download isn't the file GitHub published (it's deleted). */
+    static final String DOWNLOAD_MISMATCH = "The download didn't match what GitHub published, so it wasn't installed. Try again later.";
+
+    /** Bytes as lowercase hex ("9f86d0…"). */
+    static String hex(byte[] b) {
+        StringBuilder s = new StringBuilder(b.length * 2);
+        for (byte x : b) s.append(Character.forDigit((x >> 4) & 0xf, 16)).append(Character.forDigit(x & 0xf, 16));
+        return s.toString();
     }
 
     /** 0.9.0: Restock's release file on github.com: .../d-plenty/Restock/releases/download/v0.9.1/restock.apk (or restock-0.9.1.apk). */
@@ -943,6 +1024,8 @@ public class RestockNativePlugin extends Plugin {
 
     @Override
     public void load() {
+        // 0.9.1: in front of the cookie handler Capacitor has just set up (see Net.Cookies).
+        Net.installCookies();
         if (getActivity() != null) {
             pendingAction = actionFrom(getActivity().getIntent());
             consume(getActivity().getIntent());
@@ -997,8 +1080,13 @@ public class RestockNativePlugin extends Plugin {
                 o.put("canRecover", hub.paired() && !owner && hub.engine.householdValue("recovery") != null);
                 String folder = hub.folder();
                 o.put("folder", folder);
-                o.put("folderName", folder == null ? null : Backups.folderName(getContext(), Uri.parse(folder)));
+                // 0.9.1: a Nextcloud or other WebDAV server ("cloud.example.com · Restock"), or a folder on the phone.
+                String kind = hub.folderKind();
+                o.put("folderKind", kind);
+                o.put("folderName", folder == null ? null : "folder".equals(kind) ? Backups.folderName(getContext(), Uri.parse(folder)) : SyncDav.describe(folder));
                 o.put("folderAt", hub.engine.meta("folder_at"));
+                o.put("shareReceipts", hub.paired() && hub.engine.shareReceipts());
+                o.put("onWifi", hub.onLan());
                 o.put("folderError", hub.folderError);
                 // 0.9.0: other phones' files in the folder that couldn't be opened, and a phone whose date looks wrong.
                 String unread = hub.engine.meta("folder_unread");
@@ -1138,11 +1226,14 @@ public class RestockNativePlugin extends Plugin {
         final String householdName = call.getString("household");
         final java.util.Set<String> myTabs = tabsFrom(call, "tabs");
         final java.util.Set<String> householdTabs = tabsFrom(call, "householdTabs");
+        final Boolean householdReceipts = call.getBoolean("householdReceipts");
         syncThread.execute(() -> {
             try {
                 SyncHub hub = SyncHub.get(getContext());
                 if (myTabs != null && hub.paired()) hub.setMyTabs(myTabs);
                 if (householdTabs != null && hub.paired()) hub.setHouseholdTabs(householdTabs);
+                // 0.9.1, owner: "Share receipts with the household".
+                if (householdReceipts != null && hub.paired()) hub.setHouseholdReceipts(householdReceipts);
                 if (name != null && !name.trim().isEmpty()) hub.household.rename(name.trim());
                 if (householdName != null && !householdName.trim().isEmpty() && hub.paired()) hub.household.renameHousehold(householdName.trim());
                 if (shareCards != null) hub.engine.setShareCards(shareCards);
@@ -1299,15 +1390,20 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
-    /** Sync through a folder (uri), or stop (no uri). */
+    /**
+     * Sync through a folder picked on the phone (uri), or stop (no uri: also forgets a WebDAV or
+     * Nextcloud sign-in). 0.9.1: a picked folder is tried out first (a test file written, read
+     * back and deleted); one that fails is turned down with a message.
+     */
     @PluginMethod
     public void syncSetFolder(PluginCall call) {
         final String uri = call.getString("uri", null);
         syncThread.execute(() -> {
             try {
                 SyncHub hub = SyncHub.get(getContext());
-                hub.setFolder(uri);
-                if (uri != null) {
+                if (uri == null) hub.setFolder(null);
+                else {
+                    hub.setPickedFolder(uri);
                     hub.schedule();
                     hub.syncAll(); // the folder straight away (and any phones on this Wi-Fi)
                 }
@@ -1318,6 +1414,71 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
+    /** 0.9.1: sync away from home through a WebDAV server: its address, user name, password and a folder in it. */
+    @PluginMethod
+    public void syncSetWebDav(PluginCall call) {
+        final String url = call.getString("url", "");
+        final String user = call.getString("user", "");
+        final String password = call.getString("password", "");
+        final String folder = call.getString("folder", SyncDav.DEFAULT_FOLDER);
+        new Thread(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.setWebDav(SyncDav.folderUrl(url, folder), user, password, "webdav");
+                syncThread.execute(() -> {
+                    hub.schedule();
+                    hub.syncAll();
+                    call.resolve(syncInfoObject(hub));
+                });
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Couldn't use that server." : e.getMessage(), e);
+            }
+        }, "restock-webdav").start();
+    }
+
+    /**
+     * 0.9.1, "Sign in to Nextcloud" (Login Flow v2): opens Nextcloud's sign-in page in the browser
+     * and waits (up to 20 minutes) for the person to finish there. Resolves with cancelled: true
+     * after syncNextcloudCancel().
+     */
+    @PluginMethod
+    public void syncNextcloud(PluginCall call) {
+        final String server = call.getString("server", "");
+        final String folder = call.getString("folder", SyncDav.DEFAULT_FOLDER);
+        new Thread(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                boolean done = hub.signInNextcloud(server, folder, url -> {
+                    Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    i.addCategory(Intent.CATEGORY_BROWSABLE);
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    getContext().startActivity(i);
+                });
+                if (!done) {
+                    JSObject r = new JSObject();
+                    r.put("cancelled", true);
+                    call.resolve(r);
+                    return;
+                }
+                syncThread.execute(() -> {
+                    hub.schedule();
+                    hub.syncAll();
+                    call.resolve(syncInfoObject(hub));
+                });
+            } catch (android.content.ActivityNotFoundException e) {
+                call.reject("There's no web browser on this phone to sign in with.", e);
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Couldn't sign in to Nextcloud." : e.getMessage(), e);
+            }
+        }, "restock-nextcloud").start();
+    }
+
+    @PluginMethod
+    public void syncNextcloudCancel(PluginCall call) {
+        SyncHub.get(getContext()).cancelNextcloud();
+        call.resolve();
+    }
+
     /** Erase everything (0.8.2): forget the household on this phone and stop all background work. */
     @PluginMethod
     public void eraseNative(PluginCall call) {
@@ -1325,7 +1486,15 @@ public class RestockNativePlugin extends Plugin {
             try {
                 SyncHub hub = SyncHub.get(getContext());
                 hub.stop();
-                if (hub.ready()) hub.household.forget();
+                hub.cancelNextcloud();
+                if (hub.ready()) hub.letGoOfServer();
+                if (hub.ready()) hub.household.forget(); // 0.9.1: the WebDAV or Nextcloud sign-in too
+                // 0.9.1: and this phone's signing key, and the key store's key that sealed the secrets.
+                if (hub.ready()) {
+                    hub.engine.setMeta("my_priv", null);
+                    hub.engine.setMeta("my_pub", null);
+                }
+                hub.keystore.forgetKey();
                 getContext().stopService(new Intent(getContext(), SyncService.class));
                 WorkManager wm = WorkManager.getInstance(getContext());
                 wm.cancelUniqueWork(SyncHub.WORK_NAME);
@@ -1350,6 +1519,8 @@ public class RestockNativePlugin extends Plugin {
         // The shops' hidden pages first (so they can't set anything again), then the browser's data.
         // WebView wants these on the main thread; wait (a few seconds at most) for them to finish.
         StoreWeb.blankAll();
+        // 0.9.1: and the cookies barcode lookups kept in memory (Net.jar).
+        Net.forgetJars();
         final java.util.concurrent.CountDownLatch webDone = new java.util.concurrent.CountDownLatch(1);
         new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
             try {

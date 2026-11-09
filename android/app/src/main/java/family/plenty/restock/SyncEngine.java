@@ -33,6 +33,17 @@ import org.json.JSONObject;
  *   replayed to another phone.
  * - Sample items (ids "demo-…") stay on the phone that added them.
  *
+ * 0.9.1:
+ * - Receipts sync when the owner turns on "Share receipts with the household" (off by default).
+ *   Their rows go everywhere sync goes; their photos only over the Wi-Fi ("photo", fetched after
+ *   each sync), and only real receipt photo paths of receipts this pair shares.
+ * - Secrets in sync_meta (keys, secrets, signing keys, the recovery key, the WebDAV password) go
+ *   through Secrets: on the phone, sealed with a key in Android's key store (SyncKeystore). An old
+ *   plain value is sealed the first time it's read. A value that can't be opened any more (restored
+ *   onto another phone) reads as missing, so the phone counts as not in a household.
+ * - Each phone notes how far the others have got through its own changes (sync_peers.seen), and
+ *   compact() removes deletes older than 90 days that every phone in the household has seen.
+ *
  * No Android classes here, so the same code is tested on a computer (tools/sync-test).
  */
 final class SyncEngine {
@@ -43,7 +54,82 @@ final class SyncEngine {
     /** Folder files leave out deletes older than this (phones apart longer catch up on the Wi-Fi). */
     static final long OLD_DELETE_MS = 180L * 24 * 3600 * 1000;
     /** Tables where a delete beats an edit made without knowing about it. */
-    static final Set<String> DELETE_WINS = new HashSet<>(java.util.Arrays.asList("items", "list_entries", "products", "categories", "cards"));
+    static final Set<String> DELETE_WINS = new HashSet<>(java.util.Arrays.asList("items", "list_entries", "products", "categories", "cards", "receipts"));
+    /** 0.9.1: deletes older than this go from sync_log once every phone in the household has seen them. */
+    static final long COMPACT_AFTER_MS = 90L * 24 * 3600 * 1000;
+    /** 0.9.1: the biggest receipt photo that goes to another phone. */
+    static final int MAX_PHOTO = 8 * 1024 * 1024;
+    /** 0.9.1: at most this many photos fetched from one phone in one sync (the rest come next time). */
+    static final int PHOTOS_PER_SYNC = 30;
+    /** The only paths a receipt photo can have (mirrors src/lib/receiptPaths.ts). */
+    private static final java.util.regex.Pattern PHOTO_PATH = java.util.regex.Pattern.compile("receipts/[A-Za-z0-9_-]{1,80}\\.jpg");
+
+    static boolean isPhotoPath(String p) {
+        return p != null && PHOTO_PATH.matcher(p).matches();
+    }
+
+    /**
+     * 0.9.1: how secrets in sync_meta are kept. On the phone, sealed with a key in Android's key
+     * store (SyncKeystore); on a computer (tools/sync-test), as they are.
+     */
+    interface Secrets {
+        /** The stored form of a secret. */
+        String seal(String plain) throws Exception;
+
+        /** The secret from its stored form (an old plain value comes back as it is). Throws if it can't be opened. */
+        String open(String stored) throws Exception;
+
+        /** Whether the stored form is already sealed (false: an old plain value, to seal again). */
+        boolean sealed(String stored);
+    }
+
+    /**
+     * Thrown by Secrets.open when a value can never be opened on this phone again (the key that
+     * sealed it is gone, or it was sealed with another one). Any other failure is taken as passing
+     * (the key store busy, say): nothing is forgotten over it.
+     */
+    static final class SecretLost extends Exception {
+        SecretLost(String why, Throwable cause) {
+            super(why, cause);
+        }
+    }
+
+    static final Secrets PLAIN = new Secrets() {
+        public String seal(String plain) {
+            return plain;
+        }
+
+        public String open(String stored) {
+            return stored;
+        }
+
+        public boolean sealed(String stored) {
+            return true;
+        }
+    };
+
+    /** The sync_meta values that are secrets: never shown, never synced, sealed on the phone. */
+    static final Set<String> SECRET_KEYS = new HashSet<>(java.util.Arrays.asList(
+        "key", "oldkey", "secret", "owner_secrets", "owner_priv", "my_priv", "recovery", "pair_token", "dav_pass"));
+
+    Secrets secrets = PLAIN;
+    /** Set when a secret couldn't be opened (the key store's key is gone): SyncHub treats the phone as not paired. */
+    volatile boolean secretsLost;
+    private final Map<String, String> opened = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 0.9.1: receipt photos in the phone's own storage. Null: photos don't travel (tests that don't need them). */
+    interface Photos {
+        /** The photo's size in bytes, or -1 if it isn't on this phone. */
+        long size(String path) throws Exception;
+
+        byte[] read(String path) throws Exception;
+
+        void write(String path, byte[] data) throws Exception;
+
+        void delete(String path) throws Exception;
+    }
+
+    Photos photos;
 
     /** 0.9.0: signs this phone's household changes, and decides on other phones' ones (SyncHousehold). */
     interface Household {
@@ -84,6 +170,8 @@ final class SyncEngine {
         { "prices", "product_id || '|' || date" },
         // 0.8.2: the household itself: its name, which phone is the owner, its members.
         { "household", "k" },
+        // 0.9.1: receipts, when the household shares them.
+        { "receipts", "id" },
     };
 
     static final int PAGE = 400;
@@ -104,12 +192,55 @@ final class SyncEngine {
 
     String meta(String key) throws Exception {
         List<JSONObject> r = db.query("SELECT value FROM sync_meta WHERE key = ?", key);
-        return r.isEmpty() ? null : r.get(0).optString("value", null);
+        String v = r.isEmpty() ? null : r.get(0).optString("value", null);
+        if (v == null || !SECRET_KEYS.contains(key)) return v;
+        String plain = secrets.sealed(v) ? opened.get(v) : null;
+        if (plain != null) return plain;
+        try {
+            plain = secrets.open(v);
+        } catch (SecretLost lost) {
+            // 0.9.1: sealed with a key this phone doesn't have any more (restored onto another phone,
+            // or Android's key store was reset): as if it weren't there.
+            secretsLost = true;
+            return null;
+        }
+        if (!secrets.sealed(v)) {
+            // An old plain value (0.9.0): seal it now.
+            String sealed = secrets.seal(plain);
+            db.exec("UPDATE sync_meta SET value = ? WHERE key = ? AND value = ?", sealed, key, v);
+            opened.put(sealed, plain);
+        } else {
+            opened.put(v, plain);
+        }
+        return plain;
     }
 
     void setMeta(String key, String value) throws Exception {
         if (value == null) db.exec("DELETE FROM sync_meta WHERE key = ?", key);
-        else db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)", key, value);
+        else if (SECRET_KEYS.contains(key)) {
+            String sealed = secrets.seal(value);
+            opened.put(sealed, value);
+            db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)", key, sealed);
+        } else db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)", key, value);
+    }
+
+    /**
+     * 0.9.1: reads every secret once, sealing old plain ones. True when one couldn't be opened
+     * (the phone's key store lost its key): those are removed (they're no use to anyone now), and
+     * the caller forgets the household on this phone.
+     */
+    boolean checkSecrets() throws Exception {
+        boolean lost = false;
+        for (String k : SECRET_KEYS) {
+            secretsLost = false;
+            meta(k);
+            if (secretsLost) {
+                lost = true;
+                db.exec("DELETE FROM sync_meta WHERE key = ?", k);
+            }
+        }
+        secretsLost = false;
+        return lost;
     }
 
     String device() throws Exception {
@@ -137,6 +268,11 @@ final class SyncEngine {
                     db.exec("UPDATE sync_log SET seq = (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log) WHERE tbl = 'cards' AND pk = ?", r.getString("pk"));
             });
         }
+    }
+
+    /** 0.9.1: whether the household shares receipts (the owner turns it on; off by default). */
+    boolean shareReceipts() throws Exception {
+        return "1".equals(householdValue("receipts"));
     }
 
     private static String keyOf(String table) {
@@ -199,19 +335,31 @@ final class SyncEngine {
      * When this phone starts syncing a tab it didn't before (it picked one more, or the household
      * now shares one more), go through everything again: ask the others for all their changes,
      * and offer them all of this phone's, so the tab's older things come across too.
+     * 0.9.1: true when it did that.
      */
-    void noteTabs() throws Exception {
+    boolean noteTabs() throws Exception {
         Set<String> now = tabs();
         String was = meta("tabs_eff");
         Set<String> before = was == null ? null : parseTabs(was);
-        if (before != null && !before.containsAll(now)) {
+        // 0.9.1: the household starting to share receipts goes through everything again too (and
+        // so does a phone that was still on 0.9.0 when the owner turned them on: it passed them over).
+        boolean receipts = shareReceipts();
+        String rwas = meta("receipts_eff");
+        boolean receiptsOn = receipts && !"1".equals(rwas);
+        boolean again = (before != null && !before.containsAll(now)) || receiptsOn;
+        if (again) {
             db.transaction(() -> {
                 db.exec("UPDATE sync_peers SET got = 0");
                 db.exec("UPDATE sync_log SET seq = seq + (SELECT COALESCE(MAX(seq), 0) FROM sync_log)");
+                // And the folder's files are read again, for what this phone left out before.
+                db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'");
             });
         }
         String j = joinTabs(now);
         if (!j.equals(was)) setMeta("tabs_eff", j);
+        String r = receipts ? "1" : "0";
+        if (!r.equals(rwas)) setMeta("receipts_eff", r);
+        return again;
     }
 
     private Map<String, String> customTabs;
@@ -263,6 +411,10 @@ final class SyncEngine {
             }
             case "products":
                 return chainTab(str(row, "chain"));
+            case "receipts": {
+                String s = str(row, "section");
+                return s == null ? "pantry" : s;
+            }
             case "prices": {
                 List<JSONObject> r = db.query("SELECT chain FROM products WHERE id = ?", str(row, "product_id"));
                 return r.isEmpty() ? null : chainTab(str(r.get(0), "chain"));
@@ -290,6 +442,20 @@ final class SyncEngine {
     private void setGot(String peer, long got) throws Exception {
         db.exec("INSERT OR IGNORE INTO sync_peers (device, got) VALUES (?, 0)", peer);
         db.exec("UPDATE sync_peers SET got = ? WHERE device = ? AND got < ?", got, peer, got);
+    }
+
+    /** 0.9.1: how far that phone has got through this phone's own changes (its claim, or what it was sent). */
+    long seenBy(String peer) throws Exception {
+        List<JSONObject> r = db.query("SELECT seen FROM sync_peers WHERE device = ?", peer);
+        return r.isEmpty() ? 0 : r.get(0).optLong("seen", 0);
+    }
+
+    void setSeen(String peer, long seen) throws Exception {
+        if (peer == null || peer.isEmpty() || seen <= 0) return;
+        List<JSONObject> top = db.query("SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log");
+        long max = top.get(0).optLong("top", 0);
+        db.exec("INSERT OR IGNORE INTO sync_peers (device, got) VALUES (?, 0)", peer);
+        db.exec("UPDATE sync_peers SET seen = ? WHERE device = ? AND seen < ?", Math.min(seen, max), peer, Math.min(seen, max));
     }
 
     void markSynced(String peer, String when) throws Exception {
@@ -330,6 +496,7 @@ final class SyncEngine {
         boolean more = rows.size() > limit;
         if (more) rows = rows.subList(0, limit);
         boolean cards = shareCards();
+        boolean receipts = shareReceipts();
         JSONArray entries = new JSONArray();
         long top = since;
         for (JSONObject r : rows) {
@@ -339,6 +506,7 @@ final class SyncEngine {
             String pk = r.getString("pk");
             if (key == null || (exclude != null && exclude.equals(r.getString("device")))) continue;
             if ("cards".equals(tbl) && !cards) continue;
+            if ("receipts".equals(tbl) && !receipts) continue;
             if (pk.startsWith("demo-")) continue; // sample items stay on this phone
             JSONObject e = new JSONObject();
             e.put("tbl", tbl);
@@ -399,6 +567,9 @@ final class SyncEngine {
         final Map<String, Set<String>> columns = new HashMap<>();
         final Set<String> mine = tabs();
         final long now = System.currentTimeMillis();
+        final boolean receipts = shareReceipts();
+        // 0.9.1: receipt photos on this phone that a change made unused (a receipt deleted on another phone).
+        final List<String> unused = new ArrayList<>();
         db.transaction(() -> {
             // While this is set, the triggers don't note these as this phone's own changes.
             db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
@@ -414,6 +585,7 @@ final class SyncEngine {
                 String device = e.optString("device", "");
                 boolean deleted = e.optBoolean("deleted", false);
                 if ("household".equals(tbl) && !householdChangeAllowed(pk, device, e)) continue;
+                if ("receipts".equals(tbl) && !receipts) continue;
                 // A phone whose date is far ahead: take its change, but don't let it drag this
                 // phone's clock along (and say so on the Sync screen).
                 if (stamp > now + CLOCK_SLACK_MS) setMeta("clock_warn", device);
@@ -445,6 +617,12 @@ final class SyncEngine {
                     String tab = tabOf(tbl, e.optJSONObject("row"));
                     if (tab != null && !mine.contains(tab)) continue;
                 }
+                if ("receipts".equals(tbl) && photos != null) {
+                    List<String> before = new ArrayList<>();
+                    for (JSONObject cur : db.query("SELECT photo, pages FROM receipts WHERE id = ?", pk)) before.addAll(photoPaths(cur));
+                    if (!deleted) before.removeAll(photoPaths(e.optJSONObject("row")));
+                    unused.addAll(before);
+                }
                 if (deleted) {
                     db.exec("DELETE FROM " + tbl + " WHERE " + key + " = ?", pk);
                 } else {
@@ -464,7 +642,36 @@ final class SyncEngine {
             setMeta("clock", String.valueOf(Math.min(Math.max(clock, cur), now + CLOCK_SLACK_MS)));
             db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
         });
+        for (String p : unused) {
+            try {
+                // Still used by another receipt here? Then it stays.
+                if (db.query("SELECT 1 FROM receipts WHERE photo = ? OR pages LIKE ?", p, "%\"" + p + "\"%").isEmpty()) photos.delete(p);
+            } catch (Exception ignored) {
+                // gone already
+            }
+        }
         return changed[0];
+    }
+
+    /** 0.9.1: a receipt row's photo paths (its photo, then its pages), only real receipt photo paths. */
+    static List<String> photoPaths(JSONObject row) {
+        List<String> out = new ArrayList<>();
+        if (row == null) return out;
+        String p = str(row, "photo");
+        if (isPhotoPath(p)) out.add(p);
+        String pages = str(row, "pages");
+        if (pages != null) {
+            try {
+                JSONArray a = new JSONArray(pages);
+                for (int i = 0; i < a.length(); i++) {
+                    String x = a.optString(i, null);
+                    if (isPhotoPath(x) && !out.contains(x)) out.add(x);
+                }
+            } catch (Exception ignored) {
+                // not a list
+            }
+        }
+        return out;
     }
 
     private Set<String> columnsOf(String tbl, Map<String, Set<String>> cache) throws Exception {
@@ -765,6 +972,8 @@ final class SyncEngine {
                 Set<String> allowed = tabs();
                 Set<String> theirs = parseTabs(req.optJSONArray("tabs"));
                 if (theirs != null) allowed.retainAll(theirs);
+                // 0.9.1: asking for what's after N means it has everything up to N.
+                setSeen(peer, req.optLong("since", 0));
                 JSONObject c = collect(req.optLong("since", 0), peer, PAGE, allowed, "", modern, 0);
                 for (Iterator<String> it = c.keys(); it.hasNext(); ) {
                     String k = it.next();
@@ -777,9 +986,16 @@ final class SyncEngine {
                 if (n > 0) tidyCategories();
                 setGot(peer, req.optLong("top", 0));
                 markSynced(peer, req.optString("at", null));
+                setSeen(peer, req.optLong("seen", 0));
                 res.put("changed", n);
                 return res;
             }
+            case "seen":
+                // 0.9.1: how far the other phone got through this one's changes, after it pulled.
+                setSeen(peer, req.optLong("seen", 0));
+                return res;
+            case "photo":
+                return photoFor(req, res);
             default:
                 res.put("error", "unknown");
                 return res;
@@ -797,6 +1013,8 @@ final class SyncEngine {
         String rekey;
         int received;
         int sent;
+        /** 0.9.1: receipt photos that came across. */
+        int photos;
     }
 
     /**
@@ -829,6 +1047,8 @@ final class SyncEngine {
         notePeer(r.peer, r.peerName, null, 0);
         final boolean modern = h.optInt("v", 0) >= VERSION;
         final String peer = r.peer;
+        // 0.9.1: how far it has got through this phone's changes.
+        setSeen(peer, h.optLong("got", 0));
 
         // 0.9.0: just updated: look at the whole household record afresh (once).
         if (modern && "1".equals(meta("rehousehold"))) {
@@ -840,20 +1060,27 @@ final class SyncEngine {
             setMeta("rehousehold", null);
         }
 
-        long since = gotFrom(r.peer);
-        for (int guard = 0; guard < 10000; guard++) {
-            JSONObject pull = new JSONObject();
-            pull.put("op", "pull");
-            pull.put("device", me);
-            pull.put("since", since);
-            pull.put("tabs", tabsJson(mine));
-            if (modern) pull.put("to", peer);
-            JSONObject got = send(t, pull, modern);
-            r.received += apply(got.optJSONArray("entries"));
-            long top = got.optLong("top", since);
-            if (top > since) setGot(r.peer, top);
-            since = Math.max(since, top);
-            if (!got.optBoolean("more", false)) break;
+        long since = 0;
+        for (int round = 0; round < 2; round++) {
+            since = gotFrom(r.peer);
+            for (int guard = 0; guard < 10000; guard++) {
+                JSONObject pull = new JSONObject();
+                pull.put("op", "pull");
+                pull.put("device", me);
+                pull.put("since", since);
+                pull.put("tabs", tabsJson(mine));
+                if (modern) pull.put("to", peer);
+                JSONObject got = send(t, pull, modern);
+                r.received += apply(got.optJSONArray("entries"));
+                long top = got.optLong("top", since);
+                if (top > since) setGot(r.peer, top);
+                since = Math.max(since, top);
+                if (!got.optBoolean("more", false)) break;
+            }
+            // 0.9.1: what just came in made the household share more (a tab, or receipts): what was
+            // passed over a moment ago comes across now, rather than at the next sync.
+            if (round > 0 || !noteTabs()) break;
+            mine = tabs();
         }
 
         if (r.received > 0) tidyCategories();
@@ -872,14 +1099,154 @@ final class SyncEngine {
             push.put("entries", c.getJSONArray("entries"));
             push.put("top", top);
             push.put("at", now);
+            push.put("seen", since);
             if (modern) push.put("to", peer);
             send(t, push, modern);
             r.sent += c.getJSONArray("entries").length();
             theirs = top;
+            setSeen(peer, top);
             if (!c.getBoolean("more")) break;
         }
         markSynced(r.peer, now);
+        if (modern) {
+            // 0.9.1: tell it how far this phone got (an older phone doesn't know "seen": that's fine).
+            try {
+                JSONObject seen = new JSONObject();
+                seen.put("op", "seen");
+                seen.put("device", me);
+                seen.put("to", peer);
+                seen.put("seen", since);
+                send(t, seen, true);
+            } catch (Exception older) {
+                // a phone on 0.9.0
+            }
+            r.photos = fetchPhotos(t, peer, mine);
+        }
         return r;
+    }
+
+    // ---------- 0.9.1: receipt photos, over the Wi-Fi only ----------
+
+    /** The receipt that has this photo, if this phone shares it with a phone sharing `allowed` tabs. */
+    private JSONObject receiptWith(String path, Set<String> allowed) throws Exception {
+        if (!isPhotoPath(path) || !shareReceipts()) return null;
+        String id = path.substring("receipts/".length(), path.length() - ".jpg".length()).replaceFirst("-[0-9]+$", "");
+        // The photo's own receipt first (receipts/<id>.jpg, receipts/<id>-2.jpg), then any other that lists it.
+        List<JSONObject> rows = new ArrayList<>(db.query("SELECT * FROM receipts WHERE id = ?", id));
+        rows.addAll(db.query("SELECT * FROM receipts WHERE photo = ? OR pages LIKE ?", path, "%\"" + path + "\"%"));
+        for (JSONObject row : rows) {
+            if (row.optString("id").startsWith("demo-") || !photoPaths(row).contains(path)) continue;
+            String tab = tabOf("receipts", row);
+            if (tab != null && !allowed.contains(tab)) continue;
+            return row;
+        }
+        return null;
+    }
+
+    /** Answers "photo": a receipt photo this pair shares, at most MAX_PHOTO bytes. */
+    private JSONObject photoFor(JSONObject req, JSONObject res) throws Exception {
+        String path = req.optString("path", "");
+        Set<String> allowed = tabs();
+        Set<String> theirs = parseTabs(req.optJSONArray("tabs"));
+        if (theirs != null) allowed.retainAll(theirs);
+        if (photos == null || receiptWith(path, allowed) == null) return res.put("error", "That photo isn't shared.");
+        long size = photos.size(path);
+        if (size < 0) return res.put("missing", true);
+        if (size > MAX_PHOTO) return res.put("tooBig", true);
+        byte[] data = photos.read(path);
+        if (data == null) return res.put("missing", true);
+        if (data.length > MAX_PHOTO) return res.put("tooBig", true);
+        res.put("path", path);
+        res.put("data", java.util.Base64.getEncoder().encodeToString(data));
+        return res;
+    }
+
+    /** Is this a JPEG (what Restock saves receipt photos as)? */
+    static boolean jpeg(byte[] b) {
+        return b != null && b.length > 3 && (b[0] & 0xff) == 0xff && (b[1] & 0xff) == 0xd8 && (b[2] & 0xff) == 0xff;
+    }
+
+    /**
+     * After a Wi-Fi sync: the photos of shared receipts that aren't on this phone yet, from the
+     * other phone (a few at a time). A receipt shows without its photo until it's here.
+     */
+    int fetchPhotos(Transport t, String peer, Set<String> mine) throws Exception {
+        if (photos == null || !shareReceipts()) return 0;
+        int got = 0, asked = 0;
+        for (JSONObject row : db.query("SELECT * FROM receipts ORDER BY scanned_at DESC")) {
+            String tab = tabOf("receipts", row);
+            if (tab != null && !mine.contains(tab)) continue;
+            for (String path : photoPaths(row)) {
+                if (photos.size(path) >= 0) continue;
+                if (asked++ >= PHOTOS_PER_SYNC) return got;
+                JSONObject m = new JSONObject();
+                m.put("op", "photo");
+                m.put("device", device());
+                m.put("to", peer);
+                m.put("path", path);
+                m.put("tabs", tabsJson(mine));
+                JSONObject res;
+                try {
+                    res = send(t, m, true);
+                } catch (Exception no) {
+                    // An older phone, or not shared there: try the next one.
+                    if (String.valueOf(no.getMessage()).contains("unknown")) return got;
+                    continue;
+                }
+                if (res.has("error") || !path.equals(res.optString("path", ""))) {
+                    if ("unknown".equals(res.optString("error"))) return got;
+                    continue;
+                }
+                String data = res.optString("data", "");
+                if (data.isEmpty() || data.length() > (MAX_PHOTO / 3 + 1) * 4) continue;
+                byte[] b;
+                try {
+                    b = java.util.Base64.getDecoder().decode(data);
+                } catch (IllegalArgumentException bad) {
+                    continue;
+                }
+                if (b.length > MAX_PHOTO || !jpeg(b)) continue;
+                photos.write(path, b);
+                got++;
+            }
+        }
+        return got;
+    }
+
+    // ---------- 0.9.1: tidying sync_log ----------
+
+    /**
+     * Removes deletes (tombstones) older than 90 days that every other phone in the household has
+     * seen, so sync_log doesn't keep growing. Never one a phone in the household hasn't seen; never
+     * the household's own (few, and they decide who's in it); cards and receipts only while they're
+     * shared (turning sharing on sends them all again). The highest change number stays, so it never
+     * goes back down. Returns how many went.
+     */
+    int compact(long now) throws Exception {
+        String me = device();
+        long top = db.query("SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log").get(0).optLong("top", 0);
+        long upTo = top;
+        for (JSONObject m : db.query("SELECT k FROM household WHERE k LIKE 'member:%'")) {
+            String d = m.getString("k").substring("member:".length());
+            if (d.equals(me)) continue;
+            upTo = Math.min(upTo, seenBy(d));
+        }
+        if (upTo <= 0) return 0;
+        final long limit = upTo;
+        StringBuilder skip = new StringBuilder("'_seq', 'household'");
+        if (!shareCards()) skip.append(", 'cards'");
+        if (!shareReceipts()) skip.append(", 'receipts'");
+        final String where = "deleted = 1 AND tbl NOT IN (" + skip + ") AND stamp < ? AND seq <= ?";
+        final long before = now - COMPACT_AFTER_MS;
+        final int[] gone = { 0 };
+        db.transaction(() -> {
+            gone[0] = db.query("SELECT COUNT(*) AS n FROM sync_log WHERE " + where, before, limit).get(0).optInt("n", 0);
+            if (gone[0] == 0) return;
+            // A marker that keeps the highest number (as forget() does), in case the newest note goes.
+            db.exec("INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq) VALUES ('_seq', 'floor', 0, '', 1, ?)", top);
+            db.exec("DELETE FROM sync_log WHERE " + where, before, limit);
+        });
+        return gone[0];
     }
 
     private static final java.security.SecureRandom NONCES = new java.security.SecureRandom();

@@ -39,6 +39,11 @@ import org.json.JSONObject;
  *
  * If a store still wants a person to prove they're human, {@link #showUnblock} opens the same
  * site on screen so the user can clear it; the cookies it leaves are then used here too.
+ *
+ * 0.9.1: these pages share the in-app browser's cookies (Android has one set for every WebView),
+ * so a request through here goes with any shop account signed in to in Restock. That's on purpose
+ * for the signed-in features. Requests that mustn't go signed in (barcode lookups, and StoreClient's
+ * direct requests) never come through here: they use their own cookies (Net.anonymous).
  */
 final class StoreWeb implements StoreClient.WebFetcher {
     private static final String TAG = "RestockWeb";

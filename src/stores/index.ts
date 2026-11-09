@@ -14,7 +14,10 @@ export const ADAPTERS = { woolworths, coles, aldi };
 export function adapterFor(chain: StoreChain | 'other'): StoreAdapter | undefined {
   if (chain === 'other') return undefined;
   // Test builds only (VITE_FAKE_STORES=1): canned results so the Add screen can be clicked through off-phone.
-  if (import.meta.env.VITE_FAKE_STORES === '1') return fakeAdapter(chain);
+  if (import.meta.env.VITE_FAKE_STORES === '1') {
+    const fake = fakeAdapter(chain);
+    return { ...fake, searchAnonymous: (term) => fake.search(term) };
+  }
   switch (kindOf(chain)) {
     case 'woolworths':
     case 'coles':
@@ -113,6 +116,25 @@ function fakeAdapter(chain: StoreChain): StoreAdapter {
           isSpecial: n === 4,
           memberOnly: false,
         }));
+      }
+      // "solo": cans in packs of 10, 24 and 30, bottles and mini cans, and a Zero Sugar that isn't the same (0.9.1, Other sizes).
+      if (/\bsolo\b/i.test(term) && grocer) {
+        const solo = (id: string, name: string, size: string, price: number) => ({ ...fake(id, name, size, price), brand: 'Solo' });
+        return chain === 'coles'
+          ? [
+              solo('so1', 'Solo Original Lemon Soft Drink Cans Multipack 375ml', '30 Pack', 33),
+              solo('so2', 'Solo Original Lemon Soft Drink Cans Multipack 375ml', '10 Pack', 20),
+              solo('so3', 'Solo Original Lemon Soft Drink Bottle', '1.25L', 3.9),
+              solo('so4', 'Solo Zero Sugar Lemon Soft Drink Cans Multipack 375ml', '10 Pack', 20),
+            ]
+          : [
+              solo('so1', 'Solo Original Lemon Soft Drink Cans 375mL x 10 pack', '375mL x 10 pack', 21),
+              solo('so2', 'Solo Original Lemon Soft Drink Cans 375mL x 24 pack', '375mL x 24 pack', 27),
+              solo('so3', 'Solo Original Lemon Soft Drink Cans 375mL x 30 pack', '375mL x 30 pack', 32),
+              solo('so4', 'Solo Original Lemon Soft Drink Bottle 1.25L', '1.25L', 4),
+              solo('so5', 'Solo Original Lemon Soft Drink Mini Cans 250mL x 6 pack', '250mL x 6 pack', 6.6),
+              solo('so6', 'Solo Zero Sugar Lemon Soft Drink Cans 375mL x 10 pack', '375mL x 10 pack', 21),
+            ];
       }
       // localStorage fakeNoBarcode=1: the shops can't find it by barcode (like the real Woolworths sometimes).
       const noCode = (() => {

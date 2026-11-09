@@ -113,10 +113,31 @@ export async function request(opts: {
   body?: unknown;
   /** How long to wait for the answer (default 20 s). */
   timeoutMs?: number;
+  /**
+   * 0.9.1: the name of this request's own cookie jar ("lookup"). The request then goes without the
+   * in-app browser's cookies, so without any shop account you've signed in to in Restock, and what
+   * the shop sets is kept only in that jar, in the phone's memory, until Restock closes (Net.java).
+   * Without it, a request on the phone also carries the browser's cookies (Capacitor shares them
+   * with every plain request) as well as this file's own jar.
+   */
+  anonymous?: string;
 }): Promise<HttpResult> {
   if (!isNative()) throw new NativeOnlyError();
-  const host = new URL(opts.url).host;
   const headers: Record<string, string> = { 'User-Agent': MOBILE_UA, ...(opts.headers ?? {}) };
+  if (opts.anonymous) {
+    const body = opts.body === undefined ? undefined : typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
+    const r = await RestockNative.plainFetch({
+      jar: opts.anonymous,
+      url: opts.url,
+      method: opts.method ?? 'GET',
+      headers,
+      body,
+      timeoutMs: opts.timeoutMs ?? 20_000,
+    });
+    capture('request', opts.url, r.status, r.body ?? '');
+    return { status: r.status, text: r.body ?? '', headers: r.headers ?? {} };
+  }
+  const host = new URL(opts.url).host;
   const cookie = cookieHeader(host);
   if (cookie) headers.Cookie = cookie;
   const res = await CapacitorHttp.request({

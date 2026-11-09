@@ -73,7 +73,7 @@ export async function openDatabase(): Promise<void> {
   await ensureDefaults();
 }
 
-/** Where the copy made just before the 0.8.0 upgrade is kept (Settings → Data and backup). */
+/** Where the copy made just before the 0.8.0 upgrade is kept (Settings → Sync and backups). */
 export const BEFORE_UPGRADE_FILE = 'backups/before-0.8.0.json';
 
 /** 0.9.0: the copies made just before an update, newest first (the last two are kept). */
@@ -103,7 +103,7 @@ export async function beforeUpdateCopies(): Promise<BeforeUpdate[]> {
 /**
  * Just before a new version first opens (0.9.0, as for 0.8.0 before it): Restock saves a full
  * backup (without receipt photos) inside the app, so an update that went wrong can be undone
- * from Settings → Data and backup. The last two are kept. It also goes into the automatic backup
+ * from Settings → Sync and backups. The last two are kept. It also goes into the automatic backup
  * folder, if one is set, locked like the automatic backups. If it can't be made, the update still
  * goes ahead.
  */

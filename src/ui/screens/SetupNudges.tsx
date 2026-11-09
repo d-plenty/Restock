@@ -32,7 +32,7 @@ function TabOffer({ settings }: { settings: Settings }) {
       </span>
       <span className="small">
         Share the {SECTION_NAMES[tab]} tab on this phone too? The household's {what.title.toLowerCase()} things come across at the next sync. You can
-        change it any time in Settings → Local sync.
+        change it any time in Settings → Sync and backups → Local sync.
       </span>
       <div style={{ display: 'flex', gap: 8 }}>
         <button

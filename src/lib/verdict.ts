@@ -102,12 +102,15 @@ export function localDay(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Keep the last reading per calendar day, oldest first, within the history window. */
-export function normaliseReadings(readings: PriceReading[], now = Date.now()): PriceReading[] {
+/**
+ * Keep the last reading per calendar day, oldest first, within the history window. `days`: a longer
+ * window, only for an item page's chart showing 12 months (0.9.1); verdicts and alerts always use HISTORY_DAYS.
+ */
+export function normaliseReadings(readings: PriceReading[], now = Date.now(), days = HISTORY_DAYS): PriceReading[] {
   const byDay = new Map<string, PriceReading>();
   const sorted = [...readings].sort((a, b) => a.date.localeCompare(b.date));
   for (const r of sorted) {
-    if (now - Date.parse(r.date) > HISTORY_DAYS * DAY) continue;
+    if (now - Date.parse(r.date) > days * DAY) continue;
     byDay.set(localDay(r.date), r);
   }
   return [...byDay.values()];
@@ -119,8 +122,8 @@ export function normaliseReadings(readings: PriceReading[], now = Date.now()): P
  * set the normal price, the usual sale, the lowest price ("wait for a better sale") or the sale
  * cycle; only their "was" price still counts, as the store's. Mirrored in Deals.java.
  */
-export function computeStats(raw: PriceReading[], now = Date.now(), hasCard = true): PriceStats {
-  const readings = normaliseReadings(raw, now);
+export function computeStats(raw: PriceReading[], now = Date.now(), hasCard = true, days = HISTORY_DAYS): PriceStats {
+  const readings = normaliseReadings(raw, now, days);
   if (!readings.length) return { readings: 0, spanDays: 0, asOf: now };
   const current = readings[readings.length - 1];
   const mine = hasCard ? readings : readings.filter((r) => !r.memberOnly);

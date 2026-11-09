@@ -282,6 +282,11 @@ export interface Settings {
   shopAroundMin: number;
   /** The order of an item's products (0.7.6): by shop then size, cheapest first, or A to Z. */
   productOrder?: ProductOrder;
+  /**
+   * 0.9.1: "Other sizes of this" when adding an item also shows other can, bottle or jar sizes of the
+   * same product (1.25L bottles as well as 375mL cans), not just other packs of the same size. Off by default.
+   */
+  otherContainerSizes: boolean;
   /** New versions on GitHub (0.7.3): tell me once a week, when I last looked, and the last one I was told about. */
   updates?: { notify: boolean; lastCheck?: string; told?: string };
   /** Date of the privacy policy the person accepted. */
@@ -358,6 +363,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   listCompare: 'unit',
   shopAroundMin: 1,
+  otherContainerSizes: false,
   seenHints: [],
   marketData: { enabled: false, wifiOnly: true },
   look: { style: 'australia', icon: 'green' },
@@ -372,9 +378,10 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export const CHECK_INTERVALS = [6, 12, 24, 48, 168];
-/** Price history to keep: 1 month, 8 weeks (default), 3 months, 6 months. */
-export const HISTORY_WEEKS = [4, 8, 13, 26];
-export const historyLabel = (w: number) => (w === 4 ? '1 month' : w === 13 ? '3 months' : w === 26 ? '6 months' : `${w} weeks`);
+/** Price history to keep: 1 month, 8 weeks (default), 3 months, 6 months, 12 months (0.9.1). */
+export const HISTORY_WEEKS = [4, 8, 13, 26, 52];
+export const historyLabel = (w: number) =>
+  w === 4 ? '1 month' : w === 13 ? '3 months' : w === 26 ? '6 months' : w === 52 ? '12 months' : `${w} weeks`;
 /**
  * Under this much history, an item is still "learning" what its normal price is. A little under
  * four weeks, so items don't flicker back to "learning" when only 1 month of history is kept.

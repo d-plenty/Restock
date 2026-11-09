@@ -743,14 +743,25 @@ export async function rowsForGroups(ids: string[]): Promise<RowSet[]> {
  * and so is the sample items' made-up history. Returns how many prices were removed.
  */
 export async function pruneHistory(weeks: number, now = Date.now()): Promise<number> {
-  // 0.9.0: only ever one of the real choices (1 to 6 months). A nonsense number (from a damaged
-  // setting) deletes nothing, rather than every price but the latest.
+  // 0.9.0: only ever one of the real choices (1 to 12 months since 0.9.1). A nonsense number (from
+  // a damaged setting) deletes nothing, rather than every price but the latest.
   if (!HISTORY_WEEKS.includes(weeks) || !Number.isFinite(now)) return 0;
   const cutoff = new Date(now - weeks * 7 * 86_400_000).toISOString();
   const where = `date < ? AND source <> 'demo' AND date < (SELECT MAX(q.date) FROM prices q WHERE q.product_id = prices.product_id)`;
   const [{ n }] = await sql().query<{ n: number }>(`SELECT COUNT(*) AS n FROM prices WHERE ${where}`, [cutoff]);
   if (Number(n) > 0) await write([{ sql: `DELETE FROM prices WHERE ${where}`, params: [cutoff] }]);
   return Number(n);
+}
+
+/**
+ * 0.9.1: how many prices this phone keeps and the date of the oldest (not counting the sample items'
+ * made-up history), so the backup screens can say what's in a backup.
+ */
+export async function priceHistorySpan(): Promise<{ count: number; oldest?: string }> {
+  const [row] = await sql().query<{ n: number; oldest: string | null }>(
+    `SELECT COUNT(*) AS n, MIN(date) AS oldest FROM prices WHERE source <> 'demo'`,
+  );
+  return { count: Number(row?.n ?? 0), oldest: row?.oldest ?? undefined };
 }
 
 // ---------- bulk (sample data, backup) ----------

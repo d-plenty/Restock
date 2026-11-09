@@ -13,7 +13,8 @@
 <ul>
 <li>Coles, Woolworths and Aldi, plus bottle shops (18+) and pharmacies if you want them, and any other shop's website</li>
 <li>Built-in open-source barcode scanner; Restock finds the same product at each of your shops</li>
-<li>Sync with your household: phones in the same house share one pantry and shopping list straight to each other on your Wi-Fi, encrypted, with no server or account</li>
+<li>Sync with your household: phones in the same house share one pantry and shopping list straight to each other on your Wi-Fi, encrypted, with no Restock server or account. Away from home, sync through your own Nextcloud, another WebDAV server or a Syncthing folder, sealed so only your phones can read it</li>
+<li>Other sizes of this: the same can or bottle in other packs, compared per litre or per 100g</li>
 <li>Search that works out what you mean: "butter" puts butter first, not peanut butter or butter chicken sauce</li>
 <li>Price history for each product at each shop: where today's price sits, how often it's on sale and when the next sale is likely</li>
 <li>My catalogue: this week's sales on the things you buy, a page for each shop</li>

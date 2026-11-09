@@ -20,9 +20,11 @@ import {
   getSettings,
   groupProductIds,
   nowIso,
+  readingsFor,
   uid,
   updateGroup,
   updateProduct,
+  updateSettings,
 } from '../../lib/db';
 import { addGroupToList } from '../../lib/listActions';
 import { genericName, nameHasSize } from '../../lib/naming';
@@ -96,6 +98,7 @@ import {
   type PreviewProduct,
 } from '../components';
 import { useNav } from '../nav';
+import { OtherSizesCard } from '../OtherSizes';
 import { AlertPicker } from './Item';
 
 type ChainResult =
@@ -215,7 +218,10 @@ export function AddScreen({
     const group = await getGroup(attachTo);
     if (!group) return undefined;
     const mains = await getProducts(mainProductIds(group));
-    return { group, mains };
+    // 0.9.1: each pick's latest price, so "Other sizes of this" can compare with the usual one.
+    const readings = await readingsFor(mains.map((p) => p.id));
+    const latest = new Map([...readings].map(([id, rs]) => [id, rs[rs.length - 1]?.price]));
+    return { group, mains, latest };
   }, [attachTo]);
   const attachGroup = attach?.group;
   // Adding to an item: its tab. Otherwise the tab you came from, or the one picked at the top.
@@ -718,6 +724,67 @@ export function AddScreen({
       }),
     );
   };
+
+  // 0.9.1: "Other sizes of this": other packs and sizes of the first thing you ticked or, on an
+  // item's "Add another pick", of its usual pick. Found in what the shops sent back, plus one more
+  // search for its brand and type (at its own shop; the others are searched by recommend()).
+  const sizesFor: StoreProduct | undefined = (() => {
+    if (attachGroup) {
+      if (as !== 'main' || !another || !attach) return undefined;
+      const usual = attach.mains.find((p) => p.id === attachGroup.usualProductId) ?? attach.mains[0];
+      if (!usual?.storeProductId) return undefined;
+      const live = Object.values(results)
+        .flatMap((r) => (r?.status === 'ok' ? r.items : []))
+        .find((p) => p.chain === usual.chain && p.storeProductId === usual.storeProductId);
+      return (
+        live ?? {
+          chain: usual.chain,
+          storeProductId: usual.storeProductId,
+          name: usual.name,
+          brand: usual.brand,
+          size: usual.size,
+          imageUrl: usual.imageUrl,
+          price: attach.latest.get(usual.id),
+          isSpecial: false,
+          memberOnly: false,
+        }
+      );
+    }
+    if (!picks.size) return undefined;
+    return recAnchor && picks.has(keyOf(recAnchor)) ? recAnchor : [...picks.values()][0];
+  })();
+  const sizesKey = sizesFor ? keyOf(sizesFor) : '';
+  const [sizesBusy, setSizesBusy] = useState<string>();
+  const sizesSearched = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!sizesFor || !searched.length || sizesSearched.current === sizesKey) return;
+    if (searched.some((c) => !results[c] || results[c]?.status === 'loading')) return;
+    sizesSearched.current = sizesKey;
+    const kind = genericName(sizesFor.name, sizesFor.brand);
+    const term = sizesFor.brand && kind ? `${sizesFor.brand} ${kind}`.toLowerCase().trim() : '';
+    if (!term || term === lastText.toLowerCase().trim()) return;
+    const chains = (another ? searched : searched.filter((c) => c === sizesFor.chain)).filter((c) => adapterFor(c));
+    if (!chains.length) return;
+    setSizesBusy(sizesKey);
+    void (async () => {
+      const s = settings ?? (await getSettings());
+      await Promise.all(
+        chains.map(async (c) => {
+          const found = await adapterFor(c)!
+            .search(term, searchStoreId(s, c))
+            .catch(() => [] as StoreProduct[]);
+          if (sizesSearched.current === sizesKey && found.length) mergeInto(c as Chain, found);
+        }),
+      );
+      setSizesBusy((k) => (k === sizesKey ? undefined : k));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sizesKey, searched, results]);
+  const sizesPool = [
+    ...Object.values(results).flatMap((r) => (r?.status === 'ok' ? r.items : [])),
+    ...Object.values(instead).flatMap((x) => x?.items ?? []),
+  ];
+  const sizesSkip = attach ? new Set(attach.mains.filter((p) => p.storeProductId).map((p) => `${p.chain}:${p.storeProductId}`)) : undefined;
 
   const toggle = (sp: StoreProduct) => {
     setPicks((prev) => {
@@ -1345,6 +1412,21 @@ export function AddScreen({
               );
             })}
         </div>
+      )}
+
+      {sizesFor && anyResults && (
+        <OtherSizesCard
+          anchor={sizesFor}
+          pool={sizesPool}
+          skip={sizesSkip}
+          picks={picks}
+          onToggle={toggle}
+          onPreview={setPreview}
+          photoFor={photoFor}
+          containersOn={!!settings?.otherContainerSizes}
+          onContainers={(on) => void updateSettings({ otherContainerSizes: on })}
+          searching={sizesBusy === sizesKey}
+        />
       )}
 
       {anyResults && (

@@ -64,14 +64,15 @@ The **normal price** is the middle of the non-sale prices over the history you k
 
 - **Your shops, your items.** Coles, Woolworths and Aldi, plus bottle shops (Keg tab, 18+) and pharmacies if you want them, and any other shop's website.
 - **Scan to add.** An open-source barcode scanner built in, with Open Food Facts lookup. Restock finds the same product at each of your shops and ticks it for you.
-- **Local sync with your household.** Up to 6 phones in the same house share one pantry and shopping list, straight from one phone to another on your Wi-Fi. No account and no server. Away from home, phones can also sync through a folder you pick (Nextcloud, Syncthing, Google Drive), sealed so only your phones can read it. A recovery key lets another phone take over if the owner phone is lost. You pick what's shared: groceries, bottle shops (Keg) and pharmacy, each on or off, so a share house can share groceries and keep the rest separate. (Hosted sync, from anywhere through your own server, comes later.) Tick something off and it's off everyone's list.
+- **Other sizes of this.** Tick a product and Restock shows the same thing in other packs (375mL cans × 10, × 24, × 30), compared per litre or per 100g, so a 10-pack on special doesn't slip past your usual 30-pack. Bottles and other container sizes only if you switch them on.
+- **Local sync with your household.** Up to 6 phones in the same house share one pantry and shopping list, straight from one phone to another on your Wi-Fi. No account and no server. Away from home, phones can also sync through your Nextcloud, another WebDAV server (ownCloud, Synology, QNAP, TrueNAS and others) or a folder Syncthing keeps the same, sealed so only your phones can read it. The owner can also share kept receipts with the household. A recovery key lets another phone take over if the owner phone is lost. You pick what's shared: groceries, bottle shops (Keg) and pharmacy, each on or off, so a share house can share groceries and keep the rest separate. (Hosted sync, from anywhere through your own server, comes later.) Tick something off and it's off everyone's list.
 - **My catalogue.** A catalogue made only from the things you buy: a page for each shop with this week's sales on your items (40% OFF, HALF PRICE, 2 FOR $5), and for a shop with no sales, a page of what it's cheapest for. Add one or all of them to your list.
 - **Shop around, or one store.** Your list puts each item at its cheapest shop and recommends shopping around, unless it saves less than your minimum (a dollar to start with, change it in Settings); then it recommends the one store that has everything.
 - **Honest shopping list.** "If you only go to one store" compares the *same shopping* at each store, every item at the size you usually buy, so one bulk deal can't tip the result. Tap ⓘ to see the working.
 - **Background price checks** on Android's own scheduler, with alerts only for the deals you care about, plus a weekly deals summary on catalogue day.
 - **Specials** this week (Woolworths and Coles half price, Aldi Special Buys), filtered to things like what you buy.
 - **Recall alerts.** Once a day Restock checks the official Australian recall lists (FSANZ, Product Safety Australia, TGA) against what you have.
-- **Receipts** (optional). Scan, straighten and read receipts on the phone, and keep them as long as you choose.
+- **Receipts** (optional). Scan, straighten and read receipts on the phone, keep them as long as you choose, and share them with your household if you like.
 - **Your own store's prices.** Sign in to Woolworths inside Restock (on Woolworths' own page; your password never reaches Restock), or choose your Coles store (Restock picks up its store number from Coles' store finder by itself), and prices and stock are for your local shop.
 - **Shopping mode** with big ticks, aisle groups, a running total, your loyalty card one tap away, and ⓘ on every item to see what it looks like on the shelf.
 - **Widgets, shortcuts, share-to-list**, automatic backups, Australian green-and-gold or plain themes, and accessibility settings.
@@ -106,7 +107,7 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Catalogues**: a link to the catalogue of every shop you use.
 - **Home screen widgets**: Deals, Shopping list and Quick actions, with your choice of background, transparency and text colour.
 - **App icon shortcuts** (Scan, List, Receipt) and **Share to Restock** from any app.
-- **Local sync**: up to 6 phones in a household pair by scanning a one-time QR code from the owner phone (it works once, for 10 minutes, and never contains the household's key), then sync straight to each other whenever they're on the same Wi-Fi: when you open Restock, shortly after a change, and every 15 minutes or so in the background. Pantry, list (ticks too), prices, categories and alerts, plus loyalty cards if you choose. The owner picks what the household shares (groceries, Keg, Pharmacy) and each phone picks what it takes; a phone joining after setup gets the household's shops and settings for those, and is asked if they're 18 or over before Keg. Encrypted with a key only your phones have; no server and no account. If both phones change the same thing, the later change wins, except that a tick and a new amount on the same line both survive, and deleting something beats an edit made without knowing about it. **Sync away from home** (optional): pick the same folder on each phone (one Nextcloud, Syncthing or Google Drive keeps in sync); each phone leaves its changes there sealed with the household's key and picks up the others', prices aside. **Recovery key**: the owner phone shows a key to save; if it's ever lost, another phone takes over as owner with it. The owner phone adds and removes phones (removing one changes the household's key) and can hand ownership to another phone. Pull down on Home, Pantry, Keg, Pharmacy or the list to sync; Check now on Home also checks prices.
+- **Local sync**: up to 6 phones in a household pair by scanning a one-time QR code from the owner phone (it works once, for 10 minutes, and never contains the household's key), then sync straight to each other whenever they're on the same Wi-Fi: when you open Restock, shortly after a change, and every 15 minutes or so in the background. Pantry, list (ticks too), prices, categories and alerts, plus loyalty cards if you choose. The owner picks what the household shares (groceries, Keg, Pharmacy) and each phone picks what it takes; a phone joining after setup gets the household's shops and settings for those, and is asked if they're 18 or over before Keg. Encrypted with a key only your phones have; no server and no account. If both phones change the same thing, the later change wins, except that a tick and a new amount on the same line both survive, and deleting something beats an edit made without knowing about it. **Sync away from home** (optional): sign in to Nextcloud, use another WebDAV server, or pick the same folder on each phone (one Syncthing keeps in sync); each phone leaves its changes there sealed with the household's key and picks up the others', prices and photos aside. **Receipts** (optional, set by the owner phone): kept receipts go to every phone, photos over the Wi-Fi only. **Recovery key**: the owner phone shows a key to save; if it's ever lost, another phone takes over as owner with it. The owner phone adds and removes phones (removing one changes the household's key) and can hand ownership to another phone. Pull down on Home, Pantry, Keg, Pharmacy or the list to sync; Check now on Home also checks prices.
 - **Start fresh, restore, or join your household** on the first screen; **Erase everything and start fresh** at the bottom of Settings (it asks twice).
 - **Setup tiles for everything**: sync, price checks, notifications, loyalty cards and shop accounts, widgets, updates and your household name, as well as shops, permissions, look, backups and the rest. Skip any of them.
 - **Backups**: export and restore exactly the parts you pick, plus optional automatic backups into a folder you choose. Lock any backup with a password (encrypted on the phone). Restock also keeps a copy from just before each update, so an update can be undone.
@@ -146,7 +147,7 @@ All three are the same APK, signed with the same key, so you can switch between 
 
 **Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux or macOS, `sha256sum restock-0.x.y.apk` (macOS: `shasum -a 256`) should print the same.
 
-**Moving to a new phone?** Settings → Data and backup → Export a backup on the old phone, then **Restore from a backup** on the new phone's first screen. If your household uses local sync, the new phone can simply **Join your household** instead.
+**Moving to a new phone?** Settings → Sync and backups → Export a backup on the old phone, then **Restore from a backup** on the new phone's first screen. If your household uses local sync, the new phone can simply **Join your household** instead.
 
 **Build it yourself:** see **[BUILD.md](BUILD.md)**. About 20 minutes the first time, on Linux, macOS or Windows.
 
@@ -185,7 +186,7 @@ Your phone asks each shop's own website, the same way you would by visiting it, 
 <details>
 <summary><strong>Can my partner and I share one list?</strong></summary>
 
-Yes, with **local sync**: up to 6 phones share one pantry and shopping list, straight from phone to phone on your home Wi-Fi. No account and no server. Start a household on one phone (Settings → Local sync), pick what it shares (groceries, Keg, Pharmacy), and scan its one-time code with the others. Each phone can take all of it or just some, like groceries only. Changes made away from home catch up when you're both back on the Wi-Fi. Syncing from anywhere, through a server you run yourself, is [coming later](#hosted-sync).
+Yes, with **local sync**: up to 6 phones share one pantry and shopping list, straight from phone to phone on your home Wi-Fi. No account and no server. Start a household on one phone (Settings → Sync and backups → Local sync), pick what it shares (groceries, Keg, Pharmacy), and scan its one-time code with the others. Each phone can take all of it or just some, like groceries only. Changes made away from home catch up when you're both back on the Wi-Fi, or straight away through your Nextcloud, another WebDAV server or a Syncthing folder if you set one up. A sync server you run yourself is [coming in 0.9.3](#roadmap).
 </details>
 
 <details>
@@ -209,7 +210,7 @@ Shops change their websites without warning, so connections break now and then. 
 <details>
 <summary><strong>How do I keep my data safe?</strong></summary>
 
-Everything lives on your phone, so back it up: Settings → Data and backup → **Export a backup**, or turn on automatic backups into a folder you choose. Backups can include loyalty card numbers, so keep them private. Uninstalling Restock deletes its data.
+Everything lives on your phone, so back it up: Settings → Sync and backups → **Export a backup**, or turn on automatic backups into a folder you choose. Backups can include loyalty card numbers, so keep them private. Uninstalling Restock deletes its data.
 </details>
 
 ## How you can help
@@ -242,9 +243,60 @@ Why I'm asking: publishing on the App Store means paying Apple every year for a 
 
 Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issue](../../issues?q=is%3Aissue+label%3Aios).
 
+## Roadmap
+
+Restock is in its **release candidate** stage. Each new feature is followed by a release of fixes and polish, and there are no dates: each step is done when it's ready.
+
+**✅ 0.9.0: Release candidate**
+My catalogue, Shop around first, sync through a folder, a household recovery key, backup passwords, and a full security and privacy review.
+
+**✅ 0.9.1: Your cloud drive (now)**
+- Sign in to Nextcloud, or use WebDAV for your own NAS and other drives.
+- Receipts sync, and Sync and backups in one place in Settings.
+- Clearer pack sizes, and 12 months of price history.
+- Fixes and tighter security.
+
+**🔧 0.9.2: Fixes**
+Fixes and polish for drive sync, receipts and anything else testers find. Found something? [Report a problem](../../issues/new/choose).
+
+**🏠 0.9.3: Your own sync server**
+- **A small server you run yourself:** a Docker container on a NAS, home server or Raspberry Pi.
+- **Works anywhere:** on your home network first, then through your own domain or a tunnel (Tailscale, Cloudflare) when you're out.
+- **End-to-end encrypted:** the server only holds sealed files, never the key.
+- **Restock never waits for it.** If the server is down, everything works as normal and catches up later.
+- **Restock in your computer's browser,** served by the same container, which joins your household like another phone.
+
+**🔧 0.9.4: Fixes**
+Fixes and polish for the sync server.
+
+**🏡 0.9.5: Home Assistant**
+- **Your shopping list in Home Assistant, both ways:** add milk from a kitchen tablet or by voice and it's on everyone's list.
+- **Deals and recall alerts** can show up in Home Assistant too.
+
+**🔧 0.9.6: Fixes**
+Fixes and polish for Home Assistant.
+
+**✨ 0.9.7 and later: Final polish**
+- The last fixes and adjustments before 1.0.
+- Permission from the price-history sources, and a final read-through of the privacy policy.
+
+**🏁 1.0: The official release**
+
+| | GitHub and Obtainium | F-Droid |
+|---|---|---|
+| Where to get it | [Releases](../../releases), or add it to [Obtainium](https://github.com/ImranR98/Obtainium) | The F-Droid app |
+| Updates | Built into the app | Through F-Droid |
+
+Both are built from the same open-source code. *Still an idea:* optional add-ons you choose to download. If they happen, they'll probably come with the GitHub version only, to fit F-Droid's rules.
+
+**After 1.0**
+Everything else under [Coming soon](#coming-soon): what you have at home, a spending summary, free shared prices for everyone, Google Drive and other big-name drives if people want them, and an iPhone version.
+
+Restock stays focused on saving money on what you buy. Bigger ideas, like full budgeting, will be separate apps that work with it.
+
 ## Coming soon
 
-These are planned, and each already has its own page in the app under **Settings → Coming soon**. None of them are switched on yet. Want one sooner, or have a better idea? Say so in [Discussions → Ideas](../../discussions/categories/ideas).
+These are planned (the [Roadmap](#roadmap) has the order), and each already has its own page in the app under **Settings → Coming soon**. None of them are switched on yet. Want one sooner, or have a better idea? Say so in [Discussions → Ideas](../../discussions/categories/ideas).
 
 ### What you have at home
 Tell Restock roughly how much of something you've got (a full bottle, two left, nearly out) and it keeps track as you buy and use things. It learns how fast you get through each one, so it can put things on your shopping list before you run out, and time it with a good price: *"You're nearly out of coffee, and it's half price at Coles this week."* Scanning a receipt or ticking things off in the shop tops your stock back up.
@@ -253,13 +305,13 @@ Tell Restock roughly how much of something you've got (a full bottle, two left, 
 A simple month-by-month look at what you spent at each shop (from your kept receipts) and what Restock's deals saved you. It stays on your phone like everything else. Full budgeting is planned as a separate app that works with Restock, so this stays light.
 
 ### Hosted sync
-Phones in a household already sync on the same Wi-Fi, and away from home through a folder you pick. Next is a small server you control, such as a Docker container on a home server, NAS or Raspberry Pi: tick something off at the shops and it's off the list at home straight away. There's no Restock account and no Restock server holding your data, and the server only ever sees encrypted data.
+Phones in a household already sync on the same Wi-Fi, and away from home through Nextcloud, another WebDAV drive or a folder you pick. Next is a small server you control, such as a Docker container on a home server, NAS or Raspberry Pi: tick something off at the shops and it's off the list at home straight away. There's no Restock account and no Restock server holding your data, and the server only ever sees encrypted data. Planned for 0.9.3 (see the [Roadmap](#roadmap)).
 
 ### iPhone version
 The same Restock on iOS, so a household with both kinds of phone can share a pantry and list. This needs a developer with an Apple developer account: see [Wanted: someone to bring Restock to iPhone](#wanted-someone-to-bring-restock-to-iphone).
 
 ### Home Assistant
-Connect Restock to [Home Assistant](https://www.home-assistant.io) and your shopping list shows up there, with changes going both ways: add milk from a kitchen tablet or by voice and it's on your Restock list. Deals and recall alerts can show up in Home Assistant too. This comes after sync, since it uses the same server.
+Connect Restock to [Home Assistant](https://www.home-assistant.io) and your shopping list shows up there, with changes going both ways: add milk from a kitchen tablet or by voice and it's on your Restock list. Deals and recall alerts can show up in Home Assistant too. Planned for 0.9.5, after the sync server it builds on (see the [Roadmap](#roadmap)).
 
 ### Shared prices, free for everyone
 Every price a phone sees can help everyone else. With shared prices, a new item arrives with months of history, so you know straight away whether its "special" is real. Restock will run a **free public price website** that anyone can browse and that every Restock phone can download history from, with no account and no ads.
@@ -290,7 +342,7 @@ tools/        search test tools for a computer (see tools/README.md)
 docs/         screenshots, the F-Droid recipe, the release guide
 ```
 
-**Local sync**, briefly: every change to a synced table is logged in the phone's database with a time and the phone it came from. Phones find each other on the Wi-Fi with Android's network service discovery (under a random name and a tag that changes every day, so a phone can't be followed from place to place), swap whatever the other hasn't seen over a direct connection encrypted with AES-256-GCM, and the later change wins; ticks and amounts are merged separately, and a delete wins over an edit that didn't know about it. The household key is made on the owner phone and handed over only through a one-time, 10-minute pairing code, with a fresh key exchange (ECDH) so even someone who saw the code can't read the hand-over; removing a phone changes the key. Changes only the owner may make (who's in the household, what it shares, who owns it) are signed by the owner phone, and each phone checks the signature. Folder sync uses the same sealed format, one file per phone. `tools/sync-test` runs whole households of phones through the real Java code.
+**Local sync**, briefly: every change to a synced table is logged in the phone's database with a time and the phone it came from. Phones find each other on the Wi-Fi with Android's network service discovery (under a random name and a tag that changes every day, so a phone can't be followed from place to place), swap whatever the other hasn't seen over a direct connection encrypted with AES-256-GCM, and the later change wins; ticks and amounts are merged separately, and a delete wins over an edit that didn't know about it. The household key is made on the owner phone and handed over only through a one-time, 10-minute pairing code, with a fresh key exchange (ECDH) so even someone who saw the code can't read the hand-over; removing a phone changes the key. Changes only the owner may make (who's in the household, what it shares, who owns it) are signed by the owner phone, and each phone checks the signature. Folder and WebDAV sync use the same sealed format, one file per phone, through Restock's own small WebDAV client (https only, except for servers at home or on Tailscale); a Nextcloud sign-in uses Nextcloud's Login Flow v2, so Restock gets an app password of its own. The household's keys, secrets and any drive password are sealed with a key in Android's Keystore. Phones only listen for each other on Wi-Fi or Ethernet, and old deletes are tidied from the sync log after 90 days once every phone has seen them. `tools/sync-test` runs whole households of phones through the real Java code.
 
 **Restock's F-Droid repo** is built by a GitHub Action ([`fdroid-repo.yml`](.github/workflows/fdroid-repo.yml)) from each release's APK and published on GitHub Pages.
 

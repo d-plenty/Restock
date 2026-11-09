@@ -54,7 +54,7 @@ export const SOON: Soon[] = [
     body: (
       <>
         <p>
-          Phones in a household already sync on the same Wi-Fi with local sync (Settings → Local sync), with no account and nothing leaving your
+          Phones in a household already sync on the same Wi-Fi with local sync (Settings → Sync and backups → Local sync), with no account and nothing leaving your
           phones. This adds syncing from anywhere: tick something off at the shops and it's off the list at home straight away.
         </p>
         <p>

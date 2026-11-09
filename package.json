@@ -1,7 +1,7 @@
 {
   "name": "restock",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.9.1",
   "type": "module",
   "description": "Restock: a local-first price tracker for supermarkets, bottle shops and pharmacies in Australia. No account, no server, no ads.",
   "scripts": {

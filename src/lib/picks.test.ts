@@ -69,8 +69,8 @@ describe('moving to My picks', () => {
 
   it('happens once, when Restock updates', async () => {
     const d = await createSqlJsDriver({ load: () => initSqlJs(), restore: async () => undefined, persist: async () => undefined });
-    // A phone on 0.8.8: everything before the 0.8.9 step (0.9.0's sync step comes after it).
-    const PICKS = MIGRATIONS.length - 2;
+    // A phone on 0.8.8: everything before the 0.8.9 step (0.9.0's and 0.9.1's sync steps come after it).
+    const PICKS = MIGRATIONS.length - 3;
     for (let v = 0; v < PICKS; v++) for (const sql of MIGRATIONS[v]) await d.run(sql);
     await d.run(`PRAGMA user_version = ${PICKS}`);
     for (const [id, c] of Object.entries(chain))

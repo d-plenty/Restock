@@ -28,6 +28,7 @@ import {
   ALERT_LEVELS,
   computeStats,
   eachText,
+  HISTORY_DAYS,
   multiBuy,
   productQty,
   tiedWithBest,
@@ -179,6 +180,9 @@ function AlertsPrompt({ name }: { name: string }) {
 }
 
 /** The usual amount, for "Any size": "300 g", or the usual product when its amount isn't known. */
+/** The price history chart's range buttons, short enough for five across a phone (0.9.1). */
+const RANGE_SHORT: Record<number, string> = { 4: '1 mth', 8: '8 wks', 13: '3 mths', 26: '6 mths', 52: '1 yr' };
+
 function amountOf(rec: Recommendation): string {
   const u = usualOption(rec);
   if (!u) return 'the amount you usually buy';
@@ -265,7 +269,11 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   const chartReadings = allReadings.filter((r) => Date.parse(r.date) >= from);
   // Member prices only count towards normal and lowest with the shop's card (0.9.0), as in the verdict.
   const stats = chartOption
-    ? withMarket(computeStats(chartReadings, Date.now(), cards.has(chartOption.product.chain)), chartOption.product.market)
+    ? withMarket(
+        // 0.9.1: with 12 months picked, Lowest, Normal and Usual sale cover the whole chart, not just its last 6 months.
+        computeStats(chartReadings, Date.now(), cards.has(chartOption.product.chain), Math.max(HISTORY_DAYS, weeks * 7 + 1)),
+        chartOption.product.market,
+      )
     : undefined;
   // Shops you've said you don't buy it at (0.8.9), and the ones on this item's tab with none of
   // your picks yet (one per website).
@@ -479,19 +487,21 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           allowMulti={group.allowMulti !== false}
           range={
             allReadings.length >= 2 ? (
-              <div className="seg" role="group" aria-label="How far back">
+              <div className="seg range-seg" role="group" aria-label="How far back">
                 {HISTORY_WEEKS.map((w) => (
                   <button
                     key={w}
                     aria-pressed={w === weeks}
+                    aria-label={historyLabel(w)}
                     className={w > keepWeeks ? 'dim' : undefined}
                     onClick={() =>
                       w > keepWeeks
-                        ? nav.toast(`You keep ${historyLabel(keepWeeks)} of prices. Keep more in Settings → Data and backup.`)
+                        ? nav.toast(`You keep ${historyLabel(keepWeeks)} of prices. Keep more in Settings → Price checks.`)
                         : setRangeWeeks(w)
                     }
                   >
-                    {historyLabel(w)}
+                    {/* 0.9.1: five choices now, so short labels fit a phone. */}
+                    {RANGE_SHORT[w] ?? historyLabel(w)}
                   </button>
                 ))}
               </div>

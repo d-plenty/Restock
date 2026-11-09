@@ -16,7 +16,8 @@ import org.json.JSONObject;
 
 /**
  * Sync through a folder (0.9.0): for phones that aren't on the same Wi-Fi. The household picks a
- * folder each phone can reach (Nextcloud, Syncthing, Google Drive and the like), and:
+ * folder each phone can reach (0.9.1: on a Nextcloud or other WebDAV server, see SyncDav, or a
+ * folder on the phone that Syncthing or a similar app keeps the same everywhere), and:
  *
  * - Each phone writes one file of its own, restock-sync-DEVICE.bin: everything it knows (its own
  *   changes and the ones it took in), sealed with the household's key (AES-256-GCM, gzipped
@@ -31,6 +32,9 @@ import org.json.JSONObject;
  *   only ever takes a newer key than it has (an old keys file put back can't set it back), and
  *   each household has its own keys file, so two households sharing a folder don't clash.
  * - A file that hasn't changed since last time (same size and time) isn't read again.
+ * - 0.9.1: a folder is tried out before it's used (check(): a test file written, read back, listed
+ *   and deleted), so one an app can't really hold is turned down straight away. Each file also says
+ *   how far its phone has got through the others' changes ("seen"), so they can tidy old deletes.
  *
  * No Android classes here (the folder is an interface), so it's tested on a computer too.
  */
@@ -54,6 +58,51 @@ final class SyncFolder {
         }
 
         void write(String name, byte[] data) throws Exception;
+
+        /** 0.9.1: removes a file (only the test file check() writes). */
+        default void delete(String name) throws Exception {
+            throw new UnsupportedOperationException("can't delete");
+        }
+    }
+
+    /** Thrown by check() with words for the person. */
+    static final class Unusable extends Exception {
+        Unusable(String why, Throwable cause) {
+            super(why, cause);
+        }
+    }
+
+    /**
+     * 0.9.1: tries a folder out before it's used: writes a small test file, reads it back, finds it
+     * in the folder's list and deletes it. Any step failing throws Unusable with `why`.
+     */
+    static void check(Folder f, String why) throws Unusable {
+        byte[] b = new byte[16];
+        RANDOM.nextBytes(b);
+        String name = PREFIX + "test-" + Base64.getUrlEncoder().withoutPadding().encodeToString(b).substring(0, 12) + ".tmp";
+        byte[] data = ("Restock checking it can use this folder. " + Base64.getEncoder().encodeToString(b)).getBytes(StandardCharsets.UTF_8);
+        String step = "write";
+        try {
+            f.write(name, data);
+            step = "read";
+            byte[] back = f.read(name);
+            if (back == null || !java.util.Arrays.equals(back, data)) throw new java.io.IOException("the test file came back different");
+            step = "list";
+            if (!f.names().contains(name)) throw new java.io.IOException("the test file isn't in the folder's list");
+            step = "delete";
+            f.delete(name);
+        } catch (Unusable u) {
+            throw u;
+        } catch (Exception ex) {
+            if (!"write".equals(step)) {
+                try {
+                    f.delete(name);
+                } catch (Exception ignored) {
+                    // leave it
+                }
+            }
+            throw new Unusable(why, ex);
+        }
     }
 
     /** What a round did. */
@@ -145,6 +194,24 @@ final class SyncFolder {
         }
         byte[] key = h.key();
         String me = e.device();
+        e.noteTabs();
+        readOthers(f, names, key, me, now, res);
+        // 0.9.1: a file just read made the household share more (a tab, or receipts): read the
+        // files again for what was passed over a moment ago.
+        if (e.noteTabs()) readOthers(f, names, key, me, now, res);
+        // Made the owner by the phone before (handed over in the folder)? Take over.
+        h.takeHandover();
+        writeOwn(f, names, me, now, res);
+        if (h.isOwner()) writeKeys(f, names);
+        // "Synced through the folder" only when another phone's file was read.
+        if (res.phones > 0) e.setMeta("folder_at", now);
+        e.setMeta("folder_unread", res.unread > 0 ? String.valueOf(res.unread) : null);
+        return res;
+    }
+
+    /** Takes in the other phones' files that changed since last time. */
+    private void readOthers(Folder f, List<String> names, byte[] key, String me, String now, Result res) throws Exception {
+        res.unread = 0;
         for (String name : names) {
             if (!name.startsWith(PREFIX) || !name.endsWith(SUFFIX) || name.equals(fileFor(me))) continue;
             // Not changed since last time: nothing to read.
@@ -176,20 +243,47 @@ final class SyncFolder {
             int n = e.apply(m.optJSONArray("entries"));
             if (n > 0) e.tidyCategories();
             e.notePeer(device, m.optString("name", null), null, 0);
+            // 0.9.1: how far this phone has now got through that one's changes (for its own file),
+            // and how far that one got through this phone's (for tidying old deletes).
+            long theirTop = m.optLong("top", 0);
+            if (theirTop > 0) {
+                String gotKey = "folder_got:" + device;
+                String had = e.meta(gotKey);
+                if (had == null || Long.parseLong(had) < theirTop) e.setMeta(gotKey, String.valueOf(theirTop));
+            }
+            JSONObject seen = m.optJSONObject("seen");
+            if (seen != null) e.setSeen(device, seen.optLong(me, 0));
             e.markSynced(device, now);
             e.setMeta(seenKey, sum);
             res.received += n;
             res.phones++;
         }
-        // Made the owner by the phone before (handed over in the folder)? Take over.
-        h.takeHandover();
-        // This phone's own file, when something changed since it was last written.
+    }
+
+    /** This phone's own file, when something changed since it was last written. */
+    private void writeOwn(Folder f, List<String> names, String me, String now, Result res) throws Exception {
         List<JSONObject> top = e.db.query("SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log");
-        String mark = top.get(0).optLong("top", 0) + "/" + keyv() + "/" + String.join(",", e.tabs()) + "/" + e.shareCards();
+        String mark = top.get(0).optLong("top", 0) + "/" + keyv() + "/" + String.join(",", e.tabs()) + "/" + e.shareCards() + "/" + e.shareReceipts();
         if (!mark.equals(e.meta("folder_top")) || !names.contains(fileFor(me))) {
             // Everything but prices; deletes older than half a year are left out to keep it small.
-            JSONObject c = e.collect(0, null, 5_000_000, null, " AND tbl <> 'prices'", true, System.currentTimeMillis() - SyncEngine.OLD_DELETE_MS);
+            long oldest = System.currentTimeMillis() - SyncEngine.OLD_DELETE_MS;
+            JSONObject c = e.collect(0, null, 5_000_000, null, " AND tbl <> 'prices'", true, oldest);
+            // 0.9.1: how far a phone reading this file gets through this phone's changes: all of
+            // them, except it stops short of the first old delete left out above.
+            long fileTop = top.get(0).optLong("top", 0);
+            List<JSONObject> left = e.db.query("SELECT MIN(seq) AS s FROM sync_log WHERE deleted = 1 AND tbl <> '_seq' AND stamp < ?", oldest);
+            if (!left.isEmpty() && !left.get(0).isNull("s")) fileTop = Math.min(fileTop, left.get(0).getLong("s") - 1);
+            JSONObject seen = new JSONObject();
+            for (JSONObject r : e.db.query("SELECT key, value FROM sync_meta WHERE key LIKE 'folder_got:%'")) {
+                try {
+                    seen.put(r.getString("key").substring("folder_got:".length()), Long.parseLong(r.getString("value")));
+                } catch (NumberFormatException ignored) {
+                    // an odd value
+                }
+            }
             JSONObject out = new JSONObject();
+            out.put("top", fileTop);
+            out.put("seen", seen);
             out.put("format", "restock-sync");
             out.put("v", 1);
             out.put("device", me);
@@ -201,11 +295,6 @@ final class SyncFolder {
             e.setMeta("folder_top", mark);
             res.wrote = true;
         }
-        if (h.isOwner()) writeKeys(f, names);
-        // "Synced through the folder" only when another phone's file was read.
-        if (res.phones > 0) e.setMeta("folder_at", now);
-        e.setMeta("folder_unread", res.unread > 0 ? String.valueOf(res.unread) : null);
-        return res;
     }
 
     /** Owner: the household's key, sealed for each phone still in it (after a phone was removed). */

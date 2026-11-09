@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { nameHasSize } from '../lib/naming';
 import { RestockNative } from '../lib/sql/native';
 import { formatUnitPrice, money, tidySize, tidyUnitText } from '../lib/units';
@@ -398,18 +399,55 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
+ * 0.9.1: the layer on <body> that sheets, the toast and its announcer go in, outside the app's own
+ * #root, so the app can be shut off from screen readers while a sheet is open (see Sheet).
+ */
+export function layerHost(): HTMLElement {
+  let el = document.getElementById('layers');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'layers';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+/** Open sheets, oldest first. Only the newest can be reached: the app and any sheets under it are inert. */
+const openSheets: HTMLElement[] = [];
+
+function shutOff(el: HTMLElement, off: boolean) {
+  el.inert = off;
+  if (off) el.setAttribute('aria-hidden', 'true');
+  else el.removeAttribute('aria-hidden');
+}
+
+function updateBehindSheets() {
+  const root = document.getElementById('root');
+  if (root) shutOff(root, openSheets.length > 0);
+  openSheets.forEach((el, i) => shutOff(el, i < openSheets.length - 1));
+}
+
+/**
  * A sheet over the screen (0.9.0: a proper modal dialog for screen readers and keyboards). Focus
  * moves to its title when it opens (unless something in it, like a price box, takes it first), Tab
- * stays inside it, and focus goes back to whatever opened it when it closes.
+ * stays inside it, and focus goes back to whatever opened it when it closes. 0.9.1: it's drawn in
+ * the layer on <body>, and while it's open the app and any sheet under it are inert and hidden from
+ * screen readers.
  */
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   useBackLayer(onClose);
   const ref = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLDivElement>(null);
   // What had focus before the sheet drew (the button that opened it), so focus can go back there.
   const [opener] = useState(() => (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null));
   useEffect(() => {
     const sheet = ref.current;
-    if (!sheet) return;
+    const back = backRef.current;
+    if (!sheet || !back) return;
+    // 0.9.1: everything behind this sheet (the app, and a sheet it was opened from) is out of reach
+    // for screen readers and the keyboard until it closes.
+    openSheets.push(back);
+    updateBehindSheets();
     if (!sheet.contains(document.activeElement)) sheet.querySelector<HTMLElement>('.sheet-title')?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab' || e.defaultPrevented) return;
@@ -429,13 +467,18 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
     sheet.addEventListener('keydown', onKey);
     return () => {
       sheet.removeEventListener('keydown', onKey);
+      // Let the app (or the sheet underneath) back in first, so focus can go back to the opener.
+      const at = openSheets.indexOf(back);
+      if (at >= 0) openSheets.splice(at, 1);
+      updateBehindSheets();
       // Not back into a text box: that would pop the keyboard up.
       const typing = opener?.matches('textarea, input:not([type="checkbox"]):not([type="radio"])');
       if (opener && opener !== document.body && opener.isConnected && !typing) opener.focus({ preventScroll: true });
     };
   }, [opener]);
-  return (
-    <div className="sheet-back" onClick={onClose}>
+  // 0.9.1: drawn in the layer on <body>, not inside whatever screen opened it.
+  return createPortal(
+    <div ref={backRef} className="sheet-back" onClick={onClose}>
       <div ref={ref} className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="topbar">
           <h2 className="sheet-title" tabIndex={-1} style={{ flex: 1 }}>
@@ -447,7 +490,8 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    layerHost(),
   );
 }
 

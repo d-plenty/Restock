@@ -680,9 +680,22 @@ final class StoreClient {
         return new JSONObject(t);
     }
 
+    /**
+     * A direct request (not through the hidden browser). 0.9.1: with this client's own cookies only
+     * (the jar above), never the in-app browser's, so a direct price check doesn't go with a shop
+     * account you've signed in to in Restock's browser, and doesn't change that browser's cookies.
+     * Before, it did whenever Restock's screen was open (Capacitor shares the browser's cookies with
+     * every plain request; see Net.Cookies). Signed-in checks go through StoreWeb on purpose.
+     */
     private Resp request(String method, String url, Map<String, String> headers, String body) throws Exception {
         URL u = Net.url(url);
-        HttpURLConnection c = (HttpURLConnection) u.openConnection();
+        try (Net.Scope own = Net.anonymous(Net.NO_COOKIES)) {
+            return request(u, method, headers, body);
+        }
+    }
+
+    private Resp request(URL u, String method, Map<String, String> headers, String body) throws Exception {
+        HttpURLConnection c = Net.open(u);
         try {
             c.setRequestMethod(method);
             c.setConnectTimeout(15_000);
@@ -738,7 +751,7 @@ final class StoreClient {
      */
     static final int MAX_BODY = 8 * 1024 * 1024;
 
-    private static String readAll(InputStream in) throws Exception {
+    static String readAll(InputStream in) throws Exception {
         try (InputStream is = in; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] buf = new byte[16_384];
             int n;

@@ -27,6 +27,19 @@ export interface RestockNativePlugin {
   /** A request made from inside the store's own web page, in a hidden browser (StoreWeb.java). */
   storeFetch(opts: { chain: string; method: 'GET' | 'POST'; url: string; body?: string }): Promise<{ status: number; body: string }>;
   /**
+   * 0.9.1: a plain request that doesn't go with the in-app browser's cookies (so not with any shop
+   * account signed in to in Restock): only the cookies in its own jar, kept in memory until Restock
+   * closes (Net.java). For barcode lookups (jar "lookup").
+   */
+  plainFetch(opts: {
+    jar: string;
+    method: 'GET' | 'POST';
+    url: string;
+    headers?: Record<string, string>;
+    body?: string;
+    timeoutMs?: number;
+  }): Promise<{ status: number; body: string; headers?: Record<string, string> }>;
+  /**
    * Open a page in the hidden browser, wait for its scripts to draw it, and return the finished
    * page (for shop websites that build their product lists with scripts, or block plain requests).
    */
@@ -53,8 +66,15 @@ export interface RestockNativePlugin {
   checkRecalls(): Promise<{ checked: number; found: number; fresh: number; errors: Record<string, string> }>;
   /** Show a notification right away (recalls found by "Check now", the weekly summary). */
   notify(opts: { id: number; title: string; body: string }): Promise<void>;
-  /** 0.7.3: download an official release APK and open Android's installer. */
-  installUpdate(opts: { url: string }): Promise<{ started?: boolean; needsPermission?: boolean }>;
+  /**
+   * 0.7.3: download an official release APK and open Android's installer. 0.9.1: `sha256` (lowercase
+   * hex, as GitHub published it) is checked against the download first; without it, only the
+   * signature and version are (sha256Checked false).
+   */
+  installUpdate(opts: {
+    url: string;
+    sha256?: string;
+  }): Promise<{ started?: boolean; needsPermission?: boolean; notified?: boolean; sha256Checked?: boolean }>;
   /** Pick a folder for automatic backups (Android's folder picker). Rejects if cancelled. */
   pickFolder(): Promise<{ uri: string; name: string }>;
   /** Write a backup file into the picked folder, keeping the newest `keep` Restock backups there. */
@@ -93,8 +113,19 @@ export interface RestockNativePlugin {
   syncRecoverySaved(opts: { fresh?: boolean; key?: string }): Promise<SyncInfo>;
   /** 0.9.0: take over as owner with the recovery key (the owner phone was lost). */
   syncTakeOver(opts: { key: string }): Promise<SyncInfo>;
-  /** 0.9.0: sync through a picked folder (its uri), or stop (no uri). */
+  /**
+   * 0.9.0: sync through a picked folder (its uri), or stop (no uri; 0.9.1: also forgets a WebDAV
+   * or Nextcloud sign-in). 0.9.1: a picked folder is tried out first; rejects with a message if it fails.
+   */
   syncSetFolder(opts: { uri?: string }): Promise<SyncInfo>;
+  /** 0.9.1: sync away from home through a WebDAV server (made and tried out first; rejects with a message). */
+  syncSetWebDav(opts: { url: string; user: string; password: string; folder?: string }): Promise<SyncInfo>;
+  /**
+   * 0.9.1, "Sign in to Nextcloud": opens Nextcloud's sign-in page in the browser and waits (up to
+   * 20 minutes) for the person to finish there. cancelled: syncNextcloudCancel() was called.
+   */
+  syncNextcloud(opts: { server: string; folder?: string }): Promise<SyncInfo & { cancelled?: boolean }>;
+  syncNextcloudCancel(): Promise<void>;
   /** The search test with the screen off (0.8.6): a notification with progress and a Stop button. */
   searchTestStart(opts: { total: number }): Promise<void>;
   searchTestProgress(opts: { done: number; total: number; text: string }): Promise<{ stop: boolean }>;
@@ -126,6 +157,8 @@ export interface RestockNativePlugin {
     keepReady?: boolean;
     tabs?: Section[];
     householdTabs?: Section[];
+    /** 0.9.1, owner: "Share receipts with the household". */
+    householdReceipts?: boolean;
   }): Promise<SyncInfo>;
   /** left false: this is the owner and other phones are in the household; hand over first. */
   syncLeave(): Promise<SyncInfo & { left: boolean }>;
@@ -153,7 +186,10 @@ export interface SyncInfo {
   /** 0.8.2: whether this phone is the household's owner, and the household's phones. */
   isOwner?: boolean;
   members?: { device: string; name: string; owner: boolean; me: boolean }[];
-  /** "repair": paired on 0.8.0/0.8.1, pair again. "removed": the owner removed this phone. */
+  /**
+   * "repair": paired on 0.8.0/0.8.1, pair again. "removed": the owner removed this phone.
+   * "keys" (0.9.1): this phone's sync keys couldn't be opened (Restock's data moved to another phone).
+   */
   notice?: string | null;
   /** The phone's maker (some stop apps in the background regardless; see dontkillmyapp.com). */
   maker?: string;
@@ -177,6 +213,12 @@ export interface SyncInfo {
   folderUnread?: number;
   /** 0.9.0: the name of a phone whose date looks well ahead (its changes would always win). */
   clockWarning?: string | null;
+  /** 0.9.1: what sync away from home goes through (folderName is then "cloud.example.com · Restock" for a server). */
+  folderKind?: 'nextcloud' | 'webdav' | 'folder' | null;
+  /** 0.9.1: the household shares receipts (the owner's choice; off by default). */
+  shareReceipts?: boolean;
+  /** 0.9.1: on Wi-Fi or Ethernet (phones only sync with each other there). */
+  onWifi?: boolean;
 }
 
 /** Why Restock was opened: a share, an app icon shortcut, a widget or a notification. */

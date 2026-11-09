@@ -1,6 +1,7 @@
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { openDatabase } from '../lib/boot';
 import { wireSync } from '../lib/sync';
 import { checkPrices, syncBackgroundSchedule } from '../lib/check';
@@ -11,7 +12,7 @@ import { setConnectionMode } from '../stores/http';
 import { applyTheme, syncInsets } from '../lib/theme';
 import { scheduleReminders } from '../lib/notify';
 import { useLive } from '../lib/useLive';
-import { Announcer, closeTopLayer, Icon, runBackHandlers } from './components';
+import { Announcer, closeTopLayer, Icon, layerHost, runBackHandlers } from './components';
 import { isSectionTab, NavContext, type Nav, type Screen, type Tab } from './nav';
 import { activeSections, type Section } from '../shops';
 import { ConfirmHost } from './ConfirmHost';
@@ -264,13 +265,19 @@ function RestockApp() {
               {stack[stack.length - 1].name === 'soon' && <SoonScreen id={(stack[stack.length - 1] as { id: string }).id} />}
             </div>
           )}
-          <ScannerHost />
           <ConfirmHost />
-          <Announcer text={toastMsg} />
-          {toastMsg && (
-            <div className="toast" onClick={() => setToastMsg(undefined)}>
-              {toastMsg}
-            </div>
+          {/* 0.9.1: in the layer on <body>, so they still work while a sheet shuts the app off (components.tsx Sheet). */}
+          {createPortal(
+            <>
+              <ScannerHost />
+              <Announcer text={toastMsg} />
+              {toastMsg && (
+                <div className="toast" onClick={() => setToastMsg(undefined)}>
+                  {toastMsg}
+                </div>
+              )}
+            </>,
+            layerHost(),
           )}
         </div>
       </NavContext.Provider>
@@ -355,35 +362,42 @@ function RestockApp() {
           </div>
         )}
 
-        <ScannerHost />
         <TourHost />
         <ConfirmHost />
-        <Announcer text={toastMsg} />
-        {toastMsg && (
-          <div
-            className="toast"
-            // Tap it to make it go away, so it never sits over a button you need (0.7.3).
-            onClick={(e) => {
-              if ((e.target as HTMLElement).closest('.toast-undo')) return;
-              setToastMsg(undefined);
-              setToastUndo(undefined);
-            }}
-          >
-            <span style={{ flex: 1 }}>{toastMsg}</span>
-            {toastUndo && (
-              <button
-                className="toast-undo"
-                onClick={async () => {
-                  const run = toastUndo;
+        {/* 0.9.1: in the layer on <body>, so the scanner, the toast and its Undo, and what screen readers
+            hear still work while a sheet shuts the app off (components.tsx Sheet). */}
+        {createPortal(
+          <>
+            <ScannerHost />
+            <Announcer text={toastMsg} />
+            {toastMsg && (
+              <div
+                className="toast"
+                // Tap it to make it go away, so it never sits over a button you need (0.7.3).
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest('.toast-undo')) return;
                   setToastMsg(undefined);
                   setToastUndo(undefined);
-                  await run();
                 }}
               >
-                Undo
-              </button>
+                <span style={{ flex: 1 }}>{toastMsg}</span>
+                {toastUndo && (
+                  <button
+                    className="toast-undo"
+                    onClick={async () => {
+                      const run = toastUndo;
+                      setToastMsg(undefined);
+                      setToastUndo(undefined);
+                      await run();
+                    }}
+                  >
+                    Undo
+                  </button>
+                )}
+              </div>
             )}
-          </div>
+          </>,
+          layerHost(),
         )}
       </div>
     </NavContext.Provider>
