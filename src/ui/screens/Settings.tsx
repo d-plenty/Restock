@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { version } from '../../../package.json';
 import legal from '../../lib/legal.json';
 import { confirmAction } from '../../lib/confirm';
-import { readCopyInApp, shareTextFile, type BackupSummary } from '../../lib/backup';
-import { BEFORE_UPGRADE_FILE } from '../../lib/boot';
+import { readBackup, readCopyInApp, shareTextFile, type BackupSummary } from '../../lib/backup';
+import { BEFORE_UPGRADE_FILE, beforeUpdateCopies } from '../../lib/boot';
+import { shareCsv } from '../../lib/csvExport';
 import { RestockNative } from '../../lib/sql/native';
 import { syncInfo } from '../../lib/sync';
 import { isNative } from '../../stores/http';
@@ -13,6 +14,8 @@ import { loadDemo, removeDemo } from '../../lib/demo';
 import { syncBackgroundSchedule } from '../../lib/check';
 import { ensureNotificationPermission, scheduleReminders } from '../../lib/notify';
 import { useLive } from '../../lib/useLive';
+import { money } from '../../lib/units';
+import { STALE_DAYS } from '../../lib/verdict';
 import { chainName, CHECK_INTERVALS, GOOD_SALE, GREAT_SALE, HISTORY_WEEKS, historyLabel, WEEKDAYS, type Settings } from '../../types';
 import { ChainDot, Explain, Icon, Logo, OpenStoreButton, Sheet, timeAgo, TopBar } from '../components';
 import { AccessibilitySettings, LookSettings } from './Look';
@@ -32,6 +35,9 @@ import { shopSummary } from './Stores';
 import { ExportSheet } from './BackupParts';
 import { LegalSheet } from './Legal';
 import { readBackupFile, RestoreSheet } from './Restore';
+
+/** Settings → Shopping list: how much shopping around has to save (0.9.0). */
+const SHOP_AROUND_MINS = [0, 0.5, 1, 2, 5, 10];
 
 const intervalLabel = (h: number) => (h === 24 ? 'Once a day' : h === 48 ? 'Every 2 days' : h === 168 ? 'Once a week' : `Every ${h} hours`);
 
@@ -110,7 +116,7 @@ async function eraseAll() {
   }
   const first = await confirmAction('Erase everything on this phone?', {
     detail:
-      "Every item, list, price, loyalty card, receipt and setting is deleted from this phone, and it leaves your household if it's in one. Other phones keep their things. Export a backup first if you might want any of it back.",
+      "Every item, list, price, loyalty card, receipt and setting is deleted from this phone, you're signed out of the shops inside Restock, and it leaves your household if it's in one. Other phones keep their things. Export a backup first if you might want any of it back.",
     action: 'Continue',
   });
   if (!first) return;
@@ -145,6 +151,8 @@ export function SettingsScreen() {
   const sync = useLive(syncInfo, []);
   // 0.8.0: the copy saved just before the upgrade, if there is one.
   const beforeUpgrade = useLive(async () => (isNative() ? (await RestockNative.appFileInfo({ path: BEFORE_UPGRADE_FILE })).exists : false), []);
+  // 0.9.0: the copies saved just before each update (the last two).
+  const beforeUpdate = useLive(async () => (isNative() ? beforeUpdateCopies() : []), []);
   const fileRef = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState<'privacy' | 'disclaimer'>();
   const [picking, setPicking] = useState<BackupSummary>();
@@ -200,6 +208,7 @@ export function SettingsScreen() {
           ['s-stores', 'Shops'],
           ['s-sync', 'Sync'],
           ['s-checks', 'Price checks'],
+          ['s-list', 'Shopping list'],
           ['s-alerts', 'Alerts'],
           ['s-look', 'Colours'],
           ['s-a11y', 'Accessibility'],
@@ -207,7 +216,7 @@ export function SettingsScreen() {
           ['s-receipts', 'Receipts'],
           ['s-data', 'Backup'],
           ['s-widgets', 'Widgets'],
-          ['s-shared', 'Shared history'],
+          ['s-shared', 'Shared prices'],
           ['s-help', 'Help'],
           ['s-about', 'About and updates'],
           ['s-soon', 'Coming soon'],
@@ -246,16 +255,50 @@ export function SettingsScreen() {
       </div>
       <PriceCheckSettings settings={settings} />
 
+      <div className="eyebrow" id="s-list">
+        Shopping list
+      </div>
+      <div className="card flush">
+        <label className="row field-row">
+          <span className="grow">
+            <span className="title">Shop around if it saves at least</span>
+            <span className="small">
+              Below this, a store that has everything on your list is recommended instead, so you're not making extra stops for a few cents.
+            </span>
+            <select
+              className="input"
+              value={String(settings.shopAroundMin ?? 1)}
+              onChange={(e) => void updateSettings({ shopAroundMin: Number(e.target.value) })}
+              aria-label="Shop around if it saves at least"
+            >
+              {SHOP_AROUND_MINS.map((v) => (
+                <option key={v} value={String(v)}>
+                  {v === 0 ? 'Any saving' : money(v)}
+                  {v === 1 ? ' (default)' : ''}
+                </option>
+              ))}
+            </select>
+          </span>
+        </label>
+      </div>
+
       <div className="eyebrow" id="s-alerts">
         Notifications
       </div>
       <NotificationSettings settings={settings} />
 
       <Explain title="How Restock judges a sale">
+        {/* 0.9.0: says what the code does (verdict.ts computeStats and judge). */}
         <p>
-          Each product's <strong>normal price</strong> is the middle of its non-sale prices over the history you keep (
+          Each product's <strong>normal price</strong> is the middle of the non-sale prices Restock has seen for it over the history you keep (
           {historyLabel(settings.historyWeeks)}
-          {settings.historyWeeks === 8 ? ' unless you change it' : ''}). New items use the store's "was" price until there's about 4 weeks of history.
+          {settings.historyWeeks === 8 ? ' unless you change it' : ''}). Until it has seen one at a non-sale price, it goes by the store's "was" price.
+          {settings.marketData.enabled ? ' For its first 4 weeks or so, shared price history fills in.' : ''} Member prices only count if you've added that
+          shop's card.
+        </p>
+        <p>
+          Only this week's specials (Wednesday to Tuesday) count as on sale. An older special, or a lower price last checked over {STALE_DAYS} days
+          ago, isn't called a deal until prices are checked again.
         </p>
         <p>
           Small saving: any drop under {GOOD_SALE * 100}% · On sale: {GOOD_SALE * 100}%+ · Great deal: {GREAT_SALE * 100}%+. "Wait" means it's been at
@@ -293,7 +336,7 @@ export function SettingsScreen() {
       <div className="card flush">
         <label className="check">
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               Keep price history for
             </span>
             <span className="small">
@@ -302,7 +345,7 @@ export function SettingsScreen() {
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
             value={settings.historyWeeks}
             aria-label="Keep price history for"
             onChange={async (e) => {
@@ -349,6 +392,44 @@ export function SettingsScreen() {
             </span>
           </button>
         )}
+        {(beforeUpdate ?? []).map((c) => (
+          <button
+            key={c.path}
+            className="row"
+            onClick={async () => {
+              const json = await readCopyInApp(c.path);
+              if (!json) return nav.toast("Couldn't read that copy");
+              try {
+                setPicking(readBackup(json));
+              } catch (e) {
+                nav.toast(e instanceof Error ? e.message : String(e));
+              }
+            }}
+          >
+            <span className="grow">
+              <span className="title">Backup from before {c.to}</span>
+              <span className="small">
+                Saved {new Date(c.at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                {c.from ? `, on ${c.from}` : ''}, just before the update. Tap to restore from it, if the update changed something it shouldn't have.
+              </span>
+            </span>
+          </button>
+        ))}
+        <button
+          className="row"
+          onClick={async () => {
+            try {
+              await shareCsv();
+            } catch (e) {
+              nav.toast(`Couldn't make the spreadsheets: ${e instanceof Error ? e.message : e}`);
+            }
+          }}
+        >
+          <span className="grow">
+            <span className="title">Export as spreadsheets (CSV)</span>
+            <span className="small">Your pantry, shopping list and price history, for Excel, Google Sheets, LibreOffice or Numbers.</span>
+          </span>
+        </button>
         <button className="row" onClick={() => fileRef.current?.click()}>
           <span className="grow">
             <span className="title">Restore a backup</span>
@@ -425,8 +506,9 @@ export function SettingsScreen() {
       </Fold>
 
       <div className="eyebrow" id="s-shared">
-        Shared price history <span className="tag normal beta">Beta</span>
+        Shared prices <span className="tag normal beta">Beta</span>
       </div>
+      <SharePrices settings={settings} />
       <Fold title="Judge new items from day one" sub={settings.marketData.enabled ? 'On' : 'Off'}>
         <SharedHistory settings={settings} />
       </Fold>
@@ -445,7 +527,7 @@ export function SettingsScreen() {
           </summary>
           <label className="check">
             <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 Store connections
               </span>
               <span className="small">
@@ -454,7 +536,7 @@ export function SettingsScreen() {
             </span>
             <select
               className="input"
-              style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+              style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
               value={settings.connection}
               onChange={(e) => updateSettings({ connection: e.target.value as Settings['connection'] })}
               aria-label="Store connections"
@@ -524,7 +606,7 @@ export function SettingsScreen() {
         <Logo size={40} />
       </div>
       <p className="small" style={{ textAlign: 'center' }}>
-        Restock {version} public beta · free and open source
+        Restock {version} release candidate · free and open source
         <br />
         Your data stays on this phone, and your household's phones only if you share
         <br />
@@ -563,6 +645,46 @@ export function SettingsScreen() {
  * Beta: price history from hotprices.org, an open-source project that records Coles and
  * Woolworths prices daily, so new items can be judged from day one.
  */
+/**
+ * Share prices about products (0.9.0). On unless turned off. For now it only adds a "shared prices"
+ * section to your own backups (sharedPrices.ts); nothing is sent anywhere yet.
+ */
+function SharePrices({ settings }: { settings: Settings }) {
+  const on = settings.sharePrices !== 'no';
+  return (
+    <div className="card flush">
+      <label className="check">
+        <input
+          type="checkbox"
+          className="switch"
+          checked={on}
+          onChange={(e) => void updateSettings({ sharePrices: e.target.checked ? 'yes' : 'no' })}
+        />
+        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <span className="title">Share prices about products</span>
+          <span className="small">{on ? 'On' : 'Off'} · for now, only saved in your own backups</span>
+        </span>
+      </label>
+      <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <p className="small">
+          The plan is a free, open price list anyone can search: what things cost at each shop, and when. It's meant to be decentralised. The
+          phones and computers running Restock share prices with each other, instead of one central server collecting them. The prices will
+          never be sold.
+        </p>
+        <p className="small">
+          <strong>For now nothing leaves your phone.</strong> Restock adds a "shared prices" part to the backups you make, ready for when sharing
+          starts. Before any version sends prices anywhere, it will tell you and you can say no.
+        </p>
+        <p className="small">
+          <strong>What's in it:</strong> for each product Restock has checked, the shop, name, brand, size and barcode, and each price with the
+          normal price, any special or multi-buy, and the day. <strong>Never:</strong> who you are, your loyalty cards, your branch or location,
+          your shopping list or what you ticked off, receipts, or anything you type about yourself.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function SharedHistory({ settings }: { settings: Settings }) {
   const nav = useNav();
   const info = useLive(marketInfo, []);
@@ -597,7 +719,7 @@ function SharedHistory({ settings }: { settings: Settings }) {
     <div className="card flush">
       <label className="check">
         <input
-          type="checkbox"
+          type="checkbox" className="switch"
           checked={md.enabled}
           onChange={async (e) => {
             const enabled = e.target.checked;
@@ -606,7 +728,7 @@ function SharedHistory({ settings }: { settings: Settings }) {
           }}
         />
         <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title" style={{ fontSize: 14 }}>
+          <span className="title" style={{ fontSize: 15 }}>
             Judge new items from day one
           </span>
           <span className="small">
@@ -619,9 +741,9 @@ function SharedHistory({ settings }: { settings: Settings }) {
       {md.enabled && (
         <>
           <label className="check">
-            <input type="checkbox" checked={md.wifiOnly} onChange={(e) => updateSettings({ marketData: { ...md, wifiOnly: e.target.checked } })} />
+            <input type="checkbox" className="switch" checked={md.wifiOnly} onChange={(e) => updateSettings({ marketData: { ...md, wifiOnly: e.target.checked } })} />
             <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 Only on Wi-Fi
               </span>
               <span className="small">Downloads wait for Wi-Fi. Download now always goes ahead.</span>
@@ -629,7 +751,7 @@ function SharedHistory({ settings }: { settings: Settings }) {
           </label>
           <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
             <span className="grow" style={{ minWidth: 180 }}>
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 {info?.count ? `${info.count.toLocaleString()} products` : 'Not downloaded yet'}
               </span>
               <span className="small">
@@ -714,7 +836,7 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
                     )}
                   </span>
                   <span className="grow">
-                    <span className="title" style={{ fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="title" style={{ fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <ChainDot chain={c} /> {chainName(c)}
                     </span>
                     <span className="small">
@@ -761,9 +883,9 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
     <>
       <div className="card flush">
         <label className="check">
-          <input type="checkbox" checked={settings.sync.backgroundActivity} onChange={(e) => setChecks({ on: e.target.checked })} />
+          <input type="checkbox" className="switch" checked={settings.sync.backgroundActivity} onChange={(e) => setChecks({ on: e.target.checked })} />
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               Check prices in the background
             </span>
             <span className="small">Only on a network connection and when the battery isn't low.</span>
@@ -775,14 +897,14 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
           aria-disabled={!settings.sync.backgroundActivity || undefined}
         >
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               How often
             </span>
             <span className="small">Android may run it a little later to save battery.</span>
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
             value={settings.checkIntervalHours}
             disabled={!settings.sync.backgroundActivity}
             onChange={(e) => setChecks({ hours: parseInt(e.target.value, 10) })}
@@ -803,14 +925,14 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
             aria-disabled={!settings.sync.backgroundActivity || undefined}
           >
             <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 Which day
               </span>
               <span className="small">Wednesday recommended: that's when new specials start.</span>
             </span>
             <select
               className="input"
-              style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+              style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
               value={settings.checkWeekday}
               disabled={!settings.sync.backgroundActivity}
               onChange={(e) => setChecks({ weekday: parseInt(e.target.value, 10) })}
@@ -842,9 +964,9 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
     <>
       <div className="card flush">
         <label className="check">
-          <input type="checkbox" checked={settings.alerts.catalogueDay} onChange={(e) => setAlerts({ catalogueDay: e.target.checked })} />
+          <input type="checkbox" className="switch" checked={settings.alerts.catalogueDay} onChange={(e) => setAlerts({ catalogueDay: e.target.checked })} />
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               Weekly deals summary
             </span>
             <span className="small">
@@ -854,7 +976,7 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
             value={settings.alerts.catalogueWeekday}
             onChange={(e) => setAlerts({ catalogueWeekday: parseInt(e.target.value, 10) })}
             aria-label="Roundup day"
@@ -867,9 +989,9 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
           </select>
         </label>
         <label className="check">
-          <input type="checkbox" checked={settings.alerts.daily} onChange={(e) => setAlerts({ daily: e.target.checked })} />
+          <input type="checkbox" className="switch" checked={settings.alerts.daily} onChange={(e) => setAlerts({ daily: e.target.checked })} />
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               Daily reminder
             </span>
             <span className="small">A nudge to open the app and check prices.</span>
@@ -877,25 +999,25 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
           <input
             type="time"
             className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
             value={settings.alerts.dailyTime}
             onChange={(e) => setAlerts({ dailyTime: e.target.value || '07:30' })}
             aria-label="Reminder time"
           />
         </label>
         <label className="check">
-          <input type="checkbox" checked={settings.alerts.greatDeals} onChange={(e) => setAlerts({ greatDeals: e.target.checked })} />
+          <input type="checkbox" className="switch" checked={settings.alerts.greatDeals} onChange={(e) => setAlerts({ greatDeals: e.target.checked })} />
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               Great deals, straight away
             </span>
             <span className="small">When a price check finds a deal that matches an item's alert setting, or an item is under its target price.</span>
           </span>
         </label>
         <label className="check">
-          <input type="checkbox" checked={settings.alerts.stockUpTips} onChange={(e) => setAlerts({ stockUpTips: e.target.checked })} />
+          <input type="checkbox" className="switch" checked={settings.alerts.stockUpTips} onChange={(e) => setAlerts({ stockUpTips: e.target.checked })} />
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               Stock-up tips
             </span>
             <span className="small">On deals for things that only go on sale every few weeks: "a good time to stock up".</span>
@@ -1015,9 +1137,9 @@ function UpdateRowsOn({ settings }: { settings: Settings }) {
         </div>
       )}
       <label className="check">
-        <input type="checkbox" checked={!!u?.notify} onChange={(e) => void updateSettings({ updates: { ...u, notify: e.target.checked } })} />
+        <input type="checkbox" className="switch" checked={!!u?.notify} onChange={(e) => void updateSettings({ updates: { ...u, notify: e.target.checked } })} />
         <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title" style={{ fontSize: 14 }}>
+          <span className="title" style={{ fontSize: 15 }}>
             Tell me when there's an update
           </span>
           <span className="small">Once a week, when you open Restock, it asks GitHub if there's a newer version.</span>

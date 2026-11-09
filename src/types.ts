@@ -1,18 +1,8 @@
 // Core data types. Everything here is stored on the device in SQLite.
 
-import type { Chain, CustomShop, GroceryChain, Section, StoreChain } from './shops';
+import type { Chain, CustomShop, Section, StoreChain } from './shops';
 export type { Chain, CustomShop, Section, StoreChain } from './shops';
 export { chainName } from './shops';
-
-/** The three supermarkets (the Pantry tab's shops). */
-export const CHAINS: GroceryChain[] = ['woolworths', 'coles', 'aldi'];
-/** Names of the supermarkets and "Other". For any shop, use chainName(). */
-export const CHAIN_NAMES: Record<GroceryChain | 'other', string> = {
-  woolworths: 'Woolworths',
-  coles: 'Coles',
-  aldi: 'Aldi',
-  other: 'Other',
-};
 
 /** Base unit used for unit-price comparison. */
 export type BaseUnit = 'g' | 'ml' | 'ea';
@@ -268,6 +258,7 @@ export interface Settings {
     backgroundActivity: boolean;
   };
   household: { name: string };
+  /** Share prices about products (0.9.0): on unless 'no'. For now only saved in your own backups (sharedPrices.ts). */
   sharePrices: 'unasked' | 'yes' | 'no';
   defaultThresholdPct: number;
   /** How often background price checks run. 168 = weekly, on checkWeekday. */
@@ -287,6 +278,8 @@ export interface Settings {
   theme: 'system' | 'light' | 'dark';
   /** Shopping list: cheapest by best value (per 100 g / litre / item) or by lowest shelf price. */
   listCompare: 'unit' | 'price';
+  /** Shopping around is only recommended over one store with everything when it saves at least this much (0.9.0). */
+  shopAroundMin: number;
   /** The order of an item's products (0.7.6): by shop then size, cheapest first, or A to Z. */
   productOrder?: ProductOrder;
   /** New versions on GitHub (0.7.3): tell me once a week, when I last looked, and the last one I was told about. */
@@ -306,7 +299,7 @@ export interface Settings {
   lastCheck?: string;
   demoLoaded?: boolean;
   /** Colours: the Australian style (navy bars, green and gold) or plain; an accent colour; the app icon colour. */
-  /** `black`: true black in dark mode, for OLED screens (0.8.9). */
+  /** `black`: true black in dark mode, for OLED screens (0.8.9). On unless set to false (0.9.0). */
   look: { style: 'australia' | 'plain'; accent?: string; icon: string; black?: boolean };
   /** Accessibility: text size (1 = normal), high contrast, less motion, bigger buttons. */
   a11y: { text: number; contrast: boolean; motion: boolean; big: boolean };
@@ -327,6 +320,8 @@ export interface Settings {
     keep: number;
     /** Put receipt photos in automatic backups (on unless turned off). */
     receiptPhotos?: boolean;
+    /** 0.9.0: lock automatic backups with this password. Kept on this phone only, never in a backup. */
+    password?: string;
     lastAt?: string;
     lastError?: string;
   };
@@ -362,6 +357,7 @@ export const DEFAULT_SETTINGS: Settings = {
   connection: 'auto',
   theme: 'system',
   listCompare: 'unit',
+  shopAroundMin: 1,
   seenHints: [],
   marketData: { enabled: false, wifiOnly: true },
   look: { style: 'australia', icon: 'green' },
@@ -384,8 +380,6 @@ export const historyLabel = (w: number) => (w === 4 ? '1 month' : w === 13 ? '3 
  * four weeks, so items don't flicker back to "learning" when only 1 month of history is kept.
  */
 export const LEARNING_DAYS = 25;
-
-export const DEFAULT_CATEGORIES = ['Pantry', 'Fridge & freezer', 'Cleaning', 'Bathroom'];
 
 /** Your store at a shop (never undefined, so it's safe to read .primary). */
 export const storeChoice = (s: Pick<Settings, 'stores'>, c: StoreChain): StoreChoice => s.stores[c] ?? {};

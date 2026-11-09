@@ -54,8 +54,10 @@ export async function ensureNotificationPermission(): Promise<boolean> {
 export async function scheduleReminders(s: Settings): Promise<void> {
   const ln = plugin();
   if (!ln) return;
+  // Every one is cancelled first, so a monthly summary scheduled by an older version stops too.
   await ln.cancel({ notifications: Object.values(ID).map((id) => ({ id })) });
-  const wanted = s.alerts.catalogueDay || s.alerts.daily || s.alerts.monthly;
+  // 0.9.0: the monthly savings summary is still "coming soon", so it isn't sent even if it's switched on.
+  const wanted = s.alerts.catalogueDay || s.alerts.daily;
   // Never asks: permission is requested when it's useful (after your first item, or in Settings).
   if (!wanted || !(await notificationsAllowed())) return;
 
@@ -78,14 +80,6 @@ export async function scheduleReminders(s: Settings): Promise<void> {
       title: 'Daily price check',
       body: 'Tap to check today’s prices on your pantry items.',
       schedule: { on: { hour, minute }, allowWhileIdle: true },
-    });
-  }
-  if (s.alerts.monthly) {
-    notifications.push({
-      id: ID.monthly,
-      title: 'Your monthly savings',
-      body: 'See what you saved last month and where.',
-      schedule: { on: { day: 1, hour: 9, minute: 0 }, allowWhileIdle: true },
     });
   }
   await ln.schedule({ notifications });

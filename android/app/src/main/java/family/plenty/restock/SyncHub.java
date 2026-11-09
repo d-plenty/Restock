@@ -64,6 +64,8 @@ final class SyncHub {
     private final ReentrantLock syncing = new ReentrantLock();
     volatile String lastError;
     volatile String lastSyncAt;
+    /** 0.9.0: folder sync's last problem, or null. */
+    volatile String folderError;
 
     static synchronized SyncHub get(Context context) {
         if (instance == null) instance = new SyncHub(context.getApplicationContext());
@@ -77,7 +79,12 @@ final class SyncHub {
         // A phone joining from the first screen gets the owner's shop choices and settings once.
         household.settings = () -> {
             try (Cursor c = RestockDatabase.get(context).rawQuery("SELECT value FROM kv WHERE key = 'settings'", null)) {
-                return c.moveToFirst() ? c.getString(0) : null;
+                if (!c.moveToFirst()) return null;
+                // 0.9.0: the automatic backups' password stays on this phone.
+                JSONObject st = new JSONObject(c.getString(0));
+                JSONObject ab = st.optJSONObject("autoBackup");
+                if (ab != null) ab.remove("password");
+                return st.toString();
             }
         };
     }
@@ -180,7 +187,8 @@ final class SyncHub {
                     JSONObject r = step.run(cl);
                     r.put("_reached", hp);
                     return r;
-                } catch (SyncHousehold.OwnerSaid e) {
+                } catch (SyncHousehold.OwnerSaid | SyncWire.Refused e) {
+                    // The owner phone was reached and said no: say why, rather than "couldn't reach it".
                     throw new IllegalStateException(e.getMessage());
                 } catch (Exception e) {
                     // not there: try the next address
@@ -212,12 +220,15 @@ final class SyncHub {
         // Starting over from the household's things: a fresh sync name, so the others don't skip
         // records this phone made before (they'd think it already has them).
         if (replace) engine.newDevice();
+        household.pairingKeyUsed = SyncHousehold.pairingKey(SyncWire.unbase32(SyncHousehold.parseCode(code)[0]));
         JSONObject got = withOwner(code, cl -> household.join(cl, true));
         String reached = got.optString("_reached", null);
         got.remove("_reached");
         stop();
         Set<String> mine = tabs == null ? SyncEngine.parseTabs((String) null) : tabs;
         if (replace) engine.clearForJoin(mine);
+        // 0.9.0, "Combine": where the household already has something, its version wins.
+        else engine.yieldToHousehold();
         engine.setMeta("tabs", tabs == null ? null : SyncEngine.joinTabs(tabs));
         engine.setMeta("tabs_eff", null);
         engine.setShareCards(shareCards);
@@ -366,23 +377,30 @@ final class SyncHub {
         }
     }
 
+    /** The name this phone advertises under (random, 0.9.0), so it can skip itself when looking. */
+    private volatile String myServiceName;
+
     /**
      * Tells the Wi-Fi this phone is here: "h" is a public tag for the household's key (and "o"
-     * for the one before it, on the owner), "p" for an open pairing code, "d" this phone.
+     * for the one before it, on the owner), "p" for an open pairing code. 0.9.0: the tags change
+     * every day and the name is random, so nobody can follow this phone around by them.
      */
     private synchronized void advertise() throws Exception {
         byte[] key = key();
         if (key == null || server == null) return;
         NsdServiceInfo info = new NsdServiceInfo();
-        String device = engine.device();
-        info.setServiceName("Restock-" + device.substring(0, Math.min(8, device.length())));
+        byte[] r = new byte[4];
+        new java.security.SecureRandom().nextBytes(r);
+        StringBuilder name = new StringBuilder("Restock-");
+        for (byte x : r) name.append(String.format("%02x", x & 0xff));
+        myServiceName = name.toString();
+        info.setServiceName(myServiceName);
         info.setServiceType(SERVICE_TYPE);
         info.setPort(server.port());
-        info.setAttribute("h", SyncWire.householdId(key));
-        info.setAttribute("d", device);
+        info.setAttribute("h", SyncWire.dayTag(key, 0));
         if (household.isOwner()) {
             byte[] old = household.oldKey();
-            if (old != null) info.setAttribute("o", SyncWire.householdId(old));
+            if (old != null) info.setAttribute("o", SyncWire.dayTag(old, 0));
             String tag = household.openPairingTag();
             if (tag != null) info.setAttribute("p", tag);
         }
@@ -418,10 +436,24 @@ final class SyncHub {
     List<String> discover(long ms) {
         byte[] key = key();
         if (key == null) return new ArrayList<>();
-        List<String> found = discover(ms, "h", SyncWire.householdId(key));
+        // Today's tag, yesterday's and tomorrow's (phones either side of midnight), and the fixed
+        // tag phones on 0.8.x still use.
+        List<String> found = discover(ms, "h", SyncWire.dayTag(key, 0));
+        for (String tag : new String[] { SyncWire.dayTag(key, -1), SyncWire.dayTag(key, 1), SyncWire.householdId(key) })
+            for (String hp : discover(0, "h", tag)) if (!found.contains(hp)) found.add(hp);
         // An owner that changed the key still shows the old one as "o", for phones that missed it.
-        for (String hp : discover(0, "o", SyncWire.householdId(key))) if (!found.contains(hp)) found.add(hp);
+        for (String tag : new String[] { SyncWire.dayTag(key, 0), SyncWire.dayTag(key, -1), SyncWire.dayTag(key, 1), SyncWire.householdId(key) })
+            for (String hp : discover(0, "o", tag)) if (!found.contains(hp)) found.add(hp);
         return found;
+    }
+
+    /** Everyone on this Wi-Fi advertising Restock (from the last look), for a phone that lost track of the key. */
+    private List<String> everyoneSeen() {
+        List<String> all = new ArrayList<>();
+        synchronized (lastAttrs) {
+            all.addAll(lastAttrs.keySet());
+        }
+        return all;
     }
 
     private final Map<String, Map<String, String>> lastAttrs = new java.util.HashMap<>();
@@ -467,7 +499,8 @@ final class SyncHub {
 
             @Override
             public void onServiceFound(NsdServiceInfo info) {
-                if (info.getServiceName() != null && info.getServiceName().startsWith("Restock-")) synchronized (seen) {
+                String n = info.getServiceName();
+                if (n != null && n.startsWith("Restock-") && !n.equals(myServiceName)) synchronized (seen) {
                     seen.add(info);
                 }
             }
@@ -518,7 +551,7 @@ final class SyncHub {
                 synchronized (lastAttrs) {
                     lastAttrs.put(hp, text);
                 }
-                if (!household.equals(text.get(wanted)) || self.equals(text.get("d"))) continue;
+                if (!household.equals(text.get(wanted)) || self.equals(text.get("d")) || (r.getServiceName() != null && r.getServiceName().equals(myServiceName))) continue;
                 found.add(hp);
             }
         } catch (Exception e) {
@@ -632,9 +665,58 @@ final class SyncHub {
             }
             // Made the owner by the phone before? Take over (the phones' secrets came sealed for this one).
             if (key() != null && household.takeHandover()) readvertise();
-            if (s.reached > 0) lastSyncAt = nowIso();
+            // 0.9.0: this phone's signing key, and on the owner the owner key, the household's id and
+            // the recovery key, for households from before 0.9.0 (and after a double takeover).
+            if (key() != null) household.ensureKeys();
+            // 0.9.0: no phone answered with the key this phone has: maybe it missed key changes
+            // (phones removed while it was away). Ask the owner with this phone's own secret, now
+            // and then.
+            if (key() != null && s.reached == 0 && !household.isOwner()) {
+                long last = 0;
+                try {
+                    last = Long.parseLong(String.valueOf(engine.meta("asked_key_at")));
+                } catch (Exception ignored) {
+                    // never asked
+                }
+                if (System.currentTimeMillis() - last > 10 * 60 * 1000L) {
+                    engine.setMeta("asked_key_at", String.valueOf(System.currentTimeMillis()));
+                    List<String> ask = new ArrayList<>(where);
+                    for (String hp : everyoneSeen()) if (!ask.contains(hp)) ask.add(hp);
+                    String secret = engine.meta("secret");
+                    for (String hp : ask) {
+                        int colon = hp.lastIndexOf(':');
+                        try (SyncWire.Client c = new SyncWire.Client(java.util.Base64.getUrlDecoder().decode(secret), hp.substring(0, colon), Integer.parseInt(hp.substring(colon + 1)), 2500)) {
+                            if (household.askForKey(c)) {
+                                readvertise();
+                                break;
+                            }
+                        } catch (SyncHousehold.RemovedException gone) {
+                            stop();
+                            household.forget();
+                            engine.setMeta("notice", "removed");
+                            context.stopService(new android.content.Intent(context, SyncService.class));
+                            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME);
+                            changed();
+                            return s;
+                        } catch (Exception notThisOne) {
+                            // not the owner, or not there
+                        }
+                    }
+                }
+            }
+            // 0.9.0: then the folder, for the phones that aren't on this Wi-Fi.
+            SyncFolder.Result fr = syncFolder();
+            if (fr != null) {
+                s.received += fr.received;
+                if (fr.rekeyed) readvertise();
+            }
+            // The folder only counts when another phone's file was there to read.
+            boolean viaFolder = fr != null && folderError == null && fr.phones > 0;
+            if (s.reached > 0 || viaFolder) lastSyncAt = nowIso();
             lastSummary = s;
-            lastError = s.reached > 0 ? null : (where.isEmpty() ? "No other phones found on this Wi-Fi." : "Couldn't reach the other phone" + (error == null ? "." : ": " + error));
+            lastError = s.reached > 0 || viaFolder
+                ? null
+                : (where.isEmpty() ? "No other phones found on this Wi-Fi." : "Couldn't reach the other phone" + (error == null ? "." : ": " + error));
             if (s.received > 0) changed();
         } catch (Exception e) {
             lastError = e.getMessage();
@@ -643,6 +725,135 @@ final class SyncHub {
             syncing.unlock();
         }
         return s;
+    }
+
+    // ---------- 0.9.0: sync through a folder ----------
+
+    /** The folder the household syncs through (a picked folder's address), or null. */
+    String folder() {
+        try {
+            return engine.meta("folder");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    void setFolder(String uri) throws Exception {
+        engine.setMeta("folder", uri == null || uri.isEmpty() ? null : uri);
+        engine.setMeta("folder_top", null);
+        engine.setMeta("folder_keys", null);
+        engine.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%'");
+        if (uri == null) {
+            engine.setMeta("folder_at", null);
+            folderError = null;
+        }
+    }
+
+    /** One round with the folder, if there is one; null when there isn't. */
+    SyncFolder.Result syncFolder() {
+        String uri = folder();
+        if (uri == null || key() == null) return null;
+        try {
+            SyncFolder.Result r = new SyncFolder(engine, household).sync(new AndroidFolder(context, android.net.Uri.parse(uri)), nowIso());
+            folderError = null;
+            return r;
+        } catch (SecurityException e) {
+            folderError = "Restock can't open the sync folder any more. Pick it again in Settings → Local sync.";
+        } catch (Exception e) {
+            folderError = "Couldn't sync through the folder" + (e.getMessage() == null ? "." : ": " + e.getMessage());
+            Log.w(TAG, "syncFolder", e);
+        }
+        return new SyncFolder.Result();
+    }
+
+    /** A folder picked with Android's folder picker, as SyncFolder needs it. */
+    static final class AndroidFolder implements SyncFolder.Folder {
+        private final android.content.ContentResolver cr;
+        private final android.net.Uri tree;
+        private final Map<String, String> ids = new java.util.HashMap<>();
+        private final Map<String, String> versions = new java.util.HashMap<>();
+
+        AndroidFolder(Context context, android.net.Uri tree) {
+            this.cr = context.getContentResolver();
+            this.tree = tree;
+        }
+
+        private android.net.Uri dir() {
+            return android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, android.provider.DocumentsContract.getTreeDocumentId(tree));
+        }
+
+        @Override
+        public List<String> names() throws Exception {
+            ids.clear();
+            versions.clear();
+            android.net.Uri children = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(tree, android.provider.DocumentsContract.getTreeDocumentId(tree));
+            Map<String, Long> when = new java.util.HashMap<>();
+            try (Cursor c = cr.query(children, new String[] {
+                android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID, android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED, android.provider.DocumentsContract.Document.COLUMN_SIZE }, null, null, null)) {
+                if (c == null) throw new Exception("the folder can't be read");
+                while (c.moveToNext()) {
+                    String n = c.getString(1);
+                    if (n == null || !n.startsWith(SyncFolder.PREFIX)) continue;
+                    long t = c.isNull(2) ? 0 : c.getLong(2);
+                    // Two files with the same name (Google Drive allows it): the newest.
+                    if (ids.containsKey(n) && when.getOrDefault(n, 0L) >= t) continue;
+                    ids.put(n, c.getString(0));
+                    when.put(n, t);
+                    long size = c.isNull(3) ? -1 : c.getLong(3);
+                    versions.put(n, t > 0 && size >= 0 ? t + ":" + size : null);
+                }
+            }
+            return new ArrayList<>(ids.keySet());
+        }
+
+        @Override
+        public String version(String name) {
+            return versions.get(name);
+        }
+
+        @Override
+        public byte[] read(String name) throws Exception {
+            String id = ids.get(name);
+            if (id == null) return null;
+            try (java.io.InputStream in = cr.openInputStream(android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, id))) {
+                if (in == null) return null;
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[16384];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                return out.toByteArray();
+            }
+        }
+
+        @Override
+        public void write(String name, byte[] data) throws Exception {
+            String id = ids.get(name);
+            android.net.Uri file = id != null
+                ? android.provider.DocumentsContract.buildDocumentUriUsingTree(tree, id)
+                : android.provider.DocumentsContract.createDocument(cr, dir(), name.endsWith(".json") ? "application/json" : "application/octet-stream", name);
+            if (file == null) throw new Exception("the folder didn't let Restock save there");
+            if (id == null) {
+                // Some folders rename a new file whose name is taken ("… (1).json"): that copy would never be read.
+                String got = null;
+                try (Cursor c = cr.query(file, new String[] { android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME }, null, null, null)) {
+                    if (c != null && c.moveToFirst()) got = c.getString(0);
+                }
+                if (got != null && !got.equals(name)) {
+                    try {
+                        android.provider.DocumentsContract.deleteDocument(cr, file);
+                    } catch (Exception ignored) {
+                        // leave it
+                    }
+                    throw new Exception("the folder renamed " + name + "; Restock will try again");
+                }
+            }
+            try (java.io.OutputStream out = cr.openOutputStream(file, "wt")) {
+                if (out == null) throw new Exception("couldn't open " + name);
+                out.write(data);
+            }
+            if (id == null) ids.put(name, android.provider.DocumentsContract.getDocumentId(file));
+        }
     }
 
     private void changed() {

@@ -11,7 +11,7 @@ async function freshDb() {
 
 describe('sync change log (0.8.0)', () => {
   it('is the newest migration', () => {
-    expect(SYNC_VERSION).toBe(MIGRATIONS.length - 4);
+    expect(SYNC_VERSION).toBe(MIGRATIONS.length - 5);
   });
 
   it('notes adds, edits and deletes, and seeds what was already there', async () => {

@@ -102,7 +102,7 @@ export function ReceiptsSettings({ settings, inSetup }: { settings: Settings; in
             </span>
             <span className="small">Scan and keep receipts.</span>
           </span>
-          <input type="checkbox" checked={r.enabled} disabled={reader.progress !== undefined} onChange={(e) => void turnOn(e.target.checked)} />
+          <input type="checkbox" className="switch" checked={r.enabled} disabled={reader.progress !== undefined} onChange={(e) => void turnOn(e.target.checked)} />
         </label>
         {reader.error && (
           <div style={{ padding: '0 14px 12px', display: 'grid', gap: 8 }}>
@@ -114,14 +114,14 @@ export function ReceiptsSettings({ settings, inSetup }: { settings: Settings; in
         )}
         <label className="check">
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               Keep receipts for
             </span>
             <span className="small">Counted from the day you scan each one. Pin a receipt to keep it longer.</span>
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
             value={r.keepMonths}
             aria-label="Keep receipts for"
             onChange={(e) => void setKeep(parseInt(e.target.value, 10))}
@@ -216,7 +216,7 @@ export function ReceiptsScreen() {
                 <button key={r.id} className="row" onClick={() => nav.push({ name: 'receipt', id: r.id })}>
                   {r.chain ? <ChainDot chain={r.chain} /> : <Icon name="receipt" size={18} />}
                   <span className="grow">
-                    <span className="title" style={{ fontSize: 14 }}>
+                    <span className="title" style={{ fontSize: 15 }}>
                       {r.shop || (r.chain ? chainName(r.chain) : 'Receipt')}
                     </span>
                     <span className="small">
@@ -805,9 +805,9 @@ export function ReceiptScreen({ id }: { id?: string }) {
           />
         </label>
         <label className="check" style={{ padding: 0 }}>
-          <input type="checkbox" checked={fields.pinned} onChange={(e) => set({ pinned: e.target.checked })} />
+          <input type="checkbox" className="switch" checked={fields.pinned} onChange={(e) => set({ pinned: e.target.checked })} />
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               Pin it: keep this one
             </span>
             <span className="small">

@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The folders Restock can hand a file from to another app (FileProvider, ${applicationId}.fileprovider).
+     0.9.0: only the ones it uses, instead of all of the phone's shared storage. -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
+    <!-- "Take a photo" (receipts, reading a pack): Capacitor's WebView has the camera app save the
+         photo in Restock's own Pictures folder (getExternalFilesDir(DIRECTORY_PICTURES)). -->
+    <external-files-path name="my_images" path="Pictures/" />
+    <!-- Sharing backups and spreadsheets (Capacitor's Share, from files written to Directory.Cache, at
+         the top of the cache folder) and a downloaded update for Android's installer (cache/updates). -->
     <cache-path name="my_cache_images" path="." />
 </paths>

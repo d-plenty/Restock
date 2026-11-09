@@ -43,6 +43,13 @@ final class MarketData {
     static final long REFRESH_MS = 7L * 86_400_000L;
     /** Give up on a file bigger than this (it would mean something unexpected is being served). */
     static final long MAX_BYTES = 150L * 1024 * 1024;
+    /**
+     * 0.9.0: and on one that unpacks to more than this. The real files download at 10 to 40 MB, so
+     * this leaves them plenty of room, and still stops a broken or booby-trapped file, which could
+     * unpack to many gigabytes and keep the phone busy for ages. (The file is read a product at a
+     * time, so this is about time and battery, not memory.)
+     */
+    static final long MAX_UNPACKED = 1024L * 1024 * 1024;
 
     interface Progress {
         void onProgress(String chain, long bytes, int products);
@@ -98,6 +105,11 @@ final class MarketData {
             } catch (Exception e) {
                 Log.w(TAG, chain + " import failed", e);
                 result.errors.put(chain, e.getMessage() != null ? e.getMessage() : e.toString());
+            } catch (OutOfMemoryError e) {
+                // 0.9.0: a file this phone can't hold (one huge entry, say): skip it, rather than
+                // stopping the background check that called this.
+                Log.w(TAG, chain + " import ran out of memory", e);
+                result.errors.put(chain, "the file was too big for this phone");
             }
         }
         JSONObject status = new JSONObject();
@@ -147,7 +159,7 @@ final class MarketData {
         buf.mark(2);
         int b0 = buf.read(), b1 = buf.read();
         buf.reset();
-        InputStream in = b0 == 0x1f && b1 == 0x8b ? new GZIPInputStream(buf, 64 * 1024) : buf;
+        InputStream in = b0 == 0x1f && b1 == 0x8b ? unpackedAtMost(new GZIPInputStream(buf, 64 * 1024), MAX_UNPACKED) : buf;
 
         // Download and summarise first (this is the slow part), then write in one short transaction,
         // so the app's own saves never wait on the network.
@@ -198,5 +210,38 @@ final class MarketData {
         result.bytes += count[0];
         if (progress != null) progress.onProgress(chain, count[0], written);
         return written;
+    }
+
+    /** 0.9.0: the unpacked file, stopping cleanly (an IOException) once it passes `max` bytes. */
+    static InputStream unpackedAtMost(InputStream in, final long max) {
+        return new FilterInputStream(in) {
+            private long total;
+
+            @Override
+            public int read() throws IOException {
+                int b = super.read();
+                if (b >= 0) tick(1);
+                return b;
+            }
+
+            @Override
+            public int read(byte[] b, int off, int len) throws IOException {
+                int n = super.read(b, off, len);
+                if (n > 0) tick(n);
+                return n;
+            }
+
+            @Override
+            public long skip(long n) throws IOException {
+                long s = super.skip(n);
+                if (s > 0) tick(s);
+                return s;
+            }
+
+            private void tick(long n) throws IOException {
+                total += n;
+                if (total > max) throw new IOException("the file is unexpectedly large once unpacked");
+            }
+        };
     }
 }

@@ -93,25 +93,7 @@ final class PriceChecker {
             }
         }
 
-        Set<String> enabled = new HashSet<>();
-        JSONArray chains = settings.optJSONArray("enabledChains");
-        if (chains == null) {
-            enabled.add("woolworths");
-            enabled.add("coles");
-            enabled.add("aldi");
-        } else {
-            Shops.addCustoms(settings.optJSONArray("customShops"));
-            JSONObject sections = settings.optJSONObject("sections");
-            for (int i = 0; i < chains.length(); i++) {
-                String chain = chains.optString(i);
-                // Keg and Pharmacy shops only while that tab is switched on (shops.ts sectionOn).
-                String section = Shops.section(chain);
-                if (!"pantry".equals(section) && (sections == null || !sections.optBoolean(section, false))) continue;
-                enabled.add(chain);
-                // Liquorland Warehouse and Cellars are priced from liquorland.com.au.
-                enabled.add(Shops.priceSource(chain));
-            }
-        }
+        Set<String> enabled = enabledShops(settings);
         JSONObject stores = settings.optJSONObject("stores");
 
         // Tracked products, grouped by chain.
@@ -256,6 +238,32 @@ final class PriceChecker {
     }
 
     /** A background wake-up that doesn't check prices: just the catalogue-day summary, if it's due. */
+    /**
+     * The shops switched on, plus the websites their prices come from (Liquorland Warehouse and
+     * Cellars are priced from liquorland.com.au). Keg and Pharmacy shops count only while that tab
+     * is on (shops.ts sectionOn). No list saved yet: the three supermarkets.
+     */
+    static Set<String> enabledShops(JSONObject settings) {
+        Set<String> enabled = new HashSet<>();
+        JSONArray chains = settings.optJSONArray("enabledChains");
+        if (chains == null) {
+            enabled.add("woolworths");
+            enabled.add("coles");
+            enabled.add("aldi");
+            return enabled;
+        }
+        Shops.addCustoms(settings.optJSONArray("customShops"));
+        JSONObject sections = settings.optJSONObject("sections");
+        for (int i = 0; i < chains.length(); i++) {
+            String chain = chains.optString(i);
+            String section = Shops.section(chain);
+            if (!"pantry".equals(section) && (sections == null || !sections.optBoolean(section, false))) continue;
+            enabled.add(chain);
+            enabled.add(Shops.priceSource(chain));
+        }
+        return enabled;
+    }
+
     private static Result summaryOnly(Context context, SQLiteDatabase db, JSONObject settings, Result result) {
         try {
             if (summaryDue(db, settings)) alertDeals(context, db, settings, false);
@@ -403,6 +411,8 @@ final class PriceChecker {
         boolean stockUp = alerts == null || alerts.optBoolean("stockUpTips", true);
         int onSpecial = 0;
         double weekSaving = 0;
+        // Shops switched off since a price was saved don't count (verdict.ts shopsOn).
+        Set<String> shopsOn = enabledShops(settings);
         try (Cursor c = db.rawQuery("SELECT id, name, usual_product_id, same_product_ids, alt_product_ids, threshold_pct, alert_level, allow_bulk, "
             + (hasSection ? "section" : "'pantry'") + ", " + (hasTarget ? "target_price" : "NULL") + ", " + (hasMulti ? "allow_multi" : "1") + " FROM items", null)) {
             while (c.moveToNext()) {
@@ -412,7 +422,7 @@ final class PriceChecker {
                     ids(c.getString(3)), ids(c.getString(4)), c.isNull(5) ? null : c.getDouble(5), c.getString(6),
                     c.isNull(7) || c.getInt(7) == 1);
                 item.allowMulti = c.isNull(10) || c.getInt(10) == 1;
-                Deals.Recommendation rec = Deals.recommend(item, products, readings, cardChains, nowMs);
+                Deals.Recommendation rec = Deals.recommend(item, products, readings, cardChains, nowMs, shopsOn);
                 // On special this week, for the Wednesday summary (whatever the item's alert setting).
                 Deals.Option onSale = Deals.dealOption(rec);
                 if (onSale != null && onSale.price != null && onSale.stats.current != null && onSale.stats.current.special) {
@@ -422,7 +432,8 @@ final class PriceChecker {
                 if (!dealAlerts) continue;
                 // Under the item's target price at its cheapest shop.
                 Double target = c.isNull(9) ? null : c.getDouble(9);
-                if (target != null && rec.best != null && rec.best.price != null && rec.best.price <= target + 0.004 && rec.best.stats.current != null) {
+                if (target != null && rec.best != null && rec.best.price != null && rec.best.price <= target + 0.004 && rec.best.stats.current != null
+                    && rec.best.stale == null) {
                     // Once per price, not once per day it stays there (see priceSince).
                     String tkey = "target:" + item.id + ":" + rec.best.product.id + ":" + String.format(Locale.ROOT, "%.2f", rec.best.price) + ":"
                         + priceSince(readings.get(rec.best.product.id), rec.best.stats.current);

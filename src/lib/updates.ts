@@ -51,7 +51,10 @@ export async function checkForUpdate(current: string): Promise<UpdateInfo> {
   };
   const version = String(r.tag_name ?? '').replace(/^v/i, '');
   if (!version) throw new Error("Couldn't read the latest version from GitHub");
-  const apk = r.assets?.find((a) => a.name === 'restock.apk') ?? r.assets?.find((a) => /\.apk$/i.test(a.name ?? ''));
+  // 0.9.0: only the release's restock.apk, never just any APK attached to it. (The phone also checks
+  // the download is a newer Restock, signed by Restock, before installing it: installUpdate in
+  // RestockNativePlugin.java.)
+  const apk = r.assets?.find((a) => a.name === 'restock.apk');
   return {
     version,
     newer: isNewer(version, current),

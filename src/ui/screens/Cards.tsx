@@ -97,7 +97,7 @@ export function CardsScreen() {
         </button>
       ))}
 
-      <button className="btn ghost" onClick={() => setAdding(true)}>
+      <button className="btn add" onClick={() => setAdding(true)}>
         <Icon name="plus" size={18} /> Add a card
       </button>
 

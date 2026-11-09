@@ -1,5 +1,5 @@
 import {
-  DEFAULT_SETTINGS,
+  HISTORY_WEEKS,
   type Category,
   type Chain,
   type Group,
@@ -16,6 +16,8 @@ import { DEFAULT_SECTION_CATEGORIES, SECTIONS, setCustomShops, shopDef, type Sec
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
 import { migrate } from './sql/schema';
 import { toPicks } from './picks';
+import { checkSettings } from './settingsCheck';
+import { isPhotoPath } from './receiptPaths';
 
 // All reads and writes to the on-device SQLite database go through this file.
 
@@ -218,7 +220,7 @@ export const insertReadingOp = (r: Omit<PriceReading, 'id'>): SqlOp => ({
 });
 
 export const insertEntryOp = (e: ListEntry, replace = false): SqlOp => ({
-  sql: `INSERT ${replace ? 'OR REPLACE ' : ''}INTO list_entries (id, text, item_id, chain, category_id, qty, price, section, product, checked, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+  sql: `INSERT ${replace ? 'OR REPLACE ' : ''}INTO list_entries (id, text, item_id, chain, category_id, qty, price, section, product, checked, created_at, checked_at, qty_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   params: [
     e.id,
     e.text,
@@ -231,6 +233,9 @@ export const insertEntryOp = (e: ListEntry, replace = false): SqlOp => ({
     e.product ? JSON.stringify(e.product) : null,
     b(e.checked),
     e.createdAt,
+    // When the tick and the amount were set (see updateEntryOp).
+    Date.now(),
+    Date.now(),
   ],
 });
 
@@ -289,29 +294,14 @@ export async function putKV(key: string, value: unknown): Promise<void> {
   await write([{ sql: 'INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', params: [key, JSON.stringify(value)] }]);
 }
 
-export function mergeSettings(stored: Partial<Settings> | undefined): Settings {
-  const s = stored ?? {};
-  return {
-    ...DEFAULT_SETTINGS,
-    ...s,
-    stores: { ...DEFAULT_SETTINGS.stores, ...(s.stores ?? {}) },
-    alerts: { ...DEFAULT_SETTINGS.alerts, ...(s.alerts ?? {}) },
-    sync: { ...DEFAULT_SETTINGS.sync, ...(s.sync ?? {}) },
-    household: { ...DEFAULT_SETTINGS.household, ...(s.household ?? {}) },
-    marketData: { ...DEFAULT_SETTINGS.marketData, ...(s.marketData ?? {}) },
-    sections: { ...DEFAULT_SETTINGS.sections, ...(s.sections ?? {}) },
-    look: { ...DEFAULT_SETTINGS.look, ...(s.look ?? {}) },
-    a11y: { ...DEFAULT_SETTINGS.a11y, ...(s.a11y ?? {}) },
-    setup: { ...DEFAULT_SETTINGS.setup, ...(s.setup ?? {}) },
-    tour: { ...DEFAULT_SETTINGS.tour, ...(s.tour ?? {}) },
-    receipts: { ...DEFAULT_SETTINGS.receipts, ...(s.receipts ?? {}) },
-    recalls: { ...DEFAULT_SETTINGS.recalls, ...(s.recalls ?? {}) },
-    autoBackup: { ...DEFAULT_SETTINGS.autoBackup, ...(s.autoBackup ?? {}) },
-    cartPush: { ...DEFAULT_SETTINGS.cartPush, ...(s.cartPush ?? {}) },
-    widgets: { ...DEFAULT_SETTINGS.widgets, ...(s.widgets ?? {}) },
-    customShops: Array.isArray(s.customShops) ? s.customShops : [],
-    seenHints: Array.isArray(s.seenHints) ? s.seenHints : DEFAULT_SETTINGS.seenHints,
-  };
+/**
+ * Saved (or sent) settings filled in with the defaults. 0.9.0: every setting is checked first
+ * (settingsCheck.ts), so a damaged or made-up value can't stop Restock opening or do something
+ * odd: the wrong kind of value gets the default. `strict` is for settings from a backup or
+ * another phone.
+ */
+export function mergeSettings(stored: Partial<Settings> | undefined, opts: { strict?: boolean } = {}): Settings {
+  return checkSettings(stored, opts);
 }
 
 /** The settings as last read or saved, for wording that can't wait for the database (stock: "online" or "at Coles Kirwan"). */
@@ -327,6 +317,27 @@ export async function getSettings(): Promise<Settings> {
 
 export async function updateSettings(patch: Partial<Settings>): Promise<Settings> {
   const next = mergeSettings({ ...(await getSettings()), ...patch });
+  setCustomShops(next.customShops);
+  await putKV('settings', next);
+  lastSettings = next;
+  return next;
+}
+
+/**
+ * 0.9.0: "Reset settings" on the something-went-wrong screen. Only the settings go back to how a
+ * new phone has them; items, lists, prices, cards and receipts stay. Restock still counts as set
+ * up (so it opens on your things, not on its first screen), and keeps which setup steps are done.
+ */
+export async function resetSettings(): Promise<Settings> {
+  let kept: Partial<Settings> = {};
+  try {
+    const [row] = await sql().query<{ value: string }>('SELECT value FROM kv WHERE key = ?', ['settings']);
+    const old = checkSettings(row ? JSON.parse(row.value) : undefined);
+    kept = { onboarded: old.onboarded, privacyAccepted: old.privacyAccepted, setup: old.setup };
+  } catch {
+    // The saved settings can't even be read: start from the defaults.
+  }
+  const next = checkSettings(kept);
   setCustomShops(next.customShops);
   await putKV('settings', next);
   lastSettings = next;
@@ -450,15 +461,6 @@ export async function updateProduct(id: string, patch: Partial<Product>): Promis
   if (op) await write([op]);
 }
 
-export async function deleteProducts(ids: string[]): Promise<void> {
-  if (!ids.length) return;
-  const ph = placeholders(ids.length);
-  await write([
-    { sql: `DELETE FROM prices WHERE product_id IN (${ph})`, params: ids },
-    { sql: `DELETE FROM products WHERE id IN (${ph})`, params: ids },
-  ]);
-}
-
 // ---------- items (pantry groups) ----------
 
 const GROUP_COLS = {
@@ -578,10 +580,30 @@ export async function addListEntry(e: ListEntry): Promise<void> {
   await write([insertEntryOp(e)]);
 }
 
-export async function updateListEntry(id: string, patch: Partial<ListEntry>): Promise<void> {
+/**
+ * 0.9.0: a tick or a new amount also records when it changed (checked_at, qty_at), so when two
+ * phones change the same line, sync keeps the newer tick and the newer amount separately.
+ */
+export function updateEntryOp(id: string, patch: Partial<ListEntry>, now = Date.now()): SqlOp | undefined {
   const op = updateOp('list_entries', id, patch, ENTRY_COLS);
+  if (!op) return undefined;
+  const extra: string[] = [];
+  if ('checked' in patch) extra.push('checked_at = ' + now);
+  if ('qty' in patch) extra.push('qty_at = ' + now);
+  if (!extra.length) return op;
+  return { sql: op.sql.replace(' WHERE id = ?', `, ${extra.join(', ')} WHERE id = ?`), params: op.params };
+}
+
+export async function updateListEntry(id: string, patch: Partial<ListEntry>): Promise<void> {
+  const op = updateEntryOp(id, patch);
   if (op) await write([op]);
 }
+
+/** Ticks several lines at once (with the time, as updateEntryOp). */
+export const checkEntriesOp = (ids: string[], now = Date.now()): SqlOp => ({
+  sql: `UPDATE list_entries SET checked = 1, checked_at = ? WHERE id IN (${placeholders(ids.length)})`,
+  params: [now, ...ids],
+});
 
 export async function deleteListEntries(ids: string[]): Promise<void> {
   if (!ids.length) return;
@@ -721,6 +743,9 @@ export async function rowsForGroups(ids: string[]): Promise<RowSet[]> {
  * and so is the sample items' made-up history. Returns how many prices were removed.
  */
 export async function pruneHistory(weeks: number, now = Date.now()): Promise<number> {
+  // 0.9.0: only ever one of the real choices (1 to 6 months). A nonsense number (from a damaged
+  // setting) deletes nothing, rather than every price but the latest.
+  if (!HISTORY_WEEKS.includes(weeks) || !Number.isFinite(now)) return 0;
   const cutoff = new Date(now - weeks * 7 * 86_400_000).toISOString();
   const where = `date < ? AND source <> 'demo' AND date < (SELECT MAX(q.date) FROM prices q WHERE q.product_id = prices.product_id)`;
   const [{ n }] = await sql().query<{ n: number }>(`SELECT COUNT(*) AS n FROM prices WHERE ${where}`, [cutoff]);
@@ -775,18 +800,50 @@ function fromBackup(g: Group, s: Snapshot): Group {
   );
 }
 
+/**
+ * 0.9.0: a receipt from a backup keeps only photo paths a receipt really has (receiptPaths.ts).
+ * Any other path is left out, so a backup can't point Restock at another of its files.
+ */
+export function withSafePhotos(r: Receipt): Receipt {
+  const photo = isPhotoPath(r.photo) ? r.photo : undefined;
+  const pages = Array.isArray(r.pages) ? r.pages.filter(isPhotoPath) : [];
+  return { ...r, photo, pages: pages.length ? pages : undefined };
+}
+
+/** Which list a shopping list line is on: its item's tab, or the tab it was added from (List.tsx entrySection). */
+const lineTab = (e: ListEntry, itemTabs: Map<string, Section>): Section =>
+  (e.groupId ? itemTabs.get(e.groupId) : undefined) ?? (e.section ? asSection(e.section) : 'pantry');
+
 export async function restoreSnapshot(s: Snapshot): Promise<void> {
+  // 0.9.0: this phone's automatic-backup password (never in a backup) and its app version stay.
+  const here = new Map((await sql().query<{ key: string; value: string }>("SELECT key, value FROM kv WHERE key IN ('settings', 'appVersion')")).map((r) => [r.key, r.value]));
+  const password = (() => {
+    try {
+      return (JSON.parse(here.get('settings') ?? '{}') as Partial<Settings>).autoBackup?.password;
+    } catch {
+      return undefined;
+    }
+  })();
+  const kv = s.kv
+    .filter((k) => k.key !== 'appVersion')
+    .map((k) => {
+      if (k.key !== 'settings') return k;
+      // 0.9.0: settings are checked on the way in (settingsCheck.ts).
+      const checked = mergeSettings(k.value as Partial<Settings>);
+      return { key: k.key, value: password ? { ...checked, autoBackup: { ...checked.autoBackup, password } } : checked };
+    });
+  if (here.has('appVersion')) kv.push({ key: 'appVersion', value: JSON.parse(here.get('appVersion')!) });
   const ops: SqlOp[] = ['prices', 'products', 'items', 'list_entries', 'cards', 'categories', 'kv', 'receipts'].map((t) => ({
     sql: `DELETE FROM ${t}`,
   }));
-  (s.receipts ?? []).forEach((r) => ops.push(insertReceiptOp(r)));
+  (s.receipts ?? []).forEach((r) => ops.push(insertReceiptOp(withSafePhotos(r))));
   s.products.forEach((p) => ops.push(insertProductOp(p)));
   s.groups.forEach((g) => ops.push(insertGroupOp(fromBackup(g, s))));
   s.prices.forEach((r) => ops.push(insertReadingOp(r)));
   s.list.forEach((e) => ops.push(insertEntryOp(e)));
   s.cards.forEach((c) => ops.push(insertCardOp(c)));
   s.categories.forEach((c) => ops.push(insertCategoryOp(c)));
-  s.kv.forEach((k) => ops.push({ sql: 'INSERT INTO kv (key, value) VALUES (?, ?)', params: [k.key, JSON.stringify(k.value)] }));
+  kv.forEach((k) => ops.push({ sql: 'INSERT INTO kv (key, value) VALUES (?, ?)', params: [k.key, JSON.stringify(k.value)] }));
   await write(ops);
 }
 
@@ -826,6 +883,8 @@ const DEVICE_SETTINGS = [
   'backupNudgeAt',
   'demoLoaded',
   'marketData',
+  // 0.9.0: whether you're signed in to a shop is about this phone's own sign-in, not the backup's.
+  'accounts',
 ] as const;
 
 /**
@@ -838,7 +897,8 @@ export function mergeRestoredSettings(
   incoming: Partial<Settings>,
   pick: { shops?: boolean; shopSections?: Section[]; other?: boolean },
 ): Settings {
-  const from = mergeSettings(incoming);
+  // 0.9.0: checked strictly, as it comes from a file (settingsCheck.ts).
+  const from = mergeSettings(incoming, { strict: true });
   const out: Settings = { ...current };
   const shopKeys = new Set<string>(SHOP_SETTINGS);
   const deviceKeys = new Set<string>(DEVICE_SETTINGS);
@@ -859,6 +919,8 @@ export function mergeRestoredSettings(
       folderName: current.autoBackup.folderName,
       lastAt: current.autoBackup.lastAt,
       lastError: undefined,
+      // 0.9.0: the password is this phone's own (backups never have it).
+      password: current.autoBackup.password,
     };
     if (!out.autoBackup.folder) out.autoBackup.enabled = false;
     out.look = { ...from.look, icon: current.look.icon };
@@ -928,16 +990,28 @@ export function pickSnapshot(s: Snapshot, parts: RestoreParts, opts: { prices?: 
  * Restores only the parts picked, replacing those parts on this phone and leaving the rest as
  * it is. Items are replaced tab by tab: restoring Keg items leaves the Pantry alone. Shopping
  * list lines whose item isn't on the phone become plain lines.
+ *
+ * 0.9.0: shopping lists are replaced tab by tab too: the tabs the backup has lines for, and the
+ * tabs whose items are being restored. Another tab's list stays as it is. `household` ("Restore
+ * for the household"): loyalty cards are added from the backup (a card already here with the same
+ * id is replaced) and no card is deleted, because the cards on a phone in a household can be other
+ * people's, and deleting them here would delete them on their phones too.
  */
-export async function restoreParts(s: Snapshot, parts: RestoreParts, renames: Map<string, string> = new Map()): Promise<void> {
+export async function restoreParts(
+  s: Snapshot,
+  parts: RestoreParts,
+  renames: Map<string, string> = new Map(),
+  opts: { household?: boolean } = {},
+): Promise<void> {
   const ops: SqlOp[] = [];
+  const before = await allGroups();
   if (parts.pantry) {
     const secs = parts.sections ?? SECTIONS;
     const incoming = s.groups.filter((g) => secs.includes(g.section ?? 'pantry'));
     const incomingIds = new Set(incoming.flatMap(groupProductIds));
     // Take out this phone's items on those tabs, with their products and prices.
-    const existing = (await allGroups()).filter((g) => secs.includes(g.section ?? 'pantry'));
-    const keepIds = new Set((await allGroups()).filter((g) => !secs.includes(g.section ?? 'pantry')).flatMap(groupProductIds));
+    const existing = before.filter((g) => secs.includes(g.section ?? 'pantry'));
+    const keepIds = new Set(before.filter((g) => !secs.includes(g.section ?? 'pantry')).flatMap(groupProductIds));
     const dropIds = [...new Set(existing.flatMap(groupProductIds))].filter((id) => !keepIds.has(id));
     for (const g of existing) ops.push({ sql: 'DELETE FROM items WHERE id = ?', params: [g.id] });
     for (const id of dropIds)
@@ -969,21 +1043,29 @@ export async function restoreParts(s: Snapshot, parts: RestoreParts, renames: Ma
     cats.forEach((c) => ops.push({ ...insertCategoryOp(c), sql: insertCategoryOp(c).sql.replace('INSERT INTO', 'INSERT OR REPLACE INTO') }));
   }
   if (parts.list) {
-    const groupIds = new Set([...(await allGroups()).map((g) => g.id), ...(parts.pantry ? s.groups.map((g) => g.id) : [])]);
-    ops.push({ sql: 'DELETE FROM list_entries' });
+    const secs = parts.pantry ? (parts.sections ?? SECTIONS) : [];
+    // The items there will be afterwards: this phone's on tabs that aren't being restored, and the backup's on those that are.
+    const items = [...before.filter((g) => !secs.includes(g.section ?? 'pantry')), ...s.groups.filter((g) => secs.includes(g.section ?? 'pantry'))];
+    const groupIds = new Set(items.map((g) => g.id));
+    const backupTabs = new Map(s.groups.map((g) => [g.id, asSection(g.section)]));
+    const hereTabs = new Map(before.map((g) => [g.id, asSection(g.section)]));
+    const tabs = new Set<Section>([...secs, ...s.list.map((e) => lineTab(e, backupTabs))]);
+    for (const e of await allListEntries()) if (tabs.has(lineTab(e, hereTabs))) ops.push({ sql: 'DELETE FROM list_entries WHERE id = ?', params: [e.id] });
     s.list.forEach((e) => {
       const keep = e.groupId && groupIds.has(e.groupId);
       const name = e.groupId ? (renames.get(e.groupId) ?? s.groups.find((g) => g.id === e.groupId)?.name ?? e.text) : e.text;
-      ops.push(insertEntryOp(keep ? e : { ...e, groupId: undefined, text: name }));
+      // A line whose item doesn't come back keeps its tab, so it stays on the same list.
+      const section = e.section ?? (e.groupId ? backupTabs.get(e.groupId) : undefined);
+      ops.push(insertEntryOp(keep ? e : { ...e, groupId: undefined, text: name, section }, true));
     });
   }
   if (parts.cards) {
-    ops.push({ sql: 'DELETE FROM cards' });
-    s.cards.forEach((c) => ops.push(insertCardOp(c)));
+    if (!opts.household) ops.push({ sql: 'DELETE FROM cards' });
+    s.cards.forEach((c) => ops.push(opts.household ? { ...insertCardOp(c), sql: insertCardOp(c).sql.replace('INSERT INTO', 'INSERT OR REPLACE INTO') } : insertCardOp(c)));
   }
   if (parts.receipts) {
     ops.push({ sql: 'DELETE FROM receipts' });
-    (s.receipts ?? []).forEach((r) => ops.push(insertReceiptOp(r)));
+    (s.receipts ?? []).forEach((r) => ops.push(insertReceiptOp(withSafePhotos(r))));
   }
   if (parts.settings || parts.shops) {
     // Only the settings picked change; nothing else saved on the phone is touched.
@@ -1024,5 +1106,17 @@ export async function eraseEverything(): Promise<void> {
   ops.push({ sql: 'DELETE FROM sync_meta' });
   ops.push({ sql: "INSERT INTO sync_meta (key, value) VALUES ('device', lower(hex(randomblob(8))))" });
   await sql().batch(ops);
+  // 0.9.0: and what the app keeps outside the database: the settings it remembers, and the
+  // browser storage it uses for small things (recent searches, the Pantry's sort, the deal shops
+  // on Home). Shop sign-ins, cookies and exported files are cleared on the Android side (eraseNative).
+  lastSettings = undefined;
+  setCustomShops([]);
+  for (const store of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      globalThis[store]?.clear();
+    } catch {
+      // Not available here (tests), or blocked: nothing kept there.
+    }
+  }
   changed();
 }

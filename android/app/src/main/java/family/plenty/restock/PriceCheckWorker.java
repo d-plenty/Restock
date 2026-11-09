@@ -25,6 +25,9 @@ public class PriceCheckWorker extends Worker {
         } catch (Exception e) {
             Log.w("RestockCheck", "background check failed", e);
             return Result.retry();
+        } finally {
+            // 0.9.0: no shop page keeps running in the background after the check.
+            StoreWeb.blankAll();
         }
     }
 }

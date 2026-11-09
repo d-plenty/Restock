@@ -71,6 +71,8 @@ export interface ShopTotal {
   cheapestFor: number;
   /** How many items this store is cheapest for at the till, with this list's picks. */
   cheapestForTill: number;
+  /** 0.9.0: what the list's one-off buys with a price add to this total (the same at every store, see ShopTotals.oneOffs). */
+  oneOffs: number;
 }
 
 export interface ShopTotals {
@@ -81,8 +83,15 @@ export interface ShopTotals {
   pickFor: Map<string, ShopLine>;
   /** List items linked to the pantry (the ones that can be priced). */
   linked: number;
-  /** Notes and hand-written items, which have no price. */
+  /** Notes and hand-written items with no price. */
   unpriced: number;
+  /**
+   * 0.9.0: one-off buys with a price (found at a shop for this trip), at one of these shops or any
+   * shop. They're bought where you said whichever store you pick, so each counts the same in every
+   * store's total and in shopping around: the totals match "Start shopping · about $X", and stores
+   * still compare on your pantry items.
+   */
+  oneOffs: { count: number; total: number };
   /** Best value or lowest price, as set at the top of the list. */
   by: CompareBy;
 }
@@ -257,7 +266,8 @@ function fromFewestMissing(t: ShopTotals, by: CompareBy): Recommended {
   const gap = measure(runnerUp, by) - measure(cheapest, by);
   out.runnerUp = runnerUp;
   out.saving = gap;
-  out.close = gap < tooClose(measure(cheapest, by)) - 0.005;
+  // Close or not goes by your pantry items, not the one-off buys every store has the same (0.9.0).
+  out.close = gap < tooClose(measure(cheapest, by) - (cheapest.oneOffs ?? 0)) - 0.005;
   // The item with the biggest gap in the cheapest store's favour.
   let top: { item: string; difference: number } | undefined;
   for (const l of cheapest.lines) {
@@ -299,7 +309,7 @@ export function recommendedStores(t: ShopTotals, by: CompareBy = t.by): Recommen
   );
   if (base && challenger) {
     const gap = withRest(base) - withRest(challenger);
-    if (gap > tooClose(withRest(base)) + 0.005) {
+    if (gap > tooClose(withRest(base) - (base.oneOffs ?? 0)) + 0.005) {
       out.recommended = challenger;
       out.cheapest = challenger;
       out.reason = 'with-elsewhere';
@@ -344,7 +354,16 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains:
   const linked = open
     .map((e) => ({ rec: e.groupId ? byGroup.get(e.groupId) : undefined, qty: Math.max(1, e.qty ?? 1) }))
     .filter((x): x is { rec: Recommendation; qty: number } => !!x.rec);
-  const unpriced = open.length - linked.length;
+  // One-off buys with a price (0.9.0), as the list prices them. One at a shop that isn't one of these
+  // (not going there today) isn't counted, and isn't "without a price" either.
+  const notLinked = open.filter((e) => !(e.groupId && byGroup.has(e.groupId)));
+  const priced = notLinked.filter((e) => e.price !== undefined && Number.isFinite(e.price) && e.price >= 0);
+  const counted = priced.filter((e) => !e.chain || e.chain === 'other' || chains.includes(e.chain as Chain3));
+  const oneOffs = {
+    count: counted.length,
+    total: counted.reduce((s, e) => s + Math.round(e.price! * Math.max(1, e.qty ?? 1) * 100) / 100, 0),
+  };
+  const unpriced = notLinked.length - priced.length;
 
   const stores: ShopTotal[] = chains.map((chain) => {
     const t: ShopTotal = {
@@ -359,6 +378,7 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains:
       fair: 0,
       cheapestFor: 0,
       cheapestForTill: 0,
+      oneOffs: 0,
     };
     for (const { rec, qty } of linked) {
       const here = buy(
@@ -393,6 +413,11 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains:
         }
       }
     }
+    // The one-off buys, the same at every store (so they can't tip the comparison).
+    t.oneOffs = oneOffs.total;
+    t.total += oneOffs.total;
+    t.fair += oneOffs.total;
+    t.value += oneOffs.total;
     t.totalWithElsewhere += t.total;
     return t;
   });
@@ -413,6 +438,11 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains:
     const c = l.pick.product.chain as Chain3;
     if (!around.chains.includes(c)) around.chains.push(c);
   }
+  // The one-off buys, at the shop each was found at (0.9.0).
+  around.total += oneOffs.total;
+  for (const e of counted) {
+    if (e.chain && e.chain !== 'other' && !around.chains.includes(e.chain as Chain3)) around.chains.push(e.chain as Chain3);
+  }
 
   // How many items each store is cheapest for, like for like and at the till.
   for (const { rec } of linked) {
@@ -430,5 +460,65 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains:
 
   // Stores with everything first, then cheapest first for how the list is set.
   stores.sort((a, b) => a.missing.length - b.missing.length || measure(a, by) - measure(b, by) || a.total - b.total);
-  return { stores, around, pickFor, linked: linked.length, unpriced, by };
+  return { stores, around, pickFor, linked: linked.length, unpriced, oneOffs, by };
+}
+
+export interface AroundPlan {
+  /** What to recommend: shopping around, or one store that has everything. */
+  pick: 'around' | ShopTotal;
+  /** Shopping around for how the list is set: the same shopping (best value) or at the till (lowest price). */
+  around: number;
+  /** Shopping around the other way, shown smaller. */
+  aroundOther: number;
+  /** The cheapest store with everything on the list, for how the list is set. */
+  complete?: ShopTotal;
+  /** How much less shopping around comes to than that store (negative when the store is cheaper). */
+  saving?: number;
+  /** How many items come from each shop when shopping around. */
+  stops: { chain: Chain3; items: number }[];
+  /** The store with everything is also the cheapest for every item. */
+  oneStop: boolean;
+  /** Anything on the list has a price at all. */
+  priced: boolean;
+}
+
+/** One store's total for how the list is set: the same shopping (best value) or at the till (lowest price). */
+export const storeMeasure = (s: ShopTotal, by: CompareBy) => measure(s, by);
+
+/**
+ * Shop around, or one store? (0.9.0) Shopping around is recommended unless a store has everything on
+ * the list and shopping around wouldn't save at least `min` (the setting, $1 to start with) over it.
+ * Both sides are measured the same way, so the numbers next to each other always compare like with like.
+ */
+export function aroundPlan(t: ShopTotals, by: CompareBy = t.by, min = 1): AroundPlan {
+  // Each item shopping around buys, measured the way its own shop's line is (so a bulk pack counts the
+  // same here as in that shop's total, and the two always compare like with like).
+  const lineFair = (l: ShopLine) =>
+    t.stores.find((s) => s.chain === l.pick.product.chain)?.lines.find((x) => x.groupId === l.groupId)?.fair ?? l.fair;
+  // The list's one-off buys count the same here as in every store's total (0.9.0).
+  const fair = t.around.lines.reduce((s, l) => s + lineFair(l), 0) + (t.oneOffs?.total ?? 0);
+  const till = t.around.total;
+  const around = by === 'unit' ? fair : till;
+  const aroundOther = by === 'unit' ? till : fair;
+  const completes = t.stores.filter((s) => s.lines.length && !s.missing.length);
+  // The one store with everything to compare against: the same one Restock recommends as one store,
+  // when that one has everything (so the list, Home and the Start shopping sheet agree), else the
+  // cheapest store with everything.
+  const best = recommendedStores(t, by).recommended;
+  const complete =
+    best && completes.includes(best)
+      ? best
+      : completes.reduce<ShopTotal | undefined>((b, s) => (!b || measure(s, by) < measure(b, by) - 0.005 ? s : b), undefined);
+  const counts = new Map<Chain3, number>();
+  for (const l of t.around.lines) {
+    const c = l.pick.product.chain as Chain3;
+    counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  const stops = [...counts].map(([chain, items]) => ({ chain, items })).sort((a, b) => b.items - a.items);
+  const saving = complete ? measure(complete, by) - around : undefined;
+  // One shop already has the cheapest of everything: that's the one to go to.
+  const oneStop = !!complete && stops.length === 1 && stops[0].chain === complete.chain;
+  // Shopping around has to save at least the minimum, and always more than nothing.
+  const pick = complete && (oneStop || saving! < Math.max(min, 0.01) - 0.005) ? complete : 'around';
+  return { pick, around, aroundOther, complete, saving, stops, oneStop, priced: t.around.lines.length > 0 };
 }

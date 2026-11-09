@@ -3,6 +3,7 @@ import { getSettings, nowIso, uid, updateSettings } from '../../lib/db';
 import { request as askPermission } from '../../lib/permissions';
 import { describePosition, findPickedShops, nearbyStores, searchArea, type Area, type NearbyStore } from '../../lib/places';
 import { RestockNative } from '../../lib/sql/native';
+import { asHttps, searchOnSite } from '../../lib/site';
 import { useLive } from '../../lib/useLive';
 import {
   chainName,
@@ -35,6 +36,7 @@ import {
 import { confirmAction } from '../../lib/confirm';
 import { ChainDot, Icon, LoadingBar, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
+import { money } from '../../lib/units';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -269,7 +271,7 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
           {areas.map((a) => (
             <button key={a.label + a.lat} className="row" onClick={() => loadStores(a)}>
               <Icon name="pin" size={18} />
-              <span className="grow title" style={{ fontSize: 14 }}>
+              <span className="grow title" style={{ fontSize: 15 }}>
                 {a.label}
               </span>
               <Icon name="chevron" size={18} />
@@ -322,7 +324,7 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
                   return (
                     <div key={s.id ?? s.name + s.lat} className="row near-branch">
                       <span className="grow" style={{ flex: '1 1 170px', minWidth: 0 }}>
-                        <span className="title" style={{ fontSize: 14 }}>
+                        <span className="title" style={{ fontSize: 15 }}>
                           {cleanStoreName(s.name)}
                         </span>
                         <span className="small">
@@ -462,7 +464,7 @@ export function ShopDropdown({ settings, section, startOpen }: { settings: Setti
         <button className="row" onClick={() => setAdding(true)}>
           <Icon name="plus" size={18} />
           <span className="grow">
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               Other: add a shop's website
             </span>
             <span className="small">Any shop with prices on its website. Give it a name and Restock reads its search page.</span>
@@ -485,14 +487,19 @@ export function CustomShopSheet({ section, shop, onClose }: { section: Section; 
     const t = site.trim();
     if (!t) return '';
     const withScheme = /^https?:\/\//i.test(t) ? t : `https://${t}`;
-    try {
-      const u = new URL(withScheme);
-      return u.hostname.includes('.') ? `${u.protocol}//${u.host}` : '';
-    } catch {
-      return '';
-    }
+    // 0.9.0: always https (an http:// address is moved to https).
+    const u = asHttps(withScheme);
+    return u ? `https://${u.host}` : '';
   })();
-  const search = searchAt.trim() ? (searchAt.includes('{q}') ? searchAt.trim() : '') : '';
+  // 0.9.0: the search page has to be on the shop's own site (site.ts), with {q} in it.
+  const search = searchAt.trim() ? (searchOnSite(searchAt, website) ?? '') : '';
+  const searchProblem = !searchAt.trim()
+    ? undefined
+    : !searchAt.includes('{q}')
+      ? `Put {q} where the search word goes.`
+      : !search
+        ? `The search page has to be on ${website ? hostOf(website) : 'the shop’s website'}.`
+        : undefined;
   const valid = !!name.trim() && !!website && (!searchAt.trim() || !!search);
 
   /** Save (so the shop exists to test), then search it for the test word. */
@@ -515,7 +522,8 @@ export function CustomShopSheet({ section, shop, onClose }: { section: Section; 
         text: items.length
           ? `Working: found ${items.length} products for "${TEST_WORD[section]}".`
           : `Saved, but no products came back for "${TEST_WORD[section]}". If the site has a search page, search it for "${TEST_WORD[section]}" in your browser, then paste that page's address below with {q} where the word was.`,
-        samples: items.slice(0, 3).map((p) => `${p.name} · $${p.price?.toFixed(2)}`),
+        // 0.9.0: a result without a price shows just its name (not "$undefined").
+        samples: items.slice(0, 3).map((p) => (typeof p.price === 'number' ? `${p.name} · ${money(p.price)}` : p.name)),
       });
     } catch (e) {
       setTest({ ok: false, text: `Saved, but the test didn't work: ${errText(e)}` });
@@ -581,9 +589,9 @@ export function CustomShopSheet({ section, shop, onClose }: { section: Section; 
             onChange={(e) => setSearchAt(e.target.value)}
             placeholder="https://…/search?q={q}"
           />
-          {searchAt.trim() && !search && (
+          {searchProblem && (
             <span className="small" style={{ color: 'var(--red-ink)' }}>
-              Put {'{q}'} where the search word goes.
+              {searchProblem}
             </span>
           )}
         </div>
@@ -643,13 +651,12 @@ export function SectionSwitch({ settings, section }: { settings: Settings; secti
                 : 'Track medicine, first aid and personal care prices at the pharmacies you pick. Kept separate from groceries.'}
             </span>
           </span>
-          <input type="checkbox" checked={on} onChange={(e) => void turn(e.target.checked)} aria-label={`Use the ${SECTION_NAMES[section]} tab`} />
+          <input type="checkbox" className="switch" checked={on} onChange={(e) => void turn(e.target.checked)} aria-label={`Use the ${SECTION_NAMES[section]} tab`} />
         </label>
         {on && (
           <label className="check" style={{ borderTop: '1px solid var(--line)' }}>
-            <span style={{ width: 22 }} />
             <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 Show {SECTION_NAMES[section]} in the bottom bar
               </span>
               <span className="small">
@@ -658,7 +665,7 @@ export function SectionSwitch({ settings, section }: { settings: Settings; secti
               </span>
             </span>
             <input
-              type="checkbox"
+              type="checkbox" className="switch"
               checked={!settings.hiddenTabs?.includes(section)}
               onChange={(e) =>
                 void updateSettings({
@@ -843,7 +850,7 @@ function ShopDropdownCustomOnly({ settings }: { settings: Settings }) {
       <button className="row" onClick={() => setAdding(true)}>
         <Icon name="plus" size={18} />
         <span className="grow">
-          <span className="title" style={{ fontSize: 14 }}>
+          <span className="title" style={{ fontSize: 15 }}>
             Other: add a shop's website
           </span>
           <span className="small">IGA, a local grocer, or any shop with prices online</span>
@@ -874,7 +881,7 @@ function SelectedSummary({ settings, section }: { settings: Settings; section: S
           <div key={c} className="row">
             <ChainDot chain={c} />
             <span className="grow">
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 {chainName(c)}
               </span>
               <span className="small">{branchText(st)}</span>

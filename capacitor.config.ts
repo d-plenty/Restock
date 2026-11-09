@@ -4,10 +4,8 @@ const config: CapacitorConfig = {
   appId: 'family.plenty.restock',
   appName: 'Restock',
   webDir: 'dist',
-  android: {
-    // Lets testers debug the WebView from desktop Chrome (chrome://inspect).
-    webContentsDebuggingEnabled: true,
-  },
+  // 0.9.0: no webContentsDebuggingEnabled here, so desktop Chrome can only inspect the WebView
+  // (chrome://inspect) in a debug build (npm run android:apk-debug), never in a release.
   plugins: {
     SystemBars: {
       insetsHandling: 'css',

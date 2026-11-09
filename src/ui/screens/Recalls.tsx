@@ -33,6 +33,28 @@ export const OFFICIAL = [
 
 const SOURCE: Record<string, string> = { FSANZ: 'Food Standards Australia New Zealand', TGA: 'Therapeutic Goods Administration' };
 
+/** 0.9.0: the official recall sites. A notice's link is only opened if it's https on one of these (or under one). Same as Recalls.java. */
+const OFFICIAL_HOSTS = ['foodstandards.gov.au', 'productsafety.gov.au', 'tga.gov.au'];
+
+/** The list a source's notices come from (Recalls.java listPage). */
+function listPage(source: string): string {
+  if (source === 'FSANZ') return 'https://www.foodstandards.gov.au/food-recalls/alerts';
+  if (source === 'TGA') return 'https://www.tga.gov.au/safety/safety-alerts';
+  return 'https://www.productsafety.gov.au/recalls';
+}
+
+/** The notice's own link if it's on an official recall site over https, else its list's page. */
+export function recallLink(r: Pick<FoundRecall, 'url' | 'source'>): string {
+  try {
+    const u = new URL(String(r.url ?? '').trim());
+    const host = u.hostname.toLowerCase();
+    if (u.protocol === 'https:' && !u.username && !u.password && OFFICIAL_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) return u.href;
+  } catch {
+    // Not a web address: the list instead.
+  }
+  return listPage(String(r.source ?? ''));
+}
+
 /** Possible recalls that haven't been marked "Not my product". */
 export async function openRecalls(): Promise<FoundRecall[]> {
   const [all, dismissed] = await Promise.all([getKV<FoundRecall[]>('recalls'), getKV<string[]>('recallDismissed')]);
@@ -61,7 +83,7 @@ export function RecallSettings({ settings, inSetup }: { settings: Settings; inSe
           </span>
         </span>
         <input
-          type="checkbox"
+          type="checkbox" className="switch"
           checked={on}
           aria-label="Recall alerts"
           onChange={async (e) => {
@@ -118,7 +140,7 @@ export function RecallCard({ r, onDismiss }: { r: FoundRecall; onDismiss?: () =>
         Check the brand, size and dates on yours against the official notice. Restock matches by name, so it can be wrong.
       </p>
       <div className="two">
-        <a className="btn small primary" href={r.url} style={{ textDecoration: 'none' }}>
+        <a className="btn small primary" href={recallLink(r)} style={{ textDecoration: 'none' }}>
           <Icon name="external" size={16} /> Official notice
         </a>
         {onDismiss && (
@@ -196,7 +218,7 @@ export function RecallsScreen() {
         {OFFICIAL.map((o) => (
           <a key={o.url} className="row" href={o.url} style={{ textDecoration: 'none', color: 'inherit' }}>
             <span className="grow">
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 {o.name}
               </span>
               <span className="small">{o.who}</span>

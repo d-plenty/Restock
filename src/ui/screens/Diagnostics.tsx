@@ -7,8 +7,8 @@ import { getHealth } from '../../lib/health';
 import { useLive } from '../../lib/useLive';
 import { chainName, enabledIn, SECTION_NAMES, type Section, type StoreChain } from '../../shops';
 import { adapterFor } from '../../stores';
-import { searchStoreId } from '../../types';
 import { isNative } from '../../stores/http';
+import { localDay } from '../../lib/verdict';
 import {
   searchTestSize,
   shareLastSearchTest,
@@ -22,6 +22,9 @@ import { useNav } from '../nav';
 
 // Settings → Diagnostics: what went wrong lately, shop by shop, and "Send search details" to
 // capture exactly what a shop sends back, so its connection can be fixed.
+
+/** 0.9.0: files are named for the day on the phone's own calendar, not UTC's. */
+const today = () => localDay(new Date().toISOString());
 
 export function DiagnosticsScreen() {
   const nav = useNav();
@@ -43,7 +46,7 @@ export function DiagnosticsScreen() {
       await navigator.clipboard.writeText(text);
       nav.toast('Copied');
     } catch {
-      await shareTextFile(`restock-diagnostics-${new Date().toISOString().slice(0, 10)}.txt`, text, 'text/plain');
+      await shareTextFile(`restock-diagnostics-${today()}.txt`, text, 'text/plain');
     }
   };
 
@@ -51,16 +54,15 @@ export function DiagnosticsScreen() {
     if (!shop || !term.trim()) return;
     setBusy(true);
     try {
-      // The same store as a real search: your Coles when you have chosen your Coles store in My shops.
-      const storeId = searchStoreId(await getSettings(), shop);
-      const run = await captureWhile(() => adapterFor(shop)!.search(term.trim(), storeId));
+      // 0.9.0: always the shop's online store, never your branch, so the file has no store number
+      // or branch in it (the shop's answer would carry them).
+      const run = await captureWhile(() => adapterFor(shop)!.search(term.trim()));
       const file = {
         app: 'restock',
         kind: 'search-details',
         version: __APP_VERSION__,
         at: new Date().toISOString(),
         shop,
-        storeId: storeId ?? 'online',
         shopName: chainName(shop),
         term: term.trim(),
         found: run.result?.length ?? 0,
@@ -69,7 +71,7 @@ export function DiagnosticsScreen() {
         answers: run.captured,
       };
       await shareTextFile(
-        `restock-search-${shop}-${new Date().toISOString().slice(0, 10)}.json`,
+        `restock-search-${shop}-${today()}.json`,
         JSON.stringify(file, null, 1),
         'application/json',
         'Restock search details',
@@ -93,7 +95,7 @@ export function DiagnosticsScreen() {
             <div key={c} className="row">
               <ChainDot chain={c} />
               <span className="grow">
-                <span className="title" style={{ fontSize: 14 }}>
+                <span className="title" style={{ fontSize: 15 }}>
                   {chainName(c)} <span className="small">· {SECTION_NAMES[sec]}</span>
                 </span>
                 <span className="small">
@@ -151,8 +153,13 @@ export function DiagnosticsScreen() {
       <div className="eyebrow">Send search details</div>
       <div className="card">
         <p className="small" style={{ margin: 0 }}>
-          If a shop's search looks wrong, run one search here. Restock saves exactly what the shop sent back into a file you can send to the
-          developer, so the connection can be fixed. It only has the shop's answer: nothing about you or your pantry.
+          If a shop's search looks wrong, run one search here. Restock searches the shop's online store (not your branch) and saves exactly what
+          the shop sent back into a file you can send to the developer, so the connection can be fixed. Nothing from your pantry, lists or
+          settings goes in it.
+        </p>
+        <p className="small" style={{ margin: 0 }}>
+          The shop's answer can still be about you: if you're signed in to Woolworths inside Restock, Woolworths answers for your account (its
+          store's prices and stock, and possibly what's in your trolley). Open the file and check it before you send it.
         </p>
         <label className="field">
           <span>Shop</span>
@@ -199,7 +206,7 @@ function TrolleyRecorder() {
       }
       const file = { app: 'restock', kind: 'trolley-recording', version: __APP_VERSION__, at: new Date().toISOString(), shop: chain, calls };
       await shareTextFile(
-        `restock-trolley-${chain}-${new Date().toISOString().slice(0, 10)}.json`,
+        `restock-trolley-${chain}-${today()}.json`,
         JSON.stringify(file, null, 1),
         'application/json',
         'Restock trolley recording',
@@ -278,7 +285,7 @@ function SearchTest() {
         <p className="small" style={{ margin: 0 }}>
           Searches a list of everyday words (milk, Western Star, Panadol, VB…) at each of your shops, the way Restock does, and saves what came
           back in one file you can send to the developer, so search can be made better. One search at a time with a pause in between. The file
-          has the shops' answers and the test words, nothing about you, your items or your store.
+          has the shops' answers and the test words: nothing from your pantry, lists or settings, and no store numbers.
         </p>
         <label className="field">
           <span>Which shops</span>
@@ -290,7 +297,7 @@ function SearchTest() {
           </select>
         </label>
         <label className="row" style={{ padding: 0 }}>
-          <input type="checkbox" checked={every} disabled={!!progress} onChange={(e) => setEvery(e.target.checked)} />
+          <input type="checkbox" className="switch" checked={every} disabled={!!progress} onChange={(e) => setEvery(e.target.checked)} />
           <span className="grow small">Every word (about four times as many)</span>
         </label>
         {progress ? (

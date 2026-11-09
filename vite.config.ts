@@ -27,5 +27,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Dates in the tests are Sydney days, wherever the tests run.
+    env: { TZ: 'Australia/Sydney' },
   },
 });

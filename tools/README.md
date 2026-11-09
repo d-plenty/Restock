@@ -81,3 +81,15 @@ npx vitest run --config tools/search-test/vitest.config.ts
 
 The files land in `tools/search-test/out`: `report.txt` to read, and `ranked.json`,
 `recommend.json` and `raw.json` for working on search.
+
+## Java sync check (`tools/sync-test`)
+
+The recovery key and sync through a folder (0.9.0), tested on a computer: several pretend phones,
+each with a real SQLite database in Restock's own layout (through Python's sqlite3), pairing,
+taking over as owner, removing a phone, and syncing through a shared folder. Needs Java 17 or
+newer, Python 3 and the [org.json](https://github.com/stleary/JSON-java) jar:
+
+```bash
+ORGJSON=~/json-20240303.jar bash tools/sync-test/run.sh
+```
+

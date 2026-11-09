@@ -6,6 +6,7 @@ import { activeSections, chainName, enabledIn, hostOf, sectionOf, websiteOf, typ
 import { isNative } from '../../stores/http';
 import { storeChoice, type Settings } from '../../types';
 import { ChainDot, Icon, TopBar } from '../components';
+import { useNav } from '../nav';
 
 const GROUP: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Pharmacy' };
 
@@ -25,12 +26,24 @@ export function catalogueShops(settings: Settings): { section: Section; chains: 
     .filter((g) => g.chains.length > 0);
 }
 
+/** 0.9.0: only an https web address is ever shown as a link (a catalogue link is read off the shop's website). */
+export function httpsLink(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    return new URL(url).protocol === 'https:' ? url : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function CatalogueRow({ chain }: { chain: StoreChain }) {
-  const [link, setLink] = useState<CatalogueLink>();
+  const [found, setLink] = useState<CatalogueLink>();
   useEffect(() => {
     void findCatalogue(chain).then(setLink, () => setLink({ missing: 'unchecked' }));
   }, [chain]);
-  const site = websiteOf(chain);
+  // A catalogue address that isn't https counts as no catalogue found.
+  const link: CatalogueLink | undefined = found?.url && !httpsLink(found.url) ? { missing: 'none' } : found;
+  const site = httpsLink(websiteOf(chain));
   // Plain links: the app hands outside web addresses to the phone's browser.
   return (
     <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -66,12 +79,21 @@ function CatalogueRow({ chain }: { chain: StoreChain }) {
 }
 
 export function CataloguesScreen() {
+  const nav = useNav();
   const settings = useLive(getSettings, []);
   if (!settings) return <div className="screen" />;
   const groups = catalogueShops(settings);
   return (
     <div className="screen">
       <TopBar title="Catalogues" />
+      {/* Your own catalogue first (0.9.0): this week's deals on the things you track. */}
+      <button className="banner green cat-entry" onClick={() => nav.push({ name: 'mycatalogue' })}>
+        <span className="cat-kicker">NEW · YOUR RESTOCK CATALOGUE</span>
+        <span className="cat-entry-title">Made from what you buy</span>
+        <span className="cat-lede">This week's sales on the things you track, a page for each shop.</span>
+        <span className="btn small cat-open">Open my catalogue</span>
+      </button>
+      <div className="eyebrow">The shops' own catalogues</div>
       <p className="sub">
         The catalogue for each shop you use. Catalogue opens the shop's own catalogue, Website opens its site, both in your web browser.
       </p>

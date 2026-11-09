@@ -12,8 +12,6 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -25,11 +23,22 @@ import org.json.JSONObject;
  * the messages or send any that will be accepted, so only paired phones can sync.
  *
  * Each message: 4 bytes of length, then 12 bytes of random nonce and the sealed JSON.
+ *
+ * 0.9.0: the listener only takes a small first message (until one of the household's keys opens
+ * it, nothing big is read), gives each message a deadline, keeps a few connections at a time (two
+ * per address), only answers addresses on the local network, and never lets one bad connection
+ * stop it. The household's public tag changes every day (dayTag), so a phone can't be followed
+ * from place to place by it.
+ *
  * No Android classes here, so it's tested on a computer too.
  */
 final class SyncWire {
     static final int PORT = 47461;
     private static final int MAX = 32 * 1024 * 1024;
+    /** Before a key has opened anything on a connection, messages can't be bigger than this. */
+    private static final int FIRST_MAX = 256 * 1024;
+    /** How long one message may take to arrive. */
+    private static final int MESSAGE_MS = 20_000;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private SyncWire() {}
@@ -88,6 +97,25 @@ final class SyncWire {
         return out.toByteArray();
     }
 
+    /**
+     * 0.9.0: the household's public tag for one day (UTC), from the key, so phones on the same
+     * Wi-Fi find each other but someone watching can't follow a phone from day to day.
+     * `dayOffset`: 0 today, -1 yesterday, 1 tomorrow (phones either side of midnight).
+     */
+    static String dayTag(byte[] key, int dayOffset) {
+        try {
+            long day = Math.floorDiv(System.currentTimeMillis(), 86_400_000L) + dayOffset;
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(key, "HmacSHA256"));
+            byte[] h = mac.doFinal(("restock-tag|" + day).getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 8; i++) sb.append(String.format("%02x", h[i] & 0xff));
+            return sb.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     /** A short, public name for the household, so phones can find each other without showing the key. */
     static String householdId(byte[] key) {
         try {
@@ -132,14 +160,41 @@ final class SyncWire {
     }
 
     private static byte[] read(DataInputStream in) throws IOException {
+        return read(in, MAX, 0);
+    }
+
+    /** One message, at most `max` bytes, arriving by `deadline` (System.nanoTime; 0: no deadline). */
+    private static byte[] read(DataInputStream in, int max, long deadline) throws IOException {
         int n = in.readInt();
-        if (n < 0 || n > MAX) throw new IOException("message too big");
+        if (n < 0 || n > max) throw new IOException("message too big");
         byte[] b = new byte[n];
-        in.readFully(b);
+        int off = 0;
+        while (off < n) {
+            if (deadline != 0 && System.nanoTime() > deadline) throw new IOException("too slow");
+            int r = in.read(b, off, Math.min(n - off, 65536));
+            if (r < 0) throw new IOException("ended early");
+            off += r;
+        }
         return b;
     }
 
+    /** Is this address on a local network (home Wi-Fi), not the internet or a mobile network? */
+    static boolean local(java.net.InetAddress a) {
+        if (a == null) return false;
+        if (a.isLoopbackAddress() || a.isSiteLocalAddress() || a.isLinkLocalAddress()) return true;
+        byte[] b = a.getAddress();
+        // IPv6 unique local addresses (fc00::/7), which home routers hand out too.
+        return b.length == 16 && (b[0] & 0xfe) == 0xfc;
+    }
+
     // ---------- asking another phone ----------
+
+    /** 0.9.0: the other phone answered, but said no (a used code, a full household): its words. */
+    static final class Refused extends IOException {
+        Refused(String why) {
+            super(why);
+        }
+    }
 
     /** A connection to another phone, one message at a time. Close it when done. */
     static final class Client implements SyncEngine.Transport, AutoCloseable {
@@ -161,7 +216,7 @@ final class SyncWire {
         public JSONObject send(JSONObject message) throws Exception {
             write(out, seal(key, message));
             JSONObject res = open(key, read(in));
-            if (res.has("error")) throw new IOException("the other phone said: " + res.optString("error"));
+            if (res.has("error")) throw new Refused(res.optString("error"));
             return res;
         }
 
@@ -199,7 +254,10 @@ final class SyncWire {
         private final Keys keys;
         private final Handler handler;
         private final ServerSocket socket;
-        private final ExecutorService pool = Executors.newFixedThreadPool(2);
+        /** A few connections at a time; more wait briefly in line, and past that they're closed. */
+        private final java.util.concurrent.ThreadPoolExecutor pool = new java.util.concurrent.ThreadPoolExecutor(
+            3, 3, 30, java.util.concurrent.TimeUnit.SECONDS, new java.util.concurrent.ArrayBlockingQueue<>(6));
+        private final java.util.Map<String, Integer> perAddress = new java.util.HashMap<>();
         private volatile boolean running = true;
 
         Server(Keys keys, Handler handler) throws IOException {
@@ -225,19 +283,58 @@ final class SyncWire {
             while (running) {
                 try {
                     final Socket c = socket.accept();
-                    pool.execute(() -> serve(c));
+                    String host = c.getInetAddress() == null ? "" : c.getInetAddress().getHostAddress();
+                    // Only phones on the local network, and at most two connections from each.
+                    boolean ok = local(c.getInetAddress()) && local(c.getLocalAddress());
+                    synchronized (perAddress) {
+                        int n = perAddress.getOrDefault(host, 0);
+                        if (ok && n < 2) perAddress.put(host, n + 1);
+                        else ok = false;
+                    }
+                    if (!ok) {
+                        closeQuietly(c);
+                        continue;
+                    }
+                    try {
+                        pool.execute(() -> {
+                            try {
+                                serve(c);
+                            } finally {
+                                synchronized (perAddress) {
+                                    int n = perAddress.getOrDefault(host, 1) - 1;
+                                    if (n <= 0) perAddress.remove(host);
+                                    else perAddress.put(host, n);
+                                }
+                            }
+                        });
+                    } catch (java.util.concurrent.RejectedExecutionException busy) {
+                        synchronized (perAddress) {
+                            int n = perAddress.getOrDefault(host, 1) - 1;
+                            if (n <= 0) perAddress.remove(host);
+                            else perAddress.put(host, n);
+                        }
+                        closeQuietly(c);
+                    }
                 } catch (SocketException closed) {
                     return;
-                } catch (IOException e) {
+                } catch (Throwable e) {
                     if (!running) return;
                 }
+            }
+        }
+
+        private static void closeQuietly(Socket c) {
+            try {
+                c.close();
+            } catch (IOException ignored) {
+                // closed
             }
         }
 
         private void serve(Socket c) {
             String host = c.getInetAddress().getHostAddress();
             try (Socket s = c) {
-                s.setSoTimeout(60_000);
+                s.setSoTimeout(MESSAGE_MS);
                 DataInputStream in = new DataInputStream(s.getInputStream());
                 DataOutputStream out = new DataOutputStream(s.getOutputStream());
                 byte[] key = null;
@@ -245,7 +342,8 @@ final class SyncWire {
                 while (running) {
                     byte[] sealed;
                     try {
-                        sealed = read(in);
+                        // Small until a key has opened something; each message has a deadline.
+                        sealed = read(in, key == null ? FIRST_MAX : MAX, System.nanoTime() + MESSAGE_MS * 1_000_000L);
                     } catch (IOException end) {
                         break;
                     }
@@ -281,10 +379,14 @@ final class SyncWire {
                     }
                     write(out, seal(key, res));
                 }
-            } catch (Exception ignored) {
-                // the other phone went away; it carries on next time
+            } catch (Throwable ignored) {
+                // the other phone went away (or sent something odd); it carries on next time
             } finally {
-                handler.done(host);
+                try {
+                    handler.done(host);
+                } catch (Throwable ignored) {
+                    // never stop listening over one connection
+                }
             }
         }
 

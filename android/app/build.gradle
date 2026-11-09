@@ -1,11 +1,20 @@
 apply plugin: 'com.android.application'
 
 // Restock's own signing key, kept outside the project (see BUILD.md, "Restock's signing key").
-// When it's there, every build is signed with it, so updates install over each other on any
-// computer. Without it, builds use this computer's debug key as before.
+// When it's there, release builds are signed with it, so updates install over each other on any
+// computer. Without it, they use this computer's debug key as before. 0.9.0: debug builds always
+// use this computer's debug key (they're a separate app, see buildTypes below).
 def signingFile = new File(System.getProperty('user.home'), '.restock/signing.properties')
 def signing = new Properties()
 if (signingFile.exists()) signingFile.withInputStream { signing.load(it) }
+
+// 0.9.0: say so when a release build is about to be signed without Restock's key (a home build).
+// Only for release builds, so a debug build doesn't print it.
+gradle.taskGraph.whenReady { graph ->
+    if (!signingFile.exists() && (graph.hasTask(project.path + ':packageRelease') || graph.hasTask(project.path + ':bundleRelease'))) {
+        logger.warn("Release build signed with this computer's debug key: it won't install over official Restock")
+    }
+}
 
 android {
     namespace = "family.plenty.restock"
@@ -14,8 +23,8 @@ android {
         applicationId "family.plenty.restock"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 60
-        versionName "0.8.9"
+        versionCode 61
+        versionName "0.9.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -35,13 +44,25 @@ android {
     }
     buildTypes {
         debug {
-            if (signingFile.exists()) signingConfig signingConfigs.restock
+            // 0.9.0: a debug build is its own app (family.plenty.restock.debug, version "0.9.0-debug"),
+            // signed with this computer's debug key, so it can never install over the real Restock
+            // or be mistaken for it. Android shows it as a second Restock.
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
         }
         release {
+            // 0.9.0: official APKs are release builds (not debuggable, so a computer can't copy
+            // Restock's database off the phone). Code shrinking stays off so nothing the plugins
+            // or the shops' pages need is removed. Without Restock's key, this computer's debug
+            // key signs it, so a home build still installs.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            if (signingFile.exists()) signingConfig signingConfigs.restock
+            signingConfig signingFile.exists() ? signingConfigs.restock : signingConfigs.debug
         }
+    }
+    lint {
+        // Lint's release check shouldn't stop a build on someone else's computer.
+        checkReleaseBuilds false
     }
 }
 

@@ -79,7 +79,7 @@ export function HouseholdScreen() {
           <div key={m.device} className="row">
             <Icon name="phone" size={18} />
             <span className="grow">
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 {m.me ? `${m.name === 'This phone' ? 'This phone' : `${m.name} (this phone)`}` : m.name}
               </span>
               <span className="small">{m.owner ? 'Owner' : 'Member'}</span>
@@ -89,7 +89,7 @@ export function HouseholdScreen() {
         <button className="row" onClick={() => nav.push({ name: 'sync' })}>
           <Icon name="swap" size={18} />
           <span className="grow">
-            <span className="title" style={{ fontSize: 14, color: 'var(--green)' }}>
+            <span className="title" style={{ fontSize: 15, color: 'var(--green)' }}>
               {sync?.paired ? (sync.isOwner ? 'Add or remove phones' : 'Local sync') : 'Share with other phones: local sync'}
             </span>
             <span className="small">Phone to phone on your Wi-Fi. No account, and nothing leaves your phones. Up to {MAX_SYNC_PHONES} phones.</span>
@@ -99,7 +99,7 @@ export function HouseholdScreen() {
         <button className="row" onClick={() => nav.push({ name: 'soon', id: 'sync' })}>
           <Icon name="refresh" size={18} />
           <span className="grow">
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               Hosted sync
             </span>
             <span className="small">Sync from anywhere, through a small server you run. Coming later.</span>

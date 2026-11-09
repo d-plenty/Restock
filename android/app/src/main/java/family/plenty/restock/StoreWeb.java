@@ -20,6 +20,8 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -49,21 +51,130 @@ final class StoreWeb implements StoreClient.WebFetcher {
         return site.endsWith("/") ? site : site + "/";
     }
 
+    // ---------- 0.9.0: staying on the shop's own site ----------
+
+    /**
+     * Other sites of the same shop that its pages may go to (signing in, its rewards program).
+     * Each also covers its subdomains.
+     */
+    private static String[] alsoAllowed(String chain) {
+        if ("woolworths".equals(chain)) return new String[] {"everyday.com.au", "woolworthsrewards.com.au"};
+        if ("coles".equals(chain)) return new String[] {"flybuys.com.au"};
+        return new String[0];
+    }
+
+    /** The shop's website without "www." ("coles.com.au"), or null for a shop Restock doesn't know. */
+    private static String siteHost(String chain) {
+        java.net.URI u = Net.strictUri(Shops.website(chain));
+        String h = u == null ? null : u.getHost();
+        return h == null ? null : h.toLowerCase(Locale.ROOT).replaceFirst("^www\\.", "");
+    }
+
+    /**
+     * Is `url` a secure page on the shop's own site: its website's domain or one under it
+     * ("api.coles.com.au"), or one of {@link #alsoAllowed}? Compares the address's real host, so
+     * "https://www.coles.com.au.example.net/" or "https://www.coles.com.au@example.net/" isn't Coles.
+     */
+    static boolean onShopSite(String chain, String url) {
+        java.net.URI u = Net.strictUri(url);
+        if (u == null || !"https".equalsIgnoreCase(u.getScheme()) || u.getHost() == null) return false;
+        String host = u.getHost().toLowerCase(Locale.ROOT);
+        String site = siteHost(chain);
+        if (site != null && (host.equals(site) || host.endsWith("." + site))) return true;
+        for (String h : alsoAllowed(chain)) if (host.equals(h) || host.endsWith("." + h)) return true;
+        return false;
+    }
+
+    /**
+     * `url` (a full address, or a path such as "/api/...") as a full address on the shop's own
+     * site, or null if it isn't one. A path is read against the shop's home page, so "//elsewhere"
+     * and "/\elsewhere" (which a browser reads as another site) are refused.
+     */
+    static String onSite(String chain, String url) {
+        if (url == null || url.startsWith("//")) return null;
+        java.net.URI u = Net.strictUri(url);
+        java.net.URI base = Net.strictUri(home(chain));
+        if (u == null || base == null) return null;
+        try {
+            String full = base.resolve(u).toString();
+            return onShopSite(chain, full) ? full : null;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** The host part of an address, for showing it ("www.coles.com.au"), or "" when there isn't one. */
+    static String hostOf(String url) {
+        java.net.URI u = Net.strictUri(url);
+        return u == null || u.getHost() == null ? "" : u.getHost().toLowerCase(Locale.ROOT);
+    }
+
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
+    /**
+     * A new random code for one request into the page. Only the answer carrying it is accepted, so
+     * other scripts on the page (or an ad in a frame, which can see RestockWeb too) can't answer for it.
+     */
+    private static String token() {
+        byte[] b = new byte[16];
+        RANDOM.nextBytes(b);
+        StringBuilder s = new StringBuilder(32);
+        for (byte x : b) s.append(Character.forDigit((x >> 4) & 0xf, 16)).append(Character.forDigit(x & 0xf, 16));
+        return s.toString();
+    }
+
+    /** A hidden page left alone this long is blanked, so the shop's scripts don't keep running. */
+    private static final long IDLE_MS = 2 * 60_000L;
+
     private final Context app;
     private final String chain;
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final Map<Integer, String[]> results = new ConcurrentHashMap<>();
-    private final Map<Integer, CountDownLatch> waiting = new ConcurrentHashMap<>();
+    private final Map<String, String[]> results = new ConcurrentHashMap<>();
+    private final Map<String, CountDownLatch> waiting = new ConcurrentHashMap<>();
     private WebView web;
     private volatile CountDownLatch pageLatch;
     private volatile long loadedAt;
     /** HTTP status of the last page opened (0 when Android doesn't say). */
     private volatile int pageStatus;
-    private int nextId = 1;
+    /** 0.9.0: the address the hidden page is at, as last reported by the page itself. */
+    private volatile String pageUrl;
+    /** 0.9.0: requests under way (changed only while holding this object's lock). */
+    private volatile int busy;
+    /** 0.9.0: blanks the hidden page (on the main thread), unless a request is under way. */
+    private final Runnable idle = () -> {
+        if (busy > 0 || web == null) return;
+        loadedAt = 0;
+        web.loadUrl("about:blank");
+    };
 
     private StoreWeb(Context app, String chain) {
         this.app = app;
         this.chain = chain;
+    }
+
+    /** 0.9.0: a request is starting (call holding the lock). */
+    private void begin() {
+        busy++;
+        main.removeCallbacks(idle);
+    }
+
+    /** 0.9.0: a request is over (call holding the lock): blank the page if nothing else comes along. */
+    private void end() {
+        busy--;
+        main.removeCallbacks(idle);
+        main.postDelayed(idle, IDLE_MS);
+    }
+
+    /** 0.9.0: blanks every hidden shop page now (after Check now, and when everything is erased). */
+    static void blankAll() {
+        java.util.List<StoreWeb> all;
+        synchronized (StoreWeb.class) {
+            all = new java.util.ArrayList<>(instances.values());
+        }
+        for (StoreWeb w : all) {
+            w.main.removeCallbacks(w.idle);
+            w.main.post(w.idle);
+        }
     }
 
     static synchronized StoreWeb get(Context context, String chain) {
@@ -108,9 +219,14 @@ final class StoreWeb implements StoreClient.WebFetcher {
 
     /** Opens a product page and reads its price there. Returns {status, product JSON}. */
     synchronized String[] productPage(String url) throws Exception {
-        String[] page = render(url);
-        String[] product = productHere();
-        return new String[] {page[0], product[1]};
+        begin();
+        try {
+            String[] page = render(url);
+            String[] product = productHere();
+            return new String[] {page[0], product[1]};
+        } finally {
+            end();
+        }
     }
 
     /**
@@ -120,14 +236,19 @@ final class StoreWeb implements StoreClient.WebFetcher {
      */
     synchronized String[] get(String method, String url, String body) throws Exception {
         if (Looper.myLooper() == Looper.getMainLooper()) throw new IllegalStateException("StoreWeb.get must not run on the main thread");
-        ensurePage(false);
-        String[] r = run(method, url, body);
-        if (looksBlocked(r)) {
-            Log.i(TAG, chain + ": first try blocked (" + r[0] + "), reloading and trying again");
-            ensurePage(true);
-            r = run(method, url, body);
+        begin();
+        try {
+            ensurePage(false);
+            String[] r = run(method, url, body);
+            if (looksBlocked(r)) {
+                Log.i(TAG, chain + ": first try blocked (" + r[0] + "), reloading and trying again");
+                ensurePage(true);
+                r = run(method, url, body);
+            }
+            return r;
+        } finally {
+            end();
         }
-        return r;
     }
 
     static boolean looksBlocked(String[] r) {
@@ -142,6 +263,9 @@ final class StoreWeb implements StoreClient.WebFetcher {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setBlockNetworkImage(true);
+        // 0.9.0: a shop's page has no business reading the phone's content (content://) or files.
+        s.setAllowContentAccess(false);
+        s.setAllowFileAccess(false);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(w, true);
     }
@@ -158,14 +282,11 @@ final class StoreWeb implements StoreClient.WebFetcher {
     }
 
     private String[] run(String method, String url, String body) throws Exception {
-        final int id;
-        synchronized (this) {
-            id = nextId++;
-        }
+        final String id = token();
         CountDownLatch done = new CountDownLatch(1);
         waiting.put(id, done);
         boolean coles = "coles".equals(chain);
-        final String js = "(function(){var id=" + id + ";"
+        final String js = "(function(){var id=" + JSONObject.quote(id) + ";"
             + "try{var url=" + JSONObject.quote(url) + ";"
             + (coles
                 ? "var key=window.__restockKey;"
@@ -195,7 +316,18 @@ final class StoreWeb implements StoreClient.WebFetcher {
      */
     synchronized String[] render(String url) throws Exception {
         if (Looper.myLooper() == Looper.getMainLooper()) throw new IllegalStateException("StoreWeb.render must not run on the main thread");
-        if (!Shops.sameSite(chain, url)) throw new IllegalArgumentException("Not a page on " + chain + "'s website");
+        // 0.9.0: read strictly (onShopSite), so an address can't look like the shop's to Restock
+        // while the browser reads it as another site.
+        if (!onShopSite(chain, url)) throw new IllegalArgumentException("Not a page on " + chain + "'s website");
+        begin();
+        try {
+            return renderHere(url);
+        } finally {
+            end();
+        }
+    }
+
+    private String[] renderHere(String url) throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
         pageLatch = latch;
         pageStatus = 200;
@@ -246,7 +378,12 @@ final class StoreWeb implements StoreClient.WebFetcher {
 
     /** The current page's product price, read from its search-engine data, meta tags or price labels. */
     synchronized String[] productHere() throws Exception {
-        return evalForText(PRODUCT_JS);
+        begin();
+        try {
+            return evalForText(PRODUCT_JS);
+        } finally {
+            end();
+        }
     }
 
     /**
@@ -276,13 +413,10 @@ final class StoreWeb implements StoreClient.WebFetcher {
 
     /** Runs a script in the page and returns {"200", its text result} (through the bridge, so long pages come back whole). */
     private String[] evalForText(String expr) throws Exception {
-        final int id;
-        synchronized (this) {
-            id = nextId++;
-        }
+        final String id = token();
         CountDownLatch done = new CountDownLatch(1);
         waiting.put(id, done);
-        final String js = "(function(){var id=" + id + ";try{var v=" + expr + ";RestockWeb.done(id,200,String(v));}catch(e){RestockWeb.done(id,-1,String(e));}})();";
+        final String js = "(function(){var id=" + JSONObject.quote(id) + ";try{var v=" + expr + ";RestockWeb.done(id,200,String(v));}catch(e){RestockWeb.done(id,-1,String(e));}})();";
         main.post(() -> web.evaluateJavascript(js, null));
         boolean ok = done.await(20, TimeUnit.SECONDS);
         waiting.remove(id);
@@ -309,8 +443,37 @@ final class StoreWeb implements StoreClient.WebFetcher {
                         if (request.isForMainFrame()) pageStatus = response.getStatusCode();
                     }
 
+                    // 0.9.0: the hidden page stays on the shop's own site. Frames inside the page
+                    // (a "you're a person" check, say) load as the page asks.
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
+                        if (!request.isForMainFrame()) return false;
+                        String to = request.getUrl() == null ? null : request.getUrl().toString();
+                        if (onShopSite(chain, to)) return false;
+                        Log.w(TAG, chain + ": kept the hidden page off " + hostOf(to));
+                        return true;
+                    }
+
+                    @Override
+                    public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                        pageUrl = url;
+                        // A way off the site that doesn't ask first (a form sent elsewhere): blank it.
+                        if (url != null && !"about:blank".equals(url) && !onShopSite(chain, url)) {
+                            Log.w(TAG, chain + ": the hidden page went to " + hostOf(url) + "; blanking it");
+                            view.stopLoading();
+                            view.loadUrl("about:blank");
+                        }
+                    }
+
+                    @Override
+                    public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+                        super.doUpdateVisitedHistory(view, url, isReload);
+                        pageUrl = url;
+                    }
+
                     @Override
                     public void onPageFinished(WebView view, String url) {
+                        pageUrl = url;
                         // Give the site's own bot check a moment to finish (it may reload the page).
                         final CountDownLatch l = pageLatch;
                         main.postDelayed(() -> {
@@ -325,11 +488,17 @@ final class StoreWeb implements StoreClient.WebFetcher {
     }
 
     private final class Bridge {
+        /**
+         * 0.9.0: only an answer to a request Restock is waiting for (it carries that request's random
+         * code), while the page is on the shop's own site. Anything else is ignored.
+         */
         @JavascriptInterface
-        public void done(int id, int status, String body) {
-            results.put(id, new String[] {String.valueOf(status), body});
-            CountDownLatch l = waiting.get(id);
-            if (l != null) l.countDown();
+        public void done(String id, int status, String body) {
+            CountDownLatch l = id == null ? null : waiting.get(id);
+            if (l == null) return;
+            if (onShopSite(chain, pageUrl)) results.put(id, new String[] {String.valueOf(status), body});
+            else results.put(id, new String[] {"-1", "The page wasn't on " + chain + "'s website"});
+            l.countDown();
         }
     }
 
@@ -415,7 +584,16 @@ final class StoreWeb implements StoreClient.WebFetcher {
         note.setText(message != null && !message.isEmpty() ? message : "Let the page load. If it asks, tick the box to show you're a person. Then tap Done.");
         note.setTextColor(Color.WHITE);
         note.setTextSize(14);
-        bar.addView(note, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        // 0.9.0: under the note, the site the page is on right now ("www.coles.com.au"), so you can
+        // see who you're signing in to.
+        final TextView where = new TextView(activity);
+        where.setTextColor(Color.argb(0xCC, 0xFF, 0xFF, 0xFF));
+        where.setTextSize(12);
+        LinearLayout texts = new LinearLayout(activity);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.addView(note, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        texts.addView(where, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        bar.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         Button doneBtn = new Button(activity);
         doneBtn.setText("Done");
@@ -432,33 +610,59 @@ final class StoreWeb implements StoreClient.WebFetcher {
         w.getSettings().setBlockNetworkImage(false);
         final String[] recording = {null};
         final boolean[] picked = {false};
-        if (record || pickStore) {
-            w.setWebViewClient(new WebViewClient() {
-                @Override
-                public void onPageFinished(WebView view, String url) {
-                    if (record) view.evaluateJavascript(RECORDER, null);
-                    else spot(url);
-                }
+        w.setWebViewClient(new WebViewClient() {
+            // 0.9.0: links stay on the shop's own site (and its sign-in pages); a link anywhere
+            // else isn't opened. Frames inside the page (a "you're a person" check) load as asked.
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
+                if (!request.isForMainFrame()) return false;
+                String to = request.getUrl() == null ? null : request.getUrl().toString();
+                if (onShopSite(chain, to)) return false;
+                String host = hostOf(to);
+                Toast.makeText(activity, host.isEmpty() ? "Restock only opens the shop's own website here." : "Restock only opens the shop's own website here, not " + host + ".",
+                    Toast.LENGTH_SHORT).show();
+                return true;
+            }
 
-                // The store finder changes page without loading a new one; this still sees it.
-                @Override
-                public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
-                    super.doUpdateVisitedHistory(view, url, isReload);
-                    if (pickStore) spot(url);
-                }
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                showWhere(url);
+            }
 
-                private void spot(String url) {
-                    if (picked[0] || url == null || !url.startsWith(home(chain).replaceAll("/+$", ""))) return;
-                    if (!COLES_STORE_PAGE.matcher(url).find()) return;
-                    picked[0] = true;
-                    recording[0] = url;
-                    note.setText("Got it. Going back to Restock…");
-                    w.postDelayed(dialog::dismiss, 700);
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                showWhere(url);
+                // 0.9.0: the recorder only goes into the shop's own pages.
+                if (record) {
+                    if (onShopSite(chain, url)) view.evaluateJavascript(RECORDER, null);
+                } else if (pickStore) {
+                    spot(url);
                 }
-            });
-        } else {
-            w.setWebViewClient(new WebViewClient());
-        }
+            }
+
+            // The store finder changes page without loading a new one; this still sees it.
+            @Override
+            public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+                super.doUpdateVisitedHistory(view, url, isReload);
+                showWhere(url);
+                if (pickStore) spot(url);
+            }
+
+            private void showWhere(String url) {
+                String host = hostOf(url);
+                where.setText(host.isEmpty() ? "" : onShopSite(chain, url) ? host : host + " (not the shop's site)");
+            }
+
+            private void spot(String url) {
+                // 0.9.0: the shop's own site by its real host, not by how the address starts.
+                if (picked[0] || url == null || !onShopSite(chain, url)) return;
+                if (!COLES_STORE_PAGE.matcher(url).find()) return;
+                picked[0] = true;
+                recording[0] = url;
+                note.setText("Got it. Going back to Restock…");
+                w.postDelayed(dialog::dismiss, 700);
+            }
+        });
         root.addView(w, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         dialog.setContentView(root);
@@ -469,7 +673,12 @@ final class StoreWeb implements StoreClient.WebFetcher {
                 dialog.dismiss();
                 return;
             }
-            // Read the recording back before the page goes.
+            // Read the recording back before the page goes. 0.9.0: only from the shop's own site
+            // (another site's page could have put anything there).
+            if (!onShopSite(chain, w.getUrl())) {
+                dialog.dismiss();
+                return;
+            }
             w.evaluateJavascript("sessionStorage.getItem('__restockRec')||'[]'", value -> {
                 recording[0] = value;
                 dialog.dismiss();
@@ -481,9 +690,11 @@ final class StoreWeb implements StoreClient.WebFetcher {
             get(activity, chain).reset();
             onDone.done(recording[0]);
         });
-        // Only a page on the shop's own site: a path, never another address.
+        // Only a page on the shop's own site: a path, never another address. 0.9.0: the path is read
+        // against the shop's home page and has to land on its site (onSite), or the home page opens.
         String start = home(chain);
-        if (path != null && path.startsWith("/") && !path.startsWith("//")) start = start.replaceAll("/+$", "") + path;
+        String at = path != null && path.startsWith("/") ? onSite(chain, path) : null;
+        if (at != null) start = at;
         w.loadUrl(start);
         dialog.show();
         root.requestApplyInsets();

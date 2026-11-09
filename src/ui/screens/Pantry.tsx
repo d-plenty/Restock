@@ -12,6 +12,7 @@ import { Hold, Icon, MoreInfo, stockWhere, previewFromOption, ProductPreview, Se
 import { ActionInfoTag } from '../tagInfo';
 import { useNav } from '../nav';
 import { SECTION_NAMES, type Section } from '../../shops';
+import { confirmAction } from '../../lib/confirm';
 
 type Filter = 'all' | 'sale' | string; // string = category id
 type Sort = 'sale' | 'az' | 'recent';
@@ -56,11 +57,11 @@ const EMPTY: Record<Section, string> = {
 };
 const SEARCH_HINT: Record<Section, string> = { pantry: 'Search your pantry', keg: 'Search your keg', pharmacy: 'Search your pharmacy items' };
 
-/** The Pantry, Keg or Pharmacy tab: the things you buy from that kind of shop. */
 /** At or under the item's "alert me under $X" price at its cheapest shop. */
 const underTarget = (r: Recommendation) =>
-  r.group.targetPrice !== undefined && r.best?.price !== undefined && r.best.price <= r.group.targetPrice + 0.004;
+  r.group.targetPrice !== undefined && r.best?.price !== undefined && r.best.price <= r.group.targetPrice + 0.004 && !r.best.verdict.stale;
 
+/** The Pantry, Keg or Pharmacy tab: the things you buy from that kind of shop. */
 export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   const nav = useNav();
   const allRecs = useLive(loadRecommendations, []);
@@ -132,6 +133,12 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   };
 
   const deleteOne = async (r: Recommendation) => {
+    // Swiping is quick to do by accident, so it asks first (0.9.0).
+    const ok = await confirmAction(`Delete ${r.group.name} from ${SECTION_NAMES[section]}?`, {
+      detail: 'Its products and price history go too. You can undo it straight after.',
+      action: 'Delete',
+    });
+    if (!ok) return;
     const undo = await undoable(() => deleteGroup(r.group.id), groupRows([r.group.id]));
     buzz();
     nav.toast(`${r.group.name} deleted`, undo);
@@ -190,9 +197,15 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       <div className="topbar">
         <h1>{SECTION_NAMES[section]}</h1>
         {recs.length > 0 && (
-          <button className="btn small" onClick={() => (editing ? stopEditing() : setEditing(true))}>
-            {editing ? 'Done' : 'Edit'}
-          </button>
+          editing ? (
+            <button className="btn small primary" onClick={stopEditing}>
+              Done
+            </button>
+          ) : (
+            <button className="icon-btn" aria-label="Edit" onClick={() => setEditing(true)}>
+              <Icon name="pencil" size={18} />
+            </button>
+          )
         )}
         {!editing && (
           <button className="icon-btn" aria-label="Add an item" onClick={() => nav.setTab('add')}>

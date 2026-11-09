@@ -54,11 +54,11 @@ export function LookSettings({ settings }: { settings: Settings }) {
             True black in dark mode
           </span>
           <span className="small">
-            For OLED screens: the background is pure black, so those pixels switch off. Saves battery and gives deeper contrast.
+            For OLED screens: the background is pure black, so those pixels switch off. Saves battery and gives deeper contrast. On to start with.
             {settings.theme === 'light' ? ' Shows when Light or dark is set to Dark or System.' : ''}
           </span>
         </span>
-        <input type="checkbox" checked={!!look.black} onChange={(e) => void setLook({ black: e.target.checked })} />
+        <input type="checkbox" className="switch" checked={look.black !== false} onChange={(e) => void setLook({ black: e.target.checked })} />
       </label>
 
       <div className="field">
@@ -124,7 +124,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
         <div className="field">
           <label className="check" style={{ padding: 0 }}>
             <input
-              type="checkbox"
+              type="checkbox" className="switch"
               checked={look.icon === 'match'}
               onChange={(e) => void setIcon(e.target.checked ? 'match' : iconId)}
               disabled={iconBusy}
@@ -179,7 +179,7 @@ export function AccessibilitySettings({ settings }: { settings: Settings }) {
         </span>
         <span className="small">{detail}</span>
       </span>
-      <input type="checkbox" checked={a[key]} onChange={(e) => void set({ [key]: e.target.checked })} />
+      <input type="checkbox" className="switch" checked={a[key]} onChange={(e) => void set({ [key]: e.target.checked })} />
     </label>
   );
   return (

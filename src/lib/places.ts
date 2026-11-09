@@ -5,6 +5,13 @@ import { APP_UA, num, request, sleep } from '../stores/http';
 //  - Nominatim turns a suburb or postcode into a map position.
 //  - Overpass lists the supermarkets, bottle shops or pharmacies around that position.
 // No Google services and no account. Map data © OpenStreetMap contributors.
+//
+// 0.9.0: a position sent to these services is rounded to 3 decimal places (about 100 m), and the
+// Overpass servers are asked one at a time (overpass-api.de, then overpass.private.coffee if it
+// doesn't answer), so your position only goes to a second server when the first one fails.
+
+/** A map position rounded to 3 decimal places, about 100 m, before it's sent anywhere. */
+export const roundCoord = (n: number) => Math.round(n * 1000) / 1000;
 
 export interface Area {
   label: string;
@@ -132,7 +139,7 @@ export async function searchArea(text: string): Promise<Area[]> {
 
 /** A readable name for a position, e.g. "Bohle Plains QLD 4817". */
 export async function describePosition(lat: number, lon: number): Promise<string> {
-  const params = new URLSearchParams({ format: 'jsonv2', addressdetails: '1', lat: String(lat), lon: String(lon), zoom: '14' });
+  const params = new URLSearchParams({ format: 'jsonv2', addressdetails: '1', lat: String(roundCoord(lat)), lon: String(roundCoord(lon)), zoom: '14' });
   try {
     const res = await request({ url: `https://nominatim.openstreetmap.org/reverse?${params}`, headers: HEADERS });
     return parseAreas([JSON.parse(res.text)])[0]?.label ?? 'Your location';
@@ -204,7 +211,8 @@ function storeNumber(tags: Record<string, string>): string | undefined {
 
 /** Every supermarket, bottle shop or pharmacy nearby; the chains are picked out on the phone. Plain tag lookups keep this fast. */
 export function overpassQuery(lat: number, lon: number, metres: number, section: Section = 'pantry'): string {
-  const at = `(around:${metres},${lat.toFixed(5)},${lon.toFixed(5)})`;
+  // 0.9.0: rounded to about 100 m (roundCoord); still written with 5 places, as before.
+  const at = `(around:${metres},${roundCoord(lat).toFixed(5)},${roundCoord(lon).toFixed(5)})`;
   const what =
     section === 'keg'
       ? `nwr["shop"~"^(alcohol|wine|beverages)$"]${at};`
@@ -214,11 +222,8 @@ export function overpassQuery(lat: number, lon: number, metres: number, section:
   return `[out:json][timeout:20];${what}out center tags 300;`;
 }
 
-const OVERPASS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-];
+/** The Overpass servers, asked in this order, one at a time. */
+export const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
 const RADIUS_M = 25_000;
 
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -267,6 +272,23 @@ export function uniqueNames(list: NearbyStore[]): NearbyStore[] {
   });
 }
 
+/**
+ * Tries each server in turn until one answers; fails with the last server's problem if none do.
+ * `stop`: the answer came from elsewhere meanwhile (the Nominatim backup), so no more servers are asked.
+ */
+export async function overpassInTurn<T>(servers: string[], ask: (base: string) => Promise<T>, stop: () => boolean = () => false): Promise<T> {
+  let last: unknown = new Error('No map servers');
+  for (const base of servers) {
+    if (stop()) break;
+    try {
+      return await ask(base);
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
+}
+
 async function overpassFrom(base: string, lat: number, lon: number, section: Section): Promise<NearbyStore[]> {
   const res = await request({
     url: `${base}?data=${encodeURIComponent(overpassQuery(lat, lon, RADIUS_M, section))}`,
@@ -283,7 +305,9 @@ async function overpassFrom(base: string, lat: number, lon: number, section: Sec
 /** Backup: ask Nominatim for each chain's name inside a box around you. */
 export async function nominatimStores(lat: number, lon: number, section: Section = 'pantry', chains?: StoreChain[]): Promise<NearbyStore[]> {
   const d = 0.25; // about 25 km
-  const viewbox = [lon - d, lat + d, lon + d, lat - d].map((n) => n.toFixed(4)).join(',');
+  // 0.9.0: the box is drawn around your position rounded to about 100 m (roundCoord).
+  const [cLat, cLon] = [roundCoord(lat), roundCoord(lon)];
+  const viewbox = [cLon - d, cLat + d, cLon + d, cLat - d].map((n) => n.toFixed(4)).join(',');
   const all: NearbyStore[] = [];
   const brands = (chains ?? SHOPS.filter((x) => x.section === section).map((x) => x.id))
     .map((c) => shopDef(c)?.name)
@@ -365,15 +389,20 @@ export async function findPickedShops(lat: number, lon: number, section: Section
 async function nearbyStoresFresh(lat: number, lon: number, section: Section, chains?: StoreChain[]): Promise<NearbyStore[]> {
   // Test builds only (VITE_FAKE_STORES=1): canned shops so the finder can be clicked through off-phone.
   if (import.meta.env.VITE_FAKE_STORES === '1') return fakeNearby(section, lat, lon);
-  // Ask all the map servers at once and take the first good answer. If they're slow or all
-  // fail, the Nominatim backup starts too.
-  const servers = Promise.any(OVERPASS.map((b) => overpassFrom(b, lat, lon, section)));
+  // 0.9.0: ask the map servers one at a time, the next only if the one before fails, and take
+  // the first good answer. If they're slow or all fail, the Nominatim backup starts too. Once the
+  // backup has answered, no further map server is asked.
+  let answered = false;
+  const servers = overpassInTurn(OVERPASS, (b) => overpassFrom(b, lat, lon, section), () => answered);
   let backupStarted = false;
   const backup = new Promise<NearbyStore[]>((resolve, reject) => {
     const start = () => {
       if (backupStarted) return;
       backupStarted = true;
-      nominatimStores(lat, lon, section, chains).then(resolve, reject);
+      nominatimStores(lat, lon, section, chains).then((found) => {
+        answered = true;
+        resolve(found);
+      }, reject);
     };
     const t = setTimeout(start, 8000);
     servers.then(

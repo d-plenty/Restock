@@ -92,7 +92,16 @@ final class RecallChecker {
         Map<String, JSONObject> byId = new LinkedHashMap<>();
         for (int i = 0; i < saved.length(); i++) {
             JSONObject o = saved.optJSONObject(i);
-            if (o != null && !tooOld(o.optString("foundAt", null))) byId.put(o.optString("id"), o);
+            if (o == null || tooOld(o.optString("foundAt", null))) continue;
+            // 0.9.0: a link saved by an older version is held to the same rule (official recall sites only).
+            if (o.has("url") && !o.isNull("url")) {
+                try {
+                    o.put("url", Recalls.safeLink(o.optString("url"), o.optString("source")));
+                } catch (Exception ignored) {
+                    // keep it as it was
+                }
+            }
+            byId.put(o.optString("id"), o);
         }
         Set<String> dismissed = set(arr(PriceChecker.readKvRaw(db, "recallDismissed")));
         Set<String> notified = set(arr(PriceChecker.readKvRaw(db, "recallNotified")));

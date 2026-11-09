@@ -5,7 +5,8 @@ export interface ParsedSize {
   unit: BaseUnit;
 }
 
-const NUM = '(\\d+(?:\\.\\d+)?)';
+// 0.9.0: ".5kg" is half a kilo (it read as 5 kg). Mirrored in Deals.java.
+const NUM = '(\\d+(?:\\.\\d+)?|\\.\\d+)';
 const MASS_VOL = '(kg|g|ml|l)';
 
 function toBase(amount: number, unit: string): ParsedSize {
@@ -173,13 +174,27 @@ export function unitPrice(price: number, qty?: number, unit?: BaseUnit): number 
 
 /** Human label for a unit price, scaled the way Australian shelf labels do. */
 export function formatUnitPrice(perBase: number | undefined, unit?: BaseUnit): string {
-  if (perBase === undefined || !unit) return '';
+  if (perBase === undefined || !unit || !Number.isFinite(perBase)) return '';
   if (unit === 'g') return `${money(perBase * 100)} / 100g`;
-  if (unit === 'ml') return perBase * 1000 >= 1 ? `${money(perBase * 1000)} / L` : `${money(perBase * 100)} / 100ml`;
+  // Always per litre (0.9.0), so a 1 L and a 2 L milk read the same way.
+  if (unit === 'ml') return `${money(perBase * 1000)} / L`;
   return perBase < 0.1 ? `${money(perBase * 100)} per 100` : `${money(perBase)} each`;
 }
 
+/** Dollars, with commas in big amounts (0.9.0): $2,387.81. No number (or an endless one) is a dash, never "$Infinity". */
 export function money(n: number | undefined): string {
-  if (n === undefined || Number.isNaN(n)) return '—';
-  return `$${n.toFixed(2)}`;
+  if (n === undefined || !Number.isFinite(n)) return '—';
+  const s = Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${n < -0.004 ? '-' : ''}$${s}`;
+}
+
+/**
+ * A price typed by hand (0.9.0): "$4.50", "4.50", "$1,234.50" or " 4.5 ". The dollar sign, spaces and
+ * thousands commas are fine; a comma before the cents ("4,50") is read as the decimal point. NaN when
+ * there's no number in it.
+ */
+export function parseMoney(text: string | undefined | null): number {
+  let s = (text ?? '').replace(/[$\s]/g, '');
+  s = /^\d+,\d{1,2}$/.test(s) ? s.replace(',', '.') : s.replace(/,/g, '');
+  return parseFloat(s);
 }

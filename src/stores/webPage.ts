@@ -1,4 +1,5 @@
 import type { Chain } from '../types';
+import { sameSite } from '../lib/site';
 import { num } from './http';
 import type { StoreProduct } from './types';
 
@@ -751,15 +752,19 @@ export const SEARCH_GUESSES: Record<Platform, string[]> = {
   other: ['/search?q={q}', '/search?query={q}', '/search?searchTerm={q}', '/search?text={q}', '/catalogsearch/result/?q={q}', '/?s={q}'],
 };
 
-/** Work out where a shop's search page is from its homepage. */
+/**
+ * Work out where a shop's search page is from its homepage. 0.9.0: only a search page on the
+ * shop's own site (lib/site.ts), used over https; one that points anywhere else is passed over.
+ */
 export function findSearch(html: string, base: string, parse: ParseHtml = defaultParse): SearchInfo {
   const platform = platformOf(html);
+  const own = (url: string | undefined) => (url && sameSite(url, base) ? url.replace(/^http:\/\//i, 'https://') : undefined);
   // 1. schema.org SearchAction, which sites add so search engines can search them.
   for (const b of ldBlocks(html)) {
     const found = searchAction(b);
     if (found) {
       const t = found.replace(/\{\s*search_term(_string)?\s*\}|\{\s*query\s*\}|\{\s*q\s*\}/i, '{q}');
-      const url = absolute(t, base);
+      const url = own(absolute(t, base));
       if (url && url.includes('%7Bq%7D'))
         return { search: url.replace('%7Bq%7D', '{q}'), platform, how: 'the site’s search link for search engines' };
       if (url && url.includes('{q}')) return { search: url, platform, how: 'the site’s search link for search engines' };
@@ -782,7 +787,7 @@ export function findSearch(html: string, base: string, parse: ParseHtml = defaul
       const nameAttr = input?.getAttribute('name');
       if (!input || !nameAttr) continue;
       if ((form.getAttribute('method') ?? 'get').toLowerCase() === 'post') continue;
-      const action = absolute(form.getAttribute('action') || base, base);
+      const action = own(absolute(form.getAttribute('action') || base, base));
       if (!action) continue;
       const u = new URL(action);
       form.querySelectorAll('input[type="hidden"][name]').forEach((h) => u.searchParams.set(h.getAttribute('name')!, h.getAttribute('value') ?? ''));

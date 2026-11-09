@@ -1,15 +1,15 @@
-import type { Section } from '../shops';
+import { enabledIn, type Section } from '../shops';
 import { adapterFor } from '../stores';
 import type { BarcodeInfo } from './barcode';
-import { findProductByBarcode } from './db';
+import { findProductByBarcode, getSettings } from './db';
 import { sameCode } from './searchHelp';
 
 // Working out what a scanned barcode is, and what to search the shops for.
 //
 // Tried in order: things you've scanned before; the Open Food Facts family of open databases
-// (food, health and beauty, other products); Woolworths and Coles, which sell a lot of
-// pharmacy and drinks lines and can be searched by barcode (only the name is used, nothing is
-// added from them); and finally the barcode digits themselves.
+// (Open Food Facts, Open Beauty Facts and Open Products Facts); Woolworths and Coles, if you've
+// switched them on, which sell a lot of pharmacy and drinks lines and can be searched by barcode
+// (only the name is used, nothing is added from them); and finally the barcode digits themselves.
 //
 // Bottle shop and pharmacy websites search badly by long names, so for those Restock searches a
 // short version: "hard solo lemonade" rather than "Hard Solo Alcoholic Lemonade 4% 10 x 375ml",
@@ -114,12 +114,23 @@ export async function identifyBarcode(code: string, section: Section): Promise<I
   // A good name from the open databases is enough. Some entries only have the brand ("Earth
   // Choice"), which finds every product of that brand, so then the supermarkets are asked too.
   if (open && !weakName(open) && !open.kindOnly) return open;
-  // 3. The supermarkets, for the name only.
-  for (const c of ['woolworths', 'coles'] as const) {
+  // 3. The supermarkets, for the name only. 0.9.0: only the ones you've switched on (they're the
+  // Pantry tab's shops, whichever tab you're scanning on); a shop that's off is never asked.
+  // They're searched the usual way, so if you're signed in to Woolworths inside Restock, the
+  // search goes with your sign-in, as every Woolworths search does: the phone's requests share
+  // one set of cookies with Restock's browser, so there isn't a simple way to ask without it.
+  for (const c of await supermarketsOn()) {
     const hit = await supermarket(c, code);
     if (hit) return { ...hit, imageUrl: hit.imageUrl ?? open?.imageUrl, size: hit.size ?? open?.size };
   }
   return open ?? { barcode: code };
+}
+
+/** Woolworths and Coles, in that order, if they're among the shops you've switched on. */
+export async function supermarketsOn(): Promise<('woolworths' | 'coles')[]> {
+  const s = await getSettings().catch(() => undefined);
+  const on = s ? enabledIn(s.enabledChains, 'pantry') : [];
+  return (['woolworths', 'coles'] as const).filter((c) => on.includes(c));
 }
 
 /**

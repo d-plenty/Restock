@@ -255,6 +255,9 @@ public class RestockNativePlugin extends Plugin {
                 call.resolve(ret);
             } catch (Exception e) {
                 call.reject("Price check failed: " + e.getMessage(), e);
+            } finally {
+                // 0.9.0: the shops' hidden pages aren't needed until next time.
+                StoreWeb.blankAll();
             }
         });
     }
@@ -347,9 +350,10 @@ public class RestockNativePlugin extends Plugin {
         final String url = call.getString("url");
         final String body = call.getString("body");
         boolean known = knownShop(chain, call.getString("home"));
-        boolean allowed = url != null
-            && (url.startsWith("/") || url.startsWith("https://api.aldi.com.au/") || url.startsWith("https://api.danmurphys.com.au/")
-                || url.startsWith("https://api.bws.com.au/") || Shops.sameSite(chain, url));
+        // 0.9.0: the address is read against the shop's home page and has to land on the shop's own
+        // site (its APIs, such as api.aldi.com.au, are on it). That refuses "//elsewhere" and
+        // "/\elsewhere", which a browser would take to another site.
+        boolean allowed = known && StoreWeb.onSite(chain, url) != null;
         if (!known || !allowed) {
             call.reject("Not a store address Restock uses");
             return;
@@ -372,7 +376,8 @@ public class RestockNativePlugin extends Plugin {
     public void storeRender(PluginCall call) {
         final String chain = call.getString("chain", "");
         final String url = call.getString("url");
-        if (!knownShop(chain, call.getString("home")) || url == null || !Shops.sameSite(chain, url)) {
+        // 0.9.0: read strictly (StoreWeb.onShopSite), the same way the hidden browser is kept on the site.
+        if (!knownShop(chain, call.getString("home")) || url == null || !StoreWeb.onShopSite(chain, url)) {
             call.reject("Not a page of a shop Restock uses");
             return;
         }
@@ -492,12 +497,16 @@ public class RestockNativePlugin extends Plugin {
      * Android's installer, which shows its own Install screen. Only Restock's own release addresses
      * are allowed. The first time, Android needs "Install unknown apps" allowed for Restock: this
      * opens that page instead and resolves needsPermission.
+     *
+     * 0.9.0: the downloaded file is only handed to the installer if it's Restock, signed with the
+     * same key as the Restock on this phone, and a newer version (see notOurUpdate); otherwise it's
+     * deleted. Every address on the way is read properly (see updateAddress).
      */
     @PluginMethod
     public void installUpdate(final PluginCall call) {
         final String url = call.getString("url");
-        if (url == null || !(url.startsWith("https://github.com/d-plenty/Restock/releases/download/")
-                || url.startsWith("https://github.com/d-plenty/restock/releases/download/"))) {
+        final java.net.URI release = updateAddress(url, true);
+        if (release == null) {
             call.reject("Not a Restock release");
             return;
         }
@@ -517,31 +526,40 @@ public class RestockNativePlugin extends Plugin {
                 java.io.File dir = new java.io.File(ctx.getCacheDir(), "updates");
                 if (!dir.exists() && !dir.mkdirs()) throw new java.io.IOException("Couldn't make a folder for the download");
                 java.io.File apk = new java.io.File(dir, "restock-update.apk");
-                String next = url;
+                java.net.URI next = release;
                 java.net.HttpURLConnection c = null;
+                int code = 0;
                 // GitHub sends the download on to its file server: follow up to five hops, https only.
                 // 0.8.3: GitHub's file server sometimes answers 502-504 for a moment; wait and try
                 // again (three times) before giving up.
                 int retries = 0;
                 for (int hop = 0; hop < 5; hop++) {
-                    c = (java.net.HttpURLConnection) Net.url(next).openConnection();
+                    c = (java.net.HttpURLConnection) next.toURL().openConnection();
                     c.setInstanceFollowRedirects(false);
                     c.setConnectTimeout(20000);
                     c.setReadTimeout(60000);
                     c.setRequestProperty("User-Agent", "Restock");
-                    int code = c.getResponseCode();
+                    code = c.getResponseCode();
                     if (code >= 300 && code < 400) {
                         String loc = c.getHeaderField("Location");
                         c.disconnect();
-                        if (loc == null || !loc.startsWith("https://")) throw new java.io.IOException("GitHub sent an unexpected address");
-                        next = loc;
+                        // 0.9.0: only on to GitHub's own file servers (or the release on github.com),
+                        // read against the address it came from.
+                        java.net.URI to = null;
+                        try {
+                            if (loc != null) to = updateAddress(next.resolve(loc.trim()).toString(), false);
+                        } catch (IllegalArgumentException ignored) {
+                            // not an address at all
+                        }
+                        if (to == null) throw new java.io.IOException("GitHub sent an unexpected address");
+                        next = to;
                         continue;
                     }
                     if (code >= 500 && retries < 3) {
                         c.disconnect();
                         retries++;
                         hop--;
-                        next = url;
+                        next = release;
                         Thread.sleep(2000L * retries);
                         continue;
                     }
@@ -549,6 +567,8 @@ public class RestockNativePlugin extends Plugin {
                         throw new java.io.IOException("GitHub answered " + code + (code >= 500 ? " (GitHub's download server is busy; try again in a few minutes)" : ""));
                     break;
                 }
+                // 0.9.0: still being sent on after five hops: stop, rather than read a redirect as the file.
+                if (code != 200 || c == null) throw new java.io.IOException("GitHub kept sending the download somewhere else. Try again in a few minutes.");
                 // How big GitHub says the file is, so a download cut short isn't handed to the installer.
                 long expected = c.getContentLengthLong();
                 long got = 0;
@@ -566,6 +586,12 @@ public class RestockNativePlugin extends Plugin {
                     apk.delete();
                     throw new java.io.IOException("The download stopped part way (" + (got / 1024) + " of " + (expected / 1024)
                         + " KB). Check your connection and try again.");
+                }
+                // 0.9.0: before Android's installer sees it: is it a newer Restock, signed like this one?
+                String wrong = notOurUpdate(ctx, apk);
+                if (wrong != null) {
+                    if (!apk.delete()) apk.deleteOnExit();
+                    throw new java.io.IOException(wrong);
                 }
                 android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
                 android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW);
@@ -585,6 +611,75 @@ public class RestockNativePlugin extends Plugin {
                 call.reject(e.getMessage() != null ? e.getMessage() : e.toString());
             }
         });
+    }
+
+    /** 0.9.0: Restock's release file on github.com: .../d-plenty/Restock/releases/download/v0.9.1/restock.apk (or restock-0.9.1.apk). */
+    private static final java.util.regex.Pattern RELEASE_FILE =
+        java.util.regex.Pattern.compile("/d-plenty/[Rr]estock/releases/download/[^/]+/restock(-[0-9][0-9A-Za-z.-]*)?\\.apk");
+
+    /**
+     * 0.9.0: an address an update may be downloaded from, read with java.net.URI (not by how it
+     * starts), or null. The first (`release`) must be Restock's release file on github.com; GitHub
+     * then sends the download on to its file servers (objects.githubusercontent.com or
+     * release-assets.githubusercontent.com). Always https, with no "user@" part, other port, ".."
+     * or backslash.
+     */
+    static java.net.URI updateAddress(String s, boolean release) {
+        if (s == null) return null;
+        try {
+            java.net.URI u = new java.net.URI(s);
+            if (!"https".equalsIgnoreCase(u.getScheme()) || u.getHost() == null || u.getRawUserInfo() != null) return null;
+            if (u.getPort() != -1 && u.getPort() != 443) return null;
+            String path = u.getRawPath() == null ? "" : u.getRawPath().toLowerCase(Locale.ROOT);
+            if (path.contains("..") || path.contains("\\") || path.contains("%2e") || path.contains("%2f") || path.contains("%5c")) return null;
+            String host = u.getHost().toLowerCase(Locale.ROOT);
+            boolean releaseFile = "github.com".equals(host) && RELEASE_FILE.matcher(u.getRawPath()).matches();
+            if (release) return releaseFile ? u : null;
+            boolean fileServer = "objects.githubusercontent.com".equals(host) || "release-assets.githubusercontent.com".equals(host);
+            return releaseFile || fileServer ? u : null;
+        } catch (java.net.URISyntaxException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 0.9.0: why a downloaded update mustn't be installed, or null when it's fine: it has to be
+     * Restock (this copy's package name), signed with exactly the same key as the Restock on this
+     * phone, and a newer version (a higher versionCode).
+     */
+    @SuppressWarnings("deprecation") // GET_SIGNATURES, signatures and versionCode are what Android 8 has
+    static String notOurUpdate(android.content.Context ctx, java.io.File apk) {
+        final String notOurs = "That update isn't signed by Restock, so it wasn't installed.";
+        try {
+            android.content.pm.PackageManager pm = ctx.getPackageManager();
+            // Android 9 can leave signingInfo empty for a file that isn't installed yet, so ask for
+            // the older form as well (signers() uses whichever is there).
+            int flags = android.os.Build.VERSION.SDK_INT >= 28
+                ? android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES | android.content.pm.PackageManager.GET_SIGNATURES
+                : android.content.pm.PackageManager.GET_SIGNATURES;
+            android.content.pm.PackageInfo got = pm.getPackageArchiveInfo(apk.getPath(), flags);
+            android.content.pm.PackageInfo mine = pm.getPackageInfo(ctx.getPackageName(), flags);
+            if (got == null || !ctx.getPackageName().equals(got.packageName)) return notOurs;
+            java.util.Set<String> want = signers(mine);
+            if (want.isEmpty() || !want.equals(signers(got))) return notOurs;
+            long gotVersion = android.os.Build.VERSION.SDK_INT >= 28 ? got.getLongVersionCode() : got.versionCode;
+            long myVersion = android.os.Build.VERSION.SDK_INT >= 28 ? mine.getLongVersionCode() : mine.versionCode;
+            if (gotVersion <= myVersion) return "That update isn't newer than the Restock you have, so it wasn't installed.";
+            return null;
+        } catch (Exception e) {
+            return notOurs;
+        }
+    }
+
+    /** The certificates a package is signed with now (not any it rotated away from). */
+    @SuppressWarnings("deprecation")
+    private static java.util.Set<String> signers(android.content.pm.PackageInfo p) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        android.content.pm.Signature[] s = null;
+        if (android.os.Build.VERSION.SDK_INT >= 28 && p.signingInfo != null) s = p.signingInfo.getApkContentsSigners();
+        if (s == null || s.length == 0) s = p.signatures;
+        if (s != null) for (android.content.pm.Signature x : s) if (x != null) out.add(x.toCharsString());
+        return out;
     }
 
     /** Is Restock on screen right now? */
@@ -745,60 +840,7 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
-    /** Downloads a file into Restock's private storage (the receipt reader), with "downloadProgress" events. */
-    @PluginMethod
-    public void downloadAppFile(final PluginCall call) {
-        final String url = call.getString("url");
-        final String path = call.getString("path");
-        checkThread.execute(() -> {
-            java.io.File tmp = null;
-            try {
-                if (url == null || !url.startsWith("https://")) throw new Exception("Not a secure link");
-                java.io.File f = appFile(path);
-                java.io.File dir = f.getParentFile();
-                if (dir != null && !dir.exists() && !dir.mkdirs()) throw new Exception("Couldn't make the folder");
-                tmp = new java.io.File(f.getPath() + ".part");
-                java.net.HttpURLConnection c = (java.net.HttpURLConnection) Net.url(url).openConnection();
-                c.setConnectTimeout(20000);
-                c.setReadTimeout(30000);
-                c.setInstanceFollowRedirects(true);
-                c.setRequestProperty("User-Agent", "Restock (Android)");
-                int code = c.getResponseCode();
-                if (code != 200) throw new Exception("The download site said " + code);
-                long total = c.getContentLengthLong();
-                long got = 0;
-                long lastSent = 0;
-                byte[] buf = new byte[64 * 1024];
-                try (java.io.InputStream in = c.getInputStream(); java.io.FileOutputStream out = new java.io.FileOutputStream(tmp)) {
-                    int n;
-                    while ((n = in.read(buf)) > 0) {
-                        out.write(buf, 0, n);
-                        got += n;
-                        if (got - lastSent > 256 * 1024) {
-                            lastSent = got;
-                            JSObject p = new JSObject();
-                            p.put("path", path);
-                            p.put("bytes", got);
-                            p.put("total", total);
-                            notifyListeners("downloadProgress", p);
-                        }
-                    }
-                } finally {
-                    c.disconnect();
-                }
-                if (total > 0 && got != total) throw new Exception("The download stopped part-way. Try again.");
-                if (f.exists() && !f.delete()) throw new Exception("Couldn't replace the old file");
-                if (!tmp.renameTo(f)) throw new Exception("Couldn't save the file");
-                JSObject ret = new JSObject();
-                ret.put("uri", android.net.Uri.fromFile(f).toString());
-                ret.put("bytes", got);
-                call.resolve(ret);
-            } catch (Exception e) {
-                if (tmp != null && tmp.exists()) tmp.delete();
-                call.reject(e.getMessage() == null ? "Download failed" : e.getMessage(), e);
-            }
-        });
-    }
+    // 0.9.0: downloadAppFile (any https file into Restock's private storage) is gone: nothing used it.
 
     /** Where a file in Restock's private storage is (for the app to load it), and whether it's there. */
     @PluginMethod
@@ -845,6 +887,36 @@ public class RestockNativePlugin extends Plugin {
     public void updateWidgets(PluginCall call) {
         Widgets.saveFromApp(getContext(), call.getString("data", "{}"));
         call.resolve();
+    }
+
+    // ---------- 0.9.0: copying ----------
+
+    /**
+     * Copies text to the clipboard. sensitive (the recovery key): marked so Android 13 and later
+     * doesn't show it in the "Copied" preview, and keyboards leave it out of their clipboard history.
+     */
+    @PluginMethod
+    public void copyText(PluginCall call) {
+        final String text = call.getString("text", "");
+        final boolean sensitive = Boolean.TRUE.equals(call.getBoolean("sensitive", false));
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+            try {
+                android.content.ClipboardManager cm =
+                    (android.content.ClipboardManager) getContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                if (cm == null) throw new IllegalStateException("No clipboard on this phone");
+                android.content.ClipData clip = android.content.ClipData.newPlainText(sensitive ? "Restock recovery key" : "Restock", text);
+                if (sensitive) {
+                    android.os.PersistableBundle extras = new android.os.PersistableBundle();
+                    // ClipDescription.EXTRA_IS_SENSITIVE (Android 13); older Android ignores it, some keyboards still use it.
+                    extras.putBoolean("android.content.extra.IS_SENSITIVE", true);
+                    clip.getDescription().setExtras(extras);
+                }
+                cm.setPrimaryClip(clip);
+                call.resolve();
+            } catch (Exception e) {
+                call.reject("Couldn't copy it: " + e.getMessage(), e);
+            }
+        });
     }
 
     // ---------- 0.6.0: shared links and app icon shortcuts ----------
@@ -918,6 +990,25 @@ public class RestockNativePlugin extends Plugin {
                 o.put("myTabs", tabsArray(hub.engine.myTabs()));
                 o.put("tabs", tabsArray(hub.engine.tabs()));
                 o.put("handoverTo", hub.paired() ? hub.household.handingOverTo() : null);
+                // 0.9.0: the recovery key (whether there is one to save) and folder sync.
+                boolean owner = hub.paired() && hub.household.isOwner();
+                o.put("hasRecovery", owner && hub.engine.meta("recovery") != null);
+                o.put("recoverySaved", owner && hub.household.recoverySaved());
+                o.put("canRecover", hub.paired() && !owner && hub.engine.householdValue("recovery") != null);
+                String folder = hub.folder();
+                o.put("folder", folder);
+                o.put("folderName", folder == null ? null : Backups.folderName(getContext(), Uri.parse(folder)));
+                o.put("folderAt", hub.engine.meta("folder_at"));
+                o.put("folderError", hub.folderError);
+                // 0.9.0: other phones' files in the folder that couldn't be opened, and a phone whose date looks wrong.
+                String unread = hub.engine.meta("folder_unread");
+                o.put("folderUnread", unread == null ? 0 : Integer.parseInt(unread));
+                String warn = hub.engine.meta("clock_warn");
+                if (warn != null) {
+                    String who = null;
+                    for (JSONObject m : hub.household.members()) if (warn.equals(m.optString("device"))) who = m.optString("name");
+                    o.put("clockWarning", who != null ? who : "Another phone");
+                }
                 o.put("keepReady", hub.keepReady());
                 JSArray peers = new JSArray();
                 for (JSONObject r : hub.engine.db.query("SELECT device, name, synced_at FROM sync_peers ORDER BY synced_at DESC")) {
@@ -1124,6 +1215,109 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
+    // ---------- 0.9.0: the recovery key and folder sync ----------
+
+    /** Owner: shows the recovery key, after the phone's screen lock if it has one. */
+    @PluginMethod
+    public void syncRecovery(PluginCall call) {
+        android.app.KeyguardManager km = (android.app.KeyguardManager) getContext().getSystemService(android.content.Context.KEYGUARD_SERVICE);
+        if (km != null && km.isKeyguardSecure()) {
+            Intent i = km.createConfirmDeviceCredentialIntent("Your recovery key", "Unlock to see your household's recovery key");
+            if (i != null) {
+                startActivityForResult(call, i, "recoveryUnlocked");
+                return;
+            }
+        }
+        giveRecovery(call);
+    }
+
+    @ActivityCallback
+    private void recoveryUnlocked(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result.getResultCode() != android.app.Activity.RESULT_OK) {
+            call.reject("Not unlocked");
+            return;
+        }
+        giveRecovery(call);
+    }
+
+    private void giveRecovery(PluginCall call) {
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.household.ensureRecovery();
+                String k = hub.household.recovery();
+                if (k == null) throw new IllegalStateException("Only the owner phone has the recovery key.");
+                JSObject r = new JSObject();
+                r.put("key", k);
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** Owner: the person saved the recovery key; or (fresh: true) wants a new one. */
+    @PluginMethod
+    public void syncRecoverySaved(PluginCall call) {
+        final boolean fresh = Boolean.TRUE.equals(call.getBoolean("fresh", false));
+        final String shown = call.getString("key", null);
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                if (fresh) {
+                    hub.household.newRecovery();
+                    new Thread(hub::syncAll).start();
+                } else {
+                    // Only the key the person was shown counts as saved.
+                    String now = hub.household.recovery();
+                    if (shown != null && now != null && !now.equals(shown)) throw new IllegalStateException("The recovery key changed. Open it again and save the new one.");
+                    hub.household.setRecoverySaved();
+                }
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** Takes over as owner with the recovery key (the owner phone was lost). */
+    @PluginMethod
+    public void syncTakeOver(PluginCall call) {
+        final String key = call.getString("key", "");
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.syncAll(); // the newest household record first
+                hub.household.takeOver(key);
+                hub.readvertise();
+                new Thread(hub::syncAll).start();
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** Sync through a folder (uri), or stop (no uri). */
+    @PluginMethod
+    public void syncSetFolder(PluginCall call) {
+        final String uri = call.getString("uri", null);
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.setFolder(uri);
+                if (uri != null) {
+                    hub.schedule();
+                    hub.syncAll(); // the folder straight away (and any phones on this Wi-Fi)
+                }
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
     /** Erase everything (0.8.2): forget the household on this phone and stop all background work. */
     @PluginMethod
     public void eraseNative(PluginCall call) {
@@ -1140,8 +1334,76 @@ public class RestockNativePlugin extends Plugin {
             } catch (Exception e) {
                 android.util.Log.w("Restock", "erase", e);
             }
+            // 0.9.0: and what Restock keeps outside its database.
+            eraseOutsideDatabase(getContext());
             call.resolve();
         });
+    }
+
+    /**
+     * 0.9.0, Erase everything: the shops' cookies and site storage (so no shop account stays signed
+     * in), everything in the cache folder (shared backups and spreadsheets, diagnostics, recordings,
+     * a downloaded update), photos the camera saved for "Take a photo", and the home screen
+     * widgets' copy of your deals and list. Each part on its own, so one failing doesn't stop the rest.
+     */
+    private void eraseOutsideDatabase(android.content.Context ctx) {
+        // The shops' hidden pages first (so they can't set anything again), then the browser's data.
+        // WebView wants these on the main thread; wait (a few seconds at most) for them to finish.
+        StoreWeb.blankAll();
+        final java.util.concurrent.CountDownLatch webDone = new java.util.concurrent.CountDownLatch(1);
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+            try {
+                android.webkit.WebStorage.getInstance().deleteAllData();
+                // The browser's own download cache (shared by every WebView in Restock).
+                if (getBridge() != null && getBridge().getWebView() != null) getBridge().getWebView().clearCache(true);
+                final android.webkit.CookieManager cookies = android.webkit.CookieManager.getInstance();
+                cookies.removeAllCookies(removed -> {
+                    cookies.flush();
+                    webDone.countDown();
+                });
+            } catch (Exception e) {
+                android.util.Log.w("Restock", "erase web data", e);
+                webDone.countDown();
+            }
+        });
+        try {
+            if (!webDone.await(5, TimeUnit.SECONDS)) android.util.Log.w("Restock", "erase: cookies still clearing");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        try {
+            // Everything in the cache folder except the browser's own (in use, and cleared above).
+            java.io.File[] all = ctx.getCacheDir().listFiles();
+            if (all != null) for (java.io.File f : all) {
+                if (f.getName().startsWith("WebView") || f.getName().startsWith("org.chromium")) continue;
+                deleteAll(f);
+            }
+        } catch (Exception e) {
+            android.util.Log.w("Restock", "erase cache", e);
+        }
+        try {
+            // Capacitor has the camera app save "Take a photo" pictures here (see res/xml/file_paths.xml).
+            java.io.File pictures = ctx.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES);
+            java.io.File[] all = pictures == null ? null : pictures.listFiles();
+            if (all != null) for (java.io.File f : all) deleteAll(f);
+        } catch (Exception e) {
+            android.util.Log.w("Restock", "erase photos", e);
+        }
+        try {
+            // The widgets keep their own copy; empty it and redraw them ("Open Restock to fill this in").
+            Widgets.saveFromApp(ctx, "{}");
+        } catch (Exception e) {
+            android.util.Log.w("Restock", "erase widgets", e);
+        }
+    }
+
+    /** Deletes a file, or a folder and everything in it (a link is removed, not followed). */
+    private static void deleteAll(java.io.File f) {
+        if (f.isDirectory() && !java.nio.file.Files.isSymbolicLink(f.toPath())) {
+            java.io.File[] inside = f.listFiles();
+            if (inside != null) for (java.io.File g : inside) deleteAll(g);
+        }
+        if (!f.delete()) android.util.Log.w("Restock", "couldn't delete " + f.getName());
     }
 
     @PluginMethod
@@ -1149,6 +1411,7 @@ public class RestockNativePlugin extends Plugin {
         syncThread.execute(() -> {
             try {
                 SyncHub.get(getContext()).engine.setMeta("notice", null);
+                SyncHub.get(getContext()).engine.setMeta("clock_warn", null);
             } catch (Exception ignored) {
                 // fine
             }

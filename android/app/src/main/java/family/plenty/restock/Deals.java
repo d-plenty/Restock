@@ -29,6 +29,8 @@ public final class Deals {
     static final int LEARNING_DAYS = 25;
     /** A lower price that lasts longer than this is treated as the old shelf price, not a special. */
     static final int MAX_SALE_DAYS = 42;
+    /** 0.9.0: a price seen longer ago than this isn't taken as today's price for a deal (verdict.ts STALE_DAYS). */
+    static final int STALE_DAYS = 14;
 
     // ---------- data ----------
 
@@ -138,6 +140,8 @@ public final class Deals {
         public int spanDays;
         public Integer cycleWeeks;
         public boolean fromMarket;
+        /** 0.9.0: when these were worked out (the `now` given to computeStats), 0 when not known. */
+        public long asOf;
     }
 
     public enum Kind { GREAT, GOOD, SMALL, WAIT, FAKE, NORMAL, NODATA }
@@ -154,6 +158,8 @@ public final class Deals {
         public Double unitPrice;
         public Double normalUnitPrice;
         public String unit;
+        /** 0.9.0: "ended" (last week's sale) or "old" (a price drop over STALE_DAYS old): not a deal. Verdict.stale in verdict.ts. */
+        public String stale;
     }
 
     public static final class Recommendation {
@@ -202,7 +208,8 @@ public final class Deals {
         }
     }
 
-    private static final String NUM = "(\\d+(?:\\.\\d+)?)";
+    // 0.9.0: ".5kg" is half a kilo (units.ts NUM).
+    private static final String NUM = "(\\d+(?:\\.\\d+)?|\\.\\d+)";
     private static final String MASS_VOL = "(kg|g|ml|l)";
     private static final Pattern MULTI_A = Pattern.compile("(\\d+)\\s*x\\s*" + NUM + "\\s*" + MASS_VOL + "\\b");
     private static final Pattern MULTI_B = Pattern.compile(NUM + "\\s*" + MASS_VOL + "\\s*x\\s*(\\d+)\\b");
@@ -345,18 +352,28 @@ public final class Deals {
     }
 
     public static Stats computeStats(List<Reading> raw, long now) {
+        return computeStats(raw, now, true);
+    }
+
+    /**
+     * Mirrors computeStats in verdict.ts. Without the shop's card (0.9.0), member prices don't set the
+     * normal price, the lowest price or the sale cycle; only their "was" price still counts.
+     */
+    public static Stats computeStats(List<Reading> raw, long now, boolean hasCard) {
         Stats st = new Stats();
+        st.asOf = now;
         List<Reading> rs = normalise(raw, now);
         if (rs.isEmpty()) return st;
         Reading current = rs.get(rs.size() - 1);
-        List<Reading> history = rs.subList(0, rs.size() - 1);
+        List<Reading> mine = new ArrayList<>();
+        for (Reading r : rs) if (hasCard || !r.member) mine.add(r);
+        List<Reading> history = new ArrayList<>();
+        for (Reading r : mine) if (r != current) history.add(r);
 
         List<Double> nonSpecial = new ArrayList<>();
         List<Double> was = new ArrayList<>();
-        for (Reading r : rs) {
-            if (!r.special) nonSpecial.add(r.price);
-            if (r.was != null && r.was > 0) was.add(r.was);
-        }
+        for (Reading r : mine) if (!r.special) nonSpecial.add(r.price);
+        for (Reading r : rs) if (r.was != null && r.was > 0) was.add(r.was);
         Double fromHistory = median(nonSpecial);
         st.typicalFromHistory = fromHistory != null;
         st.typical = fromHistory != null ? fromHistory : median(was);
@@ -364,8 +381,8 @@ public final class Deals {
         for (Reading r : history) if (st.low == null || r.price < st.low) st.low = r.price;
 
         List<Long> starts = new ArrayList<>();
-        for (int i = 0; i < rs.size(); i++) {
-            if (rs.get(i).special && (i == 0 || !rs.get(i - 1).special)) starts.add(rs.get(i).time());
+        for (int i = 0; i < mine.size(); i++) {
+            if (mine.get(i).special && (i == 0 || !mine.get(i - 1).special)) starts.add(mine.get(i).time());
         }
         if (starts.size() >= 2) {
             double sum = 0;
@@ -392,7 +409,20 @@ public final class Deals {
         out.readings = Math.max(st.readings, 4);
         out.spanDays = Math.max(st.spanDays, m.days);
         out.fromMarket = true;
+        out.asOf = st.asOf;
         return out;
+    }
+
+    /**
+     * Midnight at the start of the specials week (Wednesday to Tuesday) that `now` is in, on the
+     * phone's own calendar (0.9.0). Same as specialsWeekStart in verdict.ts.
+     */
+    static long weekStart(long now) {
+        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+        java.time.LocalDate day = Instant.ofEpochMilli(now).atZone(zone).toLocalDate();
+        // getValue(): Monday 1 … Sunday 7, so % 7 counts from Sunday 0 like JavaScript; Wednesday is 3.
+        int back = (day.getDayOfWeek().getValue() % 7 + 7 - 3) % 7;
+        return day.minusDays(back).atStartOfDay(zone).toInstant().toEpochMilli();
     }
 
     /** Scale shared history to local prices. Mirrors marketScale in verdict.ts. */
@@ -512,8 +542,9 @@ public final class Deals {
 
     /** The price this shopper actually pays: member prices only count with the card. */
     static final double HALF_PRICE = 0.45;
+    // 0.9.0: "112 for $5" isn't "12 for $5" (the count can't be the end of a longer number).
     private static final java.util.regex.Pattern MULTI = java.util.regex.Pattern.compile(
-        "(\\d{1,2})\\s*for\\s*\\$\\s*(\\d+(?:\\.\\d{1,2})?)", java.util.regex.Pattern.CASE_INSENSITIVE);
+        "(?<!\\d)(\\d{1,2})\\s*for\\s*\\$\\s*(\\d+(?:\\.\\d{1,2})?)", java.util.regex.Pattern.CASE_INSENSITIVE);
 
     /** Multi-buy "2 for $5" → {2, 5}, or null. Mirrors multiBuy in verdict.ts. */
     static double[] multiBuy(String promo) {
@@ -531,7 +562,15 @@ public final class Deals {
     }
 
     static double effectivePrice(Reading r, boolean hasCard, boolean allowMulti) {
-        if (r.member && !hasCard) return r.was != null ? r.was : r.price;
+        return effectivePrice(r, hasCard, allowMulti, null);
+    }
+
+    /**
+     * Mirrors effectivePrice in verdict.ts. Without the card a member price costs the shelf price: the
+     * "was" price or, without one, `normal` (its normal price for this shopper, 0.9.0).
+     */
+    static double effectivePrice(Reading r, boolean hasCard, boolean allowMulti, Double normal) {
+        if (r.member && !hasCard) return r.was != null ? r.was : normal != null ? normal : r.price;
         double[] mb = allowMulti ? multiBuy(r.promo) : null;
         if (mb != null && mb[1] / mb[0] < r.price - 0.004) return mb[1] / mb[0];
         return r.price;
@@ -547,16 +586,26 @@ public final class Deals {
         Reading cur = st.current;
         if (cur == null) return Kind.NODATA;
         boolean locked = cur.member && !hasCard;
-        double p = effectivePrice(cur, hasCard, allowMulti);
+        double p = effectivePrice(cur, hasCard, allowMulti, st.typical);
         boolean multi = !locked && allowMulti && multiBuy(cur.promo) != null && p < cur.price - 0.004;
         boolean multiOnly = !allowMulti && multiBuy(cur.promo) != null && !(cur.was != null && cur.was > cur.price + 0.004);
         boolean special = ((cur.special && !multiOnly) || multi) && !locked;
         Double ref = st.typical != null ? st.typical : cur.was;
         if (locked) return Kind.NORMAL;
+        // 0.9.0: last week's special (or multi-buy) may be over by now, so it isn't on sale now.
+        if (special && st.asOf > 0 && cur.time() < weekStart(st.asOf)) {
+            if (o != null) o.stale = "ended";
+            return Kind.NORMAL;
+        }
         if (ref == null) return special ? Kind.SMALL : Kind.NORMAL;
         double discount = 1 - p / ref;
         if (o != null) o.discount = discount;
         if (ref - p < 0.005) return special ? Kind.FAKE : Kind.NORMAL;
+        // 0.9.0: a lower price from over two weeks ago may not be today's, so it isn't a deal.
+        if (st.asOf > 0 && st.asOf - cur.time() > STALE_DAYS * DAY) {
+            if (o != null) o.stale = "old";
+            return Kind.NORMAL;
+        }
         boolean enough = st.readings >= 4 && st.spanDays >= 21;
         if (enough && st.low != null && st.low < p * 0.95 && discount < HALF_PRICE) return Kind.WAIT;
         return discount >= GREAT_SALE ? Kind.GREAT : discount >= GOOD_SALE ? Kind.GOOD : Kind.SMALL;
@@ -601,6 +650,16 @@ public final class Deals {
 
     public static Recommendation recommend(Item item, Map<String, Product> products, Map<String, List<Reading>> readings,
                                            Set<String> cardChains, long now) {
+        return recommend(item, products, readings, cardChains, now, null);
+    }
+
+    /**
+     * Mirrors recommend in verdict.ts. `shopsOn` (0.9.0): the shops switched on (with the websites
+     * their prices come from, like PriceChecker's enabled set). Products at any other shop are left
+     * out; hand-typed prices ("other") always count. Null: every shop.
+     */
+    public static Recommendation recommend(Item item, Map<String, Product> products, Map<String, List<Reading>> readings,
+                                           Set<String> cardChains, long now, Set<String> shopsOn) {
         List<String[]> ids = new ArrayList<>();
         if (item.usual != null) ids.add(new String[] {item.usual, "main"});
         for (String id : item.same) ids.add(new String[] {id, "main"});
@@ -610,17 +669,22 @@ public final class Deals {
         Set<String> seen = new HashSet<>();
         for (String[] pair : ids) {
             Product product = products.get(pair[0]);
-            if (product == null || !seen.add(pair[0])) continue;
+            if (product == null || seen.contains(pair[0])) continue;
+            if (shopsOn != null && !"other".equals(product.chain) && !shopsOn.contains(product.chain)) continue;
+            seen.add(pair[0]);
             Option o = new Option();
             o.product = product;
             o.role = pair[1];
             List<Reading> rs = readings.get(product.id);
-            o.stats = withMarket(computeStats(rs != null ? rs : Collections.<Reading>emptyList(), now), product.market);
             boolean hasCard = cardChains.contains(product.chain);
+            o.stats = withMarket(computeStats(rs != null ? rs : Collections.<Reading>emptyList(), now, hasCard), product.market);
             o.kind = judge(o.stats, hasCard, o, item.allowMulti);
             Size size = productQty(product);
             o.unit = size != null ? size.unit : null;
-            if (o.stats.current != null) o.price = effectivePrice(o.stats.current, hasCard, item.allowMulti);
+            // A multi-buy from a sale that may have ended (0.9.0) doesn't count: the price is for one.
+            if (o.stats.current != null) {
+                o.price = effectivePrice(o.stats.current, hasCard, item.allowMulti && !"ended".equals(o.stale), o.stats.typical);
+            }
             if (size != null && size.qty > 0) {
                 if (o.price != null) o.unitPrice = o.price / size.qty;
                 if (o.stats.typical != null) o.normalUnitPrice = o.stats.typical / size.qty;

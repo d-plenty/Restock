@@ -89,11 +89,40 @@ public final class Recalls {
             String link = text(tag(item, "link"));
             if (title.isEmpty() || link.isEmpty()) continue;
             Recall r = new Recall(source, title, link, text(tag(item, "pubDate")));
+            // 0.9.0: the link the app opens is only kept if it's on an official recall site (the id
+            // stays as it was, so each notice is still told apart).
+            r.url = safeLink(link, source);
             String desc = text(tag(item, "description"));
             if (!desc.isEmpty()) r.reason = first(desc, 280);
             out.add(r);
         }
         return out;
+    }
+
+    /** 0.9.0: the official recall sites. A notice's link is only used if it's on one of these (or under one), over https. */
+    private static final String[] OFFICIAL = {"foodstandards.gov.au", "productsafety.gov.au", "tga.gov.au"};
+
+    /** The list a source's notices come from, opened instead of a notice's link that can't be used. */
+    static String listPage(String source) {
+        if ("FSANZ".equals(source)) return "https://www.foodstandards.gov.au/food-recalls/alerts";
+        if ("TGA".equals(source)) return "https://www.tga.gov.au/safety/safety-alerts";
+        return "https://www.productsafety.gov.au/recalls";
+    }
+
+    /** 0.9.0: `link` if it's an https address on an official recall site, otherwise the source's list page. */
+    public static String safeLink(String link, String source) {
+        if (link != null && link.indexOf('\\') < 0) {
+            try {
+                java.net.URI u = new java.net.URI(link.trim());
+                String host = u.getHost() == null ? "" : u.getHost().toLowerCase(Locale.ROOT);
+                if ("https".equalsIgnoreCase(u.getScheme()) && u.getRawUserInfo() == null) {
+                    for (String h : OFFICIAL) if (host.equals(h) || host.endsWith("." + h)) return u.toString();
+                }
+            } catch (java.net.URISyntaxException e) {
+                // not an address: the list instead
+            }
+        }
+        return listPage(source);
     }
 
     /** From an FSANZ recall page: the problem, the date markings and what to do. */

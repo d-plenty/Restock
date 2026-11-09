@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BACKUP_EVERY, BACKUP_KEEP, everyLabel, maybeAutoBackup } from '../../lib/autoBackup';
+import { askPassword, confirmAction } from '../../lib/confirm';
 import { getSettings, updateSettings } from '../../lib/db';
 import { RestockNative } from '../../lib/sql/native';
 import { isNative } from '../../stores/http';
@@ -44,6 +45,28 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
     }
   };
 
+  // 0.9.0: lock automatic backups with a password.
+  const setPassword = async () => {
+    const pw = await askPassword(b.password ? 'New password for automatic backups' : 'Password for automatic backups', {
+      detail: 'Use one you won’t forget: without it, these backups can’t be opened by anyone, including you. At least 8 characters.',
+      action: 'Next',
+    });
+    if (!pw) return;
+    if (pw.length < 8) return nav.toast('Use at least 8 characters.');
+    const again = await askPassword('Type it again', { action: 'Lock automatic backups' });
+    if (again === undefined) return;
+    if (again !== pw) return nav.toast('Those didn’t match. Nothing changed.');
+    await set({ password: pw });
+    nav.toast('Automatic backups will be locked with your password');
+  };
+  const removePassword = async () => {
+    const ok = await confirmAction('Stop locking automatic backups?', {
+      detail: 'New automatic backups won’t need a password. The ones already saved still do.',
+      action: 'Stop locking',
+    });
+    if (ok) await set({ password: undefined });
+  };
+
   const now = async () => {
     setBusy(true);
     try {
@@ -68,11 +91,11 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
             {inSetup ? ' Off unless you turn it on.' : ''}
           </span>
         </span>
-        <input type="checkbox" checked={b.enabled} onChange={(e) => void toggle(e.target.checked)} aria-label="Back up automatically" />
+        <input type="checkbox" className="switch" checked={b.enabled} onChange={(e) => void toggle(e.target.checked)} aria-label="Back up automatically" />
       </label>
       <button className="row" onClick={() => void pick()}>
         <span className="grow">
-          <span className="title" style={{ fontSize: 14 }}>
+          <span className="title" style={{ fontSize: 15 }}>
             Folder
           </span>
           <span className="small">{b.folderName ?? 'Not picked yet'}</span>
@@ -83,14 +106,14 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
       </button>
       <label className="check">
         <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title" style={{ fontSize: 14 }}>
+          <span className="title" style={{ fontSize: 15 }}>
             How often
           </span>
           <span className="small">When you open Restock and the last backup is older than this.</span>
         </span>
         <select
           className="input"
-          style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+          style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
           value={b.everyDays}
           aria-label="How often to back up"
           onChange={(e) => void set({ everyDays: parseInt(e.target.value, 10) })}
@@ -105,14 +128,14 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
       </label>
       <label className="check">
         <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title" style={{ fontSize: 14 }}>
+          <span className="title" style={{ fontSize: 15 }}>
             Keep the newest
           </span>
           <span className="small">Older automatic backups in the folder are removed. Your other files are never touched.</span>
         </span>
         <select
           className="input"
-          style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 14 }}
+          style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
           value={b.keep}
           aria-label="How many automatic backups to keep"
           onChange={(e) => void set({ keep: parseInt(e.target.value, 10) })}
@@ -126,15 +149,37 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
       </label>
       {settings.receipts.enabled && (
         <label className="check">
-          <input type="checkbox" checked={b.receiptPhotos !== false} onChange={(e) => void set({ receiptPhotos: e.target.checked })} />
+          <input type="checkbox" className="switch" checked={b.receiptPhotos !== false} onChange={(e) => void set({ receiptPhotos: e.target.checked })} />
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               Include receipt photos
             </span>
             <span className="small">Restock's own photos of your receipts (not your phone's photos). Untick for smaller backups.</span>
           </span>
         </label>
       )}
+      <div className="row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+        <span className="grow">
+          <span className="title" style={{ fontSize: 15 }}>
+            Lock with a password
+          </span>
+          <span className="small">
+            {b.password
+              ? 'On. Restoring one of these backups asks for the password. It’s kept on this phone only, never in a backup.'
+              : 'Off. Worth turning on if the folder is in the cloud: backups hold your loyalty card numbers.'}
+          </span>
+        </span>
+        <span style={{ display: 'flex', gap: 8 }}>
+          <button className="btn small" onClick={() => void setPassword()}>
+            {b.password ? 'Change' : 'Set a password'}
+          </button>
+          {b.password && (
+            <button className="btn small" onClick={() => void removePassword()}>
+              Remove
+            </button>
+          )}
+        </span>
+      </div>
       {!inSetup && (
         <div className="row" style={{ flexWrap: 'wrap' }}>
           <span className="grow" style={{ minWidth: 180 }}>

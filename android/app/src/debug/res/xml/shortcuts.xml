@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only (0.9.0): they install as family.plenty.restock.debug, so the shortcuts open that copy. Keep in step with main/res/xml/shortcuts.xml. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:icon="@drawable/ic_shortcut_scan"
+        android:shortcutId="scan"
+        android:shortcutLongLabel="@string/shortcut_scan_long"
+        android:shortcutShortLabel="@string/shortcut_scan">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="family.plenty.restock.MainActivity"
+            android:targetPackage="family.plenty.restock.debug">
+            <extra android:name="restockAction" android:value="scan" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:icon="@drawable/ic_shortcut_list"
+        android:shortcutId="list"
+        android:shortcutLongLabel="@string/shortcut_list_long"
+        android:shortcutShortLabel="@string/shortcut_list">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="family.plenty.restock.MainActivity"
+            android:targetPackage="family.plenty.restock.debug">
+            <extra android:name="restockAction" android:value="list" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:icon="@drawable/ic_shortcut_receipt"
+        android:shortcutId="receipt"
+        android:shortcutLongLabel="@string/shortcut_receipt_long"
+        android:shortcutShortLabel="@string/shortcut_receipt">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="family.plenty.restock.MainActivity"
+            android:targetPackage="family.plenty.restock.debug">
+            <extra android:name="restockAction" android:value="receipt" />
+        </intent>
+    </shortcut>
+</shortcuts>

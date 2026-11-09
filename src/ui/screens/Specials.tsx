@@ -88,7 +88,7 @@ export function SpecialsScreen() {
                   <div key={p.storeProductId} className="row">
                     <Thumb src={p.imageUrl} />
                     <span className="grow" style={{ minWidth: 0 }}>
-                      <span className="title" style={{ fontSize: 14 }}>
+                      <span className="title" style={{ fontSize: 15 }}>
                         {p.name}
                       </span>
                       <span className="small">

@@ -1,4 +1,5 @@
 import { capture } from '../lib/diagnostics';
+import { sameSite } from '../lib/site';
 import { getKV, putKV } from '../lib/db';
 import { RestockNative } from '../lib/sql/native';
 import { chainName, customShop, shopDef, websiteOf, type StoreChain } from '../shops';
@@ -19,6 +20,8 @@ interface Cached extends SearchInfo {
 // "3": 0.8.5 fixed Priceline's (its old address now shows "No results"), so those are dropped too.
 const KV = (c: StoreChain) => `webShop3:${c}`;
 const DAY = 86_400_000;
+/** How long a search page Restock worked out is remembered before it looks again. */
+const REMEMBER_FOR = 14 * DAY;
 
 /** Where this shop's search page is: typed in by the person, known, remembered, or worked out from its homepage. */
 export async function searchInfo(chain: StoreChain, fresh = false, ignoreKnown = false): Promise<SearchInfo> {
@@ -26,8 +29,11 @@ export async function searchInfo(chain: StoreChain, fresh = false, ignoreKnown =
   if (typed && typed.includes('{q}')) return { search: typed, platform: 'other', how: 'the search address you typed in' };
   const known = ignoreKnown ? undefined : shopDef(chain)?.search;
   const cached = fresh || ignoreKnown ? undefined : await getKV<Cached>(KV(chain)).catch(() => undefined);
-  if (cached?.search && Date.now() - Date.parse(cached.at) < 14 * DAY) return cached;
   const site = websiteOf(chain);
+  // 0.9.0: never a time in the future (which would keep it forever),
+  // and only a search page on the shop's own site (one could come back in an old backup).
+  const age = cached?.at ? Date.now() - Date.parse(cached.at) : NaN;
+  if (cached?.search && age >= 0 && age < REMEMBER_FOR && (known ? cached.search === known : sameSite(cached.search, site))) return cached;
   if (!site) throw new Error(`${chainName(chain)} has no website set.`);
   let html = '';
   try {

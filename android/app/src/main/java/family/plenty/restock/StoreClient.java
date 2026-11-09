@@ -731,12 +731,24 @@ final class StoreClient {
         }
     }
 
+    /**
+     * 0.9.0: the most of one answer Restock reads. A search or product answer is well under 1 MB and
+     * a shop's product page a few MB at most, so this only stops something broken or hostile from
+     * filling the phone's memory (which would stop the background check part way).
+     */
+    static final int MAX_BODY = 8 * 1024 * 1024;
+
     private static String readAll(InputStream in) throws Exception {
         try (InputStream is = in; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] buf = new byte[16_384];
             int n;
-            while ((n = is.read(buf)) != -1) out.write(buf, 0, n);
+            while ((n = is.read(buf)) != -1) {
+                if (out.size() + n > MAX_BODY) throw new java.io.IOException("The shop sent back far more than expected, so Restock stopped reading it.");
+                out.write(buf, 0, n);
+            }
             return out.toString("UTF-8");
+        } catch (OutOfMemoryError e) {
+            throw new java.io.IOException("The shop's answer was too big for this phone to read.");
         }
     }
 }

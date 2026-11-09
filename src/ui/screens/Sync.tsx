@@ -32,7 +32,7 @@ export function qrSvg(symbol: { data: ArrayLike<number>; width: number; height: 
 }
 
 /** The pairing code as a QR code, drawn on the phone (zxing, bundled; nothing is sent anywhere). */
-function PairingQr({ code }: { code: string }) {
+function PairingQr({ code, label = 'Pairing QR code' }: { code: string; label?: string }) {
   const [svg, setSvg] = useState<string>();
   useEffect(() => {
     let alive = true;
@@ -47,7 +47,7 @@ function PairingQr({ code }: { code: string }) {
     };
   }, [code]);
   return (
-    <div className="sync-qr" role="img" aria-label="Pairing QR code">
+    <div className="sync-qr" role="img" aria-label={label}>
       {svg ? <span dangerouslySetInnerHTML={{ __html: svg }} /> : <LoadingBar seconds={3} />}
     </div>
   );
@@ -288,7 +288,7 @@ export function TabsPicker({ offered, value, onChange, disabled }: { offered: Se
             }}
           />
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               {t.title}
             </span>
             <span className="small">{t.sub}</span>
@@ -476,7 +476,7 @@ export function JoinSheet({
             <button className={`row choice${replace ? ' picked' : ''}`} aria-pressed={replace} onClick={() => setReplace(true)}>
               <Icon name="refresh" size={18} />
               <span className="grow">
-                <span className="title" style={{ fontSize: 14, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span className="title" style={{ fontSize: 15, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                   Use the household's things <span className="tag great">Recommended</span>
                 </span>
                 <span className="small">
@@ -489,7 +489,7 @@ export function JoinSheet({
             <button className={`row choice${!replace ? ' picked' : ''}`} aria-pressed={!replace} onClick={() => setReplace(false)}>
               <Icon name="plus" size={18} />
               <span className="grow">
-                <span className="title" style={{ fontSize: 14 }}>
+                <span className="title" style={{ fontSize: 15 }}>
                   Combine with the household
                 </span>
                 <span className="small">Both keep their things and get each other's. You might see a few doubles to tidy up.</span>
@@ -522,6 +522,144 @@ export async function scanPairingCode(): Promise<string | undefined> {
     typeHint: 'Or paste the code',
   });
   return out.ok ? out.code : undefined;
+}
+
+// ---------- 0.9.0: the recovery key ----------
+
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** Owner: the household's recovery key, to write down or keep in a password manager. */
+function RecoverySheet({ saved, onClose, onDone }: { saved: boolean; onClose: () => void; onDone: (info: SyncInfo, msg?: string) => void }) {
+  const nav = useNav();
+  const [key, setKey] = useState<string>();
+  const [error, setError] = useState<string>();
+  useEffect(() => {
+    RestockNative.syncRecovery().then(
+      (r) => setKey(r.key),
+      (e) => setError(errText(e) === 'Not unlocked' ? 'Unlock the phone to see the recovery key.' : errText(e)),
+    );
+  }, []);
+  const copy = async () => {
+    if (!key) return;
+    try {
+      // 0.9.0: on the phone, marked sensitive (kept out of the clipboard preview and keyboards' history).
+      await (syncAvailable() ? RestockNative.copyText({ text: key, sensitive: true }) : navigator.clipboard.writeText(key));
+      nav.toast('Recovery key copied');
+    } catch {
+      nav.toast("Couldn't copy it. Write it down instead.");
+    }
+  };
+  const fresh = async () => {
+    const ok = await confirmAction('Make a new recovery key?', {
+      detail: 'The one you have now stops working. Save the new one straight away.',
+      action: 'Make a new one',
+    });
+    if (!ok) return;
+    try {
+      onDone(await RestockNative.syncRecoverySaved({ fresh: true }));
+      setKey((await RestockNative.syncRecovery()).key);
+    } catch (e) {
+      setError(errText(e));
+    }
+  };
+  return (
+    <Sheet title="Recovery key" onClose={onClose}>
+      <p className="small">
+        If this phone is lost, broken or wiped, another phone in the household can take over as the owner with this key, and then add and remove
+        phones again. Keep it somewhere safe that isn't this phone: a password manager, or written down at home.
+      </p>
+      <div className="banner amber" style={{ gap: 4 }}>
+        <strong>Keep it private</strong>
+        <span style={{ fontSize: 13 }}>Anyone with it and a phone in your household can take the household over.</span>
+      </div>
+      {error && <div className="banner amber">{error}</div>}
+      {key ? (
+        <>
+          <code className="recovery-key" aria-label="Recovery key">
+            {key}
+          </code>
+          <details className="sync-code">
+            <summary className="small">Show it as a QR code</summary>
+            <PairingQr code={`RESTOCK-RECOVERY:${key}`} label="Recovery key QR code" />
+          </details>
+          <button className="btn" onClick={() => void copy()}>
+            Copy
+          </button>
+          <button
+            className="btn primary"
+            onClick={() =>
+              void RestockNative.syncRecoverySaved({ key }).then(
+                (i) => onDone(i, saved ? undefined : 'Recovery key saved'),
+                (e) => setError(errText(e)),
+              )
+            }
+          >
+            <Icon name="check" size={18} /> {saved ? 'Done' : "I've saved it"}
+          </button>
+          <button className="btn ghost small" onClick={() => void fresh()}>
+            Make a new recovery key
+          </button>
+        </>
+      ) : (
+        !error && <LoadingBar seconds={2} />
+      )}
+    </Sheet>
+  );
+}
+
+/** Another phone: take over as the owner with the recovery key (the owner phone was lost). */
+function TakeOverSheet({ ownerName, onClose, onDone }: { ownerName?: string; onClose: () => void; onDone: (info: SyncInfo) => void }) {
+  const [key, setKey] = useState('');
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const scan = async () => {
+    const out = await scanBarcode('Scan the recovery key', {
+      accept: (t: string) => (/^RESTOCK-RECOVERY:/i.test(t.trim()) ? t.trim() : undefined),
+      qr: true,
+      wrong: "That isn't a Restock recovery key.",
+      typeHint: 'Or type it',
+    });
+    if (out.ok) setKey(out.code.replace(/^RESTOCK-RECOVERY:/i, ''));
+  };
+  const go = async () => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      onDone(await RestockNative.syncTakeOver({ key }));
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet title="Take over as the owner" onClose={onClose}>
+      <p className="small">
+        For when the owner phone{ownerName ? ` (${ownerName})` : ''} is lost, broken or wiped. Enter the household's recovery key and this phone
+        becomes the owner: it can add and remove phones. Then remove the lost phone, so it can't sync again.
+      </p>
+      <p className="small">Every phone in the household needs Restock 0.9.0 or newer to see the change.</p>
+      <label className="field">
+        <span>Recovery key</span>
+        <input
+          className="input"
+          value={key}
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder="ABCD-EFGH-…"
+          onChange={(e) => setKey(e.target.value)}
+        />
+      </label>
+      <button className="btn" onClick={() => void scan()}>
+        <Icon name="scan" size={18} /> Scan its QR code
+      </button>
+      {error && <div className="banner amber">{error}</div>}
+      <button className="btn primary" disabled={busy || key.replace(/[^a-z0-9]/gi, '').length < 32} onClick={() => void go()}>
+        {busy ? 'Taking over…' : 'Take over'}
+      </button>
+    </Sheet>
+  );
 }
 
 /** What the owner can do with another phone. */
@@ -585,6 +723,8 @@ export function SyncScreen() {
   const [joining, setJoining] = useState<string>();
   const [member, setMember] = useState<{ device: string; name: string }>();
   const [busy, setBusy] = useState(false);
+  const [recovery, setRecovery] = useState(false);
+  const [takeOver, setTakeOver] = useState(false);
   const [, tick] = useState(0);
 
   const refresh = () => void syncInfo().then(setInfo);
@@ -652,6 +792,27 @@ export function SyncScreen() {
     if (r.left) nav.toast('This phone has stopped syncing');
   };
 
+  const pickFolder = async () => {
+    try {
+      const f = await RestockNative.pickFolder();
+      setBusy(true);
+      const i = await RestockNative.syncSetFolder({ uri: f.uri });
+      setInfo(i);
+      nav.toast(i.folderError ?? `Syncing through ${f.name}`);
+    } catch (e) {
+      if (errText(e) !== 'No folder picked') nav.toast(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const stopFolder = async () => {
+    const ok = await confirmAction('Stop syncing through the folder?', {
+      detail: "This phone stops reading and writing the folder. Its file stays there; delete it yourself if you like. Wi-Fi sync carries on.",
+      action: 'Stop',
+    });
+    if (ok) setInfo(await RestockNative.syncSetFolder({}));
+  };
+
   const synced = (device: string) => info?.peers?.find((p) => p.device === device)?.syncedAt;
   const owner = info?.members?.find((m) => m.owner);
 
@@ -684,7 +845,7 @@ export function SyncScreen() {
         <strong>Local sync: one pantry and list for the whole house</strong>
         <span className="small">
           Phones in your household sync <strong>straight from one phone to another</strong> on your own Wi-Fi: pantry, shopping list (ticks too),
-          prices, categories and alerts.
+          prices, categories and alerts. Away from home, they can also sync through a folder you choose.
         </span>
         <ul className="ticks">
           <li>
@@ -693,7 +854,7 @@ export function SyncScreen() {
           </li>
           <li>
             <Icon name="check" size={16} />
-            <span>Nothing leaves your phones: it never goes over the internet, and the makers of Restock never see it.</span>
+            <span>On your Wi-Fi it never goes over the internet. Through a folder, it's sealed so only your phones can read it. The makers of Restock never see it.</span>
           </li>
           <li>
             <Icon name="check" size={16} />
@@ -753,13 +914,38 @@ export function SyncScreen() {
             <button className="row" onClick={() => void leave()}>
               <Icon name="close" size={18} />
               <span className="grow">
-                <span className="title" style={{ fontSize: 14 }}>
+                <span className="title" style={{ fontSize: 15 }}>
                   Stop syncing this phone
                 </span>
                 <span className="small">This phone keeps everything. Nothing is deleted on the other phones.</span>
               </span>
             </button>
           </div>
+
+          {info.clockWarning && (
+            <div className="banner amber" role="status" style={{ gap: 8 }}>
+              <strong>{info.clockWarning}'s date looks wrong</strong>
+              <span style={{ fontSize: 13 }}>
+                Its changes are stamped more than a day ahead, so they'd beat everyone else's. On that phone, open Android's Settings → System → Date and
+                time and turn on the automatic date and time.
+              </span>
+              <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => void RestockNative.syncDismissNotice().then(refresh)}>
+                OK
+              </button>
+            </div>
+          )}
+
+          {info.isOwner && info.hasRecovery && !info.recoverySaved && (
+            <div className="banner amber" role="status" style={{ gap: 8 }}>
+              <strong>Save your household's recovery key</strong>
+              <span style={{ fontSize: 13 }}>
+                If this phone is lost, another phone can take over as the owner with it. Without it, nobody can add or remove phones again.
+              </span>
+              <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => setRecovery(true)}>
+                Show the recovery key
+              </button>
+            </div>
+          )}
 
           {info.isOwner && info.handoverTo && (
             <div className="banner grey" role="status" style={{ gap: 8 }}>
@@ -785,7 +971,7 @@ export function SyncScreen() {
                 <>
                   <Icon name="phone" size={18} />
                   <span className="grow">
-                    <span className="title" style={{ fontSize: 14, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span className="title" style={{ fontSize: 15, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                       {m.name}
                       {m.owner && <span className="tag great">Owner</span>}
                       {m.device === info.handoverTo && <span className="tag normal">Taking over</span>}
@@ -814,7 +1000,7 @@ export function SyncScreen() {
               <button className="row" onClick={() => setInviting(true)}>
                 <Icon name="plus" size={18} />
                 <span className="grow">
-                  <span className="title" style={{ fontSize: 14, color: 'var(--green)' }}>
+                  <span className="title" style={{ fontSize: 15, color: 'var(--green)' }}>
                     Add a phone
                   </span>
                   <span className="small">Shows a new one-time code for it to scan</span>
@@ -824,6 +1010,80 @@ export function SyncScreen() {
               <p className="small" style={{ padding: '4px 14px 12px', margin: 0 }}>
                 Only the owner phone{owner ? ` (${owner.name})` : ''} can add or remove phones.
               </p>
+            )}
+          </div>
+
+          <div className="card flush">
+            {info.isOwner ? (
+              <button className="row" onClick={() => setRecovery(true)}>
+                <Icon name="lock" size={18} />
+                <span className="grow">
+                  <span className="title" style={{ fontSize: 15 }}>
+                    Recovery key
+                  </span>
+                  <span className="small">
+                    {info.recoverySaved ? 'Saved. If this phone is lost, another phone takes over with it.' : 'Not saved yet. Tap to see it and save it.'}
+                  </span>
+                </span>
+                <Icon name="chevron" size={18} />
+              </button>
+            ) : (
+              <button className="row" disabled={!info.canRecover} onClick={() => setTakeOver(true)}>
+                <Icon name="lock" size={18} />
+                <span className="grow">
+                  <span className="title" style={{ fontSize: 15 }}>
+                    Owner phone lost?
+                  </span>
+                  <span className="small">
+                    {info.canRecover
+                      ? "Take over as the owner with the household's recovery key."
+                      : "Once the owner phone has Restock 0.9.0 and syncs, this phone can take over with the recovery key if it's ever lost."}
+                  </span>
+                </span>
+                <Icon name="chevron" size={18} />
+              </button>
+            )}
+          </div>
+
+          <div className="eyebrow">Sync away from home</div>
+          <div className="card" style={{ gap: 8 }}>
+            {info.folder ? (
+              <>
+                <span className="title" style={{ fontSize: 15 }}>
+                  Syncing through {info.folderName ?? 'a folder'}
+                </span>
+                <span className="small">
+                  {info.folderError ??
+                    (info.folderAt
+                      ? `Last synced through the folder ${agoText(info.folderAt)}. Each phone in the household needs to pick the same folder.`
+                      : "No other phone's file here yet. Pick the same folder on each phone in the household.")}
+                </span>
+                {!!info.folderUnread && !info.folderError && (
+                  <span className="small">
+                    {info.folderUnread === 1 ? "1 file in the folder couldn't be opened" : `${info.folderUnread} files in the folder couldn't be opened`}: from
+                    another household, or a phone that needs the household's new key (it gets it next time it syncs with the owner).
+                  </span>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn small" disabled={busy} onClick={() => void pickFolder()}>
+                    Change folder
+                  </button>
+                  <button className="btn small" onClick={() => void stopFolder()}>
+                    Stop
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="small">
+                  Pick a folder every phone in the household can reach, like one in <strong>Nextcloud</strong>, <strong>Syncthing</strong> or{' '}
+                  <strong>Google Drive</strong>, and pick the same folder on each phone. Each phone leaves its changes there, sealed with the
+                  household's key, and picks up the others'. Your list, pantry and ticks go through it; prices stay on the Wi-Fi to keep it small.
+                </span>
+                <button className="btn" disabled={!syncAvailable() || busy} onClick={() => void pickFolder()}>
+                  <Icon name="folder" size={18} /> Pick a folder
+                </button>
+              </>
             )}
           </div>
 
@@ -872,18 +1132,18 @@ export function SyncScreen() {
 
           <div className="card flush">
             <label className="check">
-              <input type="checkbox" checked={!!info.shareCards} onChange={(e) => void set({ shareCards: e.target.checked })} />
+              <input type="checkbox" className="switch" checked={!!info.shareCards} onChange={(e) => void set({ shareCards: e.target.checked })} />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <span className="title" style={{ fontSize: 14 }}>
+                <span className="title" style={{ fontSize: 15 }}>
                   Share my loyalty cards
                 </span>
                 <span className="small">Copies this phone's Flybuys and Everyday Rewards numbers to the household's other phones.</span>
               </span>
             </label>
             <label className="check">
-              <input type="checkbox" checked={info.keepReady !== false} onChange={(e) => void set({ keepReady: e.target.checked })} />
+              <input type="checkbox" className="switch" checked={info.keepReady !== false} onChange={(e) => void set({ keepReady: e.target.checked })} />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <span className="title" style={{ fontSize: 14 }}>
+                <span className="title" style={{ fontSize: 15 }}>
                   Stay ready to sync
                 </span>
                 <span className="small">
@@ -924,7 +1184,8 @@ export function SyncScreen() {
       <div className="card" style={{ gap: 6 }}>
         <strong>Good to know</strong>
         <span className="small">
-          Both phones need to be on the same Wi-Fi at the same time; whatever changed while apart catches up then. Some routers and guest networks
+          On the Wi-Fi, both phones need to be there at the same time; whatever changed while apart catches up then (or through the folder, if you
+          use one). Some routers and guest networks
           keep devices from seeing each other ("client isolation" or "AP isolation"); if the phones never find each other, that's the usual reason.
         </span>
         <span className="small">
@@ -940,8 +1201,9 @@ export function SyncScreen() {
       <div className="card" style={{ gap: 6 }}>
         <strong>Hosted sync: coming later</strong>
         <span className="small">
-          For syncing from anywhere, not just on the same Wi-Fi: through a small server you run yourself (a Docker container on a home server, NAS or
-          Raspberry Pi). Still no Restock account, and the server only ever sees encrypted data. Local sync keeps working either way.
+          A small server you run yourself (a Docker container on a home server, NAS or Raspberry Pi) that keeps the household's changes for phones
+          away from home, like the folder does. Still no Restock account, and the server only ever sees sealed data. Wi-Fi and folder sync keep
+          working either way.
         </span>
       </div>
 
@@ -962,6 +1224,50 @@ export function SyncScreen() {
             setJoining(undefined);
             nav.toast(msg);
             refresh();
+          }}
+        />
+      )}
+      {recovery && (
+        <RecoverySheet
+          saved={!!info?.recoverySaved}
+          onClose={() => setRecovery(false)}
+          onDone={(i, msg) => {
+            setInfo(i);
+            if (msg) {
+              setRecovery(false);
+              nav.toast(msg);
+            }
+          }}
+        />
+      )}
+      {takeOver && (
+        <TakeOverSheet
+          ownerName={owner?.name}
+          onClose={() => setTakeOver(false)}
+          onDone={(i) => {
+            setTakeOver(false);
+            setInfo(i);
+            nav.toast('This phone is the owner now');
+            void (async () => {
+              // The lost phone still has the household's key: offer to remove it straight away.
+              const lost = owner && (i.members ?? []).find((m) => m.device === owner.device && !m.me);
+              if (
+                lost &&
+                (await confirmAction(`Remove ${lost.name} from the household?`, {
+                  detail: "Recommended if it's lost or stolen: the household's key changes, so it can't sync again. It keeps what it has now.",
+                  action: 'Remove it',
+                }))
+              ) {
+                try {
+                  setInfo(await RestockNative.syncRemove({ device: lost.device }));
+                  nav.toast(`${lost.name} removed`);
+                } catch (e) {
+                  nav.toast(errText(e));
+                }
+              }
+              // Then the new recovery key, to save.
+              setRecovery(true);
+            })();
           }}
         />
       )}

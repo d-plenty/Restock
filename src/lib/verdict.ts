@@ -10,7 +10,7 @@ import {
   type Product,
 } from '../types';
 import { nameHasSize } from './naming';
-import { formatUnitPrice, inSheets, packSize, unitPrice } from './units';
+import { formatUnitPrice, inSheets, money, packSize, unitPrice } from './units';
 import { chainName } from '../shops';
 
 export type VerdictKind = 'great' | 'good' | 'small' | 'wait' | 'fake' | 'normal' | 'nodata';
@@ -25,6 +25,11 @@ export interface Verdict {
   discount?: number;
   /** Where the reference came from. */
   basis: 'history' | 'was-price' | 'none';
+  /**
+   * 0.9.0: the newest price may not be today's, so it isn't called a deal. 'ended': a sale price from
+   * before this week's specials started. 'old': a price drop last seen over STALE_DAYS ago.
+   */
+  stale?: 'ended' | 'old';
 }
 
 export const VERDICT_LABEL: Record<VerdictKind, string> = {
@@ -52,9 +57,26 @@ export interface PriceStats {
   fromMarket?: boolean;
   /** How much the shared history was scaled to match local prices (1.04 = 4% dearer here). */
   marketScale?: number;
+  /** 0.9.0: when these were worked out (the `now` given to computeStats), to tell how old the newest price is. */
+  asOf?: number;
 }
 
 const DAY = 86_400_000;
+
+/** 0.9.0: a price seen longer ago than this isn't taken as today's price when judging a deal. Same as Deals.STALE_DAYS. */
+export const STALE_DAYS = 14;
+
+/**
+ * Midnight at the start of the specials week (Wednesday to Tuesday) that `now` is in, where the
+ * phone is (0.9.0). A sale price from before then was last week's special and may have ended.
+ * Same as Deals.weekStart in Java.
+ */
+export function specialsWeekStart(now: number): number {
+  const d = new Date(now);
+  const from = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  from.setDate(from.getDate() - ((from.getDay() + 7 - 3) % 7));
+  return from.getTime();
+}
 
 export function median(values: number[]): number | undefined {
   if (!values.length) return undefined;
@@ -72,6 +94,8 @@ export const HISTORY_DAYS = 183;
  * count as one day. Same as Deals.localDay in Java.
  */
 export function localDay(iso: string): string {
+  // 0.9.0: a plain date is already a day (JavaScript would read it as UTC midnight, the day before west of UTC).
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -89,13 +113,20 @@ export function normaliseReadings(readings: PriceReading[], now = Date.now()): P
   return [...byDay.values()];
 }
 
-export function computeStats(raw: PriceReading[], now = Date.now()): PriceStats {
+/**
+ * A product's normal price, usual sale, lowest price and sale cycle. `hasCard`: whether you have
+ * the shop's loyalty card. Without it (0.9.0), member prices aren't prices you can pay, so they don't
+ * set the normal price, the usual sale, the lowest price ("wait for a better sale") or the sale
+ * cycle; only their "was" price still counts, as the store's. Mirrored in Deals.java.
+ */
+export function computeStats(raw: PriceReading[], now = Date.now(), hasCard = true): PriceStats {
   const readings = normaliseReadings(raw, now);
-  if (!readings.length) return { readings: 0, spanDays: 0 };
+  if (!readings.length) return { readings: 0, spanDays: 0, asOf: now };
   const current = readings[readings.length - 1];
-  const history = readings.slice(0, -1);
+  const mine = hasCard ? readings : readings.filter((r) => !r.memberOnly);
+  const history = mine.filter((r) => r !== current);
 
-  const nonSpecial = readings.filter((r) => !r.isSpecial).map((r) => r.price);
+  const nonSpecial = mine.filter((r) => !r.isSpecial).map((r) => r.price);
   const wasPrices = readings.map((r) => r.wasPrice).filter((v): v is number => typeof v === 'number' && v > 0);
   const typicalFromHistory = median(nonSpecial);
   const typical = typicalFromHistory ?? median(wasPrices);
@@ -113,8 +144,8 @@ export function computeStats(raw: PriceReading[], now = Date.now()): PriceStats 
 
   // Sale cycle: average gap between the starts of consecutive special runs.
   const starts: number[] = [];
-  readings.forEach((r, i) => {
-    if (r.isSpecial && (i === 0 || !readings[i - 1].isSpecial)) starts.push(Date.parse(r.date));
+  mine.forEach((r, i) => {
+    if (r.isSpecial && (i === 0 || !mine[i - 1].isSpecial)) starts.push(Date.parse(r.date));
   });
   let cycleWeeks: number | undefined;
   if (starts.length >= 2) {
@@ -133,6 +164,7 @@ export function computeStats(raw: PriceReading[], now = Date.now()): PriceStats 
     readings: readings.length,
     spanDays,
     cycleWeeks,
+    asOf: now,
   };
 }
 
@@ -190,11 +222,12 @@ export interface MultiBuy {
 
 /**
  * Multi-buy deals like "2 for $5", "Any 3 for $10" or "Buy 2 for $7". Mirrored in Deals.java.
- * (Not "2 x 150g": the price has to have a dollar sign.)
+ * (Not "2 x 150g": the price has to have a dollar sign. And not "112 for $5" as "12 for $5":
+ * the count can't be the end of a longer number, 0.9.0.)
  */
 export function multiBuy(promo?: string): MultiBuy | undefined {
   if (!promo) return undefined;
-  const m = promo.match(/(\d{1,2})\s*for\s*\$\s*(\d+(?:\.\d{1,2})?)/i);
+  const m = promo.match(/(?<!\d)(\d{1,2})\s*for\s*\$\s*(\d+(?:\.\d{1,2})?)/i);
   if (!m) return undefined;
   const n = Number(m[1]);
   const total = Number(m[2]);
@@ -211,9 +244,13 @@ export function effectivePrice(
   hasCard: boolean,
   /** Count multi-buy deals (the item's "multi-buy to save money" setting). */
   allowMulti = true,
+  /** Its normal price for this shopper (PriceStats.typical), for a member price without a "was" price. */
+  normal?: number,
 ): { price: number; locked: boolean; multi?: MultiBuy; shelf: number } {
   if (r.memberOnly && !hasCard) {
-    const p = r.wasPrice ?? r.price;
+    // Without the card you pay the shelf price: the store's "was" price or, without one, its normal
+    // price (0.9.0). The member price is only used when there's nothing else to go by.
+    const p = r.wasPrice ?? normal ?? r.price;
     return { price: p, locked: true, shelf: p };
   }
   const mb = allowMulti ? multiBuy(r.promo) : undefined;
@@ -231,10 +268,6 @@ export function lineCost(o: { price?: number; shelfPrice?: number; multi?: Multi
   return Math.floor(qty / o.multi.n) * o.multi.total + (qty % o.multi.n) * one;
 }
 
-function money(n: number): string {
-  return `$${n.toFixed(2)}`;
-}
-
 const pct = (d: number) => `${Math.round(d * 100)}%`;
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 /** At this discount or more, a sale is never "wait for a better one". */
@@ -247,13 +280,15 @@ export const HALF_PRICE = 0.45;
  *  - Great deal: 30%+ off normal. On sale (good sale): 15%+. Small saving: any price drop below that, even 5c.
  *  - Wait: it's been at least 5% cheaper than this in the last 6 months.
  *  - Fake sale: marked as a special, but not even a cent below normal.
+ *  - Not a deal at all (0.9.0): a sale price from before this week's specials started (Wednesday),
+ *    or a lower price last seen over STALE_DAYS ago. They may not be today's prices.
  * Mirrored in Deals.java.
  */
 export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Verdict {
   const cur = stats.current;
   if (!cur) return { kind: 'nodata', headline: 'No price yet', detail: 'Check prices or add one by hand.', basis: 'none' };
 
-  const { price: p, locked, multi } = effectivePrice(cur, hasCard, allowMulti);
+  const { price: p, locked, multi } = effectivePrice(cur, hasCard, allowMulti, stats.typical);
   // With multi-buys off, a multi-buy on its own (the shelf price unchanged) isn't a sale.
   const multiOnly = !allowMulti && !!multiBuy(cur.promo) && !(cur.wasPrice !== undefined && cur.wasPrice > cur.price + 0.004);
   const isSpecial = ((cur.isSpecial && !multiOnly) || !!multi) && !locked;
@@ -263,6 +298,17 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
 
   if (locked) {
     return { kind: 'normal', headline: 'Member price only', detail: 'Add your loyalty card to count this sale.', basis };
+  }
+  const seen = Date.parse(cur.date);
+  // 0.9.0: last week's special (or multi-buy) may be over by now, so it isn't "on sale now".
+  if (isSpecial && stats.asOf !== undefined && seen < specialsWeekStart(stats.asOf)) {
+    return {
+      kind: 'normal',
+      headline: 'Sale may have ended',
+      detail: `It was ${multi ? multiText(multi) : `on special for ${money(p)}`} on ${shortDate(cur.date)}, before this week's specials started. Check prices to see this week's price.`,
+      basis,
+      stale: 'ended',
+    };
   }
   if (ref === undefined) {
     return {
@@ -283,6 +329,17 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
     if (p > ref * 1.03) return { kind: 'normal', headline: 'Pricier than usual', detail: `Usually ${money(ref)}.`, discount, basis };
     return { kind: 'normal', headline: 'Normal price', detail: `Usually ${money(ref)}.`, discount, basis };
   }
+  // 0.9.0: a lower price from over two weeks ago may not be today's, so it isn't called a deal.
+  if (stats.asOf !== undefined && stats.asOf - seen > STALE_DAYS * DAY) {
+    return {
+      kind: 'normal',
+      headline: 'Price may be out of date',
+      detail: `${money(p)} when last checked, on ${shortDate(cur.date)}. Usually ${money(ref)}.`,
+      discount,
+      basis,
+      stale: 'old',
+    };
+  }
 
   const enoughHistory = stats.readings >= 4 && stats.spanDays >= 21;
   // Half price is about as good as supermarket specials get, so it's never "wait".
@@ -299,11 +356,15 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
     };
   }
 
+  // "the store's was-price" only when it is the store's was-price (0.9.0). From the prices Restock
+  // has seen, it's "its usual" until there's enough history to call it normal.
   const vs = stats.fromMarket
     ? `its usual ${money(ref)} (from shared price history)`
-    : enoughHistory
-      ? `its normal ${money(ref)}`
-      : `the store's was-price of ${money(ref)}`;
+    : basis === 'was-price'
+      ? `the store's was-price of ${money(ref)}`
+      : enoughHistory
+        ? `its normal ${money(ref)}`
+        : `its usual ${money(ref)}`;
   const kind: VerdictKind = discount >= GREAT_SALE ? 'great' : discount >= GOOD_SALE ? 'good' : 'small';
   const headline = { great: 'Great deal', good: 'On sale', small: 'Small saving' }[kind as 'great' | 'good' | 'small'];
   return { kind, headline, detail: `${deal}${pct(discount)} off ${vs}.`, saving, discount, basis };
@@ -375,6 +436,11 @@ export function recommend(
   readingsByProduct: Map<string, PriceReading[]>,
   cards: Set<Chain>,
   now = Date.now(),
+  /**
+   * 0.9.0: the shops switched on (recs.ts shopsOn). Products at any other shop are left out: no deal,
+   * verdict, "cheapest at" or total. Hand-typed prices ('other') always count. Left out: every shop.
+   */
+  shopsOn?: ReadonlySet<string>,
 ): Recommendation {
   const ids: [string, Role][] = [
     ...mainProductIds(group).map((id): [string, Role] => [id, 'main']),
@@ -386,9 +452,10 @@ export function recommend(
   for (const [id, role] of ids) {
     const product = products.get(id);
     if (!product || seen.has(id)) continue;
+    if (shopsOn && product.chain !== 'other' && !shopsOn.has(product.chain)) continue;
     seen.add(id);
-    const stats = withMarket(computeStats(readingsByProduct.get(id) ?? [], now), product.market);
     const hasCard = cards.has(product.chain);
+    const stats = withMarket(computeStats(readingsByProduct.get(id) ?? [], now, hasCard), product.market);
     const allowMulti = group.allowMulti !== false;
     const verdict = judge(stats, hasCard, allowMulti);
     const { qty, unit } = productQty(product);
@@ -397,7 +464,8 @@ export function recommend(
     let multi: MultiBuy | undefined;
     let locked = false;
     if (stats.current) {
-      const eff = effectivePrice(stats.current, hasCard, allowMulti);
+      // A multi-buy from a sale that may have ended (0.9.0) doesn't count: the price is for one.
+      const eff = effectivePrice(stats.current, hasCard, allowMulti && verdict.stale !== 'ended', stats.typical);
       price = eff.price;
       shelfPrice = eff.shelf;
       multi = eff.multi;

@@ -28,6 +28,7 @@ export type Screen =
     }
   | { name: 'settings' }
   | { name: 'catalogues' }
+  | { name: 'mycatalogue' }
   | { name: 'permissions' }
   | { name: 'stores'; section?: Section }
   | { name: 'cards' }

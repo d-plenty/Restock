@@ -3,6 +3,7 @@ import { groupRows, productRows, undoable } from '../../lib/undo';
 import {
   addReading,
   allCategories,
+  cardChains,
   deleteGroup,
   getGroup,
   groupProductIds,
@@ -21,7 +22,7 @@ import { ensureNotificationPermission, notificationsAllowed, scheduleReminders }
 import { isNative } from '../../stores/http';
 import { getSettings, updateSettings } from '../../lib/db';
 import { loadRecommendations } from '../../lib/recs';
-import { formatUnitPrice, money, tidySize } from '../../lib/units';
+import { formatUnitPrice, money, parseMoney, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import {
   ALERT_LEVELS,
@@ -80,7 +81,7 @@ const PCTS = [10, 20, 30, 40, 50, 60, 70, 80, 90];
 export function AlertPicker({ level, pct, onChange }: { level: AlertLevel; pct: number; onChange: (level: AlertLevel, pct: number) => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div className="title" style={{ fontSize: 14 }}>
+      <div className="title" style={{ fontSize: 15 }}>
         Tell me when it's on sale
       </div>
       <div className="card flush radio-list" role="radiogroup" aria-label="Alerts">
@@ -88,7 +89,7 @@ export function AlertPicker({ level, pct, onChange }: { level: AlertLevel; pct: 
           <label key={a.id} className="radio">
             <input type="radio" name="alert-level" checked={level === a.id} onChange={() => onChange(a.id, pct)} />
             <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 {a.label}
               </span>
               <span className="small">{a.explain}</span>
@@ -150,7 +151,7 @@ function AlertsPrompt({ name }: { name: string }) {
     <div className="card" style={{ flexDirection: 'row', alignItems: 'center' }}>
       <Icon name="bell" />
       <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span className="title" style={{ fontSize: 14 }}>
+        <span className="title" style={{ fontSize: 15 }}>
           Want a heads-up when {name} is on sale?
         </span>
         <span className="small">Restock can send a notification after each price check.</span>
@@ -213,11 +214,12 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   const data = useLive(async () => {
     const group = await getGroup(groupId);
     if (!group) return null;
-    const [recs, readings, categories, onList] = await Promise.all([
+    const [recs, readings, categories, onList, cards] = await Promise.all([
       loadRecommendations(),
       readingsFor(groupProductIds(group)),
       allCategories(),
       openEntryForGroup(groupId),
+      cardChains(),
     ]);
     // Deleted on another phone (or a moment ago): show "Item removed".
     const rec = recs.find((r) => r.group.id === groupId);
@@ -228,6 +230,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       readings,
       categories: categories.filter((c) => c.section === (group.section ?? 'pantry')),
       onList,
+      cards,
     };
   }, [groupId]);
   const [selected, setSelected] = useState<string>();
@@ -246,7 +249,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
     );
   }
 
-  const { group, rec, readings, categories, onList } = data;
+  const { group, rec, readings, categories, onList, cards } = data;
   // Listed in the order picked on this page (0.7.6): by shop then size, cheapest first, or A to Z.
   const order = appSettings?.productOrder ?? 'size';
   const ordered = orderOptions(rec.options, order);
@@ -260,7 +263,10 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   const weeks = Math.min(rangeWeeks ?? keepWeeks, keepWeeks);
   const from = Date.now() - weeks * 7 * 86_400_000;
   const chartReadings = allReadings.filter((r) => Date.parse(r.date) >= from);
-  const stats = chartOption ? withMarket(computeStats(chartReadings), chartOption.product.market) : undefined;
+  // Member prices only count towards normal and lowest with the shop's card (0.9.0), as in the verdict.
+  const stats = chartOption
+    ? withMarket(computeStats(chartReadings, Date.now(), cards.has(chartOption.product.chain)), chartOption.product.market)
+    : undefined;
   // Shops you've said you don't buy it at (0.8.9), and the ones on this item's tab with none of
   // your picks yet (one per website).
   const chainOf = (id: string) => rec.options.find((o) => o.product.id === id)?.product.chain;
@@ -300,13 +306,13 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       <div className="row">
         <MoreInfo src={o.product.imageUrl} name={o.product.name} onOpen={() => setPreview(o)} />
         <button className="row-main" style={{ color: 'inherit', font: 'inherit' }} onClick={() => setSheet({ option: o })}>
-          <ChainDot chain={o.product.chain} />
           <span className="grow">
-            <span className="title two-lines" style={{ fontSize: 14 }}>
+            <span className="title two-lines" style={{ fontSize: 15 }}>
               {o.product.name}
             </span>
+            {/* The shop on the line under the name, as on Home and the Pantry (0.9.0). */}
             <span className="small">
-              {chainName(o.product.chain)}
+              <ChainDot chain={o.product.chain} /> {chainName(o.product.chain)}
               {o.product.size ? ` · ${tidySize(o.product.size, o.product.name)}` : ''}
               {unitText(o) ? ` · ${unitText(o)}` : ''}
               {o.stats.current && ' · '}
@@ -335,7 +341,13 @@ export function ItemScreen({ groupId }: { groupId: string }) {
                 {money(o.price)} each in {o.multi.n}s
               </span>
             )}
-            {o.stats.current?.isSpecial && (
+            {/* Last week's special (0.9.0): the last price seen, but the sale may be over. */}
+            {o.stats.current?.isSpecial && o.verdict.stale === 'ended' && (
+              <span className="small" style={{ display: 'block' }}>
+                special, may have ended
+              </span>
+            )}
+            {o.stats.current?.isSpecial && o.verdict.stale !== 'ended' && (
               <span className="small" style={{ display: 'block' }}>
                 {o.stats.current.wasPrice && o.stats.current.wasPrice > (o.price ?? 0) ? (
                   <>
@@ -375,8 +387,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           Verdict
         </div>
         <div className="big">{rec.headline}</div>
-        {rec.detail && <p style={{ fontSize: 14 }}>{rec.detail}</p>}
-        {rec.saving !== undefined && <p style={{ fontSize: 14, fontWeight: 700 }}>Saves about {money(rec.saving)}</p>}
+        {rec.detail && <p style={{ fontSize: 15 }}>{rec.detail}</p>}
+        {rec.saving !== undefined && <p style={{ fontSize: 15, fontWeight: 700 }}>Saves about {money(rec.saving)}</p>}
       </div>
       {rec.action === 'alt' && rec.alt && (
         <div className="two">
@@ -437,7 +449,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           <Icon name="tag" size={14} /> {group.targetPrice !== undefined ? `Under ${money(group.targetPrice)}` : 'Set a price alert'}
         </button>
       </div>
-      {group.targetPrice !== undefined && rec.best?.price !== undefined && rec.best.price <= group.targetPrice + 0.004 && (
+      {/* Not for a price that may not be today's any more (0.9.0): it says "right now". */}
+      {group.targetPrice !== undefined && rec.best?.price !== undefined && rec.best.price <= group.targetPrice + 0.004 && !rec.best.verdict.stale && (
         <div className="banner green">
           <strong>Under your {money(group.targetPrice)} target</strong>
           <span style={{ fontSize: 13 }}>
@@ -550,27 +563,30 @@ export function ItemScreen({ groupId }: { groupId: string }) {
         )}
         {missingChains.map((c) => (
           // A shop on this tab with none of your picks: find it there, or say you don't buy it there.
+          // The words on full width, the two buttons under them (0.9.0: side by side they squashed the words).
           <div className="row shop-gap" key={c}>
             <ChainDot chain={c} />
             <span className="grow">
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 Not added at {chainName(c)}
               </span>
               <span className="small">So Restock can tell you which shop is cheapest</span>
+              <span className="shop-gap-btns">
+                <button className="btn small" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'main', chain: c, query: searchName })}>
+                  <Icon name="search" size={16} /> Find it
+                </button>
+                <button className="btn small" onClick={() => void notAtShop(c)}>
+                  Not here
+                </button>
+              </span>
             </span>
-            <button className="btn small" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'main', chain: c, query: searchName })}>
-              <Icon name="search" size={16} /> Find
-            </button>
-            <button className="btn small" onClick={() => void notAtShop(c)}>
-              Not here
-            </button>
           </div>
         ))}
         {notAt.map((c) => (
           <div className="row shop-gap" key={c}>
             <ChainDot chain={c} />
             <span className="grow">
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 Not at {chainName(c)}
               </span>
               <span className="small">You don't buy it there, so {chainName(c)} counts as not having it</span>
@@ -592,7 +608,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           <button className="row" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'main', another: true, query: group.name })}>
             <Icon name="plus" size={18} />
             <span className="grow">
-              <span className="title" style={{ fontSize: 14, color: 'var(--green)' }}>
+              <span className="title" style={{ fontSize: 15, color: 'var(--green)' }}>
                 Add another pick
               </span>
               <span className="small">
@@ -617,7 +633,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
         <button className="row" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'alt', query: group.name })}>
           <Icon name="swap" size={18} />
           <span className="grow">
-            <span className="title" style={{ fontSize: 14, color: 'var(--green)' }}>
+            <span className="title" style={{ fontSize: 15, color: 'var(--green)' }}>
               Find one you'd also take
             </span>
             <span className="small">Another brand or size you'd happily buy instead, when it's cheaper</span>
@@ -763,18 +779,18 @@ function EditSheet({
         <span className="small">Tells you when any of your shops has it at or below this price, special or not.</span>
       </label>
       <label className="check" style={{ padding: '4px 0' }}>
-        <input type="checkbox" checked={allowBulk} onChange={(e) => setAllowBulk(e.target.checked)} />
+        <input type="checkbox" className="switch" checked={allowBulk} onChange={(e) => setAllowBulk(e.target.checked)} />
         <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title" style={{ fontSize: 14 }}>
+          <span className="title" style={{ fontSize: 15 }}>
             Swap for bulk packs to save money
           </span>
           <span className="small">Off: a bigger pack you'd also take is never suggested as a swap. Your own picks always count.</span>
         </span>
       </label>
       <label className="check" style={{ padding: '4px 0' }}>
-        <input type="checkbox" checked={allowMulti} onChange={(e) => setAllowMulti(e.target.checked)} />
+        <input type="checkbox" className="switch" checked={allowMulti} onChange={(e) => setAllowMulti(e.target.checked)} />
         <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title" style={{ fontSize: 14 }}>
+          <span className="title" style={{ fontSize: 15 }}>
             Multi-buy to save money
           </span>
           <span className="small">
@@ -807,17 +823,19 @@ function PriceSheet({ options, onClose }: { options: Option[]; onClose: () => vo
   const [was, setWas] = useState('');
   const [special, setSpecial] = useState(false);
   const [member, setMember] = useState(false);
-  const p = parseFloat(price);
+  // "$4.50" and "4.50" both work (0.9.0).
+  const p = parseMoney(price);
 
   const save = async () => {
     if (!productId || !(p > 0)) return;
-    const w = parseFloat(was);
+    const w = parseMoney(was);
     await addReading({
       productId,
       date: nowIso(),
       price: p,
       wasPrice: w > p ? w : undefined,
-      isSpecial: special,
+      // A member price is a special for card holders (0.9.0), so it never becomes the normal price.
+      isSpecial: special || member,
       memberOnly: member,
       source: 'manual',
     });
@@ -855,7 +873,14 @@ function PriceSheet({ options, onClose }: { options: Option[]; onClose: () => vo
           <span>It's on special</span>
         </label>
         <label className="check">
-          <input type="checkbox" checked={member} onChange={(e) => setMember(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={member}
+            onChange={(e) => {
+              setMember(e.target.checked);
+              if (e.target.checked) setSpecial(true);
+            }}
+          />
           <span>Needs a loyalty card (member price)</span>
         </label>
       </div>
@@ -913,7 +938,7 @@ function OptionSheet({ group, option, options, onClose }: { group: Group; option
         {option.verdict.headline}. {option.verdict.detail}
       </p>
       <div className="card">
-        <div className="title" style={{ fontSize: 14 }}>
+        <div className="title" style={{ fontSize: 15 }}>
           Amount for unit pricing
         </div>
         <p className="small">Lets Restock compare different pack sizes fairly. For toilet paper, use total sheets (rolls × sheets per roll).</p>
@@ -1006,7 +1031,7 @@ function StockUpTip({ stats, readings }: { stats: PriceStats; readings: { date: 
   if (!stats.cycleWeeks || stats.cycleWeeks < 3) return null;
   if (stats.current?.isSpecial) {
     return (
-      <div className="banner green" style={{ padding: '10px 12px' }}>
+      <div className="banner green" style={{ paddingTop: 10, paddingBottom: 10 }}>
         <strong>A good time to stock up</strong>
         <span style={{ fontSize: 13 }}>It only goes on sale about every {stats.cycleWeeks} weeks, so this price may not be back for a while.</span>
       </div>
@@ -1175,6 +1200,8 @@ function PriceHistory({
     : chartReadings;
   const v = o.verdict;
   const today = o.price;
+  // A price that may not be today's any more (0.9.0) is the last one seen, with its date by the product.
+  const todayWord = v.stale ? 'Last seen' : 'Today';
 
   // The tag by today's price.
   const off = v.discount !== undefined && v.discount > 0.004 ? `${Math.round(v.discount * 100)}% OFF` : undefined;
@@ -1290,7 +1317,7 @@ function PriceHistory({
 
       <div className="ph-now">
         <div>
-          <div className="ph-lab">Today</div>
+          <div className="ph-lab">{todayWord}</div>
           <div className="ph-big num">
             {money(today)}
             {o.multi && <span className="ph-each"> each</span>}
@@ -1324,7 +1351,7 @@ function PriceHistory({
       {!flat && today !== undefined ? (
         <>
           <div className="ph-sec">Where today's price sits</div>
-          <div className="ph-scale" aria-label={`Today ${money(today)}, between ${money(lo)} and ${money(hi)}`}>
+          <div className="ph-scale" aria-label={`${todayWord} ${money(today)}, between ${money(lo)} and ${money(hi)}`}>
             <div className="ph-track" />
             {labels.map((l) => (
               <span key={l.key} className={`ph-mark ${l.key}`} style={{ left: `${l.pos}%` }} />
@@ -1334,7 +1361,7 @@ function PriceHistory({
               className="ph-pin"
               style={{ left: `${at(today)}%`, transform: `translateX(${at(today) < 20 ? '-12%' : at(today) > 80 ? '-88%' : '-50%'})` }}
             >
-              Today {money(today)}
+              {todayWord} {money(today)}
               {todayNote ? ` · ${todayNote.text.toLowerCase()}` : ''}
             </div>
             {shown.map((l) => (

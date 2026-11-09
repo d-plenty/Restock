@@ -69,19 +69,22 @@ describe('moving to My picks', () => {
 
   it('happens once, when Restock updates', async () => {
     const d = await createSqlJsDriver({ load: () => initSqlJs(), restore: async () => undefined, persist: async () => undefined });
-    for (let v = 0; v < MIGRATIONS.length - 1; v++) for (const sql of MIGRATIONS[v]) await d.run(sql);
-    await d.run(`PRAGMA user_version = ${MIGRATIONS.length - 1}`);
+    // A phone on 0.8.8: everything before the 0.8.9 step (0.9.0's sync step comes after it).
+    const PICKS = MIGRATIONS.length - 2;
+    for (let v = 0; v < PICKS; v++) for (const sql of MIGRATIONS[v]) await d.run(sql);
+    await d.run(`PRAGMA user_version = ${PICKS}`);
     for (const [id, c] of Object.entries(chain))
       await d.run(`INSERT INTO products (id, chain, name, created_at) VALUES (?, ?, ?, 'x')`, [id, c, id]);
     await d.run(
       `INSERT INTO items (id, name, usual_product_id, same_product_ids, alt_product_ids, created_at) VALUES ('beans', 'Baked beans', 'heinz', '["heinzW"]', '["aldiBeans","coles"]', 'x')`,
     );
-    const logBefore = await d.query('SELECT * FROM sync_log');
+    const log = 'SELECT tbl, pk, stamp, device, deleted, seq FROM sync_log ORDER BY seq';
+    const logBefore = await d.query(log);
     await migrate(d);
     const [row] = await d.query<Record<string, unknown>>('SELECT * FROM items');
     expect(row).toMatchObject({ same_product_ids: '["heinzW","aldiBeans"]', alt_product_ids: '["coles"]', any_size: 0, not_at: null });
     // Each phone moves its own items, so it isn't sent to a paired phone.
-    expect(await d.query('SELECT * FROM sync_log')).toEqual(logBefore);
+    expect(await d.query(log)).toEqual(logBefore);
     expect(await d.query("SELECT 1 FROM sync_meta WHERE key = 'applying'")).toEqual([]);
   });
 });

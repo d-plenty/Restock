@@ -3,14 +3,14 @@ import { refreshText, useFullRefresh } from '../refresh';
 import { allCards, allListEntries, deleteListEntries, getSettings, updateSettings } from '../../lib/db';
 import { loadDemo } from '../../lib/demo';
 import { addGroupToList } from '../../lib/listActions';
-import { recommendedStores, shopTotals } from '../../lib/shopTotals';
+import { aroundPlan, shopTotals } from '../../lib/shopTotals';
 import { loadRecommendations } from '../../lib/recs';
 import { money } from '../../lib/units';
 import { lineCost } from '../../lib/verdict';
 import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { isBlockMessage, isNative } from '../../stores/http';
-import { WEEKDAYS, chainName, stockKnown } from '../../types';
+import { chainName, stockKnown } from '../../types';
 import { ChainDot, ChainName, Icon, LoadingBar, OpenStoreButton, Price, SectionMark, SwapBox, Thumb, timeAgo } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { ActionInfoTag, MemberInfoTag, MultiInfoTag } from '../tagInfo';
@@ -89,11 +89,12 @@ export function HomeScreen() {
     searchChainsIn(settings.enabledChains, 'pantry'),
     settings.listCompare,
   );
-  // The store recommended on the shopping list, so Home and the list agree.
-  const pickedStore = recommendedStores(totals).recommended;
-  const oneStop = pickedStore && !pickedStore.missing.length ? pickedStore : totals.stores.find((s) => !s.missing.length);
-  // What this week's list saves against everything's normal price.
+  // The store with everything that the shopping list compares against, so Home and the list agree (0.9.0).
+  const oneStop = aroundPlan(totals, settings.listCompare, settings.shopAroundMin ?? 1).complete;
+  // What this week's list saves against everything's normal price. Not from a sale that may have
+  // ended, or a price that may be out of date (0.9.0): those aren't deals.
   const listSaving = totals.around.lines.reduce((sum, l) => {
+    if (l.pick.verdict.stale) return sum;
     const normal = l.pick.stats.typical ?? l.pick.stats.current?.wasPrice;
     return normal && l.pick.price !== undefined ? sum + Math.max(0, normal * l.qty - lineCost(l.pick, l.qty)) : sum;
   }, 0);
@@ -140,7 +141,7 @@ export function HomeScreen() {
         <div className="home-links" style={{ gridTemplateColumns: `repeat(${settings.receipts.enabled ? 4 : 3}, 1fr)` }}>
           <button onClick={() => nav.push({ name: 'cards' })}>
             <Icon name="card" size={22} />
-            <span>Loyalty cards</span>
+            <span>Cards</span>
           </button>
           <button onClick={() => nav.push({ name: 'catalogues' })}>
             <Icon name="book" size={22} />
@@ -189,16 +190,6 @@ export function HomeScreen() {
             </>
           )}
         </div>
-        {isNative() && !refresh.busy && (
-          <span className="small">
-            {refresh.paired ? 'Pull down to sync with your household. ' : ''}
-            {settings.sync.backgroundActivity
-              ? settings.checkIntervalHours >= 168
-                ? `Also checks every ${WEEKDAYS[settings.checkWeekday]}.`
-                : `Also checks about every ${settings.checkIntervalHours} hours.`
-              : 'Background checks are off.'}
-          </span>
-        )}
       </div>
 
       <RecallBanner />
@@ -220,7 +211,7 @@ export function HomeScreen() {
           <span className="home-list-total">
             <span className="num">{money(totals.around.total)}</span>
             <span className="home-list-how">
-              shopping around
+              at the till, shopping around
               {totals.around.chains.length > 1
                 ? ` · ${totals.around.chains.length} stores`
                 : totals.around.chains.length === 1
@@ -434,7 +425,7 @@ export function HomeScreen() {
                 onClick={() => nav.push({ name: 'item', groupId: r.group.id })}
               >
                 <span className="grow">
-                  <span className="title clip" style={{ fontSize: 14 }}>
+                  <span className="title clip" style={{ fontSize: 15 }}>
                     <SectionMark section={r.group.section} />
                     {r.group.name}
                   </span>
@@ -479,7 +470,7 @@ export function HomeScreen() {
       {skips.map((r) => (
         <button
           key={r.group.id}
-          className="card dashed"
+          className="card note-card"
           style={{ flexDirection: 'row', alignItems: 'center', textAlign: 'left' }}
           onClick={() => nav.push({ name: 'item', groupId: r.group.id })}
         >

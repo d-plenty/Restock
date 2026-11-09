@@ -4,17 +4,23 @@ import { RestockNative } from '../lib/sql/native';
 import { formatUnitPrice, money, tidySize, tidyUnitText } from '../lib/units';
 import { fetchDetails, type ProductDetails } from '../stores/details';
 import { isNative, promoLabel } from '../stores/http';
-import { describe, eachText, lineCost, productQty, VERDICT_LABEL, type ActionKind, type Option, type VerdictKind } from '../lib/verdict';
+import { describe, eachText, productQty, type Option } from '../lib/verdict';
 import { chainName, stockAtBranch, type Chain, type PriceReading } from '../types';
 import { cachedSettings } from '../lib/db';
-import { fewMissing, lineMeasure, recommendedStores } from '../lib/shopTotals';
-import { SECTION_NAMES, shopColor, websiteOf, type Section, type StoreChain } from '../shops';
+import { SECTION_NAMES, shopColor, websiteOf, type Section } from '../shops';
 import { useNav } from './nav';
 
 // ---------- icons (inline stroke SVG) ----------
 
 const paths: Record<string, ReactNode> = {
   home: <path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+  lock: (
+    <>
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </>
+  ),
+  folder: <path d="M3 6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
   pantry: (
     <>
       <rect x="4" y="3" width="16" height="18" rx="2" />
@@ -233,28 +239,20 @@ export function ChainName({ chain }: { chain: Chain }) {
   );
 }
 
-export function VerdictTag({ kind }: { kind: VerdictKind }) {
-  return <span className={`tag ${kind}`}>{VERDICT_LABEL[kind]}</span>;
-}
-
-/** The one status tag for a pantry item. `great` upgrades "On sale" to "Great deal". */
-export function ActionTag({ action, great }: { action: ActionKind; great?: boolean }) {
-  const map: Record<ActionKind, [string, string]> = {
-    buy: ['good', great ? 'GREAT DEAL' : 'ON SALE'],
-    alt: ['alt', 'SWAP & SAVE'],
-    small: ['small', 'SMALL SAVING'],
-    wait: ['wait', 'WAIT'],
-    skip: ['fake', 'FAKE SALE'],
-    none: ['normal', 'NORMAL PRICE'],
-  };
-  const [cls, label] = map[action];
-  return <span className={`tag ${cls}`}>{label}</span>;
+/**
+ * The member program behind a shop's member prices (0.9.0, one list for every tag): Flybuys at Coles
+ * and the Liquorlands, Everyday Rewards at Woolworths and BWS, My Dan's at Dan Murphy's.
+ */
+export function memberProgram(chain: string): { name?: string; cls: 'flybuys' | 'everyday' | 'normal' } {
+  if (chain === 'coles' || chain.startsWith('liquorland')) return { name: 'Flybuys', cls: 'flybuys' };
+  if (chain === 'woolworths' || chain === 'bws') return { name: 'Everyday Rewards', cls: 'everyday' };
+  if (chain === 'danmurphys') return { name: "My Dan's", cls: 'normal' };
+  return { cls: 'normal' };
 }
 
 export function MemberTag({ chain }: { chain: Chain }) {
-  if (chain === 'coles') return <span className="tag flybuys">MEMBER PRICE · FLYBUYS</span>;
-  if (chain === 'woolworths') return <span className="tag everyday">MEMBER PRICE · EVERYDAY REWARDS</span>;
-  return <span className="tag normal">MEMBER PRICE</span>;
+  const { name, cls } = memberProgram(chain);
+  return <span className={`tag ${cls}`}>{name ? `MEMBER PRICE · ${name.toUpperCase()}` : 'MEMBER PRICE'}</span>;
 }
 
 /**
@@ -396,19 +394,72 @@ export function runBackHandlers(): boolean {
     .some((x) => x.fn());
 }
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * A sheet over the screen (0.9.0: a proper modal dialog for screen readers and keyboards). Focus
+ * moves to its title when it opens (unless something in it, like a price box, takes it first), Tab
+ * stays inside it, and focus goes back to whatever opened it when it closes.
+ */
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   useBackLayer(onClose);
+  const ref = useRef<HTMLDivElement>(null);
+  // What had focus before the sheet drew (the button that opened it), so focus can go back there.
+  const [opener] = useState(() => (typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null));
+  useEffect(() => {
+    const sheet = ref.current;
+    if (!sheet) return;
+    if (!sheet.contains(document.activeElement)) sheet.querySelector<HTMLElement>('.sheet-title')?.focus({ preventScroll: true });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || e.defaultPrevented) return;
+      const items = [...sheet.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const at = document.activeElement;
+      if (e.shiftKey && (at === first || !items.includes(at as HTMLElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && at === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    sheet.addEventListener('keydown', onKey);
+    return () => {
+      sheet.removeEventListener('keydown', onKey);
+      // Not back into a text box: that would pop the keyboard up.
+      const typing = opener?.matches('textarea, input:not([type="checkbox"]):not([type="radio"])');
+      if (opener && opener !== document.body && opener.isConnected && !typing) opener.focus({ preventScroll: true });
+    };
+  }, [opener]);
   return (
     <div className="sheet-back" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
+      <div ref={ref} className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="topbar">
-          <h2 style={{ flex: 1 }}>{title}</h2>
+          <h2 className="sheet-title" tabIndex={-1} style={{ flex: 1 }}>
+            {title}
+          </h2>
           <button className="icon-btn" aria-label="Close" onClick={onClose}>
             <Icon name="close" size={20} />
           </button>
         </div>
         {children}
       </div>
+    </div>
+  );
+}
+
+/**
+ * A screen reader announcement area that's always there and shows nothing on screen (0.9.0). Live
+ * regions only speak when their text changes, so a toast that appears with its words already in it
+ * can go unread; App puts each toast's words in here as well.
+ */
+export function Announcer({ text }: { text?: string }) {
+  return (
+    <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      {text ?? ''}
     </div>
   );
 }
@@ -604,501 +655,6 @@ export function OpenStoreButton({ chain = 'coles', onDone, label }: { chain?: Ex
   );
 }
 
-/** The product line for something you'd buy: name, size, store and price. */
-/** Swap & save: one you'd also take instead of your pick, side by side. */
-export function SwapWhy({
-  line,
-  chainName: storeLabel,
-  onOpen,
-  onClose,
-}: {
-  line: ShopLineT;
-  chainName?: string;
-  onOpen?: () => void;
-  onClose: () => void;
-}) {
-  const [looking, setLooking] = useState(false);
-  const { pick, yours } = line;
-  if (looking) return <ProductPreview product={previewFromOption(pick)} onClose={() => setLooking(false)} />;
-  const unitA = pick.unitPrice;
-  const unitB = yours?.unitPrice;
-  const sameUnit = yours && unitA !== undefined && unitB !== undefined && productQty(pick.product).unit === productQty(yours.product).unit;
-  const where = storeLabel ?? chainName(pick.product.chain);
-  let why: string;
-  if (!yours) why = `Your pick has no price yet, so this is the one you can get.`;
-  else if (yours.product.chain !== pick.product.chain && storeLabel)
-    why = `Your pick isn't sold at ${where}, so this is the closest you can get there.`;
-  else if (yours.product.inStock === false) why = `Yours is out of stock ${stockWhere(yours.product.chain, true)}, so this is the next best.`;
-  else if (sameUnit && unitA! < unitB!) {
-    const a = productQty(pick.product).qty ?? 0;
-    const b = productQty(yours.product).qty ?? 0;
-    const pack = a && b ? (a < b ? ' even though the pack is smaller' : a > b ? ', because the bigger pack costs less per 100 g' : '') : '';
-    why = `It works out cheaper per ${productQty(pick.product).unit === 'ea' ? 'item' : '100 g / 100 mL'}: ${unitLabel(pick)} instead of ${unitLabel(yours)}${pack}. If you're only shopping at ${where}, this is the better buy.`;
-  } else why = `It's cheaper on the shelf: ${money(pick.price)} instead of ${money(yours.price)}.`;
-  return (
-    <Sheet title={line.item} onClose={onClose}>
-      <p style={{ margin: 0, fontWeight: 600 }}>
-        Swap {yours ? describe(yours) : 'your pick'} for {describe(pick)}
-      </p>
-      <div className="two">
-        <SwapBox label="Instead of yours" option={yours} />
-        <SwapBox label="Get this" option={pick} hi />
-      </div>
-      <p className="small" style={{ fontSize: 14 }}>
-        {why}
-      </p>
-      <button className="btn" onClick={() => setLooking(true)}>
-        <Icon name="info" size={18} /> Photo and product details
-      </button>
-      {onOpen && (
-        <button className="btn primary" onClick={onOpen}>
-          Open {line.item}
-        </button>
-      )}
-    </Sheet>
-  );
-}
-
-type ShopLineT = import('../lib/shopTotals').ShopLine;
-
-/** A line in a store's breakdown. Swapped lines say why (tap "Why this one?" or hold). */
-function SwapLine({ line, chainName, onOpen }: { line: ShopLineT; chainName?: string; onOpen: () => void }) {
-  const [why, setWhy] = useState(false);
-  const swapped = line.pick.role === 'alt';
-  return (
-    <>
-      <Hold onLong={() => setWhy(true)}>
-        <PickRow
-          label={line.item}
-          pick={line.pick}
-          qty={line.qty}
-          onOpen={onOpen}
-          note={line.outOfStock ? `Out of stock ${stockWhere(line.pick.product.chain)}` : undefined}
-        />
-      </Hold>
-      {swapped && (
-        <div style={{ padding: '0 14px 10px 38px' }}>
-          <button className="linkish small" onClick={() => setWhy(true)}>
-            Why this one instead of yours?
-          </button>
-        </div>
-      )}
-      {why && <SwapWhy line={line} chainName={chainName} onOpen={onOpen} onClose={() => setWhy(false)} />}
-    </>
-  );
-}
-
-function PickRow({
-  label,
-  pick,
-  onOpen,
-  note,
-  qty = 1,
-}: {
-  label: string;
-  pick?: import('../lib/verdict').Option;
-  onOpen?: () => void;
-  note?: string;
-  qty?: number;
-}) {
-  return (
-    <button className="row" onClick={onOpen} disabled={!onOpen}>
-      {pick ? <ChainDot chain={pick.product.chain} /> : <span style={{ width: 12 }} />}
-      <span className="grow">
-        <span className="title" style={{ fontSize: 14 }}>
-          {qty > 1 ? `${qty} × ` : ''}
-          {label}
-        </span>
-        <span className="small">
-          {pick
-            ? `${pick.product.name}${pick.product.size && !nameHasSize(pick.product.name, pick.product.size) ? ` · ${pick.product.size}` : ''}`
-            : note}
-        </span>
-        {pick && (pick.role === 'alt' || note) && (
-          <span className="tags" style={{ marginTop: 2 }}>
-            {note && <span className="tag normal">{note}</span>}
-            {pick.role === 'alt' && <span className="tag alt">WOULD ALSO TAKE</span>}
-          </span>
-        )}
-      </span>
-      {pick && (
-        <span className="num" style={{ fontWeight: 600 }}>
-          {money(lineCost(pick, qty))}
-        </span>
-      )}
-    </button>
-  );
-}
-
-type Totals = import('../lib/shopTotals').ShopTotals;
-type StoreTotal = Totals['stores'][number];
-
-type FindAt = (groupId: string, chain: StoreChain, query: string) => void;
-
-function StoreDetail({
-  s,
-  onOpenItem,
-  onFindAt,
-  onClose,
-}: {
-  s: StoreTotal;
-  onOpenItem: (groupId: string) => void;
-  onFindAt?: FindAt;
-  onClose: () => void;
-}) {
-  const name = chainName(s.chain);
-  const open = (id: string) => () => {
-    onClose();
-    onOpenItem(id);
-  };
-  return (
-    <Sheet title={`Only ${name}`} onClose={onClose}>
-      <div className="card flush">
-        <div className="section-head">
-          <span className="title">Buy at {name}</span>
-          <span className="num" style={{ fontWeight: 700 }}>
-            {money(s.total)}
-          </span>
-        </div>
-        {s.lines.map((l) => (
-          <SwapLine key={l.groupId} line={l} chainName={name} onOpen={open(l.groupId)} />
-        ))}
-        {!s.lines.length && (
-          <p className="small" style={{ padding: '0 14px 12px' }}>
-            Nothing on your list is available at {name}.
-          </p>
-        )}
-      </div>
-      {s.missing.length > 0 && (
-        <div className="card flush">
-          <div className="section-head">
-            <span className="title">Not at {name}</span>
-          </div>
-          <p className="small" style={{ padding: '0 14px' }}>
-            None of your picks for these are at {name}. Here's the next best place, or find one at {name} to add as a pick there.
-          </p>
-          {s.missing.map((m) => (
-            <div key={m.groupId}>
-              <PickRow
-                label={m.item}
-                pick={m.elsewhere}
-                qty={m.qty}
-                onOpen={open(m.groupId)}
-                note={
-                  (m.notHere ? `You don't buy it at ${name} · ` : '') +
-                  (m.elsewhere ? `Next best: ${chainName(m.elsewhere.product.chain)}` : 'No price anywhere yet')
-                }
-              />
-              {onFindAt && !m.notHere && (
-                <div style={{ padding: '0 14px 10px 38px' }}>
-                  <button
-                    className="btn small"
-                    onClick={() => {
-                      onClose();
-                      onFindAt(m.groupId, s.chain, m.item);
-                    }}
-                  >
-                    <Icon name="search" size={16} /> Find one at {name}
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-          <div className="row" style={{ borderTop: '1px solid var(--line)' }}>
-            <span className="grow">
-              <span className="title" style={{ fontSize: 14 }}>
-                {name} plus the rest elsewhere
-              </span>
-            </span>
-            <span className="num" style={{ fontWeight: 700 }}>
-              {money(s.totalWithElsewhere)}
-            </span>
-          </div>
-        </div>
-      )}
-      <p className="small">
-        Today's prices and online stock. Tap an item to see it in your pantry. Uses the cheapest of your picks at {name}.
-      </p>
-    </Sheet>
-  );
-}
-
-function AroundDetail({ t, onOpenItem, onClose }: { t: Totals; onOpenItem: (groupId: string) => void; onClose: () => void }) {
-  return (
-    <Sheet title="Shopping around" onClose={onClose}>
-      <p className="small">The cheapest of each item, from whichever store has it in stock.</p>
-      <div className="card flush">
-        {t.around.lines.map((l) => (
-          <SwapLine
-            key={l.groupId}
-            line={l}
-            onOpen={() => {
-              onClose();
-              onOpenItem(l.groupId);
-            }}
-          />
-        ))}
-        {t.around.missing.map((m) => (
-          <PickRow key={m} label={m} note="Not in stock anywhere you track" />
-        ))}
-      </div>
-    </Sheet>
-  );
-}
-
-/** The working behind the recommended store, in plain words. */
-function HowPicked({ totals, onClose }: { totals: Totals; onClose: () => void }) {
-  const by = totals.by;
-  const r = recommendedStores(totals);
-  const rec = r.recommended;
-  const run = r.runnerUp;
-  const low = r.cheapest;
-  const n = totals.linked;
-  const count = (s: StoreTotal) => (by === 'unit' ? s.cheapestFor : s.cheapestForTill);
-  const how = by === 'unit' ? 'for the same shopping' : 'at the till';
-  const gaps =
-    rec && run
-      ? rec.lines
-          .map((l) => {
-            const o = run.lines.find((x) => x.groupId === l.groupId);
-            return o ? { item: l.item, d: lineMeasure(o, by) - lineMeasure(l, by) } : undefined;
-          })
-          .filter((x): x is { item: string; d: number } => !!x && Math.abs(x.d) > 0.005)
-          .sort((a, b) => Math.abs(b.d) - Math.abs(a.d))
-          .slice(0, 4)
-      : [];
-  return (
-    <Sheet title="How Restock picks a store" onClose={onClose}>
-      {by === 'unit' ? (
-        <p className="small">
-          Your list is on <strong>Best value</strong>, so Restock prices <strong>the same shopping</strong> at each store: every item at the size you
-          usually buy, from your picks at each store and its regular packs (Any size items: the cheapest way to get that amount). A bulk pack,
-          or a store only selling a bigger or smaller size, can't tip it. Ones you'd also take don't count here.
-        </p>
-      ) : (
-        <p className="small">
-          Your list is on <strong>Lowest price</strong>, so Restock compares what you'd pay <strong>at the till</strong> at each store, whatever the
-          pack sizes.
-        </p>
-      )}
-      <p className="small">
-        The cheapest store is recommended, unless it only just wins (by under $2, or 3%) or one item alone makes the difference. Then the store that's
-        cheapest for more of your items is recommended instead, so one big special at a store that's dearer for everything else doesn't decide it.
-      </p>
-      <p className="small">
-        A store that's missing a few items (up to {fewMissing(n)} of your {n}) can still be recommended, if it's clearly cheaper (by over $2, or 3%)
-        even after buying those few at the next cheapest shop. A store missing more than that isn't one store any more, so it isn't recommended as one.
-      </p>
-      <div className="card flush">
-        <div className="row small" style={{ fontWeight: 700 }}>
-          <span className="grow">Store</span>
-          <span style={{ width: 80, textAlign: 'right' }}>Same shopping</span>
-          <span style={{ width: 74, textAlign: 'right' }}>At the till</span>
-        </div>
-        {totals.stores
-          .filter((s) => s.lines.length)
-          .map((s) => (
-            <div key={s.chain} className="row" style={s === rec ? { background: 'var(--green-bg)' } : undefined}>
-              <ChainDot chain={s.chain} />
-              <span className="grow">
-                <span className="title" style={{ fontSize: 14 }}>
-                  {chainName(s.chain)}
-                </span>
-                <span className="small">
-                  {s.missing.length ? `missing ${s.missing.length} · ` : ''}cheapest for {count(s)} of {n}
-                </span>
-              </span>
-              <span className="num" style={{ width: 80, textAlign: 'right', fontWeight: by === 'unit' ? 700 : 400 }}>
-                {money(s.fair)}
-              </span>
-              <span className="num" style={{ width: 74, textAlign: 'right', fontWeight: by === 'price' ? 700 : 400 }}>
-                {money(s.total)}
-              </span>
-            </div>
-          ))}
-      </div>
-      {rec && run && low && r.saving !== undefined && r.reason === 'cheapest' && (
-        <p className="small">
-          <strong>{chainName(rec.chain)}</strong> is {money(r.saving)} cheaper than {chainName(run.chain)} {how}
-          {n > 1 ? `, and the cheapest for ${count(rec)} of your ${n} items` : ''}.
-          {(r.close || r.mostlyFrom) &&
-            n > 1 &&
-            ' That’s close, but it’s also the cheapest for at least as many of your items, so it stays recommended.'}
-        </p>
-      )}
-      {rec && r.fewestMissing && r.saving !== undefined && r.reason === 'with-elsewhere' && (
-        <p className="small">
-          <strong>{chainName(rec.chain)}</strong> doesn't have {rec.missing.length === 1 ? '1 of your items' : `${rec.missing.length} of your items`},
-          but even after buying {rec.missing.length === 1 ? 'it' : 'those'} at the next cheapest shop, it comes to {money(r.saving)} less {how} than{' '}
-          {chainName(r.fewestMissing.chain)}
-          {r.fewestMissing.missing.length ? '' : ', which has everything'}. So {chainName(rec.chain)} is recommended, plus a quick stop for{' '}
-          {rec.missing.map((m) => m.item.toLowerCase()).join(', ')}.
-        </p>
-      )}
-      {rec && low && r.saving !== undefined && r.reason === 'more-items' && (
-        <p className="small">
-          <strong>{chainName(low.chain)}</strong> comes to {money(r.saving)} less {how},{' '}
-          {r.mostlyFrom
-            ? `but most of that is the ${r.mostlyFrom.item.toLowerCase()} (${money(r.mostlyFrom.difference)} less there)`
-            : 'but that’s too close to call'}
-          . <strong>{chainName(rec.chain)}</strong> is the cheapest for {count(rec)} of your {n} items ({chainName(low.chain)}: {count(low)}), so{' '}
-          {chainName(rec.chain)} is recommended.
-        </p>
-      )}
-      {gaps.length > 0 && rec && run && (
-        <div className="card flush">
-          <div className="row small" style={{ fontWeight: 700 }}>
-            Biggest differences
-          </div>
-          {gaps.map((g) => (
-            <div key={g.item} className="row small">
-              <span className="grow">{g.item}</span>
-              <span className="num">
-                {money(Math.abs(g.d))} less at {chainName(g.d > 0 ? rec.chain : run.chain)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-      {by === 'unit' && r.lowest && rec && r.lowest !== rec && r.lowest !== low && (
-        <p className="small">
-          <strong>{chainName(r.lowest.chain)}</strong> has the lowest total at the till ({money(r.lowest.total)}), but you'd take home less of some
-          things: the same amount costs {money(r.lowest.fair)} there.
-        </p>
-      )}
-      {by === 'price' && r.bestValue && rec && r.bestValue !== rec && r.bestValue !== low && (
-        <p className="small">
-          For the same amount of everything, <strong>{chainName(r.bestValue.chain)}</strong> is the best value ({money(r.bestValue.fair)}). Switch the
-          list to Best value to compare that way.
-        </p>
-      )}
-      <p className="small">
-        The <strong>Best value / Lowest price</strong> switch at the top of the list changes how stores are compared, and which packs are picked.
-      </p>
-    </Sheet>
-  );
-}
-
-/** "If you only went to one store" totals for the shopping list. Tap a store for the details. */
-export function ShopTotalsCard({
-  totals,
-  onOpenItem,
-  onFindAt,
-  by,
-  onShowLowest,
-}: {
-  totals: Totals;
-  onOpenItem: (groupId: string) => void;
-  onFindAt?: FindAt;
-  /** How the list picks the cheapest: best value per 100 g, or lowest shelf price. */
-  by?: 'unit' | 'price';
-  onShowLowest?: () => void;
-}) {
-  const [detail, setDetail] = useState<StoreTotal | 'around'>();
-  const [how, setHow] = useState(false);
-  if (!totals.linked) return null;
-  const r = recommendedStores(totals);
-  const best = r.recommended;
-  const lowest = r.lowest;
-  const n = totals.linked;
-  const several = totals.stores.filter((s) => s.lines.length).length > 1;
-  return (
-    <div className="card flush">
-      <div className="section-head" style={{ alignItems: 'flex-start', gap: 8 }}>
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-          <span className="title">If you only go to one store</span>
-          <span className="small">
-            {several
-              ? `${totals.by === 'price' ? 'Green is the store to go to for the lowest checkout total.' : 'Green is the best value store: every item at the size you usually buy.'} Tap a store to see what you’d buy there.`
-              : 'Tap the store to see what you’d buy there.'}
-          </span>
-        </span>
-        {several && (
-          <button className="info-btn" onClick={() => setHow(true)} aria-label="How Restock picks a store">
-            <Icon name="info" size={20} />
-          </button>
-        )}
-      </div>
-      {/* The recommended store first, then the rest cheapest first. */}
-      {[...totals.stores]
-        .sort((a, b) => (a === best ? -1 : b === best ? 1 : 0))
-        .map((s) => {
-          const showFair = s.lines.length && Math.abs(s.fair - s.total) > 0.25;
-          return (
-            <button
-              key={s.chain}
-              className="row"
-              style={best === s && several ? { background: 'var(--green-bg)' } : undefined}
-              onClick={() => setDetail(s)}
-            >
-              <ChainDot chain={s.chain} />
-              <span className="grow">
-                <span className="title" style={{ fontSize: 14, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                  {chainName(s.chain)}
-                  {several && best === s && <span className="badge">RECOMMENDED</span>}
-                  {several && r.cheapest === s && best !== s && r.saving !== undefined && (
-                    <span className="tag normal">{money(r.saving)} CHEAPER</span>
-                  )}
-                  {several && totals.by !== 'price' && lowest === s && best !== s && r.cheapest !== s && (
-                    <span className="tag normal">LOWEST CHECKOUT</span>
-                  )}
-                </span>
-                <span className="small">
-                  {s.missing.length ? `Has ${s.lines.length} of ${n} · ${s.missing.length} elsewhere` : n === 1 ? 'Has your item' : `Has all ${n}`}
-                  {s.missing.length && s.missing.every((m) => m.elsewhere) && s.lines.length
-                    ? ` · about ${money(s.totalWithElsewhere)} with ${s.missing.length === 1 ? 'that one' : 'those'}`
-                    : ''}
-                  {several && n > 1 && s.lines.length ? ` · cheapest for ${totals.by === 'price' ? s.cheapestForTill : s.cheapestFor}` : ''}
-                  {showFair && totals.by !== 'price' ? ` · same shopping ${money(s.fair)}` : ''}
-                </span>
-              </span>
-              <span className="num" style={{ fontWeight: 700 }}>
-                {s.lines.length ? money(s.total) : '—'}
-              </span>
-              <Icon name="chevron" size={16} />
-            </button>
-          );
-        })}
-      <button className="row" style={{ borderTop: '1px solid var(--line)' }} onClick={() => setDetail('around')}>
-        <Icon name="swap" size={18} />
-        <span className="grow">
-          <span className="title" style={{ fontSize: 14 }}>
-            Shopping around
-          </span>
-          <span className="small">
-            {totals.around.chains.length > 1
-              ? `${totals.around.chains.length} stores: ${totals.around.chains.map((c) => chainName(c)).join(', ')}`
-              : 'The cheapest of each item'}
-          </span>
-        </span>
-        <span className="num" style={{ fontWeight: 700 }}>
-          {money(totals.around.total)}
-        </span>
-        <Icon name="chevron" size={16} />
-      </button>
-      {by !== 'price' && best && totals.around.total > best.total + 0.005 && (
-        <div className="explain-note">
-          <strong>Why is shopping around dearer than {chainName(best.chain)}?</strong> Best value picks whatever is cheapest per 100 g, per litre or
-          per item, which is sometimes a bigger pack. You'd get more for your money, but spend more at the checkout today.
-          {onShowLowest && (
-            <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={onShowLowest}>
-              Show the lowest checkout total instead
-            </button>
-          )}
-        </div>
-      )}
-      {totals.unpriced > 0 && (
-        <p className="small" style={{ padding: '0 14px 12px' }}>
-          {totals.unpriced} note{totals.unpriced === 1 ? '' : 's'} without a price {totals.unpriced === 1 ? "isn't" : "aren't"} counted.
-        </p>
-      )}
-      {how && <HowPicked totals={totals} onClose={() => setHow(false)} />}
-      {detail === 'around' && <AroundDetail t={totals} onOpenItem={onOpenItem} onClose={() => setDetail(undefined)} />}
-      {detail && detail !== 'around' && <StoreDetail s={detail} onOpenItem={onOpenItem} onFindAt={onFindAt} onClose={() => setDetail(undefined)} />}
-    </div>
-  );
-}
-
 /** Light / dark / follow the phone. */
 export function ThemePicker({ value, onChange }: { value: 'system' | 'light' | 'dark'; onChange: (v: 'system' | 'light' | 'dark') => void }) {
   const opts = [
@@ -1290,7 +846,7 @@ function buzzOnce() {
   }
 }
 
-function unitLabel(o?: Option) {
+export function unitLabel(o?: Option) {
   if (!o || o.unitPrice === undefined) return '';
   return formatUnitPrice(o.unitPrice, productQty(o.product).unit);
 }
@@ -1472,10 +1028,10 @@ export function ProductPreview({ product: p, onClose, action }: { product: Previ
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {p.brand && !brandInName && <span className="eyebrow">{p.brand}</span>}
-        <span className="title" style={{ fontSize: 19, lineHeight: 1.25 }}>
+        <span className="title" style={{ fontSize: 17, lineHeight: 1.25 }}>
           {p.name}
         </span>
-        <span className="small" style={{ fontSize: 14 }}>
+        <span className="small" style={{ fontSize: 15 }}>
           {[tidySize(p.size, p.name), tidyUnitText(p.unitText)].filter(Boolean).join(' · ')}
         </span>
       </div>
@@ -1493,7 +1049,8 @@ export function ProductPreview({ product: p, onClose, action }: { product: Previ
       )}
       <div className="tags">
         {p.role && <span className={`tag ${p.role === 'alt' ? 'alt' : 'normal'}`}>{p.role === 'alt' ? 'WOULD ALSO TAKE' : 'MY PICK'}</span>}
-        {p.isSpecial && !p.memberOnly && <span className="tag good">SPECIAL</span>}
+        {/* A member-only special is still a special (0.9.0): both tags show. */}
+        {p.isSpecial && <span className="tag good">SPECIAL</span>}
         {promoLabel(p.promo) && <span className="tag normal">{promoLabel(p.promo)}</span>}
         {p.memberOnly && <MemberTag chain={p.chain} />}
         {p.inStock === false && <span className="tag fake">OUT OF STOCK {stockWhere(p.chain).toUpperCase()}</span>}
@@ -1537,7 +1094,7 @@ function DetailsPanel({ product: p }: { product: PreviewProduct }) {
   const block = (title: string, text?: string) =>
     text ? (
       <div className="detail-block">
-        <div className="title" style={{ fontSize: 14 }}>
+        <div className="title" style={{ fontSize: 15 }}>
           {title}
         </div>
         <p>{text}</p>
@@ -1550,7 +1107,7 @@ function DetailsPanel({ product: p }: { product: PreviewProduct }) {
       {block('Allergens', d.allergens)}
       {d.nutrition && (
         <div className="detail-block">
-          <div className="title" style={{ fontSize: 14 }}>
+          <div className="title" style={{ fontSize: 15 }}>
             Nutrition
           </div>
           {d.nutrition.note && <p className="small">{d.nutrition.note}</p>}
@@ -1582,12 +1139,6 @@ function DetailsPanel({ product: p }: { product: PreviewProduct }) {
       <p className="small">From {d.source}. Always check the pack, especially for allergies: recipes change.</p>
     </div>
   );
-}
-
-/** "2 FOR $5.00" on anything priced with a multi-buy. */
-export function MultiTag({ o }: { o?: { multi?: { n: number; total: number } } }) {
-  if (!o?.multi) return null;
-  return <span className="tag good">{`${o.multi.n} FOR $${o.multi.total.toFixed(2)}`}</span>;
 }
 
 /** Wraps a row so pressing and holding it calls onLong (taps still go through). */

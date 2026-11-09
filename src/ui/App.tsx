@@ -11,14 +11,16 @@ import { setConnectionMode } from '../stores/http';
 import { applyTheme, syncInsets } from '../lib/theme';
 import { scheduleReminders } from '../lib/notify';
 import { useLive } from '../lib/useLive';
-import { closeTopLayer, Icon, runBackHandlers } from './components';
+import { Announcer, closeTopLayer, Icon, runBackHandlers } from './components';
 import { isSectionTab, NavContext, type Nav, type Screen, type Tab } from './nav';
 import { activeSections, type Section } from '../shops';
 import { ConfirmHost } from './ConfirmHost';
+import { ErrorBoundary } from './ErrorBoundary';
 import { ScannerHost } from './Scanner';
 import { AddScreen } from './screens/Add';
 import { CardsScreen } from './screens/Cards';
 import { CataloguesScreen } from './screens/Catalogues';
+import { MyCatalogueScreen } from './screens/MyCatalogue';
 import { PermissionsScreen } from './screens/Permissions';
 import { HomeScreen } from './screens/Home';
 import { HouseholdScreen } from './screens/Household';
@@ -52,7 +54,16 @@ const ALL_TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'list', label: 'List', icon: 'cart' },
 ];
 
+/** 0.9.0: the whole app inside a safety net, so a screen that breaks shows a way out, not a blank page (ErrorBoundary.tsx). */
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <RestockApp />
+    </ErrorBoundary>
+  );
+}
+
+function RestockApp() {
   const [ready, setReady] = useState(false);
   const [bootError, setBootError] = useState<string>();
   const [tab, setTab] = useState<Tab>('home');
@@ -255,8 +266,9 @@ export default function App() {
           )}
           <ScannerHost />
           <ConfirmHost />
+          <Announcer text={toastMsg} />
           {toastMsg && (
-            <div className="toast" role="status" onClick={() => setToastMsg(undefined)}>
+            <div className="toast" onClick={() => setToastMsg(undefined)}>
               {toastMsg}
             </div>
           )}
@@ -326,6 +338,7 @@ export default function App() {
               />
             )}
             {top.name === 'catalogues' && <CataloguesScreen />}
+            {top.name === 'mycatalogue' && <MyCatalogueScreen />}
             {top.name === 'permissions' && <PermissionsScreen />}
             {top.name === 'settings' && <SettingsScreen />}
             {top.name === 'stores' && <StoresScreen section={top.section} />}
@@ -345,10 +358,10 @@ export default function App() {
         <ScannerHost />
         <TourHost />
         <ConfirmHost />
+        <Announcer text={toastMsg} />
         {toastMsg && (
           <div
             className="toast"
-            role="status"
             // Tap it to make it go away, so it never sits over a button you need (0.7.3).
             onClick={(e) => {
               if ((e.target as HTMLElement).closest('.toast-undo')) return;

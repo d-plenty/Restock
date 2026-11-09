@@ -372,6 +372,8 @@ export function nameHasSize(name: string, size?: string): boolean {
       .toLowerCase()
       .replace(/\s+/g, '')
       .replace(/litres?|ltr/g, 'l');
+  // "Sprite 10×375ml" already says how much, so "3.75L" after it would say it twice.
+  if (/\d\s*[x×]\s*\d+(?:\.\d+)?\s*(?:ml|l|g|kg)\b|\d(?:ml|l|g|kg)\s*[x×]\s*\d/i.test(name)) return true;
   return squash(name).includes(squash(size));
 }
 

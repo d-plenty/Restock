@@ -26,7 +26,8 @@ describe('trolley recordings', () => {
       ]),
     );
     const out = tidyRecording(raw, 'https://www.coles.com.au/');
-    expect(out.map((c) => c.url)).toEqual(['/api/bff/trolley/items', 'https://www.coles.com.au/api/bff/products/search?q=milk']);
+    // 0.9.0: query values are blanked; the path stays.
+    expect(out.map((c) => c.url)).toEqual(['/api/bff/trolley/items', 'https://www.coles.com.au/api/bff/products/search?q=(removed)']);
     expect(out[0].response).not.toContain('me@x.com');
     expect(out[0].response).not.toContain('Dec');
     expect(out[0].body).toContain('8100621');

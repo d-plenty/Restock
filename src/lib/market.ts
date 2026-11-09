@@ -7,7 +7,6 @@ import { RestockNative } from './sql/native';
 // same for everyone, so nothing about what you track leaves the phone.
 
 export const MARKET_SOURCE = 'hotprices.org';
-export const MARKET_URL = 'https://hotprices.org';
 /**
  * Rough size of one full download (both files). Not measured yet: the files hold every price
  * change since 2023 for about 60,000 products. Update this once a real download reports its size.

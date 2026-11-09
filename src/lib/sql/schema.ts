@@ -101,6 +101,53 @@ const HOUSEHOLD_MIGRATION: string[] = [
   ...syncTriggers(SYNCED.find((t) => t.table === 'household')!),
 ];
 
+/**
+ * 0.9.0: sync, made sturdier.
+ * - Each change is stamped after the record's own last change too, so a second edit to the same
+ *   line always counts as newer (before, a phone that had seen a clock ahead of its own stamped
+ *   both edits the same, and the second one never went anywhere).
+ * - `created`: when the record was last made (or made again, like a restore). A delete beats an
+ *   edit made without knowing about it; only something made again after the delete brings it back.
+ * - `sig`: the household's signed changes (owner changes are signed by the owner's key).
+ * - Prices: an index for the sync's look-ups by "product|date", and a deleted (tidied) price takes
+ *   its change note with it, so the log doesn't keep growing.
+ * - List lines: when the tick and the quantity last changed, so a tick in the shop and a quantity
+ *   change at home both survive.
+ */
+const STAMP_090 = (t: { table: string; key: string }, row: 'NEW' | 'OLD') => {
+  const key = t.key.replace(/\b(id|product_id|date|k)\b/g, `${row}.$1`);
+  return `MAX(CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), COALESCE((SELECT CAST(value AS INTEGER) FROM sync_meta WHERE key = 'clock'), 0) + 1, COALESCE((SELECT stamp FROM sync_log WHERE tbl = '${t.table}' AND pk = ${key}), 0) + 1)`;
+};
+const SYNC_TRIGGERS_090: string[] = SYNCED.flatMap((t) => {
+  const key = (row: 'NEW' | 'OLD') => t.key.replace(/\b(id|product_id|date|k)\b/g, `${row}.$1`);
+  const names = [`sync_${t.table}_ins`, `sync_${t.table}_upd`, `sync_${t.table}_del`];
+  const keep = (row: 'NEW' | 'OLD') => `COALESCE((SELECT created FROM sync_log WHERE tbl = '${t.table}' AND pk = ${key(row)}), 0)`;
+  const log = (row: 'NEW' | 'OLD', deleted: 0 | 1, created: string) =>
+    `INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq, sig, created) VALUES ('${t.table}', ${key(row)}, ${STAMP_090(t, row)}, ${DEVICE}, ${deleted}, ${NEXT_SEQ}, NULL, ${created});`;
+  const out = [
+    ...names.map((n) => `DROP TRIGGER IF EXISTS ${n}`),
+    `CREATE TRIGGER sync_${t.table}_ins AFTER INSERT ON ${t.table} WHEN ${NOT_APPLYING} BEGIN ${log('NEW', 0, STAMP_090(t, 'NEW'))} END`,
+  ];
+  if (t.deletes) {
+    const cols = t.table === 'products' ? `OF ${PRODUCT_SYNCED_COLUMNS.join(', ')} ` : '';
+    out.push(`CREATE TRIGGER sync_${t.table}_upd AFTER UPDATE ${cols}ON ${t.table} WHEN ${NOT_APPLYING} BEGIN ${log('NEW', 0, keep('NEW'))} END`);
+    out.push(`CREATE TRIGGER sync_${t.table}_del AFTER DELETE ON ${t.table} WHEN ${NOT_APPLYING} BEGIN ${log('OLD', 1, keep('OLD'))} END`);
+  } else {
+    // Prices are only added; a tidied-away price takes its note with it (whoever deleted it).
+    out.push(`CREATE TRIGGER sync_${t.table}_del AFTER DELETE ON ${t.table} BEGIN DELETE FROM sync_log WHERE tbl = '${t.table}' AND pk = ${key('OLD')}; END`);
+  }
+  return out;
+});
+const SYNC_090: string[] = [
+  'ALTER TABLE sync_log ADD COLUMN sig TEXT',
+  'ALTER TABLE sync_log ADD COLUMN created INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE list_entries ADD COLUMN checked_at INTEGER',
+  'ALTER TABLE list_entries ADD COLUMN qty_at INTEGER',
+  `CREATE INDEX IF NOT EXISTS prices_sync_key ON prices(product_id || '|' || date)`,
+  `DELETE FROM sync_log WHERE tbl = 'prices' AND NOT EXISTS (SELECT 1 FROM prices WHERE product_id || '|' || date = sync_log.pk)`,
+  ...SYNC_TRIGGERS_090,
+];
+
 /** 0.8.9: "Any size" and "Not at this shop" (picks.ts); the move to My picks is in DATA_STEPS. */
 const PICKS_089 = ['ALTER TABLE items ADD COLUMN any_size INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE items ADD COLUMN not_at TEXT'];
 
@@ -248,6 +295,8 @@ export const MIGRATIONS: string[][] = [
   // 0.8.9: My picks and Would also take, "Any size" and "Not at this shop" (picks.ts). The data
   // part is in DATA_STEPS.
   PICKS_089,
+  // 0.9.0: sturdier sync (stamps, deletes, signed household changes, prices, ticks).
+  SYNC_090,
 ];
 
 /**

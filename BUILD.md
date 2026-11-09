@@ -2,7 +2,7 @@
 
 This builds the Restock APK from the terminal. You don't need Android Studio. Steps 1–4 are a one-off setup (about 20 minutes); after that, building again takes about a minute.
 
-You'll end up with `app-debug.apk`, which installs on any Android 8.0 or newer phone, including de-Googled ones.
+You'll end up with `app-release.apk`, which installs on any Android 8.0 or newer phone, including de-Googled ones.
 
 - [Linux](#1-install-nodejs-and-java-21) (Fedora, Ubuntu, Debian and friends): the main path, every step below
 - [macOS](#macos)
@@ -107,17 +107,17 @@ npm run android:apk
 The first build downloads Gradle and the Android libraries, so give it 5–10 minutes. It should finish with **BUILD SUCCESSFUL**. The APK is at:
 
 ```
-~/restock/android/app/build/outputs/apk/debug/app-debug.apk
+~/restock/android/app/build/outputs/apk/release/app-release.apk
 ```
 
 ## 7. Put it on your phone
 
-**Without a cable:** send `app-debug.apk` to your phone (LocalSend, Nextcloud, email, anything), tap it, allow the install when Android asks, and tap **Install**.
+**Without a cable:** send `app-release.apk` to your phone (LocalSend, Nextcloud, email, anything), tap it, allow the install when Android asks, and tap **Install**.
 
 **With a USB cable:** turn on Settings → System → Developer options → USB debugging on the phone, plug it in, and run:
 
 ```bash
-adb install -r ~/restock/android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r ~/restock/android/app/build/outputs/apk/release/app-release.apk
 ```
 
 > **Already have the official Restock installed?** Your build is signed with your own computer's key, so Android won't install it over the official one (or the other way round). Export a backup in Settings first, uninstall, install yours, and restore.
@@ -154,7 +154,7 @@ wsl --install -d Ubuntu
 Restart, open **Ubuntu** from the Start menu, and follow the Linux steps from step 1 (the Ubuntu lines). When the APK is built, copy it to Windows to send it to your phone:
 
 ```bash
-cp ~/restock/android/app/build/outputs/apk/debug/app-debug.apk /mnt/c/Users/Public/
+cp ~/restock/android/app/build/outputs/apk/release/app-release.apk /mnt/c/Users/Public/
 ```
 
 ---
@@ -172,7 +172,7 @@ Installing over the top keeps your data. To test setup like a brand-new user, un
 
 ```bash
 adb uninstall family.plenty.restock
-adb install ~/restock/android/app/build/outputs/apk/debug/app-debug.apk
+adb install ~/restock/android/app/build/outputs/apk/release/app-release.apk
 ```
 
 ## Testing your changes
@@ -190,7 +190,7 @@ npm test
 VITE_FAKE_STORES=1 npm run dev
 ```
 
-**On the phone**, plug it in with USB debugging on, open `chrome://inspect` in Chrome or Chromium on your computer and click **inspect** under Restock: the Console shows errors from the app. Background checks log with:
+**On the phone**, build a debug APK first (`npm run android:apk-debug`, which lands in `android/app/build/outputs/apk/debug/app-debug.apk`; release builds can't be inspected). It installs as a separate app (`family.plenty.restock.debug`, with its own data), so it never replaces the real Restock. Then, plug it in with USB debugging on, open `chrome://inspect` in Chrome or Chromium on your computer and click **inspect** under Restock: the Console shows errors from the app. Background checks log with:
 
 ```bash
 adb logcat -s RestockCheck
@@ -200,7 +200,7 @@ Tapping **Check now** in the app runs exactly the same code as the background ch
 
 ## Signing
 
-Debug builds are signed with your computer's own debug key, which is fine for testing. If you want builds that install over each other from any computer, `android/app/build.gradle` uses a key in `~/.restock/signing.properties` when it finds one. How to make one is in [docs/RELEASING.md](docs/RELEASING.md). **Never commit a key**; `*.keystore` is in `.gitignore`.
+`npm run android:apk` makes a release build. Without a key of your own, it's signed with your computer's own debug key (the build prints a warning), which is fine for testing but won't install over the official Restock. If you want builds that install over each other from any computer, `android/app/build.gradle` uses a key in `~/.restock/signing.properties` when it finds one. How to make one is in [docs/RELEASING.md](docs/RELEASING.md). **Never commit a key**; `*.keystore` is in `.gitignore`.
 
 If you publish your own version of Restock, please also change `applicationId` in `android/app/build.gradle` and give it your own name and icon, so it installs alongside the official app instead of clashing with it.
 

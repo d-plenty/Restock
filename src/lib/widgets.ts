@@ -1,11 +1,11 @@
-import { activeSections, chainName } from '../shops';
+import { activeSections, chainName, SECTIONS, type Section } from '../shops';
 import { allGroups, allListEntries, getSettings } from './db';
 import { onChange } from './live';
 import { loadRecommendations } from './recs';
 import { RestockNative } from './sql/native';
 import { money } from './units';
 import { isNative } from '../stores/http';
-import type { Settings } from '../types';
+import type { Group, ListEntry, Settings } from '../types';
 
 // What the home screen widgets show. Android draws them (Widgets.java); the app hands over the
 // words each time something changes, a moment later so a burst of changes is one update.
@@ -20,6 +20,29 @@ export interface WidgetData {
   look: Settings['widgets'];
 }
 
+/**
+ * The list lines the widget shows (0.9.0): only from tabs that are switched on, and in the list's
+ * own order, A to Z by name the way the List tab sorts them (Groceries first, then Keg, then Pharmacy).
+ */
+export function widgetList(
+  entries: ListEntry[],
+  groups: Pick<Group, 'id' | 'name' | 'section'>[],
+  settings: Parameters<typeof activeSections>[0],
+): { open: ListEntry[]; label: (e: ListEntry) => string } {
+  const on = activeSections(settings);
+  const byId = new Map(groups.map((g) => [g.id, g]));
+  // A line's tab: its pantry item's, or the tab it was added from (List.tsx entrySection).
+  const tab = (e: ListEntry): Section => {
+    const g = e.groupId ? byId.get(e.groupId) : undefined;
+    return g ? (g.section ?? 'pantry') : (e.section ?? 'pantry');
+  };
+  const label = (e: ListEntry) => (e.groupId && byId.get(e.groupId)?.name) || e.text;
+  const open = entries
+    .filter((e) => !e.checked && on.includes(tab(e)))
+    .sort((a, b) => SECTIONS.indexOf(tab(a)) - SECTIONS.indexOf(tab(b)) || label(a).localeCompare(label(b), undefined, { sensitivity: 'base' }));
+  return { open, label };
+}
+
 export async function widgetData(): Promise<WidgetData> {
   const [s, recs, entries, groups] = await Promise.all([getSettings(), loadRecommendations(), allListEntries(), allGroups()]);
   const on = activeSections(s);
@@ -31,10 +54,9 @@ export async function widgetData(): Promise<WidgetData> {
       const d = (r.action === 'alt' ? r.alt : r.best)!;
       return { text: r.group.name, extra: d ? `${money(d.price)} ${chainName(d.product.chain)}` : undefined };
     });
-  const names = new Map(groups.map((g) => [g.id, g.name]));
-  const open = entries.filter((e) => !e.checked);
+  const { open, label } = widgetList(entries, groups, s);
   const list = open.slice(0, 8).map((e) => ({
-    text: `${(e.qty ?? 1) > 1 ? `${e.qty} × ` : ''}${(e.groupId && names.get(e.groupId)) || e.text}`,
+    text: `${(e.qty ?? 1) > 1 ? `${e.qty} × ` : ''}${label(e)}`,
   }));
   const dark =
     s.theme === 'dark' || (s.theme === 'system' && typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches);

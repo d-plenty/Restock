@@ -24,6 +24,13 @@ final class MarketParser {
 
     private MarketParser() {}
 
+    /**
+     * 0.9.0: the most price changes kept per product, the newest ones. The summary only looks at
+     * the last 26 weeks (at most one change a day, so about 183), so keeping the newest 400 never
+     * changes a summary; it stops one broken entry with endless history filling the phone's memory.
+     */
+    static final int MAX_HISTORY = 400;
+
     /** Returns how many products had enough history to summarise. */
     static int parse(InputStream in, long now, int windowDays, Sink sink, Progress progress) throws IOException {
         int seen = 0, kept = 0;
@@ -98,9 +105,12 @@ final class MarketParser {
                         if (date != null && price != null && date.length() >= 10) {
                             item.dates.add(date);
                             item.prices.add(price);
+                            // 0.9.0: trim now and then while reading (not every time), and at the end.
+                            if (item.dates.size() >= 2 * MAX_HISTORY) keepNewest(item, MAX_HISTORY);
                         }
                     }
                     r.endArray();
+                    keepNewest(item, MAX_HISTORY);
                     break;
                 default:
                     r.skipValue();
@@ -108,5 +118,24 @@ final class MarketParser {
         }
         r.endObject();
         return item;
+    }
+
+    /** 0.9.0: keeps a product's newest `keep` price changes (the dates are ISO, so they sort as text). */
+    static void keepNewest(Item item, int keep) {
+        int n = Math.min(item.dates.size(), item.prices.size());
+        if (n <= keep) return;
+        Integer[] order = new Integer[n];
+        for (int i = 0; i < n; i++) order[i] = i;
+        java.util.Arrays.sort(order, (a, b) -> item.dates.get(b).compareTo(item.dates.get(a)));
+        List<String> dates = new ArrayList<>(keep);
+        List<Double> prices = new ArrayList<>(keep);
+        for (int k = 0; k < keep; k++) {
+            dates.add(item.dates.get(order[k]));
+            prices.add(item.prices.get(order[k]));
+        }
+        item.dates.clear();
+        item.dates.addAll(dates);
+        item.prices.clear();
+        item.prices.addAll(prices);
     }
 }

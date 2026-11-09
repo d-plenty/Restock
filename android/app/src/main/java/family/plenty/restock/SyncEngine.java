@@ -21,9 +21,41 @@ import org.json.JSONObject;
  * device id, so both phones pick the same one). Deletes are kept as "deleted" in sync_log, so a
  * deleted thing doesn't come back. Prices are only added: each phone tidies its own old ones.
  *
+ * 0.9.0:
+ * - A delete beats an edit made without knowing about it ("created" says when a record was last
+ *   made); only something made again after the delete brings it back.
+ * - A list line's tick and quantity are merged one by one (checked_at, qty_at), so a tick in the
+ *   shop and a quantity change at home both survive.
+ * - A phone whose date is far ahead can't drag every other phone's clock with it, and the Sync
+ *   screen says which phone's date looks wrong.
+ * - The household's own changes are checked by SyncHousehold (signed by the owner's key).
+ * - Messages name the phone they're for and echo a fresh number, so a recorded message can't be
+ *   replayed to another phone.
+ * - Sample items (ids "demo-…") stay on the phone that added them.
+ *
  * No Android classes here, so the same code is tested on a computer (tools/sync-test).
  */
 final class SyncEngine {
+    /** This sync's version, sent in hello (0.9.0 = 90). */
+    static final int VERSION = 90;
+    /** How far ahead of this phone's clock another phone's stamp may pull it. */
+    static final long CLOCK_SLACK_MS = 24L * 3600 * 1000;
+    /** Folder files leave out deletes older than this (phones apart longer catch up on the Wi-Fi). */
+    static final long OLD_DELETE_MS = 180L * 24 * 3600 * 1000;
+    /** Tables where a delete beats an edit made without knowing about it. */
+    static final Set<String> DELETE_WINS = new HashSet<>(java.util.Arrays.asList("items", "list_entries", "products", "categories", "cards"));
+
+    /** 0.9.0: signs this phone's household changes, and decides on other phones' ones (SyncHousehold). */
+    interface Household {
+        /** A signature for this household change, or null if this phone doesn't sign it. */
+        String sign(JSONObject entry) throws Exception;
+
+        /** May this household change be taken in? */
+        boolean allowed(String pk, String byDevice, JSONObject entry) throws Exception;
+    }
+
+    Household household;
+
     /** The database, as the engine needs it. On the phone: AndroidSyncDb. */
     interface Db {
         List<JSONObject> query(String sql, Object... args) throws Exception;
@@ -277,9 +309,24 @@ final class SyncEngine {
 
     /** As above, only records on `allowed` tabs (null: this phone's own tabs). */
     JSONObject collect(long since, String exclude, int limit, Set<String> allowed) throws Exception {
+        return collect(since, exclude, limit, allowed, false);
+    }
+
+    /** As above; `noPrices` leaves prices out (0.9.0: folder sync, where files stay small). */
+    JSONObject collect(long since, String exclude, int limit, Set<String> allowed, boolean noPrices) throws Exception {
+        return collect(since, exclude, limit, allowed, noPrices ? " AND tbl <> 'prices'" : "", false, 0);
+    }
+
+    /**
+     * The full version. `where`: more conditions on sync_log. `moves`: the other phone understands
+     * "moved" (0.9.0): a record now on a tab this pair doesn't share is sent as a delete it only
+     * applies if its own copy is on a tab it shares (so a line moved off a shared tab goes from the
+     * others). `oldestDelete`: leave out deletes stamped before this (0: all).
+     */
+    JSONObject collect(long since, String exclude, int limit, Set<String> allowed, String where, boolean moves, long oldestDelete) throws Exception {
         if (allowed == null) allowed = tabs();
         List<JSONObject> rows = db.query(
-            "SELECT tbl, pk, stamp, device, deleted, seq FROM sync_log WHERE seq > ? ORDER BY seq LIMIT ?", since, (long) limit + 1);
+            "SELECT tbl, pk, stamp, device, deleted, seq, sig, created FROM sync_log WHERE seq > ?" + where + " ORDER BY seq LIMIT ?", since, (long) limit + 1);
         boolean more = rows.size() > limit;
         if (more) rows = rows.subList(0, limit);
         boolean cards = shareCards();
@@ -289,24 +336,43 @@ final class SyncEngine {
             top = Math.max(top, r.getLong("seq"));
             String tbl = r.getString("tbl");
             String key = keyOf(tbl);
+            String pk = r.getString("pk");
             if (key == null || (exclude != null && exclude.equals(r.getString("device")))) continue;
             if ("cards".equals(tbl) && !cards) continue;
+            if (pk.startsWith("demo-")) continue; // sample items stay on this phone
             JSONObject e = new JSONObject();
             e.put("tbl", tbl);
-            e.put("pk", r.getString("pk"));
+            e.put("pk", pk);
             e.put("stamp", r.getLong("stamp"));
             e.put("device", r.getString("device"));
+            e.put("created", r.optLong("created", 0));
             boolean deleted = r.getLong("deleted") != 0;
+            if (deleted && oldestDelete > 0 && r.getLong("stamp") < oldestDelete) continue;
             e.put("deleted", deleted);
             if (!deleted) {
-                List<JSONObject> row = db.query("SELECT * FROM " + tbl + " WHERE " + key + " = ?", r.getString("pk"));
+                List<JSONObject> row = db.query("SELECT * FROM " + tbl + " WHERE " + key + " = ?", pk);
                 if (row.isEmpty()) continue; // tidied away since (old prices)
                 JSONObject data = row.get(0);
                 String tab = tabOf(tbl, data);
-                if (tab != null && !allowed.contains(tab)) continue; // a tab this pair doesn't share
+                if (tab != null && !allowed.contains(tab)) {
+                    // A tab this pair doesn't share.
+                    if (!moves || "prices".equals(tbl)) continue;
+                    e.put("deleted", true);
+                    e.put("moved", true);
+                    entries.put(e);
+                    continue;
+                }
                 if ("prices".equals(tbl)) data.remove("id");
                 if ("products".equals(tbl)) for (String c : LOCAL_PRODUCT_COLUMNS) data.remove(c);
                 e.put("row", data);
+            }
+            if ("household".equals(tbl)) {
+                String sig = r.isNull("sig") ? null : r.optString("sig", null);
+                if (sig == null && household != null) {
+                    sig = household.sign(e);
+                    if (sig != null) db.exec("UPDATE sync_log SET sig = ? WHERE tbl = ? AND pk = ? AND stamp = ?", sig, tbl, pk, r.getLong("stamp"));
+                }
+                if (sig != null) e.put("sig", sig);
             }
             entries.put(e);
         }
@@ -317,6 +383,13 @@ final class SyncEngine {
         return out;
     }
 
+    /** Notes a change in sync_log as taken in (or made) here: `seq` is this phone's next number. */
+    private void logEntry(String tbl, String pk, long stamp, String device, boolean deleted, String sig, long created) throws Exception {
+        db.exec(
+            "INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq, sig, created) VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log), ?, ?)",
+            tbl, pk, stamp, device, deleted ? 1L : 0L, sig, created);
+    }
+
     // ---------- taking in another phone's changes ----------
 
     /** Applies another phone's changes. Returns how many records changed here. */
@@ -325,6 +398,7 @@ final class SyncEngine {
         if (entries == null || entries.length() == 0) return 0;
         final Map<String, Set<String>> columns = new HashMap<>();
         final Set<String> mine = tabs();
+        final long now = System.currentTimeMillis();
         db.transaction(() -> {
             // While this is set, the triggers don't note these as this phone's own changes.
             db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
@@ -335,13 +409,37 @@ final class SyncEngine {
                 String key = keyOf(tbl);
                 if (key == null) continue;
                 String pk = e.getString("pk");
-                if ("household".equals(tbl) && !householdChangeAllowed(pk, e.optString("device", ""), e)) continue;
+                if (pk.startsWith("demo-")) continue; // another phone's sample items
                 long stamp = e.getLong("stamp");
                 String device = e.optString("device", "");
-                clock = Math.max(clock, stamp);
-                List<JSONObject> had = db.query("SELECT stamp, device FROM sync_log WHERE tbl = ? AND pk = ?", tbl, pk);
-                if (!had.isEmpty() && !newer(stamp, device, had.get(0).getLong("stamp"), had.get(0).optString("device", ""))) continue;
                 boolean deleted = e.optBoolean("deleted", false);
+                if ("household".equals(tbl) && !householdChangeAllowed(pk, device, e)) continue;
+                // A phone whose date is far ahead: take its change, but don't let it drag this
+                // phone's clock along (and say so on the Sync screen).
+                if (stamp > now + CLOCK_SLACK_MS) setMeta("clock_warn", device);
+                else clock = Math.max(clock, stamp);
+                List<JSONObject> hadRows = db.query("SELECT stamp, device, deleted, created FROM sync_log WHERE tbl = ? AND pk = ?", tbl, pk);
+                JSONObject had = hadRows.isEmpty() ? null : hadRows.get(0);
+                boolean wins = had == null || newer(stamp, device, had.getLong("stamp"), had.optString("device", ""));
+                long created = e.optLong("created", 0);
+                boolean hadDeleted = had != null && had.getLong("deleted") != 0;
+                if (had != null && DELETE_WINS.contains(tbl)) {
+                    if (deleted && !hadDeleted) wins = stamp > had.optLong("created", 0); // a delete beats edits
+                    else if (!deleted && hadDeleted) wins = created > had.getLong("stamp"); // only made again after it
+                }
+                if ("list_entries".equals(tbl) && !deleted && had != null && !hadDeleted) {
+                    // The tick and the quantity are merged one by one.
+                    if (mergeListLine(e, wins, had, mine, columns)) changed[0]++;
+                    continue;
+                }
+                if (!wins) continue;
+                if (deleted && e.optBoolean("moved", false)) {
+                    // Moved to a tab the other phone doesn't share: goes only if it's on one this phone shares.
+                    List<JSONObject> cur = db.query("SELECT * FROM " + tbl + " WHERE " + key + " = ?", pk);
+                    if (cur.isEmpty()) continue;
+                    String tab = tabOf(tbl, cur.get(0));
+                    if (tab == null || !mine.contains(tab)) continue;
+                }
                 if (!deleted) {
                     // A tab this phone doesn't sync: leave it out (an older phone may still send it).
                     String tab = tabOf(tbl, e.optJSONObject("row"));
@@ -352,26 +450,89 @@ final class SyncEngine {
                 } else {
                     JSONObject row = e.optJSONObject("row");
                     if (row == null) continue;
-                    Set<String> cols = columns.get(tbl);
-                    if (cols == null) {
-                        cols = new HashSet<>();
-                        for (JSONObject c : db.query("PRAGMA table_info(" + tbl + ")")) cols.add(c.getString("name"));
-                        columns.put(tbl, cols);
-                    }
-                    writeRow(tbl, row, cols);
+                    writeRow(tbl, row, columnsOf(tbl, columns));
                 }
-                db.exec(
-                    "INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq) VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log))",
-                    tbl, pk, stamp, device, deleted ? 1L : 0L);
+                logEntry(tbl, pk, stamp, device, deleted, e.isNull("sig") ? null : e.optString("sig", null), created);
                 changed[0]++;
             }
-            // This phone's next changes are stamped after anything it has seen (clocks differ).
+            // This phone's next changes are stamped after anything it has seen (clocks differ), but
+            // never more than a day ahead (a clock dragged far ahead before 0.9.0 comes back too;
+            // each record's own stamp still keeps its next change newer).
             String was = meta("clock");
-            long now = was == null ? 0 : Long.parseLong(was);
-            if (clock > now) setMeta("clock", String.valueOf(clock));
+            long cur = was == null ? 0 : Long.parseLong(was);
+            if (cur > now + CLOCK_SLACK_MS) cur = 0;
+            setMeta("clock", String.valueOf(Math.min(Math.max(clock, cur), now + CLOCK_SLACK_MS)));
             db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
         });
         return changed[0];
+    }
+
+    private Set<String> columnsOf(String tbl, Map<String, Set<String>> cache) throws Exception {
+        Set<String> cols = cache.get(tbl);
+        if (cols == null) {
+            cols = new HashSet<>();
+            for (JSONObject c : db.query("PRAGMA table_info(" + tbl + ")")) cols.add(c.getString("name"));
+            cache.put(tbl, cols);
+        }
+        return cols;
+    }
+
+    private static long at(JSONObject row, String col) {
+        return row == null || row.isNull(col) ? 0 : row.optLong(col, 0);
+    }
+
+    /**
+     * 0.9.0: a list line that's here and in the other phone's change. The newer change wins as
+     * before, except the tick and the quantity, which each keep whichever changed last
+     * (checked_at, qty_at). If this phone's side added something, the merged line is noted as a
+     * new change from this phone, so it goes back to the others too.
+     */
+    private boolean mergeListLine(JSONObject e, boolean wins, JSONObject had, Set<String> mine, Map<String, Set<String>> columns) throws Exception {
+        JSONObject in = e.optJSONObject("row");
+        if (in == null) return false;
+        String pk = e.getString("pk");
+        List<JSONObject> curRows = db.query("SELECT * FROM list_entries WHERE id = ?", pk);
+        if (curRows.isEmpty()) return false;
+        JSONObject cur = curRows.get(0);
+        String tab = tabOf("list_entries", in);
+        if (tab != null && !mine.contains(tab)) return false;
+        long lc = at(cur, "checked_at"), ic = at(in, "checked_at"), lq = at(cur, "qty_at"), iq = at(in, "qty_at");
+        JSONObject merged;
+        boolean ours;
+        if (wins) {
+            merged = new JSONObject(in.toString());
+            ours = false;
+            if (lc > ic) {
+                merged.put("checked", cur.opt("checked"));
+                merged.put("checked_at", lc);
+                ours = true;
+            }
+            if (lq > iq) {
+                merged.put("qty", cur.opt("qty"));
+                merged.put("qty_at", lq);
+                ours = true;
+            }
+        } else {
+            merged = new JSONObject(cur.toString());
+            boolean any = false;
+            if (ic > lc) {
+                merged.put("checked", in.opt("checked"));
+                merged.put("checked_at", ic);
+                any = true;
+            }
+            if (iq > lq) {
+                merged.put("qty", in.opt("qty"));
+                merged.put("qty_at", iq);
+                any = true;
+            }
+            if (!any) return false;
+            ours = true;
+        }
+        writeRow("list_entries", merged, columnsOf("list_entries", columns));
+        long stamp = e.getLong("stamp");
+        if (!ours) logEntry("list_entries", pk, stamp, e.optString("device", ""), false, null, e.optLong("created", 0));
+        else logEntry("list_entries", pk, Math.max(stamp, had.getLong("stamp")) + 1, device(), false, null, Math.max(e.optLong("created", 0), had.optLong("created", 0)));
+        return true;
     }
 
     /**
@@ -388,6 +549,13 @@ final class SyncEngine {
      * request), while that request is here.
      */
     boolean householdChangeAllowed(String pk, String byDevice, JSONObject entry) throws Exception {
+        // 0.9.0: SyncHousehold checks signatures once the household has an owner key.
+        if (household != null && entry != null) return household.allowed(pk, byDevice, entry);
+        return legacyHouseholdChangeAllowed(pk, byDevice, entry);
+    }
+
+    /** The rules before signed household changes (and for households whose owner is still on 0.8.x). */
+    boolean legacyHouseholdChangeAllowed(String pk, String byDevice, JSONObject entry) throws Exception {
         String owner = householdValue("owner");
         if (owner == null || owner.equals(byDevice) || pk.equals("member:" + byDevice)) return true;
         if (householdValue("handover:" + byDevice) == null) return false;
@@ -542,6 +710,15 @@ final class SyncEngine {
         });
     }
 
+    /**
+     * 0.9.0: joining with "Combine": where the household already has a record, its version wins
+     * (this phone's copy might be from an old backup). This phone's own records still go to the
+     * others, and anything the household deleted goes here too.
+     */
+    void yieldToHousehold() throws Exception {
+        db.exec("UPDATE sync_log SET stamp = 0, created = 0 WHERE tbl <> 'household'");
+    }
+
     /** A new name for this phone in sync (rejoining after clearing, so the others don't skip its records). */
     void newDevice() throws Exception {
         byte[] b = new byte[8];
@@ -560,6 +737,16 @@ final class SyncEngine {
         JSONObject res = new JSONObject();
         res.put("device", device());
         res.put("name", name());
+        res.put("v", VERSION);
+        // 0.9.0: a message for another phone (recorded on the Wi-Fi and sent here) is turned away,
+        // and the answer echoes the asker's number so an old answer can't stand in for a new one.
+        String to = req.optString("to", "");
+        if (!to.isEmpty() && !to.equals(device())) {
+            res.put("error", "That message was for another phone.");
+            return res;
+        }
+        if (req.has("nonce")) res.put("nonce", req.optString("nonce"));
+        boolean modern = req.optInt("v", 0) >= VERSION;
         switch (op) {
             case "hello":
                 noteTabs();
@@ -568,11 +755,17 @@ final class SyncEngine {
                 res.put("got", gotFrom(peer));
                 res.put("tabs", tabsJson(tabs()));
                 return res;
+            case "household": {
+                // 0.9.0: all of the household record (a phone just updated looks at it afresh).
+                JSONObject c = collect(0, null, 100_000, null, " AND tbl = 'household'", false, 0);
+                res.put("entries", c.getJSONArray("entries"));
+                return res;
+            }
             case "pull": {
                 Set<String> allowed = tabs();
                 Set<String> theirs = parseTabs(req.optJSONArray("tabs"));
                 if (theirs != null) allowed.retainAll(theirs);
-                JSONObject c = collect(req.optLong("since", 0), peer, PAGE, allowed);
+                JSONObject c = collect(req.optLong("since", 0), peer, PAGE, allowed, "", modern, 0);
                 for (Iterator<String> it = c.keys(); it.hasNext(); ) {
                     String k = it.next();
                     res.put(k, c.get(k));
@@ -619,7 +812,7 @@ final class SyncEngine {
         hello.put("device", me);
         hello.put("name", name());
         hello.put("port", myPort);
-        JSONObject h = t.send(hello);
+        JSONObject h = send(t, hello, false);
         Result r = new Result();
         r.peer = h.optString("device");
         r.peerName = h.optString("name", null);
@@ -634,6 +827,18 @@ final class SyncEngine {
         }
         if (r.peer.isEmpty() || r.peer.equals(me)) return r;
         notePeer(r.peer, r.peerName, null, 0);
+        final boolean modern = h.optInt("v", 0) >= VERSION;
+        final String peer = r.peer;
+
+        // 0.9.0: just updated: look at the whole household record afresh (once).
+        if (modern && "1".equals(meta("rehousehold"))) {
+            JSONObject all = new JSONObject();
+            all.put("op", "household");
+            all.put("device", me);
+            all.put("to", peer);
+            r.received += apply(send(t, all, true).optJSONArray("entries"));
+            setMeta("rehousehold", null);
+        }
 
         long since = gotFrom(r.peer);
         for (int guard = 0; guard < 10000; guard++) {
@@ -642,7 +847,8 @@ final class SyncEngine {
             pull.put("device", me);
             pull.put("since", since);
             pull.put("tabs", tabsJson(mine));
-            JSONObject got = t.send(pull);
+            if (modern) pull.put("to", peer);
+            JSONObject got = send(t, pull, modern);
             r.received += apply(got.optJSONArray("entries"));
             long top = got.optLong("top", since);
             if (top > since) setGot(r.peer, top);
@@ -657,7 +863,7 @@ final class SyncEngine {
         Set<String> peerTabs = parseTabs(h.optJSONArray("tabs"));
         if (peerTabs != null) allowed.retainAll(peerTabs);
         for (int guard = 0; guard < 10000; guard++) {
-            JSONObject c = collect(theirs, r.peer, PAGE, allowed);
+            JSONObject c = collect(theirs, r.peer, PAGE, allowed, "", modern, 0);
             long top = c.getLong("top");
             if (top <= theirs) break;
             JSONObject push = new JSONObject();
@@ -666,12 +872,31 @@ final class SyncEngine {
             push.put("entries", c.getJSONArray("entries"));
             push.put("top", top);
             push.put("at", now);
-            t.send(push);
+            if (modern) push.put("to", peer);
+            send(t, push, modern);
             r.sent += c.getJSONArray("entries").length();
             theirs = top;
             if (!c.getBoolean("more")) break;
         }
         markSynced(r.peer, now);
         return r;
+    }
+
+    private static final java.security.SecureRandom NONCES = new java.security.SecureRandom();
+
+    /**
+     * Sends a message with a fresh number and the sync version. `strict`: the answer must echo the
+     * number (0.9.0 phones always do), or it's an old answer being played back.
+     */
+    static JSONObject send(Transport t, JSONObject m, boolean strict) throws Exception {
+        byte[] b = new byte[12];
+        NONCES.nextBytes(b);
+        String nonce = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(b);
+        m.put("nonce", nonce);
+        m.put("v", VERSION);
+        JSONObject res = t.send(m);
+        boolean echoes = res.optInt("v", 0) >= VERSION;
+        if ((strict || echoes) && !nonce.equals(res.optString("nonce", ""))) throw new java.io.IOException("The other phone's answer didn't match. Try again.");
+        return res;
     }
 }

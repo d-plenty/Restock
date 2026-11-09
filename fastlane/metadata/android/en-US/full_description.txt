@@ -16,7 +16,8 @@
 <li>Sync with your household: phones in the same house share one pantry and shopping list straight to each other on your Wi-Fi, encrypted, with no server or account</li>
 <li>Search that works out what you mean: "butter" puts butter first, not peanut butter or butter chicken sauce</li>
 <li>Price history for each product at each shop: where today's price sits, how often it's on sale and when the next sale is likely</li>
-<li>Shopping list that compares the same shopping at each store, so one bulk deal can't tip it</li>
+<li>My catalogue: this week's sales on the things you buy, a page for each shop</li>
+<li>Shopping list that recommends shopping around, or the one store with everything when shopping around saves less than your minimum, comparing the same shopping at each store</li>
 <li>Background price checks and alerts, and a weekly deals summary</li>
 <li>Recall alerts from the official Australian recall lists (FSANZ, Product Safety Australia, TGA)</li>
 <li>Optional receipt scanning, read on the phone by a built-in open-source reader that works offline</li>

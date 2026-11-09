@@ -75,7 +75,7 @@ export function PartsPicker({
     <label className="check" key={key} style={indent ? { paddingLeft: 28 } : undefined}>
       <input type="checkbox" checked={has && checked} disabled={!has} onChange={(e) => toggle(e.target.checked)} aria-label={title} />
       <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <span className="title" style={{ fontSize: 14 }}>
+        <span className="title" style={{ fontSize: 15 }}>
           {title}
         </span>
         <span className="small">{has ? detail : 'Nothing to include'}</span>
@@ -173,6 +173,11 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
   const [counts, setCounts] = useState<PartCounts>();
   const [parts, setParts] = useState<ExportParts>(EVERYTHING);
   const [busy, setBusy] = useState(false);
+  // 0.9.0: lock the file with a password.
+  const [lock, setLock] = useState(false);
+  const [pw, setPw] = useState('');
+  const [pw2, setPw2] = useState('');
+  const pwProblem = !lock ? undefined : pw.length < 8 ? 'At least 8 characters.' : pw !== pw2 ? 'The two don’t match yet.' : undefined;
   useEffect(() => {
     void exportCounts().then((c) => {
       setCounts({ ...c, hasSettings: true });
@@ -189,16 +194,16 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
   }, []);
   const any = parts.pantry || parts.list || parts.cards || parts.settings || parts.receipts;
   const go = async () => {
-    if (parts.cards && counts?.cards) {
+    if (parts.cards && counts?.cards && !lock) {
       const ok = await confirmAction('Your backup includes your loyalty card numbers', {
-        detail: 'Keep the file somewhere private, and only share it with people you trust.',
+        detail: 'Keep the file somewhere private, and only share it with people you trust. Or go back and turn on "Lock it with a password".',
         action: 'Make the backup',
       });
       if (!ok) return;
     }
     setBusy(true);
     try {
-      const name = await exportBackup(parts);
+      const name = await exportBackup({ ...parts, password: lock ? pw : undefined });
       onDone(`Backup ready: ${name}`);
       onClose();
     } catch (e) {
@@ -220,7 +225,33 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
           onPhotos={(v) => setParts((x) => ({ ...x, receiptPhotos: v }))}
         />
       )}
-      <button className="btn primary block" disabled={!any || busy || !counts} onClick={go}>
+      <div className="card flush">
+        <label className="check">
+          <input type="checkbox" className="switch" checked={lock} onChange={(e) => setLock(e.target.checked)} />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              Lock it with a password
+            </span>
+            <span className="small">The whole file is encrypted on this phone. Without the password nobody can open it, including you.</span>
+          </span>
+        </label>
+        {lock && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 14px 12px' }}>
+            <input className="input" type="password" autoComplete="new-password" placeholder="Password" aria-label="Password" value={pw} onChange={(e) => setPw(e.target.value)} />
+            <input
+              className="input"
+              type="password"
+              autoComplete="new-password"
+              placeholder="Type it again"
+              aria-label="Type the password again"
+              value={pw2}
+              onChange={(e) => setPw2(e.target.value)}
+            />
+            {pwProblem && (pw || pw2) && <span className="small">{pwProblem}</span>}
+          </div>
+        )}
+      </div>
+      <button className="btn primary block" disabled={!any || busy || !counts || !!pwProblem} onClick={go}>
         <Icon name="external" size={18} /> {busy ? 'Making the backup…' : 'Export'}
       </button>
     </Sheet>

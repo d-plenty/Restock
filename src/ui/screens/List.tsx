@@ -1,5 +1,5 @@
 import { useFullRefresh } from '../refresh';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { nameHasSize } from '../../lib/naming';
 import { lookupBarcode, scanBarcode } from '../../lib/barcode';
 import {
@@ -8,26 +8,28 @@ import {
   allCategories,
   allGroups,
   allListEntries,
+  checkEntriesOp,
   deleteListEntries,
   findProductByBarcode,
   getSettings,
   groupProductIds,
   nowIso,
+  runOps,
   uid,
   updateListEntry,
   updateSettings,
+  cachedSettings,
 } from '../../lib/db';
 import { buzz } from '../../lib/listActions';
 import { loadRecommendations } from '../../lib/recs';
 import { lineCost, type Option } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
-import { cheaperThan, recommendedStores, shopTotals, type ShopTotals } from '../../lib/shopTotals';
+import { aroundPlan, cheaperThan, recommendedStores, shopTotals, type ShopTotals } from '../../lib/shopTotals';
 import { entryRows, undoable } from '../../lib/undo';
 import { money, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
 import { chainName, secondBranch, stockAtBranch, type Category, type Chain, type ListEntry, type LoyaltyCard } from '../../types';
-import { cachedSettings } from '../../lib/db';
 import {
   ChainDot,
   ChainName,
@@ -39,7 +41,6 @@ import {
   ProductPreview,
   SelectBar,
   Sheet,
-  ShopTotalsCard,
   stockWhere,
   Thumb,
   useBackLayer,
@@ -49,6 +50,7 @@ import { SendToShopSheet } from './SendToShop';
 import { useNav } from '../nav';
 import { activeSections, enabledIn, SECTION_NAMES, SECTION_PLACE, searchChainsIn, type Section, type StoreChain } from '../../shops';
 import { CardBarcode, PROGRAMS } from './Cards';
+import { ShopTotalsCard } from '../shopTotalsCard';
 
 type ShopKey = Chain | 'any';
 
@@ -176,27 +178,37 @@ export function ListScreen() {
   const [shopping, setShopping] = useState<StoreChain[]>();
   const [skipToday, setSkipToday] = useState<Set<string>>(new Set());
   const [preview, setPreview] = useState<ListEntry>();
+  // Shops opened on the list (0.9.0): each starts folded down to one line.
+  const [openShops, setOpenShops] = useState<Set<ShopKey>>(new Set());
 
   const full = useFullRefresh();
-  if (!allEntries || !allRecs || !allCats || !settings) return <div className="screen" />;
-  // One list per tab (Pantry, Keg, Pharmacy), each with its own shops.
-  const sectionsOn = activeSections(settings);
-  const section: Section = sectionsOn.includes(picked0) ? picked0 : 'pantry';
-  const groupSection = new Map(allRecs.map((r) => [r.group.id, r.group.section ?? 'pantry']));
-  const entries = allEntries.filter((e) => entrySection(e, groupSection) === section);
-  const recs = allRecs.filter((r) => (r.group.section ?? 'pantry') === section);
+  // 0.9.0: the list's totals are worked out again only when the list, the prices or the settings
+  // change, not on every keystroke in "Add anything" (each one goes through every item and shop).
+  const sums = useMemo(() => {
+    if (!allEntries || !allRecs || !settings) return undefined;
+    // One list per tab (Pantry, Keg, Pharmacy), each with its own shops.
+    const sectionsOn = activeSections(settings);
+    const section: Section = sectionsOn.includes(picked0) ? picked0 : 'pantry';
+    const groupSection = new Map(allRecs.map((r) => [r.group.id, r.group.section ?? 'pantry']));
+    const entries = allEntries.filter((e) => entrySection(e, groupSection) === section);
+    const recs = allRecs.filter((r) => (r.group.section ?? 'pantry') === section);
+    const shops = searchChainsIn(settings.enabledChains, section);
+    // Store totals count what's still to buy; the per-row picks include ticked rows too, so
+    // a ticked item keeps its shop and price (and counts towards the trolley total).
+    const totals = shopTotals(entries, recs, shops, settings.listCompare);
+    const picks = shopTotals(
+      entries.map((e) => ({ ...e, checked: false })),
+      recs,
+      shops,
+      settings.listCompare,
+    );
+    const names = new Map(recs.map((r) => [r.group.id, r.group.name]));
+    return { sectionsOn, section, groupSection, entries, recs, shops, totals, picks, names };
+  }, [allEntries, allRecs, settings, picked0]);
+  if (!allEntries || !allRecs || !allCats || !settings || !sums) return <div className="screen" />;
+  const { sectionsOn, section, groupSection, entries, recs, shops, totals, picks, names } = sums;
   const categories = allCats.filter((x) => x.section === section);
-  const shops = searchChainsIn(settings.enabledChains, section);
   const openCount = (sec: Section) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;
-  // Store totals count what's still to buy; the per-row picks include ticked rows too, so
-  // a ticked item keeps its shop and price (and counts towards the trolley total).
-  const totals = shopTotals(entries, recs, shops, settings.listCompare);
-  const picks = shopTotals(
-    entries.map((e) => ({ ...e, checked: false })),
-    recs,
-    shops,
-    settings.listCompare,
-  );
   const order: ShopKey[] = [...shops, ...enabledIn(settings.enabledChains, section).filter((x) => !shops.includes(x)), 'other', 'any'];
   const c: Ctx = { totals: picks, recs, order, title: LIST_TITLE[section] };
 
@@ -273,8 +285,10 @@ export function ListScreen() {
 
   // A to Z by default (0.7.4), within each shop.
   const az = (a: ListEntry, b: ListEntry) => labelOf(a).localeCompare(labelOf(b), undefined, { sensitivity: 'base' });
-  const labelOf = (e: ListEntry) => recs.find((r) => r.group.id === e.groupId)?.group.name ?? e.text;
+  const labelOf = (e: ListEntry) => (e.groupId ? names.get(e.groupId) : undefined) ?? e.text;
   const open = entries.filter((e) => !e.checked).sort(az);
+  const shopsInList = c.order.filter((shop) => open.some((e) => shopOf(c, e) === shop));
+  const allOpen = shopsInList.length > 0 && shopsInList.every((x) => openShops.has(x));
   const done = entries.filter((e) => e.checked).sort(az);
   const total = open.reduce((s, e) => s + (priceOf(c, e) ?? 0), 0);
   const firstTime = !settings.seenHints.includes('list');
@@ -428,9 +442,15 @@ export function ListScreen() {
           </button>
         )}
         {entries.length > 0 && (
-          <button className="btn small" onClick={() => (selecting ? stopSelecting() : setSelecting(true))}>
-            {selecting ? 'Done' : 'Edit'}
-          </button>
+          selecting ? (
+            <button className="btn small primary" onClick={stopSelecting}>
+              Done
+            </button>
+          ) : (
+            <button className="icon-btn" aria-label="Edit" onClick={() => setSelecting(true)}>
+              <Icon name="pencil" size={18} />
+            </button>
+          )
         )}
       </div>
       {sectionsOn.length > 1 && (
@@ -445,7 +465,7 @@ export function ListScreen() {
       )}
       <span className="sub num" style={{ marginTop: sectionsOn.length > 1 ? 0 : -8 }}>
         {open.length} item{open.length === 1 ? '' : 's'}
-        {total > 0 ? ` · about ${money(total)}` : ''}
+        {total > 0 ? ` · about ${money(total)} at the till` : ''}
         {totals.linked > 0 ? ` · ${settings.listCompare === 'unit' ? 'best value' : 'lowest price'}` : ''}
       </span>
 
@@ -495,7 +515,7 @@ export function ListScreen() {
             <button key={r.group.id} role="listitem" className="row" onClick={() => void addFromPantry(r)}>
               <Thumb src={(r.best ?? r.options[0])?.product.imageUrl} />
               <span className="grow">
-                <span className="title clip" style={{ fontSize: 14 }}>
+                <span className="title clip" style={{ fontSize: 15 }}>
                   {r.group.name}
                 </span>
                 <span className="small clip">
@@ -537,22 +557,49 @@ export function ListScreen() {
 
       {view === 'all' && open.length > 0 && <div className="card flush">{open.map((e) => renderRow(e))}</div>}
 
+      {view === 'shop' && shopsInList.length > 1 && !selecting && (
+        <div className="list-head">
+          <span className="eyebrow" style={{ margin: 0 }}>
+            Your list by shop
+          </span>
+          <button className="linkish" onClick={() => setOpenShops(allOpen ? new Set() : new Set(shopsInList))}>
+            {allOpen ? 'Collapse all' : 'Expand all'} <span className={allOpen ? 'turn-up' : 'turn-down'}><Icon name="chevron" size={14} /></span>
+          </button>
+        </div>
+      )}
       {view === 'shop' &&
         c.order.map((shop) => {
           const items = open.filter((e) => shopOf(c, e) === shop);
           if (!items.length) return null;
           const sub = items.reduce((s, e) => s + (priceOf(c, e) ?? 0), 0);
+          // Folded down to one line until you open it (0.9.0); always open with one shop, or while selecting.
+          const isOpen = selecting || shopsInList.length === 1 || openShops.has(shop);
+          const toggle = () =>
+            setOpenShops((was) => {
+              const next = new Set(was);
+              if (next.has(shop)) next.delete(shop);
+              else next.add(shop);
+              return next;
+            });
           return (
             <div className="card flush" key={shop}>
-              <div
-                className="row"
-                style={{
-                  minHeight: 44,
-                  borderBottom: '1px solid var(--line-soft)',
-                }}
-              >
-                <span className="grow title">{shop === 'any' ? 'Any shop' : <ChainName chain={shop} />}</span>
-                <span className="num small">{sub > 0 ? money(sub) : ''}</span>
+              <div className={`row shop-head${isOpen ? ' open' : ''}`}>
+                {shopsInList.length > 1 && !selecting ? (
+                  <button className="grow shop-head-main" onClick={toggle} aria-expanded={isOpen}>
+                    <span className="title">{shop === 'any' ? 'Any shop' : <ChainName chain={shop} />}</span>
+                    <span className="small">
+                      {items.length} item{items.length === 1 ? '' : 's'}
+                    </span>
+                  </button>
+                ) : (
+                  <span className="grow shop-head-main">
+                    <span className="title">{shop === 'any' ? 'Any shop' : <ChainName chain={shop} />}</span>
+                    <span className="small">
+                      {items.length} item{items.length === 1 ? '' : 's'}
+                    </span>
+                  </span>
+                )}
+                <span className="num price-col">{sub > 0 ? money(sub) : ''}</span>
                 {(shop === 'woolworths' || shop === 'coles') && (
                   <button
                     className="icon-btn"
@@ -563,19 +610,32 @@ export function ListScreen() {
                     <Icon name="cartPlus" size={16} />
                   </button>
                 )}
-                <button
-                  className="icon-btn"
-                  style={{ width: 36, height: 36 }}
-                  aria-label={`Share the ${shop === 'any' ? 'any shop' : chainName(shop)} list as text`}
-                  onClick={async () => {
-                    const how = await shareText(listAsText(c, open, shop));
-                    nav.toast(how === 'shared' ? 'Shared' : 'Copied, ready to paste');
-                  }}
-                >
-                  <Icon name="share" size={16} />
-                </button>
+                {isOpen && (
+                  <button
+                    className="icon-btn"
+                    style={{ width: 36, height: 36 }}
+                    aria-label={`Share the ${shop === 'any' ? 'any shop' : chainName(shop)} list as text`}
+                    onClick={async () => {
+                      const how = await shareText(listAsText(c, open, shop));
+                      nav.toast(how === 'shared' ? 'Shared' : 'Copied, ready to paste');
+                    }}
+                  >
+                    <Icon name="share" size={16} />
+                  </button>
+                )}
+                {shopsInList.length > 1 && !selecting && (
+                  <button
+                    className="icon-btn"
+                    style={{ width: 36, height: 36 }}
+                    aria-label={`${isOpen ? 'Fold' : 'Open'} ${shop === 'any' ? 'any shop' : chainName(shop)}`}
+                    aria-expanded={isOpen}
+                    onClick={toggle}
+                  >
+                    <span className={isOpen ? 'turn-up' : 'turn-down'}><Icon name="chevron" size={16} /></span>
+                  </button>
+                )}
               </div>
-              {items.map((e) => renderRow(e))}
+              {isOpen && items.map((e) => renderRow(e))}
             </div>
           );
         })}
@@ -583,8 +643,7 @@ export function ListScreen() {
       {open.length > 0 && !selecting && (
         <ShopTotalsCard
           totals={totals}
-          by={settings.listCompare}
-          onShowLowest={() => void updateSettings({ listCompare: 'price' })}
+          min={settings.shopAroundMin ?? 1}
           onOpenItem={(groupId) => nav.push({ name: 'item', groupId })}
           onFindAt={(groupId, chain, query) =>
             nav.push({
@@ -627,8 +686,10 @@ export function ListScreen() {
             className="btn small"
             disabled={!picked.size}
             onClick={async () => {
-              for (const id of picked) await updateListEntry(id, { checked: true });
-              nav.toast(`${picked.size} marked as got`);
+              // 0.9.0: one write for all of them, so the list reloads once, not once per item.
+              const ids = [...picked];
+              await runOps([checkEntriesOp(ids)]);
+              nav.toast(`${ids.length} marked as got`);
               stopSelecting();
             }}
           >
@@ -730,7 +791,12 @@ export function ListScreen() {
           recs={recs}
           totals={totals}
           compare={settings.listCompare}
-          start={c.totals.around.chains}
+          min={settings.shopAroundMin ?? 1}
+          start={(() => {
+            // The recommendation on the list: one store when it wins, otherwise the shops shopping around uses.
+            const pick = aroundPlan(totals, totals.by, settings.shopAroundMin ?? 1).pick;
+            return pick === 'around' ? totals.around.chains : [pick.chain];
+          })()}
           onClose={() => setChoosingShops(false)}
           onStart={(chosen, skip) => {
             setChoosingShops(false);
@@ -816,7 +882,7 @@ function StockCheck({
             aria-label={`Skip ${name(e)} today`}
           />
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 14 }}>
+            <span className="title" style={{ fontSize: 15 }}>
               {name(e)}
             </span>
             <span className="small" style={{ color: n.kind === 'second' ? 'var(--green-ink)' : 'var(--amber-ink)' }}>
@@ -839,6 +905,7 @@ function PickShops({
   recs,
   totals,
   compare,
+  min,
   start,
   onClose,
   onStart,
@@ -848,6 +915,8 @@ function PickShops({
   recs: Recommendation[];
   totals: ShopTotals;
   compare: 'unit' | 'price';
+  /** Settings → Shopping list: what shopping around has to save. */
+  min: number;
   /** Ticked to begin with: the shops the list is split across now. */
   start: StoreChain[];
   onClose: () => void;
@@ -855,6 +924,9 @@ function PickShops({
 }) {
   const [skip, setSkip] = useState<Set<string>>(new Set());
   const recommended = recommendedStores(totals).recommended?.chain as StoreChain | undefined;
+  // RECOMMENDED only when one store wins over shopping around, as on the list (0.9.0).
+  const aroundPick = aroundPlan(totals, compare, min).pick;
+  const oneWins = aroundPick === 'around' ? undefined : (aroundPick.chain as StoreChain);
   const [chosen, setChosen] = useState<StoreChain[]>(start.length ? start.filter((x) => shops.includes(x)) : shops);
   const n = totals.linked;
   const plan = chosen.length ? shopTotals(entries, onlyAt(recs, chosen), chosen as never, compare) : undefined;
@@ -883,7 +955,12 @@ function PickShops({
               <ChainDot chain={x} />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <span className="title" style={{ fontSize: 15 }}>
-                  {chainName(x)} {x === recommended && <span className="badge">RECOMMENDED</span>}
+                  {chainName(x)}{' '}
+                  {x === oneWins ? (
+                    <span className="badge">RECOMMENDED</span>
+                  ) : (
+                    x === recommended && !oneWins && <span className="tag info">BEST ONE STORE</span>
+                  )}
                 </span>
                 {st && n > 0 && (
                   <span className="small">
@@ -1033,12 +1110,17 @@ function ShoppingMode({
     <div className="shopmode" role="dialog" aria-label="Shopping">
       <div className="shopmode-top">
         <div style={{ flex: 1 }}>
-          <div className="title" style={{ fontSize: 18 }}>
+          <div className="title" style={{ fontSize: 17 }}>
             Shopping
           </div>
           <div className="small num">
             In the trolley: <strong>{money(inTrolley)}</strong> · {left.length} to go
           </div>
+          {entries.length > 0 && (
+            <div className="shop-progress" aria-hidden>
+              <span style={{ width: `${Math.round(((entries.length - left.length) / entries.length) * 100)}%` }} />
+            </div>
+          )}
           {chosen.length < shops.length && (
             <button className="linkish small" style={{ padding: 0 }} onClick={onChangeShops}>
               At {chosen.map((x) => chainName(x)).join(', ')} · change
@@ -1101,7 +1183,7 @@ function ShoppingMode({
                         flexDirection: 'column',
                       }}
                     >
-                      <span className="title" style={{ fontSize: 18 }}>
+                      <span className="title" style={{ fontSize: 17 }}>
                         {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}
                         {name}
                       </span>
@@ -1121,7 +1203,7 @@ function ShoppingMode({
                       )}
                     </span>
                     {priceOf(c, e) !== undefined && (
-                      <span className="num" style={{ fontWeight: 700, fontSize: 16 }}>
+                      <span className="num" style={{ fontWeight: 700, fontSize: 17 }}>
                         {money(priceOf(c, e))}
                       </span>
                     )}
@@ -1172,7 +1254,7 @@ function ShoppingMode({
                     }}
                   />
                   <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <span className="title" style={{ fontSize: 18 }}>
+                    <span className="title" style={{ fontSize: 17 }}>
                       {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}
                       {name}
                     </span>

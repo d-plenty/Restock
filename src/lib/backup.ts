@@ -1,10 +1,26 @@
+import { sharedPrices, type SharedPrices } from './sharedPrices';
 import { RestockNative } from './sql/native';
-import { Capacitor } from '@capacitor/core';
 import { SECTIONS, shopDef, type Section } from '../shops';
 import type { Group, Product, Settings } from '../types';
-import { getSettings, pickSnapshot, restoreParts, restoreSnapshot, snapshot, updateSettings, type RestoreParts, type Snapshot } from './db';
+import {
+  getSettings,
+  mergeSettings,
+  pickSnapshot,
+  restoreParts,
+  restoreSnapshot,
+  snapshot,
+  updateSettings,
+  type RestoreParts,
+  type Snapshot,
+} from './db';
 import { genericName } from './naming';
-import { readPhoto, writePhoto } from './receiptFiles';
+import { isPhotoPath, readPhoto, writePhoto } from './receiptFiles';
+import { lockBackup } from './backupLock';
+import { localDay } from './verdict';
+import { base64ToText, textToBase64 } from './base64';
+import { shareTextFile } from './shareFile';
+
+export { shareTextFile };
 
 interface BackupFile {
   app: 'restock';
@@ -15,6 +31,8 @@ interface BackupFile {
   tables: Snapshot;
   /** Receipt photos (base64 JPEG) by their path in Restock's storage. Restock's own copies, not the phone's photos. */
   photos?: Record<string, string>;
+  /** Shared prices (0.9.0): products and their prices only, nothing about you (sharedPrices.ts). Ignored when restoring. */
+  sharedPrices?: SharedPrices;
 }
 
 export interface ExportParts extends RestoreParts {
@@ -22,6 +40,8 @@ export interface ExportParts extends RestoreParts {
   prices: boolean;
   /** Include the receipt photos Restock keeps (not the phone's own photos). */
   receiptPhotos?: boolean;
+  /** 0.9.0: lock the file with this password (backupLock.ts). */
+  password?: string;
 }
 
 export const EVERYTHING: ExportParts = {
@@ -61,9 +81,12 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
     app: 'restock',
     version: 2,
     exportedAt: new Date().toISOString(),
-    parts: picked,
-    tables: pickSnapshot(all, picked, { prices: parts.prices }),
+    parts: { ...picked, password: undefined },
+    tables: withoutSecrets(pickSnapshot(all, picked, { prices: parts.prices })),
   };
+  // With "Share prices" on (the default) and price history in the file. 0.9.0: made from what's in
+  // this file only (the tabs picked), not from everything on the phone.
+  if (parts.prices && (await getSettings()).sharePrices !== 'no') file.sharedPrices = sharedPrices(file.tables);
   if (parts.receipts && parts.receiptPhotos) {
     const photos: Record<string, string> = {};
     for (const r of file.tables.receipts ?? []) {
@@ -74,7 +97,21 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
     }
     if (Object.keys(photos).length) file.photos = photos;
   }
-  return JSON.stringify(file);
+  const json = JSON.stringify(file);
+  return parts.password ? lockBackup(json, parts.password) : json;
+}
+
+/** The automatic backups' password never goes into a backup (it would be in the file it locks). */
+function withoutSecrets(t: Snapshot): Snapshot {
+  return {
+    ...t,
+    kv: t.kv.map((k) => {
+      if (k.key !== 'settings' || !k.value || typeof k.value !== 'object') return k;
+      const v = k.value as { autoBackup?: { password?: string } };
+      if (!v.autoBackup?.password) return k;
+      return { key: k.key, value: { ...v, autoBackup: { ...v.autoBackup, password: undefined } } };
+    }),
+  };
 }
 
 /**
@@ -83,10 +120,7 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
  */
 export async function saveCopyInApp(path: string): Promise<string> {
   const json = await backupJson({ ...EVERYTHING, receiptPhotos: false });
-  const bytes = new TextEncoder().encode(json);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  await RestockNative.writeAppFile({ path, data: btoa(bin) });
+  await RestockNative.writeAppFile({ path, data: textToBase64(json) });
   return json;
 }
 
@@ -94,10 +128,7 @@ export async function saveCopyInApp(path: string): Promise<string> {
 export async function readCopyInApp(path: string): Promise<string | undefined> {
   try {
     const { data } = await RestockNative.readAppFile({ path });
-    const bin = atob(data);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return new TextDecoder().decode(bytes);
+    return base64ToText(data);
   } catch {
     return undefined;
   }
@@ -114,40 +145,13 @@ export async function exportBackup(parts: ExportParts = EVERYTHING): Promise<str
     parts.settings &&
     parts.prices &&
     parts.receipts !== false;
-  const name = `restock-backup-${new Date().toISOString().slice(0, 10)}${whole ? '' : '-part'}.json`;
+  // 0.9.0: named for the day on the phone's own calendar, not UTC's (an evening backup in
+  // Australia isn't yesterday's).
+  const name = `restock-backup-${localDay(new Date().toISOString())}${whole ? '' : '-part'}${parts.password ? '-locked' : ''}.json`;
 
-  if (Capacitor.isNativePlatform()) {
-    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
-    const { Share } = await import('@capacitor/share');
-    const written = await Filesystem.writeFile({ path: name, data: json, directory: Directory.Cache, encoding: Encoding.UTF8 });
-    await Share.share({ title: 'Restock backup', files: [written.uri] });
-  } else {
-    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  await shareTextFile(name, json, 'application/json', 'Restock backup');
   await updateSettings({ lastBackupAt: new Date().toISOString() });
   return name;
-}
-
-/** Hand a text file to the person: the share sheet on the phone, a download in a browser. */
-export async function shareTextFile(name: string, text: string, mime = 'application/json', title = name): Promise<void> {
-  if (Capacitor.isNativePlatform()) {
-    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
-    const { Share } = await import('@capacitor/share');
-    const written = await Filesystem.writeFile({ path: name, data: text, directory: Directory.Cache, encoding: Encoding.UTF8 });
-    await Share.share({ title, files: [written.uri] });
-  } else {
-    const url = URL.createObjectURL(new Blob([text], { type: mime }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
 }
 
 /**
@@ -239,9 +243,11 @@ export function readBackup(text: string): BackupSummary {
 
 /** Which tabs a backup has shops for: Groceries if it has settings, Keg and Pharmacy if they were on with a shop picked. */
 function shopTabsIn(snap: Snapshot): Section[] {
-  const st = snap.kv.find((k) => k.key === 'settings')?.value as Partial<Settings> | undefined;
-  if (!st) return [];
-  const chains = st.enabledChains ?? [];
+  const raw = snap.kv.find((k) => k.key === 'settings')?.value as Partial<Settings> | undefined;
+  if (!raw) return [];
+  // 0.9.0: checked first, so an odd backup can't stop the restore sheet opening.
+  const st = mergeSettings(raw, { strict: true });
+  const chains = st.enabledChains;
   const custom = st.customShops ?? [];
   const has = (sec: Section) =>
     chains.some((c) => (shopDef(c)?.section ?? custom.find((x) => x.id === c)?.section) === sec) || custom.some((x) => x.section === sec);
@@ -284,17 +290,18 @@ export function suggestRenames(groups: Group[], products: Product[]): BackupSumm
 export async function restoreBackup(
   summary: BackupSummary,
   parts: RestoreParts,
-  opts: { stayInSetup?: string; renames?: Map<string, string> } = {},
+  opts: { stayInSetup?: string; renames?: Map<string, string>; household?: boolean } = {},
 ): Promise<void> {
-  await restoreParts(summary.snapshot, parts, opts.renames);
+  // 0.9.0: `household` ("Restore for the household") adds the backup's cards rather than replacing them all (db.ts restoreParts).
+  await restoreParts(summary.snapshot, parts, opts.renames, { household: opts.household });
   if (parts.receipts) await restorePhotos(summary.photos);
   if (opts.stayInSetup) await updateSettings({ privacyAccepted: opts.stayInSetup });
 }
 
-/** Puts receipt photos from a backup back into Restock's storage. */
+/** Puts receipt photos from a backup back into Restock's storage (only at receipt photo paths, receiptPaths.ts). */
 async function restorePhotos(photos: Record<string, string> | undefined): Promise<void> {
   for (const [path, data] of Object.entries(photos ?? {})) {
-    if (/^receipts\/[\w-]+\.jpg$/.test(path)) await writePhoto(path, data).catch(() => undefined);
+    if (isPhotoPath(path) && typeof data === 'string') await writePhoto(path, data).catch(() => undefined);
   }
 }
 

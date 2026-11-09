@@ -107,7 +107,7 @@ export function SendToShopSheet({ chain, lines, onClose }: { chain: 'woolworths'
         {lines.map((l, i) => (
           <button key={l.name + i} className="row" onClick={() => open(i)}>
             <span className="grow">
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 {l.qty > 1 ? `${l.qty} × ` : ''}
                 {l.name}
               </span>

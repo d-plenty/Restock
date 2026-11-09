@@ -63,15 +63,17 @@ export interface RestockNativePlugin {
   writeAppFile(opts: { path: string; data: string }): Promise<void>;
   readAppFile(opts: { path: string }): Promise<{ data: string }>;
   deleteAppFile(opts: { path: string }): Promise<void>;
-  /** Download a file into Restock's private storage (the receipt reader), with downloadProgress events. */
-  downloadAppFile(opts: { url: string; path: string }): Promise<{ uri: string; bytes: number }>;
   appFileInfo(opts: { path: string }): Promise<{ uri: string; exists: boolean; bytes: number }>;
   deleteAppDir(opts: { path: string }): Promise<void>;
-  addListener(event: 'downloadProgress', fn: (e: { path: string; bytes: number; total: number }) => void): Promise<PluginListenerHandle>;
   /** How much space Restock's private files use, in bytes. */
   appFilesSize(opts: { dir: string }): Promise<{ bytes: number }>;
   /** Refresh the home screen widgets with the latest deals and list. */
   updateWidgets(opts: { data: string }): Promise<void>;
+  /**
+   * 0.9.0: copy text to the clipboard. sensitive (the recovery key): Android 13 and later doesn't
+   * show it in the "Copied" preview, and keyboards leave it out of their clipboard history.
+   */
+  copyText(opts: { text: string; sensitive?: boolean }): Promise<void>;
   // ---------- 0.8.0: phone-to-phone sync (SyncHub.java) ----------
   syncInfo(): Promise<SyncInfo>;
   /** Starts (or reuses) the household; the code to show as a QR code. */
@@ -85,6 +87,14 @@ export interface RestockNativePlugin {
   syncHandOver(opts: { device: string }): Promise<SyncInfo>;
   /** Owner: never mind, stay the owner. */
   syncCancelHandOver(): Promise<SyncInfo>;
+  /** 0.9.0, owner: the recovery key ("ABCD-EFGH-…"), after the phone's screen lock if it has one. */
+  syncRecovery(): Promise<{ key: string }>;
+  /** 0.9.0, owner: the recovery key was saved; or fresh: make a new one. */
+  syncRecoverySaved(opts: { fresh?: boolean; key?: string }): Promise<SyncInfo>;
+  /** 0.9.0: take over as owner with the recovery key (the owner phone was lost). */
+  syncTakeOver(opts: { key: string }): Promise<SyncInfo>;
+  /** 0.9.0: sync through a picked folder (its uri), or stop (no uri). */
+  syncSetFolder(opts: { uri?: string }): Promise<SyncInfo>;
   /** The search test with the screen off (0.8.6): a notification with progress and a Stop button. */
   searchTestStart(opts: { total: number }): Promise<void>;
   searchTestProgress(opts: { done: number; total: number; text: string }): Promise<{ stop: boolean }>;
@@ -153,6 +163,20 @@ export interface SyncInfo {
   tabs?: Section[];
   /** Owner: the phone it asked to take over, until that phone does. */
   handoverTo?: string | null;
+  /** 0.9.0, owner: there's a recovery key, and whether it's been saved. */
+  hasRecovery?: boolean;
+  recoverySaved?: boolean;
+  /** 0.9.0, other phones: the household has a recovery key, so this phone could take over with it. */
+  canRecover?: boolean;
+  /** 0.9.0: the folder the household syncs through, its name, the last sync through it and any problem. */
+  folder?: string | null;
+  folderName?: string | null;
+  folderAt?: string | null;
+  folderError?: string | null;
+  /** 0.9.0: other phones' files in the folder that couldn't be opened. */
+  folderUnread?: number;
+  /** 0.9.0: the name of a phone whose date looks well ahead (its changes would always win). */
+  clockWarning?: string | null;
 }
 
 /** Why Restock was opened: a share, an app icon shortcut, a widget or a notification. */

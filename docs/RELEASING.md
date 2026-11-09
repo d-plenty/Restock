@@ -40,7 +40,7 @@ tar czf ~/restock-signing-key-backup.tar.gz -C ~ .restock
 3. **Build:**
    ```bash
    npm run android:apk
-   cp android/app/build/outputs/apk/debug/app-debug.apk ~/restock-$(node -p "require('./package.json').version").apk
+   cp android/app/build/outputs/apk/release/app-release.apk ~/restock-$(node -p "require('./package.json').version").apk
    ```
 4. **Install it on your own phone over the last release** and give it a quick go. Installing over the top proves the signing key matches.
 5. **Commit and tag:**

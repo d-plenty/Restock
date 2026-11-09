@@ -157,7 +157,7 @@ export function ComingSoon() {
           <button key={s.id} className="row" onClick={() => nav.push({ name: 'soon', id: s.id })} aria-label={`${s.title}: more about it`}>
             <Icon name={s.icon} size={18} />
             <span className="grow">
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 {s.title}
               </span>
               <span className="small">{s.short}</span>

@@ -9,6 +9,7 @@ import { RestockNative } from './sql/native';
 import { intendedKind, normaliseQuery, scoreAll, weakShops } from './searchHelp';
 import { mark, scorecard } from './searchScore';
 import { PHONE_WORDS, SEARCH_WORDS } from './searchWords';
+import { localDay } from './verdict';
 
 // The search test on the phone (0.8.6): Settings → Troubleshooting → Diagnostics. Searches a list
 // of everyday words at your shops the way the app does (including the shops that only answer the
@@ -178,7 +179,7 @@ export const stopSearchTest = () => {
 export async function shareLastSearchTest(): Promise<boolean> {
   const f = await getKV<Record<string, unknown>>(LAST);
   if (!f) return false;
-  await shareTextFile(`restock-search-test-${String(f.at).slice(0, 10)}.json`, JSON.stringify(f), 'application/json', 'Restock search test');
+  await shareTextFile(`restock-search-test-${localDay(String(f.at))}.json`, JSON.stringify(f), 'application/json', 'Restock search test');
   return true;
 }
 

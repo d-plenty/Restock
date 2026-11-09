@@ -5,7 +5,8 @@ import { money } from '../lib/units';
 import { promoLabel } from '../stores/http';
 import { describe, multiText, VERDICT_LABEL, type ActionKind, type Option, type Recommendation } from '../lib/verdict';
 import { chainName, GOOD_SALE, GREAT_SALE, type Chain } from '../types';
-import { Icon, Sheet, stockWhere, SwapWhy } from './components';
+import { Icon, memberProgram, Sheet, stockWhere } from './components';
+import { SwapWhy } from './shopTotalsCard';
 
 // Every status tag can be tapped to say what it means for this product: why it's a small
 // saving, why it's the cheapest, what it was swapped for, how a multi-buy works.
@@ -121,7 +122,7 @@ function FakeWhy({ o }: { o: Option }) {
   const shops = shop.endsWith('s') ? `${shop}'` : `${shop}'s`;
   return (
     <div className="fake-why">
-      <div className="title" style={{ fontSize: 14 }}>
+      <div className="title" style={{ fontSize: 15 }}>
         Why "fake sale"?
       </div>
       {was !== undefined ? (
@@ -153,7 +154,7 @@ export function VerdictBody({ o }: { o: Option }) {
       {o.verdict.headline.toLowerCase() !== VERDICT_LABEL[o.verdict.kind].toLowerCase() && (
         <p style={{ margin: 0, fontWeight: 600 }}>{o.verdict.headline}</p>
       )}
-      <p className="small" style={{ fontSize: 14, margin: 0 }}>
+      <p className="small" style={{ fontSize: 15, margin: 0 }}>
         {describe(o)} at {chainName(o.product.chain)}. {o.verdict.detail}
       </p>
       <div className="stat-row">
@@ -173,7 +174,7 @@ export function VerdictBody({ o }: { o: Option }) {
       </div>
       <p className="small">The normal price comes from {basisText(o)}.</p>
       {o.verdict.kind === 'fake' && <FakeWhy o={o} />}
-      <div className="title" style={{ fontSize: 14 }}>
+      <div className="title" style={{ fontSize: 15 }}>
         What the labels mean
       </div>
       {LEGEND}
@@ -219,7 +220,7 @@ export function CheapestInfoTag({ o, options }: { o: Option; options: Option[] }
   const priced = options.filter((x) => x.price !== undefined).sort((a, b) => a.price! - b.price!);
   return (
     <InfoTag className="best" label="CHEAPEST" title="Why it's the cheapest">
-      <p className="small" style={{ fontSize: 14, margin: 0 }}>
+      <p className="small" style={{ fontSize: 15, margin: 0 }}>
         Of the stores with your picks, {chainName(o.product.chain)} is cheapest for you today
         {o.multi ? `, when you buy ${o.multi.n} (${multiText(o.multi)})` : ''}.
       </p>
@@ -227,7 +228,7 @@ export function CheapestInfoTag({ o, options }: { o: Option; options: Option[] }
         {priced.map((x) => (
           <div key={x.product.id} className={`row${x === o ? ' selected' : ''}`}>
             <span className="grow">
-              <span className="title" style={{ fontSize: 14 }}>
+              <span className="title" style={{ fontSize: 15 }}>
                 {chainName(x.product.chain)}
               </span>
               <span className="small">
@@ -256,11 +257,11 @@ export function MultiInfoTag({ o }: { o?: Option }) {
   if (!o?.multi) return null;
   const m = o.multi;
   return (
-    <InfoTag className="good" label={`${m.n} FOR $${m.total.toFixed(2)}`} title="Multi-buy deal">
+    <InfoTag className="good" label={`${m.n} FOR ${money(m.total)}`} title="Multi-buy deal">
       <p style={{ margin: 0 }}>
         {chainName(o.product.chain)} has {describe(o)} at <strong>{multiText(m)}</strong>: that's {money(o.price)} each when you buy {m.n}.
       </p>
-      <p className="small" style={{ fontSize: 14 }}>
+      <p className="small" style={{ fontSize: 15 }}>
         Buy just one and it's {money(o.shelfPrice)}. Restock judges the deal at {money(o.price)} each, and your shopping list only uses that price
         when you've got {m.n} or more on the list (tap + to add more).
       </p>
@@ -269,14 +270,13 @@ export function MultiInfoTag({ o }: { o?: Option }) {
 }
 
 export function MemberInfoTag({ chain, hasCard }: { chain: Chain; hasCard?: boolean }) {
-  const flybuys = chain === 'coles' || chain.startsWith('liquorland');
-  const everyday = chain === 'woolworths' || chain === 'bws';
-  const program = flybuys ? 'Flybuys' : everyday ? 'Everyday Rewards' : chain === 'danmurphys' ? "My Dan's" : 'membership';
-  const cls = flybuys ? 'flybuys' : everyday ? 'everyday' : 'normal';
+  // The same program names as MemberTag (0.9.0: one list, components.tsx memberProgram).
+  const { name, cls } = memberProgram(chain);
+  const program = name ?? 'membership';
   return (
     <InfoTag className={cls} label={program === 'membership' ? 'MEMBER PRICE' : `MEMBER PRICE · ${program.toUpperCase()}`} title="Member price">
       <p style={{ margin: 0 }}>This price is only for {program} members.</p>
-      <p className="small" style={{ fontSize: 14 }}>
+      <p className="small" style={{ fontSize: 15 }}>
         {hasCard === false
           ? `You haven't added a ${program} card, so Restock uses the normal price for you. Add your card under Loyalty cards on Home to count it.`
           : `Restock counts it because you've added your ${program} card. Remember to scan it at the checkout.`}
@@ -288,11 +288,11 @@ export function MemberInfoTag({ chain, hasCard }: { chain: Chain; hasCard?: bool
 export function StockInfoTag({ o, label }: { o: Option; label?: string }) {
   const where = stockWhere(o.product.chain);
   return (
-    <InfoTag className="fake" label={label ?? `OUT OF STOCK ${where.toUpperCase()}`} title={`Out of stock ${where}`}>
+    <InfoTag className="fake wrap" label={label ?? `OUT OF STOCK ${where.toUpperCase()}`} title={`Out of stock ${where}`}>
       <p style={{ margin: 0 }}>
         {chainName(o.product.chain)}'s website says {describe(o)} is out of stock {where === 'online' ? 'at its online store' : where}.
       </p>
-      <p className="small" style={{ fontSize: 14 }}>
+      <p className="small" style={{ fontSize: 15 }}>
         {where === 'online'
           ? "Online stock is checked at the shop's default online store, not your branch, so your local shop may still have it."
           : "This is Coles' own stock count for your store, from its website. It can be a little behind the shelf."}{' '}

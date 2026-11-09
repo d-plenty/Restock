@@ -2,19 +2,23 @@ import { SHOPS, type Section, type StoreChain } from '../shops';
 import type { Receipt, Settings } from '../types';
 import { allReceipts, deleteReceipts, getSettings } from './db';
 import { deletePhoto } from './receiptFiles';
+import { KEEP_MONTHS } from './settingsCheck';
 
 // Receipts: how long they're kept, and reading the shop, date and total off the words the reader
 // found. Reading is a best guess; everything can be corrected before saving.
 
-/** Keep for 1, 2, 3, 6 or 12 months, or forever (0). Counted from the day it was scanned. */
-export const KEEP_MONTHS = [1, 2, 3, 6, 12, 0];
-export const DEFAULT_KEEP = 3;
+/** Keep for 1, 2, 3, 6 or 12 months, or forever (0). Counted from the day it was scanned. (Listed in settingsCheck.ts.) */
+export { KEEP_MONTHS };
 export const keepLabel = (m: number) => (m === 0 ? 'Until I delete them' : m === 12 ? '12 months' : m === 1 ? '1 month' : `${m} months`);
 
 /** The day a receipt will be deleted, or undefined if it's kept (pinned, or keeping forever). */
 export function deleteOn(r: Pick<Receipt, 'scannedAt' | 'pinned'>, keepMonths: number): Date | undefined {
   if (r.pinned || !keepMonths) return undefined;
+  // 0.9.0: only one of the real choices. A nonsense keep time (a damaged setting, say -1) keeps
+  // the receipt rather than deleting it.
+  if (!KEEP_MONTHS.includes(keepMonths)) return undefined;
   const d = new Date(r.scannedAt);
+  if (Number.isNaN(d.getTime())) return undefined;
   const day = d.getDate();
   d.setMonth(d.getMonth() + keepMonths);
   // 31 March + 1 month is 1 May in JavaScript; keep it to the end of April.
@@ -33,7 +37,10 @@ export function expired(receipts: Receipt[], keepMonths: number, now = new Date(
 /** Deletes receipts past their keep time (pinned ones stay). Returns how many went. */
 export async function tidyReceipts(s?: Settings): Promise<number> {
   const settings = s ?? (await getSettings());
-  const gone = expired(await allReceipts(), settings.receipts.keepMonths);
+  // 0.9.0: nothing is deleted unless the keep time is one of the real choices.
+  const keep = settings.receipts?.keepMonths;
+  if (!KEEP_MONTHS.includes(keep) || keep === 0) return 0;
+  const gone = expired(await allReceipts(), keep);
   await removeReceipts(gone);
   return gone.length;
 }

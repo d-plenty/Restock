@@ -409,7 +409,7 @@ function MarketSetup({ settings }: { settings: Settings }) {
       </ul>
       <label className="check" style={{ padding: 0 }}>
         <input
-          type="checkbox"
+          type="checkbox" className="switch"
           checked={settings.marketData.enabled}
           onChange={(e) => updateSettings({ marketData: { ...settings.marketData, enabled: e.target.checked } })}
           aria-label="Download shared price history"
@@ -420,7 +420,7 @@ function MarketSetup({ settings }: { settings: Settings }) {
       </label>
       <label className="check" style={{ padding: 0 }}>
         <input
-          type="checkbox"
+          type="checkbox" className="switch"
           checked={settings.marketData.wifiOnly}
           onChange={(e) => updateSettings({ marketData: { ...settings.marketData, wifiOnly: e.target.checked } })}
         />
@@ -473,7 +473,7 @@ function SyncTile() {
       <div className="row">
         <Icon name="refresh" size={18} />
         <span className="grow">
-          <span className="title" style={{ fontSize: 14 }}>
+          <span className="title" style={{ fontSize: 15 }}>
             Hosted sync
           </span>
           <span className="small">

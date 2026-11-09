@@ -19,8 +19,10 @@ let listening = false;
 
 // ---------- colour maths ----------
 
-const hex = (h: string) => {
-  const m = h.replace('#', '').match(/^([0-9a-f]{6})$/i);
+// 0.9.0: anything that isn't a "#rrggbb" colour (a number, nothing, a damaged setting) is the
+// default Australian green, never an error.
+const hex = (h: unknown) => {
+  const m = typeof h === 'string' ? h.replace('#', '').match(/^([0-9a-f]{6})$/i) : null;
   const n = m ? parseInt(m[1], 16) : 0x00843d;
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 };
@@ -84,7 +86,8 @@ function paint() {
   root.dataset.style = look.style;
   const dark = isDark(theme);
   // True black (0.8.9): only while dark, so "System" still goes light in the day.
-  const black = dark && !!look.black;
+  // On unless turned off (0.9.0: true black is the default).
+  const black = dark && look.black !== false;
   if (black) root.dataset.black = '1';
   else delete root.dataset.black;
   for (const k of ACCENT_KEYS) root.style.removeProperty(k);

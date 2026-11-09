@@ -53,7 +53,8 @@ import {
   weakShops,
   type Scored,
 } from '../../lib/searchHelp';
-import { money, packSize, tidySize } from '../../lib/units';
+import { money, packSize, parseMoney, tidySize } from '../../lib/units';
+import { localDay } from '../../lib/verdict';
 import { useLive } from '../../lib/useLive';
 import { adapterFor, type StoreProduct } from '../../stores';
 import { shopDetails } from '../../stores/details';
@@ -492,7 +493,8 @@ export function AddScreen({
       instead: alt ? { kind: alt.kind, results: alt.items.slice(0, 60).map(slim) } : undefined,
     };
     await shareTextFile(
-      `restock-wrong-results-${chain}-${new Date().toISOString().slice(0, 10)}.json`,
+      // Today on the phone's calendar (0.9.0), not UTC's.
+      `restock-wrong-results-${chain}-${localDay(new Date().toISOString())}.json`,
       JSON.stringify(file, null, 1),
       'application/json',
       'Restock wrong results',
@@ -1173,7 +1175,7 @@ export function AddScreen({
                   <span className="small" style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
                     <ChainDot chain={sp.chain} /> {chainName(sp.chain)}
                   </span>
-                  <span className="title" style={{ fontSize: 14 }}>
+                  <span className="title" style={{ fontSize: 15 }}>
                     {sp.name}
                   </span>
                   {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
@@ -1222,7 +1224,7 @@ export function AddScreen({
                       />
                       <MoreInfo src={sp.imageUrl ?? photoFor(sp)} name={sp.name} onOpen={() => setPreview(sp)} />
                       <span className="grow">
-                        <span className="title" style={{ fontSize: 14 }}>
+                        <span className="title" style={{ fontSize: 15 }}>
                           {sp.name}
                         </span>
                         {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
@@ -1261,7 +1263,7 @@ export function AddScreen({
                 <MoreInfo src={c.sp.imageUrl ?? photoFor(c.sp)} name={c.sp.name} onOpen={() => setPreview(c.sp)} />
                 <button className="row-main" style={{ color: 'inherit', font: 'inherit' }} onClick={() => choose(c)} aria-label={`It's ${c.sp.name}`}>
                   <span className="grow" style={{ textAlign: 'left' }}>
-                    <span className="title" style={{ fontSize: 14 }}>
+                    <span className="title" style={{ fontSize: 15 }}>
                       {c.sp.name}
                     </span>
                     <span className="small">
@@ -1325,7 +1327,7 @@ export function AddScreen({
                           />
                           <MoreInfo src={sp.imageUrl ?? photoFor(sp)} name={sp.name} onOpen={() => setPreview(sp)} />
                           <span className="grow">
-                            <span className="title" style={{ fontSize: 14 }}>
+                            <span className="title" style={{ fontSize: 15 }}>
                               {sp.name}
                             </span>
                             {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
@@ -1509,7 +1511,7 @@ export function AddScreen({
                               </span>
                             </button>
                             <span className="grow">
-                              <span className="title" style={{ fontSize: 14 }}>
+                              <span className="title" style={{ fontSize: 15 }}>
                                 {sp.name}
                               </span>
                               {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
@@ -1608,7 +1610,7 @@ export function AddScreen({
         </div>
       )}
 
-      <button className="btn ghost" onClick={() => setManual(true)}>
+      <button className="btn add" onClick={() => setManual(true)}>
         Can't find it? Add it by hand
       </button>
 
@@ -1709,9 +1711,9 @@ export function AddScreen({
                 </div>
               </details>
               <label className="check" style={{ padding: '4px 2px' }}>
-                <input type="checkbox" checked={allowBulk} onChange={(e) => setAllowBulk(e.target.checked)} />
+                <input type="checkbox" className="switch" checked={allowBulk} onChange={(e) => setAllowBulk(e.target.checked)} />
                 <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <span className="title" style={{ fontSize: 14 }}>
+                  <span className="title" style={{ fontSize: 15 }}>
                     Swap for bulk packs to save money
                   </span>
                   <span className="small">
@@ -1721,9 +1723,9 @@ export function AddScreen({
                 </span>
               </label>
               <label className="check" style={{ padding: '4px 2px' }}>
-                <input type="checkbox" checked={allowMulti} onChange={(e) => setAllowMulti(e.target.checked)} />
+                <input type="checkbox" className="switch" checked={allowMulti} onChange={(e) => setAllowMulti(e.target.checked)} />
                 <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <span className="title" style={{ fontSize: 14 }}>
+                  <span className="title" style={{ fontSize: 15 }}>
                     Multi-buy to save money
                   </span>
                   <span className="small">
@@ -1860,7 +1862,8 @@ function ManualSheet({
     }
     const id = uid();
     await addProduct({ id, chain, name: n, size: size || undefined, barcode: as === 'main' ? barcode : undefined, createdAt: nowIso() });
-    const p = parseFloat(price);
+    // "$4.50" works as well as "4.50" (0.9.0).
+    const p = parseMoney(price);
     if (p > 0) await addReading({ productId: id, date: nowIso(), price: p, isSpecial: special, memberOnly: false, source: 'manual' });
     if (attachTo) {
       if (as === 'alt') await updateGroup(attachTo.id, { altProductIds: [...attachTo.altProductIds, id] });
@@ -2010,7 +2013,7 @@ function Stocktake({ section, onClose }: { section: Section; onClose: () => void
           {lines.map((l, i) => (
             <div key={`${l.code}-${i}`} className="row">
               <span className="grow">
-                <span className="title" style={{ fontSize: 14 }}>
+                <span className="title" style={{ fontSize: 15 }}>
                   {l.name}
                 </span>
                 <span className="small">
