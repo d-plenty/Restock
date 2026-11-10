@@ -11,7 +11,7 @@ async function freshDb() {
 
 describe('sync change log (0.8.0)', () => {
   it('is the newest migration', () => {
-    expect(SYNC_VERSION).toBe(MIGRATIONS.length - 7);
+    expect(SYNC_VERSION).toBe(MIGRATIONS.length - 8);
   });
 
   it('notes adds, edits and deletes, and seeds what was already there', async () => {
@@ -65,7 +65,7 @@ describe('sync change log (0.8.0)', () => {
   it('0.9.1: notes receipts; an edit keeps when it was made, a delete then a new one makes it again', async () => {
     const d = await freshDb();
     // A phone on 0.9.0 with a receipt already kept.
-    const before = MIGRATIONS.length - 2;
+    const before = MIGRATIONS.length - 3;
     for (let v = 0; v < before; v++) for (const sql of MIGRATIONS[v]) await d.run(sql);
     await d.run(`PRAGMA user_version = ${before}`);
     await d.run(`INSERT INTO receipts (id, scanned_at, section) VALUES ('old', 'x', 'pantry')`);
@@ -89,5 +89,45 @@ describe('sync change log (0.8.0)', () => {
     const again = await row('old');
     expect(again.deleted).toBe(0);
     expect(again.created).toBeGreaterThan(edited.stamp);
+  });
+
+  it('0.9.4: notes who made each record, through edits and deletes; from before, only what nobody changed since', async () => {
+    const d = await freshDb();
+    // A phone on 0.9.3, with one record of its own nobody changed, and one another phone changed last.
+    const before = MIGRATIONS.length - 1;
+    for (let v = 0; v < before; v++) for (const sql of MIGRATIONS[v]) await d.run(sql);
+    await d.run(`PRAGMA user_version = ${before}`);
+    const me = (await d.query<{ value: string }>(`SELECT value FROM sync_meta WHERE key = 'device'`))[0].value;
+    await d.run(`INSERT INTO items (id, name, created_at) VALUES ('mine', 'Milk', 'x'), ('edited', 'Tea', 'x')`);
+    await d.run(`UPDATE sync_log SET device = 'other', stamp = stamp + 5 WHERE pk = 'edited'`);
+    await migrate(d);
+    type L = { origin: string | null; deleted: number };
+    const row = async (tbl: string, pk: string) => (await d.query<L>(`SELECT origin, deleted FROM sync_log WHERE tbl = ? AND pk = ?`, [tbl, pk]))[0];
+    expect((await row('items', 'mine')).origin).toBe(me);
+    expect((await row('items', 'edited')).origin).toBeNull();
+    // Made here: this phone; kept through an edit and a delete.
+    await d.run(`INSERT INTO items (id, name, created_at) VALUES ('new', 'Bread', 'x')`);
+    expect((await row('items', 'new')).origin).toBe(me);
+    await d.run(`INSERT INTO sync_meta (key, value) VALUES ('applying', '1')`);
+    await d.run(`INSERT INTO items (id, name, created_at) VALUES ('theirs', 'Eggs', 'x')`);
+    await d.run(`DELETE FROM sync_meta WHERE key = 'applying'`);
+    await d.run(`INSERT INTO sync_log (tbl, pk, stamp, device, deleted, seq, created, origin) VALUES ('items', 'theirs', 5, 'other', 0, 999, 5, 'other')`);
+    await d.run(`UPDATE items SET name = 'Free-range eggs' WHERE id = 'theirs'`);
+    expect((await row('items', 'theirs')).origin).toBe('other');
+    await d.run(`DELETE FROM items WHERE id = 'theirs'`);
+    expect(await row('items', 'theirs')).toEqual({ origin: 'other', deleted: 1 });
+    // Made again here after the delete: this phone's now.
+    await d.run(`INSERT INTO items (id, name, created_at) VALUES ('theirs', 'Eggs', 'x')`);
+    expect((await row('items', 'theirs')).origin).toBe(me);
+    // Receipts saved again (INSERT OR REPLACE) keep who made them; prices are this phone's.
+    await d.run(`INSERT INTO sync_meta (key, value) VALUES ('applying', '1')`);
+    await d.run(`INSERT INTO receipts (id, scanned_at, section) VALUES ('r1', 'x', 'pantry')`);
+    await d.run(`DELETE FROM sync_meta WHERE key = 'applying'`);
+    await d.run(`INSERT INTO sync_log (tbl, pk, stamp, device, deleted, seq, created, origin) VALUES ('receipts', 'r1', 5, 'other', 0, 1000, 5, 'other')`);
+    await d.run(`INSERT OR REPLACE INTO receipts (id, scanned_at, section, note) VALUES ('r1', 'x', 'pantry', 'milk run')`);
+    expect((await row('receipts', 'r1')).origin).toBe('other');
+    await d.run(`INSERT INTO products (id, chain, name, created_at) VALUES ('p1', 'coles', 'Milk 2L', 'x')`);
+    await d.run(`INSERT INTO prices (product_id, date, price, source) VALUES ('p1', '2026-11-01', 3.1, 'check')`);
+    expect((await row('prices', 'p1|2026-11-01')).origin).toBe(me);
   });
 });

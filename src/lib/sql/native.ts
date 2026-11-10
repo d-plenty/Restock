@@ -141,8 +141,12 @@ export interface RestockNativePlugin {
   syncNextcloudCancel(): Promise<void>;
   /** 0.9.2: join a Restock server with the code from its Add a phone page (restock-server:2?…). */
   syncJoinServer(opts: { code: string }): Promise<SyncInfo>;
-  /** 0.9.2: stop using the Restock server. bringBack: its receipt photos come back first (rejects if they can't). */
-  syncStopServer(opts: { bringBack?: boolean }): Promise<SyncInfo>;
+  /**
+   * 0.9.2: stop using the Restock server. bringBack: its receipt photos come back first (rejects if they can't).
+   * 0.9.4, a house: takeBack: those kinds come off the server first, as turning them off with "Also take
+   * what this phone shared off the server" ticked (only what this phone added; rejects if it can't reach it).
+   */
+  syncStopServer(opts: { bringBack?: boolean; takeBack?: TakeBack[] }): Promise<SyncInfo>;
   /** 0.9.2: a web page's code (restock-link:2 or restock-login:2), checked: what it asks for. */
   syncWebCode(opts: { code: string }): Promise<{ kind: 'link' | 'login'; host: string }>;
   /** 0.9.2: the person said yes: the household's server keys go to that browser, sealed to it. */
@@ -155,6 +159,40 @@ export interface RestockNativePlugin {
    * received: changes taken in, or -1 when it didn't look (no server, a round going, out of reach).
    */
   syncServerPoll(): Promise<{ received: number }>;
+  /** 0.9.4 (P4): one Home Assistant round, in Java (HaSync.java), and starting its pairing afresh. */
+  haRound(opts: { manual?: boolean }): Promise<import('../homeAssistant').HaRound>;
+  haResetPairing(): Promise<void>;
+  // ---------- 0.9.4: a v3 server's house (docs/server-v3-design.md) ----------
+  /** A scanned Add a phone code, checked, and what this phone is in now (only a health check is sent). */
+  syncCheckServer(opts: { code: string }): Promise<ServerCodeCheck>;
+  /**
+   * Joins a v3 server's house. how: "join" (not in a household), "bring" (this owner phone's household
+   * goes onto an empty server), "leave" (leave the household first, keeping everything, then join).
+   * Nothing is synced yet: the screen asks what this phone shares, then syncs.
+   */
+  syncJoinServer3(opts: {
+    code: string;
+    how: 'join' | 'bring' | 'leave';
+  }): Promise<
+    SyncInfo & {
+      label?: string | null;
+      houseName?: string | null;
+      /** bring: the server already has a house (nothing changed). */ notEmpty?: boolean;
+      message?: string;
+      /** leave: the household already lives on this server, so this phone connected as its member (it didn't leave). */
+      member?: boolean;
+    }
+  >;
+  /** Joins the server that's now the household's owner (its signed server row), without a code. */
+  syncJoinHouse(): Promise<SyncInfo>;
+  /** What this phone shares with its v3 server, and what it calls it. takeBack: also take those off the server. */
+  syncSetServer(opts: { label?: string; tabs?: Section[]; receipts?: boolean; cards?: boolean; takeBack?: TakeBack[] }): Promise<SyncInfo>;
+  /** Phone-to-phone sync on the Wi-Fi, on or off. */
+  syncSetWifi(opts: { on: boolean }): Promise<SyncInfo>;
+  /** The phone's server, asked what it is: { mode: "new" | "v2" | "v3" | "released", api, house }, or {} for a 0.9.3 server. */
+  syncServerHealth(): Promise<{ mode?: string; api?: number; house?: string }>;
+  /** Owner phone on a v2 server: hand the household to the server with its Take this household code. */
+  syncHandOverServer(opts: { code: string }): Promise<SyncInfo>;
   /** The search test with the screen off (0.8.6): a notification with progress and a Stop button. */
   searchTestStart(opts: { total: number }): Promise<void>;
   searchTestProgress(opts: { done: number; total: number; text: string }): Promise<{ stop: boolean }>;
@@ -176,7 +214,7 @@ export interface RestockNativePlugin {
     shareCards: boolean;
     tabs?: Section[];
   }): Promise<SyncInfo & { reached: number; received: number; settings?: string; ownerName?: string }>;
-  syncNow(): Promise<SyncInfo & { reached: number; received: number; sent: number }>;
+  syncNow(): Promise<SyncNowResult>;
   /** household: the household's name (owner only). */
   /** tabs: what this phone shares; householdTabs: what the household shares (owner only). */
   syncSet(opts: {
@@ -262,6 +300,60 @@ export interface SyncInfo {
   serverPrices?: number;
   serverPhotos?: number;
   serverWaiting?: number;
+  /** 0.9.4: 3 for a v3 server (the household's owner), 2 for a 0.9.3-style one, null without. */
+  serverApi?: 2 | 3 | null;
+  /** 0.9.4: the household is a server's house (its owner is the server). */
+  house?: boolean;
+  /** 0.9.4: what this phone calls its server ("Home"), and what the server calls this phone. */
+  serverLabel?: string | null;
+  serverMemberLabel?: string | null;
+  /** 0.9.4: the v2 server's mode as last asked ("v2": waiting for Hand this household to the server). */
+  serverMode?: string | null;
+  /** 0.9.4: when this owner phone handed the household over (until it reads the server's own change). */
+  serverHandover?: string | null;
+  /** 0.9.4: phone-to-phone sync on the Wi-Fi is on. */
+  wifiSync?: boolean;
+  /** 0.9.4: this phone's own choice of sharing receipts (the household's switch aside). */
+  shareReceiptsMine?: boolean;
+  /** 0.9.4: what this phone is taking back off the server. */
+  takeBack?: TakeBack[];
+  /** 0.9.4: the house's owner-signed server row: where it is, and Keep data for. */
+  serverRow?: { home: string; away: string | null; keepMonths: number | null };
+  /** 0.9.4: the household is now a server's house and this phone isn't on the server yet. */
+  serverOffer?: boolean;
+}
+
+/** 0.9.4: what can be taken back off the server when this phone stops sharing it. */
+export type TakeBack = 'keg' | 'pharmacy' | 'receipts' | 'cards';
+
+/** 0.9.4: what Sync now did (SyncHub.Summary). */
+export type SyncNowResult = SyncInfo & {
+  reached: number;
+  received: number;
+  sent: number;
+  /** Wi-Fi sync is on (only then is anything said about the Wi-Fi's phones). */
+  wifi?: boolean;
+  viaServer?: boolean;
+  viaFolder?: boolean;
+  names?: string[];
+};
+
+/** 0.9.4: a scanned Add a phone code, before joining (ServerSync.check). */
+export interface ServerCodeCheck {
+  v: 2 | 3;
+  home: string | null;
+  away: string | null;
+  /** v3, when the server answered: its mode, its house's name, and whether the house is new and empty. */
+  mode?: string;
+  house?: string;
+  empty?: boolean;
+  inHousehold: boolean;
+  isOwner?: boolean;
+  household?: string;
+  owner?: string;
+  members?: number;
+  /** The household is already this server's house (the code's key is the one in its server row). */
+  sameHouse?: boolean;
 }
 
 /** Why Restock was opened: a share, an app icon shortcut, a widget or a notification. */

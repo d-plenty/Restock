@@ -39,4 +39,11 @@ describe('the local copy of the household', () => {
     await st.persist(new Uint8Array([1, 2, 3]));
     expect(opened).toEqual([]);
   });
+
+  it('0.9.4, a house: a passphrase session keeps its copy per web id; one signed in with a phone keeps nothing', async () => {
+    const opened = fakeIdb();
+    await localCopyStore(session({ v: 3, webId: 'w3web', webPriv: '', webPub: '', sid: 's', sessionKey: 'k' })).persist(new Uint8Array([1]));
+    await localCopyStore(session({ v: 3, webId: 'w3web', webPriv: '', webPub: '', viaPhone: true })).persist(new Uint8Array([1]));
+    expect(opened).toEqual(['restock-server-w3web']);
+  });
 });

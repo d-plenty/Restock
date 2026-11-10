@@ -10,10 +10,17 @@ import { SECTION_NAMES, type Section } from '../../shops';
 import { Icon, ThemePicker, TopBar, timeAgo } from '../../ui/components';
 import { useNav, type Screen } from '../../ui/nav';
 import { PROGRAMS } from '../../ui/screens/Cards';
-import { api, type Activity, type Device } from '../api';
+import { api, isV3, serverInfo, type Activity, type Device } from '../api';
 import { deleteLocalCopy, downloadBackup, householdInfo, memberNames, onStatus, syncNow, syncStatus } from '../live';
 import { canChangeVault, inviteCode, session, signOut, signOutEverywhere, type Session } from '../session';
 import { PassphraseForm } from './Gate';
+import { ActivityLogs } from './DeskActivity';
+import { PassphraseV3, SignOutChoices } from './DeskHouseSettings';
+import { HandoverCard, ServerAndPhones } from './DeskServer';
+import { DeskSettings, Line } from './DeskSettings';
+import { DeskSpecials } from './DeskSpecials';
+import { ServerHomeAssistant } from './ServerHomeAssistant';
+import { peekStartOn } from './deskShared';
 import { AddOnServer, PhoneOnlyNote, PhoneOnlyScreen } from './PhoneOnly';
 import { Qr } from './Qr';
 
@@ -33,6 +40,11 @@ export function useNow(ms = 20_000) {
 export function ServerStrip() {
   const nav = useNav();
   const st = useStatus();
+  // Straight after Set up this server: Server and phones, with Add a phone open.
+  useEffect(() => {
+    if (peekStartOn() === 'add-phone') nav.push({ name: 'server', page: 'phones' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const now = useNow();
   const fresh = st.phoneAt ?? st.at;
   const line = st.error ? `Can't reach the server · ${st.error}` : fresh ? `Synced with your phones ${agoText(fresh, now)}` : st.busy ? 'Getting your household…' : 'Not synced yet';
@@ -41,7 +53,7 @@ export function ServerStrip() {
       <div className="strip-top">
         <span className="strip-name clip">{st.household ?? session()?.household ?? 'Your household'}</span>
         <nav className="strip-links" aria-label="Server">
-          <button onClick={() => nav.push({ name: 'server', page: 'phones' })}>Phones</button>
+          <button onClick={() => nav.push({ name: 'server', page: 'phones' })}>{isV3() ? 'Server' : 'Phones'}</button>
           <button onClick={() => nav.push({ name: 'server', page: 'activity' })}>Activity</button>
           <button onClick={() => nav.push({ name: 'server', page: 'account' })}>Account</button>
         </nav>
@@ -65,10 +77,15 @@ export function ServerTab() {
 export function serverScreen(top: Screen): ReactNode | undefined {
   switch (top.name) {
     case 'server':
+      if (isV3()) return top.page === 'phones' ? <ServerAndPhones narrow /> : top.page === 'activity' ? <ActivityLogs narrow /> : <AccountPage />;
       return top.page === 'phones' ? <PhonesPage /> : top.page === 'activity' ? <ActivityPage /> : <AccountPage />;
     case 'settings':
     case 'household':
-      return <ServerSettings />;
+      return isV3() ? <DeskSettings narrow /> : <ServerSettings />;
+    case 'homeAssistant':
+      return isV3() ? <ServerHomeAssistant narrow /> : undefined;
+    case 'specials':
+      return <DeskSpecials narrow />;
     case 'cards':
       return <ServerCards />;
     case 'add':
@@ -76,7 +93,7 @@ export function serverScreen(top: Screen): ReactNode | undefined {
     case 'stores':
       return <PhoneOnlyScreen title="Shops" />;
     case 'catalogues':
-      return <PhoneOnlyScreen title="Catalogues" />;
+      return <DeskSpecials narrow />;
     case 'sync':
       return <PhoneOnlyScreen title="Local sync" text="Do this on a phone: phones pair with each other on the Wi-Fi. Add phones to this server on the Phones page." />;
     case 'permissions':
@@ -239,6 +256,7 @@ function PhonesPage() {
         ))}
       </div>
       {error && <p className="banner red small">{error}</p>}
+      {serverInfo()?.api === 3 && serverInfo()?.mode === 'v2' && <HandoverCard />}
       <AddPhonePanel onAdded={() => void load()} />
     </div>
   );
@@ -356,6 +374,41 @@ export function AccountPage({ onSession }: { onSession?: (s: Session) => void })
   const [changing, setChanging] = useState(false);
   const [msg, setMsg] = useState<string>();
   const [busy, setBusy] = useState(false);
+  if (s?.v === 3)
+    return (
+      <div className="screen house-narrow">
+        <TopBar title="Account" />
+        <div className="card">
+          <span className="small">Signed in as</span>
+          <span className="title">{s.user}</span>
+          {s.viaPhone && <span className="small">With a phone: this tab can see the house for 12 hours, or until it's closed.</span>}
+        </div>
+        <div className="card flush dk-set-card">
+          {!s.viaPhone &&
+            (changing ? (
+              <PassphraseV3
+                onCancel={() => setChanging(false)}
+                onDone={(m) => {
+                  setChanging(false);
+                  setMsg(m);
+                }}
+              />
+            ) : (
+              <Line title="Passphrase" sub="Changing it signs every other browser out.">
+                <button className="btn small" onClick={() => setChanging(true)}>
+                  Change
+                </button>
+              </Line>
+            ))}
+          {msg && (
+            <p className="dk-set small" role="status">
+              {msg}
+            </p>
+          )}
+          <SignOutChoices Line={Line} />
+        </div>
+      </div>
+    );
   return (
     <div className="screen">
       <TopBar title="Account" />

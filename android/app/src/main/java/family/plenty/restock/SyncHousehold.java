@@ -256,7 +256,95 @@ final class SyncHousehold implements SyncEngine.Household {
     /** Entries only the owner changes. */
     static boolean ownerOnly(String pk) {
         return "name".equals(pk) || "owner".equals(pk) || "tabs".equals(pk) || "owner_pub".equals(pk) || "recovery".equals(pk) || "hid".equals(pk)
-            || "receipts".equals(pk) || pk.startsWith("removed:") || pk.startsWith("handover:");
+            || "receipts".equals(pk) || pk.startsWith("removed:") || pk.startsWith("handover:")
+            // 0.9.4: where the house's server is (docs/server-protocol.md "v3").
+            || "server".equals(pk);
+    }
+
+    /** 0.9.4: whether the household is a house: its owner is a Restock server (srv-<sid>). */
+    boolean isHouse() throws Exception {
+        String o = owner();
+        return o != null && o.startsWith("srv-");
+    }
+
+    /**
+     * 0.9.4: the owner-signed `server` row, checked (engine.ts parseServerRow): { v: 3, sid, home,
+     * away, kex, keepMonths }, or null when there's none or it isn't one.
+     */
+    JSONObject serverRow() throws Exception {
+        return parseServerRow(e.householdValue("server"));
+    }
+
+    static JSONObject parseServerRow(String v) {
+        if (v == null) return null;
+        try {
+            JSONObject m = new JSONObject(v);
+            if (m.optInt("v", 0) != 3 || !(m.opt("sid") instanceof String) || !(m.opt("home") instanceof String) || !(m.opt("kex") instanceof String)) return null;
+            JSONObject out = new JSONObject();
+            out.put("v", 3);
+            out.put("sid", m.getString("sid"));
+            out.put("home", m.getString("home"));
+            out.put("away", m.opt("away") instanceof String ? m.getString("away") : JSONObject.NULL);
+            out.put("kex", m.getString("kex"));
+            Object k = m.opt("keepMonths");
+            int km = k instanceof Number ? ((Number) k).intValue() : 0;
+            boolean ok = k instanceof Number && ((Number) k).doubleValue() == km && (km == 3 || km == 6 || km == 9 || km == 12);
+            out.put("keepMonths", ok ? (Object) km : JSONObject.NULL);
+            return out;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    /** 0.9.4: this phone's household signing key (my_priv) over `text`, base64url DER (a member join). */
+    String signMine(String text) throws Exception {
+        myPub();
+        return signWith(e.meta("my_priv"), text);
+    }
+
+    /**
+     * 0.9.4, owner: what the server needs to become the household's owner (docs/server-protocol.md
+     * "v3", RSH3): the household key and version, every serverKey, the owner key, the phones'
+     * secrets and this phone's own, the recovery key, the household's id and name.
+     */
+    JSONObject handoverPayload(JSONObject serverKeys) throws Exception {
+        if (!isOwner() || e.meta("owner_priv") == null) throw new IllegalStateException("Only the owner phone can hand the household to the server.");
+        ensureKeys();
+        JSONObject p = new JSONObject();
+        p.put("format", "restock-handover");
+        p.put("v", 3);
+        p.put("key", e.meta("key"));
+        p.put("keyv", keyv());
+        p.put("serverKeys", serverKeys);
+        if (e.meta("oldkey") != null && e.meta("oldkey_until") != null) {
+            p.put("oldkey", e.meta("oldkey"));
+            p.put("oldkey_until", e.meta("oldkey_until"));
+        }
+        p.put("owner_priv", e.meta("owner_priv"));
+        p.put("owner_pubkey", e.meta("owner_pubkey") != null ? e.meta("owner_pubkey") : e.householdValue("owner_pub"));
+        JSONObject s = secrets();
+        for (String d : keysOf(new JSONObject(s.toString()))) if (e.householdValue("member:" + d) == null) s.remove(d);
+        p.put("owner_secrets", s);
+        p.put("secret", e.meta("secret"));
+        if (e.meta("recovery") != null) {
+            p.put("recovery", e.meta("recovery"));
+            p.put("recovery_saved", recoverySaved());
+        }
+        p.put("hid", hid());
+        String name = e.householdValue("name");
+        p.put("name", name != null ? name : e.meta("household") != null ? e.meta("household") : "Our house");
+        return p;
+    }
+
+    /** 0.9.4: a month for "Keep data for" (a year's 365.25 days over 12), as engine.ts MONTH_MS. */
+    static final long MONTH_MS = 2_629_800_000L;
+
+    /** 0.9.4: keepCutoff (engine.ts): ms of now − keepMonths months, or -1 for none (Until I delete, or not a choice). */
+    static long keepCutoff(Object keepMonths, long now) {
+        if (!(keepMonths instanceof Number)) return -1;
+        int km = ((Number) keepMonths).intValue();
+        if (km != 3 && km != 6 && km != 9 && km != 12) return -1;
+        return now - km * MONTH_MS;
     }
 
     @Override
@@ -979,7 +1067,8 @@ final class SyncHousehold implements SyncEngine.Household {
     /** This phone's name changed: tell the household (its own member entry). */
     void rename(String name) throws Exception {
         e.setMeta("name", name);
-        if (paired() && e.householdValue("member:" + e.device()) != null) setRow("member:" + e.device(), member(name));
+        // 0.9.4: in a house the server names each phone (its label, renamed on the server's page).
+        if (paired() && !isHouse() && e.householdValue("member:" + e.device()) != null) setRow("member:" + e.device(), member(name));
     }
 
     /**
@@ -1011,13 +1100,18 @@ final class SyncHousehold implements SyncEngine.Household {
             // What the phone moved there (photo_off:…) and the keys that open it (server_filekeys)
             // stay, so the photos can still come back if it connects again.
             "server_dev_priv", "server_home", "server_away", "server_top", "server_keys", "server_at", "server_unread", "server_files", "server_webs",
-            "server_webkeys", "server_off_at", "server_off_prices", "server_off_waiting" })
+            "server_webkeys", "server_off_at", "server_off_prices", "server_off_waiting",
+            // 0.9.4: a v3 server (its kex key, this phone's for it, the label, what this phone shares with it).
+            "server_api", "server_kex", "server_kex_priv", "server_label", "server_sid", "server_keysfile", "share_receipts", "server_takeback",
+            "seed_settings", "wifi_sync", "server_handover", "server_mode", "server_member_label" })
             e.setMeta(k, null);
         e.db.transaction(() -> {
             e.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
             List<JSONObject> top = e.db.query("SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log");
             e.db.exec("DELETE FROM household");
             e.db.exec("DELETE FROM sync_log WHERE tbl = 'household'");
+            // 0.9.4 review: deletes held for tabs this phone didn't sync were that household's.
+            if (e.hasOrigin()) e.db.exec("DELETE FROM sync_held");
             // 0.9.3: the household's settings go too; this phone keeps its settings as they are now.
             // Its "Always use this for …" and "Keep it as just …" rows stay (they're about its own
             // items and lines, and go with them if it makes or joins another household).

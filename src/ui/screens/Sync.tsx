@@ -4,10 +4,23 @@ import { saveCopyInApp } from '../../lib/backup';
 import { confirmAction } from '../../lib/confirm';
 import { allGroups, allProducts, getSettings, reapplyHouseholdSettings, updateSettings } from '../../lib/db';
 import { CARRIED_TILES, householdSettingsFor } from '../../lib/household';
-import { SECTIONS, sectionOn, shopDef, type Section } from '../../shops';
+import { chainName, enabledIn, SECTIONS, sectionOn, shopDef, type Section } from '../../shops';
 import type { Settings } from '../../types';
-import { RestockNative } from '../../lib/sql/native';
-import { agoText, MAX_SYNC_PHONES, pairingCode, serverCode, serverCodeAddresses, strictBatteryMaker, syncAvailable, syncInfo, webPageCode, type SyncInfo } from '../../lib/sync';
+import { RestockNative, type TakeBack } from '../../lib/sql/native';
+import {
+  agoText,
+  MAX_SYNC_PHONES,
+  pairingCode,
+  serverCode,
+  serverCodeAddresses,
+  serverName,
+  strictBatteryMaker,
+  syncAvailable,
+  syncInfo,
+  syncNowMessage,
+  webPageCode,
+  type SyncInfo,
+} from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { syncBackgroundSchedule } from '../../lib/check';
 import { scheduleReminders } from '../../lib/notify';
@@ -1191,7 +1204,230 @@ export function serverSummary(info: SyncInfo | undefined): string {
   if (!info?.server) return 'Sync at home and away through a small server you run yourself, and use Restock in a browser';
   if (info.serverError) return info.serverError;
   const where = addressText(info.serverReached ?? info.serverHome ?? info.serverAway);
-  return [where, info.serverAt ? `synced ${agoText(info.serverAt)}` : 'connected'].filter(Boolean).join(' · ');
+  return [where, info.serverAt ? `synced ${agoText(info.serverAt)}` : 'connected', info.serverApi === 3 ? 'anywhere, around the clock' : ''].filter(Boolean).join(' · ');
+}
+
+// ---------- 0.9.4: adding a phone, and leaving the server (the "Restock sync redesign" canvas) ----------
+
+/**
+ * Add a phone: to the Restock server (on the server's page: the server decides who's in the house),
+ * or, with no server, a code on this Wi-Fi only. Opens InviteSheet for the Wi-Fi way.
+ */
+export function AddPhoneSheet({ info, onClose, onWifi }: { info: SyncInfo; onClose: () => void; onWifi: () => void }) {
+  const nav = useNav();
+  const house = !!info.house || info.serverApi === 3;
+  // Only the owner of a household without a server (or a phone not in one) shows a Wi-Fi code.
+  const wifiOk = !house && (!info.paired || !!info.isOwner);
+  const page = info.serverHome ?? info.serverRow?.home;
+  return (
+    <Sheet title="Add a phone" onClose={onClose}>
+      {info.server || house ? (
+        <div className="sync-choice recommended">
+          <span className="eyebrow green" style={{ margin: 0 }}>
+            To your Restock server
+          </span>
+          <strong style={{ fontSize: 17 }}>Add it on the server's page</strong>
+          <span className="small">
+            Your server decides who's in the house. On a computer, open the server's page, choose <strong>Add a phone</strong>, name it (like
+            "Sister's phone"), and scan the code with the new phone. Works anywhere, around the clock.
+          </span>
+          {page && (
+            <a href={page} target="_blank" rel="noreferrer" style={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>
+              Open the server's page
+            </a>
+          )}
+        </div>
+      ) : (
+        <button className="sync-choice" onClick={() => nav.push({ name: 'restockServer' })}>
+          <strong style={{ fontSize: 17 }}>Use your Restock server</strong>
+          <span className="small">Have a server at home? Join it first; then phones are added on its page, and sync at home and away.</span>
+        </button>
+      )}
+      {wifiOk ? (
+        <button className="sync-choice" disabled={!syncAvailable()} onClick={onWifi}>
+          <strong style={{ fontSize: 17 }}>On this Wi-Fi only</strong>
+          <span className="small">
+            No server. Phones swap changes straight to each other, only at home. Both phones need to be on this Wi-Fi now. This phone shows a code
+            for the other to scan.
+          </span>
+        </button>
+      ) : (
+        !house &&
+        info.paired && (
+          <p className="small" style={{ margin: 0 }}>
+            On this Wi-Fi only: the owner phone{info.members?.find((m) => m.owner) ? ` (${info.members.find((m) => m.owner)!.name})` : ''} shows the
+            code for a new phone.
+          </p>
+        )
+      )}
+      {house && (
+        <p className="small" style={{ margin: 0 }}>
+          Once a phone has joined the server, phones on your Wi-Fi can also swap changes straight to each other at home (Phones on your Wi-Fi).
+        </p>
+      )}
+      <button className="btn block" onClick={onClose}>
+        Cancel
+      </button>
+    </Sheet>
+  );
+}
+
+/**
+ * Leave the server's house: this phone stops syncing with it and keeps everything it has now.
+ * Nothing is deleted on the server (it shows this phone as Left).
+ */
+// ---------- 0.9.4: what stays on the server when a phone stops sharing something, or leaves ----------
+
+/** The personal things a phone can take back off a v3 server (never groceries). */
+export const PERSONAL: { kind: TakeBack; title: string }[] = [
+  { kind: 'keg', title: 'Keg' },
+  { kind: 'pharmacy', title: 'Pharmacy' },
+  { kind: 'receipts', title: 'Receipts' },
+  { kind: 'cards', title: 'Loyalty cards' },
+];
+
+/** The personal things this phone shares with its server now. */
+export function personalShared(info: SyncInfo | undefined): TakeBack[] {
+  const tabs = info?.tabs ?? info?.myTabs ?? [];
+  return PERSONAL.map((p) => p.kind).filter((k) => (k === 'receipts' ? !!info?.shareReceipts : k === 'cards' ? !!info?.shareCards : tabs.includes(k)));
+}
+
+/** "Coles, Woolworths and Aldi": a list in words. */
+const andList = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+
+/** The grocery shops this phone follows, by name ("Coles, Woolworths and Aldi"), or the general words. */
+export function shopsText(s: Settings | undefined): string {
+  const names = s ? [...new Set(enabledIn(s.enabledChains, 'pantry').map((c) => chainName(c)))] : [];
+  if (!names.length || names.length > 6) return 'Coles, Woolworths, Aldi and the others';
+  return andList(names);
+}
+
+/** Always said when a phone stops sharing something or leaves: shop data isn't personal, and it stays. */
+export function ShopDataStays() {
+  const settings = useLive(getSettings, []);
+  return (
+    <span className="small">
+      <strong style={{ color: 'var(--ink)' }}>Prices and product details</strong> your phone found at your shops ({shopsText(settings)}) stay on the server
+      for the household, with the shared shopping list and pantry. They're about the shops, not about you.
+    </span>
+  );
+}
+
+/** What a take-back tick removes, in words (TurnOffSheet and the Leave sheet). */
+export const TAKE_BACK_NOTE =
+  "Only what this phone added comes off the server and the house's other phones. Other people's things stay, and this phone keeps its own copy.";
+
+/**
+ * Leaves the server (0.9.4): the ticked personal kinds this phone shares come off the server first
+ * (only what it added), as turning each off with its box ticked; groceries never. Rejects (and the
+ * phone stays) if they can't be taken back or its photos can't come back.
+ */
+export function leaveServer(info: SyncInfo, ticked: TakeBack[], bringBack = true): Promise<SyncInfo> {
+  const offered = info.house || info.serverApi === 3 ? [...personalShared(info), ...(info.takeBack ?? [])] : [];
+  return RestockNative.syncStopServer({ bringBack, takeBack: ticked.filter((k) => offered.includes(k)) });
+}
+
+export function LeaveServerSheet({ info, onClose, onDone }: { info: SyncInfo; onClose: () => void; onDone: (i: SyncInfo) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const label = info.serverLabel?.trim() || 'the server';
+  // 0.9.4: the receipt photos this phone moved to the server come back first; if they can't (out of
+  // reach), it doesn't leave, and the person can try again or leave them there.
+  const [photosStuck, setPhotosStuck] = useState(false);
+  // 0.9.4: the personal things it shares, each with an unticked "take it back" box (as turning it off).
+  // Review fix: a kind ticked here stays offered (and ticked) after a try that couldn't reach the
+  // server, which already turned it off and is taking it back (info.takeBack), so trying again
+  // still takes it back first.
+  const [back, setBack] = useState<TakeBack[]>([]);
+  const shared = info.house || info.serverApi === 3 ? personalShared(info) : [];
+  const personal = [...shared, ...back.filter((k) => !shared.includes(k) && (info.takeBack ?? []).includes(k))];
+  const allTicked = personal.length > 0 && personal.every((k) => back.includes(k));
+  const flip = (k: TakeBack, on: boolean) => setBack((b) => (on ? [...new Set([...b, k])] : b.filter((x) => x !== k)));
+  const leave = async (bringBack = true, takeBack: TakeBack[] = back) => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      onDone(await leaveServer(info, takeBack, bringBack));
+    } catch (e) {
+      const m = errText(e);
+      setError(m);
+      setPhotosStuck(/receipt photos back/i.test(m));
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet title={`Leave ${label}?`} onClose={busy ? () => undefined : onClose}>
+      <p className="small" style={{ margin: 0, fontSize: 15 }}>
+        This phone stops syncing with the server and keeps everything it has now.
+      </p>
+      <div className="card" style={{ gap: 8 }}>
+        <ShopDataStays />
+        <span className="small">
+          {personal.length ? (
+            <>
+              <strong style={{ color: 'var(--ink)' }}>Your personal things stay too, unless you tick them below</strong>: what this phone shared of{' '}
+              {andList(PERSONAL.filter((p) => personal.includes(p.kind)).map((p) => (p.kind === 'cards' ? 'loyalty cards' : p.kind === 'receipts' ? 'receipts' : p.title)))}.
+            </>
+          ) : info.house || info.serverApi === 3 ? (
+            "This phone didn't share anything personal (Keg, Pharmacy, receipts or loyalty cards)."
+          ) : (
+            <>
+              <strong style={{ color: 'var(--ink)' }}>On the server, nothing is deleted.</strong> What this phone shared stays there for the house: prices,
+              history, receipts.
+            </>
+          )}
+        </span>
+        <span className="small">
+          The server's page shows this phone as <strong style={{ color: 'var(--ink)' }}>Left</strong>. To come back, scan a new code from the server's
+          page.
+        </span>
+        <span className="small">Ending the whole house, or removing someone else's phone, is done on the server's page.</span>
+      </div>
+      {personal.length > 0 && (
+        <div className="card flush">
+          <div className="section-head">
+            <span className="title">Also take these off the server</span>
+            <button className="linkish small" type="button" disabled={busy} onClick={() => setBack(allTicked ? [] : personal)}>
+              {allTicked ? 'Select none' : 'Select all'}
+            </button>
+          </div>
+          {PERSONAL.filter((p) => personal.includes(p.kind)).map((p) => (
+            <label key={p.kind} className="check">
+              <input type="checkbox" checked={back.includes(p.kind)} disabled={busy} onChange={(e) => flip(p.kind, e.target.checked)} />
+              <span className="title" style={{ fontSize: 15, flex: 1 }}>
+                {p.title}
+              </span>
+            </label>
+          ))}
+          <p className="small" style={{ margin: 0, padding: '0 16px 12px' }}>
+            {TAKE_BACK_NOTE}
+          </p>
+        </div>
+      )}
+      {error && (
+        <div className="banner amber" role="alert">
+          {error}
+        </div>
+      )}
+      <button className="btn block danger" disabled={busy} onClick={() => void leave()}>
+        {busy ? 'Leaving…' : back.some((k) => personal.includes(k)) ? `Take those back and leave ${label}` : `Leave ${label}`}
+      </button>
+      {photosStuck && !busy && (
+        <button className="btn block" onClick={() => void leave(false)}>
+          Leave without the photos (they stay on the server)
+        </button>
+      )}
+      {/Couldn't take those things off the server/i.test(error ?? '') && !busy && (
+        <button className="btn block" onClick={() => void leave(true, [])}>
+          Leave without taking them back (they stay on the server)
+        </button>
+      )}
+      {busy && <LoadingBar seconds={6} />}
+      <button className="btn block" disabled={busy} onClick={onClose}>
+        Cancel
+      </button>
+    </Sheet>
+  );
 }
 
 export function SyncScreen({ invite }: { invite?: boolean } = {}) {
@@ -1209,6 +1445,9 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
   const [choosing, setChoosing] = useState(false);
   const [awayError, setAwayError] = useState<string>();
   const [, tick] = useState(0);
+  // 0.9.4: Add a phone (server or Wi-Fi), and leaving the server's house.
+  const [adding, setAdding] = useState(false);
+  const [leavingServer, setLeavingServer] = useState(false);
 
   const refresh = () => void syncInfo().then(setInfo);
   useEffect(() => {
@@ -1234,13 +1473,8 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
     try {
       const r = await RestockNative.syncNow();
       setInfo(r);
-      nav.toast(
-        r.reached
-          ? `Synced with ${r.reached === 1 ? (r.peers?.[0]?.name ?? 'the other phone') : `${r.reached} phones`}${r.received ? `: ${r.received} change${r.received === 1 ? '' : 's'} came in` : ''}`
-          : r.server && !r.serverError && r.serverAt && Date.now() - Date.parse(r.serverAt) < 120_000
-            ? `Synced through your Restock server${r.received ? `: ${r.received} change${r.received === 1 ? '' : 's'} came in` : ''}`
-            : (r.serverError ?? r.lastError ?? "Couldn't find the other phone."),
-      );
+      // 0.9.4: what it did, and never about the Wi-Fi's phones unless Wi-Fi sync is on.
+      nav.toast(syncNowMessage(r));
     } finally {
       setBusy(false);
     }
@@ -1262,6 +1496,8 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
   };
 
   const leave = async () => {
+    // 0.9.4: in a server's house, leaving is leaving the server (nothing is deleted there).
+    if (info?.house || info?.serverApi === 3) return setLeavingServer(true);
     const others = (info?.members ?? []).filter((m) => !m.me);
     if (info?.isOwner && others.length) {
       await confirmAction('Make another phone the owner first', {
@@ -1377,11 +1613,11 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
       )}
 
       <div className="card" style={{ gap: 8 }}>
-        <strong>Local sync: one pantry and list for the whole house</strong>
+        <strong>Phones on your Wi-Fi: one pantry and list for the whole house</strong>
         <span className="small">
-          Phones in your household sync <strong>straight from one phone to another</strong> on your own Wi-Fi: pantry, shopping list (ticks too),
-          prices, categories and alerts. Away from home, they can also sync through your Nextcloud, another WebDAV server, a folder you choose, or a
-          Restock server you run yourself.
+          Phones in your household swap changes <strong>straight from one phone to another</strong> on your own Wi-Fi: pantry, shopping list (ticks
+          too), prices, categories and alerts. With your own Restock server they also sync anywhere, around the clock; without one, a cloud drive
+          folder works away from home.
         </span>
         <ul className="ticks">
           <li>
@@ -1391,18 +1627,14 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
           <li>
             <Icon name="check" size={16} />
             <span>
-              On your Wi-Fi it never goes over the internet. Away from home, it's sealed so only your phones can read it, wherever it's kept. The
-              makers of Restock never see it.
+              On your Wi-Fi it never goes over the internet. Away from home, it's sealed on the way, wherever it's kept. The makers of Restock never
+              see it.
             </span>
           </li>
           <li>
             <Icon name="check" size={16} />
-            <span>Encrypted with a key only your phones have.</span>
-          </li>
-          <li>
-            <Icon name="check" size={16} />
             <span>
-              Up to {MAX_SYNC_PHONES} phones. Each keeps its own look, backups and shop sign-ins, and its receipts unless the household shares them.
+              Up to {MAX_SYNC_PHONES} phones on the Wi-Fi. Each keeps its own look, backups and shop sign-ins, and its receipts unless it shares them.
             </span>
           </li>
         </ul>
@@ -1410,6 +1642,16 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
 
       {info && !info.paired && (
         <div className="card flush">
+          <button className="row" disabled={!syncAvailable()} onClick={() => nav.push({ name: 'restockServer' })}>
+            <Icon name="server" size={18} />
+            <span className="grow">
+              <span className="title" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                Join your Restock server <span className="tag great">Recommended</span>
+              </span>
+              <span className="small">Your server is the house: phones join it, at home and away.</span>
+            </span>
+            <Icon name="chevron" size={18} />
+          </button>
           <button className="row" disabled={!syncAvailable()} onClick={() => setInviting(true)}>
             <Icon name="plus" size={18} />
             <span className="grow">
@@ -1426,15 +1668,10 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
             </span>
             <Icon name="chevron" size={18} />
           </button>
-          <button className="row" disabled={!syncAvailable()} onClick={() => nav.push({ name: 'restockServer' })}>
-            <Icon name="refresh" size={18} />
-            <span className="grow">
-              <span className="title">Use a Restock server</span>
-              <span className="small">Run your own? Connect starts the household for you.</span>
-            </span>
-            <Icon name="chevron" size={18} />
-          </button>
         </div>
+      )}
+      {info && !info.paired && (
+        <p className="small group-note">A cloud drive folder (for phones away from home without a server) is set up here once this phone is in a household.</p>
       )}
 
       {info?.paired && (
@@ -1469,6 +1706,23 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                 <span className="small">This phone keeps everything. Nothing is deleted on the other phones.</span>
               </span>
             </button>
+          </div>
+
+          {/* 0.9.4: Wi-Fi sync can be off (a phone in a server's house starts with it off). */}
+          <div className="card flush">
+            <label className="check">
+              <input type="checkbox" className="switch" checked={info.wifiSync !== false} onChange={(e) => void RestockNative.syncSetWifi({ on: e.target.checked }).then(setInfo, (er) => nav.toast(errText(er)))} />
+              <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <span className="title" style={{ fontSize: 15 }}>
+                  Phones on your Wi-Fi
+                </span>
+                <span className="small">
+                  {info.wifiSync !== false
+                    ? 'On: swaps changes straight with the household\'s phones on this Wi-Fi, even when the internet is down.'
+                    : 'Off · turn on to also swap changes at home when the internet is down.'}
+                </span>
+              </span>
+            </label>
           </div>
 
           {info.clockWarning && (
@@ -1514,7 +1768,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
 
           <div className="eyebrow">The household's phones</div>
           <div className="card flush">
-            {(info.members ?? []).map((m) => {
+            {(info.members ?? []).filter((m) => !m.device.startsWith('srv-')).map((m) => {
               const canManage = info.isOwner && !m.me;
               const body = (
                 <>
@@ -1541,12 +1795,22 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                 </div>
               );
             })}
-            {info.isOwner && (info.members?.length ?? 1) >= MAX_SYNC_PHONES ? (
+            {info.house ? (
+              <button className="row" onClick={() => setAdding(true)}>
+                <Icon name="plus" size={18} />
+                <span className="grow">
+                  <span className="title" style={{ fontSize: 15, color: 'var(--green)' }}>
+                    Add a phone
+                  </span>
+                  <span className="small">In a server's house, phones are added and removed on the server's page.</span>
+                </span>
+              </button>
+            ) : info.isOwner && (info.members?.length ?? 1) >= MAX_SYNC_PHONES ? (
               <p className="small" style={{ padding: '4px 14px 12px', margin: 0 }}>
                 That's the most local sync allows ({MAX_SYNC_PHONES} phones). To add another, remove one first.
               </p>
             ) : info.isOwner ? (
-              <button className="row" onClick={() => setInviting(true)}>
+              <button className="row" onClick={() => (info.server ? setAdding(true) : setInviting(true))}>
                 <Icon name="plus" size={18} />
                 <span className="grow">
                   <span className="title" style={{ fontSize: 15, color: 'var(--green)' }}>
@@ -1594,9 +1858,11 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
             )}
           </div>
 
-          <div className="eyebrow">Sync away from home</div>
+          <div className="eyebrow">Cloud drive folder</div>
           <div className="card" style={{ gap: 8 }}>
-            {info.folder ? (
+            {info.house || info.serverApi === 3 ? (
+              <span className="small">Not used with your Restock server: the server already syncs away from home, and hands out new keys itself.</span>
+            ) : info.folder ? (
               <>
                 <span className="title" style={{ fontSize: 15 }}>
                   {awayTitle(info)}
@@ -1627,9 +1893,9 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
               </>
             ) : (
               <span className="small">
-                For phones away from home. Each phone leaves its changes in one place every phone in the household can reach, sealed with the
-                household's key, and picks up the others'. Your list, pantry and ticks go this way; prices and photos stay on the Wi-Fi to keep it
-                small.
+                For phones away from home, without a server: a folder your drive app keeps in step, like Google Drive, Dropbox, OneDrive, Syncthing or
+                Nextcloud, or a WebDAV server. Each phone leaves its changes there, sealed with the household's key, and picks up the others'. Your list,
+                pantry and ticks go this way; prices and photos stay on the Wi-Fi to keep it small. Slower, and depends on the drive app.
               </span>
             )}
             {awayError && (
@@ -1638,7 +1904,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
               </div>
             )}
           </div>
-          {(!info.folder || choosing) && <AwayChoices disabled={!syncAvailable() || busy} onPick={pickAway} />}
+          {(!info.folder || choosing) && !info.house && info.serverApi !== 3 && <AwayChoices disabled={!syncAvailable() || busy} onPick={pickAway} />}
 
           <div className="eyebrow">Restock server</div>
           <div className="card flush">
@@ -1653,6 +1919,21 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
           </div>
 
           <div className="eyebrow">What's shared</div>
+          {info.house || info.serverApi === 3 ? (
+            <div className="card flush">
+              <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
+                <Icon name="server" size={18} />
+                <span className="grow">
+                  <span className="title" style={{ fontSize: 15 }}>
+                    What this phone shares with {serverName(info)}
+                  </span>
+                  <span className="small">Groceries, Keg, Pharmacy, receipts and loyalty cards: each on or off for this phone.</span>
+                </span>
+                <Icon name="chevron" size={18} />
+              </button>
+            </div>
+          ) : (
+            <>
           {info.isOwner && (
             <>
               <span className="small">The household shares:</span>
@@ -1716,8 +1997,11 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
             What the other phones call this one, like "Declan's phone".
           </p>
 
+            </>
+          )}
+
           <div className="card flush">
-            <label className="check">
+            {!(info.house || info.serverApi === 3) && <label className="check">
               <input type="checkbox" className="switch" checked={!!info.shareCards} onChange={(e) => void set({ shareCards: e.target.checked })} />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <span className="title" style={{ fontSize: 15 }}>
@@ -1725,7 +2009,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                 </span>
                 <span className="small">Copies this phone's Flybuys and Everyday Rewards numbers to the household's other phones.</span>
               </span>
-            </label>
+            </label>}
             <label className="check">
               <input type="checkbox" className="switch" checked={info.keepReady !== false} onChange={(e) => void set({ keepReady: e.target.checked })} />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -1784,6 +2068,27 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
         </span>
       </div>
 
+      {adding && info && (
+        <AddPhoneSheet
+          info={info}
+          onClose={() => setAdding(false)}
+          onWifi={() => {
+            setAdding(false);
+            setInviting(true);
+          }}
+        />
+      )}
+      {leavingServer && info && (
+        <LeaveServerSheet
+          info={info}
+          onClose={() => setLeavingServer(false)}
+          onDone={(i) => {
+            setLeavingServer(false);
+            setInfo(i);
+            nav.toast('This phone has left the server');
+          }}
+        />
+      )}
       {inviting && info && (
         <InviteSheet
           info={info}
@@ -1869,7 +2174,8 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
 /** One line for Settings and the setup tile. */
 export function syncSummary(info: SyncInfo | undefined): string {
   if (!info) return '';
-  if (!info.paired) return info.notice === 'repair' ? 'Pair your phones again (0.8.2)' : 'Share one pantry and list between phones';
+  if (!info.paired) return info.notice === 'repair' ? 'Pair your phones again (0.8.2)' : 'Your server, phones on your Wi-Fi, or a drive folder';
+  if (info.house || info.serverApi === 3) return `${serverName(info)} · ${info.serverError ?? (info.serverAt ? `synced ${agoText(info.serverAt)}` : 'connected')}`;
   const n = info.members?.length ?? 1;
   return n > 1
     ? `${info.household ?? 'Household'} · ${n} phones · synced ${agoText(info.lastSyncAt)}`

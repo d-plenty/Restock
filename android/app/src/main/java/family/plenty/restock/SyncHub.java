@@ -326,6 +326,17 @@ final class SyncHub {
     /** This phone leaves the household (keeping its things). False: the owner must hand over first. */
     boolean leave() throws Exception {
         if (!household.paired()) return true;
+        // 0.9.4: in a server's house, leaving the house is leaving the server (nothing is deleted there).
+        if (household.isHouse() || server().v3()) {
+            try {
+                leaveHouse(true);
+            } catch (IllegalStateException photos) {
+                if (photos.getMessage() == null || !photos.getMessage().startsWith(PHOTOS_NOT_BACK)) throw photos;
+                // As 0.9.3's leaving with a server (letGoOfRestockServer): the photos stay on the server.
+                leaveHouse(false);
+            }
+            return true;
+        }
         if (!household.startLeaving()) return false;
         syncAll(); // let the others see it go, if they're here
         stop();
@@ -337,8 +348,19 @@ final class SyncHub {
         return true;
     }
 
+    /**
+     * 0.9.4: this owner phone handed the household to its server (or brought it there) and hasn't
+     * read the server's owner change yet: it mustn't change the key or the owner meanwhile (the
+     * server, which has the household's key now, would never get a new one from it).
+     */
+    private void notWhileHandedOver() throws Exception {
+        if (engine.meta("server_handover") != null || server().v3())
+            throw new IllegalStateException("This household now lives on your Restock server. Add and remove phones on the server's page.");
+    }
+
     /** Owner: removes a phone. The household's key changes so it can't sync again. */
     void remove(String device) throws Exception {
+        notWhileHandedOver();
         household.remove(device);
         readvertise();
         new Thread(this::syncAll).start(); // hand the new key out to whoever's here
@@ -346,6 +368,7 @@ final class SyncHub {
 
     /** Owner: asks another phone to be the owner (it takes over when it next syncs). */
     void handOver(String device) throws Exception {
+        notWhileHandedOver();
         household.handOver(device);
         readvertise();
         new Thread(this::syncAll).start();
@@ -458,6 +481,12 @@ final class SyncHub {
         upgradeOldPairing();
         if (key() == null) return;
         wanted = true;
+        // 0.9.4: Wi-Fi sync can be off (a phone in a server's house, unless it's turned on): no listening.
+        if (!wifiOn()) {
+            pause();
+            schedule();
+            return;
+        }
         if (server != null || !onLan()) return;
         try {
             InetAddress at = lanAddress();
@@ -769,6 +798,29 @@ final class SyncHub {
         int received;
         int sent;
         final List<String> names = new ArrayList<>();
+        /** 0.9.4: what Sync now says: whether Wi-Fi sync is on, and the server's and the folder's part. */
+        boolean wifi;
+        boolean viaServer;
+        boolean viaFolder;
+        String serverError;
+        String folderError;
+    }
+
+    // ---------- 0.9.4: Wi-Fi sync on or off ----------
+
+    /** Phone-to-phone sync on the Wi-Fi: on unless turned off (a phone joining a server's house starts with it off). */
+    boolean wifiOn() {
+        try {
+            return !"0".equals(engine.meta("wifi_sync"));
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    void setWifi(boolean on) throws Exception {
+        engine.setMeta("wifi_sync", on ? null : "0");
+        if (on) start();
+        else pause();
     }
 
     private volatile Summary lastSummary;
@@ -792,7 +844,10 @@ final class SyncHub {
             start();
             Set<String> where = new LinkedHashSet<>();
             // 0.9.1: the other phones only on the Wi-Fi (or Ethernet), never over mobile data.
-            boolean lan = onLan();
+            // 0.9.4: and only while Wi-Fi sync is on.
+            boolean wifi = wifiOn();
+            s.wifi = wifi;
+            boolean lan = wifi && onLan();
             // Where they were last time (quickest), the phone that invited this one, then a fresh look.
             if (lan) try (Cursor c = RestockDatabase.get(context).rawQuery("SELECT host, port FROM sync_peers WHERE host IS NOT NULL AND port > 0", null)) {
                 while (c.moveToNext()) where.add(c.getString(0) + ":" + c.getInt(1));
@@ -906,11 +961,16 @@ final class SyncHub {
             }
             // The folder (or server) only counts when another phone's file was there to read.
             boolean viaFolder = (fr != null && folderError == null && fr.phones > 0) || (sr != null && serverError == null && sr.phones > 0);
+            s.viaServer = sr != null && serverError == null;
+            s.viaFolder = fr != null && folderError == null;
+            s.serverError = sr != null ? serverError : null;
+            s.folderError = fr != null ? folderError : null;
             if (s.reached > 0 || viaFolder) lastSyncAt = nowIso();
             lastSummary = s;
-            lastError = s.reached > 0 || viaFolder
+            // 0.9.4: never about the Wi-Fi's phones when Wi-Fi sync is off.
+            lastError = s.reached > 0 || viaFolder || !wifi
                 ? null
-                : !lan
+                : !onLan()
                     ? "This phone isn't on Wi-Fi, so it can't reach the other phones right now."
                     : (where.isEmpty() ? "No other phones found on this Wi-Fi." : "Couldn't reach the other phone" + (error == null ? "." : ": " + error));
             if (s.received > 0) changed();
@@ -1054,6 +1114,18 @@ final class SyncHub {
     SyncFolder.Result syncFolder() {
         String uri = folder();
         if (uri == null || key() == null) return null;
+        // 0.9.4 (D13): no folder sync once the household is a server's house (rekeys can't reach a folder).
+        // But one last round first, once it is one and this phone is on the server: its folder file then
+        // carries the signed owner change and the server row, so the phones that only meet it in the
+        // folder learn where the household went (and connect through the household). Until then (a
+        // brought or upgraded phone that hasn't read the server's owner change yet, or a phone that
+        // hasn't connected to the server yet) the folder carries on as before.
+        boolean last = false;
+        try {
+            last = household.isHouse() && server().v3();
+        } catch (Exception e) {
+            Log.w(TAG, "folder in a house", e);
+        }
         boolean dav = uri.startsWith("https://") || uri.startsWith("http://");
         try {
             SyncFolder.Result r = new SyncFolder(engine, household).sync(openFolder(uri), nowIso());
@@ -1069,6 +1141,14 @@ final class SyncHub {
         } catch (Exception e) {
             folderError = "Couldn't sync " + (dav ? "with the server" : "through the folder") + (e.getMessage() == null ? "." : ": " + e.getMessage());
             Log.w(TAG, "syncFolder", e);
+        } finally {
+            if (last) {
+                try {
+                    setFolder(null);
+                } catch (Exception e) {
+                    Log.w(TAG, "folder in a house", e);
+                }
+            }
         }
         return new SyncFolder.Result();
     }
@@ -1150,6 +1230,13 @@ final class SyncHub {
         ServerSync.Round r = server().round(nowIso(), System.currentTimeMillis());
         serverReached = r.reached;
         serverError = r.error;
+        // 0.9.4: removed on the server's page: this phone keeps everything, and leaves the house.
+        if (r.removed) {
+            forgetHouse("server-removed");
+            return r.result;
+        }
+        // (D13: a folder goes after one last round, once the household is a house: syncFolder.)
+        if (r.upgraded || r.rekeyed) readvertise();
         // 0.9.3: a round that worked (from any start) lets the quick check look every minute again.
         if (r.error == null) pollGate.ok();
         if (r.error != null && r.cause != null) Log.w(TAG, "syncServer", r.cause);
@@ -1195,6 +1282,186 @@ final class SyncHub {
 
     JSONObject webCode(String code) throws Exception {
         return server().webCode(code);
+    }
+
+    // ---------- 0.9.4: a v3 server's house ----------
+
+    /** What a scanned Add a phone code is (and what this phone is in now), before joining. */
+    JSONObject checkServerCode(String code) throws Exception {
+        upgradeOldPairing();
+        return server().check(code);
+    }
+
+    /**
+     * Joins a v3 server's house. how: "join" (this phone isn't in a household), "bring" (it's its
+     * household's owner and the server's house is empty: the household goes onto the server), or
+     * "leave" (it leaves its household first, keeping its things, which then join the house).
+     */
+    JSONObject joinServer3(String code, String how) throws Exception {
+        upgradeOldPairing();
+        if ("leave".equals(how) && household.paired()) {
+            // Its household may already be this server's house (brought onto it, with the server row
+            // not here yet): then it connects as the member it is and keeps everything, rather than
+            // leaving and giving way to the house's copies of its own records. Out of reach: nothing
+            // changes here (it doesn't leave its household for a join that can't happen yet).
+            try {
+                JSONObject g = joinHouse(code);
+                g.put("member", true);
+                engine.setMeta("notice", null);
+                start();
+                return g;
+            } catch (ServerFolder.NotMember another) {
+                // another household's server: leave this one, then join below
+            }
+            if (household.isOwner() && household.members().size() > 1)
+                throw new IllegalStateException("This is the household's owner phone. Make another phone the owner first (Sync and backups → Phones on your Wi-Fi), then join the server.");
+            household.startLeaving();
+            syncAll(); // one last sync, so the others see it go, if it can
+            stop();
+            letGoOfServer();
+            letGoOfRestockServer(true);
+            household.forget();
+        }
+        if (engine.meta("name") == null) engine.setMeta("name", defaultName());
+        lockForServer();
+        JSONObject gift;
+        try {
+            gift = server().join3(code, "bring".equals(how));
+            serverError = null;
+            serverReached = engine.meta("server_home");
+            // (D13: a brought household's folder goes after one last round, once it's a house: syncFolder.)
+        } finally {
+            syncing.unlock();
+        }
+        engine.setMeta("notice", null);
+        start();
+        return gift;
+    }
+
+    /** Joins the server that's now the household's owner (an owner-signed server row), without a code. */
+    JSONObject joinHouse() throws Exception {
+        return joinHouse(null);
+    }
+
+    /** As joinHouse, at the server of a v3 Add a phone code (null: the household's server row). Throws NotMember if it isn't this household's. */
+    private JSONObject joinHouse(String code) throws Exception {
+        lockForServer();
+        try {
+            JSONObject gift = code == null ? server().joinAsMember() : server().joinAsMember(code);
+            serverError = null;
+            serverReached = engine.meta("server_home");
+            // (D13: the folder goes after one last round: syncFolder.)
+            return gift;
+        } finally {
+            syncing.unlock();
+        }
+    }
+
+    /** The start of what leaveHouse says when the receipt photos couldn't come back (the Leave sheet looks for it). */
+    static final String PHOTOS_NOT_BACK = "Couldn't bring this phone's receipt photos back from the server";
+
+    /**
+     * Leaves the server's house: off the server's list (best effort), then the household is forgotten
+     * here. bringBack: the receipt photos it moved there come back first; if they can't, it throws
+     * (PHOTOS_NOT_BACK) and stays in the house.
+     */
+    void leaveHouse(boolean bringBack) throws Exception {
+        leaveHouse(bringBack, null);
+    }
+
+    /** takeBack: the kinds to take off the server first (ServerSync.takeBackBeforeLeaving); it stays if that can't be done. */
+    void leaveHouse(boolean bringBack, Set<String> takeBack) throws Exception {
+        lockForServer();
+        try {
+            ServerSync ss = server();
+            if (takeBack != null && !takeBack.isEmpty() && ss.on()) ss.takeBackBeforeLeaving(takeBack, nowIso(), System.currentTimeMillis());
+            if (bringBack && ss.on() && ss.offloadedPhotos() > 0) {
+                try {
+                    ServerFolder f = ss.open();
+                    f.names();
+                    ss.offloader(f).bringBack();
+                } catch (Exception e) {
+                    Log.w(TAG, "photos back", e);
+                    // As Stop (ServerSync.stop): it stays in the house, so the photos aren't left where
+                    // this phone can't reach them any more without being asked.
+                    String why = e.getMessage() == null ? "" : e.getMessage().trim();
+                    throw new IllegalStateException(PHOTOS_NOT_BACK + (why.isEmpty() ? "." : ": " + why + (why.endsWith(".") ? "" : "."))
+                        + " Try again when the server can be reached, or leave without them.");
+                }
+            }
+            if (ss.on()) ss.leave3();
+            ss.clearNotes();
+        } finally {
+            syncing.unlock();
+        }
+        forgetHouse(null);
+    }
+
+    /** Forgets the household here (keeping everything else), after leaving or being removed on the server. */
+    private void forgetHouse(String notice) {
+        try {
+            stop();
+            letGoOfServer();
+            household.forget();
+            for (String k : new String[] { "server_dev_priv", "server_home", "server_away", "server_webs" }) engine.setMeta(k, null);
+            engine.setMeta("notice", notice);
+            serverError = null;
+            serverReached = null;
+            context.stopService(new android.content.Intent(context, SyncService.class));
+            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME);
+            changed();
+        } catch (Exception e) {
+            Log.w(TAG, "forgetHouse", e);
+        }
+    }
+
+    /**
+     * What this phone shares with its v3 server, and what it calls it. takeBack: the kinds turned
+     * off whose records this phone also takes off the server ("keg", "pharmacy", "receipts", "cards").
+     */
+    void setServerShares(String label, Set<String> tabs, Boolean receipts, Boolean cards, Set<String> takeBack) throws Exception {
+        if (label != null) engine.setMeta("server_label", label.trim().isEmpty() ? "Home" : label.trim());
+        Set<String> before = engine.tabs();
+        boolean rBefore = engine.shareReceipts(), cBefore = engine.shareCards();
+        if (tabs != null) {
+            if (!tabs.contains("pantry") && tabs.isEmpty()) throw new IllegalArgumentException("Pick at least one thing to share.");
+            engine.setMeta("tabs", SyncEngine.joinTabs(tabs));
+        }
+        if (receipts != null) engine.setShareReceipts(receipts);
+        if (cards != null) engine.setShareCards(cards);
+        // Taken back only for what's off now; turning one on again stops taking it back.
+        for (String t : new String[] { "keg", "pharmacy" }) {
+            boolean on = engine.tabs().contains(t);
+            if (on) engine.setTakeBack(t, false);
+            else if (takeBack != null && takeBack.contains(t) && before.contains(t)) engine.setTakeBack(t, true);
+        }
+        if (engine.shareReceipts()) engine.setTakeBack("receipts", false);
+        else if (takeBack != null && takeBack.contains("receipts") && rBefore) engine.setTakeBack("receipts", true);
+        if (engine.shareCards()) engine.setTakeBack("cards", false);
+        else if (takeBack != null && takeBack.contains("cards") && cBefore) engine.setTakeBack("cards", true);
+        engine.noteTabs();
+        engine.setMeta("server_top", null);
+        new Thread(this::syncAll).start();
+    }
+
+    /** The owner phone's (v2) server: { mode, api, house }, or null (a 0.9.3 server, or out of reach). */
+    JSONObject serverHealth() {
+        return serverOn() ? server().health() : null;
+    }
+
+    /** Owner phone: hands the household to the server with its Take this household code, then syncs. */
+    JSONObject handOverToServer(String code) throws Exception {
+        lockForServer();
+        JSONObject r;
+        try {
+            r = server().handOver(code);
+        } finally {
+            syncing.unlock();
+        }
+        // The server's answer counts once its file says so: a round now (it upgrades this phone, and
+        // reads the signed owner change, which lets go of the owner's secrets here).
+        syncAll();
+        return r;
     }
 
     JSONObject approveWeb(String code) throws Exception {

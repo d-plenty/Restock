@@ -1,10 +1,24 @@
 import { Capacitor } from '@capacitor/core';
-import { addListEntry, allGroups, allListEntries, deleteListEntries, getKV, nowIso, putKV, queryRows, uid, updateListEntry } from './db';
-import { onChange } from './live';
-import { emptyState, HaError, haLists, restApi, syncRound, type HaState, type Line, type Store, type Transport } from './haSync';
+import { allGroups, allListEntries, deleteListEntries, getKV, insertEntryOp, nowIso, putKV, queryRows, runOps, uid, updateListEntry } from './db';
+import { changed, onChange } from './live';
+import { emptyState, HaError, haLineId, haLists, restApi, syncRound, type HaState, type Line, type Store, type Transport } from './haSync';
 import { RestockNative } from './sql/native';
-import { HA_CONFIG, HA_STATE, HA_STATUS, haPairingResets, LIST_ALIASES, LOCAL_ONLY_KV, resetHaPairing } from './haKeys';
-import { claimHaPhone, FROM_HA, getAliases, haPhone, keepAsWords, linesToPick, migrateAliases, pickItemFor, pickWord, releaseHaPhone, tidyKeeps, type HaPhone } from './listPicks';
+import { HA_CONFIG, HA_STATE, HA_STATUS, haPairingResets, LIST_ALIASES, LOCAL_ONLY_KV, onHaPairingReset, resetHaPairing } from './haKeys';
+import {
+  claimHaPhone,
+  FROM_HA,
+  getAliases,
+  haPhone,
+  keepAsWords,
+  linesToPick,
+  migrateAliases,
+  pickItemFor,
+  pickWord,
+  releaseHaPhone,
+  tidyKeeps,
+  type HaHouse,
+  type HaPhone,
+} from './listPicks';
 import type { ListEntry } from '../types';
 
 // 0.9.3: Settings → Home Assistant. The shopping list both ways with a Home Assistant to-do list,
@@ -25,11 +39,42 @@ import type { ListEntry } from '../types';
 //   go in backups too (backup.ts, as LIST_ALIASES).
 //
 // When it runs: while Restock is open: when it opens or comes back, every minute, and a few seconds
-// after the list changes (here, or from another phone). Not in the background, so a voice add shows
-// up the next time Restock is opened.
+// after the list changes (here, or from another phone). 0.9.4: also in the background job, about
+// every 15 minutes (SyncWorker), so a voice add reaches the list with Restock closed. Every round on
+// the phone runs in Java (HaSync.java, the port of haSync.ts, one at a time with the background
+// job's): this side asks for one with RestockNative.haRound. haSync.ts stays the reference (and is
+// what the server runs); its round here (tsRound) is only for an Android side without haRound.
+//
+// 0.9.4, in a house (the household's owner is a Restock server): Home Assistant runs only on the
+// server (design D12). This phone never claims it or runs its own; its screen says the server
+// handles it (or to set it up on the server's page). The token goes to the server only sealed in
+// the handover or upgrade payload (HomeAssistant.java), and is deleted here once the server runs it.
 
 export { HA_CONFIG, HA_STATE, HA_STATUS, LIST_ALIASES, LOCAL_ONLY_KV };
-export { claimHaPhone, getAliases, haPhone, keepAsWords, linesToPick, pickItemFor, pickWord, type HaPhone };
+export { claimHaPhone, getAliases, haPhone, keepAsWords, linesToPick, pickItemFor, pickWord, type HaHouse, type HaPhone };
+
+/** 0.9.4: what a Java round answers (HaSync.Outcome). */
+export interface HaRound {
+  /** A round ran (Home Assistant on for this phone, and it's the one). */
+  ran: boolean;
+  /** The pairing was started afresh mid-round: another round in a moment. */
+  restarted?: boolean;
+  /** Another round was going for longer than the screens wait. */
+  busy?: boolean;
+  /** This phone is in a house: it doesn't run its own. */
+  house?: boolean;
+  came: number;
+  went: number;
+  held?: boolean;
+  status: HaStatus;
+}
+
+/** The Home Assistant calls of RestockNative that are new in 0.9.4 (HomeAssistant.java, HaSync.java). */
+interface HaNative {
+  haRound(opts: { manual?: boolean }): Promise<HaRound>;
+  haResetPairing(): Promise<void>;
+}
+const haNative = () => RestockNative as unknown as HaNative;
 
 export const DEFAULT_LIST = 'todo.shopping_list';
 
@@ -57,10 +102,21 @@ export interface HaStatus {
 
 export const haAvailable = () => Capacitor.isNativePlatform();
 
+/** 0.9.4: this phone is in a house (its household's owner is a Restock server). */
+async function inHouse(): Promise<boolean> {
+  const [o] = await queryRows<{ v: string }>("SELECT v FROM household WHERE k = 'owner'").catch(() => []);
+  return !!o?.v?.startsWith('srv-');
+}
+
+/**
+ * This phone's settings. 0.9.4: in a house it's never on here (the server does it, or nobody does),
+ * whatever was saved: what was saved stays as it was until the server runs Home Assistant, so the
+ * upgrade can still hand it over (HomeAssistant.java handoverPayload, through ServerSync.haSource).
+ */
 export async function getHaConfig(): Promise<HaConfig> {
   const c = (await getKV<Partial<HaConfig>>(HA_CONFIG)) ?? {};
   return {
-    enabled: c.enabled === true,
+    enabled: c.enabled === true && !(await inHouse()),
     address: typeof c.address === 'string' ? c.address : '',
     entity: typeof c.entity === 'string' && /^todo\.[a-z0-9_]+$/.test(c.entity) ? c.entity : DEFAULT_LIST,
   };
@@ -77,8 +133,11 @@ export async function saveHaConfig(patch: Partial<HaConfig>): Promise<HaConfig> 
   const fresh = next.address !== was.address || next.entity !== was.entity;
   // A round already under way (for the old list) doesn't save its pairing over the fresh one.
   if (fresh) resetHaPairing();
-  await putKV(HA_CONFIG, next);
-  if (fresh) await putKV(HA_STATE, emptyState());
+  // 0.9.4: both at once, so a round in Java (the background job's) never reads the new list with the old pairing.
+  await runOps([
+    { sql: 'INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', params: [HA_CONFIG, JSON.stringify(next)] },
+    ...(fresh ? [{ sql: 'INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', params: [HA_STATE, JSON.stringify(emptyState())] }] : []),
+  ]);
   if (next.address !== was.address || next.entity !== was.entity || next.enabled !== was.enabled) await setStatus({});
   // 0.9.3: turned off on the household's Home Assistant phone: it isn't the one any more.
   if (was.enabled && !next.enabled) await releaseHaPhone().catch(() => undefined);
@@ -99,6 +158,12 @@ export async function getHaStatus(): Promise<HaStatus> {
 export function onHaStatus(fn: (s: HaStatus) => void): () => void {
   statusListeners.add(fn);
   return () => statusListeners.delete(fn);
+}
+
+/** 0.9.4: a status Java worked out (and saved): kept for the screens, not saved again. */
+function heardStatus(s: HaStatus): void {
+  status = s;
+  statusListeners.forEach((fn) => fn(s));
 }
 
 async function setStatus(s: HaStatus): Promise<void> {
@@ -195,10 +260,13 @@ export function dbStore(resets?: number): Store {
       return (await allGroups()).filter((g) => (g.section ?? 'pantry') === 'pantry').map((g) => ({ id: g.id, name: g.name }));
     },
     aliases: getAliases,
-    async addLine(l) {
+    async addLine(l, itemUid) {
       // Made from Home Assistant's list: the "ha-" says so on every phone and the web (listPicks.ts).
-      const id = FROM_HA + uid();
-      await addListEntry({ id, text: l.text, qty: l.qty, groupId: l.groupId, section: 'pantry', checked: l.checked, createdAt: nowIso() });
+      // 0.9.4: made from an item, its id comes from the list and the item (haLineId), added only if
+      // it isn't there yet (another runner made it), as HaSync.java's DbStore does.
+      const id = itemUid ? haLineId((await getHaConfig()).entity, itemUid) : FROM_HA + uid();
+      const op = insertEntryOp({ id, text: l.text, qty: l.qty, groupId: l.groupId, section: 'pantry', checked: l.checked, createdAt: nowIso() });
+      await runOps([{ ...op, sql: op.sql.replace('INSERT INTO', 'INSERT OR IGNORE INTO') }]);
       return id;
     },
     async updateLine(id, patch) {
@@ -248,6 +316,8 @@ async function listPrint(): Promise<string> {
  */
 export async function stillTheHaPhone(): Promise<boolean> {
   const who = await haPhone();
+  // 0.9.4: never in a house (HaSync.java stillTheHaPhone is the same).
+  if (who.house) return false;
   if (who.mine) return true;
   if (who.device) {
     await saveHaConfig({ enabled: false });
@@ -261,6 +331,8 @@ export async function stillTheHaPhone(): Promise<boolean> {
 export function phoneLabel(name: string | undefined): string {
   const n = (name ?? '').trim();
   if (!n || n === 'another phone') return 'another phone';
+  // 0.9.4: the household's row names the server (listPicks.ts haPhone).
+  if (n === 'your server') return n;
   return /phone$/i.test(n) ? n : `${n}'s phone`;
 }
 
@@ -270,8 +342,13 @@ export function phoneLabel(name: string | undefined): string {
  * round pairs both lists by their words, so nothing is removed or added twice): this phone's notes
  * from the last time it did it are out of date.
  */
+/** 0.9.4: why a phone in a house can't turn on its own Home Assistant. */
+export const HOUSE_RUNS_IT = 'In a server household, Home Assistant runs on your server, so every phone and browser shares one list. Set it up on your server’s page.';
+
 export async function takeHomeAssistant(): Promise<HaConfig> {
   const who = await haPhone();
+  // 0.9.4: never in a house (D12).
+  if (who.house) throw new Error(HOUSE_RUNS_IT);
   if (!who.mine) {
     // Another phone named, or the last change to the row was another phone's (it took it and has
     // since turned it off, or left): it synced with Home Assistant after this phone last did.
@@ -285,6 +362,54 @@ export async function takeHomeAssistant(): Promise<HaConfig> {
   return saveHaConfig({ enabled: true });
 }
 
+/** The round in TypeScript, on this side (haSync.ts with dbStore): only for an Android side without haRound. */
+async function tsRound(opts: { manual?: boolean }): Promise<void> {
+  const resets = haPairingResets();
+  const c = await getHaConfig();
+  if (!c.enabled || !c.address || !haAvailable()) return;
+  // 0.9.3: one phone per household (another phone took over: this one stops here).
+  if (!(await stillTheHaPhone())) return;
+  const st = await getHaStatus();
+  if (st.auth && !opts.manual) return;
+  try {
+    await migrateAliases().catch(() => 0);
+    const r = await syncRound(restApi(phoneTransport(c.address), c.entity), dbStore(resets));
+    lastPrint = await listPrint();
+    // Held (Home Assistant's list came back empty): not counted as synced, nothing went wrong either.
+    await setStatus(r.held ? { okAt: st.okAt, held: true } : { okAt: nowIso() });
+    await tidyKeeps().catch(() => 0);
+  } catch (e) {
+    // The list or the database changed under it: a fresh round with the new one in a moment.
+    if (e instanceof PairingRestarted) return requestHaSync('soon');
+    const err = e instanceof HaError ? e : new HaError(reachText(e));
+    await setStatus({ okAt: st.okAt, error: err.message, auth: err.auth || undefined });
+  }
+}
+
+/** True for Capacitor's answer to a method the Android side doesn't have. */
+const unimplemented = (e: unknown) => (e as { code?: unknown })?.code === 'UNIMPLEMENTED' || /not implemented/i.test(String((e as Error)?.message ?? ''));
+
+/** 0.9.4: one round in Java (HaSync.java), the same as the background job's. Answers false if Java can't. */
+async function javaRound(opts: { manual?: boolean }): Promise<boolean> {
+  const c = (await getKV<Partial<HaConfig>>(HA_CONFIG)) ?? {};
+  // "Always use this for …" saved the old way move into the household's rows first.
+  if (c.enabled) await migrateAliases().catch(() => 0);
+  let r: HaRound;
+  try {
+    r = await haNative().haRound({ manual: !!opts.manual });
+  } catch (e) {
+    if (unimplemented(e)) return false;
+    throw e;
+  }
+  if (r.came > 0) changed();
+  if (r.ran || r.house) lastPrint = await listPrint();
+  if (r.ran && !r.status?.error) await tidyKeeps().catch(() => 0);
+  heardStatus(r.status ?? {});
+  // The list or the database changed under it: a fresh round with the new one in a moment.
+  if (r.restarted) requestHaSync('soon');
+  return true;
+}
+
 /**
  * One round now, if Home Assistant is on for this phone. `manual` (Sync now, Try again) also runs
  * after the token was turned down, which the automatic ones don't, so a wrong token isn't tried
@@ -294,26 +419,8 @@ export async function runHaSync(opts: { manual?: boolean } = {}): Promise<HaStat
   // One round at a time: another one waits for it, then looks again.
   while (running) await running;
   running = (async () => {
-    const resets = haPairingResets();
-    const c = await getHaConfig();
-    if (!c.enabled || !c.address || !haAvailable()) return;
-    // 0.9.3: one phone per household (another phone took over: this one stops here).
-    if (!(await stillTheHaPhone())) return;
-    const st = await getHaStatus();
-    if (st.auth && !opts.manual) return;
-    try {
-      await migrateAliases().catch(() => 0);
-      const r = await syncRound(restApi(phoneTransport(c.address), c.entity), dbStore(resets));
-      lastPrint = await listPrint();
-      // Held (Home Assistant's list came back empty): not counted as synced, nothing went wrong either.
-      await setStatus(r.held ? { okAt: st.okAt, held: true } : { okAt: nowIso() });
-      await tidyKeeps().catch(() => 0);
-    } catch (e) {
-      // The list or the database changed under it: a fresh round with the new one in a moment.
-      if (e instanceof PairingRestarted) return requestHaSync('soon');
-      const err = e instanceof HaError ? e : new HaError(reachText(e));
-      await setStatus({ okAt: st.okAt, error: err.message, auth: err.auth || undefined });
-    }
+    if (!haAvailable()) return;
+    if (!(await javaRound(opts))) await tsRound(opts);
   })()
     .catch((e) => console.error('Home Assistant sync failed', e))
     .finally(() => (running = undefined));
@@ -343,6 +450,8 @@ let wired = false;
 export function wireHomeAssistant(onResume: (fn: () => void) => () => void): () => void {
   if (wired || !haAvailable()) return () => undefined;
   wired = true;
+  // 0.9.4: Java's round stops (or doesn't save) when the pairing is started afresh on this side.
+  const offReset = onHaPairingReset(() => void haNative().haResetPairing().catch(() => undefined));
   // "Always use this for …" saved the old way on this phone move into the household's rows.
   void migrateAliases().catch(() => 0);
   requestHaSync('now');
@@ -370,6 +479,7 @@ export function wireHomeAssistant(onResume: (fn: () => void) => () => void): () 
   });
   return () => {
     wired = false;
+    offReset();
     off();
     clearInterval(every);
     if (look) clearTimeout(look);
@@ -385,6 +495,7 @@ export async function testHomeAssistant(address: string, token?: string) {
 }
 
 export async function saveHaToken(token: string, address: string): Promise<void> {
+  if ((await haPhone()).house) throw new Error(HOUSE_RUNS_IT);
   await RestockNative.haSaveToken({ token, address });
   const st = await getHaStatus();
   // A new token: Restock tries again by itself.

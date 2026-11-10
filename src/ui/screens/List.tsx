@@ -1,5 +1,5 @@
 import { useFullRefresh } from '../refresh';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { nameHasSize } from '../../lib/naming';
 import { lookupBarcode, scanBarcode } from '../../lib/barcode';
 import { serverMode } from '../../server-mode/flag';
@@ -879,6 +879,38 @@ const onlyAt = (recs: Recommendation[], chains: StoreChain[]): Recommendation[] 
   recs.map((r) => ({ ...r, options: r.options.filter((o) => chains.includes(o.product.chain as StoreChain)) }));
 
 /**
+ * A line in shopping mode. On the phone the whole line ticks it (a big target in the shop). 0.9.4,
+ * the web on a server (design 15): only the checkbox ticks, and the line opens its product.
+ */
+function ShopRow({ e, name, onOpen, extra, children }: { e: ListEntry; name: string; onOpen?: () => void; extra?: ReactNode; children: ReactNode }) {
+  const tick = (ev: { target: { checked: boolean } }) => {
+    buzz(10);
+    void updateListEntry(e.id, { checked: ev.target.checked });
+  };
+  if (!serverMode)
+    return (
+      <label className={`shoprow${e.checked ? ' got' : ''}`}>
+        <input type="checkbox" checked={e.checked} onChange={tick} />
+        {children}
+        {extra}
+      </label>
+    );
+  return (
+    <div className={`shoprow${e.checked ? ' got' : ''}`}>
+      <input type="checkbox" checked={e.checked} onChange={tick} aria-label={`Got ${name}`} />
+      {onOpen ? (
+        <button type="button" className="shoprow-open" onClick={onOpen} aria-label={`${name}, open the item`}>
+          {children}
+        </button>
+      ) : (
+        children
+      )}
+      {extra}
+    </div>
+  );
+}
+
+/**
  * Before shopping: anything out of stock where you're going. In stock at your other Coles says so;
  * out everywhere is listed so you can skip it today (it stays on your list for next time).
  */
@@ -1115,7 +1147,13 @@ function ShoppingMode({
   const inTrolley = entries.filter((e) => e.checked && !elsewhere(e)).reduce((s, e) => s + (priceOf(c, e) ?? 0), 0);
   const notHere = entries.filter((e) => elsewhere(e));
   const left = entries.filter((e) => !e.checked);
-  const toast = useNav().toast;
+  const nav = useNav();
+  const toast = nav.toast;
+  // 0.9.4, the web on a server: a line opens its product (only the checkbox ticks); see ShopRow.
+  const openOf = (e: ListEntry) => {
+    const g = recFor(all, e)?.group.id;
+    return serverMode && g ? () => nav.push({ name: 'item', groupId: g }) : undefined;
+  };
 
   /** Scan something going into the trolley: tick it off, and say if the price matches. */
   const scanToTick = async () => {
@@ -1206,17 +1244,35 @@ function ShoppingMode({
                 const d = dealFor(c, e);
                 const name = recFor(c, e)?.group.name ?? e.text;
                 return (
-                  <label key={e.id} className={`shoprow${e.checked ? ' got' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={e.checked}
-                      onChange={(ev) => {
-                        buzz(10);
-                        void updateListEntry(e.id, {
-                          checked: ev.target.checked,
-                        });
-                      }}
-                    />
+                  <ShopRow
+                    key={e.id}
+                    e={e}
+                    name={name}
+                    onOpen={openOf(e)}
+                    extra={
+                      <>
+                        {priceOf(c, e) !== undefined && (
+                          <span className="num" style={{ fontWeight: 700, fontSize: 17 }}>
+                            {money(priceOf(c, e))}
+                          </span>
+                        )}
+                        {shelfLook(e) && (
+                          <button
+                            type="button"
+                            className="info-btn shop-info"
+                            aria-label={`What ${name} looks like`}
+                            onClick={(ev) => {
+                              ev.preventDefault();
+                              ev.stopPropagation();
+                              setInfo(shelfLook(e));
+                            }}
+                          >
+                            <Icon name="info" size={22} />
+                          </button>
+                        )}
+                      </>
+                    }
+                  >
                     <span
                       style={{
                         flex: 1,
@@ -1243,26 +1299,7 @@ function ShoppingMode({
                         </span>
                       )}
                     </span>
-                    {priceOf(c, e) !== undefined && (
-                      <span className="num" style={{ fontWeight: 700, fontSize: 17 }}>
-                        {money(priceOf(c, e))}
-                      </span>
-                    )}
-                    {shelfLook(e) && (
-                      <button
-                        type="button"
-                        className="info-btn shop-info"
-                        aria-label={`What ${name} looks like`}
-                        onClick={(ev) => {
-                          ev.preventDefault();
-                          ev.stopPropagation();
-                          setInfo(shelfLook(e));
-                        }}
-                      >
-                        <Icon name="info" size={22} />
-                      </button>
-                    )}
-                  </label>
+                  </ShopRow>
                 );
               })}
             </section>
@@ -1285,15 +1322,7 @@ function ShoppingMode({
               const best = dealFor(all, e);
               const name = recFor(all, e)?.group.name ?? e.text;
               return (
-                <label key={e.id} className={`shoprow${e.checked ? ' got' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={e.checked}
-                    onChange={(ev) => {
-                      buzz(10);
-                      void updateListEntry(e.id, { checked: ev.target.checked });
-                    }}
-                  />
+                <ShopRow key={e.id} e={e} name={name} onOpen={openOf(e)}>
                   <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <span className="title" style={{ fontSize: 17 }}>
                       {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}
@@ -1303,7 +1332,7 @@ function ShoppingMode({
                       {best ? `At ${chainName(best.product.chain)}: ${best.product.name}, ${money(best.price)}` : 'No price at any of your shops yet'}
                     </span>
                   </span>
-                </label>
+                </ShopRow>
               );
             })}
           </section>

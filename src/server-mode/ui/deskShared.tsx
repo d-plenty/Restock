@@ -18,6 +18,16 @@ export function takeOpenItem(): string | undefined {
   return id;
 }
 
+let start: 'add-phone' | undefined;
+/** 0.9.4: where the app opens next (after Set up this server: Server and phones, Add a phone showing). */
+export const startOn = (what: 'add-phone') => (start = what);
+export const peekStartOn = () => start;
+export function takeStartOn(): 'add-phone' | undefined {
+  const s = start;
+  start = undefined;
+  return s;
+}
+
 /** Where a greyed setting is changed: "Change this on the owner phone". */
 export function WhereNote({ children }: { children: ReactNode }) {
   return (
@@ -32,10 +42,12 @@ export function WhereNote({ children }: { children: ReactNode }) {
 export function DeskHead({ title, sub, children }: { title: string; sub?: ReactNode; children?: ReactNode }) {
   return (
     <div className="dk-head">
-      <h1>
-        {title}
-        {sub !== undefined && <span className="dk-head-sub"> {sub}</span>}
-      </h1>
+      {title ? (
+        <h1>
+          {title}
+          {sub !== undefined && <span className="dk-head-sub"> {sub}</span>}
+        </h1>
+      ) : null}
       {children}
     </div>
   );

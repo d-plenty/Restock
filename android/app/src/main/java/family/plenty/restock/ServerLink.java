@@ -123,6 +123,84 @@ final class ServerLink {
         return okm;
     }
 
+    // ---------- 0.9.4, protocol v3 (docs/server-protocol.md "v3"; vectors in tools/sync-test/vectors-v3.json) ----------
+
+    /** HKDF-SHA256 (RFC 5869) with a salt (null: no salt, 32 zero bytes). */
+    static byte[] hkdf(byte[] ikm, byte[] salt, String info, int length) throws Exception {
+        if (salt == null) return hkdf(ikm, info, length);
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(salt.length == 0 ? new byte[32] : salt, "HmacSHA256"));
+        byte[] prk = mac.doFinal(ikm);
+        mac.init(new SecretKeySpec(prk, "HmacSHA256"));
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] t = new byte[0];
+        for (int i = 1; out.size() < length; i++) {
+            mac.update(t);
+            mac.update(info.getBytes(StandardCharsets.UTF_8));
+            mac.update((byte) i);
+            t = mac.doFinal();
+            out.write(t);
+        }
+        byte[] okm = new byte[length];
+        System.arraycopy(out.toByteArray(), 0, okm, 0, length);
+        return okm;
+    }
+
+    /** The ECDH secret: the shared point's x-coordinate (32 bytes). */
+    static byte[] ecdh(PrivateKey mine, PublicKey theirs) throws Exception {
+        KeyAgreement ka = KeyAgreement.getInstance("ECDH");
+        ka.init(mine);
+        ka.doPhase(theirs, true);
+        return ka.generateSecret();
+    }
+
+    /** v3: HKDF(ECDH(mine, theirs), salt, info), 32 bytes. */
+    static byte[] v3Key(PrivateKey mine, PublicKey theirs, byte[] salt, String info) throws Exception {
+        return hkdf(ecdh(mine, theirs), salt, info, 32);
+    }
+
+    /** v3 "sealed": nonce (12) + AES-256-GCM(key, aad, JSON). `nonce` null: a random one. */
+    static byte[] sealAad(byte[] key, String aad, JSONObject message, byte[] nonce) throws Exception {
+        byte[] n = nonce;
+        if (n == null) {
+            n = new byte[12];
+            RANDOM.nextBytes(n);
+        }
+        Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+        c.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, n));
+        c.updateAAD(aad.getBytes(StandardCharsets.UTF_8));
+        byte[] body = c.doFinal(message.toString().getBytes(StandardCharsets.UTF_8));
+        byte[] out = new byte[12 + body.length];
+        System.arraycopy(n, 0, out, 0, 12);
+        System.arraycopy(body, 0, out, 12, body.length);
+        return out;
+    }
+
+    /** Opens sealAad's bytes; throws if the key or the associated data is wrong. */
+    static JSONObject openAad(byte[] key, String aad, byte[] sealed) throws Exception {
+        if (sealed == null || sealed.length < 12 + 16) throw new SecurityException("too short");
+        Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+        c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, sealed, 0, 12));
+        c.updateAAD(aad.getBytes(StandardCharsets.UTF_8));
+        return new JSONObject(new String(c.doFinal(sealed, 12, sealed.length - 12), StandardCharsets.UTF_8));
+    }
+
+    static final String JOIN_INFO = "restock-join-v3", KEYS_INFO = "restock-keys-v3", HANDOVER_INFO = "restock-handover-v3", HA_INFO = "restock-ha-v3";
+    static final byte[] RSE3 = "RSE3".getBytes(StandardCharsets.US_ASCII);
+
+    /** keys/<device>.bin (RSE3): "RSE3" + nonce + AES-GCM(HKDF(ECDH, no salt, keys-v3), aad "RSE3" + device, { keyv, keys }). */
+    static JSONObject openKeysFile(PrivateKey kex, PublicKey server, String device, byte[] file) throws Exception {
+        if (file == null || file.length < 4 + 28 || !startsWith(file, RSE3)) throw new SecurityException("not a keys file");
+        JSONObject m = openAad(v3Key(kex, server, null, KEYS_INFO), "RSE3" + device, java.util.Arrays.copyOfRange(file, 4, file.length));
+        if (m.optInt("keyv", 0) < 1 || m.optJSONObject("keys") == null) throw new SecurityException("odd keys file");
+        return m;
+    }
+
+    /** What a phone signs with its household key (my_priv) to join through the household (member join). */
+    static String memberJoinText(String device, String pub, String kex, String n) {
+        return "restock-member-v3\n" + device + "\n" + pub + "\n" + kex + "\n" + n;
+    }
+
     /** The AES key between a private key and the other side's public key. */
     static byte[] linkKey(PrivateKey mine, PublicKey theirs) throws Exception {
         KeyAgreement ka = KeyAgreement.getInstance("ECDH");
@@ -189,10 +267,15 @@ final class ServerLink {
         String host;
         String id;
         PublicKey browser;
+        /** 0.9.4: 3 for a v3 server's codes (restock-login:3, restock-handover:3), else 2. */
+        int v = 2;
     }
 
     static final String LINK_PREFIX = "restock-link:2?";
     static final String LOGIN_PREFIX = "restock-login:2?";
+    /** 0.9.4: a v3 server's Sign in with a phone code, and its Take this household code (the handover). */
+    static final String LOGIN3_PREFIX = "restock-login:3?";
+    static final String HANDOVER_PREFIX = "restock-handover:3?";
 
     @SuppressWarnings("CharsetObjectCanBeUsed") // URLDecoder.decode(String, Charset) is Android 13+
     static String decode(String v) {
@@ -214,6 +297,15 @@ final class ServerLink {
         } else if (t.regionMatches(true, 0, LOGIN_PREFIX, 0, LOGIN_PREFIX.length())) {
             c.kind = "login";
             rest = t.substring(LOGIN_PREFIX.length());
+        } else if (t.regionMatches(true, 0, LOGIN3_PREFIX, 0, LOGIN3_PREFIX.length())) {
+            c.kind = "login";
+            c.v = 3;
+            rest = t.substring(LOGIN3_PREFIX.length());
+        } else if (t.regionMatches(true, 0, HANDOVER_PREFIX, 0, HANDOVER_PREFIX.length())) {
+            // restock-handover:3?u=ORIGIN&t=TOKEN&k=SERVER_KEX: the token is the id here.
+            c.kind = "handover";
+            c.v = 3;
+            rest = t.substring(HANDOVER_PREFIX.length());
         } else {
             throw new IllegalArgumentException("That isn't a code from your Restock server's web page.");
         }
@@ -224,7 +316,7 @@ final class ServerLink {
             String name = part.substring(0, eq);
             String v = decode(part.substring(eq + 1));
             if (name.equals("u")) c.origin = v;
-            else if (name.equals("s")) c.id = v;
+            else if (name.equals("s") || (name.equals("t") && "handover".equals(c.kind))) c.id = v;
             else if (name.equals("k")) k = v;
         }
         if (c.id == null || !c.id.matches("[A-Za-z0-9_-]{8,128}") || k == null || c.origin == null)

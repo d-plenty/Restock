@@ -2,7 +2,7 @@ import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { cachedSettings, getSettings, reapplyHouseholdSettings } from './db';
 import { changed, onChange } from './live';
-import { RestockNative, type SyncInfo } from './sql/native';
+import { RestockNative, type SyncInfo, type SyncNowResult } from './sql/native';
 
 // Phone-to-phone sync (0.8.0). The work is done in Java (SyncHub, SyncEngine), so it also runs
 // while Restock is closed; this is the screens' side of it.
@@ -26,7 +26,19 @@ export function pairingCode(text: string): string | undefined {
 export function serverCode(text: string): string | undefined {
   const t = text.trim();
   if (/^restock-server:1\?/i.test(t)) return t;
-  return /^restock-server:2\?/i.test(t) && /[?&]i=[A-Za-z0-9_-]{20,128}(&|$)/.test(t) ? t : undefined;
+  if (!/[?&]i=[A-Za-z0-9_-]{20,128}(&|$)/.test(t)) return undefined;
+  // 0.9.4: a v3 server's code also names the server's key (k=), so the phone pins the server from it.
+  if (/^restock-server:3\?/i.test(t)) return /[?&]k=[A-Za-z0-9_+/=-]{40,200}(&|$)/.test(t) ? t : undefined;
+  return /^restock-server:2\?/i.test(t) ? t : undefined;
+}
+
+/** 0.9.4: which protocol an Add a phone code is for (3: the server is the house). */
+export const serverCodeVersion = (code: string): 2 | 3 => (/^restock-server:3\?/i.test(code.trim()) ? 3 : 2);
+
+/** 0.9.4: the code on a v2 server's Take this household page (restock-handover:3?u=&t=&k=), or undefined. */
+export function handoverCode(text: string): string | undefined {
+  const t = text.trim();
+  return /^restock-handover:3\?/i.test(t) && /[?&]t=[A-Za-z0-9_-]{20,128}(&|$)/.test(t) && /[?&]k=/.test(t) && /[?&]u=/.test(t) ? t : undefined;
 }
 
 /**
@@ -57,7 +69,8 @@ export function serverCodeAddresses(code: string): string[] {
 /** 0.9.2: a code from the Restock server's web page: link the browser (restock-link:2) or sign in (restock-login:2). */
 export function webPageCode(text: string): string | undefined {
   const t = text.trim();
-  return /^restock-(link|login):2\?/i.test(t) && /[?&]s=[A-Za-z0-9_-]{8,128}(&|$)/.test(t) && /[?&]k=/.test(t) ? t : undefined;
+  // 0.9.4: a v3 server's Sign in with a phone code too (restock-login:3).
+  return (/^restock-(link|login):2\?/i.test(t) || /^restock-login:3\?/i.test(t)) && /[?&]s=[A-Za-z0-9_-]{8,128}(&|$)/.test(t) && /[?&]k=/.test(t) ? t : undefined;
 }
 
 /** 0.9.2: a receipt photo from the Restock server (base64 JPEG), to show. Rejects with words (offline, say). */
@@ -68,9 +81,26 @@ export async function serverPhoto(path: string): Promise<string> {
 /** Local sync is for a household: up to 6 phones (SyncHousehold.MAX_PHONES). */
 export const MAX_SYNC_PHONES = 6;
 
-export const syncAvailable = () => Capacitor.isNativePlatform();
+/**
+ * 0.9.4, development only (never in a release build): a pretend sync state for looking at the sync
+ * screens in a browser, from localStorage "restock-demo-sync" (a SyncInfo, plus `_joined` to open
+ * the What this phone shares page). Nothing native is called with it.
+ */
+export function demoSync(): (SyncInfo & { _joined?: { label?: string; houseName?: string } }) | undefined {
+  if (!import.meta.env.DEV || typeof localStorage === 'undefined') return undefined;
+  try {
+    const t = localStorage.getItem('restock-demo-sync');
+    return t ? (JSON.parse(t) as SyncInfo) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export const syncAvailable = () => Capacitor.isNativePlatform() || !!demoSync();
 
 export async function syncInfo(): Promise<SyncInfo> {
+  const demo = demoSync();
+  if (demo) return demo;
   if (!syncAvailable()) return { paired: false, batteryExempt: false };
   return RestockNative.syncInfo();
 }
@@ -137,7 +167,7 @@ async function usesServer(): Promise<boolean> {
  * server every 60 s while open, and bring the settings in line with the household's.
  */
 export function wireSync(): void {
-  if (wired || !syncAvailable()) return;
+  if (wired || !Capacitor.isNativePlatform()) return;
   wired = true;
   void reapplyHouseholdSettings().catch(() => undefined);
   void RestockNative.addListener('syncChanged', () => {
@@ -191,3 +221,53 @@ export function agoText(iso: string | null | undefined, now = Date.now()): strin
   const d = Math.round(h / 24);
   return `${d} day${d === 1 ? '' : 's'} ago`;
 }
+
+const changes = (n: number) => (n ? `: ${n} change${n === 1 ? '' : 's'} came in` : '');
+
+/**
+ * 0.9.4: what Sync now says it did, in a few words: "Synced with your server", "Synced with Sarah's
+ * phone", "Synced through your drive folder", what came in, or the first problem. It only mentions
+ * the Wi-Fi's phones when Wi-Fi sync is on.
+ */
+export function syncNowMessage(r: SyncNowResult): string {
+  const wifi = r.wifi ?? r.wifiSync ?? true;
+  const done: string[] = [];
+  if (r.server && r.viaServer && !r.serverError) done.push(r.serverLabel ? `your server, ${r.serverLabel}` : 'your server');
+  if (wifi && r.reached > 0) done.push(r.reached === 1 ? (r.names?.[0] ?? r.peers?.[0]?.name ?? 'the other phone') : `${r.reached} phones`);
+  if (r.folder && r.viaFolder && !r.folderError) done.push('your drive folder');
+  if (done.length) {
+    const list = done.length === 1 ? done[0] : `${done.slice(0, -1).join(', ')} and ${done[done.length - 1]}`;
+    const problem = r.server && r.serverError ? ` (${r.serverError.replace(/\.$/, '')})` : '';
+    return `Synced with ${list}${changes(r.received)}${problem}`;
+  }
+  if (r.server && r.serverError) return r.serverError;
+  if (r.folder && r.folderError) return r.folderError;
+  if (wifi && r.lastError) return r.lastError;
+  if (!r.paired) return 'Nothing to sync yet: this phone isn\'t sharing with anyone';
+  if (!wifi && !r.server && !r.folder) return 'Nothing to sync with: turn on a way to sync below';
+  return 'Up to date';
+}
+
+/**
+ * 0.9.4: a day and a time for the strip ("Today 6:00 am", "Yesterday 9:15 pm", "Mon 3 Nov 6:00 am"),
+ * in the phone's own time zone, or "Not yet".
+ */
+export function dayAndTime(iso: string | null | undefined, now = Date.now()): string {
+  if (!iso) return 'Not yet';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'Not yet';
+  const time = d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\s+/g, ' ').toLowerCase();
+  const start = (t: number) => {
+    const x = new Date(t);
+    x.setHours(0, 0, 0, 0);
+    return x.getTime();
+  };
+  const days = Math.round((start(now) - start(d.getTime())) / 86_400_000);
+  if (days === 0) return `Today ${time}`;
+  if (days === 1) return `Yesterday ${time}`;
+  const day = d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', ...(days > 300 ? { year: 'numeric' } : {}) }).replace(/,/g, '');
+  return `${day} ${time}`;
+}
+
+/** 0.9.4: what this phone calls its server ("Home"), for headings. */
+export const serverName = (i: SyncInfo | undefined): string => i?.serverLabel?.trim() || 'Your Restock server';

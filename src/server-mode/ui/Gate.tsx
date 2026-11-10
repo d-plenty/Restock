@@ -1,10 +1,12 @@
 // Server mode: before the app opens. Sign in (passphrase, or with a phone), set the passphrase on
 // first start, and link this browser with the household once.
+// 0.9.4, a house (v3): sign in with a challenge (no vault, no link), and on a fresh server the
+// second setup step, Set up this server (the server's own setup page does the first, the passphrase).
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon, Logo } from '../../ui/components';
-import { ApiError } from '../api';
+import { ApiError, isV3, serverInfo } from '../api';
 import { checkPassphrase } from '../passphrase';
-import { login, setPassphrase, startLink, startPhoneLogin, signOut, type Session } from '../session';
+import { login, loginV3, setPassphrase, setUpHouse, startLink, startPhoneLogin, startPhoneLoginV3, signOut, type Session } from '../session';
 import { Qr } from './Qr';
 
 function Frame({ title, children, foot }: { title: string; children: ReactNode; foot?: ReactNode }) {
@@ -39,12 +41,14 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
   const [phone, setPhone] = useState(false);
+  const house = isV3();
+  const [keep, setKeep] = useState(false);
   if (phone) return <PhoneLoginScreen onDone={onDone} onBack={() => setPhone(false)} />;
   const go = async () => {
     setError(undefined);
     setBusy('Signing in…');
     try {
-      const r = await login(user, pass, setBusy);
+      const r = house ? { mustChange: false as const, session: await loginV3(user, pass, keep, setBusy) } : await login(user, pass, setBusy);
       try {
         localStorage.setItem('restock-server-user', user.trim());
       } catch {
@@ -62,7 +66,9 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
   return (
     <Frame title="Sign in">
       <p className="small" style={{ margin: 0 }}>
-        Your household's lists, prices and receipts, from your phones. They're unlocked here, in this browser; the server only keeps them sealed.
+        {house
+          ? `${serverInfo()?.house ? `${serverInfo()!.house}: your` : 'Your'} house's lists, prices and receipts. Your passphrase never leaves this browser, and what the server sends is sealed for this sign-in only.`
+          : "Your household's lists, prices and receipts, from your phones. They're unlocked here, in this browser; the server only keeps them sealed."}
       </p>
       <form
         className="card gate-form"
@@ -79,6 +85,17 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
           <span className="small">Passphrase</span>
           <input className="input" type="password" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} autoFocus />
         </label>
+        {house && (
+          <label className="check gate-keep">
+            <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} aria-describedby="gate-keep-help" />
+            <span className="grow">
+              Keep me signed in on this computer
+              <span id="gate-keep-help" className="small">
+                For 30 days of not using it. Leave it off on a shared computer: then closing the tab signs you out.
+              </span>
+            </span>
+          </label>
+        )}
         {error && (
           <p className="banner red small" role="alert">
             {error}
@@ -87,9 +104,15 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
         <button className="btn primary block" type="submit" disabled={!!busy || !user.trim() || !pass}>
           {busy ?? 'Sign in'}
         </button>
-        <p className="small" style={{ margin: 0 }}>
-          First time? Sign in with the user name and password the server started with (<code>admin</code> unless it was set up with others).
-        </p>
+        {house ? (
+          <p className="small" style={{ margin: 0 }}>
+            First time? Set the passphrase on the server's <a href="/setup/">setup page</a>, then sign in here with it.
+          </p>
+        ) : (
+          <p className="small" style={{ margin: 0 }}>
+            First time? Sign in with the user name and password the server started with (<code>admin</code> unless it was set up with others).
+          </p>
+        )}
       </form>
       <button className="btn block" onClick={() => setPhone(true)}>
         <Icon name="phone" size={18} /> Sign in with a phone
@@ -109,7 +132,7 @@ function PhoneLoginScreen({ onDone, onBack }: { onDone: (s: Session) => void; on
     setError(undefined);
     void (async () => {
       try {
-        const l = await startPhoneLogin();
+        const l = await (isV3() ? startPhoneLoginV3() : startPhoneLogin());
         if (stopped) return;
         setCode(l.code);
         const s = await l.wait(() => stopped);
@@ -139,7 +162,11 @@ function PhoneLoginScreen({ onDone, onBack }: { onDone: (s: Session) => void; on
           {error}
         </p>
       )}
-      <p className="small">Signed in this way, this tab can see the household until it's closed. It can't change the passphrase.</p>
+      <p className="small">
+        {isV3()
+          ? "Signed in this way, this tab can see the house for 12 hours, or until it's closed. It can't change the passphrase."
+          : "Signed in this way, this tab can see the household until it's closed. It can't change the passphrase."}
+      </p>
       <div className="two">
         <button className="btn" onClick={onBack}>
           Back
@@ -296,6 +323,101 @@ export function LinkScreen({ onDone, addPhone }: { onDone: (s: Session) => void;
           {addPhone}
         </details>
       )}
+    </Frame>
+  );
+}
+
+/**
+ * 0.9.4, a fresh server: step 2 of 2 (the server's setup page did the passphrase). Makes the house:
+ * its key, its owner key and its record, all on the server. Then Server and phones, to add a phone.
+ */
+export function SetUpServerScreen({ session, onDone }: { session: Session; onDone: (s: Session) => void }) {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const go = async () => {
+    setError(undefined);
+    setBusy(true);
+    try {
+      onDone(await setUpHouse(name));
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="setup-house">
+      <main className="setup-card" aria-labelledby="setup-title">
+        <div className="setup-brand">
+          <span className="setup-mark" aria-hidden>
+            R
+          </span>
+          <strong>Restock server</strong>
+        </div>
+        <div className="setup-steps" role="img" aria-label="Step 2 of 2">
+          <span className="done" />
+          <span className="done" />
+        </div>
+        <h1 id="setup-title">Set up this server</h1>
+        <p className="setup-lede">This server becomes your house. Phones join it, and what they share stays here, even if a phone is removed.</p>
+        <form
+          className="setup-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim()) void go();
+          }}
+        >
+          <div className="field">
+            <label htmlFor="setup-name" className="setup-label">
+              Name it
+            </label>
+            <input
+              id="setup-name"
+              className="input setup-input"
+              value={name}
+              maxLength={60}
+              autoFocus
+              autoComplete="off"
+              placeholder="Declan and Sarah"
+              onChange={(e) => setName(e.target.value)}
+              aria-describedby="setup-name-help"
+            />
+            <span id="setup-name-help" className="setup-help">
+              Shown on this page and when a phone joins. Each phone can call it what it likes ("Home").
+            </span>
+          </div>
+          <div className="setup-note">
+            <strong>Signed in as {session.user}</strong>
+            <span>
+              You've already swapped the starting password for your own passphrase. Changes between phones and this server are encrypted on the way, even on
+              plain http at home.
+            </span>
+          </div>
+          {error && (
+            <p className="banner red small" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="btn primary block setup-go" type="submit" disabled={busy || !name.trim()}>
+            {busy ? 'Setting up…' : 'Set up server'}
+          </button>
+          <span className="setup-help center">Next: add your first phone.</span>
+        </form>
+      </main>
+    </div>
+  );
+}
+
+/** 0.9.4: a phone took the household back with its recovery key; this server no longer owns it. */
+export function ReleasedScreen() {
+  return (
+    <Frame title="Your household was taken back">
+      <p className="small" style={{ margin: 0 }}>
+        A phone took the household back with its recovery key, so this server isn't its owner any more and phones don't sync here. Whoever runs the
+        server can start it afresh (the server's README says how).
+      </p>
+      <SignOutLink />
     </Frame>
   );
 }

@@ -1,8 +1,7 @@
 // 0.9.3: Household and phones at desktop widths: the phones and this browser on the server (remove,
 // sign out), what the server keeps, recent activity, and what stays on the phones, greyed. The same
 // server calls as the Phones, Activity and Account pages (ServerScreens.tsx).
-import { useEffect, useState } from 'react';
-import { confirmAction } from '../../lib/confirm';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useLive } from '../../lib/useLive';
 import { Icon, timeAgo } from '../../ui/components';
 import { useNav } from '../../ui/nav';
@@ -168,21 +167,21 @@ function KeptOnPhones() {
   );
 }
 
-export function DeskHousehold() {
+/** `extra`: 0.9.4 in v2 mode, the Take this household card. */
+export function DeskHousehold({ extra }: { extra?: ReactNode } = {}) {
   const nav = useNav();
   const { phones, error, reload } = usePhones();
   const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState<string>();
   const acct = serverAccount();
   const remove = async (device: string, name: string) => {
-    const ok = await confirmAction(`Remove ${name} from this server?`, {
-      detail: 'It stops syncing here. To take it out of the household too, remove it on the owner phone.',
-      action: 'Remove from the server',
-      danger: true,
-    });
-    if (!ok) return;
     try {
-      await removePhone(device);
+      const done = await removePhone(device, {
+        title: `Remove ${name} from this server?`,
+        detail: 'It stops syncing here. To take it out of the household too, remove it on the owner phone.',
+        action: 'Remove from the server',
+      });
+      if (!done) return;
       setMsg(`${name} was taken off this server.`);
       reload();
     } catch (e) {
@@ -191,13 +190,14 @@ export function DeskHousehold() {
   };
   return (
     <div className="dk-page">
-      <DeskHead title="Household and phones">
+      <DeskHead title="Server and phones">
         <button className="btn primary" aria-expanded={adding} onClick={() => setAdding(!adding)}>
           <Icon name={adding ? 'close' : 'plus'} size={18} /> {adding ? 'Close' : 'Add a phone'}
         </button>
       </DeskHead>
       <div className="dk-split">
         <div className="dk-wide dk-stack">
+          {extra}
           {adding && <AddPhonePanel onAdded={reload} />}
           <section className="card flush" aria-labelledby="dk-onserver">
             <h2 id="dk-onserver" className="dk-card-title">

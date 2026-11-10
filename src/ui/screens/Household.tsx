@@ -56,7 +56,8 @@ export function HouseholdScreen() {
         <input
           key={sync?.paired ? (sync.household ?? '') : settings.household.name}
           className="input"
-          // With local sync, the household's name is the owner phone's to change (0.8.5).
+          // With local sync, the household's name is the owner phone's to change (0.8.5); in a server's
+          // house (0.9.4), the server's page renames it.
           disabled={!!sync?.paired && !sync.isOwner}
           defaultValue={sync?.paired && sync.household ? sync.household : settings.household.name}
           onBlur={(e) => {
@@ -68,48 +69,55 @@ export function HouseholdScreen() {
         />
       </label>
       <p className="small">
-        {sync?.paired && !sync.isOwner
-          ? `Shared by your household. Only the owner phone${sync.members?.find((m) => m.owner) ? ` (${sync.members.find((m) => m.owner)!.name})` : ''} can rename it.`
-          : 'Made for you automatically. Rename it any time.'}
+        {sync?.house
+          ? "Your server's house. Rename it on the server's page."
+          : sync?.paired && !sync.isOwner
+            ? `Shared by your household. Only the owner phone${sync.members?.find((m) => m.owner) ? ` (${sync.members.find((m) => m.owner)!.name})` : ''} can rename it.`
+            : 'Made for you automatically. Rename it any time.'}
       </p>
 
       <div className="eyebrow">Phones</div>
       <div className="card flush">
-        {(sync?.paired ? (sync.members ?? []) : [{ device: 'me', name: 'This phone', owner: true, me: true }]).map((m) => (
+        {(sync?.paired ? (sync.members ?? []).filter((m) => !m.device.startsWith('srv-')) : [{ device: 'me', name: 'This phone', owner: true, me: true }]).map((m) => (
           <div key={m.device} className="row">
             <Icon name="phone" size={18} />
             <span className="grow">
               <span className="title" style={{ fontSize: 15 }}>
                 {m.me ? `${m.name === 'This phone' ? 'This phone' : `${m.name} (this phone)`}` : m.name}
               </span>
-              <span className="small">{m.owner ? 'Owner' : 'Member'}</span>
+              <span className="small">{m.owner ? 'Owner' : sync?.house ? 'On the server' : 'Member'}</span>
             </span>
           </div>
         ))}
-        <button className="row" onClick={() => nav.push({ name: 'sync' })}>
-          <Icon name="swap" size={18} />
+        <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
+          <Icon name="server" size={18} />
           <span className="grow">
             <span className="title" style={{ fontSize: 15, color: 'var(--green)' }}>
-              {sync?.paired ? (sync.isOwner ? 'Add or remove phones' : 'Local sync') : 'Share with other phones: local sync'}
+              {sync?.server ? (sync.house ? 'Your Restock server' : 'Restock server') : 'Join your Restock server'}
             </span>
-            <span className="small">Phone to phone on your Wi-Fi. No account, and nothing leaves your phones. Up to {MAX_SYNC_PHONES} phones.</span>
+            <span className="small">
+              {sync?.house
+                ? "The server is the house: phones are added and removed on its page."
+                : 'Your server is the house: phones join it, at home and away, and you get Restock in a browser.'}
+            </span>
           </span>
           <Icon name="chevron" size={18} />
         </button>
-        <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
-          <Icon name="refresh" size={18} />
+        <button className="row" onClick={() => nav.push({ name: 'sync' })}>
+          <Icon name="swap" size={18} />
           <span className="grow">
             <span className="title" style={{ fontSize: 15 }}>
-              Restock server
+              {sync?.paired && !sync.house ? (sync.isOwner ? 'Add or remove phones' : 'Phones on your Wi-Fi') : 'Phones on your Wi-Fi'}
             </span>
-            <span className="small">Sync at home and away through a small server you run yourself, and use Restock in a browser.</span>
+            <span className="small">Phone to phone on your Wi-Fi. No account, and nothing leaves your home. Up to {MAX_SYNC_PHONES} phones.</span>
           </span>
           <Icon name="chevron" size={18} />
         </button>
       </div>
       <p className="small">
-        With local sync on, the pantry, list, prices, categories and alerts are shared. Each phone keeps its own look, receipts, backups and shop
-        sign-ins.
+        {sync?.house
+          ? 'Each phone picks what it shares with the house (Sync and backups → What this phone shares), and keeps its own look, backups and shop sign-ins.'
+          : 'With sync on, the pantry, list, prices, categories and alerts are shared. Each phone keeps its own look, receipts, backups and shop sign-ins.'}
       </p>
 
       <div className="eyebrow">Categories</div>

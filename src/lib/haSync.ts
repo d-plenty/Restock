@@ -1,3 +1,4 @@
+import { sha256 } from '@noble/hashes/sha2';
 import { candidates, lineSummary, matchKey, parseLine, type NamedItem } from './haMatch';
 
 // 0.9.3: the shopping list both ways with a Home Assistant to-do list. Nothing here touches the
@@ -22,6 +23,9 @@ import { candidates, lineSummary, matchKey, parseLine, type NamedItem } from './
 //   emptied); if the items come back, it carries on as usual. Something added on either side
 //   meanwhile waits for that round, so it can't be added twice, and the next round always ends the
 //   hold one way or the other.
+// - 0.9.4: a line made from Home Assistant's item has an id made from the list and the item
+//   (haLineId), so two runners (a phone and the server, or two phones before ha:phone settled) make
+//   the same line, and the second one's add finds it there and pairs with it instead of doubling.
 
 /** A to-do item in Home Assistant. */
 export interface HaItem {
@@ -40,6 +44,16 @@ export interface HaApi {
 
 /** One request to Home Assistant. `path` starts with /api/. Rejects when it can't be reached at all (in words). */
 export type Transport = (method: 'GET' | 'POST', path: string, body?: unknown) => Promise<{ status: number; text: string }>;
+
+/**
+ * 0.9.4: the id of a line made from Home Assistant's item `uid` on the list `entity`:
+ * "ha-" + the first 24 hex characters of sha256("restock-ha-v1\n" + entity + "\n" + uid) (UTF-8).
+ * HaSync.java makes the same (tools/sync-test/vectors-v3.json).
+ */
+export function haLineId(entity: string, uid: string): string {
+  const h = sha256(new TextEncoder().encode(`restock-ha-v1\n${entity}\n${uid}`));
+  return 'ha-' + Array.from(h.subarray(0, 12), (x) => x.toString(16).padStart(2, '0')).join('');
+}
 
 /** Home Assistant has to be at least this new: the REST API answers todo.get_items (?return_response) from then. */
 export const MIN_HA_VERSION = '2024.8';
@@ -188,7 +202,12 @@ export interface Store {
   items(): Promise<NamedItem[]>;
   /** Saved "Always use this for …" words (matchKey → item id). */
   aliases(): Promise<Record<string, string>>;
-  addLine(l: Omit<Line, 'id'>): Promise<string>;
+  /**
+   * Adds a line and returns its id. 0.9.4: `uid` is the Home Assistant item it's made from: the
+   * store gives it the id haLineId(entity, uid), with INSERT OR IGNORE, and returns that id whether
+   * it added the line or one was there already (made by another runner and synced here).
+   */
+  addLine(l: Omit<Line, 'id'>, uid?: string): Promise<string>;
   updateLine(id: string, patch: Partial<Omit<Line, 'id'>>): Promise<void>;
   removeLines(ids: string[]): Promise<void>;
   loadState(): Promise<HaState>;
@@ -393,7 +412,15 @@ export async function syncRound(api: HaApi, store: Store, now: number = Date.now
       const line: Omit<Line, 'id'> = one
         ? { text: one.name, qty: whole ? 1 : said.qty, checked: false, groupId: one.id }
         : { text: said.name, qty: said.qty, checked: false };
-      const id = await store.addLine(line);
+      let id = await store.addLine(line, h.uid);
+      // 0.9.4: its line was there already (another runner made it from the same item): pair with that.
+      const there = byId.get(id);
+      if (there && !pairedIds.has(id)) {
+        await pairUp(h, there);
+        continue;
+      }
+      // Taken by a line already paired with another item (paired by its words): a line of its own.
+      if (there) id = await store.addLine(line);
       const added: Line = { id, ...line };
       byId.set(id, added);
       keep({ id, uid: h.uid, r: { s: summaryOf(added, names), c: false }, h: { s: h.summary, c: false } });

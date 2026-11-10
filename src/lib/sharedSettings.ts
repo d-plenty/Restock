@@ -38,6 +38,12 @@
 //                                                  "Pick my milk" button anywhere (goes with the line)
 //   ha:phone              "<device id>"            the one phone in the household that syncs the
 //                                                  shopping list with Home Assistant
+//
+// 0.9.4: one more kind of setting, written by the web app (never seeded):
+//
+//   branch:<chain>        { name, storeNo? }       the household's default branch of a shop, used by
+//                                                  a phone that hasn't picked its own (StoreChoice
+//                                                  primary empty, or still the default it took)
 
 import { SHOPS, shopDef, type CustomShop, type Section } from '../shops';
 import { siteOf } from './site';
@@ -123,6 +129,20 @@ export function sameShop(a: Obj, b: Obj): boolean {
   return SHOP_FIELDS.every((f) => (a[f] ?? null) === (b[f] ?? null));
 }
 
+export const BRANCH_PREFIX = 'branch:';
+
+/** 0.9.4: a branch:<chain> row's value, checked (SharedSettings.java checkBranch), or undefined. */
+export function checkBranch(k: string, v: unknown): { name: string; storeNo?: string } | undefined {
+  if (!k.startsWith(BRANCH_PREFIX)) return undefined;
+  const id = k.slice(BRANCH_PREFIX.length);
+  if (!builtIn(id) && !CUSTOM_ID.test(id)) return undefined;
+  if (!isObj(v) || typeof v.name !== 'string') return undefined;
+  const name = v.name.trim();
+  if (!name || name.length > 80 || /[\u0000-\u001f\u007f]/.test(name)) return undefined;
+  if (v.storeNo === undefined || v.storeNo === null) return { name };
+  return typeof v.storeNo === 'string' && /^[A-Za-z0-9 _-]{1,16}$/.test(v.storeNo) ? { name, storeNo: v.storeNo } : undefined;
+}
+
 /** A setting's value as it may be applied, or undefined when it can't be (wrong kind, out of range, unknown key). */
 export function checkValue(k: string, v: unknown): unknown {
   switch (k) {
@@ -139,6 +159,7 @@ export function checkValue(k: string, v: unknown): unknown {
     case 'tab:pharmacy':
       return typeof v === 'boolean' ? v : undefined;
   }
+  if (k.startsWith(BRANCH_PREFIX)) return checkBranch(k, v);
   if (!k.startsWith('shop:') || !isObj(v) || typeof v.on !== 'boolean') return undefined;
   const id = k.slice(5);
   if (builtIn(id)) return { on: v.on };
@@ -223,6 +244,8 @@ export function settingChangeOk(pk: string, row: unknown, deleted: boolean, room
     const ok = checkListRow(pk, decode(v));
     if (ok === undefined || v !== JSON.stringify(ok)) return false;
   }
+  // 0.9.4: a default branch only of the right shape.
+  if (pk.startsWith(BRANCH_PREFIX) && checkBranch(pk, decode(v)) === undefined) return false;
   if (room.has(pk)) return true;
   const kind = pk.startsWith(ALIAS_PREFIX) ? ALIAS_PREFIX : pk.startsWith(KEEP_PREFIX) ? KEEP_PREFIX : '';
   if ((kind && room.count(kind) >= LIST_ROWS_MAX) || room.count('') >= ROWS_MAX) return false;
@@ -233,6 +256,11 @@ export function settingChangeOk(pk: string, row: unknown, deleted: boolean, room
 /** Which tab a row is about (tab: and shop: rows), or null when it's the whole household's. */
 export function settingTab(k: string, v: string | null | undefined): string | null {
   if (k.startsWith('tab:')) return k.slice(4);
+  // 0.9.4: a default branch is about its shop's tab (a shop someone added: left alone).
+  if (k.startsWith(BRANCH_PREFIX)) {
+    const b = k.slice(BRANCH_PREFIX.length);
+    return builtIn(b) ? shopDef(b)!.section : 'unknown';
+  }
   if (!k.startsWith('shop:')) return null;
   const id = k.slice(5);
   if (builtIn(id)) return shopDef(id)!.section;
@@ -290,6 +318,23 @@ export function applyRows(s: Obj, rows: { k: string; v: string }[], tabs: Readon
       if ((sec[tab!] === true) !== val) {
         s.sections = { keg: sec.keg === true, pharmacy: sec.pharmacy === true, [tab!]: val };
         changed = true;
+      }
+    } else if (k.startsWith(BRANCH_PREFIX)) {
+      // 0.9.4: the household's default branch, only where this phone hasn't picked its own.
+      const id = k.slice(BRANCH_PREFIX.length);
+      const b = val as { name: string; storeNo?: string };
+      const stores = isObj(s.stores) ? s.stores : {};
+      const cur = isObj(stores[id]) ? stores[id] : {};
+      if (!cur.primary || cur.primary === cur.householdBranch) {
+        const next: Obj = { ...cur, primary: b.name, householdBranch: b.name };
+        if (id === 'coles' && b.storeNo && (!cur.branchStoreNo || cur.branchStoreNo === cur.householdStoreNo)) {
+          next.branchStoreNo = b.storeNo;
+          next.householdStoreNo = b.storeNo;
+        }
+        if (JSON.stringify(next) !== JSON.stringify(cur)) {
+          s.stores = { ...stores, [id]: next };
+          changed = true;
+        }
       }
     } else {
       const id = k.slice(5);

@@ -2,11 +2,19 @@ package family.plenty.restock;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
+import androidx.work.Constraints;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
+import org.json.JSONObject;
 
 /**
  * 0.9.3: Home Assistant's side of the shopping list (src/lib/homeAssistant.ts does the rest).
@@ -22,6 +30,12 @@ import java.util.regex.Pattern;
  *   certificate checked everywhere else, a timeout and a size limit on each. That's the same rule
  *   as sync; nothing in the app allows plain http otherwise.
  * - Only Home Assistant's API (/api/...), GET and POST.
+ * - 0.9.4: every round on this phone runs here (HaSync.java, the port of haSync.ts), one at a time
+ *   (HaSync.LOCK): asked for by the screens while Restock is open (RestockNative.haRound) and by the
+ *   background job after the household's sync (SyncWorker). In a house (its owner a Restock server)
+ *   this phone never runs its own (D12); the token leaves this phone only sealed inside the
+ *   handover (RSH3) or the upgrade (RSA3) payload that ServerSync makes (handoverPayload, through
+ *   ServerSync.haSource), and is deleted here once the server runs Home Assistant.
  */
 final class HomeAssistant {
     private HomeAssistant() {}
@@ -123,5 +137,137 @@ final class HomeAssistant {
         // A home's whole /api/states can be a few megabytes.
         SyncDav.Response r = SyncDav.request(method, u, h, b, SyncDav.MAX_LIST);
         return new Answer(r.status, r.text());
+    }
+
+    // ---------- 0.9.4: the rounds (HaSync.java) ----------
+
+    private static final String TAG = "RestockHa";
+
+    private static SyncEngine.Db db(Context c) {
+        return new SyncHub.AndroidDb(RestockDatabase.get(c));
+    }
+
+    private static HaSync.Host host(final Context c) {
+        return new HaSync.Host() {
+            @Override
+            public boolean tokenSaved() {
+                return hasToken(c);
+            }
+
+            @Override
+            public void forgetToken() {
+                forget(c);
+            }
+
+            @Override
+            public HaSync.Transport transport(final String address) {
+                return (method, path, body) -> {
+                    Answer a = request(c, address, method, path, body, null);
+                    return new HaSync.Answer(a.status, a.body);
+                };
+            }
+        };
+    }
+
+    /**
+     * One round now, for the screens (Sync now, every minute while open, after the list changes). A
+     * round already going (the background job's) is waited for, then this one runs, as
+     * homeAssistant.ts did. Also makes sure the background job runs while Home Assistant is on here.
+     */
+    static HaSync.Outcome round(Context c, boolean manual) throws Exception {
+        HaSync.Outcome out = HaSync.runLocked(db(c), host(c), manual, 90_000);
+        if (out.ran) schedule(c);
+        if (out.came > 0) refreshWidgets(c);
+        return out;
+    }
+
+    /**
+     * The background job's round (SyncWorker, after the household's sync). Never waits: if a round
+     * is going (Restock is open and doing one), this one is skipped. Open screens hear about what came
+     * in, like another phone's changes.
+     */
+    static HaSync.Outcome backgroundRound(Context c) throws Exception {
+        HaSync.Outcome out = HaSync.runLocked(db(c), host(c), false, 0);
+        if (out.came > 0) {
+            Runnable r = SyncHub.onChanged;
+            if (r != null) r.run();
+            refreshWidgets(c);
+        }
+        return out;
+    }
+
+    /** Whether Home Assistant is on for this phone (and it's the one), for the background job. */
+    static boolean wanted(Context c) {
+        try {
+            SyncEngine.Db d = db(c);
+            HaSync.Config cfg = HaSync.config(d);
+            if (!cfg.enabled || cfg.address.isEmpty() || !hasToken(c)) return false;
+            HaSync.Phone who = HaSync.haPhone(d);
+            return !who.house && (who.mine || who.device == null);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * The background job (SyncWorker, SyncHub.WORK_NAME) runs every 15 minutes or so while Home
+     * Assistant is on here, in a household or not. KEEP: the household's schedule, if it has one, stays.
+     */
+    static void schedule(Context c) {
+        try {
+            PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(SyncWorker.class, 15, TimeUnit.MINUTES)
+                .setConstraints(new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .build();
+            WorkManager.getInstance(c).enqueueUniquePeriodicWork(SyncHub.WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, req);
+        } catch (Exception e) {
+            Log.w(TAG, "schedule", e);
+        }
+    }
+
+    private static void refreshWidgets(Context c) {
+        try {
+            Widgets.refreshAll(c);
+        } catch (Throwable ignored) {
+            // widgets refresh next time
+        }
+    }
+
+    // ---------- 0.9.4: handing Home Assistant to the server (design section 9) ----------
+
+    /**
+     * The server's sync (ServerSync) asks here for what to hand over: in the handover (inside the
+     * owner phone's sealed RSH3 payload, as `ha`) and in the upgrade (sealed on its own, RSA3, as
+     * `ha`). Once at start-up (RestockNativePlugin.load, SyncWorker), before any round with the server.
+     */
+    static void install(Context c) {
+        final Context app = c.getApplicationContext() != null ? c.getApplicationContext() : c;
+        ServerSync.haSource = () -> handoverPayload(app);
+    }
+
+    /**
+     * For P3's handover and upgrade (ServerSync.haSource, installed above), and a bring (a join
+     * carrying the handover payload): `{ address, entity, enabled, token, state }`, or null when this
+     * phone isn't the one that does Home Assistant (or has no token). The token is read from the key
+     * store for this one purpose; ServerSync seals the answer before it leaves the phone, and it's
+     * never logged.
+     */
+    static JSONObject handoverPayload(Context c) throws Exception {
+        boolean got;
+        try {
+            got = HaSync.LOCK.tryLock(30, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            got = false;
+        }
+        try {
+            JSONObject o = HaSync.payload(db(c), hasToken(c));
+            if (o == null) return null;
+            // The token only goes with the address it was saved for.
+            if (!base(o.getString("address")).equals(prefs(c).getString(FOR, null))) return null;
+            o.put("token", token(c));
+            return o;
+        } finally {
+            if (got) HaSync.LOCK.unlock();
+        }
     }
 }

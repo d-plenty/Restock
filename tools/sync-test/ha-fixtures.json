@@ -1,0 +1,8389 @@
+{
+ "about": "0.9.4: Home Assistant's round on shared fixtures, run through src/lib/haSync.ts and haMatch.ts (src/lib/haParity.test.ts) and through HaSync.java and HaMatch.java (tools/sync-test HaSyncTest.java), which must give the same answers. `expect` is what haSync.ts gives (rewrite it with HA_FIXTURES_WRITE=1 npx vitest run src/lib/haParity.test.ts after a deliberate change to haSync.ts, then port the change to Java). Item uids are u1, u2, … in the order they're made; store a's own lines are r1, r2, …, store b's s1, s2, …; lines made from an item get haLineId(entity, uid).",
+ "pantry": [
+  {
+   "id": "g-milk",
+   "name": "Milk"
+  },
+  {
+   "id": "g-bread1",
+   "name": "Bread"
+  },
+  {
+   "id": "g-bread2",
+   "name": "bread"
+  },
+  {
+   "id": "g-eggs",
+   "name": "Eggs"
+  }
+ ],
+ "words": [
+  "milk",
+  "2 milk",
+  "2 x milk",
+  "2x milk",
+  "2× milk",
+  "milk x2",
+  "milk x 2",
+  "two milks",
+  "Twelve Eggs",
+  "some milk",
+  "the Milk",
+  "a loaf of bread",
+  "2xl shirt",
+  "box 2",
+  "0 milk",
+  "100 eggs",
+  "12 eggs",
+  "x2",
+  "1 x",
+  "  eggs.  ",
+  "milk!!",
+  "Crème brûlée",
+  "ŒUFS",
+  "Straße",
+  "İstanbul simit",
+  "ΟΔΟΣ",
+  "Молоко",
+  "牛奶",
+  "🍌",
+  "🍌 bananas",
+  "fish & chips",
+  "berries",
+  "potatoes",
+  "boxes",
+  "glasses",
+  "bus",
+  "status",
+  "pies",
+  "toys",
+  "cookie",
+  "dishes",
+  "2 milk",
+  "milk　x 3",
+  "tab\tmilk",
+  "",
+  "   ",
+  "A",
+  "an apple",
+  "more",
+  "2 Minute Noodles",
+  "Weet-Bix",
+  "oat-milk (2L)",
+  "50% off cheese",
+  "3 × Full cream milk",
+  "x milk",
+  "*milk*",
+  "milk *2",
+  "1st choice",
+  " milk"
+ ],
+ "wordAliases": {
+  "bread": "g-bread2",
+  "loaf of bread": "g-bread1"
+ },
+ "scenarios": [
+  {
+   "name": "voice adds link to the one pantry item they match",
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "milk"
+    },
+    {
+     "op": "seed",
+     "summary": "2 eggs"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "plain words when there's no match or more than one",
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "oat milk"
+    },
+    {
+     "op": "seed",
+     "summary": "bread"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "a saved alias straight away",
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "Bread"
+    },
+    {
+     "op": "round"
+    }
+   ],
+   "aliases": {
+    "bread": "g-bread2"
+   }
+  },
+  {
+   "name": "what's ticked off in Home Assistant isn't brought across",
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "milk",
+     "status": "completed"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "ticks both ways",
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "milk"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "haSet",
+     "uid": "u1",
+     "status": "completed"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "update",
+     "patch": {
+      "checked": false
+     },
+     "text": "Milk"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "removed on one side, removed on the other",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "pears"
+    },
+    {
+     "op": "seed",
+     "summary": "milk"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "remove",
+     "text": "apples"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "haRemove",
+     "uid": "u1"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "doesn't bring back what it just took off",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "pears"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "remove",
+     "text": "apples"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "kept if the other side changed it since",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "remove",
+     "text": "apples"
+    },
+    {
+     "op": "haSet",
+     "uid": "u1",
+     "status": "completed"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "readable names, renamed with the item",
+   "steps": [
+    {
+     "op": "line",
+     "text": "Milk",
+     "groupId": "g-milk",
+     "qty": 2
+    },
+    {
+     "op": "line",
+     "text": "Eggs",
+     "groupId": "g-eggs",
+     "checked": true
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "rename",
+     "groupId": "g-milk",
+     "name": "Full cream milk"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "update",
+     "patch": {
+      "qty": 3
+     },
+     "id": "r1"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "a rename in Home Assistant is a plain line's words",
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "oat milk"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "haSet",
+     "uid": "u1",
+     "summary": "2 almond milk"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "a linked line keeps its pantry name but takes a new number",
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "milk"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "haSet",
+     "uid": "u1",
+     "summary": "3 x milk"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "haSet",
+     "uid": "u1",
+     "summary": "chocolate"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "the first time: pairs by words instead of doubling",
+   "steps": [
+    {
+     "op": "line",
+     "text": "Milk",
+     "groupId": "g-milk"
+    },
+    {
+     "op": "line",
+     "text": "bananas"
+    },
+    {
+     "op": "line",
+     "text": "Eggs",
+     "groupId": "g-eggs",
+     "checked": true
+    },
+    {
+     "op": "seed",
+     "summary": "milk"
+    },
+    {
+     "op": "seed",
+     "summary": "Banana"
+    },
+    {
+     "op": "seed",
+     "summary": "eggs",
+     "status": "completed"
+    },
+    {
+     "op": "seed",
+     "summary": "tea"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "still to buy on either side is still to buy on both",
+   "steps": [
+    {
+     "op": "line",
+     "text": "Milk",
+     "groupId": "g-milk",
+     "checked": true
+    },
+    {
+     "op": "seed",
+     "summary": "milk"
+    },
+    {
+     "op": "seed",
+     "summary": "tea",
+     "status": "completed"
+    },
+    {
+     "op": "line",
+     "text": "tea"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "never adds twice when a round stops part-way",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "pears"
+    },
+    {
+     "op": "line",
+     "text": "plums"
+    },
+    {
+     "op": "line",
+     "text": "figs"
+    },
+    {
+     "op": "failAddAfter",
+     "n": 2
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "other alphabets, and no letters at all",
+   "steps": [
+    {
+     "op": "line",
+     "text": "Молоко"
+    },
+    {
+     "op": "line",
+     "text": "牛奶",
+     "qty": 2
+    },
+    {
+     "op": "line",
+     "text": "🍌"
+    },
+    {
+     "op": "seed",
+     "summary": "Хлеб"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "line",
+     "text": "Кефир 2%"
+    },
+    {
+     "op": "line",
+     "text": "Молоко 2%"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "Home Assistant fails in the middle of the paired lines",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "pears"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "update",
+     "patch": {
+      "checked": true
+     },
+     "id": "r1"
+    },
+    {
+     "op": "update",
+     "patch": {
+      "checked": true
+     },
+     "id": "r2"
+    },
+    {
+     "op": "failUpdateOnce"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "safety catch: held while starting up, carries on when the items come back",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "Milk",
+     "groupId": "g-milk"
+    },
+    {
+     "op": "seed",
+     "summary": "bread"
+    },
+    {
+     "op": "round",
+     "now": 1000000000
+    },
+    {
+     "op": "haSwapOut"
+    },
+    {
+     "op": "round",
+     "now": 1000060000
+    },
+    {
+     "op": "round",
+     "now": 1000119999
+    },
+    {
+     "op": "haSwapIn"
+    },
+    {
+     "op": "round",
+     "now": 1000180000
+    },
+    {
+     "op": "haSwapOut"
+    },
+    {
+     "op": "round",
+     "now": 1003600000
+    }
+   ]
+  },
+  {
+   "name": "safety catch: two empty looks hours apart don't confirm each other",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "Milk",
+     "groupId": "g-milk"
+    },
+    {
+     "op": "seed",
+     "summary": "bread"
+    },
+    {
+     "op": "round",
+     "now": 1000000000
+    },
+    {
+     "op": "haSwapOut"
+    },
+    {
+     "op": "round",
+     "now": 1000060000
+    },
+    {
+     "op": "round",
+     "now": 1010800000
+    },
+    {
+     "op": "round",
+     "now": 1010860000
+    },
+    {
+     "op": "round",
+     "now": 1010980000
+    }
+   ]
+  },
+  {
+   "name": "safety catch: cleared on a second look 2 minutes on, a changed line stays",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "Milk",
+     "groupId": "g-milk"
+    },
+    {
+     "op": "seed",
+     "summary": "bread"
+    },
+    {
+     "op": "round",
+     "now": 1000000000
+    },
+    {
+     "op": "haSwapOut"
+    },
+    {
+     "op": "round",
+     "now": 1000060000
+    },
+    {
+     "op": "update",
+     "patch": {
+      "qty": 3
+     },
+     "text": "apples"
+    },
+    {
+     "op": "round",
+     "now": 1000120000
+    },
+    {
+     "op": "round",
+     "now": 1000180000
+    },
+    {
+     "op": "round",
+     "now": 1000240000
+    }
+   ]
+  },
+  {
+   "name": "safety catch: an add in Restock during the hold, list comes back",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "Milk",
+     "groupId": "g-milk"
+    },
+    {
+     "op": "seed",
+     "summary": "bread"
+    },
+    {
+     "op": "round",
+     "now": 1000000000
+    },
+    {
+     "op": "haSwapOut"
+    },
+    {
+     "op": "round",
+     "now": 1000060000
+    },
+    {
+     "op": "line",
+     "text": "pears"
+    },
+    {
+     "op": "round",
+     "now": 1000090000
+    },
+    {
+     "op": "haSwapIn"
+    },
+    {
+     "op": "round",
+     "now": 1000240000
+    },
+    {
+     "op": "round",
+     "now": 1000300000
+    }
+   ]
+  },
+  {
+   "name": "safety catch: an add in Restock during the hold, list really emptied",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "Milk",
+     "groupId": "g-milk"
+    },
+    {
+     "op": "seed",
+     "summary": "bread"
+    },
+    {
+     "op": "round",
+     "now": 1000000000
+    },
+    {
+     "op": "haSwapOut"
+    },
+    {
+     "op": "round",
+     "now": 1000060000
+    },
+    {
+     "op": "line",
+     "text": "pears"
+    },
+    {
+     "op": "round",
+     "now": 1000090000
+    },
+    {
+     "op": "round",
+     "now": 1000240000
+    },
+    {
+     "op": "round",
+     "now": 1000300000
+    }
+   ]
+  },
+  {
+   "name": "safety catch: an add in Home Assistant during the hold, list comes back",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "Milk",
+     "groupId": "g-milk"
+    },
+    {
+     "op": "seed",
+     "summary": "bread"
+    },
+    {
+     "op": "round",
+     "now": 1000000000
+    },
+    {
+     "op": "haSwapOut"
+    },
+    {
+     "op": "round",
+     "now": 1000060000
+    },
+    {
+     "op": "haSwapIn"
+    },
+    {
+     "op": "seed",
+     "summary": "eggs"
+    },
+    {
+     "op": "round",
+     "now": 1000090000
+    },
+    {
+     "op": "round",
+     "now": 1000120000
+    }
+   ]
+  },
+  {
+   "name": "safety catch: an add in Home Assistant to a list really emptied",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "Milk",
+     "groupId": "g-milk"
+    },
+    {
+     "op": "seed",
+     "summary": "bread"
+    },
+    {
+     "op": "round",
+     "now": 1000000000
+    },
+    {
+     "op": "haSwapOut"
+    },
+    {
+     "op": "round",
+     "now": 1000060000
+    },
+    {
+     "op": "seed",
+     "summary": "eggs"
+    },
+    {
+     "op": "round",
+     "now": 1000090000
+    },
+    {
+     "op": "round",
+     "now": 1000120000
+    }
+   ]
+  },
+  {
+   "name": "safety catch: a clock that went backwards starts the wait afresh",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "line",
+     "text": "Milk",
+     "groupId": "g-milk"
+    },
+    {
+     "op": "seed",
+     "summary": "bread"
+    },
+    {
+     "op": "round",
+     "now": 1000000000
+    },
+    {
+     "op": "haSwapOut"
+    },
+    {
+     "op": "round",
+     "now": 1000060000
+    },
+    {
+     "op": "round",
+     "now": 1000000000
+    },
+    {
+     "op": "round",
+     "now": 1000060000
+    },
+    {
+     "op": "round",
+     "now": 1000180000
+    }
+   ]
+  },
+  {
+   "name": "an empty list with nothing paired is just empty",
+   "steps": [
+    {
+     "op": "round"
+    },
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "remove",
+     "text": "apples"
+    },
+    {
+     "op": "haSwapOut"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "deterministic ids: two runners on one list make one line per item",
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "oat milk"
+    },
+    {
+     "op": "seed",
+     "summary": "2 eggs"
+    },
+    {
+     "op": "round",
+     "store": "a"
+    },
+    {
+     "op": "update",
+     "patch": {
+      "text": "oat milk (2L)"
+     },
+     "text": "oat milk"
+    },
+    {
+     "op": "round",
+     "store": "b"
+    },
+    {
+     "op": "update",
+     "patch": {
+      "text": "oat milk (1L)"
+     },
+     "text": "oat milk (2L)"
+    },
+    {
+     "op": "round",
+     "store": "b"
+    },
+    {
+     "op": "round",
+     "store": "a"
+    }
+   ]
+  },
+  {
+   "name": "deterministic ids: an id taken by a line paired with another item",
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "tea"
+    },
+    {
+     "op": "line",
+     "text": "coffee",
+     "idOf": "u1"
+    },
+    {
+     "op": "haPush",
+     "uid": "u9",
+     "summary": "coffee"
+    },
+    {
+     "op": "state",
+     "pairs": [
+      {
+       "idOf": "u1",
+       "uid": "u9",
+       "r": {
+        "s": "coffee",
+        "c": false
+       },
+       "h": {
+        "s": "coffee",
+        "c": false
+       }
+      }
+     ]
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "words as people say them",
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "2 Minute Noodles"
+    },
+    {
+     "op": "seed",
+     "summary": "  milk.  "
+    },
+    {
+     "op": "seed",
+     "summary": "bread x2"
+    },
+    {
+     "op": "seed",
+     "summary": "two eggs"
+    },
+    {
+     "op": "seed",
+     "summary": "some Milk"
+    },
+    {
+     "op": "seed",
+     "summary": "a loaf of bread"
+    },
+    {
+     "op": "seed",
+     "summary": "3× Weet-Bix"
+    },
+    {
+     "op": "seed",
+     "summary": "Crème brûlée"
+    },
+    {
+     "op": "seed",
+     "summary": ""
+    },
+    {
+     "op": "seed",
+     "summary": "   "
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    }
+   ],
+   "pantry": [
+    {
+     "id": "g-milk",
+     "name": "Milk"
+    },
+    {
+     "id": "g-noodles",
+     "name": "2 Minute Noodles"
+    },
+    {
+     "id": "g-eggs",
+     "name": "Eggs"
+    },
+    {
+     "id": "g-weetbix",
+     "name": "Weet-Bix"
+    },
+    {
+     "id": "g-creme",
+     "name": "Creme Brulee"
+    }
+   ]
+  },
+  {
+   "name": "a line whose pantry item went, and a rename to nothing",
+   "steps": [
+    {
+     "op": "line",
+     "text": "Juice",
+     "groupId": "g-gone"
+    },
+    {
+     "op": "seed",
+     "summary": "cheese"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "haSet",
+     "uid": "u2",
+     "summary": ""
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "a different entity makes different ids",
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "milk"
+    },
+    {
+     "op": "seed",
+     "summary": "tea"
+    },
+    {
+     "op": "round"
+    }
+   ],
+   "entity": "todo.groceries"
+  },
+  {
+   "name": "a tick and a rename at once, both sides",
+   "steps": [
+    {
+     "op": "line",
+     "text": "apples"
+    },
+    {
+     "op": "seed",
+     "summary": "pears"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "update",
+     "patch": {
+      "checked": true,
+      "qty": 2
+     },
+     "text": "apples"
+    },
+    {
+     "op": "haSet",
+     "uid": "u1",
+     "summary": "nashi pears",
+     "status": "completed"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  }
+ ],
+ "expect": {
+  "words": [
+   {
+    "w": "milk",
+    "key": "milk",
+    "parsed": [
+     1,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "milk",
+     "3 × milk"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "2 milk",
+    "key": "2 milk",
+    "parsed": [
+     2,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "2 milk",
+     "3 × 2 milk"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "2 x milk",
+    "key": "2 x milk",
+    "parsed": [
+     2,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "2 x milk",
+     "3 × 2 x milk"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "2x milk",
+    "key": "2x milk",
+    "parsed": [
+     2,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "2x milk",
+     "3 × 2x milk"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "2× milk",
+    "key": "2 milk",
+    "parsed": [
+     2,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "2× milk",
+     "3 × 2× milk"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "milk x2",
+    "key": "milk x2",
+    "parsed": [
+     2,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "milk x2",
+     "3 × milk x2"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "milk x 2",
+    "key": "milk x 2",
+    "parsed": [
+     2,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "milk x 2",
+     "3 × milk x 2"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "two milks",
+    "key": "two milk",
+    "parsed": [
+     2,
+     "milks",
+     "milk"
+    ],
+    "summary": [
+     "two milks",
+     "3 × two milks"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "Twelve Eggs",
+    "key": "twelve egg",
+    "parsed": [
+     12,
+     "Eggs",
+     "egg"
+    ],
+    "summary": [
+     "Twelve Eggs",
+     "3 × Twelve Eggs"
+    ],
+    "candidates": [
+     "g-eggs"
+    ]
+   },
+   {
+    "w": "some milk",
+    "key": "milk",
+    "parsed": [
+     1,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "some milk",
+     "3 × some milk"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "the Milk",
+    "key": "milk",
+    "parsed": [
+     1,
+     "Milk",
+     "milk"
+    ],
+    "summary": [
+     "the Milk",
+     "3 × the Milk"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "a loaf of bread",
+    "key": "loaf of bread",
+    "parsed": [
+     1,
+     "loaf of bread",
+     "loaf of bread"
+    ],
+    "summary": [
+     "a loaf of bread",
+     "3 × a loaf of bread"
+    ],
+    "candidates": [
+     "g-bread1"
+    ]
+   },
+   {
+    "w": "2xl shirt",
+    "key": "2xl shirt",
+    "parsed": [
+     1,
+     "2xl shirt",
+     "2xl shirt"
+    ],
+    "summary": [
+     "2xl shirt",
+     "3 × 2xl shirt"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "box 2",
+    "key": "box 2",
+    "parsed": [
+     1,
+     "box 2",
+     "box 2"
+    ],
+    "summary": [
+     "box 2",
+     "3 × box 2"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "0 milk",
+    "key": "0 milk",
+    "parsed": [
+     1,
+     "0 milk",
+     "0 milk"
+    ],
+    "summary": [
+     "0 milk",
+     "3 × 0 milk"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "100 eggs",
+    "key": "100 egg",
+    "parsed": [
+     1,
+     "100 eggs",
+     "100 egg"
+    ],
+    "summary": [
+     "100 eggs",
+     "3 × 100 eggs"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "12 eggs",
+    "key": "12 egg",
+    "parsed": [
+     12,
+     "eggs",
+     "egg"
+    ],
+    "summary": [
+     "12 eggs",
+     "3 × 12 eggs"
+    ],
+    "candidates": [
+     "g-eggs"
+    ]
+   },
+   {
+    "w": "x2",
+    "key": "x2",
+    "parsed": [
+     1,
+     "x2",
+     "x2"
+    ],
+    "summary": [
+     "x2",
+     "3 × x2"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "1 x",
+    "key": "1 x",
+    "parsed": [
+     1,
+     "x",
+     "x"
+    ],
+    "summary": [
+     "1 x",
+     "3 × 1 x"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "  eggs.  ",
+    "key": "egg",
+    "parsed": [
+     1,
+     "eggs",
+     "egg"
+    ],
+    "summary": [
+     "eggs.",
+     "3 × eggs."
+    ],
+    "candidates": [
+     "g-eggs"
+    ]
+   },
+   {
+    "w": "milk!!",
+    "key": "milk",
+    "parsed": [
+     1,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "milk!!",
+     "3 × milk!!"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "Crème brûlée",
+    "key": "creme brulee",
+    "parsed": [
+     1,
+     "Crème brûlée",
+     "creme brulee"
+    ],
+    "summary": [
+     "Crème brûlée",
+     "3 × Crème brûlée"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "ŒUFS",
+    "key": "œuf",
+    "parsed": [
+     1,
+     "ŒUFS",
+     "œuf"
+    ],
+    "summary": [
+     "ŒUFS",
+     "3 × ŒUFS"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "Straße",
+    "key": "straße",
+    "parsed": [
+     1,
+     "Straße",
+     "straße"
+    ],
+    "summary": [
+     "Straße",
+     "3 × Straße"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "İstanbul simit",
+    "key": "istanbul simit",
+    "parsed": [
+     1,
+     "İstanbul simit",
+     "istanbul simit"
+    ],
+    "summary": [
+     "İstanbul simit",
+     "3 × İstanbul simit"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "ΟΔΟΣ",
+    "key": "οδος",
+    "parsed": [
+     1,
+     "ΟΔΟΣ",
+     "οδος"
+    ],
+    "summary": [
+     "ΟΔΟΣ",
+     "3 × ΟΔΟΣ"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "Молоко",
+    "key": "молоко",
+    "parsed": [
+     1,
+     "Молоко",
+     "молоко"
+    ],
+    "summary": [
+     "Молоко",
+     "3 × Молоко"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "牛奶",
+    "key": "牛奶",
+    "parsed": [
+     1,
+     "牛奶",
+     "牛奶"
+    ],
+    "summary": [
+     "牛奶",
+     "3 × 牛奶"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "🍌",
+    "key": "",
+    "parsed": [
+     1,
+     "🍌",
+     ""
+    ],
+    "summary": [
+     "🍌",
+     "3 × 🍌"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "🍌 bananas",
+    "key": "banana",
+    "parsed": [
+     1,
+     "🍌 bananas",
+     "banana"
+    ],
+    "summary": [
+     "🍌 bananas",
+     "3 × 🍌 bananas"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "fish & chips",
+    "key": "fish and chip",
+    "parsed": [
+     1,
+     "fish & chips",
+     "fish and chip"
+    ],
+    "summary": [
+     "fish & chips",
+     "3 × fish & chips"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "berries",
+    "key": "berri",
+    "parsed": [
+     1,
+     "berries",
+     "berri"
+    ],
+    "summary": [
+     "berries",
+     "3 × berries"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "potatoes",
+    "key": "potato",
+    "parsed": [
+     1,
+     "potatoes",
+     "potato"
+    ],
+    "summary": [
+     "potatoes",
+     "3 × potatoes"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "boxes",
+    "key": "box",
+    "parsed": [
+     1,
+     "boxes",
+     "box"
+    ],
+    "summary": [
+     "boxes",
+     "3 × boxes"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "glasses",
+    "key": "glass",
+    "parsed": [
+     1,
+     "glasses",
+     "glass"
+    ],
+    "summary": [
+     "glasses",
+     "3 × glasses"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "bus",
+    "key": "bus",
+    "parsed": [
+     1,
+     "bus",
+     "bus"
+    ],
+    "summary": [
+     "bus",
+     "3 × bus"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "status",
+    "key": "status",
+    "parsed": [
+     1,
+     "status",
+     "status"
+    ],
+    "summary": [
+     "status",
+     "3 × status"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "pies",
+    "key": "pi",
+    "parsed": [
+     1,
+     "pies",
+     "pi"
+    ],
+    "summary": [
+     "pies",
+     "3 × pies"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "toys",
+    "key": "toi",
+    "parsed": [
+     1,
+     "toys",
+     "toi"
+    ],
+    "summary": [
+     "toys",
+     "3 × toys"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "cookie",
+    "key": "cooki",
+    "parsed": [
+     1,
+     "cookie",
+     "cooki"
+    ],
+    "summary": [
+     "cookie",
+     "3 × cookie"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "dishes",
+    "key": "dish",
+    "parsed": [
+     1,
+     "dishes",
+     "dish"
+    ],
+    "summary": [
+     "dishes",
+     "3 × dishes"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "2 milk",
+    "key": "2 milk",
+    "parsed": [
+     2,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "2 milk",
+     "3 × 2 milk"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "milk　x 3",
+    "key": "milk x 3",
+    "parsed": [
+     3,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "milk x 3",
+     "3 × milk x 3"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "tab\tmilk",
+    "key": "tab milk",
+    "parsed": [
+     1,
+     "tab milk",
+     "tab milk"
+    ],
+    "summary": [
+     "tab milk",
+     "3 × tab milk"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "",
+    "key": "",
+    "parsed": [
+     1,
+     "",
+     ""
+    ],
+    "summary": [
+     "",
+     "3 × "
+    ],
+    "candidates": []
+   },
+   {
+    "w": "   ",
+    "key": "",
+    "parsed": [
+     1,
+     "",
+     ""
+    ],
+    "summary": [
+     "",
+     "3 × "
+    ],
+    "candidates": []
+   },
+   {
+    "w": "A",
+    "key": "a",
+    "parsed": [
+     1,
+     "A",
+     "a"
+    ],
+    "summary": [
+     "A",
+     "3 × A"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "an apple",
+    "key": "apple",
+    "parsed": [
+     1,
+     "apple",
+     "apple"
+    ],
+    "summary": [
+     "an apple",
+     "3 × an apple"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "more",
+    "key": "more",
+    "parsed": [
+     1,
+     "more",
+     "more"
+    ],
+    "summary": [
+     "more",
+     "3 × more"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "2 Minute Noodles",
+    "key": "2 minute noodle",
+    "parsed": [
+     2,
+     "Minute Noodles",
+     "minute noodle"
+    ],
+    "summary": [
+     "2 Minute Noodles",
+     "3 × 2 Minute Noodles"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "Weet-Bix",
+    "key": "weet bix",
+    "parsed": [
+     1,
+     "Weet-Bix",
+     "weet bix"
+    ],
+    "summary": [
+     "Weet-Bix",
+     "3 × Weet-Bix"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "oat-milk (2L)",
+    "key": "oat milk 2l",
+    "parsed": [
+     1,
+     "oat-milk (2L)",
+     "oat milk 2l"
+    ],
+    "summary": [
+     "oat-milk (2L)",
+     "3 × oat-milk (2L)"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "50% off cheese",
+    "key": "50 off cheese",
+    "parsed": [
+     1,
+     "50% off cheese",
+     "50 off cheese"
+    ],
+    "summary": [
+     "50% off cheese",
+     "3 × 50% off cheese"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "3 × Full cream milk",
+    "key": "3 full cream milk",
+    "parsed": [
+     3,
+     "Full cream milk",
+     "full cream milk"
+    ],
+    "summary": [
+     "3 × Full cream milk",
+     "3 × 3 × Full cream milk"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "x milk",
+    "key": "x milk",
+    "parsed": [
+     1,
+     "x milk",
+     "x milk"
+    ],
+    "summary": [
+     "x milk",
+     "3 × x milk"
+    ],
+    "candidates": []
+   },
+   {
+    "w": "*milk*",
+    "key": "milk",
+    "parsed": [
+     1,
+     "*milk*",
+     "milk"
+    ],
+    "summary": [
+     "*milk*",
+     "3 × *milk*"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "milk *2",
+    "key": "milk 2",
+    "parsed": [
+     2,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "milk *2",
+     "3 × milk *2"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   },
+   {
+    "w": "1st choice",
+    "key": "1st choice",
+    "parsed": [
+     1,
+     "1st choice",
+     "1st choice"
+    ],
+    "summary": [
+     "1st choice",
+     "3 × 1st choice"
+    ],
+    "candidates": []
+   },
+   {
+    "w": " milk",
+    "key": "milk",
+    "parsed": [
+     1,
+     "milk",
+     "milk"
+    ],
+    "summary": [
+     "milk",
+     "3 × milk"
+    ],
+    "candidates": [
+     "g-milk"
+    ]
+   }
+  ],
+  "scenarios": {
+   "voice adds link to the one pantry item they match": [
+    {
+     "r": {
+      "came": 2,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "2 eggs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Eggs",
+       2,
+       false,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Milk",
+        false,
+        "milk",
+        false
+       ],
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "2 × Eggs",
+        false,
+        "2 eggs",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "2 eggs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Eggs",
+       2,
+       false,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Milk",
+        false,
+        "milk",
+        false
+       ],
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "2 × Eggs",
+        false,
+        "2 eggs",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "plain words when there's no match or more than one": [
+    {
+     "r": {
+      "came": 2,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "oat milk",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "bread",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "oat milk",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "oat milk",
+        false,
+        "oat milk",
+        false
+       ],
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "bread",
+        false,
+        "bread",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "a saved alias straight away": [
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "Bread",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       "g-bread2"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "Bread",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "what's ticked off in Home Assistant isn't brought across": [
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "completed"
+      ]
+     ],
+     "lines": [],
+     "state": {
+      "pairs": [],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "ticks both ways": [
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Milk",
+        false,
+        "milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "completed"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Milk",
+       1,
+       true,
+       "g-milk"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Milk",
+        true,
+        "milk",
+        true
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "update u1 {\"status\":\"needs_action\"}"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Milk",
+        false,
+        "milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "removed on one side, removed on the other": [
+    {
+     "r": {
+      "came": 1,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add pears",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "pears",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Milk",
+        false,
+        "milk",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "remove u2"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r2",
+       "pears",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Milk",
+        false,
+        "milk",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u3",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r2",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r2",
+        "u3",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "doesn't bring back what it just took off": [
+    {
+     "r": {
+      "came": 0,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add pears",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u2",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "remove u1"
+     ],
+     "ha": [
+      [
+       "u2",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r2",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r2",
+        "u2",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u2",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r2",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r2",
+        "u2",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "kept if the other side changed it since": [
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "apples",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "apples",
+        false,
+        "apples",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "apples",
+       "completed"
+      ]
+     ],
+     "lines": [],
+     "state": {
+      "pairs": [],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "readable names, renamed with the item": [
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add 2 × Milk",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "2 × Milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Milk",
+       2,
+       false,
+       "g-milk"
+      ],
+      [
+       "r2",
+       "Eggs",
+       1,
+       true,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "2 × Milk",
+        false,
+        "2 × Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "update u1 {\"rename\":\"2 × Full cream milk\"}"
+     ],
+     "ha": [
+      [
+       "u1",
+       "2 × Full cream milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Milk",
+       2,
+       false,
+       "g-milk"
+      ],
+      [
+       "r2",
+       "Eggs",
+       1,
+       true,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "2 × Full cream milk",
+        false,
+        "2 × Full cream milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "update u1 {\"rename\":\"3 × Full cream milk\"}"
+     ],
+     "ha": [
+      [
+       "u1",
+       "3 × Full cream milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Milk",
+       3,
+       false,
+       "g-milk"
+      ],
+      [
+       "r2",
+       "Eggs",
+       1,
+       true,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "3 × Full cream milk",
+        false,
+        "3 × Full cream milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "a rename in Home Assistant is a plain line's words": [
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "oat milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "oat milk",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "oat milk",
+        false,
+        "oat milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "2 almond milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "almond milk",
+       2,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "2 × almond milk",
+        false,
+        "2 almond milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "a linked line keeps its pantry name but takes a new number": [
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Milk",
+        false,
+        "milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "3 x milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Milk",
+       3,
+       false,
+       "g-milk"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "3 × Milk",
+        false,
+        "3 x milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "update u1 {\"rename\":\"3 × Milk\"}"
+     ],
+     "ha": [
+      [
+       "u1",
+       "3 × Milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Milk",
+       3,
+       false,
+       "g-milk"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "3 × Milk",
+        false,
+        "3 × Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "the first time: pairs by words instead of doubling": [
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "Banana",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "eggs",
+       "completed"
+      ],
+      [
+       "u4",
+       "tea",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "r2",
+       "bananas",
+       1,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "Eggs",
+       1,
+       true,
+       "g-eggs"
+      ],
+      [
+       "ha-dab2a7bc169d956dead757f2",
+       "tea",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "Milk",
+        false,
+        "milk",
+        false
+       ],
+       [
+        "r2",
+        "u2",
+        "bananas",
+        false,
+        "Banana",
+        false
+       ],
+       [
+        "r3",
+        "u3",
+        "Eggs",
+        true,
+        "eggs",
+        true
+       ],
+       [
+        "ha-dab2a7bc169d956dead757f2",
+        "u4",
+        "tea",
+        false,
+        "tea",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "Banana",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "eggs",
+       "completed"
+      ],
+      [
+       "u4",
+       "tea",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "r2",
+       "bananas",
+       1,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "Eggs",
+       1,
+       true,
+       "g-eggs"
+      ],
+      [
+       "ha-dab2a7bc169d956dead757f2",
+       "tea",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "Milk",
+        false,
+        "milk",
+        false
+       ],
+       [
+        "r2",
+        "u2",
+        "bananas",
+        false,
+        "Banana",
+        false
+       ],
+       [
+        "r3",
+        "u3",
+        "Eggs",
+        true,
+        "eggs",
+        true
+       ],
+       [
+        "ha-dab2a7bc169d956dead757f2",
+        "u4",
+        "tea",
+        false,
+        "tea",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "still to buy on either side is still to buy on both": [
+    {
+     "r": {
+      "came": 1,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "update u2 {\"status\":\"needs_action\"}"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "tea",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "r2",
+       "tea",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "Milk",
+        false,
+        "milk",
+        false
+       ],
+       [
+        "r2",
+        "u2",
+        "tea",
+        false,
+        "tea",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "never adds twice when a round stops part-way": [
+    {
+     "r": {
+      "error": "The connection to Home Assistant broke off."
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add pears"
+     ],
+     "ha": [
+      [
+       "u1",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "pears",
+       1,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "plums",
+       1,
+       false,
+       null
+      ],
+      [
+       "r4",
+       "figs",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add plums",
+      "add figs",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "pears",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "plums",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "figs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "pears",
+       1,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "plums",
+       1,
+       false,
+       null
+      ],
+      [
+       "r4",
+       "figs",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u2",
+        "pears",
+        false,
+        "pears",
+        false
+       ],
+       [
+        "r3",
+        "u3",
+        "plums",
+        false,
+        "plums",
+        false
+       ],
+       [
+        "r4",
+        "u4",
+        "figs",
+        false,
+        "figs",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "pears",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "plums",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "figs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "pears",
+       1,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "plums",
+       1,
+       false,
+       null
+      ],
+      [
+       "r4",
+       "figs",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u2",
+        "pears",
+        false,
+        "pears",
+        false
+       ],
+       [
+        "r3",
+        "u3",
+        "plums",
+        false,
+        "plums",
+        false
+       ],
+       [
+        "r4",
+        "u4",
+        "figs",
+        false,
+        "figs",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "other alphabets, and no letters at all": [
+    {
+     "r": {
+      "came": 1,
+      "went": 3,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add Молоко",
+      "add 2 × 牛奶",
+      "add 🍌",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "Хлеб",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "Молоко",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "2 × 牛奶",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "🍌",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Молоко",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "牛奶",
+       2,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "🍌",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Хлеб",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Хлеб",
+        false,
+        "Хлеб",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "Молоко",
+        false,
+        "Молоко",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "2 × 牛奶",
+        false,
+        "2 × 牛奶",
+        false
+       ],
+       [
+        "r3",
+        "u4",
+        "🍌",
+        false,
+        "🍌",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "Хлеб",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "Молоко",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "2 × 牛奶",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "🍌",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Молоко",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "牛奶",
+       2,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "🍌",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Хлеб",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Хлеб",
+        false,
+        "Хлеб",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "Молоко",
+        false,
+        "Молоко",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "2 × 牛奶",
+        false,
+        "2 × 牛奶",
+        false
+       ],
+       [
+        "r3",
+        "u4",
+        "🍌",
+        false,
+        "🍌",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "Хлеб",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "Молоко",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "2 × 牛奶",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "🍌",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Молоко",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "牛奶",
+       2,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "🍌",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Хлеб",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Хлеб",
+        false,
+        "Хлеб",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "Молоко",
+        false,
+        "Молоко",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "2 × 牛奶",
+        false,
+        "2 × 牛奶",
+        false
+       ],
+       [
+        "r3",
+        "u4",
+        "🍌",
+        false,
+        "🍌",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "Хлеб",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "Молоко",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "2 × 牛奶",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "🍌",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Молоко",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "牛奶",
+       2,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "🍌",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Хлеб",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Хлеб",
+        false,
+        "Хлеб",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "Молоко",
+        false,
+        "Молоко",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "2 × 牛奶",
+        false,
+        "2 × 牛奶",
+        false
+       ],
+       [
+        "r3",
+        "u4",
+        "🍌",
+        false,
+        "🍌",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add Кефир 2%",
+      "add Молоко 2%",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "Хлеб",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "Молоко",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "2 × 牛奶",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "🍌",
+       "needs_action"
+      ],
+      [
+       "u5",
+       "Кефир 2%",
+       "needs_action"
+      ],
+      [
+       "u6",
+       "Молоко 2%",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Молоко",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "牛奶",
+       2,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "🍌",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Хлеб",
+       1,
+       false,
+       null
+      ],
+      [
+       "r4",
+       "Кефир 2%",
+       1,
+       false,
+       null
+      ],
+      [
+       "r5",
+       "Молоко 2%",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Хлеб",
+        false,
+        "Хлеб",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "Молоко",
+        false,
+        "Молоко",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "2 × 牛奶",
+        false,
+        "2 × 牛奶",
+        false
+       ],
+       [
+        "r3",
+        "u4",
+        "🍌",
+        false,
+        "🍌",
+        false
+       ],
+       [
+        "r4",
+        "u5",
+        "Кефир 2%",
+        false,
+        "Кефир 2%",
+        false
+       ],
+       [
+        "r5",
+        "u6",
+        "Молоко 2%",
+        false,
+        "Молоко 2%",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "Хлеб",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "Молоко",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "2 × 牛奶",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "🍌",
+       "needs_action"
+      ],
+      [
+       "u5",
+       "Кефир 2%",
+       "needs_action"
+      ],
+      [
+       "u6",
+       "Молоко 2%",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Молоко",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "牛奶",
+       2,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "🍌",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "Хлеб",
+       1,
+       false,
+       null
+      ],
+      [
+       "r4",
+       "Кефир 2%",
+       1,
+       false,
+       null
+      ],
+      [
+       "r5",
+       "Молоко 2%",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "Хлеб",
+        false,
+        "Хлеб",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "Молоко",
+        false,
+        "Молоко",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "2 × 牛奶",
+        false,
+        "2 × 牛奶",
+        false
+       ],
+       [
+        "r3",
+        "u4",
+        "🍌",
+        false,
+        "🍌",
+        false
+       ],
+       [
+        "r4",
+        "u5",
+        "Кефир 2%",
+        false,
+        "Кефир 2%",
+        false
+       ],
+       [
+        "r5",
+        "u6",
+        "Молоко 2%",
+        false,
+        "Молоко 2%",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "Home Assistant fails in the middle of the paired lines": [
+    {
+     "r": {
+      "came": 0,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add pears",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u2",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "error": "Home Assistant had a problem (500)."
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       true,
+       null
+      ],
+      [
+       "r2",
+       "pears",
+       1,
+       true,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u2",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "update u1 {\"status\":\"completed\"}",
+      "update u2 {\"status\":\"completed\"}"
+     ],
+     "ha": [
+      [
+       "u1",
+       "apples",
+       "completed"
+      ],
+      [
+       "u2",
+       "pears",
+       "completed"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       true,
+       null
+      ],
+      [
+       "r2",
+       "pears",
+       1,
+       true,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "apples",
+        true,
+        "apples",
+        true
+       ],
+       [
+        "r2",
+        "u2",
+        "pears",
+        true,
+        "pears",
+        true
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "safety catch: held while starting up, carries on when the items come back": [
+    {
+     "r": {
+      "came": 1,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add Milk",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000060000
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000119999
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1003600000,
+      "emptyLast": 1003600000
+     }
+    }
+   ],
+   "safety catch: two empty looks hours apart don't confirm each other": [
+    {
+     "r": {
+      "came": 1,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add Milk",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000060000
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1010800000,
+      "emptyLast": 1010800000
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1010800000,
+      "emptyLast": 1010860000
+     }
+    },
+    {
+     "r": {
+      "came": 3,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [],
+     "state": {
+      "pairs": [],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "safety catch: cleared on a second look 2 minutes on, a changed line stays": [
+    {
+     "r": {
+      "came": 1,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add Milk",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000060000
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       3,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000120000
+     }
+    },
+    {
+     "r": {
+      "came": 2,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add 3 × apples",
+      "items"
+     ],
+     "ha": [
+      [
+       "u4",
+       "3 × apples",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       3,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u4",
+        "3 × apples",
+        false,
+        "3 × apples",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u4",
+       "3 × apples",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       3,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u4",
+        "3 × apples",
+        false,
+        "3 × apples",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "safety catch: an add in Restock during the hold, list comes back": [
+    {
+     "r": {
+      "came": 1,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add Milk",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000060000
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000090000
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add pears",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ],
+       [
+        "r3",
+        "u4",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ],
+       [
+        "r3",
+        "u4",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "safety catch: an add in Restock during the hold, list really emptied": [
+    {
+     "r": {
+      "came": 1,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add Milk",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000060000
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ],
+      [
+       "r3",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000090000
+     }
+    },
+    {
+     "r": {
+      "came": 3,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add pears",
+      "items"
+     ],
+     "ha": [
+      [
+       "u4",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r3",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r3",
+        "u4",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u4",
+       "pears",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r3",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r3",
+        "u4",
+        "pears",
+        false,
+        "pears",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "safety catch: an add in Home Assistant during the hold, list comes back": [
+    {
+     "r": {
+      "came": 1,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add Milk",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000060000
+     }
+    },
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "eggs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-dab2a7bc169d956dead757f2",
+       "Eggs",
+       1,
+       false,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ],
+       [
+        "ha-dab2a7bc169d956dead757f2",
+        "u4",
+        "Eggs",
+        false,
+        "eggs",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "eggs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-dab2a7bc169d956dead757f2",
+       "Eggs",
+       1,
+       false,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ],
+       [
+        "ha-dab2a7bc169d956dead757f2",
+        "u4",
+        "Eggs",
+        false,
+        "eggs",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "safety catch: an add in Home Assistant to a list really emptied": [
+    {
+     "r": {
+      "came": 1,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add Milk",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000060000
+     }
+    },
+    {
+     "r": {
+      "came": 4,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u4",
+       "eggs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-dab2a7bc169d956dead757f2",
+       "Eggs",
+       1,
+       false,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-dab2a7bc169d956dead757f2",
+        "u4",
+        "Eggs",
+        false,
+        "eggs",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u4",
+       "eggs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-dab2a7bc169d956dead757f2",
+       "Eggs",
+       1,
+       false,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-dab2a7bc169d956dead757f2",
+        "u4",
+        "Eggs",
+        false,
+        "eggs",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "safety catch: a clock that went backwards starts the wait afresh": [
+    {
+     "r": {
+      "came": 1,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "add Milk",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "bread",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "Milk",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000060000,
+      "emptyLast": 1000060000
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000000000,
+      "emptyLast": 1000000000
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": true
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "r2",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "bread",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "bread",
+        false,
+        "bread",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ],
+       [
+        "r2",
+        "u3",
+        "Milk",
+        false,
+        "Milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": 1000000000,
+      "emptyLast": 1000060000
+     }
+    },
+    {
+     "r": {
+      "came": 3,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [],
+     "state": {
+      "pairs": [],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "an empty list with nothing paired is just empty": [
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [],
+     "state": {
+      "pairs": [],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "apples",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u1",
+        "apples",
+        false,
+        "apples",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [],
+     "lines": [],
+     "state": {
+      "pairs": [],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "deterministic ids: two runners on one list make one line per item": [
+    {
+     "r": {
+      "came": 2,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "oat milk",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "2 eggs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "oat milk",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Eggs",
+       2,
+       false,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "oat milk",
+        false,
+        "oat milk",
+        false
+       ],
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "2 × Eggs",
+        false,
+        "2 eggs",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "oat milk",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "2 eggs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "oat milk (2L)",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Eggs",
+       2,
+       false,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "2 × Eggs",
+        false,
+        "2 eggs",
+        false
+       ],
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "oat milk (2L)",
+        false,
+        "oat milk",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "update u1 {\"rename\":\"oat milk (1L)\"}"
+     ],
+     "ha": [
+      [
+       "u1",
+       "oat milk (1L)",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "2 eggs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "oat milk (1L)",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Eggs",
+       2,
+       false,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "2 × Eggs",
+        false,
+        "2 eggs",
+        false
+       ],
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "oat milk (1L)",
+        false,
+        "oat milk (1L)",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "oat milk (1L)",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "2 eggs",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "oat milk (1L)",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Eggs",
+       2,
+       false,
+       "g-eggs"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "oat milk (1L)",
+        false,
+        "oat milk (1L)",
+        false
+       ],
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "2 × Eggs",
+        false,
+        "2 eggs",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "deterministic ids: an id taken by a line paired with another item": [
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "tea",
+       "needs_action"
+      ],
+      [
+       "u9",
+       "coffee",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "coffee",
+       1,
+       false,
+       null
+      ],
+      [
+       "r1",
+       "tea",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u9",
+        "coffee",
+        false,
+        "coffee",
+        false
+       ],
+       [
+        "r1",
+        "u1",
+        "tea",
+        false,
+        "tea",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "words as people say them": [
+    {
+     "r": {
+      "came": 8,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "2 Minute Noodles",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "  milk.  ",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "bread x2",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "two eggs",
+       "needs_action"
+      ],
+      [
+       "u5",
+       "some Milk",
+       "needs_action"
+      ],
+      [
+       "u6",
+       "a loaf of bread",
+       "needs_action"
+      ],
+      [
+       "u7",
+       "3× Weet-Bix",
+       "needs_action"
+      ],
+      [
+       "u8",
+       "Crème brûlée",
+       "needs_action"
+      ],
+      [
+       "u9",
+       "",
+       "needs_action"
+      ],
+      [
+       "u10",
+       "   ",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "2 Minute Noodles",
+       1,
+       false,
+       "g-noodles"
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-6011ec49cb598ce85aa412eb",
+       "bread",
+       2,
+       false,
+       null
+      ],
+      [
+       "ha-dab2a7bc169d956dead757f2",
+       "Eggs",
+       2,
+       false,
+       "g-eggs"
+      ],
+      [
+       "ha-a36a7e3ce8d981a8660ec346",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-ada0943ce72275a5f2a73911",
+       "loaf of bread",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-0cb404ce9ca06f04c81c2d71",
+       "Weet-Bix",
+       3,
+       false,
+       "g-weetbix"
+      ],
+      [
+       "ha-4ca53e0e0fe3f65edd179b18",
+       "Creme Brulee",
+       1,
+       false,
+       "g-creme"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "2 Minute Noodles",
+        false,
+        "2 Minute Noodles",
+        false
+       ],
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "Milk",
+        false,
+        "  milk.  ",
+        false
+       ],
+       [
+        "ha-6011ec49cb598ce85aa412eb",
+        "u3",
+        "2 × bread",
+        false,
+        "bread x2",
+        false
+       ],
+       [
+        "ha-dab2a7bc169d956dead757f2",
+        "u4",
+        "2 × Eggs",
+        false,
+        "two eggs",
+        false
+       ],
+       [
+        "ha-a36a7e3ce8d981a8660ec346",
+        "u5",
+        "Milk",
+        false,
+        "some Milk",
+        false
+       ],
+       [
+        "ha-ada0943ce72275a5f2a73911",
+        "u6",
+        "loaf of bread",
+        false,
+        "a loaf of bread",
+        false
+       ],
+       [
+        "ha-0cb404ce9ca06f04c81c2d71",
+        "u7",
+        "3 × Weet-Bix",
+        false,
+        "3× Weet-Bix",
+        false
+       ],
+       [
+        "ha-4ca53e0e0fe3f65edd179b18",
+        "u8",
+        "Creme Brulee",
+        false,
+        "Crème brûlée",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "2 Minute Noodles",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "  milk.  ",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "bread x2",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "two eggs",
+       "needs_action"
+      ],
+      [
+       "u5",
+       "some Milk",
+       "needs_action"
+      ],
+      [
+       "u6",
+       "a loaf of bread",
+       "needs_action"
+      ],
+      [
+       "u7",
+       "3× Weet-Bix",
+       "needs_action"
+      ],
+      [
+       "u8",
+       "Crème brûlée",
+       "needs_action"
+      ],
+      [
+       "u9",
+       "",
+       "needs_action"
+      ],
+      [
+       "u10",
+       "   ",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "2 Minute Noodles",
+       1,
+       false,
+       "g-noodles"
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-6011ec49cb598ce85aa412eb",
+       "bread",
+       2,
+       false,
+       null
+      ],
+      [
+       "ha-dab2a7bc169d956dead757f2",
+       "Eggs",
+       2,
+       false,
+       "g-eggs"
+      ],
+      [
+       "ha-a36a7e3ce8d981a8660ec346",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-ada0943ce72275a5f2a73911",
+       "loaf of bread",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-0cb404ce9ca06f04c81c2d71",
+       "Weet-Bix",
+       3,
+       false,
+       "g-weetbix"
+      ],
+      [
+       "ha-4ca53e0e0fe3f65edd179b18",
+       "Creme Brulee",
+       1,
+       false,
+       "g-creme"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "2 Minute Noodles",
+        false,
+        "2 Minute Noodles",
+        false
+       ],
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "Milk",
+        false,
+        "  milk.  ",
+        false
+       ],
+       [
+        "ha-6011ec49cb598ce85aa412eb",
+        "u3",
+        "2 × bread",
+        false,
+        "bread x2",
+        false
+       ],
+       [
+        "ha-dab2a7bc169d956dead757f2",
+        "u4",
+        "2 × Eggs",
+        false,
+        "two eggs",
+        false
+       ],
+       [
+        "ha-a36a7e3ce8d981a8660ec346",
+        "u5",
+        "Milk",
+        false,
+        "some Milk",
+        false
+       ],
+       [
+        "ha-ada0943ce72275a5f2a73911",
+        "u6",
+        "loaf of bread",
+        false,
+        "a loaf of bread",
+        false
+       ],
+       [
+        "ha-0cb404ce9ca06f04c81c2d71",
+        "u7",
+        "3 × Weet-Bix",
+        false,
+        "3× Weet-Bix",
+        false
+       ],
+       [
+        "ha-4ca53e0e0fe3f65edd179b18",
+        "u8",
+        "Creme Brulee",
+        false,
+        "Crème brûlée",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "a line whose pantry item went, and a rename to nothing": [
+    {
+     "r": {
+      "came": 1,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add Juice",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "cheese",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "Juice",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "Juice",
+       1,
+       false,
+       "g-gone"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "cheese",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "cheese",
+        false,
+        "cheese",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "Juice",
+        false,
+        "Juice",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 1,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "cheese",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "",
+       1,
+       false,
+       "g-gone"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "cheese",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "cheese",
+        false,
+        "cheese",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "",
+        false,
+        "",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "cheese",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "",
+       1,
+       false,
+       "g-gone"
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "cheese",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "cheese",
+        false,
+        "cheese",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "",
+        false,
+        "",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "a different entity makes different ids": [
+    {
+     "r": {
+      "came": 2,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "milk",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "tea",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-735f2616170996292c590f59",
+       "Milk",
+       1,
+       false,
+       "g-milk"
+      ],
+      [
+       "ha-025dfa931656746e78d4ba58",
+       "tea",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-735f2616170996292c590f59",
+        "u1",
+        "Milk",
+        false,
+        "milk",
+        false
+       ],
+       [
+        "ha-025dfa931656746e78d4ba58",
+        "u2",
+        "tea",
+        false,
+        "tea",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "a tick and a rename at once, both sides": [
+    {
+     "r": {
+      "came": 1,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add apples",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "pears",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "apples",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       1,
+       false,
+       null
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "pears",
+       1,
+       false,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "pears",
+        false,
+        "pears",
+        false
+       ],
+       [
+        "r1",
+        "u2",
+        "apples",
+        false,
+        "apples",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 2,
+      "went": 2,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "update u2 {\"status\":\"completed\"}",
+      "update u2 {\"rename\":\"2 × apples\"}"
+     ],
+     "ha": [
+      [
+       "u1",
+       "nashi pears",
+       "completed"
+      ],
+      [
+       "u2",
+       "2 × apples",
+       "completed"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       2,
+       true,
+       null
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "nashi pears",
+       1,
+       true,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "nashi pears",
+        true,
+        "nashi pears",
+        true
+       ],
+       [
+        "r1",
+        "u2",
+        "2 × apples",
+        true,
+        "2 × apples",
+        true
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "nashi pears",
+       "completed"
+      ],
+      [
+       "u2",
+       "2 × apples",
+       "completed"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "apples",
+       2,
+       true,
+       null
+      ],
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "nashi pears",
+       1,
+       true,
+       null
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "nashi pears",
+        true,
+        "nashi pears",
+        true
+       ],
+       [
+        "r1",
+        "u2",
+        "2 × apples",
+        true,
+        "2 × apples",
+        true
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ]
+  }
+ }
+}

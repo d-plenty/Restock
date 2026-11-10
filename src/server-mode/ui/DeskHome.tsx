@@ -18,6 +18,7 @@ import { openRecalls } from '../../ui/screens/Recalls';
 import { ActionInfoTag } from '../../ui/tagInfo';
 import { DeskHead, greeting, openItem } from './deskShared';
 import { DeskAddBox } from './DeskList';
+import { HomeSpecials } from './DeskSpecials';
 
 export function DeskHome() {
   const nav = useNav();
@@ -194,14 +195,29 @@ export function DeskHome() {
               const shop = shopOf(groceries.c, e);
               const title = nameOf(e.groupId, e.text);
               return (
-                <label key={e.id} className={`dk-check${e.checked ? ' done' : ''}`}>
-                  <input type="checkbox" checked={e.checked} onChange={(ev) => void updateListEntry(e.id, { checked: ev.target.checked })} />
+                <div key={e.id} className={`dk-check${e.checked ? ' done' : ''}`}>
+                  {/* 0.9.4: only the checkbox ticks; the name opens the item. */}
+                  <input type="checkbox" checked={e.checked} aria-label={`Got ${title}`} onChange={(ev) => void updateListEntry(e.id, { checked: ev.target.checked })} />
                   <span className="grow">
-                    {(e.qty ?? 1) > 1 && <span className="num">{e.qty} × </span>}
-                    {title}
+                    {e.groupId ? (
+                      <button
+                        type="button"
+                        className="dk-line-open"
+                        onClick={() => nav.push({ name: 'item', groupId: e.groupId! })}
+                        aria-label={`${(e.qty ?? 1) > 1 ? `${e.qty} × ` : ''}${title}, open the item`}
+                      >
+                        {(e.qty ?? 1) > 1 && <span className="num">{e.qty} × </span>}
+                        {title}
+                      </button>
+                    ) : (
+                      <>
+                        {(e.qty ?? 1) > 1 && <span className="num">{e.qty} × </span>}
+                        {title}
+                      </>
+                    )}
                   </span>
                   <span className="dk-sub">{shop === 'any' ? 'Any shop' : chainName(shop)}</span>
-                </label>
+                </div>
               );
             })}
             {open.length > 6 && <span className="small">and {open.length - 6} more</span>}
@@ -226,6 +242,9 @@ export function DeskHome() {
           </section>
         </aside>
       </div>
+
+      {/* 0.9.4 (section 15): this week's specials the phones shared, and My catalogue. */}
+      <HomeSpecials />
     </div>
   );
 }

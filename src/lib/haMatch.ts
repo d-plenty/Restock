@@ -78,7 +78,8 @@ export function parseLine(text: string): ParsedLine {
   } else if (tail && Number(tail[2]) > 0) {
     qty = Number(tail[2]);
     t = tail[1];
-  } else if (word && NUMBER_WORDS[word[1].toLowerCase()]) {
+  } else if (word && Object.hasOwn(NUMBER_WORDS, word[1].toLowerCase())) {
+    // Own keys only: "constructor milk" isn't a number word (0.9.4).
     qty = NUMBER_WORDS[word[1].toLowerCase()];
     t = word[2];
   }

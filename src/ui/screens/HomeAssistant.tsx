@@ -17,6 +17,8 @@ import {
   testHomeAssistant,
   tidyAddress,
   cleanToken,
+  type HaHouse,
+  type HaPhone,
   type HaStatus,
 } from '../../lib/homeAssistant';
 import { MIN_HA_VERSION, tooOld } from '../../lib/haSync';
@@ -26,9 +28,99 @@ import { LoadingBar, TopBar } from '../components';
 import { useNav } from '../nav';
 
 /**
+ * 0.9.4: which of the page's three states (design section 9): a phone household (or a phone on its
+ * own) runs its own as in 0.9.3; in a house the server handles it, or it's to be set up there.
+ */
+export function pageState(who: Pick<HaPhone, 'house'>): 'phone' | 'server' | 'setUpOnServer' {
+  if (!who.house) return 'phone';
+  return who.house.serverRuns ? 'server' : 'setUpOnServer';
+}
+
+/** 0.9.4: in a phone household, once it's linked. */
+export function NotServerWide() {
+  return (
+    <div className="banner grey" role="note" style={{ gap: 6 }}>
+      <strong>This isn't server-wide.</strong>
+      <span style={{ fontSize: 13 }}>It's just this phone and the phones paired with it.</span>
+    </div>
+  );
+}
+
+/** The server's page: at home, and away from home if it has an address for that. */
+function ServerLinks({ house }: { house: HaHouse }) {
+  if (!house.home && !house.away) return null;
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {house.home && (
+        <a className="btn small" href={house.home} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+          Open your server’s page
+        </a>
+      )}
+      {house.away && house.away !== house.home && (
+        <a className="btn small" href={house.away} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+          Away from home
+        </a>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 0.9.4: in a house (the household's owner is a Restock server), Home Assistant runs only on the
+ * server (design D12): this phone can't run its own. Either the server runs it (and this page says
+ * so, with a link to the server's page, and no controls), or nobody does yet (set it up there).
+ */
+export function InHouse({ house, saved }: { house: HaHouse; saved: boolean }) {
+  const nav = useNav();
+  const server = house.name ? `your server, ${house.name}` : 'your server';
+  const remove = async () => {
+    const ok = await confirmAction('Remove the token from this phone?', {
+      detail: "In a server household this phone doesn't use it. To stop the token working altogether, delete it in Home Assistant too (your profile → Security).",
+      action: 'Remove',
+    });
+    if (!ok) return;
+    await removeHaToken();
+    nav.toast('Token removed');
+  };
+  return (
+    <div className="screen">
+      <TopBar title="Home Assistant" />
+      {pageState({ house }) === 'server' ? (
+        <div className="banner grey" role="status" style={{ gap: 8 }}>
+          <strong>Home Assistant is handled by {server}</strong>
+          <span style={{ fontSize: 13 }}>
+            Every phone and browser on your server shares one Home Assistant shopping list. Your server keeps it in step all the time, so there’s
+            nothing to set up on this phone. To change the address, the list or the token, use your server’s page.
+          </span>
+          <ServerLinks house={house} />
+        </div>
+      ) : (
+        <div className="banner grey" role="status" style={{ gap: 8 }}>
+          <strong>Set it up on your server’s page</strong>
+          <span style={{ fontSize: 13 }}>
+            In a server household, Home Assistant runs on your server, so every phone and browser shares one list. This phone can’t run its own.
+            Open your server’s page and go to Home Assistant.
+          </span>
+          <ServerLinks house={house} />
+        </div>
+      )}
+      {saved && !house.serverRuns && (
+        <div className="card" style={{ gap: 8 }}>
+          <span className="small">A Home Assistant token from before is still saved on this phone. It isn’t used here any more.</span>
+          <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => void remove()}>
+            Remove the token
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * 0.9.3: Settings → Home Assistant. The grocery list both ways with a Home Assistant to-do list,
  * straight from this phone (homeAssistant.ts). Not part of setup: not everyone has Home Assistant.
  * One phone per household does it: turning it on here when another phone does asks to move it.
+ * 0.9.4: in a phone household it says it isn't server-wide; in a house, InHouse.
  */
 export function HomeAssistantScreen() {
   const nav = useNav();
@@ -60,6 +152,7 @@ export function HomeAssistantScreen() {
   }, [config?.address, saved]);
 
   if (!config || saved === undefined || !who) return <div className="screen" />;
+  if (who.house && pageState(who) !== 'phone') return <InHouse house={who.house} saved={saved} />;
   // Another phone in the household syncs with Home Assistant (this one stopped, or never started).
   const elsewhere = who.inHousehold && !!who.device && !who.mine ? phoneLabel(who.name) : undefined;
   const on = config.enabled && !elsewhere;
@@ -176,6 +269,8 @@ export function HomeAssistantScreen() {
           so you can say which one you mean.
         </span>
       </div>
+
+      {on && <NotServerWide />}
 
       {elsewhere ? (
         <div className="banner amber" role="status" style={{ gap: 8 }}>
@@ -348,7 +443,7 @@ export function HomeAssistantScreen() {
                   <span className="small">
                     {status?.held
                       ? "Home Assistant's list came back empty, so Restock left both lists as they are (Home Assistant may be starting up). It looks again in a minute; if it's still empty a couple of minutes later, the lines it shared come off Restock's list too."
-                      : 'While Restock is open: when you open it, every minute, and just after the list changes.'}
+                      : 'While Restock is open: when you open it, every minute, and just after the list changes. With Restock closed: about every 15 minutes.'}
                   </span>
                 </span>
                 <button className="btn small" disabled={!!busy} onClick={() => void syncNow()}>
@@ -363,8 +458,9 @@ export function HomeAssistantScreen() {
       <div className="eyebrow">Good to know</div>
       <div className="card" style={{ gap: 8 }}>
         <span className="small">
-          <strong>Voice adds show up when Restock is opened.</strong> Restock only talks to Home Assistant while it's open, so something you add by
-          voice comes onto your Restock list (and your other phones) the next time you open Restock on this phone.
+          <strong>Voice adds come in within about 15 minutes.</strong> Restock talks to Home Assistant every minute while it's open, and about
+          every 15 minutes in the background when it isn't (Android decides exactly when), so something you add by voice comes onto your Restock
+          list, and your other phones, even with Restock closed.
         </span>
         <span className="small">
           <strong>Only the groceries list.</strong> Keg and Pharmacy lists stay in Restock. Something new goes across

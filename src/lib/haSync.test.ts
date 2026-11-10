@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyState, HaError, haProblem, restApi, syncRound, tooOld, type HaApi, type HaItem, type HaState, type Line, type Store } from './haSync';
+import { emptyState, HaError, haLineId, haProblem, restApi, syncRound, tooOld, type HaApi, type HaItem, type HaState, type Line, type Store } from './haSync';
 import { matchKey } from './haMatch';
 
 // 0.9.3: the shopping list both ways with Home Assistant, against a pretend Home Assistant.
@@ -484,5 +484,62 @@ describe('talking to Home Assistant', () => {
     expect(tooOld('2024.8.0')).toBe(false);
     expect(tooOld('2026.11.1')).toBe(false);
     expect(tooOld(undefined)).toBe(false);
+  });
+});
+
+// 0.9.4: lines made from Home Assistant's items have ids made from the list and the item, so two
+// runners can't double an item (tools/sync-test/vectors-v3.json has the ids HaSync.java must make).
+describe('deterministic line ids (0.9.4)', () => {
+  /** A store as the real ones do it: haLineId for a line from Home Assistant, INSERT OR IGNORE. */
+  class IdStore extends MemStore {
+    constructor(readonly entity: string) {
+      super();
+    }
+    async addLine(l: Omit<Line, 'id'>, uid?: string) {
+      const id = uid ? haLineId(this.entity, uid) : `r${++this.n}`;
+      if (!this.list.some((x) => x.id === id)) this.list.push({ id, ...l });
+      return id;
+    }
+  }
+
+  it('haLineId is "ha-" and 24 hex characters of sha256("restock-ha-v1\\n" + entity + "\\n" + uid)', () => {
+    expect(haLineId('todo.shopping_list', '1')).toMatch(/^ha-[0-9a-f]{24}$/);
+    expect(haLineId('todo.shopping_list', '1')).not.toBe(haLineId('todo.groceries', '1'));
+    // (An entity id never has a newline in it: [a-z0-9_.] only.)
+  });
+
+  it('two runners on one shared list (a phone and the server, before ha:phone settled) make one line per item', async () => {
+    const ha = new FakeHa();
+    ha.seed('oat milk');
+    ha.seed('2 eggs');
+    // Both see the same list (household sync between them), each with its own pairing notes.
+    const shared = new IdStore('todo.shopping_list');
+    const other = new IdStore('todo.shopping_list');
+    other.list = shared.list;
+    await syncRound(ha, shared);
+    // The second runner never saw the first one's pairing, and the lines' words changed meanwhile.
+    shared.list.find((l) => l.text === 'oat milk')!.text = 'oat milk (2L)';
+    await syncRound(ha, other);
+    expect(shared.list.map((l) => l.id).sort()).toEqual([haLineId('todo.shopping_list', 'u1'), haLineId('todo.shopping_list', 'u2')].sort());
+    expect(shared.list).toHaveLength(2);
+    expect(other.state.pairs.map((p) => p.uid).sort()).toEqual(['u1', 'u2']);
+    // And nothing new went to Home Assistant either (the paired line's new words go next round).
+    expect(ha.calls.some((c) => c.startsWith('add'))).toBe(false);
+    expect(ha.summaries()).toEqual(['2 eggs', 'oat milk']);
+    shared.list.find((l) => l.text === 'oat milk (2L)')!.text = 'oat milk (1L)';
+    await syncRound(ha, other);
+    expect(ha.summaries()).toEqual(['2 eggs', 'oat milk (1L)']);
+  });
+
+  it('an id already taken by a line paired with another item gets a line of its own', async () => {
+    const ha = new FakeHa();
+    ha.seed('tea');
+    const store = new IdStore('todo.shopping_list');
+    // A line with u1's id, but already paired with another item (paired by its words earlier).
+    store.list.push({ id: haLineId('todo.shopping_list', 'u1'), text: 'coffee', qty: 1, checked: false });
+    ha.list.push({ uid: 'u9', summary: 'coffee', status: 'needs_action' });
+    store.state = { pairs: [{ id: haLineId('todo.shopping_list', 'u1'), uid: 'u9', r: { s: 'coffee', c: false }, h: { s: 'coffee', c: false } }], pick: [] };
+    await syncRound(ha, store);
+    expect(store.texts()).toEqual(['coffee', 'tea']);
   });
 });

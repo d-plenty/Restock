@@ -24,6 +24,16 @@ export const LOCAL_ONLY_KV: readonly string[] = [HA_CONFIG, HA_STATE, HA_STATUS,
 // list, a restore, Erase everything. A round already under way when that happens doesn't save its
 // old pairing over the fresh one (the next round would take what's paired with the old list's items
 // off Restock's list).
+// 0.9.4: the rounds run in Java (HaSync.java), so it's told too (homeAssistant.ts listens), straight
+// away, before the change to the database that follows the reset gets there.
 let pairingResets = 0;
-export const resetHaPairing = (): void => void pairingResets++;
+const resetListeners = new Set<() => void>();
+export const resetHaPairing = (): void => {
+  pairingResets++;
+  resetListeners.forEach((fn) => fn());
+};
 export const haPairingResets = (): number => pairingResets;
+export function onHaPairingReset(fn: () => void): () => void {
+  resetListeners.add(fn);
+  return () => void resetListeners.delete(fn);
+}

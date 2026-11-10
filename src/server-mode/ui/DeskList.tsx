@@ -32,6 +32,7 @@ import { PickItemSheet } from '../../ui/screens/PickItem';
 import { ShopTotalsCard } from '../../ui/shopTotalsCard';
 import { PhoneOnlyNote } from './PhoneOnly';
 import { DeskHead } from './deskShared';
+import { thumbOf } from './DeskSpecials';
 
 type View = 'shop' | 'aisle' | 'all';
 const VIEWS: { id: View; label: string }[] = [
@@ -192,18 +193,25 @@ export function DeskList() {
     ].filter(Boolean);
     return (
       <div key={e.id} className={`dk-line${e.checked ? ' done' : ''}`}>
+        {/* 0.9.4 (section 15): only the checkbox ticks; the name opens the product (or, for a typed line, its details). */}
         <input
           type="checkbox"
           id={`dk-got-${e.id}`}
           checked={e.checked}
+          aria-label={`Got ${qtyOf(e) > 1 ? `${qtyOf(e)} × ` : ''}${title}`}
           onChange={(ev) => void updateListEntry(e.id, { checked: ev.target.checked })}
         />
+        {rec?.best?.product.imageUrl || deal?.product.imageUrl ? <Thumb src={thumbOf((deal ?? rec?.best)?.product.imageUrl)} /> : null}
         <span className="grow">
-          <label htmlFor={`dk-got-${e.id}`} className="dk-line-title">
+          <button
+            type="button"
+            className="dk-line-title dk-line-open"
+            onClick={() => (rec ? nav.push({ name: 'item', groupId: rec.group.id }) : setEditing(e))}
+            aria-label={`${qtyOf(e) > 1 ? `${qtyOf(e)} × ` : ''}${title}, ${rec ? 'open the item' : 'details'}`}
+          >
             {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}
             {title}
-            <span className="sr-only">: tick when you've got it</span>
-          </label>
+          </button>
           {bits.length > 0 && <span className="dk-sub">{bits.join(' · ')}</span>}
           {(p !== undefined || onSale) && (
             <span className={`dk-sub num${onSale ? ' dk-good' : ''}`}>

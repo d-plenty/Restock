@@ -170,12 +170,12 @@ const ALL_TILES: Tile[] = [
   },
   {
     id: 'sync',
-    title: 'Local sync',
-    sub: 'Phone to phone · no account',
+    title: 'Sync',
+    sub: 'Your server, Wi-Fi or a drive folder',
     icon: 'swap',
     heading: 'Share with your household?',
     intro:
-      "Local sync: phones in the same house share one pantry and shopping list, straight from one phone to another on your Wi-Fi. No account, no server, and nothing leaves your phones. Up to 6 phones. Skip this if it's just you.",
+      "Phones in the same house can share one pantry and shopping list. Best is your own Restock server: it's the house, and phones join it. No server? Phones on the same Wi-Fi swap changes straight to each other, or use a cloud drive folder. No account either way. Skip this if it's just you.",
   },
   {
     id: 'widgets',
@@ -369,6 +369,8 @@ function Welcome({ onSetUp, onRestore, onJoin }: { onSetUp: () => void; onRestor
         <p className="welcome-tag2">Find out if the special is really special.</p>
         <p className="welcome-made">Made in Australia, for Australian shoppers</p>
         <p className="welcome-free">Free · no ads · no account</p>
+        {/* 0.9.4: local first, said up front. */}
+        <p className="welcome-made">Works without signal. Your list and pantry live on your phone. Only searching shops needs internet.</p>
         <div className="welcome-actions">
           <button className="welcome-go" onClick={onSetUp}>
             Set up
@@ -477,19 +479,19 @@ function BackupsTile({ settings }: { settings: Settings }) {
     <>
       <AutoBackupSettings settings={settings} inSetup />
       <div className="card flush">
-        <button className="row" onClick={() => nav.push({ name: 'sync' })}>
-          <Icon name="swap" size={18} />
+        <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
+          <Icon name="server" size={18} />
           <span className="grow">
-            <span className="title">{p.phones ? 'Phone-to-phone sync is on' : 'Phone-to-phone sync'}</span>
-            <span className="small">Your other phones keep a copy. Works offline, no server needed.</span>
+            <span className="title">{p.server ? 'Your Restock server is on' : 'Your Restock server'}</span>
+            <span className="small">Keeps a copy for years, syncs at home and away, and gives you Restock on your computer.</span>
           </span>
           <Icon name="chevron" size={18} />
         </button>
-        <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
-          <Icon name="refresh" size={18} />
+        <button className="row" onClick={() => nav.push({ name: 'sync' })}>
+          <Icon name="swap" size={18} />
           <span className="grow">
-            <span className="title">{p.server ? 'Your Restock server is on' : 'Your own Restock server'}</span>
-            <span className="small">A small server you run at home keeps a copy, and you can use Restock in a browser.</span>
+            <span className="title">{p.phones ? 'Phones on your Wi-Fi are on' : 'Phones on your Wi-Fi'}</span>
+            <span className="small">Your other phones keep a copy. Works with no internet and no server.</span>
           </span>
           <Icon name="chevron" size={18} />
         </button>
@@ -505,24 +507,32 @@ function SyncTile() {
   const info = useLive(syncInfo, []);
   return (
     <div className="card flush">
-      <button className="row" onClick={() => nav.push({ name: 'sync' })}>
-        <Icon name="refresh" size={18} />
+      <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
+        <Icon name="server" size={18} />
         <span className="grow">
-          <span className="title">{info?.paired ? 'Local sync is on' : 'Set up local sync'}</span>
-          <span className="small">{syncSummary(info)}</span>
+          <span className="title" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            {info?.server ? 'Your Restock server' : 'Join your Restock server'}
+            {!info?.server && <span className="tag great">Recommended</span>}
+          </span>
+          <span className="small">
+            {info?.server ? syncSummary(info) : 'Your server is the house: phones join it. Around the clock, at home and away, and Restock on your computer.'}
+          </span>
         </span>
         <Icon name="chevron" size={18} />
       </button>
-      <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
+      <button className="row" onClick={() => nav.push({ name: 'sync' })}>
         <Icon name="refresh" size={18} />
         <span className="grow">
-          <span className="title" style={{ fontSize: 15 }}>
-            Restock server
-          </span>
-          <span className="small">
-            Sync from anywhere through a small server you run yourself, for when the phones aren't on the same Wi-Fi. Connect starts the household
-            for you.
-          </span>
+          <span className="title">{info?.paired && !info.house ? 'Phones on your Wi-Fi are on' : 'Phones on your Wi-Fi (no server)'}</span>
+          <span className="small">{info?.paired && !info.house ? syncSummary(info) : 'Phones swap changes straight to each other on the same Wi-Fi. Nothing leaves your home.'}</span>
+        </span>
+        <Icon name="chevron" size={18} />
+      </button>
+      <button className="row" onClick={() => nav.push({ name: 'sync' })}>
+        <Icon name="folder" size={18} />
+        <span className="grow">
+          <span className="title">A cloud drive folder</span>
+          <span className="small">Google Drive, Dropbox, OneDrive, Syncthing, Nextcloud or WebDAV, for phones away from home without a server.</span>
         </span>
         <Icon name="chevron" size={18} />
       </button>

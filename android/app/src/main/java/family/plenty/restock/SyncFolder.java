@@ -146,6 +146,15 @@ final class SyncFolder {
         return "server".equals(p);
     }
 
+    /** 0.9.4: a v3 server (the household's owner): no keys file, and the file says what this phone shares. */
+    boolean v3() {
+        try {
+            return server() && "3".equals(e.meta("server_api"));
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
     /** 0.9.2: the key this folder's files are sealed with: the serverKey on a Restock server, else the household's. */
     byte[] fileKey(byte[] householdKey) throws Exception {
         return server() ? serverKey(householdKey) : householdKey;
@@ -223,7 +232,9 @@ final class SyncFolder {
         List<String> names = f.names();
         // A newer household key, left by the owner for this phone.
         String keys = keysFile();
-        if (!h.isOwner()) {
+        // 0.9.4: with a v3 server, new keys come in keys/<device>.bin (ServerSync), never a keys file.
+        boolean v3 = v3();
+        if (!h.isOwner() && !v3) {
             if (names.contains(keys)) res.rekeyed = takeKeys(f.read(keys));
             if (!res.rekeyed && !keys.equals(KEYS) && names.contains(KEYS)) res.rekeyed = takeKeys(f.read(KEYS));
         }
@@ -237,7 +248,7 @@ final class SyncFolder {
         // Made the owner by the phone before (handed over in the folder)? Take over.
         h.takeHandover();
         writeOwn(f, names, me, now, res);
-        if (h.isOwner()) writeKeys(f, names);
+        if (h.isOwner() && !v3 && !h.isHouse()) writeKeys(f, names);
         // "Synced through the folder" only when another phone's file was read.
         if (res.phones > 0) e.setMeta(p + "_at", now);
         e.setMeta(p + "_unread", res.unread > 0 ? String.valueOf(res.unread) : null);
@@ -337,6 +348,109 @@ final class SyncFolder {
         e.setMeta("server_photorefs:" + device, b.length() == 0 ? null : b.toString());
     }
 
+    /**
+     * 0.9.4: what this phone shares with a v3 server (docs/server-protocol.md "v3"): { tabs, receipts,
+     * cards }. Null elsewhere.
+     */
+    JSONObject shares() throws Exception {
+        if (!v3()) return null;
+        JSONObject o = new JSONObject();
+        o.put("tabs", SyncEngine.tabsJson(e.tabs()));
+        o.put("receipts", e.shareReceipts());
+        o.put("cards", e.shareCards());
+        return o;
+    }
+
+    /** 0.9.4: at most this many of a shop's specials go in the phone's server file. */
+    static final int SPECIALS_PER_CHAIN = 120;
+
+    /**
+     * 0.9.4: the specials this phone already fetched (the Specials page keeps them in kv "specials"),
+     * for the web app, on a server only: { at, lists: [{ chain, at, items: [{ storeProductId, name,
+     * price, wasPrice, promo, imageUrl, isSpecial }] }] }. Nothing is fetched for it. Null if none.
+     */
+    JSONObject specials() {
+        if (!server()) return null;
+        try {
+            List<JSONObject> r = e.db.query("SELECT value FROM kv WHERE key = 'specials'");
+            if (r.isEmpty()) return null;
+            JSONArray lists = new JSONArray(r.get(0).getString("value"));
+            JSONArray outLists = new JSONArray();
+            String newest = null;
+            // Only shops on the tabs this phone shares: a Keg or Pharmacy tab it keeps to itself stays here.
+            java.util.Set<String> tabs = e.tabs();
+            for (int i = 0; i < lists.length() && i < 10; i++) {
+                JSONObject l = lists.optJSONObject(i);
+                if (l == null || !(l.opt("chain") instanceof String)) continue;
+                String tab = e.chainTab(l.getString("chain"));
+                if (tab == null || !tabs.contains(tab)) continue;
+                JSONArray items = l.optJSONArray("items");
+                JSONArray outItems = new JSONArray();
+                if (items != null) for (int j = 0; j < items.length() && outItems.length() < SPECIALS_PER_CHAIN; j++) {
+                    JSONObject x = items.optJSONObject(j);
+                    if (x == null || !(x.opt("name") instanceof String)) continue;
+                    JSONObject y = new JSONObject();
+                    for (String k : new String[] { "storeProductId", "name", "promo", "imageUrl" }) {
+                        Object v = x.opt(k);
+                        if (v instanceof String && ((String) v).length() <= 500) y.put(k, v);
+                    }
+                    for (String k : new String[] { "price", "wasPrice" }) if (x.opt(k) instanceof Number) y.put(k, x.get(k));
+                    y.put("isSpecial", x.optBoolean("isSpecial", true));
+                    outItems.put(y);
+                }
+                JSONObject o = new JSONObject();
+                o.put("chain", l.getString("chain"));
+                String at = l.optString("at", "");
+                o.put("at", at);
+                o.put("items", outItems);
+                outLists.put(o);
+                if (newest == null || at.compareTo(newest) > 0) newest = at;
+            }
+            if (outLists.length() == 0) return null;
+            JSONObject out = new JSONObject();
+            out.put("at", newest == null ? "" : newest);
+            out.put("lists", outLists);
+            return out;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    /**
+     * 0.9.4: the catalogue links this phone found for the shops it follows (kv "catalogue:<chain>",
+     * Catalogues page), on a server only: { "<chain>": { url } }. The supermarkets' are known to the
+     * web app already. Null if none.
+     */
+    JSONObject catalogues() {
+        if (!server()) return null;
+        try {
+            JSONObject s = SharedSettings.settings(e);
+            JSONArray chains = s == null ? null : s.optJSONArray("enabledChains");
+            if (chains == null) return null;
+            JSONObject out = new JSONObject();
+            java.util.Set<String> tabs = e.tabs();
+            for (int i = 0; i < chains.length() && i < 60; i++) {
+                String c = chains.optString(i, "");
+                if (!c.matches("[A-Za-z0-9_-]{1,60}")) continue;
+                // Only shops on the tabs this phone shares (as specials()).
+                String tab = e.chainTab(c);
+                if (tab == null || !tabs.contains(tab)) continue;
+                List<JSONObject> r = e.db.query("SELECT value FROM kv WHERE key = ?", "catalogue:" + c);
+                if (r.isEmpty()) continue;
+                JSONObject v = new JSONObject(r.get(0).getString("value"));
+                String url = v.optString("url", "");
+                if (!url.matches("(?i)https://\\S{1,500}")) continue;
+                JSONObject o = new JSONObject();
+                o.put("url", url);
+                if (v.opt("note") instanceof String) o.put("note", v.getString("note"));
+                out.put(c, o);
+            }
+            return out.length() == 0 ? null : out;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     /** 0.9.3: this phone's settings summary, on a server only (null elsewhere, or if it can't be made). */
     JSONObject summary() {
         if (!server()) return null;
@@ -354,6 +468,12 @@ final class SyncFolder {
     String ownMark(JSONObject summary) throws Exception {
         List<JSONObject> top = e.db.query("SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log");
         String mark = top.get(0).optLong("top", 0) + "/" + keyv() + "/" + String.join(",", e.tabs()) + "/" + e.shareCards() + "/" + e.shareReceipts();
+        // 0.9.4: what this phone takes back off a v3 server, and the specials it fetched.
+        if (v3()) mark += "/v3" + e.takeBackKinds().toString();
+        if (server()) {
+            JSONObject sp = specials(), ca = catalogues();
+            if (sp != null || ca != null) mark += "/" + hash((String.valueOf(sp) + String.valueOf(ca)).getBytes(StandardCharsets.UTF_8)).substring(0, 12);
+        }
         return summary == null ? mark : mark + "/" + hash(summary.toString().getBytes(StandardCharsets.UTF_8)).substring(0, 12);
     }
 
@@ -395,7 +515,32 @@ final class SyncFolder {
             out.put("name", e.name());
             out.put("keyv", keyv());
             out.put("at", now);
-            out.put("entries", c.getJSONArray("entries"));
+            JSONArray entries = c.getJSONArray("entries");
+            // 0.9.4: "Also take what this phone shared off the server": plain deletes for this phone's
+            // own records of what it stopped sharing (instead of the "moved" ones collect gives).
+            if (v3()) {
+                List<JSONObject> back = e.takeBackEntries();
+                if (!back.isEmpty()) {
+                    java.util.Set<String> keys = new java.util.HashSet<>();
+                    for (JSONObject x : back) keys.add(x.getString("tbl") + "|" + x.getString("pk"));
+                    JSONArray kept = new JSONArray();
+                    for (int i = 0; i < entries.length(); i++) {
+                        JSONObject x = entries.getJSONObject(i);
+                        if (!keys.contains(x.optString("tbl") + "|" + x.optString("pk"))) kept.put(x);
+                    }
+                    for (JSONObject x : back) kept.put(x);
+                    entries = kept;
+                }
+            }
+            out.put("entries", entries);
+            // 0.9.4: on a v3 server, what this phone shares (the server takes only that from it).
+            JSONObject shares = shares();
+            if (shares != null) out.put("shares", shares);
+            // 0.9.4: on a server, the specials and catalogue links this phone already fetched (for the web app).
+            JSONObject sp = specials();
+            if (sp != null) out.put("specials", sp);
+            JSONObject ca = catalogues();
+            if (ca != null) out.put("catalogues", ca);
             // 0.9.2: on a server, the receipt photos this phone moved there ({ path: sha256 }).
             if (server()) out.put("photos", ServerOffload.photosMap(e));
             // 0.9.3: on a server, this phone's own settings for the web app (PhoneSummary).

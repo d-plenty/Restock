@@ -4176,3 +4176,85 @@ select {
 .sync-strip .sync-strip-cell .small {
   color: var(--muted);
 }
+
+/* 0.9.4: Sync and backups as on the "Restock sync redesign" canvas: nothing set up yet, the three
+   ways to sync (your server first), and the ways in use with a dot each. */
+.sync-alone {
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--amber-bg);
+  color: var(--amber-ink-2);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.sync-alone strong {
+  font-size: 16px;
+  color: var(--amber-ink);
+}
+.sync-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+button.sync-choice {
+  cursor: pointer;
+}
+button.sync-choice:disabled {
+  opacity: 0.6;
+}
+.sync-choice.recommended {
+  border: 2px solid var(--green-solid);
+  background: var(--green-bg);
+}
+.sync-choice .small {
+  line-height: 1.5;
+}
+.sync-choice-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sync-choice-ic {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--blue-bg);
+  color: var(--blue);
+}
+.sync-choice-ic.server {
+  background: var(--surface);
+  color: var(--green);
+}
+.sync-choice-go {
+  color: var(--green);
+  font-weight: 600;
+  font-size: 15px;
+}
+.sync-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  flex: none;
+  box-sizing: border-box;
+  border: 2px solid var(--muted);
+}
+.sync-dot.on {
+  border: 0;
+  background: var(--green);
+}

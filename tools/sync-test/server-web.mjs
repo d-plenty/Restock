@@ -5,6 +5,19 @@
 //
 //   node tools/sync-test/server-web.mjs <command> <server address> <state file> [more]
 // Prints JSON (or a code) on one line.
+//
+// 0.9.4 (P5): a house (protocol v3), signed in as the web app signs in (src/server-mode/session.ts,
+// api.ts: the challenge, the session key, RestockWeb3 MACs, sealed answers):
+//   setup3 <base> <state> [house name]   first start (admin/admin → the passphrase, as the setup page
+//                                        does), then sign in and Set up this server
+//   login3 <base> <state>                sign in again (a new session)
+//   addphone3 <base> <state> <label>     an Add a phone code (restock-server:3?…)
+//   phones3 | browsers3 | settings3 | session3 | activity3 | logs3 <base> <state>
+//   rename3 <base> <state> <device> <label> · remove3 <base> <state> <device>
+//   keep3 <base> <state> <3|6|9|12|null> · handover3 <base> <state> (v2 mode: the handover code)
+//   GET3 <base> <state> <path>           any GET, its answer opened
+// The passphrase rounds are RESTOCK_TEST_ROUNDS (default 600000, as the web app; the setup step and
+// sign-in must use the same).
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -12,7 +25,79 @@ import { pathToFileURL } from 'node:url';
 // The server's own test client. The server has its own repo; run.sh passes where it is.
 const serverDir = resolve(process.env.RESTOCK_SERVER_DIR || 'server');
 const { Browser } = await import(pathToFileURL(resolve(serverDir, 'test/client.mjs')).href);
-import { b64u, newEcdhKey, openGift, openWebKeys, sealRsf1, unb64 } from '../../src/server-mode/crypto.ts';
+import {
+  b64u,
+  derivePassphrase,
+  loginKeyOf,
+  loginProof,
+  newEcdhKey,
+  openGift,
+  openRsf1,
+  openWebKeys,
+  sealRsf1,
+  sessionKeyOf,
+  unb64,
+  webAuthorization,
+} from '../../src/server-mode/crypto.ts';
+
+const PASSPHRASE = process.env.RESTOCK_TEST_PASSPHRASE || 'kettle orbit lemon fence carpet';
+const ROUNDS = Number(process.env.RESTOCK_TEST_ROUNDS || 600000);
+const SEALED = 'application/x-restock-sealed';
+
+/** One v3 request as the web app sends it: MACed with the session key; JSON or sealed body; the answer opened. */
+async function call3(st, method, path, body, { seal = false } = {}) {
+  const key = unb64(st.sessionKey);
+  const bytes = body === undefined ? null : seal ? sealRsf1(key, body) : new TextEncoder().encode(JSON.stringify(body));
+  const headers = { Authorization: webAuthorization(st.sid, key, method, path, bytes) };
+  if (bytes) headers['Content-Type'] = seal ? SEALED : 'application/json';
+  const r = await fetch(base.replace(/\/+$/, '') + path, { method, headers, body: bytes ?? undefined });
+  const type = r.headers.get('content-type') || '';
+  const buf = new Uint8Array(await r.arrayBuffer());
+  let out;
+  if (type.startsWith(SEALED)) out = openRsf1(key, buf);
+  else {
+    try {
+      out = JSON.parse(new TextDecoder().decode(buf));
+    } catch {
+      out = { bytes: buf.length };
+    }
+  }
+  return { status: r.status, body: out };
+}
+
+/** 0.9.4: the passphrase again for a dangerous admin action, as session.ts confirmPassphrase does. */
+async function confirm3(st) {
+  const r = await fetch(base.replace(/\/+$/, '') + '/api/v3/login/challenge?user=admin');
+  const ch = await r.json();
+  return { c: ch.c, proof: loginProof(unb64(st.loginKey), ch.c, st.sid) };
+}
+
+/** Signs in to a house, as session.ts loginV3 does. */
+async function login3(st) {
+  const j = async (path, init) => {
+    const r = await fetch(base.replace(/\/+$/, '') + path, init);
+    return { status: r.status, body: await r.json().catch(() => ({})) };
+  };
+  const ch = await j('/api/v3/login/challenge?user=admin');
+  if (ch.status !== 200) fail('challenge: ' + JSON.stringify(ch.body));
+  const keys = await derivePassphrase(PASSPHRASE, unb64(ch.body.salt), ROUNDS);
+  const loginKey = loginKeyOf(keys.auth);
+  const e = newEcdhKey();
+  const epub = b64u(e.pub);
+  const r = await j('/api/v3/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: 'admin', c: ch.body.c, epub, proof: loginProof(loginKey, ch.body.c, epub) }),
+  });
+  if (r.status !== 200) fail('login3: ' + JSON.stringify(r.body));
+  const sk = sessionKeyOf(e.priv, unb64(ch.body.kex), unb64(ch.body.c), loginKey);
+  st.sid = r.body.session;
+  st.sessionKey = b64u(sk);
+  st.loginKey = b64u(loginKey);
+  st.gift = openRsf1(sk, unb64(r.body.sealed));
+  return st.gift;
+}
+
 
 const [cmd, base, stateFile, ...rest] = process.argv.slice(2);
 
@@ -124,6 +209,63 @@ switch (cmd) {
     });
     const r = await b.raw('PUT', '/api/v2/files/restock-sync-web-' + s.webId + '.bin', { body: file });
     out({ status: r.status });
+    break;
+  }
+  case 'setup3': {
+    // The setup page's step (v2's first-start login and passphrase), then the web app's: sign in, Set up this server.
+    await b.setup({ passphrase: PASSPHRASE, iterations: ROUNDS });
+    save(s, b);
+    await login3(s);
+    const r = await call3(s, 'POST', '/api/v3/setup', { name: rest[0] || 'Declan and Sarah' });
+    if (r.status !== 200) fail('setup3: ' + JSON.stringify(r.body));
+    s.gift = r.body;
+    save(s, b);
+    out({ webId: r.body.webId, keyv: r.body.keyv, keys: r.body.keys, household: r.body.household });
+    break;
+  }
+  case 'login3': {
+    const g = await login3(s);
+    save(s, b);
+    out({ webId: g.webId, keyv: g.keyv, keys: g.keys, household: g.household, mode: g.mode });
+    break;
+  }
+  case 'addphone3': {
+    const r = await call3(s, 'POST', '/api/v3/phones', { label: rest[0] || 'Phone' });
+    if (r.status !== 200) fail('addphone3: ' + JSON.stringify(r.body));
+    out(r.body.code);
+    break;
+  }
+  case 'phones3':
+  case 'browsers3':
+  case 'settings3':
+  case 'session3':
+  case 'activity3':
+  case 'logs3': {
+    const r = await call3(s, 'GET', '/api/v3/' + cmd.slice(0, -1));
+    out(r);
+    break;
+  }
+  case 'rename3': {
+    out(await call3(s, 'PATCH', '/api/v3/phones/' + encodeURIComponent(rest[0]), { label: rest[1] }));
+    break;
+  }
+  case 'remove3': {
+    out(await call3(s, 'DELETE', '/api/v3/phones/' + encodeURIComponent(rest[0]), { confirm: await confirm3(s) }));
+    break;
+  }
+  case 'keep3': {
+    out(await call3(s, 'PUT', '/api/v3/settings', { keepMonths: rest[0] === 'null' ? null : Number(rest[0]), confirm: await confirm3(s) }));
+    break;
+  }
+  case 'handover3': {
+    // v2 mode: the passphrase browser's cookie session asks for the code.
+    const r = await b.post('/api/v3/handover', {});
+    if (r.status !== 200) fail('handover3: ' + JSON.stringify(r.body));
+    out(r.body.code);
+    break;
+  }
+  case 'GET3': {
+    out(await call3(s, 'GET', rest[0]));
     break;
   }
   default:

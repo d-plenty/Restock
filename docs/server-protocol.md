@@ -1,8 +1,12 @@
-# Restock server protocol (v2, Restock 0.9.2)
+# Restock server protocol (v2, Restock 0.9.2; v3, Restock 0.9.4)
 
 The contract between the server (`server/`), the phones (Java, `ServerFolder.java` and friends) and the
 web app (the Restock web build running in a browser, served by the server). Three people build these at
 once: change this file only when you must, keep the change small, and list it under "Changes" at the end.
+
+**v3 (0.9.4)**, where the server is the household's owner and can read what phones share, is the section
+"v3" at the end (design and reasons: `docs/server-v3-design.md`). Everything above it is v2, which a server
+keeps serving byte for byte while it's in `v2` mode.
 
 The 0.9.1 RC patch (`restock-server-0.9.1.patch`, one shared access code, read-only viewer) was never
 released. v2 replaces its auth; its file storage, sealing and tests are the starting point.
@@ -290,3 +294,264 @@ numbers are never shown (the web build strips them on read).
     be `<device>`, or the whole file is passed over (noted as seen, nothing taken in). A browser's file never
     changes `household`, `cards` or `prices` entries, on the web as on a phone. Unchanged for writers: every
     device already writes its own name with its own id inside.
+
+## v3 (Restock 0.9.4): the server is the household's owner
+
+The design, its decisions and the work packages are in `docs/server-v3-design.md`; this section pins the
+bytes. The code is `src/server-mode/crypto.ts` (marked "0.9.4, protocol v3"), `src/server-mode/engine.ts`
+(`role: 'server'`) and `src/lib/haSync.ts` (`haLineId`), bundled for the server as
+`restock-core.mjs` (`npm run build:server-core`, `src/server-core/index.ts`). **Test vectors:**
+`tools/sync-test/vectors-v3.json`, made with Node's own crypto and checked by `src/server-core/core.test.ts`;
+the server's and the phones' (Java) tests read the same file.
+
+### Conventions
+- Bytes in JSON, QR codes and headers are base64url without padding (readers also take plain base64).
+- Public keys are P-256 SPKI DER (91 bytes, Java's `getEncoded()`). Private keys the server receives or
+  hands out (`owner_priv`) are PKCS#8 DER as Java writes them; the core reads Java's and Node's encodings
+  (`privOfPkcs8`) and writes the short form (`pkcs8Of`), which both read.
+- **ECDH** is P-256; its secret is the shared point's x-coordinate (32 bytes), as Java's `KeyAgreement`.
+- **HKDF** is HKDF-SHA256 with 32 bytes out. "No salt" is RFC 5869's default (32 zero bytes). A salt that
+  travels as base64url (`n`, `c`, an invite, a token, a sign-in id) is its decoded bytes.
+- **Sealed** = 12-byte random nonce + AES-256-GCM (16-byte tag) over UTF-8 JSON, with the associated data
+  named below (as UTF-8; `+ device` appends the device id).
+- Invites, handover tokens, challenges and sign-in ids are 32 random bytes; `n` is 16.
+- ECDSA is SHA256withECDSA, DER signatures (as v2 and `SyncHousehold.java`).
+
+### Keys and records
+- Server keys (`keys.json`): `kex` (ECDH P-256, its SPKI is `k=` in every v3 code), the owner key
+  (PKCS#8 + SPKI), `keyv`, household keys `{ "<keyv>": key }` for the versions it has, and serverKeys
+  `{ "<keyv>": serverKey }` for **every** version (a phone keeps older versions as serverKeys only:
+  `server_filekeys`). `serverKey = HMAC-SHA256(householdKey, "restock-server-files-v1")`, as v2.
+- The household record's owner-only rows are signed by the owner key, as 0.9.0 (`restock-hh1|pk|v=…|stamp`).
+  The server writes them through `WebSyncEngine.writeHousehold(k, v)`: the change goes through the
+  database's triggers (stamped and noted as `srv-<sid>`), then its note gets the signature, as a phone's
+  collect signs. The server keeps `sync_meta owner_pin` = its own `owner_pub`.
+- **`server`** (new owner-only row, in `ownerOnly` on both sides): `{ "v": 3, "sid", "home", "away" (or
+  null), "kex" (server kex SPKI), "keepMonths" (3, 6, 9, 12 or null) }` (`parseServerRow`). Write `owner =
+  srv-<sid>` before `server`, so a 0.9.3 phone (no `server` in its `ownerOnly`) takes `server` in
+  through `legacyAllowed` as the owner's.
+- `member:<device>` = `{ "name": <label>, "pub": <the phone's my_pub> }`, signed by the server.
+- The recovery copy (`recovery` row) is 0.9.0's: base64url(sealed, no associated data) with key
+  `SHA-256("restock-recovery" ‖ r)`, `r` 20 random bytes shown as `formatRecovery(r)` (base32 in fours),
+  JSON `{ secrets: { device: secret }, owner_priv, owner_pubkey, key, keyv (a string), oldkey?, oldkey_until? }`
+  (`sealRecovery`/`openRecovery`). Each phone's `secret` is 32 random bytes the server makes at join.
+
+### Joining (`POST /api/v3/join`, `POST /api/v3/upgrade`)
+- Add a phone code: `restock-server:3?h=<home>&a=<away>&i=<invite>&k=<server kex SPKI>` (URL-encoded).
+- Invite join body: `{ invite, device, name, pub, kex, myPub, n }` (`pub`: the phone's request-signing
+  key, as v2; `kex`: its ECDH key; `myPub`: its household signing key).
+- Member join body (no invite): `{ member: true, device, pub, kex, n, sig }`, `sig` = ECDSA by the phone's
+  household signing key (`my_priv`) over `memberJoinText`:
+  `"restock-member-v3\n" + device + "\n" + pub + "\n" + kex + "\n" + n` (the strings as sent). The server
+  checks it with `member:<device>.pub`.
+- Upgrade body (signed with the phone's v2 key, so `device` is the signer): `{ kex, myPub, n, ha? }`.
+- Answer (all three): `{ sealed }`, sealed with `joinKey` = HKDF(ECDH(server kex, phone kex), salt `n`,
+  info `restock-join-v3`), associated data `"RSJ3" + device`, JSON:
+  `{ format: "restock-join", v: 3, device, label, seed, household: { name, hid, sid, owner_pub }, keyv,
+  keys: { "<keyv>": householdKey } (every version the server has, at least the current one), serverKeys:
+  { "<keyv>": serverKey } (every version), secret, server: { home, away, keepMonths } }`.
+- `ha` on upgrade: sealed with HKDF(ECDH(server kex, phone kex), salt `n`, info `restock-ha-v3`),
+  associated data `"RSA3" + device`, JSON `{ address, entity, enabled, token, state }` (`state`: its
+  `HA_STATE`).
+
+### After a rekey: `keys/<device>.bin` (RSE3)
+`"RSE3"` + sealed with HKDF(ECDH(server kex, phone kex), no salt, info `restock-keys-v3`), associated data
+`"RSE3" + device`, JSON `{ keyv, keys: { "<keyv>": householdKey } }` (at least the new one). Written by
+the server only, readable by that device only. A phone takes only a higher `keyv` than it has.
+
+### Handover (`POST /api/v3/handover/<token>`, RSH3)
+- Code on the web: `restock-handover:3?u=<origin>&t=<token>&k=<server kex SPKI>`.
+- Body (signed with the owner phone's v2 key): `{ epub, sealed }`; `epub` a one-off ECDH key; sealed with
+  HKDF(ECDH(e, server kex), salt token, info `restock-handover-v3`), associated data `"RSH3"`, JSON
+  `{ format: "restock-handover", v: 3, key (current household key), keyv, serverKeys: { "<keyv>":
+  serverKey } (its server_filekeys and the current one), oldkey?, oldkey_until?, owner_priv (PKCS#8),
+  owner_pubkey (SPKI), owner_secrets: { device: secret } (the other phones'), secret (its own), recovery?
+  (base32), recovery_saved?, hid, name, ha? }`.
+
+### Browsers (`RestockWeb3`)
+- `loginKey = HKDF(authKey, no salt, "restock-login-v3")` (authKey is v2's PBKDF2 bytes 0–31).
+- `GET /api/v3/login/challenge?user=` → `{ salt, c, kex }`. `POST /api/v3/login`
+  `{ user, c, epub, proof }`, `proof = HMAC-SHA256(loginKey, "restock-login-v3\n" + c + "\n" + epub)`
+  (`c` and `epub` as the base64url strings sent).
+- `sessionKey = HKDF(ECDH(server kex, epub) ‖ loginKey, salt c, "restock-session-v3")` (the 32-byte
+  secret, then the 32-byte loginKey). Answer `{ session, expires, sealed }`, `sealed` = base64url of RSF1
+  with the sessionKey (`"RSF1"` + nonce + AES-GCM(gzip(JSON)), associated data `"RSF1"`, as v2's files) of
+  `{ keys: { "<keyv>": serverKey } (every version), keyv, webId, household: { name, owner_pub } }`.
+- Sign in with a phone: `POST /api/v3/qrlogin { epub }` → `{ id, kex, expires }`; the code is
+  `restock-login:3?u=<origin>&s=<id>&k=<epub>`; `sessionKey = HKDF(ECDH(server kex, epub), salt id,
+  "restock-session-v3")`.
+- Every later request: `Authorization: RestockWeb3 s=<session>, t=<unix ms>, n=<16 random bytes>,
+  m=<mac>`, `mac = HMAC-SHA256(sessionKey, METHOD\nPATH_AND_QUERY\nt\nn\nhex(sha256(body)))`, the same
+  text a phone signs (`requestText`; body the bytes sent, sealed ones included; no body hashes the empty
+  string). Clock window and nonces as v2's phone requests.
+- Answers with household data, and request bodies with secrets, are raw RSF1 bytes sealed with the
+  sessionKey, `Content-Type: application/x-restock-sealed`.
+
+### Files and the merge
+- Names: `allowedNameV3`: v2's less `restock-sync-keys-*.json` and `webkeys/`, plus `keys/<device>.bin`.
+  `restock-sync-srv-<sid>.bin` (`serverFileName`) is the server's own, written by the server only.
+- A phone's own file on a v3 server is v2's plus top-level `shares: { tabs: ["pantry" | "keg" |
+  "pharmacy"], receipts: bool, cards: bool }` (`pantry` is the groceries: pantry and shopping list).
+- The server's merge (`takeFile`, role `server`) takes from each phone only what it shares: a record of a
+  tab, receipts or cards it doesn't share is passed over, and so is a `moved` delete of one; a plain
+  delete of one is taken only when that phone **made** the record (its `origin` on the server, below; not
+  merely the last to change it): "Also take what this phone shared off the server" (the phone sends deletes
+  for its own records of that tab, the receipts' and the cards' too, even though it no longer shares
+  them). A record whose maker isn't known stays. A file without `shares` (0.9.3 phones, browsers) is
+  taken as it is. What a phone last declared is in `sync_meta phone_shares:<device>` (`sharesOf`);
+  `lastDropped` counts what was passed over, for the log.
+- **Who made a record** (0.9.4 final fixes): `sync_log.origin` (schema.ts `SYNC_094`), a device id or null
+  (not known). The triggers set it to this device when a record is made (or made again, the moments
+  `created` is set; a receipt saved again keeps it) and keep it through edits and deletes. Entries carry it
+  as an optional `origin` in every sync file and Wi-Fi message (older readers pass it over). Taken in
+  (`SyncEngine.originOf`, engine.ts `originOf`): a record that's here and live keeps its own unless the
+  change made it again (a newer `created`); a new one, or one made again, takes the entry's `origin`, else
+  the entry's `device` when that change was the one that made it (`stamp = created`); it's never filled in
+  later. The server also doesn't believe a file whose phone claims to have made a record someone else
+  changed last. Records from before 0.9.4: known only where `stamp = created` (their device made them and
+  nobody changed them since); the rest stay unknown, so they're never taken back.
+- **Deletes and tabs** (0.9.4 final fixes, phones and the engine alike): a plain delete of a record whose
+  copy here is on a tab this device doesn't sync is passed over, like that tab's changes (so what a phone
+  takes back never reaches a phone that doesn't share the tab, and its own copy stays). A `moved` delete
+  (the record's own stamp) wins only when it's newer than the copy here, never by "a delete beats edits",
+  so turning a tab off on one phone (whose file other phones read too) never deletes the others' copies of
+  records it changed last.
+- The server's own file is a sync file like a phone's: everything but `cards`, prices changed in the last
+  60 days, the household's rows with their signatures, `seen`; `name` is the house's name.
+- **Keep data for**: `keepCutoff(keepMonths, now)` = ISO time of `now − keepMonths × 2,629,800,000 ms`
+  (a year's 365.25 days over 12; null for Until I delete). Phones use the same arithmetic with
+  `keepMonths` from the signed `server` row. Incoming prices dated before it are passed over unless
+  nothing newer for that product is on the server or in the same file (the latest stays, as
+  `pruneHistory`); receipts scanned before it unless pinned; the same for archives. `prune(cutoff)` drops
+  them quietly (no deletes go out) and returns the receipts that went, for their photos.
+- `compact()`: deletes older than 90 days that every `member:` phone has seen (`seen` in their files).
+
+### Home Assistant line ids
+A line made from Home Assistant's item `uid` on the list `entity` has the id
+`haLineId(entity, uid)` = `"ha-"` + the first 24 hex characters of
+`sha256("restock-ha-v1\n" + entity + "\n" + uid)` (UTF-8). A store adds it with `INSERT OR IGNORE` and
+returns that id whether it added it or it was there (`Store.addLine(line, uid)`); `syncRound` then pairs
+the item with the line already there. 0.9.3's random `ha-` ids stay as they are.
+
+### What the server (P2) answers, where the text above leaves it open
+All additive to the shapes the web (P5) codes against; extra fields can be passed over.
+- Sessions: each v3 browser session has its **own** `webId` (its file is `restock-sync-web-<webId>.bin`). The
+  login, setup and `GET /api/v3/session` gift is `{ keys, keyv, webId, household: { name, owner_pub }, mode }`
+  (`keys` `{}` and `household` null outside mode `v3`); `session` adds `user, kind, expires`. Every 2xx JSON answer to
+  a RestockWeb3 request is sealed; errors stay plain JSON. `POST /api/v3/setup` also takes the setup page's v2
+  passphrase cookie (then answers plain `{ ok, mode, house: { name } }`), and `{ name, afresh: true }` in mode
+  `released` starts the server afresh (old files to the trash).
+- `POST /api/v3/qrlogin/<id>` (phone): body `{}` or `{ k }` (the code's `k`; if sent it must be that sign-in's
+  epub). `GET` answers `{ pending: true, status, expires }`, then once `{ pending: false, status: "done", session,
+  expires, sealed }`; the sealed gift adds `device, deviceName`.
+- `POST /api/v3/join` **bring** (a phone household onto a new, empty server, design section 7): the invite body
+  plus `bring: { epub, sealed }`, `sealed` = `sealHandover(handoverKey(e, server kex, salt = the invite's decoded
+  bytes), <the RSH3 payload>)`. Taken only while no phone has joined the server (else 409 `not-empty`); the answer
+  is the usual RSJ3 gift with the brought household's keys (`seed: false`, `household.name` = the server's house name).
+- `POST /api/v3/upgrade` answers `{ sealed, ha?: true }` (`ha` when the server took the phone's Home Assistant: only
+  from the phone `household_settings ha:phone` names). A phone with a `removed:<device>` row gets 401 `removed`; one
+  with no `member:<device>` row 403 `member` (being on the server isn't being in the household).
+- `POST /api/v3/setup` and `POST /api/v3/handover` answer 409 `signin` until the server has the passphrase's
+  `loginKey` (a v2 session from before the update): sign in again (v2) first.
+- Home Assistant `PUT`/`test` with an address on another origin than the saved one need the token again (400 `token`
+  / `ok: false`).
+- `GET /api/v3/phones` rows add `api` (2: not upgraded yet). `POST /api/v3/phones` adds `expiresIn, label, home,
+  away`. `DELETE /api/v3/phones/<d>` (passphrase session) → `{ removed, keyv }` (the new key version: browsers ask
+  `GET /api/v3/session` again). `PATCH` → `{ device, label }`.
+- `GET /api/v3/browsers` rows add `expires`, `device?` (the phone that let a phone sign-in in), `ip?` (masked).
+- **The passphrase again** (0.9.4 final fixes) for the dangerous admin actions: the body carries `confirm: { c,
+  proof }`, `c` a fresh challenge from `GET /api/v3/login/challenge` (used once), `proof` = HMAC-SHA256(loginKey,
+  `"restock-login-v3\n" + c + "\n" + <this session's id>`) (`loginProof(loginKey, c, sid)`, as a passphrase change
+  proves the current one; session.ts `confirmPassphrase`). Without it: 403 `confirm`; a wrong one 403 `current`
+  (counted towards the sign-in lockout). Needed by: `POST /api/v3/recovery { confirm }` (the key), `POST
+  /api/v3/backup`, `POST /api/v3/prune`, `PUT /api/v3/settings` when `keepMonths` gets shorter (or goes from Until
+  I delete to a window: data is deleted), and `DELETE /api/v3/phones/<d>` (its body `{ confirm }`).
+- `GET /api/v3/settings` → `{ name, keepMonths }`; `PUT` takes either (passphrase session) and answers the same;
+  changing `keepMonths` re-signs the `server` row and prunes at once. `POST /api/v3/prune { before, confirm }` →
+  `{ cutoff, prices, receipts, photos, archives, logs }` (counts).
+- `GET /api/v3/recovery` → `{ saved }`; `POST /api/v3/recovery { confirm }` → `{ recovery, saved }`; `POST
+  /api/v3/recovery { saved: true }` notes it was saved.
+- **Receipt photos** (0.9.4 final fixes): a `PUT` of `photos/<sha256>.bin` must open with one of the household's
+  serverKeys as `{ format: "restock-photo", sha256, data }` with `sha256` = the name's and = SHA-256 of `data`'s
+  bytes, or it's refused (400 `photo`), new or replacing. The path → photo map a phone's file or archive gives
+  (`photos`) is noted per path for that phone (`srv_photos.device`): another phone's file can't point a path at
+  another photo, and a photo that isn't on the server isn't noted.
+- **Connections** (0.9.4 final fixes): a request's headers must arrive within 20 seconds and all of it within
+  10 minutes; a kept-alive connection with no request goes after 10 seconds, and one where nothing moves either
+  way after 2 minutes. No endpoint holds an answer back (sign-in and link codes are polled, each poll answered at
+  once), so only a client that stopped sending is cut off.
+- `POST /api/v3/backup { passphrase, confirm }` refuses a backup passphrase that fails the passphrase rules (400 `weak`). The file:
+  `RSB3`, 2-byte length, header JSON `{ v: 1, kdf: "scrypt", N, r, p, salt }`, 12-byte nonce, AES-256-GCM(gzip(tar))
+  with the 16-byte tag at the end; associated data = everything before the nonce. `scripts/restore.mjs` reads it.
+- Activity and log rows add `who` ("Web page", "The server", the phone's label, "A removed phone").
+- `GET /api/v3/history` rows add `member_only, source`. `GET /api/v3/stats?months=` → `{ months: [{ month
+  ("yyyy-mm"), receipts: { <tab>: total }, receiptCount, productsTracked, specialsSeen }] }`. `GET
+  /api/v3/specials` → `{ specials: [latest special price per product, 14 days, with product name/chain/image],
+  lists, catalogues }` (`lists`/`catalogues` as in the server's own file, below).
+- Home Assistant: `GET` adds `phoneName`, `offOn`, `blocked` (why the server isn't running it, in words, or null);
+  `PUT` also takes `offOn: "<device>"` ("It's off on <phone>", for a 0.9.3 phone still named in `ha:phone`), and
+  `enabled: false` deletes the `ha:phone` row if it names the server. `test` adds `version`; `sync` adds `came,
+  went, held` when `ok`.
+- `household_settings` `branch:<chain>` (`chain` `[a-z0-9][a-z0-9_-]{0,63}`) = `{ "name" (1–80), "storeNo"?
+  ([A-Za-z0-9 _-]{1,16}) }` and nothing else; anything else under `branch:` is passed over by the server.
+- Shared specials: a phone file's top-level `specials` (`lists` ≤ 60, ≤ 1000 items each, ≤ 512 KB a list) and
+  `catalogues` (http(s) `url` ≤ 500, `note` ≤ 300) are kept per chain, newest `at` wins, only for chains on tabs
+  that file's `shares` includes; items keep only `storeProductId, name, price, wasPrice, promo, imageUrl
+  (http(s)), isSpecial`. The server's own file carries `specials: { at, lists }` (lists of the last 14 days) and
+  `catalogues`.
+- The household's `tabs` and `receipts` after a handover or a bring stay as the household had them until every
+  member that isn't removed is on v3; then the server signs `tabs = "pantry,keg,pharmacy"` and `receipts = "1"`
+  (logged `household-widened`). A fresh house starts with both all on. Phones keep deciding by their own shares.
+- Home Assistant: when the server takes it over (turned on from the web, "It's off on <phone>", a handover or an
+  upgrade that brings it, while it's on), it writes `household_settings` `ha:phone = "srv-<sid>"` as its own change
+  (noted as `srv-<sid>`, so it's in the server's file, newer than the phone's): the phone that ran it deletes its
+  token and stops. Turned off on the web, the server deletes the row if it names itself. While `ha:phone` names a
+  phone still on 0.9.3 (`api: 2`) without "It's off on <phone>", the server neither runs it nor writes the row.
+- Errors v3 adds: `mode` (409, with `mode`), `released` (409), `update` (403, `api: 3`; also a 0.9.4 phone that
+  hasn't upgraded yet on a v3 path other than upgrade), `v3` (409: a v2 endpoint the server no longer serves),
+  `done`/`handover` (409), `member` (401), `not-empty` (409), `challenge` (401: the challenge was used or expired),
+  `current` (403), `weak` (400), `core` (503: no Restock core in this copy), `node` (503).
+
+### What the phones (P3) do, where the text above leaves it open
+All within the shapes above; the server (P2) already answers them.
+- **Codes.** `restock-server:3?h=&a=&i=&k=` (an Add a phone code without a P-256 `k` is turned down as damaged),
+  `restock-handover:3?u=&t=&k=` (the phone checks `u`'s host is its server's, as for sign-in codes) and
+  `restock-login:3?u=&s=&k=`. A 0.9.4 phone still reads `restock-server:2` and the v2 web codes.
+- **Before joining** the phone asks `GET /api/v3/health` (unsigned). It reads `empty` (a boolean) only if the
+  server sends one; otherwise an owner phone in a phone household is offered Bring, and a 409 `not-empty` (the
+  invite isn't used) offers leaving its household and joining instead.
+- **Joining fresh** (a phone in no household, or one that just left its own): it shares `tabs = "pantry"`,
+  `share_receipts = "0"`, `share_cards = "0"`, Wi-Fi sync off (`sync_meta wifi_sync = "0"`), label "Home" for the
+  server (`server_label`). Its own records go up "giving way": their `sync_log` stamps are set to -1 (below any
+  other phone's), so wherever the house already has a record the house's copy wins, and a record only it has
+  still goes up. The first phone of a new house (`seed: true`) keeps its stamps and seeds `household_settings`
+  (`sync_meta seed_settings = "1"`), as the 0.9.3 owner did.
+- **Upgrade** (after `403 update`): the answer is opened with the server's kex key pinned from a code (the owner
+  phone pins it from the handover code). A phone that never scanned a v3 code takes it from the answer's `kex`,
+  else health's `kex`, else `GET /api/v3/login/challenge`'s `kex` (public, in every code), and keeps it only
+  because the opened gift holds this household's own key and its `owner_pub` equals the phone's pinned owner key.
+  It then shares what it shared: its tabs and cards as they were, receipts as `receipts_eff` was.
+- **`POST /api/v3/qrlogin/<id>`** (phone): `{ approve: true, k }`, `k` the code's browser key.
+- **"Also take what this phone shared off the server"** (design 14): `sync_meta server_takeback` =
+  `{ "keg" | "pharmacy" | "receipts" | "cards": <ms when ticked> }`. While a kind is in it, the phone's own file
+  carries, instead of collect's `moved` deletes, a plain delete for each record of that kind this phone made
+  (`sync_log.origin` = its id; a tab's categories, products, items, list lines, receipts and prices), stamped
+  `max(ticked, its stamp + 1)`; records other phones made, or whose maker isn't known, stay. They're found a
+  table at a time (joined with what their tab comes from), not a query a record. The phone keeps its own copy:
+  it never takes in a delete by itself of a record it's taking back. Turning the kind on again clears it.
+- **Leaving with take-back**: `syncStopServer({ bringBack, takeBack })`. The Leave sheet offers a box for each
+  personal kind the phone shares (Keg, Pharmacy, receipts, loyalty cards; never groceries), all unticked. Ticked
+  ones are turned off and taken back as above, then one round puts the phone's file with the deletes on the
+  server, then it leaves; if that round can't reach the server it doesn't leave (the error starts "Couldn't take
+  those things off the server"), and the sheet offers leaving without taking them back.
+- **Shared specials** (design 15) in the phone's file on any Restock server: `specials: { at, lists: [{ chain,
+  at, items: [{ storeProductId, name, price, wasPrice, promo, imageUrl, isSpecial }] }] }` from what its Specials
+  page already fetched (kv `specials`; at most 120 items a chain), and `catalogues: { "<chain>": { url, note? } }`
+  for the shops it follows, from what its Catalogues page found (https only). Nothing is fetched for them.
+- **`household_settings branch:<chain>`** (the web's default branch): a phone uses it only where it hasn't picked
+  its own: `StoreChoice.primary` empty, or still the default it took (`householdBranch`); Coles' `branchStoreNo`
+  likewise (`householdStoreNo`). It's applied only for the tabs the phone syncs, and never seeded.
+- **In a house** the phone never writes or reads a keys file, `webkeys/` or a vault link; folder (and WebDAV)
+  sync is turned off (D13); Wi-Fi sync stays, off by default for a phone that joined fresh. A `401 removed` makes
+  the phone forget the household and keep everything (`notice = "server-removed"`); Leave is `DELETE
+  /api/v3/devices/<me>` (best effort, after bringing offloaded receipt photos back if it can), then the same.

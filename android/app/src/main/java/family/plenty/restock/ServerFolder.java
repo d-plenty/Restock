@@ -34,21 +34,31 @@ import org.json.JSONObject;
  */
 final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
     static final String API = "/api/v2";
+    /** 0.9.4: protocol v3, where the server is the household's owner (docs/server-protocol.md "v3"). */
+    static final String API3 = "/api/v3";
     static final String INVITE_PREFIX = "restock-server:2?";
+    static final String INVITE3_PREFIX = "restock-server:3?";
     /** File names the phone uses (and the server allows). */
     private static final java.util.regex.Pattern NAME = java.util.regex.Pattern.compile("[A-Za-z0-9._-]{1,120}(/[A-Za-z0-9._-]{1,120}){0,2}");
 
     private final List<String> bases;
     private final String device;
     private final PrivateKey key;
+    /** "/api/v2" or (0.9.4) "/api/v3". */
+    final String api;
     private String base;
     private final Map<String, String> versions = new HashMap<>();
     private final Map<String, Long> sizes = new HashMap<>();
 
     ServerFolder(List<String> bases, String device, PrivateKey key) {
+        this(bases, device, key, API);
+    }
+
+    ServerFolder(List<String> bases, String device, PrivateKey key, String api) {
         this.bases = bases;
         this.device = device;
         this.key = key;
+        this.api = api;
     }
 
     /** The address that answered this round (after names()), or null. */
@@ -62,6 +72,10 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         String home;
         String away;
         String invite;
+        /** 0.9.4: 3 for a v3 server's code (it names the server's kex key, k=), else 2. */
+        int v = 2;
+        /** 0.9.4: the server's ECDH key (SPKI, base64url), pinned from the code. */
+        String kex;
     }
 
     /** A scanned Add a phone code, or an IllegalArgumentException saying what's wrong. */
@@ -69,9 +83,11 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         String t = text == null ? "" : text.trim();
         if (t.regionMatches(true, 0, "restock-server:1?", 0, 17))
             throw new IllegalArgumentException("That code is from an older Restock server. Update the server, then scan the code on its Add a phone page.");
-        if (!t.regionMatches(true, 0, INVITE_PREFIX, 0, INVITE_PREFIX.length()))
+        boolean v3 = t.regionMatches(true, 0, INVITE3_PREFIX, 0, INVITE3_PREFIX.length());
+        if (!v3 && !t.regionMatches(true, 0, INVITE_PREFIX, 0, INVITE_PREFIX.length()))
             throw new IllegalArgumentException("That isn't a Restock server code. On a computer, sign in to your server's page and choose Add a phone.");
         Invite in = new Invite();
+        in.v = v3 ? 3 : 2;
         for (String part : t.substring(INVITE_PREFIX.length()).split("&")) {
             int eq = part.indexOf('=');
             if (eq <= 0) continue;
@@ -81,6 +97,14 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
             if (k.equals("h")) in.home = v;
             else if (k.equals("a")) in.away = v;
             else if (k.equals("i")) in.invite = v;
+            else if (k.equals("k")) in.kex = v;
+        }
+        if (v3) {
+            try {
+                in.kex = ServerLink.b64u(ServerLink.publicKey(ServerLink.unb64(in.kex)).getEncoded());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("That code is damaged. Make a new one on the server's Add a phone page.");
+            }
         }
         if (in.invite == null || !in.invite.matches("[A-Za-z0-9_-]{20,128}")) throw new IllegalArgumentException("That code is damaged. Make a new one on the server's Add a phone page.");
         in.home = cleanAddress(in.home);
@@ -119,6 +143,16 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
     static final class MissingException extends Exception {
         MissingException() {
             super("not there");
+        }
+    }
+
+    /**
+     * 0.9.4: a v2 request answered 403 { error: "update", api: 3 }: the household was handed to the
+     * server (a v3 server now), and this phone carries on with POST /api/v3/upgrade.
+     */
+    static final class UpdateException extends Exception {
+        UpdateException(String m) {
+            super(m);
         }
     }
 
@@ -181,7 +215,7 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         for (String b : bases) {
             if (b == null) continue;
             try {
-                SyncDav.Response r = send(b, "GET", API + "/files", null, SyncDav.MAX_LIST);
+                SyncDav.Response r = send(b, "GET", api + "/files", null, SyncDav.MAX_LIST);
                 if (r.status != 200) throw failure(r, "list the files");
                 JSONArray files = new JSONObject(r.text()).getJSONArray("files");
                 List<String> out = new ArrayList<>();
@@ -194,12 +228,12 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
                 }
                 base = b;
                 return out;
-            } catch (AccessException e) {
+            } catch (AccessException | UpdateException e) {
                 // On another network something else could be at the home address: try away too, but
                 // a refusal from the real server is what's said.
                 last = e;
             } catch (Exception e) {
-                if (!(last instanceof AccessException)) last = e;
+                if (!(last instanceof AccessException) && !(last instanceof UpdateException)) last = e;
             }
         }
         throw last != null ? last : new Exception("no server address");
@@ -216,9 +250,9 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         return s == null ? -1 : s;
     }
 
-    private static String path(String name) {
+    private String path(String name) {
         if (name == null || !NAME.matcher(name).matches() || name.contains("..")) throw new IllegalArgumentException("not a server file name: " + name);
-        return API + "/files/" + name;
+        return api + "/files/" + name;
     }
 
     @Override
@@ -254,8 +288,15 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
 
     /** A signed JSON request to the server (after names()). */
     JSONObject call(String method, String path, JSONObject body) throws Exception {
-        SyncDav.Response r = send(base(), method, API + path, body == null ? null : body.toString().getBytes(StandardCharsets.UTF_8), SyncDav.MAX_SMALL);
-        if (r.status < 200 || r.status >= 300) throw failure(r, "do that");
+        SyncDav.Response r = send(base(), method, api + path, body == null ? null : body.toString().getBytes(StandardCharsets.UTF_8), SyncDav.MAX_SMALL);
+        if (r.status < 200 || r.status >= 300) {
+            String said = messageOf(r);
+            if (r.status == 409 || r.status == 400) {
+                String err = errorOf(r);
+                throw new Refused(err, said.isEmpty() ? "The server turned that down." : said);
+            }
+            throw failure(r, "do that");
+        }
         try {
             return r.body.length == 0 ? new JSONObject() : new JSONObject(r.text());
         } catch (Exception e) {
@@ -265,13 +306,118 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
 
     /** The status of a signed request (after names()), for things that answer 404 or 410 when a code ran out. */
     int status(String method, String path, JSONObject body) throws Exception {
-        return send(base(), method, API + path, body == null ? null : body.toString().getBytes(StandardCharsets.UTF_8), SyncDav.MAX_SMALL).status;
+        return send(base(), method, api + path, body == null ? null : body.toString().getBytes(StandardCharsets.UTF_8), SyncDav.MAX_SMALL).status;
     }
 
     /** Takes this phone off the server's list (Stop). Best effort: the server may be out of reach. */
     void leave() throws Exception {
         names();
         call("DELETE", "/devices/" + device, null);
+    }
+
+    // ---------- 0.9.4: protocol v3 ----------
+
+    /**
+     * GET /api/v3/health at the first address that answers: { ok, version, api: 3, mode, house? }, or
+     * null when no address answered as a v3 server (a 0.9.3 server, or none reachable).
+     */
+    static JSONObject health(List<String> bases) {
+        for (String a : bases) {
+            if (a == null) continue;
+            try {
+                SyncDav.Response r = SyncDav.request("GET", URI.create(a + API3 + "/health"), new LinkedHashMap<>(), null, SyncDav.MAX_SMALL);
+                if (r.status != 200) continue;
+                JSONObject o = new JSONObject(r.text());
+                o.put("_reached", a);
+                return o;
+            } catch (Exception e) {
+                // the next address
+            }
+        }
+        return null;
+    }
+
+    /**
+     * POST /api/v3/join (no signature: the invite, or the member signature inside, is what counts) at
+     * the first address that answers. Answers { sealed, _reached }. Throws with words.
+     */
+    static JSONObject join3(List<String> bases, JSONObject body) throws Exception {
+        byte[] b = body.toString().getBytes(StandardCharsets.UTF_8);
+        Exception last = null;
+        for (String a : bases) {
+            if (a == null) continue;
+            SyncDav.Response r;
+            try {
+                Map<String, String> h = new LinkedHashMap<>();
+                h.put("Content-Type", "application/json");
+                r = SyncDav.request("POST", URI.create(a + API3 + "/join"), h, b, SyncDav.MAX_SMALL);
+            } catch (Exception e) {
+                last = e;
+                continue;
+            }
+            if (r.status >= 200 && r.status < 300) {
+                JSONObject o = new JSONObject(r.text());
+                o.put("_reached", a);
+                return o;
+            }
+            String err = errorOf(r);
+            String said = messageOf(r);
+            if ("not-empty".equals(err)) throw new NotEmptyException(said);
+            if ("device-taken".equals(err))
+                throw new SyncDav.Problem(said.isEmpty() ? "That phone is already on this server. Remove it on the server's Phones page first, then add it again." : said);
+            if ("invite".equals(err)) throw new SyncDav.Problem("That code isn't from this server. Make a new one on the server's Add a phone page.");
+            if (r.status == 410 || "used".equals(err) || "expired".equals(err))
+                throw new SyncDav.Problem("That code has been used or has run out. Make a new one on the server's Add a phone page (each code works once, for 10 minutes).");
+            if ("member".equals(err) || "removed".equals(err) || (body.optBoolean("member", false) && (r.status == 401 || r.status == 403)))
+                throw new NotMember(said.isEmpty() ? "The server doesn't have this phone in its household. Add it on the server's Add a phone page instead." : said);
+            if (r.status == 404) throw new SyncDav.Problem("That server needs updating to Restock server 0.9.4 for this code.");
+            if (r.status == 429) throw new SyncDav.Problem("The server is busy. Try again in a minute.");
+            if (!said.isEmpty()) throw new SyncDav.Problem(said);
+            last = SyncDav.problem(r.status, "join");
+        }
+        if (last instanceof SyncDav.Problem) throw last;
+        throw new SyncDav.Problem("Couldn't reach the Restock server. Check this phone is on the same network as the server (or the server's away address works), then try again.", last);
+    }
+
+    /** 0.9.4: a member join (no code) the server turned down: this phone isn't in its household (or was removed from it). */
+    static final class NotMember extends Exception {
+        NotMember(String m) {
+            super(m);
+        }
+    }
+
+    /** 0.9.4: a join that tried to bring a household onto a server whose house isn't empty (409 not-empty). */
+    static final class NotEmptyException extends Exception {
+        NotEmptyException(String m) {
+            super(m == null || m.isEmpty() ? "That server already has a household." : m);
+        }
+    }
+
+    /**
+     * 0.9.4: a signed request to a full path (/api/v3/…) at the first address that answers, without a
+     * listing first (an upgrade or a handover, which the v2 listing would turn down). Refusals from
+     * the server itself are thrown as usual; the answer is given whatever its status.
+     */
+    SyncDav.Response first(String method, String fullPath, JSONObject body) throws Exception {
+        byte[] b = body == null ? null : body.toString().getBytes(StandardCharsets.UTF_8);
+        Exception last = null;
+        for (String a : bases) {
+            if (a == null) continue;
+            try {
+                SyncDav.Response r = send(a, method, fullPath, b, SyncDav.MAX_SMALL);
+                if (r.status == 404 && a != bases.get(bases.size() - 1)) {
+                    last = failure(r, "do that");
+                    continue;
+                }
+                base = a;
+                return r;
+            } catch (AccessException | UpdateException e) {
+                throw e;
+            } catch (Exception e) {
+                last = e;
+            }
+        }
+        throw last != null ? last : new Exception("no server address");
     }
 
     private String base() throws Exception {
@@ -328,16 +474,28 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         Long skew = SKEW.get(b);
         Map<String, String> h = new LinkedHashMap<>();
         h.put("Authorization", authorization(device, key, method, target, now() + (skew == null ? 0 : skew), body));
-        if (body != null) h.put("Content-Type", path.startsWith(API + "/files/") ? (path.endsWith(".json") ? "application/json" : "application/octet-stream") : "application/json");
+        if (body != null) h.put("Content-Type", path.startsWith(api + "/files/") ? (path.endsWith(".json") ? "application/json" : "application/octet-stream") : "application/json");
         SyncDav.Response r = SyncDav.request(method, u, h, body, max);
         if (r.status == 401 || r.status == 403) {
             String err = errorOf(r);
             if (err.equals("clock")) return r;
             if (err.equals("removed") || err.equals("device")) throw new AccessException(GONE, true);
+            // 0.9.4: the household was handed to the server; this phone upgrades to v3 (ServerSync).
+            if (err.equals("update") && api.equals(API)) throw new UpdateException(messageOf(r));
             String said = messageOf(r);
             throw new AccessException("The Restock server didn't accept this phone" + (said.isEmpty() ? "." : ": " + said) + " If it keeps happening, scan a new code from its Add a phone page.", false);
         }
         return r;
+    }
+
+    /** A request the server turned down with a reason (409, 400): its error code and words. */
+    static final class Refused extends Exception {
+        final String error;
+
+        Refused(String error, String m) {
+            super(m);
+            this.error = error;
+        }
     }
 
     /** The "error" in an answer's JSON, or "". */

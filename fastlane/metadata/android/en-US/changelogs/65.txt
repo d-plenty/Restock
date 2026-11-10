@@ -1,0 +1,5 @@
+Your Restock server is now the house: name it, add phones from its web page, and each phone picks what it shares. Removing a phone keeps its data.
+Still local first: your list works with no signal and no server.
+New sync screens: server first, then Wi-Fi, then a drive folder.
+Home Assistant runs on the server around the clock, or on one phone without one.
+Web: product photos, older prices, branches, specials.

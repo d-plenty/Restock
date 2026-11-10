@@ -48,8 +48,11 @@ export function suggestLocalText(p: Protection): string {
 export interface SyncStatus {
   ok: boolean;
   title: string;
-  /** One cell per way this phone keeps a copy: "Phones · 3 min ago". */
-  cells: { label: string; when: string | null | undefined }[];
+  /**
+   * One cell per way this phone keeps a copy that's in use: "Server · 1 min ago". 0.9.4: `day` cells
+   * (the last backup) show a day and a time ("Today 6:00 am") rather than how long ago.
+   */
+  cells: { label: string; when: string | null | undefined; day?: boolean }[];
 }
 
 export function syncStatus(
@@ -65,6 +68,8 @@ export function syncStatus(
         folderError?: string | null;
         lastSyncAt?: string | null;
         members?: unknown[];
+        /** 0.9.4: Wi-Fi sync off: the phones' cell isn't shown. */
+        wifiSync?: boolean;
       }
     | null
     | undefined,
@@ -72,10 +77,11 @@ export function syncStatus(
 ): SyncStatus {
   const p = protection(auto.enabled, info);
   const cells: SyncStatus['cells'] = [];
-  if (p.phones) cells.push({ label: 'Phones', when: info?.lastSyncAt });
-  if (info?.folder) cells.push({ label: 'Away', when: info.folderAt });
+  // 0.9.4: only what's in use: the server first, the Wi-Fi's phones only with Wi-Fi sync on, then the last backup.
   if (p.server) cells.push({ label: 'Server', when: info?.serverAt });
-  if (p.local) cells.push({ label: 'Backup', when: auto.lastAt });
+  if (p.phones && info?.wifiSync !== false) cells.push({ label: 'Phones', when: info?.lastSyncAt });
+  if (info?.folder) cells.push({ label: 'Drive folder', when: info.folderAt });
+  if (p.local) cells.push({ label: 'Last backup', when: auto.lastAt, day: true });
   const WEEK = 7 * 86_400_000;
   const problem =
     (!p.covered && "Nothing's kept anywhere else yet") ||
@@ -84,6 +90,7 @@ export function syncStatus(
     (info?.folder && info.folderError && "Sync away from home isn't working") ||
     (p.phones &&
       !p.server &&
+      info?.wifiSync !== false &&
       !info?.folder &&
       (!info?.lastSyncAt || now - Date.parse(info.lastSyncAt) > WEEK) &&
       "Your phones haven't synced in a week") ||

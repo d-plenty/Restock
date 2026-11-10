@@ -142,6 +142,27 @@ final class SharedSettings {
         return true;
     }
 
+    static final String BRANCH_PREFIX = "branch:";
+    private static final Pattern STORE_NO = Pattern.compile("[A-Za-z0-9 _-]{1,16}");
+
+    /** 0.9.4: a branch:<chain> row's value (the household's default branch), checked (sharedSettings.ts checkBranch), or null. */
+    static JSONObject checkBranch(String k, Object v) {
+        if (k == null || !k.startsWith(BRANCH_PREFIX)) return null;
+        String id = k.substring(BRANCH_PREFIX.length());
+        if (!builtIn(id) && !CUSTOM_ID.matcher(id).matches()) return null;
+        if (!(v instanceof JSONObject) || !(((JSONObject) v).opt("name") instanceof String)) return null;
+        JSONObject o = (JSONObject) v;
+        String name = o.optString("name").trim();
+        if (name.isEmpty() || name.length() > 80 || name.matches("(?s).*[\\u0000-\\u001f\\u007f].*")) return null;
+        try {
+            Object no = o.isNull("storeNo") ? null : o.opt("storeNo");
+            if (no == null) return new JSONObject().put("name", name);
+            return no instanceof String && STORE_NO.matcher((String) no).matches() ? new JSONObject().put("name", name).put("storeNo", no) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /** A setting's value as it may be applied (sharedSettings.ts checkValue), or null. */
     static Object checkValue(String k, Object v) {
         switch (k) {
@@ -160,6 +181,7 @@ final class SharedSettings {
             default:
                 break;
         }
+        if (k.startsWith(BRANCH_PREFIX)) return checkBranch(k, v);
         if (!k.startsWith("shop:") || !(v instanceof JSONObject) || !(((JSONObject) v).opt("on") instanceof Boolean)) return null;
         JSONObject o = (JSONObject) v;
         String id = k.substring(5);
@@ -253,6 +275,8 @@ final class SharedSettings {
             Object ok = checkListRow(pk, decode(v));
             if (ok == null || !v.equals(ok instanceof String ? JSONObject.quote((String) ok) : "true")) return false;
         }
+        // 0.9.4: a default branch only of the right shape.
+        if (pk.startsWith(BRANCH_PREFIX) && checkBranch(pk, decode(v)) == null) return false;
         if (room.has(pk)) return true;
         String kind = pk.startsWith(ALIAS_PREFIX) ? ALIAS_PREFIX : pk.startsWith(KEEP_PREFIX) ? KEEP_PREFIX : "";
         if ((!kind.isEmpty() && room.count(kind) >= LIST_ROWS_MAX) || room.count("") >= ROWS_MAX) return false;
@@ -264,6 +288,11 @@ final class SharedSettings {
     static String tabOf(String k, String v) {
         if (k == null) return null;
         if (k.startsWith("tab:")) return k.substring(4);
+        // 0.9.4: a default branch is about its shop's tab (a shop someone added: left alone).
+        if (k.startsWith(BRANCH_PREFIX)) {
+            String b = k.substring(BRANCH_PREFIX.length());
+            return builtIn(b) ? Shops.section(b) : "unknown";
+        }
         if (!k.startsWith("shop:")) return null;
         String id = k.substring(5);
         if (builtIn(id)) return Shops.section(id);
@@ -321,6 +350,31 @@ final class SharedSettings {
                     s.put("sections", next);
                     changed = true;
                 }
+            } else if (k.startsWith(BRANCH_PREFIX)) {
+                // 0.9.4: the household's default branch, only where this phone hasn't picked its own.
+                String id = k.substring(BRANCH_PREFIX.length());
+                JSONObject b = (JSONObject) val;
+                JSONObject stores = s.optJSONObject("stores");
+                JSONObject cur = stores == null ? null : stores.optJSONObject(id);
+                if (cur == null) cur = new JSONObject();
+                String primary = cur.isNull("primary") ? "" : cur.optString("primary", "");
+                if (primary.isEmpty() || primary.equals(cur.optString("householdBranch", "\u0000"))) {
+                    JSONObject next = new JSONObject(cur.toString());
+                    next.put("primary", b.getString("name"));
+                    next.put("householdBranch", b.getString("name"));
+                    String no = b.optString("storeNo", "");
+                    String had = cur.isNull("branchStoreNo") ? "" : cur.optString("branchStoreNo", "");
+                    if ("coles".equals(id) && !no.isEmpty() && (had.isEmpty() || had.equals(cur.optString("householdStoreNo", "\u0000")))) {
+                        next.put("branchStoreNo", no);
+                        next.put("householdStoreNo", no);
+                    }
+                    if (!sameFields(cur, next)) {
+                        JSONObject all = stores == null ? new JSONObject() : new JSONObject(stores.toString());
+                        all.put(id, next);
+                        s.put("stores", all);
+                        changed = true;
+                    }
+                }
             } else {
                 String id = k.substring(5);
                 JSONObject x = (JSONObject) val;
@@ -370,6 +424,16 @@ final class SharedSettings {
             }
         }
         return changed;
+    }
+
+    /** Two flat objects with the same fields and values (as text). */
+    private static boolean sameFields(JSONObject a, JSONObject b) {
+        if (a.length() != b.length()) return false;
+        for (java.util.Iterator<String> i = a.keys(); i.hasNext(); ) {
+            String k = i.next();
+            if (!b.has(k) || !String.valueOf(a.opt(k)).equals(String.valueOf(b.opt(k)))) return false;
+        }
+        return true;
     }
 
     private static Object defaultOf(String k) {
@@ -476,7 +540,10 @@ final class SharedSettings {
      */
     static int seed(SyncEngine e) throws Exception {
         String owner = e.householdValue("owner");
-        if (owner == null || !owner.equals(e.device()) || !hasTable(e)) return 0;
+        // 0.9.4: in a server's house no phone is the owner; the first phone in a fresh house seeds
+        // instead (its join said seed: true, kept as sync_meta seed_settings).
+        boolean seeder = owner != null && owner.equals(e.device()) || "1".equals(e.meta("seed_settings"));
+        if (!seeder || !hasTable(e)) return 0;
         JSONObject s = settings(e);
         if (s == null) return 0;
         Set<String> have = new HashSet<>();

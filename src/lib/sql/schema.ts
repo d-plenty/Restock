@@ -196,6 +196,51 @@ const SYNC_093: string[] = [
   "DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%'",
 ];
 
+/**
+ * 0.9.4: who made each record (`origin`, a device id; null: not known), so "Also take what this
+ * phone shared off the server" takes back only what that phone added, never what other people
+ * added (docs/server-protocol.md "v3"). It's set when a record is made (or made again, like a
+ * restore: the same moments `created` is set) and kept through edits and deletes; a change taken
+ * in from another device carries it (SyncEngine.apply, engine.ts apply). Records from before:
+ * only those whose last change was the one that made them (stamp = created) are known (their
+ * device made them); the rest stay unknown, so they're never taken back.
+ */
+function syncTriggers094(t: { table: string; key: string; deletes: boolean }): string[] {
+  const key = (row: 'NEW' | 'OLD') => t.key.replace(/\b(id|product_id|date|k)\b/g, `${row}.$1`);
+  const names = [`sync_${t.table}_ins`, `sync_${t.table}_upd`, `sync_${t.table}_del`];
+  const had = (col: string, row: 'NEW' | 'OLD') => `(SELECT ${col} FROM sync_log WHERE tbl = '${t.table}' AND pk = ${key(row)})`;
+  const keepCreated = (row: 'NEW' | 'OLD') => `COALESCE(${had('created', row)}, 0)`;
+  const log = (row: 'NEW' | 'OLD', deleted: 0 | 1, created: string, origin: string) =>
+    `INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq, sig, created, origin) VALUES ('${t.table}', ${key(row)}, ${STAMP_090(t, row)}, ${DEVICE}, ${deleted}, ${NEXT_SEQ}, NULL, ${created}, ${origin});`;
+  // Receipts are saved with INSERT OR REPLACE (an edit looks like an insert): a live one keeps when
+  // it was made, and who made it (SYNC_091).
+  const live = `${had('deleted', 'NEW')} = 0`;
+  const insCreated = t.table === 'receipts' ? `CASE WHEN ${live} THEN ${had('created', 'NEW')} ELSE ${STAMP_090(t, 'NEW')} END` : STAMP_090(t, 'NEW');
+  const insOrigin = t.table === 'receipts' ? `CASE WHEN ${live} THEN ${had('origin', 'NEW')} ELSE ${DEVICE} END` : DEVICE;
+  const out = [
+    ...names.map((n) => `DROP TRIGGER IF EXISTS ${n}`),
+    `CREATE TRIGGER sync_${t.table}_ins AFTER INSERT ON ${t.table} WHEN ${NOT_APPLYING} BEGIN ${log('NEW', 0, insCreated, insOrigin)} END`,
+  ];
+  if (t.deletes) {
+    const cols = t.table === 'products' ? `OF ${PRODUCT_SYNCED_COLUMNS.join(', ')} ` : '';
+    out.push(`CREATE TRIGGER sync_${t.table}_upd AFTER UPDATE ${cols}ON ${t.table} WHEN ${NOT_APPLYING} BEGIN ${log('NEW', 0, keepCreated('NEW'), had('origin', 'NEW'))} END`);
+    out.push(`CREATE TRIGGER sync_${t.table}_del AFTER DELETE ON ${t.table} WHEN ${NOT_APPLYING} BEGIN ${log('OLD', 1, keepCreated('OLD'), had('origin', 'OLD'))} END`);
+  } else {
+    out.push(`CREATE TRIGGER sync_${t.table}_del AFTER DELETE ON ${t.table} BEGIN DELETE FROM sync_log WHERE tbl = '${t.table}' AND pk = ${key('OLD')}; END`);
+  }
+  return out;
+}
+const SYNC_094: string[] = [
+  'ALTER TABLE sync_log ADD COLUMN origin TEXT',
+  `UPDATE sync_log SET origin = device WHERE deleted = 0 AND created > 0 AND stamp = created AND device <> '' AND tbl <> '_seq'`,
+  // 0.9.4 review: a plain delete of a record here on a tab this device doesn't sync is held (its
+  // entry, as it came), not taken in, until the device syncs that tab again (SyncEngine.releaseHeld):
+  // by then the others may have tidied the delete away (compact, after 90 days), and this copy,
+  // offered again, would bring the record back everywhere.
+  'CREATE TABLE IF NOT EXISTS sync_held (tbl TEXT NOT NULL, pk TEXT NOT NULL, entry TEXT NOT NULL, PRIMARY KEY (tbl, pk))',
+  ...SYNCED_093.flatMap(syncTriggers094),
+];
+
 /** 0.8.9: "Any size" and "Not at this shop" (picks.ts); the move to My picks is in DATA_STEPS. */
 const PICKS_089 = ['ALTER TABLE items ADD COLUMN any_size INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE items ADD COLUMN not_at TEXT'];
 
@@ -349,6 +394,8 @@ export const MIGRATIONS: string[][] = [
   SYNC_091,
   // 0.9.3: household-wide settings.
   SYNC_093,
+  // 0.9.4: who made each record (sync_log.origin).
+  SYNC_094,
 ];
 
 /**

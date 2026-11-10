@@ -211,6 +211,12 @@ export interface StoreChoice {
   /** Coles only: your second branch's store number, for its stock. */
   branchStoreNo2?: string;
   secondaryMap?: string;
+  /**
+   * 0.9.4: the household's default branch (a household_settings branch:<chain> row) this phone took
+   * because it hadn't picked its own; while `primary` is still this, a new default replaces it.
+   */
+  householdBranch?: string;
+  householdStoreNo?: string;
 }
 
 /** Where to look for nearby stores. Only ever kept on this phone. */

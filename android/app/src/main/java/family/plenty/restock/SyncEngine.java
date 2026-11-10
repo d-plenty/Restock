@@ -119,7 +119,9 @@ final class SyncEngine {
     static final Set<String> SECRET_KEYS = new HashSet<>(java.util.Arrays.asList(
         "key", "oldkey", "secret", "owner_secrets", "owner_priv", "my_priv", "recovery", "pair_token", "dav_pass",
         // 0.9.2: the phone's own key for the Restock server, and the serverKeys it has known.
-        "server_dev_priv", "server_filekeys"));
+        "server_dev_priv", "server_filekeys",
+        // 0.9.4: the phone's ECDH key for a v3 server (keys reach it sealed to this key).
+        "server_kex_priv"));
 
     Secrets secrets = PLAIN;
     /** Set when a secret couldn't be opened (the key store's key is gone): SyncHub treats the phone as not paired. */
@@ -281,9 +283,227 @@ final class SyncEngine {
         }
     }
 
-    /** 0.9.1: whether the household shares receipts (the owner turns it on; off by default). */
+    /**
+     * 0.9.1: whether the household shares receipts (the owner turns it on; off by default). 0.9.4:
+     * and this phone hasn't turned them off (share_receipts "0"; unset is on, so phone households are
+     * as 0.9.3; a phone joining a server's house writes "0", engine.ts the same).
+     */
     boolean shareReceipts() throws Exception {
-        return "1".equals(householdValue("receipts"));
+        return "1".equals(householdValue("receipts")) && !"0".equals(meta("share_receipts"));
+    }
+
+    /** 0.9.4: this phone's own choice of sharing receipts. Turning it on sends the receipts already here, too. */
+    void setShareReceipts(boolean on) throws Exception {
+        boolean was = shareReceipts();
+        setMeta("share_receipts", on ? "1" : "0");
+        if (on && !was) {
+            db.transaction(() -> {
+                for (JSONObject r : db.query("SELECT pk FROM sync_log WHERE tbl = 'receipts'"))
+                    db.exec("UPDATE sync_log SET seq = (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log) WHERE tbl = 'receipts' AND pk = ?", r.getString("pk"));
+            });
+        }
+    }
+
+    // ---------- 0.9.4: "Also take what this phone shared off the server" ----------
+
+    /** What can be taken back off a server when this phone stops sharing it: a tab, receipts or cards. */
+    static final Set<String> TAKE_BACK = new HashSet<>(java.util.Arrays.asList("keg", "pharmacy", "receipts", "cards"));
+    /** The tables a tab's records are in. */
+    private static final String[] TAB_TABLES = { "categories", "products", "items", "list_entries", "receipts", "prices" };
+
+    /** sync_meta server_takeback: { kind: when it was ticked (ms) }. */
+    JSONObject takeBackKinds() {
+        try {
+            String v = meta("server_takeback");
+            return v == null ? new JSONObject() : new JSONObject(v);
+        } catch (Exception ex) {
+            return new JSONObject();
+        }
+    }
+
+    /** Ticked (or, on: no longer): this phone's own records of `kind` go off the server in its next file. */
+    void setTakeBack(String kind, boolean on) throws Exception {
+        if (!TAKE_BACK.contains(kind)) throw new IllegalArgumentException("not something to take back: " + kind);
+        JSONObject k = takeBackKinds();
+        if (on) {
+            if (!k.has(kind)) k.put(kind, System.currentTimeMillis());
+        } else if (k.has(kind)) {
+            // Shared again: the deletes this phone sent are on the server (and the phones that took them),
+            // stamped after its own copies, so those copies would lose to them and go here too. They
+            // count as made again now instead (like a restore), so they win there and come back.
+            final List<JSONObject> back = takeBackEntries(new JSONObject().put(kind, k.get(kind)));
+            final long now = System.currentTimeMillis();
+            db.transaction(() -> {
+                for (JSONObject x : back) {
+                    long st = Math.max(now, x.getLong("stamp") + 1);
+                    db.exec("UPDATE sync_log SET stamp = ?, created = ?, seq = (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log) WHERE tbl = ? AND pk = ? AND deleted = 0",
+                        st, st, x.getString("tbl"), x.getString("pk"));
+                }
+            });
+            k.remove(kind);
+        }
+        setMeta("server_takeback", k.length() == 0 ? null : k.toString());
+    }
+
+    /**
+     * The plain deletes that take this phone's own records of the ticked kinds off the server (docs/
+     * server-v3-design.md 14): one per record this phone made (sync_log.origin, 0.9.4 review: not
+     * every record it was the last to change, which took other people's things too), stamped after
+     * both its last change and the moment it was ticked. A record whose maker isn't known stays.
+     * Only ever in its file; nothing is deleted here.
+     */
+    List<JSONObject> takeBackEntries() throws Exception {
+        return takeBackEntries(takeBackKinds());
+    }
+
+    private List<JSONObject> takeBackEntries(JSONObject kinds) throws Exception {
+        List<JSONObject> out = new ArrayList<>();
+        if (kinds.length() == 0 || !hasOrigin()) return out;
+        String me = device();
+        if (me.isEmpty()) return out;
+        for (Iterator<String> it = kinds.keys(); it.hasNext(); ) {
+            String kind = it.next();
+            long at = kinds.optLong(kind, 0);
+            boolean tab = !"receipts".equals(kind) && !"cards".equals(kind);
+            String[] tables = tab ? TAB_TABLES : new String[] { kind };
+            for (String tbl : tables) {
+                // One query a table (0.9.4 review: not one a record, which was slow on years of prices),
+                // with what tabOf needs joined in.
+                for (JSONObject r : db.query(TAKE_BACK_SQL.get(tbl), me)) {
+                    String pk = r.getString("pk");
+                    if (pk.startsWith("demo-")) continue;
+                    if (tab && !kind.equals(takeBackTab(tbl, r))) continue;
+                    JSONObject e = new JSONObject();
+                    e.put("tbl", tbl);
+                    e.put("pk", pk);
+                    e.put("stamp", Math.max(at, r.getLong("stamp") + 1));
+                    e.put("device", me);
+                    e.put("created", 0);
+                    e.put("deleted", true);
+                    out.add(e);
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * For takeBackEntries: this phone's records of a table that it made (origin = this phone) and that
+     * are still here, each with the columns its tab comes from (tabOf's rules, joined in).
+     */
+    private static final Map<String, String> TAKE_BACK_SQL = new HashMap<>();
+    static {
+        String log = "SELECT l.pk AS pk, l.stamp AS stamp";
+        String mine = " WHERE l.tbl = '%s' AND l.origin = ? AND l.deleted = 0";
+        for (String t : new String[] { "categories", "items", "receipts" })
+            TAKE_BACK_SQL.put(t, log + ", t.section AS section FROM sync_log l JOIN " + t + " t ON t.id = l.pk" + String.format(mine, t));
+        TAKE_BACK_SQL.put("cards", log + " FROM sync_log l JOIN cards t ON t.id = l.pk" + String.format(mine, "cards"));
+        TAKE_BACK_SQL.put("products", log + ", t.chain AS chain FROM sync_log l JOIN products t ON t.id = l.pk" + String.format(mine, "products"));
+        TAKE_BACK_SQL.put("list_entries", log + ", t.section AS section, t.item_id AS item_id, t.chain AS chain, i.id AS item_here, i.section AS item_section"
+            + " FROM sync_log l JOIN list_entries t ON t.id = l.pk LEFT JOIN items i ON i.id = t.item_id" + String.format(mine, "list_entries"));
+        TAKE_BACK_SQL.put("prices", log + ", pr.id AS product_here, pr.chain AS chain FROM sync_log l JOIN prices t ON t.product_id || '|' || t.date = l.pk"
+            + " LEFT JOIN products pr ON pr.id = t.product_id" + String.format(mine, "prices"));
+    }
+
+    /** tabOf for a TAKE_BACK_SQL row. */
+    private String takeBackTab(String tbl, JSONObject r) throws Exception {
+        switch (tbl) {
+            case "categories":
+            case "items":
+            case "receipts": {
+                String s = str(r, "section");
+                return s == null ? "pantry" : s;
+            }
+            case "list_entries": {
+                String s = str(r, "section");
+                if (s != null) return s;
+                if (str(r, "item_id") != null) return str(r, "item_here") == null ? null : str(r, "item_section");
+                String chain = str(r, "chain");
+                return chain != null ? chainTab(chain) : "pantry";
+            }
+            case "products":
+                return chainTab(str(r, "chain"));
+            case "prices":
+                return str(r, "product_here") == null ? null : chainTab(str(r, "chain"));
+            default:
+                return null;
+        }
+    }
+
+    // ---------- 0.9.4: who made a record (sync_log.origin) ----------
+
+    /** What a device id in an entry's `origin` can look like (engine.ts ORIGIN). */
+    private static final java.util.regex.Pattern ORIGIN = java.util.regex.Pattern.compile("[A-Za-z0-9._-]{1,80}");
+    private volatile boolean originColumn;
+
+    /**
+     * Whether sync_log has `origin` yet (schema.ts SYNC_094). The app adds it when it opens after the
+     * update; until then (the background job running first) nothing is noted or taken back by it.
+     */
+    boolean hasOrigin() {
+        if (originColumn) return true;
+        try {
+            for (JSONObject c : db.query("PRAGMA table_info(sync_log)")) if ("origin".equals(c.optString("name"))) return originColumn = true;
+        } catch (Exception ignored) {
+            // not there
+        }
+        return false;
+    }
+
+    /**
+     * Who made a record, as noted when a change to it comes in (engine.ts originOf). A record that's
+     * here (and not deleted) keeps its own, unless the change made it again (a newer `created`); a new
+     * one, or one made again, takes the entry's `origin`, or, from a phone that doesn't send one, the
+     * entry's own device when that change was the one that made it (stamp = created). Never filled in
+     * later, so nobody can claim a record they didn't make.
+     */
+    static String originOf(JSONObject e, long stamp, String device, boolean deleted, long created, JSONObject had) {
+        String hadOrigin = had == null || had.isNull("origin") ? null : had.optString("origin", null);
+        if (hadOrigin != null && hadOrigin.isEmpty()) hadOrigin = null;
+        if (had != null && had.optLong("deleted", 0) == 0 && (deleted || created <= had.optLong("created", 0))) return hadOrigin;
+        if (deleted) return hadOrigin;
+        String claim = e.isNull("origin") ? null : e.optString("origin", null);
+        if (claim != null && ORIGIN.matcher(claim).matches()) return claim;
+        return created > 0 && stamp == created && ORIGIN.matcher(device).matches() ? device : null;
+    }
+
+    /**
+     * 0.9.4: leaving the server with "Also take what this phone shared off the server" ticked for some
+     * kinds: each one this phone shares now is turned off and taken back, exactly as turning it off
+     * with the box ticked (the caller then syncs once, so the deletes reach the server, and leaves).
+     * Groceries are never taken back. Returns the kinds it took back.
+     */
+    Set<String> stopSharingAndTakeBack(Set<String> kinds) throws Exception {
+        Set<String> out = new java.util.LinkedHashSet<>();
+        if (kinds == null) return out;
+        Set<String> mine = myTabs();
+        Set<String> shared = tabs();
+        boolean changedTabs = false;
+        for (String t : new String[] { "keg", "pharmacy" }) {
+            if (!kinds.contains(t) || !shared.contains(t)) continue;
+            mine.remove(t);
+            changedTabs = true;
+            out.add(t);
+        }
+        if (changedTabs) setMeta("tabs", joinTabs(mine));
+        if (kinds.contains("receipts") && shareReceipts()) {
+            setShareReceipts(false);
+            out.add("receipts");
+        }
+        if (kinds.contains("cards") && shareCards()) {
+            setShareCards(false);
+            out.add("cards");
+        }
+        for (String k : out) setTakeBack(k, true);
+        if (!out.isEmpty()) noteTabs();
+        return out;
+    }
+
+    /** "tbl|pk" of every record takeBackEntries() names: their deletes, coming back, are never taken in here. */
+    Set<String> takeBackKeys() throws Exception {
+        Set<String> out = new HashSet<>();
+        for (JSONObject e : takeBackEntries()) out.add(e.getString("tbl") + "|" + e.getString("pk"));
+        return out;
     }
 
     private static String keyOf(String table) {
@@ -371,6 +591,7 @@ final class SyncEngine {
                 // And the folder's files are read again, for what this phone left out before.
                 db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%'");
             });
+            releaseHeld();
         }
         String j = joinTabs(now);
         if (!j.equals(was)) {
@@ -381,6 +602,38 @@ final class SyncEngine {
         String r = receipts ? "1" : "0";
         if (!r.equals(rwas)) setMeta("receipts_eff", r);
         return again;
+    }
+
+    /**
+     * 0.9.4 review: the plain deletes held back (apply) for records on a tab this phone didn't sync,
+     * taken in now for the ones whose tab it syncs (or that are gone here). The rest stay held.
+     * Returns how many records changed.
+     */
+    int releaseHeld() throws Exception {
+        if (!hasOrigin()) return 0;
+        Set<String> mine = tabs();
+        JSONArray go = new JSONArray();
+        List<String[]> done = new ArrayList<>();
+        for (JSONObject r : db.query("SELECT tbl, pk, entry FROM sync_held")) {
+            String tbl = r.getString("tbl"), pk = r.getString("pk");
+            String key = keyOf(tbl);
+            JSONObject e;
+            try {
+                e = new JSONObject(r.getString("entry"));
+            } catch (Exception bad) {
+                e = null;
+            }
+            if (key != null && e != null) {
+                List<JSONObject> cur = db.query("SELECT * FROM " + tbl + " WHERE " + key + " = ?", pk);
+                String tab = cur.isEmpty() ? null : tabOf(tbl, cur.get(0));
+                if (tab != null && !mine.contains(tab)) continue;
+                go.put(e);
+            }
+            done.add(new String[] { tbl, pk });
+        }
+        int n = go.length() == 0 ? 0 : apply(go);
+        for (String[] d : done) db.exec("DELETE FROM sync_held WHERE tbl = ? AND pk = ?", d[0], d[1]);
+        return n;
     }
 
     private Map<String, String> customTabs;
@@ -520,7 +773,7 @@ final class SyncEngine {
     JSONObject collect(long since, String exclude, int limit, Set<String> allowed, String where, boolean moves, long oldestDelete) throws Exception {
         if (allowed == null) allowed = tabs();
         List<JSONObject> rows = db.query(
-            "SELECT tbl, pk, stamp, device, deleted, seq, sig, created FROM sync_log WHERE seq > ?" + where + " ORDER BY seq LIMIT ?", since, (long) limit + 1);
+            "SELECT tbl, pk, stamp, device, deleted, seq, sig, created" + (hasOrigin() ? ", origin" : "") + " FROM sync_log WHERE seq > ?" + where + " ORDER BY seq LIMIT ?", since, (long) limit + 1);
         boolean more = rows.size() > limit;
         if (more) rows = rows.subList(0, limit);
         boolean cards = shareCards();
@@ -542,6 +795,8 @@ final class SyncEngine {
             e.put("stamp", r.getLong("stamp"));
             e.put("device", r.getString("device"));
             e.put("created", r.optLong("created", 0));
+            String origin = r.isNull("origin") ? null : r.optString("origin", null);
+            if (origin != null && !origin.isEmpty()) e.put("origin", origin);
             boolean deleted = r.getLong("deleted") != 0;
             if (deleted && oldestDelete > 0 && r.getLong("stamp") < oldestDelete) continue;
             e.put("deleted", deleted);
@@ -582,9 +837,20 @@ final class SyncEngine {
 
     /** Notes a change in sync_log as taken in (or made) here: `seq` is this phone's next number. */
     void logEntry(String tbl, String pk, long stamp, String device, boolean deleted, String sig, long created) throws Exception {
+        logEntry(tbl, pk, stamp, device, deleted, sig, created, null);
+    }
+
+    /** 0.9.4: with who made the record (origin), where sync_log has it. */
+    void logEntry(String tbl, String pk, long stamp, String device, boolean deleted, String sig, long created, String origin) throws Exception {
+        if (!hasOrigin()) {
+            db.exec(
+                "INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq, sig, created) VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log), ?, ?)",
+                tbl, pk, stamp, device, deleted ? 1L : 0L, sig, created);
+            return;
+        }
         db.exec(
-            "INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq, sig, created) VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log), ?, ?)",
-            tbl, pk, stamp, device, deleted ? 1L : 0L, sig, created);
+            "INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq, sig, created, origin) VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log), ?, ?, ?)",
+            tbl, pk, stamp, device, deleted ? 1L : 0L, sig, created, origin);
     }
 
     // ---------- taking in another phone's changes ----------
@@ -604,6 +870,10 @@ final class SyncEngine {
         final boolean[] settings = { false };
         final boolean hasSettings = SharedSettings.hasTable(this);
         final SharedSettings.Room room = new SharedSettings.Room(this);
+        // 0.9.4: this phone's own "take it off the server" deletes, passed back by the server: never here.
+        final Set<String> takenBack = takeBackKinds().length() == 0 ? java.util.Collections.emptySet() : takeBackKeys();
+        final String me = device();
+        final String hadCols = hasOrigin() ? "stamp, device, deleted, created, origin" : "stamp, device, deleted, created";
         db.transaction(() -> {
             // While this is set, the triggers don't note these as this phone's own changes.
             db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
@@ -618,6 +888,7 @@ final class SyncEngine {
                 long stamp = e.getLong("stamp");
                 String device = e.optString("device", "");
                 boolean deleted = e.optBoolean("deleted", false);
+                if (deleted && me.equals(device) && takenBack.contains(tbl + "|" + pk)) continue;
                 if ("household".equals(tbl) && !householdChangeAllowed(pk, device, e)) continue;
                 if ("receipts".equals(tbl) && !receipts) continue;
                 if (SharedSettings.TABLE.equals(tbl) && !hasSettings) continue;
@@ -627,13 +898,16 @@ final class SyncEngine {
                 // phone's clock along (and say so on the Sync screen).
                 if (stamp > now + CLOCK_SLACK_MS) setMeta("clock_warn", device);
                 else clock = Math.max(clock, stamp);
-                List<JSONObject> hadRows = db.query("SELECT stamp, device, deleted, created FROM sync_log WHERE tbl = ? AND pk = ?", tbl, pk);
+                List<JSONObject> hadRows = db.query("SELECT " + hadCols + " FROM sync_log WHERE tbl = ? AND pk = ?", tbl, pk);
                 JSONObject had = hadRows.isEmpty() ? null : hadRows.get(0);
                 boolean wins = had == null || newer(stamp, device, had.getLong("stamp"), had.optString("device", ""));
                 long created = e.optLong("created", 0);
                 boolean hadDeleted = had != null && had.getLong("deleted") != 0;
                 if (had != null && DELETE_WINS.contains(tbl)) {
-                    if (deleted && !hadDeleted) wins = stamp > had.optLong("created", 0); // a delete beats edits
+                    // A delete beats edits; 0.9.4: not a "moved" one, which carries the record's own stamp
+                    // (a tab this phone's pair stopped sharing): only if it's newer than the copy here, so
+                    // turning a tab off on one phone never deletes the others' copies it last changed.
+                    if (deleted && !hadDeleted) wins = (!e.optBoolean("moved", false) || wins) && stamp > had.optLong("created", 0);
                     else if (!deleted && hadDeleted) wins = created > had.getLong("stamp"); // only made again after it
                 }
                 if ("list_entries".equals(tbl) && !deleted && had != null && !hadDeleted) {
@@ -649,6 +923,18 @@ final class SyncEngine {
                     if (cur.isEmpty()) continue;
                     String tab = tabOf(tbl, cur.get(0));
                     if (tab == null || !mine.contains(tab)) continue;
+                } else if (deleted) {
+                    // 0.9.4: a plain delete of a record here on a tab this phone doesn't sync stays out,
+                    // like the tab's changes: what someone took off the server is only for the phones
+                    // sharing that tab (and their own copies stay on the others).
+                    List<JSONObject> cur = db.query("SELECT * FROM " + tbl + " WHERE " + key + " = ?", pk);
+                    String tab = cur.isEmpty() ? null : tabOf(tbl, cur.get(0));
+                    if (tab != null && !mine.contains(tab)) {
+                        // Held until this phone syncs that tab again (releaseHeld), so it still goes then,
+                        // even if the others have tidied the delete away by then (review fix).
+                        if (hasOrigin()) db.exec("INSERT OR REPLACE INTO sync_held (tbl, pk, entry) VALUES (?, ?, ?)", tbl, pk, e.toString());
+                        continue;
+                    }
                 }
                 if (!deleted) {
                     // A tab this phone doesn't sync: leave it out (an older phone may still send it).
@@ -668,7 +954,7 @@ final class SyncEngine {
                     if (row == null) continue;
                     writeRow(tbl, row, columnsOf(tbl, columns));
                 }
-                logEntry(tbl, pk, stamp, device, deleted, e.isNull("sig") ? null : e.optString("sig", null), created);
+                logEntry(tbl, pk, stamp, device, deleted, e.isNull("sig") ? null : e.optString("sig", null), created, originOf(e, stamp, device, deleted, created, had));
                 if (SharedSettings.TABLE.equals(tbl)) settings[0] = true;
                 changed[0]++;
             }
@@ -778,8 +1064,9 @@ final class SyncEngine {
         }
         writeRow("list_entries", merged, columnsOf("list_entries", columns));
         long stamp = e.getLong("stamp");
-        if (!ours) logEntry("list_entries", pk, stamp, e.optString("device", ""), false, null, e.optLong("created", 0));
-        else logEntry("list_entries", pk, Math.max(stamp, had.getLong("stamp")) + 1, device(), false, null, Math.max(e.optLong("created", 0), had.optLong("created", 0)));
+        String origin = had.isNull("origin") ? null : had.optString("origin", null);
+        if (!ours) logEntry("list_entries", pk, stamp, e.optString("device", ""), false, null, e.optLong("created", 0), origin);
+        else logEntry("list_entries", pk, Math.max(stamp, had.getLong("stamp")) + 1, device(), false, null, Math.max(e.optLong("created", 0), had.optLong("created", 0)), origin);
         return true;
     }
 
@@ -948,6 +1235,7 @@ final class SyncEngine {
             if (SharedSettings.hasTable(this)) db.exec("DELETE FROM " + SharedSettings.TABLE);
             db.exec("DELETE FROM sync_log");
             db.exec("DELETE FROM sync_peers");
+            if (hasOrigin()) db.exec("DELETE FROM sync_held");
             // What's left counts as this phone's own, changed now, so it can still be shared later.
             long now = System.currentTimeMillis();
             String me = device();

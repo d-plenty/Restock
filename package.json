@@ -1,7 +1,7 @@
 {
   "name": "restock",
   "private": true,
-  "version": "0.9.3",
+  "version": "0.9.4",
   "type": "module",
   "description": "Restock: a local-first price tracker for supermarkets, bottle shops and pharmacies in Australia. No account, no server, no ads.",
   "scripts": {
@@ -14,7 +14,8 @@
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleRelease",
     "android:apk-debug": "npm run android:sync && cd android && ./gradlew assembleDebug",
     "build:preview": "VITE_PREVIEW=1 vite build --config vite.preview.config.ts",
-    "build:server-web": "vite build --config vite.server.config.ts"
+    "build:server-web": "vite build --config vite.server.config.ts",
+    "build:server-core": "vite build --config vite.core.config.ts"
   },
   "dependencies": {
     "@capacitor/android": "8.6.0",

@@ -44,7 +44,8 @@ describe('0.9.3: the Sync and backups strip', () => {
     );
     expect(s.ok).toBe(true);
     expect(s.title).toBe('All up to date');
-    expect(s.cells.map((c) => c.label)).toEqual(['Phones', 'Server', 'Backup']);
+    // 0.9.4: the server first, then the phones, then the last backup (a day and a time).
+    expect(s.cells.map((c) => c.label)).toEqual(['Server', 'Phones', 'Last backup']);
   });
   it('names the first problem', () => {
     expect(syncStatus({ enabled: true, lastError: 'no folder' }, { paired: false }, now).title).toBe('The last automatic backup failed');

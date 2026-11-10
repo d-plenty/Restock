@@ -136,20 +136,47 @@ html.server-mode .app.dk {
   padding-top: 12px;
 }
 .dk-sync {
-  width: 100%;
-  padding: 14px 12px;
-  border-radius: 14px;
-  border: 0;
-  background: var(--navy-2);
-  color: #fff;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  text-align: left;
+  gap: 8px;
   font-size: 13px;
 }
-.dk-sync:hover {
-  background: rgba(255, 255, 255, 0.14);
+/* 0.9.4: Sync now and Sign out always in the sidebar's foot (section 15). */
+.dk-foot-btn {
+  min-height: 44px;
+  border-radius: 22px;
+  border: 1px solid #5a74b8;
+  background: transparent;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.dk-foot-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.dk-foot-btn.primary {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: #012169;
+}
+.dk-foot-btn.primary:hover {
+  filter: brightness(1.06);
+  background: var(--gold);
+}
+.dk-foot-btn:disabled {
+  opacity: 0.8;
+  cursor: progress;
+}
+.dk-sync-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 6px;
 }
 .dk-sync-line {
   display: flex;
@@ -1122,4 +1149,194 @@ html.server-desk .toast:hover {
 }
 .dk-fieldset:disabled {
   opacity: 0.6;
+}
+
+/* ---------- 0.9.4: a house (Server and phones, Activity and logs, Home Assistant, Specials) ---------- */
+
+.house-narrow {
+  gap: 16px;
+}
+.house-narrow .dk-split,
+.house-narrow .dk-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.house-narrow .dk-aside,
+.house-narrow .dk-wide {
+  width: auto;
+  max-width: none;
+  flex: none;
+}
+.house-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.house-add {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 2px solid var(--green);
+}
+.house-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.house-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+.house-tight {
+  margin: 0;
+}
+.btn.house-danger {
+  color: var(--red-ink);
+  border-color: var(--red-ink);
+}
+.house-gone {
+  background: var(--sunken);
+}
+.house-gone .dk-row-title {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.house-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.dk-stats.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.house-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.house-log li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 15px;
+}
+.house-log li:first-child {
+  border-top: 0;
+}
+.house-log li.bad {
+  background: var(--red-bg);
+}
+.house-log time {
+  width: 132px;
+  flex-shrink: 0;
+}
+.house-col-head {
+  padding: 16px 16px 0;
+}
+.house-col-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+}
+.house-pad {
+  padding: 0 16px 8px;
+  margin: 0;
+}
+.house-special .grow {
+  min-width: 0;
+}
+.house-cat {
+  max-width: 560px;
+}
+.house-recovery {
+  display: block;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--sunken);
+  color: var(--ink);
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  word-break: break-word;
+  text-align: center;
+  user-select: all;
+}
+.house-legend {
+  padding: 12px 14px 0;
+  font-weight: 700;
+}
+.house-branch {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.house-branch-name {
+  flex: 0 0 130px;
+  font-weight: 600;
+}
+.house-branch .input {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.house-branch .input.house-storeno {
+  flex: 0 0 96px;
+}
+
+/* Product pictures (section 15): in the pantry table and the item panel. */
+.dk-item-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dk-table td.dk-item-cell .thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+.dk-item-words {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dk-panel-head .thumb {
+  width: 56px;
+  height: 56px;
+}
+.dk-line .thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+}
+/* A list line's name opens the item; only the checkbox ticks. */
+.dk-line-open {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 3px;
+}
+.dk-line-open:hover {
+  text-decoration-color: currentColor;
+}
+.dk-check input[type='checkbox'] {
+  flex-shrink: 0;
+}
+
+.house-ha {
+  max-width: 760px;
+}
+.house-name-form {
+  flex-wrap: nowrap;
+  max-width: 100%;
+}
+.input.house-name-input {
+  width: min(260px, 100%);
+  min-width: 0;
 }

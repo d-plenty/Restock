@@ -3,6 +3,7 @@
 // handed to the app at start (src/server-mode/main.tsx), so the phone build never carries them.
 import { useSyncExternalStore, type ComponentType, type ReactNode } from 'react';
 import type { Screen, Tab } from '../ui/nav';
+import type { PriceReading } from '../types';
 
 export const serverMode = import.meta.env.VITE_SERVER_MODE === '1';
 
@@ -29,6 +30,11 @@ export interface ServerUi {
   refresh: () => Promise<string>;
   /** 0.9.3: the whole app at desktop widths (a sidebar and wide pages). */
   Desktop?: ComponentType<DesktopProps>;
+  /**
+   * 0.9.4: one product's older prices from the server (a house keeps years; this browser only weeks),
+   * from `from` (ISO) on. Empty when the server has none to give (a 0.9.3-style server).
+   */
+  olderPrices?: (productId: string, from: string) => Promise<PriceReading[]>;
 }
 
 export const serverUi: { current?: ServerUi } = {};

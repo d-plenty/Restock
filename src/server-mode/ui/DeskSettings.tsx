@@ -7,10 +7,13 @@ import { confirmAction } from '../../lib/confirm';
 import { useLive } from '../../lib/useLive';
 import { money } from '../../lib/units';
 import type { Section } from '../../shops';
-import { Icon, Sheet, timeAgo } from '../../ui/components';
+import { Icon, Sheet, TopBar, timeAgo } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { PassphraseForm } from './Gate';
 import { DeskHead, WhereNote } from './deskShared';
+import { BackupSheet, BranchSheet, KeepDataFor, PassphraseV3, RecoverySheet, SignOutChoices } from './DeskHouseSettings';
+import { ADMIN_NOTE, canAdmin, errText, house, saveHouseSettings, useHouseSettings } from './houseData';
+import { HA_SHARED } from './ServerHomeAssistant';
 import {
   categoriesData,
   downloadBrowserBackup,
@@ -42,7 +45,7 @@ type Part = 'household' | 'phones';
 const WHERE: Record<Exclude<ChangedOn, 'web'>, string> = { owner: 'Change this on the owner phone', phone: 'Change this on your phone' };
 
 /** One line of a settings card: what it is, what it's set to, and the control or where to change it. */
-function Line({ title, sub, children, greyed, htmlFor }: { title: string; sub?: ReactNode; children?: ReactNode; greyed?: boolean; htmlFor?: string }) {
+export function Line({ title, sub, children, greyed, htmlFor }: { title: string; sub?: ReactNode; children?: ReactNode; greyed?: boolean; htmlFor?: string }) {
   const words = (
     <>
       <strong className="dk-line-name">{title}</strong>
@@ -201,9 +204,45 @@ function ShopsSheet({ tab, onClose }: { tab: ShopsForTab; onClose: () => void })
   );
 }
 
+/** 0.9.4: the house's name, set here (the server signs it into the household record). */
+function HouseName({ fallback }: { fallback: string }) {
+  const nav = useNav();
+  const { data, reload } = useHouseSettings();
+  const [name, setName] = useState<string>();
+  const shown = name ?? data?.name ?? fallback;
+  return (
+    <Line title="Household name" htmlFor="dk-house-name" sub="Shown on this page and when a phone joins. Each phone can call the server what it likes.">
+      <form
+        className="dk-btns house-name-form"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!shown.trim() || shown.trim() === data?.name) return;
+          try {
+            await saveHouseSettings({ name: shown.trim() });
+            setName(undefined);
+            reload();
+            nav.toast('Renamed. Phones see it at their next sync.');
+          } catch (err) {
+            nav.toast(errText(err));
+          }
+        }}
+      >
+        <input id="dk-house-name" className="input dk-select house-name-input" disabled={!canAdmin()} value={shown} maxLength={60} onChange={(e) => setName(e.target.value)} />
+        <button className="btn small" type="submit" disabled={!shown.trim() || shown.trim() === data?.name}>
+          Save
+        </button>
+      </form>
+    </Line>
+  );
+}
+
 function HouseholdPart() {
   const nav = useNav();
   const h = useHouseholdSettings();
+  const v3 = house();
+  const [branches, setBranches] = useState(false);
+  const [backup, setBackup] = useState(false);
+  const [recovery, setRecovery] = useState(false);
   const acct = serverAccount();
   const version = useServerVersion();
   const [cats, setCats] = useState(false);
@@ -228,17 +267,31 @@ function HouseholdPart() {
         </p>
       )}
 
-      <Group id="dk-s-household" title="Household">
-        <Line title="Household name" sub={h.name} greyed={h.nameOn !== 'web'}>
-          {where(h.nameOn)}
-        </Line>
-        <Line title="What the household shares" sub={h.shares} greyed>
-          {where('owner')}
-        </Line>
-        <Line title="Owner phone, adding and removing phones" sub={h.owner} greyed>
-          {where('owner')}
-        </Line>
-      </Group>
+      {v3 ? (
+        <Group id="dk-s-household" title="Household">
+          <HouseName fallback={h.name} />
+          <Line title="What each phone shares" sub="Each phone chooses: Groceries (pantry and shopping list), Keg, Pharmacy, receipts, loyalty cards." greyed>
+            <WhereNote>Change this on each phone</WhereNote>
+          </Line>
+          <Line title="Adding and removing phones" sub="This server is the household's owner.">
+            <button className="btn small" onClick={() => nav.push({ name: 'server', page: 'phones' })}>
+              Server and phones
+            </button>
+          </Line>
+        </Group>
+      ) : (
+        <Group id="dk-s-household" title="Household">
+          <Line title="Household name" sub={h.name} greyed={h.nameOn !== 'web'}>
+            {where(h.nameOn)}
+          </Line>
+          <Line title="What the household shares" sub={h.shares} greyed>
+            {where('owner')}
+          </Line>
+          <Line title="Owner phone, adding and removing phones" sub={h.owner} greyed>
+            {where('owner')}
+          </Line>
+        </Group>
+      )}
 
       <Group id="dk-s-shops" title="Shops">
         {h.shops.map((t) => (
@@ -257,9 +310,17 @@ function HouseholdPart() {
             )}
           </Line>
         ))}
-        <Line title="Which branch" sub="The store each phone shops at (its main and second branch) stays on that phone, with its sign-ins." greyed>
-          {where('phone')}
-        </Line>
+        {v3 ? (
+          <Line title="Which branch" sub="The household's usual branch of each shop, for phones that haven't picked their own. A phone's own pick always wins.">
+            <button className="btn small" onClick={() => setBranches(true)}>
+              Set branches
+            </button>
+          </Line>
+        ) : (
+          <Line title="Which branch" sub="The store each phone shops at (its main and second branch) stays on that phone, with its sign-ins." greyed>
+            {where('phone')}
+          </Line>
+        )}
       </Group>
 
       <Group id="dk-s-list" title="Shopping list and deals">
@@ -314,6 +375,57 @@ function HouseholdPart() {
         </Line>
       </Group>
 
+      {v3 ? (
+        <Group id="dk-s-server" title="Your Restock server">
+          <Line title="Sign-in" sub={`User name ${acct.user}${version ? ` · Restock server ${version}` : ''}${acct.viaPhone ? ' · this tab signed in with a phone' : ''}`}>
+            {!acct.viaPhone && !changing && (
+              <button className="btn small" onClick={() => setChanging(true)}>
+                Change passphrase
+              </button>
+            )}
+          </Line>
+          {changing && (
+            <PassphraseV3
+              onCancel={() => setChanging(false)}
+              onDone={(m) => {
+                setChanging(false);
+                setMsg(m);
+              }}
+            />
+          )}
+          {msg && (
+            <p className="dk-set small" role="status">
+              {msg}
+            </p>
+          )}
+          <KeepDataFor Line={Line} />
+          {!canAdmin() && (
+            <p className="dk-set small" role="note">
+              {ADMIN_NOTE.replace('change this', 'change the server’s settings, back it up or see the recovery key')}
+            </p>
+          )}
+          <Line title="Encrypted backup" sub="Everything on the server in one file, locked with a backup passphrase you choose. For a laptop or a drive, in case the server is lost.">
+            <button className="btn small" disabled={!canAdmin()} onClick={() => setBackup(true)}>
+              <Icon name="download" size={16} /> Download
+            </button>
+          </Line>
+          <Line title="Recovery key" sub="If the server is lost, a phone takes the household back with it. Save it once, somewhere safe.">
+            <button className="btn small" disabled={!canAdmin()} onClick={() => setRecovery(true)}>
+              Show
+            </button>
+          </Line>
+          <Line title="Home Assistant" sub={HA_SHARED}>
+            <button className="btn small" onClick={() => nav.push({ name: 'homeAssistant' })}>
+              Home Assistant
+            </button>
+          </Line>
+          <Line title="Address" sub={`At home: ${location.origin}`}>
+            <button className="btn small" onClick={() => nav.push({ name: 'server', page: 'phones' })}>
+              Server and phones
+            </button>
+          </Line>
+        </Group>
+      ) : (
       <Group id="dk-s-server" title="Your Restock server">
         <Line title="Sign-in" sub={`User name ${acct.user}${version ? ` · Restock server ${version}` : ''}`}>
           {acct.canChangePassphrase && !changing && (
@@ -359,6 +471,7 @@ function HouseholdPart() {
           {where('phone')}
         </Line>
       </Group>
+      )}
 
       <Group id="dk-s-browser" title="This browser">
         <Line title="Look" sub="Just for this browser">
@@ -376,7 +489,14 @@ function HouseholdPart() {
             ))}
           </div>
         </Line>
-        <Line title="Download a backup" sub="Everything this browser has, as a Restock backup file. Loyalty card numbers aren't in it: they never leave the phones.">
+        <Line
+          title={v3 ? "Download this browser's copy" : 'Download a backup'}
+          sub={
+            v3
+              ? "What this browser has, as a Restock backup file a phone can restore. Not encrypted, and no loyalty card numbers. For everything the server keeps, use Encrypted backup above."
+              : "Everything this browser has, as a Restock backup file. Loyalty card numbers aren't in it: they never leave the phones."
+          }
+        >
           <button
             className="btn small"
             disabled={saving}
@@ -392,6 +512,9 @@ function HouseholdPart() {
             <Icon name="download" size={16} /> Download
           </button>
         </Line>
+        {v3 ? (
+          <SignOutChoices Line={Line} />
+        ) : (
         <Line title="Sign out of this browser" sub="Forgets the household's keys here. Your phones aren't touched.">
           <span className="dk-btns">
             <button className="btn small danger" onClick={() => void signOutHere()}>
@@ -412,8 +535,12 @@ function HouseholdPart() {
             </button>
           </span>
         </Line>
+        )}
       </Group>
       {cats && <CategoriesSheet sections={h.categories} onClose={() => setCats(false)} />}
+      {branches && <BranchSheet onClose={() => setBranches(false)} />}
+      {backup && <BackupSheet onClose={() => setBackup(false)} />}
+      {recovery && <RecoverySheet onClose={() => setRecovery(false)} />}
       {shopsFor && <ShopsSheet tab={shopsFor} onClose={() => setShopsFor(undefined)} />}
     </>
   );
@@ -432,7 +559,9 @@ function PhonesPart() {
       <p className="small dk-tight">Each phone keeps its own copy of these. You can see them all here; change them on that phone.</p>
       <p className="small dk-tight" role="note">
         <strong>Home Assistant:</strong>{' '}
-        {phones.some((x) => x.homeAssistant)
+        {house()
+          ? 'runs on your server, for every phone and browser on it (Settings → Home Assistant).'
+          : phones.some((x) => x.homeAssistant)
           ? `${phones.find((x) => x.homeAssistant)!.name} syncs your shopping list with it, for the whole household. To move it, turn Home Assistant on on another phone.`
           : 'No phone syncs your shopping list with it. Turn it on on one phone (Settings → Home Assistant).'}
       </p>
@@ -470,19 +599,22 @@ function PhonesPart() {
       <section className="card dk-lost" aria-labelledby="dk-lost">
         <span className="grow">
           <strong id="dk-lost">Lost this phone?</strong>
-          <span className="dk-sub">Take it off the server so it can't sync here any more. The owner phone can also remove it from the household.</span>
+          <span className="dk-sub">
+            {house()
+              ? "Remove it: it stops syncing, and the household gets a new key so it can't read anything changed from now on. Nothing it shared is deleted."
+              : "Take it off the server so it can't sync here any more. The owner phone can also remove it from the household."}
+          </span>
         </span>
         <button
           className="btn small danger"
           onClick={async () => {
-            const ok = await confirmAction(`Remove ${p.name} from this server?`, {
-              detail: 'It stops syncing here. To take it out of the household too, remove it on the owner phone.',
-              action: 'Remove from the server',
-              danger: true,
-            });
-            if (!ok) return;
             try {
-              await removePhone(p.device);
+              const done = await removePhone(p.device, {
+                title: `Remove ${p.name} from this server?`,
+                detail: 'It stops syncing here. To take it out of the household too, remove it on the owner phone.',
+                action: 'Remove from the server',
+              });
+              if (!done) return;
               setMsg(`${p.name} was taken off this server.`);
               setPicked(undefined);
               reload();
@@ -503,7 +635,7 @@ function PhonesPart() {
   );
 }
 
-export function DeskSettings() {
+export function DeskSettings({ narrow }: { narrow?: boolean } = {}) {
   const [part, setPart] = useState<Part>('household');
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const parts: { id: Part; label: string }[] = [
@@ -520,8 +652,9 @@ export function DeskSettings() {
     tabs.current[n]?.focus();
   };
   return (
-    <div className="dk-page dk-narrow">
-      <DeskHead title="Settings">
+    <div className={narrow ? 'screen house-narrow' : 'dk-page dk-narrow'}>
+      {narrow && <TopBar title="Settings" />}
+      <DeskHead title={narrow ? '' : 'Settings'}>
         <div className="dk-seg big" role="tablist" aria-label="Settings for" onKeyDown={onKey}>
           {parts.map((p, i) => (
             <button

@@ -86,6 +86,12 @@ final class ServerOffload {
     final byte[] key;
     final int keyv;
     final long now;
+    /**
+     * 0.9.4: the v3 server's "Keep data for" cut-off (an ISO time, from the owner-signed server row),
+     * or null. Prices older than it would be pruned there at once, so they're tidied here instead,
+     * and receipt photos older than it stay on the phone.
+     */
+    String serverCutoff;
 
     ServerOffload(SyncEngine e, Remote r, List<byte[]> keys, byte[] key, int keyv, long now) {
         this.e = e;
@@ -163,7 +169,8 @@ final class ServerOffload {
             String chain = p.isNull("chain") ? null : p.optString("chain", null);
             String tab = e.chainTab(chain);
             p.remove("chain");
-            if (tab != null && tabs.contains(tab) && !p.optString("product_id").startsWith("demo-")) prices.add(p);
+            boolean tooOld = serverCutoff != null && p.optString("date").compareTo(serverCutoff) < 0;
+            if (tab != null && tabs.contains(tab) && !p.optString("product_id").startsWith("demo-") && !tooOld) prices.add(p);
             else local.add(p);
         }
         if (!local.isEmpty()) {
@@ -180,6 +187,7 @@ final class ServerOffload {
             for (JSONObject row : e.db.query("SELECT * FROM receipts WHERE scanned_at < ? AND pinned = 0 AND id NOT LIKE 'demo-%' ORDER BY scanned_at", cutoff)) {
                 String tab = e.tabOf("receipts", row);
                 if (tab != null && !tabs.contains(tab)) continue;
+                if (serverCutoff != null && row.optString("scanned_at").compareTo(serverCutoff) < 0) continue;
                 for (String path : SyncEngine.photoPaths(row)) {
                     if (photos.size() >= PHOTOS_PER_ROUND) break;
                     if (e.meta(OFF + path) != null || e.photos.size(path) < 0) continue;

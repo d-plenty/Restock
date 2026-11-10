@@ -1,13 +1,17 @@
 // Server mode's start: sign in, set the passphrase, link once, then the real Restock app on the
 // browser's own copy of the household.
+// 0.9.4: first ask the server what it is (GET /api/v3/health). A house (v3) signs in with a
+// challenge and needs no passphrase vault or link; a fresh one asks to Set up this server first. A
+// 0.9.3 server, or a 0.9.4 one still in v2 mode, gets the 0.9.3 flow as it was.
 import { StrictMode, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../ui/App';
 import { setDatabaseOpener } from '../lib/boot';
-import { api, ApiError, whenSignedOut } from './api';
-import { deleteLocalCopy, openServerDatabase, start, stop, syncNow, syncStatus } from './live';
+import { api, api3, ApiError, isV3, probeServer, serverInfo, whenSignedOut } from './api';
+import { deleteLocalCopy, openServerDatabase, serverHistory, start, stop, syncNow, syncStatus } from './live';
 import { canChangeVault, forget, recall, session, type Session } from './session';
-import { Checking, LinkScreen, LoginScreen, SetPassphraseScreen } from './ui/Gate';
+import { startOn } from './ui/deskShared';
+import { Checking, LinkScreen, LoginScreen, ReleasedScreen, SetPassphraseScreen, SetUpServerScreen } from './ui/Gate';
 import { AddPhonePanel, ServerStrip, ServerTab, serverScreen } from './ui/ServerScreens';
 import { Desktop } from './ui/Desktop';
 import { serverUi } from './flag';
@@ -19,6 +23,8 @@ serverUi.current = {
   screen: serverScreen,
   // 0.9.3: the desktop layout, from 1000 px wide.
   Desktop,
+  // 0.9.4: the full item page shows the server's older prices too (as the desktop side panel does).
+  olderPrices: serverHistory,
   refresh: async () => {
     const r = await syncNow();
     if (!r) return syncStatus().error ?? "Couldn't reach the server";
@@ -26,7 +32,15 @@ serverUi.current = {
   },
 };
 
-type Stage = { at: 'checking' } | { at: 'offline'; why: string } | { at: 'login' } | { at: 'setup'; user: string } | { at: 'link' } | { at: 'app'; s: Session };
+type Stage =
+  | { at: 'checking' }
+  | { at: 'offline'; why: string }
+  | { at: 'login' }
+  | { at: 'setup'; user: string }
+  | { at: 'link' }
+  | { at: 'house'; s: Session }
+  | { at: 'released' }
+  | { at: 'app'; s: Session };
 
 const hasKeys = (s: Session | undefined) => !!s && Object.keys(s.keys).length > 0;
 
@@ -36,10 +50,25 @@ function ServerRoot() {
   const check = useCallback(async () => {
     setStage({ at: 'checking' });
     try {
+      const info = await probeServer();
+      if (isV3()) {
+        if (info.mode === 'released') return setStage({ at: 'released' });
+        const s = recall();
+        if (s?.v !== 3) {
+          forget();
+          return setStage({ at: 'login' });
+        }
+        // Still signed in? (A 401 here goes to the sign-in page.)
+        const g = await api3.session();
+        if (g === null) await api3.settings();
+        if (info.mode === 'new' && !hasKeys(s)) return setStage({ at: 'house', s });
+        return setStage({ at: 'app', s });
+      }
       const web = await api.web();
       if (web.mustChange) return setStage({ at: 'setup', user: web.user ?? 'admin' });
       const s = recall();
-      if (s && web.webId && s.webId === web.webId && hasKeys(s)) return setStage({ at: 'app', s });
+      if (s?.v === 3) forget();
+      else if (s && web.webId && s.webId === web.webId && hasKeys(s)) return setStage({ at: 'app', s });
       if (s && web.webId && s.webId === web.webId && canChangeVault()) return setStage({ at: 'link' });
       forget();
       setStage({ at: 'login' });
@@ -70,7 +99,14 @@ function ServerRoot() {
     return () => window.removeEventListener('restock-server-session', changed);
   }, [check]);
 
-  const opened = (s: Session) => setStage(hasKeys(s) ? { at: 'app', s } : canChangeVault() ? { at: 'link' } : { at: 'login' });
+  const opened = (s: Session) => {
+    if (s.v === 3) {
+      // A fresh server with no house yet: Set up this server first.
+      if (serverInfo()?.mode === 'new' && !hasKeys(s)) return setStage({ at: 'house', s });
+      return setStage({ at: 'app', s });
+    }
+    setStage(hasKeys(s) ? { at: 'app', s } : canChangeVault() ? { at: 'link' } : { at: 'login' });
+  };
 
   useEffect(() => {
     document.documentElement.classList.add('server-mode');
@@ -87,6 +123,21 @@ function ServerRoot() {
       return <SetPassphraseScreen user={stage.user} onDone={opened} />;
     case 'link':
       return <LinkScreen onDone={opened} addPhone={<AddPhonePanel />} />;
+    case 'house':
+      return (
+        <SetUpServerScreen
+          session={stage.s}
+          onDone={(s) => {
+            const i = serverInfo();
+            if (i) i.mode = 'v3';
+            // Next: add the first phone, on Server and phones.
+            startOn('add-phone');
+            setStage({ at: 'app', s });
+          }}
+        />
+      );
+    case 'released':
+      return <ReleasedScreen />;
     case 'app':
       return <Household key={stage.s.webId} s={stage.s} />;
   }

@@ -1,6 +1,12 @@
 // Server mode: one sync round with the server, the way SyncFolder.sync does it on a phone: new keys
 // first (webkeys/), then every device's file that changed, the phones' archives, then the web's own
 // file (if anything changed). No browser APIs here, so the Node tests run it against a folder.
+//
+// 0.9.4, a house (v3): the keys come from the server with the session, so there's no webkeys/;
+// the server keeps the history, so archives aren't read (an item's older prices come from
+// GET /api/v3/history); and the web's own file names no webPub (there's no web key pair).
+// Phones also share the specials and catalogues they fetched (design section 15): a round hands
+// back what each file it opened carried, for live.ts to keep.
 
 import { b64u, openRsf1, openWebKeys, openWithAny, sealRsf1, unb64 } from './crypto';
 import { sha256 } from '@noble/hashes/sha2';
@@ -29,12 +35,69 @@ export interface RoundResult {
   newKeys: boolean;
   /** When a phone's file was last written, newest first (for "Synced with your phones …"). */
   lastPhone?: string;
+  /** The specials and catalogue sections in the files opened this round (only those that had one). */
+  shared: SharedSection[];
+}
+
+/** Half-price lists and catalogue links one device's file carried (it fetched them; the server never does). */
+export interface SharedSection {
+  device: string;
+  at?: string;
+  specials: { chain: string; at?: string; items: Record<string, unknown>[] }[];
+  catalogues: Record<string, { url?: string; note?: string }>;
+}
+
+export interface RoundOptions {
+  /** A house (protocol v3): no webkeys/, no archives, no webPub. */
+  v3?: boolean;
+}
+
+const CHAIN = /^[a-z0-9-]{1,60}$/;
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * The `specials` and `catalogues` a file carries, checked: `specials` is { at, lists: [...] } or the
+ * lists themselves ({ chain, at, items }), `catalogues` { "<chain>": { url, note } } (https only).
+ */
+export function sharedSectionOf(m: Record<string, unknown>, device: string): SharedSection | undefined {
+  const sp = m.specials;
+  const lists = Array.isArray(sp) ? sp : isObj(sp) && Array.isArray(sp.lists) ? sp.lists : [];
+  const at = isObj(sp) && typeof sp.at === 'string' ? sp.at : undefined;
+  const specials: SharedSection['specials'] = [];
+  for (const l of lists.slice(0, 40)) {
+    if (!isObj(l) || typeof l.chain !== 'string' || !CHAIN.test(l.chain) || !Array.isArray(l.items)) continue;
+    const items = l.items
+      .filter((x): x is Record<string, unknown> => isObj(x) && typeof x.name === 'string' && typeof x.price === 'number' && Number.isFinite(x.price))
+      .slice(0, 400)
+      .map((x) => ({
+        chain: l.chain,
+        storeProductId: typeof x.storeProductId === 'string' ? x.storeProductId.slice(0, 80) : String(x.name).slice(0, 80),
+        name: String(x.name).slice(0, 200),
+        price: x.price,
+        ...(typeof x.wasPrice === 'number' ? { wasPrice: x.wasPrice } : {}),
+        ...(typeof x.promo === 'string' ? { promo: x.promo.slice(0, 80) } : {}),
+        ...(typeof x.size === 'string' ? { size: x.size.slice(0, 40) } : {}),
+        ...(typeof x.imageUrl === 'string' && /^https:\/\//.test(x.imageUrl) ? { imageUrl: x.imageUrl.slice(0, 500) } : {}),
+        isSpecial: true,
+        memberOnly: x.memberOnly === true,
+      }));
+    specials.push({ chain: l.chain, at: typeof l.at === 'string' ? l.at : at, items });
+  }
+  const catalogues: SharedSection['catalogues'] = {};
+  if (isObj(m.catalogues))
+    for (const [chain, c] of Object.entries(m.catalogues).slice(0, 80)) {
+      if (!CHAIN.test(chain) || !isObj(c)) continue;
+      const url = typeof c.url === 'string' && /^https:\/\//.test(c.url) ? c.url.slice(0, 500) : undefined;
+      catalogues[chain] = { ...(url ? { url } : {}), ...(typeof c.note === 'string' ? { note: c.note.slice(0, 120) } : {}) };
+    }
+  if (!specials.length && !Object.keys(catalogues).length) return undefined;
+  return { device, at, specials, catalogues };
 }
 
 const ARCHIVE = /^archive\/[A-Za-z0-9_-]+\/\d{4}-\d{2}\.bin$/;
 
-export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now = () => new Date().toISOString()): Promise<RoundResult> {
-  const res: RoundResult = { received: 0, phones: 0, unread: 0, archived: 0, wrote: false, newKeys: false };
+export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now = () => new Date().toISOString(), opts: RoundOptions = {}): Promise<RoundResult> {
+  const res: RoundResult = { received: 0, phones: 0, unread: 0, archived: 0, wrote: false, newKeys: false, shared: [] };
   const list = await remote.files();
   const names = list.map((f) => f.name);
   const version = (n: string) => {
@@ -50,7 +113,7 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
   // file is read again every round.
   const wk = `webkeys/${k.webId}.bin`;
   const candidates = new Map<string, string>();
-  if (names.includes(wk) && e.fresh(wk, version(wk)) && k.webPriv) {
+  if (!opts.v3 && names.includes(wk) && e.fresh(wk, version(wk)) && k.webPriv) {
     const bytes = await remote.read(wk);
     if (bytes) {
       try {
@@ -109,6 +172,9 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
       }
       e.noteVersion(name, ver);
       notePhotos(e, m.photos);
+      const dev = /^restock-sync-(.+)\.bin$/.exec(name)?.[1];
+      const sh = dev && (m as { device?: unknown }).device === dev ? sharedSectionOf(m as unknown as Record<string, unknown>, dev) : undefined;
+      if (sh) res.shared.push(sh);
       const n = e.takeFile(name, sum, m, at);
       if (n < 0) continue;
       res.received += n;
@@ -121,7 +187,7 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
   if (e.noteTabs()) await readAll();
 
   // Prices and receipts the phones moved off themselves.
-  for (const name of names) {
+  for (const name of opts.v3 ? [] : names) {
     if (!ARCHIVE.test(name)) continue;
     const ver = version(name);
     const vk = 'archive:' + name;
@@ -170,7 +236,7 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
     // Phones only seal new keys to a webPub found inside a web's own sealed file (docs, Changes).
     // So only a browser that has the key pair names one: a browser signed in with a phone only
     // knows the webPub the server told it, and passes on the one already in the file instead.
-    const webPub = k.webPriv ? k.webPub : e.meta('own_webpub');
+    const webPub = opts.v3 ? null : k.webPriv ? k.webPub : e.meta('own_webpub');
     const sealed = sealRsf1(unb64(k.keys[String(keyv)]), { ...out.msg, ...(webPub ? { webPub } : {}) });
     if (attempt > 0 || f) {
       const now2 = await remote.files();

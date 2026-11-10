@@ -475,6 +475,37 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
+    /** 0.9.4: rounds get a thread of their own, so Test connection (haRequest) never waits behind one. */
+    private final ExecutorService haRoundThread = Executors.newSingleThreadExecutor();
+
+    /**
+     * 0.9.4: one Home Assistant round in Java (HaSync.java), the same as the background job's, one
+     * at a time with it. `manual`: Sync now and Try again (also after the token was turned down).
+     * Resolves { ran, restarted, busy, house, came, went, held, status }.
+     */
+    @PluginMethod
+    public void haRound(PluginCall call) {
+        final boolean manual = Boolean.TRUE.equals(call.getBoolean("manual", false));
+        haRoundThread.execute(() -> {
+            try {
+                call.resolve(new JSObject(HomeAssistant.round(getContext(), manual).toJson().toString()));
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Couldn't sync with Home Assistant.");
+            }
+        });
+    }
+
+    /**
+     * 0.9.4: the pairing was started afresh on the screens' side (a new address or list, a restore,
+     * Erase everything: homeAssistant.ts resetHaPairing). Right away, not on a thread: it must be
+     * counted before the database change that follows it reaches the database.
+     */
+    @PluginMethod
+    public void haResetPairing(PluginCall call) {
+        HaSync.resetPairing();
+        call.resolve();
+    }
+
     /** Opens a page of a shop's website in the hidden browser and returns it once drawn. Resolves {status, html, url}. */
     @PluginMethod
     public void storeRender(PluginCall call) {
@@ -1088,6 +1119,8 @@ public class RestockNativePlugin extends Plugin {
         }
         // 0.8.0: another phone's changes arrived; open screens refresh.
         SyncHub.onChanged = () -> notifyListeners("syncChanged", new JSObject());
+        // 0.9.4: Home Assistant's settings and token for the server's handover or upgrade (sealed by ServerSync).
+        HomeAssistant.install(getContext());
     }
 
     @Override
@@ -1163,6 +1196,28 @@ public class RestockNativePlugin extends Plugin {
                 o.put("serverPhotos", hub.offloadedPhotos());
                 String waiting = hub.engine.meta("server_off_waiting");
                 o.put("serverWaiting", waiting == null ? 0 : Integer.parseInt(waiting));
+                // 0.9.4: a v3 server's house: what this phone calls it, what it shares with it, Wi-Fi sync.
+                boolean v3 = "3".equals(hub.engine.meta("server_api"));
+                boolean house = hub.paired() && hub.household.isHouse();
+                o.put("serverApi", hub.serverOn() ? (v3 ? 3 : 2) : null);
+                o.put("house", house);
+                o.put("serverLabel", hub.engine.meta("server_label"));
+                o.put("serverMemberLabel", hub.engine.meta("server_member_label"));
+                o.put("serverMode", hub.engine.meta("server_mode"));
+                o.put("serverHandover", hub.engine.meta("server_handover"));
+                o.put("wifiSync", hub.wifiOn());
+                o.put("shareReceiptsMine", hub.engine.shareReceipts() || !"0".equals(hub.engine.meta("share_receipts")));
+                o.put("takeBack", new JSArray(SyncHousehold.keysOf(hub.engine.takeBackKinds())));
+                JSONObject row = hub.paired() ? hub.household.serverRow() : null;
+                if (row != null) {
+                    JSObject sr = new JSObject();
+                    sr.put("home", row.optString("home"));
+                    sr.put("away", row.isNull("away") ? null : row.optString("away"));
+                    sr.put("keepMonths", row.isNull("keepMonths") ? null : row.opt("keepMonths"));
+                    o.put("serverRow", sr);
+                }
+                // A household that's now a server's house, with this phone not on the server yet.
+                o.put("serverOffer", row != null && !hub.serverOn());
                 String warn = hub.engine.meta("clock_warn");
                 if (warn != null) {
                     String who = null;
@@ -1303,6 +1358,11 @@ public class RestockNativePlugin extends Plugin {
             r.put("reached", s.reached);
             r.put("received", s.received);
             r.put("sent", s.sent);
+            // 0.9.4: what Sync now did, for its message (never about the Wi-Fi's phones with Wi-Fi sync off).
+            r.put("wifi", s.wifi);
+            r.put("viaServer", s.viaServer);
+            r.put("viaFolder", s.viaFolder);
+            r.put("names", new JSArray(s.names));
             call.resolve(r);
         });
     }
@@ -1611,14 +1671,153 @@ public class RestockNativePlugin extends Plugin {
         }, "restock-server-join").start();
     }
 
+    // ---------- 0.9.4: a v3 server's house ----------
+
+    private static java.util.Set<String> setFrom(PluginCall call, String key) {
+        JSArray a = call.getArray(key, null);
+        if (a == null) return null;
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        for (int i = 0; i < a.length(); i++) out.add(a.optString(i));
+        return out;
+    }
+
+    /** A scanned Add a phone code, checked: what it is and what this phone is in now (nothing is sent but a health check). */
+    @PluginMethod
+    public void syncCheckServer(PluginCall call) {
+        final String code = call.getString("code", "");
+        new Thread(() -> {
+            try {
+                call.resolve(new JSObject(SyncHub.get(getContext()).checkServerCode(code).toString()));
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "That code couldn't be read." : e.getMessage(), e);
+            }
+        }, "restock-server-check").start();
+    }
+
+    /** Joins a v3 server's house: how "join", "bring" or "leave". Resolves the info plus { label, houseName }. */
+    @PluginMethod
+    public void syncJoinServer3(PluginCall call) {
+        final String code = call.getString("code", "");
+        final String how = call.getString("how", "join");
+        new Thread(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                JSONObject gift = hub.joinServer3(code, how);
+                hub.schedule();
+                JSObject r = syncInfoObject(hub);
+                r.put("label", gift.optString("label", null));
+                JSONObject hh = gift.optJSONObject("household");
+                r.put("houseName", hh == null ? null : hh.optString("name", null));
+                // 0.9.4: "leave" found the household already lives on this server: it connected as a member instead.
+                r.put("member", gift.optBoolean("member", false));
+                call.resolve(r);
+            } catch (ServerFolder.NotEmptyException e) {
+                // The server already has a house: the screen offers leaving and joining instead.
+                JSObject r = new JSObject();
+                r.put("notEmpty", true);
+                r.put("message", e.getMessage());
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Couldn't join the Restock server." : e.getMessage(), e);
+            }
+        }, "restock-server-join3").start();
+    }
+
+    /** Joins the server that's now the household's owner, without a code, then syncs. */
+    @PluginMethod
+    public void syncJoinHouse(PluginCall call) {
+        new Thread(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.joinHouse();
+                syncThread.execute(() -> {
+                    hub.schedule();
+                    hub.syncAll();
+                    call.resolve(syncInfoObject(hub));
+                });
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Couldn't connect to the Restock server." : e.getMessage(), e);
+            }
+        }, "restock-house-join").start();
+    }
+
+    /** What this phone shares with its v3 server and what it calls it; takeBack: kinds to take off the server too. */
+    @PluginMethod
+    public void syncSetServer(PluginCall call) {
+        final String label = call.getString("label");
+        final java.util.Set<String> tabs = tabsFrom(call, "tabs");
+        final Boolean receipts = call.getBoolean("receipts");
+        final Boolean cards = call.getBoolean("cards");
+        final java.util.Set<String> takeBack = setFrom(call, "takeBack");
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.setServerShares(label, tabs, receipts, cards, takeBack);
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** Phone-to-phone sync on the Wi-Fi, on or off. */
+    @PluginMethod
+    public void syncSetWifi(PluginCall call) {
+        final boolean on = Boolean.TRUE.equals(call.getBoolean("on", true));
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.setWifi(on);
+                if (on) SyncService.startIfWanted(getContext());
+                else getContext().stopService(new Intent(getContext(), SyncService.class));
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage(), e);
+            }
+        });
+    }
+
+    /** The server's mode (for the owner phone's Hand this household to the server), or nothing. */
+    @PluginMethod
+    public void syncServerHealth(PluginCall call) {
+        new Thread(() -> {
+            JSONObject h = SyncHub.get(getContext()).serverHealth();
+            try {
+                call.resolve(h == null ? new JSObject() : new JSObject(h.toString()));
+            } catch (Exception e) {
+                call.resolve(new JSObject());
+            }
+        }, "restock-server-health").start();
+    }
+
+    /** Owner phone: hand the household to the server with the code from its Take this household page. */
+    @PluginMethod
+    public void syncHandOverServer(PluginCall call) {
+        final String code = call.getString("code", "");
+        new Thread(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.handOverToServer(code);
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Couldn't hand the household over." : e.getMessage(), e);
+            }
+        }, "restock-server-handover").start();
+    }
+
     /** Stop using the Restock server. bringBack: its receipt photos come back onto this phone first. */
     @PluginMethod
     public void syncStopServer(PluginCall call) {
         final boolean bringBack = Boolean.TRUE.equals(call.getBoolean("bringBack", false));
+        // 0.9.4: kinds to take off the server first ("keg", "pharmacy", "receipts", "cards"), as when turned off with the box ticked.
+        final java.util.Set<String> takeBack = setFrom(call, "takeBack");
         syncThread.execute(() -> {
             try {
                 SyncHub hub = SyncHub.get(getContext());
-                hub.stopServer(bringBack);
+                // 0.9.4: in a server's house, leaving the server is leaving the house (nothing is deleted
+                // there, unless this phone takes back what it shared).
+                if ("3".equals(hub.engine.meta("server_api")) || (hub.paired() && hub.household.isHouse())) hub.leaveHouse(bringBack, takeBack);
+                else hub.stopServer(bringBack);
                 call.resolve(syncInfoObject(hub));
             } catch (Exception e) {
                 call.reject(e.getMessage(), e);

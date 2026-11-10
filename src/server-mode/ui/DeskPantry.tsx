@@ -19,13 +19,16 @@ import { useLive } from '../../lib/useLive';
 import { ALERT_LEVELS, computeStats, HISTORY_DAYS, multiBuy, tiedWithBest, withMarket, type Option, type Recommendation } from '../../lib/verdict';
 import { SECTION_NAMES, type Section } from '../../shops';
 import { chainName, type AlertLevel } from '../../types';
-import { ChainName, Icon, PriceChart } from '../../ui/components';
+import { ChainName, Icon, PriceChart, Thumb } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { EditSheet } from '../../ui/screens/Item';
 import { DEAL_RANK, underTarget } from '../../ui/screens/Pantry';
 import { ActionInfoTag } from '../../ui/tagInfo';
 import { PhoneOnlyNote } from './PhoneOnly';
 import { DeskHead, takeOpenItem } from './deskShared';
+import { thumbOf } from './DeskSpecials';
+import { serverHistory } from '../live';
+import type { PriceReading } from '../../types';
 
 type Filter = 'all' | 'sale' | string;
 type Sort = 'az' | 'sale' | 'recent';
@@ -152,7 +155,9 @@ export function DeskPantry({ section }: { section: Section }) {
                     const isOpen = open === r.group.id;
                     return (
                       <tr key={r.group.id} className={isOpen ? 'on' : undefined} onClick={() => setOpen(r.group.id)}>
-                        <td>
+                        <td className="dk-item-cell">
+                          <Thumb src={thumbOf((deal ?? r.options[0])?.product.imageUrl)} />
+                          <span className="dk-item-words">
                           <button
                             className="dk-name"
                             aria-expanded={isOpen}
@@ -168,6 +173,7 @@ export function DeskPantry({ section }: { section: Section }) {
                             {[size, r.group.categoryId ? catName.get(r.group.categoryId) : undefined, onList.has(r.group.id) ? 'on the list' : undefined]
                               .filter(Boolean)
                               .join(' · ')}
+                          </span>
                           </span>
                         </td>
                         <td className="num dk-nowrap">
@@ -216,12 +222,23 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
     return { rec, readings, categories: categories.filter((c) => c.section === (rec.group.section ?? 'pantry')), cards, settings };
   }, [groupId]);
   const [picked, setPicked] = useState<string>();
+  // 0.9.4, a house: the server keeps the older prices (phones and this browser only keep weeks).
+  const [older, setOlder] = useState<Map<string, PriceReading[]>>(new Map());
   const [editing, setEditing] = useState(false);
   const [target, setTarget] = useState<string>();
   const adding = useRef(false);
   const head = useRef<HTMLHeadingElement>(null);
   // Focus (and, where the panel sits under the table, scroll) to the item opened.
   useEffect(() => head.current?.focus(), [groupId, data === undefined]);
+  const chartId = data ? (data.rec.options.find((o) => o.product.id === picked) ?? data.rec.best ?? data.rec.options[0])?.product.id : undefined;
+  useEffect(() => {
+    if (!chartId || older.has(chartId)) return;
+    let live = true;
+    void serverHistory(chartId, new Date(Date.now() - CHART_WEEKS * 7 * 86_400_000).toISOString()).then((rows) => live && setOlder((m) => new Map(m).set(chartId, rows)));
+    return () => {
+      live = false;
+    };
+  }, [chartId, older]);
 
   if (data === undefined) return <aside className="dk-panel" id="dk-item-panel" aria-busy="true" />;
   if (data === null)
@@ -244,7 +261,11 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
   const chartOpt = rec.options.find((o) => o.product.id === picked) ?? rec.best ?? mains[0] ?? rec.options[0];
   // The chart: the last three months, a multi-buy week at its price each (as the item page draws it).
   const from = Date.now() - CHART_WEEKS * 7 * 86_400_000;
-  const all = chartOpt ? (readings.get(chartOpt.product.id) ?? []) : [];
+  const local = chartOpt ? (readings.get(chartOpt.product.id) ?? []) : [];
+  // The server's history and this browser's, once per day and price (the browser's copy wins).
+  const seen = new Set(local.map((r) => `${r.date.slice(0, 16)}|${r.price}`));
+  const fromServer = chartOpt ? (older.get(chartOpt.product.id) ?? []).filter((r) => !seen.has(`${r.date.slice(0, 16)}|${r.price}`)) : [];
+  const all = fromServer.length ? [...local, ...fromServer].sort((a, b) => a.date.localeCompare(b.date)) : local;
   const shownReadings = all
     .filter((r) => Date.parse(r.date) >= from)
     .map((r) => {
@@ -296,6 +317,7 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
   return (
     <aside className="dk-panel" id="dk-item-panel" aria-label={group.name}>
       <div className="dk-panel-head">
+        <Thumb src={thumbOf((chartOpt ?? rec.options[0])?.product.imageUrl)} />
         <div className="grow">
           <h2 ref={head} tabIndex={-1}>
             {group.name}
@@ -326,7 +348,7 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
       <section className="dk-panel-part" aria-labelledby="dk-ph">
         <div className="dk-section-head">
           <h3 id="dk-ph">Price, last 3 months</h3>
-          <span className="dk-sub">older weeks from your server</span>
+          <span className="dk-sub">{fromServer.length ? 'older weeks from your server' : 'from your phones'}</span>
         </div>
         {mains.length > 1 && (
           <div className="dk-chips" role="group" aria-label="Which shop's price">

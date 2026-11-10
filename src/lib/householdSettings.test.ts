@@ -224,7 +224,7 @@ describe("the phones' summaries (phoneSummary.ts)", () => {
 describe('0.9.3 migration', () => {
   it('reads everything again once, for the household settings an older version passed over', async () => {
     const d = await createSqlJsDriver({ load: () => initSqlJs() });
-    const before = MIGRATIONS.length - 1;
+    const before = MIGRATIONS.length - 2;
     for (let v = 0; v < before; v++) for (const sql of MIGRATIONS[v]) await d.run(sql);
     await d.run(`PRAGMA user_version = ${before}`);
     await d.run("INSERT INTO sync_peers (device, got) VALUES ('b2', 50)");

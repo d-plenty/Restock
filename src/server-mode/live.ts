@@ -1,21 +1,25 @@
 // Server mode: the browser's own copy of the household (sql.js, kept in IndexedDB per web id), and
 // keeping it in step with the server: every 30 seconds while the page is open, when it comes back
 // into view, and a few seconds after an edit.
+//
+// 0.9.4, a house (v3): the same round over /api/v3 with the session's MAC (api.ts), no webkeys/
+// and no archives (round.ts); older prices come from the server when an item asks
+// (serverHistory); and the specials and catalogues the phones shared are kept here (sharedSpecials).
 
 import type { Database } from 'sql.js';
-import { ensureDefaults, getSettings, householdContext, initDb, updateSettings } from '../lib/db';
+import { ensureDefaults, getKV, getSettings, householdContext, initDb, putKV, updateSettings } from '../lib/db';
 import { applyRows } from '../lib/sharedSettings';
 import { tidyKeeps } from '../lib/listPicks';
 import { changed, onChange } from '../lib/live';
 import { createSqlJsDriver } from '../lib/sql/sqljs';
 import { setPhotoSource } from '../lib/receiptFiles';
 import { SECTIONS, shopDef, shopsIn, type Section, type StoreChain } from '../shops';
-import type { Settings } from '../types';
-import { api } from './api';
+import type { PriceReading, Settings } from '../types';
+import { api, api3, type HistoryRow } from './api';
 import { openWithAny, signedText, verifySig } from './crypto';
 import { WebSyncEngine } from './engine';
-import { syncRound, type RoundResult } from './round';
-import { addKeys, session, type Session } from './session';
+import { syncRound, type RoundResult, type SharedSection } from './round';
+import { addKeys, refreshHouseKeys, session, type Session } from './session';
 import { syncDbOf } from './sqldb';
 
 const STORE = 'files';
@@ -116,6 +120,7 @@ export async function openServerDatabase(s: Session): Promise<void> {
   if (engine.meta('device') !== me) {
     // A fresh copy for this web id: nothing in it is this browser's own yet.
     engine.db.exec('DELETE FROM sync_log');
+    engine.db.exec('DELETE FROM sync_held');
     engine.setMeta('device', me);
   }
   engine.setMeta('name', 'Web');
@@ -131,7 +136,7 @@ async function serverPhoto(path: string): Promise<string | undefined> {
   const s = session();
   const sum = engine?.meta('photo:' + path);
   if (!s || !sum) return undefined;
-  const bytes = await api.read(`photos/${sum}.bin`).catch(() => null);
+  const bytes = await (s.v === 3 ? api3 : api).read(`photos/${sum}.bin`).catch(() => null);
   if (!bytes) return undefined;
   try {
     const m = openWithAny<{ data?: string }>(s.keys, bytes).msg;
@@ -173,6 +178,8 @@ async function fitSettings(e: WebSyncEngine): Promise<void> {
 let running: Promise<RoundResult | undefined> | undefined;
 let applying = false;
 let firstDone = false;
+/** v3: when this tab last asked the server for newer keys (a file that won't open: a phone was removed). */
+let keysAskedAt = 0;
 
 /** One round now (or the one already going). */
 export function syncNow(): Promise<RoundResult | undefined> {
@@ -182,9 +189,21 @@ export function syncNow(): Promise<RoundResult | undefined> {
     if (!s || !engine) return undefined;
     setStatus({ busy: true });
     try {
-      const keys = { webId: s.webId, webPriv: s.webPriv, webPub: s.webPub, keys: { ...s.keys } };
-      const r = await syncRound(engine, api, keys);
-      if (r.newKeys) await addKeys({ keys: keys.keys });
+      const house = s.v === 3;
+      // syncRound adds a vouched-for new key (v2, webkeys/) to the keys it's handed.
+      let keys = { webId: s.webId, webPriv: s.webPriv, webPub: s.webPub, keys: { ...s.keys } };
+      let r = await syncRound(engine, house ? api3 : api, keys, undefined, { v3: house });
+      if (!house && r.newKeys) await addKeys({ keys: keys.keys });
+      // A house rekeys when a phone is removed: the server has the new key for this session.
+      if (house && r.unread > 0 && Date.now() - keysAskedAt > 5 * 60_000) {
+        keysAskedAt = Date.now();
+        const now = (await refreshHouseKeys().catch(() => false)) ? session() : undefined;
+        if (now) {
+          keys = { webId: now.webId, webPriv: '', webPub: '', keys: { ...now.keys } };
+          r = await syncRound(engine, api3, keys, undefined, { v3: true });
+        }
+      }
+      if (r.shared.length) await keepShared(r.shared).catch(() => undefined);
       if (!firstDone) {
         firstDone = true;
         await ensureDefaults();
@@ -263,6 +282,62 @@ export function householdInfo(): { name?: string; owner?: string; tabs: string[]
     tabs: [...engine.householdTabs()],
     receipts: engine.shareReceipts(),
   };
+}
+
+// ---------- 0.9.4: what the phones shared, and the server's history ----------
+
+const SHARED = 'server-shared-specials';
+
+export interface SharedSpecials {
+  /** chain → the newest half-price list a phone fetched there. */
+  lists: Record<string, { chain: string; at?: string; device: string; items: Record<string, unknown>[] }>;
+  /** chain → the catalogue link a phone found. */
+  catalogues: Record<string, { url?: string; note?: string; at?: string; device: string }>;
+}
+
+const newer = (a?: string, b?: string) => (a ?? '') >= (b ?? '');
+
+/** Keeps the newest list per shop, and each shop's catalogue link, from what the round opened. */
+export async function keepShared(found: SharedSection[]): Promise<void> {
+  const was = (await getKV<SharedSpecials>(SHARED).catch(() => undefined)) ?? { lists: {}, catalogues: {} };
+  const next: SharedSpecials = { lists: { ...was.lists }, catalogues: { ...was.catalogues } };
+  for (const f of found) {
+    for (const l of f.specials) {
+      const have = next.lists[l.chain];
+      if (!have || newer(l.at, have.at)) next.lists[l.chain] = { chain: l.chain, at: l.at, device: f.device, items: l.items };
+    }
+    for (const [chain, c] of Object.entries(f.catalogues)) {
+      const have = next.catalogues[chain];
+      if (!have || newer(f.at, have.at)) next.catalogues[chain] = { ...c, at: f.at, device: f.device };
+    }
+  }
+  await putKV(SHARED, next);
+  changed();
+}
+
+/** What the phones shared: the shops' half-price lists and catalogue links (empty until one shares). */
+export async function sharedSpecials(): Promise<SharedSpecials> {
+  return (await getKV<SharedSpecials>(SHARED).catch(() => undefined)) ?? { lists: {}, catalogues: {} };
+}
+
+const bool = (v: unknown) => v === true || v === 1;
+
+/** One product's prices from the server's history (v3; years of them), as readings. Empty on v2. */
+export async function serverHistory(productId: string, from: string): Promise<PriceReading[]> {
+  if (session()?.v !== 3) return [];
+  const rows: HistoryRow[] = await api3.history(productId, from).catch(() => []);
+  return rows
+    .filter((r) => typeof r.date === 'string' && typeof r.price === 'number')
+    .map((r) => ({
+      productId,
+      date: r.date,
+      price: r.price,
+      wasPrice: (r.wasPrice ?? r.was_price) ?? undefined,
+      isSpecial: bool(r.isSpecial ?? r.is_special),
+      memberOnly: bool(r.memberOnly ?? r.member_only),
+      promo: r.promo ?? undefined,
+      source: 'auto' as const,
+    }));
 }
 
 /** "Download a backup": the browser's copy as a Restock backup file (no card numbers: the web never has them). */

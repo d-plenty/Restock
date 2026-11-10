@@ -1,0 +1,236 @@
+{
+  "about": "Restock protocol v3 test vectors (docs/server-protocol.md \"v3\"), made with Node's own crypto (node:crypto, node:zlib), independent of Restock's code. Every value is base64url without padding unless it says hex or text. ECDH secrets are the shared x-coordinate. HKDF is HKDF-SHA256 with 32 bytes out; \"salt\": null means no salt. Plaintexts are the exact UTF-8 text sealed. ECDSA signatures are randomised: check they verify, don't compare them. RSF1 bodies are gzip inside, so check that they open, not their bytes.",
+  "keys": {
+    "serverKex": {
+      "priv": "HHJrULfMvMN0koj5yyi5T8OcS1s7aZu1nUM4ywTsMtk",
+      "pkcs8": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgHHJrULfMvMN0koj5yyi5T8OcS1s7aZu1nUM4ywTsMtmhRANCAAQ4xOw8UeXBqDeY8Ld_GlQsG0Nq0yk-BODG4EzaoHUrYBL9uBYZwLFPdC0HBxj9xkNg4EuKMBX4tgQ9XQtSn0Yh",
+      "pub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEOMTsPFHlwag3mPC3fxpULBtDatMpPgTgxuBM2qB1K2AS_bgWGcCxT3QtBwcY_cZDYOBLijAV-LYEPV0LUp9GIQ"
+    },
+    "phoneKex": {
+      "priv": "1wlBSN6hfsUQ_OBpVaJm-yqkolSGjs0JVOaQl0TZ1pI",
+      "pkcs8": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg1wlBSN6hfsUQ_OBpVaJm-yqkolSGjs0JVOaQl0TZ1pKhRANCAASPSDBHSbslziD15POcQwsOL8GPOCk8cr-uhbmpVcfT9UPp-VL6AR5VU4uxaDNJLcs3JcY30lYw1l-fLeZ3qI8H",
+      "pub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEj0gwR0m7Jc4g9eTznEMLDi_BjzgpPHK_roW5qVXH0_VD6flS-gEeVVOLsWgzSS3LNyXGN9JWMNZfny3md6iPBw"
+    },
+    "phoneSigning": {
+      "priv": "AiPprTc2C8YdXTGat-mAs07qyb82MENzecSLSvqqnTw",
+      "pkcs8": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgAiPprTc2C8YdXTGat-mAs07qyb82MENzecSLSvqqnTyhRANCAAQJJl_01dDjMBZM2YwwpKX1BFxd-ZQsdCnkx9BOv3YKvCesyypQklb3PnuL46avLEwwdkdfnPDmC6t3AatI7bTC",
+      "pub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAECSZf9NXQ4zAWTNmMMKSl9QRcXfmULHQp5MfQTr92CrwnrMsqUJJW9z57i-OmryxMMHZHX5zw5gurdwGrSO20wg"
+    },
+    "phoneServerDev": {
+      "priv": "4-Kbxrk9c-0njuKea4zQvMX1xyyiz_44dhSGhG95m9k",
+      "pkcs8": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg4-Kbxrk9c-0njuKea4zQvMX1xyyiz_44dhSGhG95m9mhRANCAAQdlafJpzdYROmtUADHsu3jR_-QjhIHH8hK1uxTuHJFOfgosv5El2TGdhDuWbIiIVqlnm5uamgIHnxPQUH0SGpl",
+      "pub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEHZWnyac3WETprVAAx7Lt40f_kI4SBx_IStbsU7hyRTn4KLL-RJdkxnYQ7lmyIiFapZ5ubmpoCB58T0FB9EhqZQ"
+    },
+    "phoneHandoverOneOff": {
+      "priv": "MUs298EH7YhCXzHpv1LtrExJlsx5SHO6KkrN_t9ueBY",
+      "pkcs8": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgMUs298EH7YhCXzHpv1LtrExJlsx5SHO6KkrN_t9ueBahRANCAAQDtOvgQHx1pVTWha7T6U5TqW0xGIZeGXTEuK12FxSPyV3GWJnU0IXpij3UsJRSqyyDRAsNJZmfX35qRXGI-XE9",
+      "pub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEA7Tr4EB8daVU1oWu0-lOU6ltMRiGXhl0xLitdhcUj8ldxliZ1NCF6Yo91LCUUqssg0QLDSWZn19-akVxiPlxPQ"
+    },
+    "browserOneOff": {
+      "priv": "z-3wffFTQcOi07J1EwpB_-VeHQ1ECw9296GURW7t7Yg",
+      "pkcs8": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgz-3wffFTQcOi07J1EwpB_-VeHQ1ECw9296GURW7t7YihRANCAATsxSmgK-5GoR2stp1-CUg9D2vURrIB1VxCdKhhkq9TdFXgv0ZgnOeCqms6lwv5DdyCY73pZ8LRaXd3ja6Uq8Xe",
+      "pub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7MUpoCvuRqEdrLadfglIPQ9r1EayAdVcQnSoYZKvU3RV4L9GYJzngqprOpcL-Q3cgmO96WfC0Wl3d42ulKvF3g"
+    },
+    "owner": {
+      "priv": "7TX6CRlbkMnF71NifzOipWGkeOtw5Ll7Lz40uqbF6FA",
+      "pkcs8": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg7TX6CRlbkMnF71NifzOipWGkeOtw5Ll7Lz40uqbF6FChRANCAASSfHdsEwPHEuKRUN89iSRoye2UfatxrT276Y3UCAMFxph7OwGecDAw848ykdoEFJq4VLUz81WuvTNNNEEQ8TFv",
+      "pub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEknx3bBMDxxLikVDfPYkkaMntlH2rca09u-mN1AgDBcaYezsBnnAwMPOPMpHaBBSauFS1M_NVrr0zTTRBEPExbw"
+    }
+  },
+  "ecdh": {
+    "serverPhone": "ehKXCzSe--Bh6QNKh7K3yXk5-hsj1fmDcQHvGC76ljs",
+    "handoverServer": "3Px6_iN-iqLlgIl2TLsOTGsnm4pWXGOWfEMeIrVAZII",
+    "serverBrowser": "kfrSEWi9DF7E5xebu8JlaQP9FwSGdfmYze7TMXpBzj0"
+  },
+  "serverKey": {
+    "householdKey": "WV27uw5O2kmbzGpOo29hYpEUpi4Ik3KgnLzzXhU2px8",
+    "serverKey": "Eou9ugRydAR-83SqXYQT6d_OdhtD1m-4WlwnKqGaf1A"
+  },
+  "join": {
+    "device": "a1b2c3d4e5f60718",
+    "n": "F8PaGuGh97igal91p-X7lQ",
+    "info": "restock-join-v3",
+    "key": "9hd4346pBbenUGyGY5bPFldnsHoaZjv2kpqjWT5Y8L4",
+    "aad": "RSJ3a1b2c3d4e5f60718",
+    "nonce": "YIWhxJz3dVDiDUmZ",
+    "plain": "{\"format\":\"restock-join\",\"v\":3,\"device\":\"a1b2c3d4e5f60718\",\"label\":\"Sister's phone\",\"seed\":false,\"household\":{\"name\":\"Declan and Sarah\",\"hid\":\"tT09Texdrpab\",\"sid\":\"k3x9q2\",\"owner_pub\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEknx3bBMDxxLikVDfPYkkaMntlH2rca09u-mN1AgDBcaYezsBnnAwMPOPMpHaBBSauFS1M_NVrr0zTTRBEPExbw\"},\"keyv\":2,\"keys\":{\"2\":\"WV27uw5O2kmbzGpOo29hYpEUpi4Ik3KgnLzzXhU2px8\"},\"serverKeys\":{\"1\":\"MhoHqeXpVj1mUZkO9cFoStHy81736Jprhr-XF6CdtyY\",\"2\":\"Eou9ugRydAR-83SqXYQT6d_OdhtD1m-4WlwnKqGaf1A\"},\"secret\":\"aBHB1Pgas69r7e0MbnC7mhXLuyEyfN0S7mJq3O6ag-c\",\"server\":{\"home\":\"http://192.168.1.20:8787\",\"away\":\"https://restock.example.ts.net\",\"keepMonths\":12}}",
+    "sealed": "YIWhxJz3dVDiDUmZXCjTPWAar_-8qA5htvR01MeV4862iW8KoD2Yep7a9ekXbRe9Ha8PXGvd6YH-eaAfXNG6QIYEJQSzFgteZuBQEzztDK7UMwBcAi0DXx6Klz7oR8qWD9AM4lUrrBg67ewD68vNjD0oNIO3OTu5VKHSwkpAKMkbWWIyAzx8s_-fMDnqNShgbdy2pEvELzcQK6sdqO-mFWp2C84YtJT3fP6ypxl2_ivaC3JiZub4CcS6jW0E0cuUgxDCZ98NGuXa9UMXkELftWd2jin_mSUfoYPe686y-_qJj73LhqUoZ5ji5_v76Pz39EP6aCc4IuxPj9DEpJZurkAsev8AU25Ta83kohAe1qwnQfOVOZHnJfAg9jeKP8afeS0EU3KCAn-gg2JhPyKLh6BS6aj8Q3ULwuZiWYCYwKP3hUc6cWzaery0AaUGq_BQrB96zyd5QsiGoKopWau1V8hHkD3D2xXE04q6quckj89LZeJdY_ENonxA_ulUBxiAlhRsN8zVYnQoyiDmFx7pIDu6DipEHYX1K2i6ybT9X8kbb6Ysjsi82Sc4mYbmo-1PB13Hb18yTb0N4RxkeBis4w0o8L9u-G4wHcP2CBZ8vIDAcUMP9r90J7_71jReEXg2yjYIiYLXO8gQgQVbZtt6LR19z7PPFgFOP_fVtLYscFjFdDyYLpUiDvnRj4MIhzdZDPYhnHT1spwNt33PpUW5gRRz8k9IvKeUUvcB0qGF21qvyi5P42gKIYEJM4TzcHQRyy9lcZZRcQCfvnoEfKy8FU7ZZL-c8PHREFReEaqwf0h5922U24ZlbmkmLARMEd7gQB5y6qJOYKlYSxEIFTKlzBUKZxSGbABCIdBkbWqVcbT7Rwt0AkoDTG3WKou94BOKKdiXqYU"
+  },
+  "memberJoin": {
+    "body": {
+      "member": true,
+      "device": "a1b2c3d4e5f60718",
+      "pub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEHZWnyac3WETprVAAx7Lt40f_kI4SBx_IStbsU7hyRTn4KLL-RJdkxnYQ7lmyIiFapZ5ubmpoCB58T0FB9EhqZQ",
+      "kex": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEj0gwR0m7Jc4g9eTznEMLDi_BjzgpPHK_roW5qVXH0_VD6flS-gEeVVOLsWgzSS3LNyXGN9JWMNZfny3md6iPBw",
+      "n": "F8PaGuGh97igal91p-X7lQ"
+    },
+    "text": "restock-member-v3\na1b2c3d4e5f60718\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEHZWnyac3WETprVAAx7Lt40f_kI4SBx_IStbsU7hyRTn4KLL-RJdkxnYQ7lmyIiFapZ5ubmpoCB58T0FB9EhqZQ\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEj0gwR0m7Jc4g9eTznEMLDi_BjzgpPHK_roW5qVXH0_VD6flS-gEeVVOLsWgzSS3LNyXGN9JWMNZfny3md6iPBw\nF8PaGuGh97igal91p-X7lQ",
+    "signedBy": "keys.phoneSigning",
+    "sig": "MEQCIEKCPSImCroXZ5_f2S9eW2UfYwpVodYr-CiZJ7nu39cDAiAj8zNKoTWMEDx-BtFpl3orcp4iowMKLufkgLL0ZikMmw"
+  },
+  "keysFile": {
+    "device": "a1b2c3d4e5f60718",
+    "info": "restock-keys-v3",
+    "salt": null,
+    "key": "rtbzNVgul0RjCy4OD3V9IKFseviaORqTTfxNLdSEmG4",
+    "aad": "RSE3a1b2c3d4e5f60718",
+    "nonce": "xikySmGqF2lzNSxU",
+    "plain": "{\"keyv\":3,\"keys\":{\"2\":\"WV27uw5O2kmbzGpOo29hYpEUpi4Ik3KgnLzzXhU2px8\",\"3\":\"nm-Pc2Fe2NeGDPLvVFrYQZudhIWsj2VIS6NupvAz1vA\"}}",
+    "file": "UlNFM8YpMkphqhdpczUsVC8yto7AGS95ZSRCCblbrPMg6gc8TTPCNA8owdzJqN7qUixau7BTaj82AUdyY_GvWcTsNkRzk3Wx_mw1w0b1a7juZb8dOL7ZH2n0QLEuQxtFGd5BYNfEnew2nDhhuO6T0BLhguo6g_b468r2UaYOZ_8fojKekMiun6AMIisvx10PsNTc6MQzlw"
+  },
+  "handover": {
+    "token": "UmD3LJKQFvk4do8phPYDcnCBKMWh1LUPGe0JW4iKde4",
+    "info": "restock-handover-v3",
+    "key": "T_qdgtsmVXx3v28cSOAvZErpv42KU7vHy97BKOg74B8",
+    "aad": "RSH3",
+    "nonce": "UzgCFBQ0wiDNgR47",
+    "plain": "{\"format\":\"restock-handover\",\"v\":3,\"key\":\"WV27uw5O2kmbzGpOo29hYpEUpi4Ik3KgnLzzXhU2px8\",\"keyv\":2,\"serverKeys\":{\"1\":\"MhoHqeXpVj1mUZkO9cFoStHy81736Jprhr-XF6CdtyY\",\"2\":\"Eou9ugRydAR-83SqXYQT6d_OdhtD1m-4WlwnKqGaf1A\"},\"owner_priv\":\"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg7TX6CRlbkMnF71NifzOipWGkeOtw5Ll7Lz40uqbF6FChRANCAASSfHdsEwPHEuKRUN89iSRoye2UfatxrT276Y3UCAMFxph7OwGecDAw848ykdoEFJq4VLUz81WuvTNNNEEQ8TFv\",\"owner_pubkey\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEknx3bBMDxxLikVDfPYkkaMntlH2rca09u-mN1AgDBcaYezsBnnAwMPOPMpHaBBSauFS1M_NVrr0zTTRBEPExbw\",\"owner_secrets\":{\"f00dfeedf00dfeed\":\"UEFvqOygJW7ezxJAvv8nFLlzyayApQXEWg1B4tG5fDM\"},\"secret\":\"PBIWhGdIH3fBD7AxKw51bCX8C5AzNGRAdjGRaCR7qz8\",\"recovery\":\"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567\",\"recovery_saved\":true,\"hid\":\"tT09Texdrpab\",\"name\":\"Declan and Sarah\"}",
+    "epub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEA7Tr4EB8daVU1oWu0-lOU6ltMRiGXhl0xLitdhcUj8ldxliZ1NCF6Yo91LCUUqssg0QLDSWZn19-akVxiPlxPQ",
+    "sealed": "UzgCFBQ0wiDNgR47O_QLzrth84oPQk3V08U0gqZhqngLAgR7fIbgYwa8ui5kax3k_Ecu8btSwm781sPlJUUX1CAqSOxZs6mvNz5uQ7QJlFMDvRuAdx2ZJmlXfN9MVmS-uzVbr6tv_rnkVYYtEhAhP5_eDD9HYDR-72pCjWGC5I2AZP5eTULtmb4vOAGM2Cf4P2029C6sTHMnnLyB9vLIMaJRcKKOehtiGucwUi7lkKtwI2S-TndYNcnbQu8XrnQb8Hw9P4XA8NX-ceALyp3VdF3tfIP92HdcPmnp9Kj6PWRzByBV5CR6fI4YvmwsknhA0mTpThiF-dD55hJvaVVWP2o0hT2SRGR17nP3iwQ6upgJz0JJlrKoPCUoyTpEKD9kazZ-V8esFqJVw6O3uunvMLKQ7q1ayCq0SuhoxEVZTEQLIR3P2KY_F29ebHXrSkc4QHDlYnB1fwZS8MeZihgA3YPM6Bf8YDqwjQB-L8SDtxEreNpsME7OxtdoXqjHcSJ7O_UAoRqxI1aIJb3uGAPqQhPRQSGxCMwewV2vfhyct-X3-U-YKGTetkABZNJRXxgVIPrEksjlnOslYiC2sI4DqP1Zcmg4nUxX_Qc5be4E3EvRLckoISNpyyNCiJDL6kJmAIeURi2lxmRJLM7yE-BbXR0lLEUn5FUp5kD6B0YqW9fAcwmysYnIHv9drfFMaKxe5P33iTNFFeohboQwbwTkHbcQU3pUcTp_XcQcKSHh0GfKRpRShHpkyWgztKqxzAvLOm6nph_imQSFZlinEOHrZlw9_3OstxGncV6-jh_vOFAtOi1YH2WRQOaOr6yFf5eJxCwgWwmw7WEAVZY9NeKc1YQO_iP-W16ZKwfQlrJQZ3CufmGm6_i8TPkNcdAH6GRW4q8cH_C4x_Y8CEseVO-IAtgTpQ2Fj9t_rQxig88qmQMsCOnJ3TXTch0ksE3S5smhfn_0hacpFN2FP2m2aeus1cfKBFErW_qqOVDKWmm-Lvi-G6U2_NeQf6wwXbbaEdSaj5uCRDk-CpYvm-JzQrt2xO_1O_ejd4H01kaGQCD8re60LZoKXwLsxfhwnlA_CQYC8ntmj6lX4MPvNa0yfFxnqQ"
+  },
+  "ha": {
+    "device": "a1b2c3d4e5f60718",
+    "n": "V8KDsSZyDEFRF8ZObvrsaw",
+    "info": "restock-ha-v3",
+    "key": "eYnHP7SKMpT5kLcUxdQgnbhGvRMOK0IryWlKpyTrM-g",
+    "aad": "RSA3a1b2c3d4e5f60718",
+    "nonce": "zyV6fhShOlfAgb-j",
+    "plain": "{\"address\":\"http://homeassistant.local:8123\",\"entity\":\"todo.shopping_list\",\"enabled\":true,\"token\":\"eyJhbGciOi.test.token\",\"state\":{\"pairs\":[],\"pick\":[]}}",
+    "sealed": "zyV6fhShOlfAgb-jGTXJlS1ynWdf2b405LlzJXrQgPn_figmMYUtzPrWpmGxNe9JWWTzbXegLPu-89axOkROdBp9fpnt-yucdzqLWdcrA48cffXdj3uoqSrUAg2B0qAwmUEMbsBwZWeLgjWzDatTk3puoG1LYXgV-5n9fHF1OX4lRj7rfXM2wx9PhykPbo0gYd4WZxIKxyA7SdxeUVrg8jk0Vdf54u_Ikw0oHd320qafRrboZw"
+  },
+  "login": {
+    "authKey": "AD9PV1t0YsDFO2frMAuBLVKmConKyJl8rMXc1d_7FRM",
+    "loginKey": "Nh81Ts8yEhxlM6cHxCbilSPG7IcQXgd_KqugSya06RI",
+    "c": "Br9Vp01_a58wrfY9xw-FT5-_jEsuabG1GSTf6GkT9DM",
+    "epub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7MUpoCvuRqEdrLadfglIPQ9r1EayAdVcQnSoYZKvU3RV4L9GYJzngqprOpcL-Q3cgmO96WfC0Wl3d42ulKvF3g",
+    "proofText": "restock-login-v3\nBr9Vp01_a58wrfY9xw-FT5-_jEsuabG1GSTf6GkT9DM\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7MUpoCvuRqEdrLadfglIPQ9r1EayAdVcQnSoYZKvU3RV4L9GYJzngqprOpcL-Q3cgmO96WfC0Wl3d42ulKvF3g",
+    "proof": "v6rocR2H50oco1XF6-mB6XjwEvUXKnT26fxpn1YFBPM",
+    "sessionKey": "k5INHDFgsf5Llwmw2s29QHoGqtyZC2nChPAW5b1FQaE",
+    "answer": {
+      "plain": {
+        "keys": {
+          "2": "Eou9ugRydAR-83SqXYQT6d_OdhtD1m-4WlwnKqGaf1A"
+        },
+        "keyv": 2,
+        "webId": "Wq8vX0aB3cD4eF5g",
+        "household": {
+          "name": "Declan and Sarah",
+          "owner_pub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEknx3bBMDxxLikVDfPYkkaMntlH2rca09u-mN1AgDBcaYezsBnnAwMPOPMpHaBBSauFS1M_NVrr0zTTRBEPExbw"
+        }
+      },
+      "sealed": "UlNGMWAAfj6Sr_akEIRjQRqvzki0QWbd8MpzZIOCg9lBW24lXwtWhvkd4YL4U3fGrRNMWWUUoxynlXBTBu03o-6eunqjFvXk0yWM6GVB_be0dSGTSkcaFHLvb-FraEtj8nkOgmZkqxtEJ2pYfb-CgGDHAPzIIwq2UcMYFcOlNGkFtYfeLOQG_2wQaAzEOyPRg-5RD518VD53GfsEMJTCHzrkY3ahMqbc9xybFfVNuAVXgmspOqNiP4C-3lcq-oRaP_55942woR55Qc1PxVOJi1Ot0UEr3rmJ863H8IhOZqOipKPgu8_eBArjxdRtLFUurJ3QzRz17CCBp4_4foOBNIhZ7VvfdpbqO4E8AZOtlS_gXvVG03AX2UZck5aTfao"
+    }
+  },
+  "qrSession": {
+    "id": "Sn1P1ComYTRrOMaAuY4hSqdv",
+    "epub": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7MUpoCvuRqEdrLadfglIPQ9r1EayAdVcQnSoYZKvU3RV4L9GYJzngqprOpcL-Q3cgmO96WfC0Wl3d42ulKvF3g",
+    "sessionKey": "FHwOTT71yUKiNaa3B81kILXThqzSkXnYM_AViPiN5uU"
+  },
+  "requests": {
+    "sessionKey": "k5INHDFgsf5Llwmw2s29QHoGqtyZC2nChPAW5b1FQaE",
+    "cases": [
+      {
+        "method": "GET",
+        "path": "/api/v3/phones",
+        "t": 1762736400123,
+        "n": "4wt9SmMmEtTNvLozQeXcAA",
+        "body": "",
+        "text": "GET\n/api/v3/phones\n1762736400123\n4wt9SmMmEtTNvLozQeXcAA\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mac": "-qgKtTYZgNoV1o3NHi7YDulJ-xmX-6d-uKX0zS9QAWI",
+        "header": "RestockWeb3 s=SESSION-ID, t=1762736400123, n=4wt9SmMmEtTNvLozQeXcAA, m=-qgKtTYZgNoV1o3NHi7YDulJ-xmX-6d-uKX0zS9QAWI"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/v3/settings",
+        "t": 1762736400456,
+        "n": "lipLykC-IjLgebBsdtiJxg",
+        "body": "{\"name\":\"Declan and Sarah\",\"keepMonths\":6}",
+        "text": "PUT\n/api/v3/settings\n1762736400456\nlipLykC-IjLgebBsdtiJxg\n354c3cc78106d5f60014a602861cde547029c3b08b26bf63a96ed64e7658b32f",
+        "mac": "OxrGG29IBmx-dU54QxIsETnsvyzK1mnmD3sKVZBTp-U",
+        "header": "RestockWeb3 s=SESSION-ID, t=1762736400456, n=lipLykC-IjLgebBsdtiJxg, m=OxrGG29IBmx-dU54QxIsETnsvyzK1mnmD3sKVZBTp-U"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v3/history?product=p1&from=2025-11-01",
+        "t": 1762736400789,
+        "n": "OWK8I6sgOiZBsr86jbbMcw",
+        "body": "",
+        "text": "GET\n/api/v3/history?product=p1&from=2025-11-01\n1762736400789\nOWK8I6sgOiZBsr86jbbMcw\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mac": "F-Fu7vIER1XNPKP4nX7Us_R8acSjZrOBPII1UqJzzuE",
+        "header": "RestockWeb3 s=SESSION-ID, t=1762736400789, n=OWK8I6sgOiZBsr86jbbMcw, m=F-Fu7vIER1XNPKP4nX7Us_R8acSjZrOBPII1UqJzzuE"
+      }
+    ]
+  },
+  "haLineId": [
+    {
+      "entity": "todo.shopping_list",
+      "uid": "7a1f6c2e-31e4-4b8e-9b5a-0d2f7c3e9a11",
+      "id": "ha-fd8663b313f8d95680bfb420"
+    },
+    {
+      "entity": "todo.shopping_list",
+      "uid": "1",
+      "id": "ha-2ad58241328a153cfd3cc877"
+    },
+    {
+      "entity": "todo.groceries",
+      "uid": "7a1f6c2e-31e4-4b8e-9b5a-0d2f7c3e9a11",
+      "id": "ha-ea39859ff1e85678c35dc6e6"
+    },
+    {
+      "entity": "todo.einkaufsliste_küche",
+      "uid": "äöü-ß-🍌",
+      "id": "ha-55048c0740296cfaadca25d7"
+    }
+  ],
+  "recovery": {
+    "r": "FrHGkeGe_LtvXwdl-RUPR5HWA0E",
+    "base32": "C2Y4NEPBT36LW327A5S7SFIPI6I5MA2B",
+    "formatted": "C2Y4-NEPB-T36L-W327-A5S7-SFIP-I6I5-MA2B",
+    "key": "RcGB0lLQrW_XzPFkuB62933Cca4GOIKIjGH4F8hrWto",
+    "nonce": "6cX4kSqBdZnVcoNc",
+    "plain": "{\"secrets\":{\"a1b2c3d4e5f60718\":\"aBHB1Pgas69r7e0MbnC7mhXLuyEyfN0S7mJq3O6ag-c\"},\"owner_priv\":\"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg7TX6CRlbkMnF71NifzOipWGkeOtw5Ll7Lz40uqbF6FChRANCAASSfHdsEwPHEuKRUN89iSRoye2UfatxrT276Y3UCAMFxph7OwGecDAw848ykdoEFJq4VLUz81WuvTNNNEEQ8TFv\",\"owner_pubkey\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEknx3bBMDxxLikVDfPYkkaMntlH2rca09u-mN1AgDBcaYezsBnnAwMPOPMpHaBBSauFS1M_NVrr0zTTRBEPExbw\",\"key\":\"WV27uw5O2kmbzGpOo29hYpEUpi4Ik3KgnLzzXhU2px8\",\"keyv\":\"2\"}",
+    "row": "6cX4kSqBdZnVcoNcp16vP8mRjCRU9IQKqtkBYGXO86eOyTc1_3P8c1K5kPlV2o_X9KqHEc7ybgSMBlARckHmwRIgg8JX4kkwMaqLfBwvU7pDSEkNDQeJXft0ptK7b7ADLRd0zmft0FD_jgJSx0oNGBWtD4kDljNzwj6td9SCAvhEdNfU22MjZgcB6yxAV-AnF19Pa4RiB4yMoFUTHEks3oL45BAQN0KDeuyFJ5bzTPb-R4g2kQegKZqcu3Wzz5gC9yIC8GMsDI7HlMUtGli-OqmjA7kGs815ziLhTj20EE0WSGcV9LU60Vv7JntJAXhACkmldYsDLV9gquO8QUxbZzy0hZn0ldQAQbXq8uI16vsz7FswkICYj94FPhzELoxTpjdwqUeMbaQ5jUQBh3MM17xxH5uoVbnqMCdBJoEHvQrJtjUN58L862ZP0KjX7yMGnOqD-cAlOtMwyTvMllIycSgelUTetMNIjnHbsbcz_L1CJ5FnzNDcnDYAyBdT_xIkgTw3WLuKpMwK-UDwxshBt8LzGnsxitM7sWQsw7VTs7wV-0ga6vJz9UO1sZPaLfnFIRF6fpjvhm_WHfYDZUAfA5gR6Ha2AKUjAJkXSirT3PtmA-JaHTXhMfTszCNohC1JN9w0pMi44X_H7yRzW2F21fjYWLECHRnk-EgouUU"
+  },
+  "serverRow": {
+    "entry": {
+      "tbl": "household",
+      "pk": "server",
+      "stamp": 1762736401000,
+      "device": "srv-k3x9q2",
+      "row": {
+        "k": "server",
+        "v": "{\"v\":3,\"sid\":\"k3x9q2\",\"home\":\"http://192.168.1.20:8787\",\"away\":\"https://restock.example.ts.net\",\"kex\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEOMTsPFHlwag3mPC3fxpULBtDatMpPgTgxuBM2qB1K2AS_bgWGcCxT3QtBwcY_cZDYOBLijAV-LYEPV0LUp9GIQ\",\"keepMonths\":12}"
+      }
+    },
+    "text": "restock-hh1|server|v={\"v\":3,\"sid\":\"k3x9q2\",\"home\":\"http://192.168.1.20:8787\",\"away\":\"https://restock.example.ts.net\",\"kex\":\"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEOMTsPFHlwag3mPC3fxpULBtDatMpPgTgxuBM2qB1K2AS_bgWGcCxT3QtBwcY_cZDYOBLijAV-LYEPV0LUp9GIQ\",\"keepMonths\":12}|1762736401000",
+    "signedBy": "keys.owner",
+    "sig": "MEUCIQCwRStLqhuXCRzkXQcgnt1cSjIziz5ILuMnSZQRV1BUTwIgfwD8E7rTMFCC4SaQUndMo2sYCYV3BGU06b2g8R4c53k"
+  },
+  "keepCutoff": {
+    "monthMs": 2629800000,
+    "now": 1794292200000,
+    "cases": [
+      {
+        "keepMonths": 3,
+        "cutoff": "2026-08-10T23:00:00.000Z"
+      },
+      {
+        "keepMonths": 6,
+        "cutoff": "2026-05-11T15:30:00.000Z"
+      },
+      {
+        "keepMonths": 9,
+        "cutoff": "2026-02-09T08:00:00.000Z"
+      },
+      {
+        "keepMonths": 12,
+        "cutoff": "2025-11-10T00:30:00.000Z"
+      },
+      {
+        "keepMonths": null,
+        "cutoff": null
+      }
+    ]
+  }
+}

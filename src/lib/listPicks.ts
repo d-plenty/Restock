@@ -16,6 +16,10 @@
 //
 // No household (a phone on its own): the same rows work on the phone itself, and no ha:phone row is
 // needed (the phone that turns Home Assistant on is the one).
+//
+// 0.9.4, a house (the household's owner is a Restock server, srv-…): Home Assistant runs only on the
+// server (design D12). Its ha:phone row names the server when it runs it; a phone never claims the
+// row there, whether the server runs it or not (HaSync.java claimHaPhone does the same).
 
 import { allGroups, allListEntries, deleteListEntries, getKV, putKV, queryRows, runOps, updateListEntry } from './db';
 import { HA_STATE, LIST_ALIASES } from './haKeys';
@@ -187,27 +191,71 @@ export interface HaPhone {
   mine: boolean;
   /** The row names a phone that has left the household (or was removed): another phone may take over. */
   left?: boolean;
+  /**
+   * 0.9.4: the household is a house (its owner is a Restock server). Home Assistant runs only on the
+   * server there; this phone never claims it or runs its own.
+   */
+  house?: HaHouse;
+}
+
+/** 0.9.4: a house, for the Home Assistant screen. */
+export interface HaHouse {
+  /** The house's name ("Declan and Sarah"). */
+  name?: string;
+  /** The household's ha:phone row names the server: it runs Home Assistant for every phone and browser. */
+  serverRuns: boolean;
+  /** Where the server's page is, from its owner-signed `server` row (at home, and away if it has one). */
+  home?: string;
+  away?: string;
+}
+
+/** A server row's address, if it's a web address (it's signed by the house, but shown as a link). */
+const webAddress = (v: unknown): string | undefined => (typeof v === 'string' && /^https?:\/\/[^\s/?#]+/i.test(v) ? v : undefined);
+
+/** 0.9.4: a house's own record (its owner is a srv- device), or undefined in any other household. */
+function houseOf(rows: { k: string; v: string }[], device: string | undefined): HaHouse | undefined {
+  const owner = rows.find((r) => r.k === 'owner')?.v;
+  if (!owner?.startsWith('srv-')) return undefined;
+  const out: HaHouse = { serverRuns: !!device?.startsWith('srv-') };
+  const name = rows.find((r) => r.k === 'name')?.v?.trim();
+  if (name) out.name = name;
+  try {
+    const s = JSON.parse(rows.find((r) => r.k === 'server')?.v ?? 'null') as { v?: unknown; home?: unknown; away?: unknown } | null;
+    if (s && s.v === 3) {
+      const home = webAddress(s.home);
+      const away = webAddress(s.away);
+      if (home) out.home = home;
+      if (away) out.away = away;
+    }
+  } catch {
+    // no server row yet
+  }
+  return out;
 }
 
 /** Which phone syncs with Home Assistant, as this device sees it. */
 export async function haPhone(): Promise<HaPhone> {
   const [meRow] = await queryRows<{ value: string }>("SELECT value FROM sync_meta WHERE key = 'device'").catch(() => []);
   const me = meRow?.value ?? '';
-  const household = await queryRows<{ k: string; v: string }>("SELECT k, v FROM household WHERE k = 'owner' OR k LIKE 'member:%' OR k LIKE 'removed:%'").catch(() => []);
+  const household = await queryRows<{ k: string; v: string }>(
+    "SELECT k, v FROM household WHERE k IN ('owner', 'name', 'server') OR k LIKE 'member:%' OR k LIKE 'removed:%'",
+  ).catch(() => []);
   const inHousehold = household.some((r) => r.k === 'owner');
   if (!inHousehold) return { inHousehold, me, mine: true };
   const [row] = await queryRows<{ v: string }>(`SELECT v FROM ${TABLE} WHERE k = ?`, [HA_PHONE]).catch(() => []);
   const device = row ? checkListRow(HA_PHONE, decode(row.v)) : undefined;
-  if (typeof device !== 'string') return { inHousehold, me, mine: false };
+  const house = houseOf(household, typeof device === 'string' ? device : undefined);
+  if (typeof device !== 'string') return { inHousehold, me, mine: false, ...(house ? { house } : {}) };
+  const server = device.startsWith('srv-');
   const member = household.find((r) => r.k === 'member:' + device);
-  if (!member) {
+  if (!member && !server) {
     // Gone for sure (its member entry deleted, or removed by the owner), or just not here yet.
     const [del] = await queryRows<{ n: number }>("SELECT COUNT(*) AS n FROM sync_log WHERE tbl = 'household' AND pk = ? AND deleted = 1", ['member:' + device]).catch(() => [{ n: 0 }]);
     const removed = household.some((r) => r.k === 'removed:' + device);
-    if (removed || Number(del?.n ?? 0) > 0) return { inHousehold, me, mine: false, left: true };
+    if (removed || Number(del?.n ?? 0) > 0) return { inHousehold, me, mine: false, left: true, ...(house ? { house } : {}) };
   }
-  let name = 'another phone';
-  if (member) {
+  let name = server ? 'your server' : 'another phone';
+  if (member && !server) {
     try {
       const n = (JSON.parse(member.v) as { name?: unknown }).name;
       if (typeof n === 'string' && n.trim()) name = n.trim();
@@ -215,7 +263,7 @@ export async function haPhone(): Promise<HaPhone> {
       // an odd entry
     }
   }
-  return { inHousehold, me, device, name, mine: device === me };
+  return { inHousehold, me, device, name, mine: device === me, ...(house ? { house } : {}) };
 }
 
 /**
@@ -224,18 +272,21 @@ export async function haPhone(): Promise<HaPhone> {
  * the household settings), so a phone that's named on another phone but hasn't reached this one
  * yet still wins: used when Home Assistant was already on here before there was a row. Otherwise
  * (Turn on, Move it here) a change made now, which wins over what's there.
+ *
+ * 0.9.4: never in a house (its server does it, or nobody does): answers false there, true otherwise.
  */
-export async function claimHaPhone(opts: { quietly?: boolean } = {}): Promise<void> {
+export async function claimHaPhone(opts: { quietly?: boolean } = {}): Promise<boolean> {
   const who = await haPhone();
-  if (!who.inHousehold || !who.me || who.me.startsWith('web-') || who.mine) return;
+  if (who.house) return false;
+  if (!who.inHousehold || !who.me || who.me.startsWith('web-') || who.mine) return true;
   const v = JSON.stringify(who.me);
   // Quietly only while there's nothing at all for the row here yet; a row that's there but no use
   // (a phone that left, a value that isn't right) is simply replaced.
   const [noted] = opts.quietly ? await queryRows<{ n: number }>('SELECT COUNT(*) AS n FROM sync_log WHERE tbl = ? AND pk = ?', [TABLE, HA_PHONE]).catch(() => [{ n: 1 }]) : [];
   if (!opts.quietly || who.device || who.left || Number(noted?.n ?? 1) > 0) {
-    if (who.device && opts.quietly) return;
+    if (who.device && opts.quietly) return true;
     await runOps([{ sql: `INSERT OR REPLACE INTO ${TABLE} (k, v) VALUES (?, ?)`, params: [HA_PHONE, v] }]);
-    return;
+    return true;
   }
   await runOps([
     { sql: "INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')" },
@@ -246,14 +297,16 @@ export async function claimHaPhone(opts: { quietly?: boolean } = {}): Promise<vo
     },
     { sql: "DELETE FROM sync_meta WHERE key = 'applying'" },
   ]);
+  return true;
 }
 
 /**
  * Home Assistant turned off on the phone that did it: the household's row goes, so the next phone
  * to turn it on just takes it (nobody's asked to move it from a phone that isn't doing it).
+ * 0.9.4: not in a house: the row is the server's to change there.
  */
 export async function releaseHaPhone(): Promise<void> {
   const who = await haPhone();
-  if (!who.inHousehold || !who.device || !who.mine) return;
+  if (!who.inHousehold || !who.device || !who.mine || who.house) return;
   await runOps([{ sql: `DELETE FROM ${TABLE} WHERE k = ?`, params: [HA_PHONE] }]);
 }

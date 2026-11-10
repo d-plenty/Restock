@@ -23,10 +23,12 @@ import { useLive } from '../../lib/useLive';
 import { activeSections, chainName, SECTION_NAMES, searchChainsIn, type Section, type StoreChain } from '../../shops';
 import { historyLabel, type Category, type ProductOrder, type Settings } from '../../types';
 import { PROGRAMS } from '../../ui/screens/Cards';
-import { api, type Device } from '../api';
+import { api, api3, isV3, serverInfo, type Device } from '../api';
 import { downloadBackup, householdInfo, memberNames } from '../live';
 import { canChangeVault, session, signOut, signOutEverywhere } from '../session';
 import { leave } from './ServerScreens';
+import { askThenConfirm } from './houseData';
+import { confirmAction } from '../../lib/confirm';
 
 /** Who can change a setting: here on the web, only on the owner phone, or on each phone. */
 export type ChangedOn = 'web' | 'owner' | 'phone';
@@ -199,6 +201,8 @@ export const signOutAll = () => leave(() => signOutEverywhere());
 export function useServerVersion(): string | undefined {
   const [v, setV] = useState<string>();
   useEffect(() => {
+    const known = serverInfo()?.version;
+    if (known) return setV(known);
     api
       .health()
       .then((h) => setV(h.version))
@@ -359,8 +363,15 @@ export function usePhones(): { phones?: PhoneSettings[]; error?: string; reload:
   const ha = useLive(homeAssistantPhone, []);
   useEffect(() => {
     let live = true;
-    api
-      .devices()
+    // 0.9.4, a house: the server's phones (the active ones; removed and left ones are on Server and phones).
+    const load: Promise<Device[]> = isV3()
+      ? api3.phones().then((list) =>
+          list
+            .filter((p) => !p.status || p.status === 'active')
+            .map((p) => ({ device: p.device, name: p.label || p.name, added: p.added, lastSeen: p.lastSeen })),
+        )
+      : api.devices();
+    load
       .then((d) => {
         if (!live) return;
         setDevices(d);
@@ -379,9 +390,16 @@ export function usePhones(): { phones?: PhoneSettings[]; error?: string; reload:
   return { phones, error, reload: () => setTick((t) => t + 1) };
 }
 
-/** Takes a phone off this server (it stops syncing here). Taking it out of the household is the owner phone's. */
-export async function removePhone(device: string): Promise<void> {
+/**
+ * Takes a phone off this server (it stops syncing here), after asking: in a house (v3) with the
+ * passphrase again (0.9.4), otherwise a plain confirm. False if it wasn't. Taking it out of the
+ * household is the owner phone's on a 0.9.3-style server.
+ */
+export async function removePhone(device: string, ask: { title: string; detail: string; action: string }): Promise<boolean> {
+  if (isV3()) return (await askThenConfirm(ask.title, ask.detail, ask.action, (c) => api3.removePhone(device, c).then(() => true))) === true;
+  if (!(await confirmAction(ask.title, { detail: ask.detail, action: ask.action, danger: true }))) return false;
   await api.removeDevice(device);
+  return true;
 }
 
 /** The loyalty cards the phones share, as the web knows them: the shop's name, never the number. */

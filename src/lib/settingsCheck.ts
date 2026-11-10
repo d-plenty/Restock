@@ -94,7 +94,7 @@ export function checkCustomShop(v: unknown, strict = false): CustomShop | undefi
   return compact({ id, name: shopName, website, section, search, createdAt: text(v.createdAt, 40) ?? '' });
 }
 
-const STORE_FIELDS = ['primary', 'secondary', 'storeId', 'primaryMap', 'branchStoreNo', 'branchStoreNo2', 'secondaryMap'] as const;
+const STORE_FIELDS = ['primary', 'secondary', 'storeId', 'primaryMap', 'branchStoreNo', 'branchStoreNo2', 'secondaryMap', 'householdBranch', 'householdStoreNo'] as const;
 
 function storeChoiceOf(v: unknown): StoreChoice {
   const o = obj(v);
