@@ -4,7 +4,9 @@ import { allReceipts, getReceipt, getSettings, nowIso, photosOnServer, saveRecei
 import { serverPhoto } from '../../lib/sync';
 import { dataUrl, photoPath, photosSize, readPhoto, writePhoto } from '../../lib/receiptFiles';
 import { readerInstalled, readText, removeOldDownload } from '../../lib/receiptReader';
-import { deleteOn, expired, itemLines, joinPages, KEEP_MONTHS, keepLabel, parseReceipt, removeReceipts } from '../../lib/receipts';
+import { deleteOn, expired, itemLines, joinPages, KEEP_MONTHS, keepLabel, parseReceipt, removeReceipts, removeReceiptsUndoable } from '../../lib/receipts';
+import { act } from '../../lib/undo'; // 0.9.5 (undo)
+import * as draft from '../../lib/settingsDraft'; // 0.9.5 (save)
 import { blackAndWhite, findPaper, fullQuad, greyscale, rotate, shrink, warp, type Img, type Quad } from '../../lib/scan';
 import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
@@ -48,12 +50,13 @@ export function ReceiptsSettings({ settings, inSetup }: { settings: Settings; in
   }, [receipts?.length]);
 
   const turnOn = async (on: boolean) => {
+    // 0.9.5 (save): on a settings screen, held until Save settings.
     if (on && !reader.installed) {
-      await updateSettings({ receipts: { ...r, enabled: true } });
+      await draft.updateSettings({ receipts: { ...r, enabled: true } });
       await reader.install();
       return;
     }
-    await updateSettings({ receipts: { ...r, enabled: on } });
+    await draft.updateSettings({ receipts: { ...r, enabled: on } });
   };
 
   const setKeep = async (months: number) => {
@@ -67,10 +70,15 @@ export function ReceiptsSettings({ settings, inSetup }: { settings: Settings; in
         danger: true,
       });
       if (!ok) return;
-      await removeReceipts(going);
     }
-    await updateSettings({ receipts: { ...r, keepMonths: months } });
-    if (going.length) nav.toast(`Deleted ${going.length} older receipt${going.length === 1 ? '' : 's'}`);
+    await draft.updateSettings({ receipts: { ...r, keepMonths: months } });
+    // 0.9.5 (save): the older ones go once it's saved (what's older by then).
+    await draft.afterSave('receipts-keep', async (s) => {
+      const gone = expired(await allReceipts(), s.receipts.keepMonths);
+      if (!gone.length) return;
+      await removeReceipts(gone);
+      nav.toast(`Deleted ${gone.length} older receipt${gone.length === 1 ? '' : 's'}`);
+    });
   };
 
   return (
@@ -122,7 +130,7 @@ export function ReceiptsSettings({ settings, inSetup }: { settings: Settings; in
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
             value={r.keepMonths}
             aria-label="Keep receipts for"
             onChange={(e) => void setKeep(parseInt(e.target.value, 10))}
@@ -565,7 +573,8 @@ export function ReceiptScreen({ id }: { id?: string }) {
         if (!extra.length) extra = undefined;
       }
       const total = parseFloat(fields.total.replace(/[$,\s]/g, ''));
-      await saveReceipt({
+      // 0.9.5 (undo)
+      await act(existing ? 'Receipt saved' : 'Receipt added', () => saveReceipt({
         id: rid,
         scannedAt: existing?.scannedAt ?? nowIso(),
         shop: fields.shop.trim() || undefined,
@@ -578,8 +587,7 @@ export function ReceiptScreen({ id }: { id?: string }) {
         photo: path,
         pages: extra,
         pinned: fields.pinned,
-      });
-      nav.toast(existing ? 'Receipt saved' : 'Receipt added');
+      }));
       nav.pop();
     } catch (e) {
       setError(`Couldn't save it: ${e instanceof Error ? e.message : e}`);
@@ -590,10 +598,8 @@ export function ReceiptScreen({ id }: { id?: string }) {
 
   const remove = async () => {
     if (!existing) return;
-    const ok = await confirmAction('Delete this receipt?', { detail: 'Its photo goes too.', action: 'Delete', danger: true });
-    if (!ok) return;
-    await removeReceipts([existing]);
-    nav.toast('Receipt deleted');
+    // 0.9.5 (undo): no question first; Undo brings it back, photo and all.
+    await removeReceiptsUndoable([existing], 'Receipt deleted');
     nav.pop();
   };
 

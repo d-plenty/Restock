@@ -120,7 +120,7 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
 
     (async () => {
       try {
-        if (!navigator.mediaDevices?.getUserMedia) throw new Error('This device has no camera access.');
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('No camera is available here.');
         stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
@@ -259,7 +259,7 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
           <input
             className="input"
             inputMode={kind ? 'text' : 'numeric'}
-            placeholder={kind ? kind.typeHint : 'Or type the number'}
+            placeholder={kind ? kind.typeHint : 'Barcode number'}
             aria-label={kind ? kind.typeHint : 'Type the barcode number'}
             value={typed}
             onChange={(e) => setTyped(e.target.value)}

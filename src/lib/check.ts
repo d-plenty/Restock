@@ -6,6 +6,7 @@ import type { Chain, Settings } from '../types';
 import { addReading, allProducts, getSettings, nowIso, readingsFor, refresh, updateProduct } from './db';
 import { RestockNative } from './sql/native';
 import { localDay } from './verdict';
+import { background } from './undo';
 
 // Price checks run in the app's native Android code (PriceCheckWorker.java), both for
 // "Check now" and for the background schedule, so there's one implementation.
@@ -75,17 +76,20 @@ async function refreshPagelessProducts(limit = 30): Promise<{ checked: number; u
       const prev = (last.get(p.id) ?? []).slice(-1)[0];
       // Same day on the phone's own calendar, not UTC's (verdict.ts localDay).
       if (prev && localDay(prev.date) === localDay(nowIso()) && prev.price === hit.price) continue;
-      await addReading({
-        productId: p.id,
-        date: nowIso(),
-        price: hit.price,
-        wasPrice: hit.wasPrice,
-        isSpecial: hit.isSpecial,
-        memberOnly: hit.memberOnly,
-        promo: hit.promo,
-        source: 'auto',
+      // 0.9.5 (final review): a price check is never part of an action someone is doing.
+      await background(async () => {
+        await addReading({
+          productId: p.id,
+          date: nowIso(),
+          price: hit.price!,
+          wasPrice: hit.wasPrice,
+          isSpecial: hit.isSpecial,
+          memberOnly: hit.memberOnly,
+          promo: hit.promo,
+          source: 'auto',
+        });
+        if (hit.inStock !== undefined) await updateProduct(p.id, { inStock: hit.inStock, stockAt: nowIso() });
       });
-      if (hit.inStock !== undefined) await updateProduct(p.id, { inStock: hit.inStock, stockAt: nowIso() });
       updated++;
     } catch {
       // that shop isn't answering; the next check tries again

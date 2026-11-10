@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { getKV, getSettings, putKV, refresh, updateSettings } from '../../lib/db';
+import { getKV, getSettings, putKV, refresh } from '../../lib/db';
+import * as draft from '../../lib/settingsDraft'; // 0.9.5 (save)
+import { SaveBar, useSettingsDraft } from '../SaveBar';
 import { ensureNotificationPermission } from '../../lib/notify';
 import { RestockNative } from '../../lib/sql/native';
 import { useLive } from '../../lib/useLive';
@@ -79,7 +81,7 @@ export function RecallSettings({ settings, inSetup }: { settings: Settings; inSe
           </span>
           <span className="small">
             Once a day, Restock checks the official Australian recall lists (food, products and medicines) against what's in your Pantry, Keg,
-            Pharmacy, shopping list and kept receipts.{inSetup ? ' On by default.' : ''}
+            Health, shopping list and kept receipts.{inSetup ? ' On by default.' : ''}
           </span>
         </span>
         <input
@@ -89,8 +91,11 @@ export function RecallSettings({ settings, inSetup }: { settings: Settings; inSe
           onChange={async (e) => {
             const enabled = e.target.checked;
             if (enabled) await ensureNotificationPermission().catch(() => false);
-            await updateSettings({ recalls: { ...settings.recalls, enabled } });
-            if (isNative()) await RestockNative.scheduleRecalls({ enabled }).catch(() => undefined);
+            // 0.9.5 (save): on a settings screen, held until Save settings.
+            await draft.updateSettings({ recalls: { ...settings.recalls, enabled } });
+            await draft.afterSave('recalls', async (s) => {
+              if (isNative()) await RestockNative.scheduleRecalls({ enabled: s.recalls.enabled }).catch(() => undefined);
+            });
           }}
         />
       </label>
@@ -155,8 +160,9 @@ export function RecallCard({ r, onDismiss }: { r: FoundRecall; onDismiss?: () =>
 
 /** Settings → Recall alerts, and where a recall notification opens. */
 export function RecallsScreen() {
+  useSettingsDraft(); // 0.9.5 (save)
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useLive(draft.getSettings, []);
   const found = useLive(openRecalls, []);
   const [busy, setBusy] = useState(false);
   if (!settings || !found) return <div className="screen" />;
@@ -231,6 +237,7 @@ export function RecallsScreen() {
         Restock isn't an official alert service and can miss a recall or flag one that isn't yours. For anything you're worried about, check the
         official list, or ask the shop or a pharmacist.
       </p>
+      <SaveBar />
     </div>
   );
 }

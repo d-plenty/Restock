@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { stage } from '../../lib/settingsDraft'; // 0.9.5 (save)
+import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar'; // 0.9.5 (save)
 import { scanBarcode } from '../../lib/barcode';
 import { confirmAction } from '../../lib/confirm';
 import { getSettings, updateSettings } from '../../lib/db';
@@ -22,6 +24,7 @@ import { useLive } from '../../lib/useLive';
 import { SECTIONS, sectionOn, type Section } from '../../shops';
 import { Icon, LoadingBar, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
+import { serverKeepText } from '../../lib/autoDelete';
 import { SuggestLocalBackup } from './Backups';
 import { askAdult, LeaveServerSheet, ServerCard, ShopDataStays, TAKE_BACK_NOTE } from './Sync';
 
@@ -53,14 +56,14 @@ export const sharesOf = (i: SyncInfo | undefined): Shares => ({
 type Kind = 'pantry' | 'keg' | 'pharmacy' | 'receipts' | 'cards';
 
 const ROWS: { kind: Kind; title: string; sub: string }[] = [
-  { kind: 'pantry', title: 'Groceries', sub: 'Pantry and shopping list, ticks too, with their prices and alerts' },
+  { kind: 'pantry', title: 'Groceries', sub: 'Pantry and shopping list (General too), ticks too, with their prices and alerts' },
   { kind: 'keg', title: 'Keg', sub: 'Bottle shops. Off unless you want the house to see it' },
-  { kind: 'pharmacy', title: 'Pharmacy', sub: 'Off unless you want the house to see it' },
+  { kind: 'pharmacy', title: 'Health', sub: 'Off unless you want the house to see it' },
   { kind: 'receipts', title: 'Receipts', sub: 'What you spent, and the photos. Off unless you want the house to see them' },
   { kind: 'cards', title: 'Loyalty cards', sub: 'Best kept on your phone. Turn on only to share cards with the house.' },
 ];
 
-const THINGS: Record<Kind, string> = { pantry: 'groceries', keg: 'Keg', pharmacy: 'Pharmacy', receipts: 'receipts', cards: 'loyalty cards' };
+const THINGS: Record<Kind, string> = { pantry: 'groceries', keg: 'Keg', pharmacy: 'Health', receipts: 'receipts', cards: 'loyalty cards' };
 
 const isOn = (v: Shares, k: Kind) => (k === 'receipts' ? v.receipts : k === 'cards' ? v.cards : v.tabs.includes(k));
 
@@ -171,15 +174,19 @@ export function SharesPicker({ value, onChange, joining }: { value: Shares; onCh
 }
 
 /** Saves what this phone shares (and takes back), then syncs: the server and the house see it. */
-async function saveShares(v: Shares, takeBack: TakeBack | undefined, before: SyncInfo | undefined): Promise<SyncInfo> {
+async function saveShares(v: Shares, takeBack: TakeBack | TakeBack[] | undefined, before: SyncInfo | undefined): Promise<SyncInfo> {
   const keep = (before?.takeBack ?? []).filter((t) => (t === 'receipts' ? !v.receipts : t === 'cards' ? !v.cards : !v.tabs.includes(t as Section)));
+  const more = Array.isArray(takeBack) ? takeBack : takeBack ? [takeBack] : [];
   return RestockNative.syncSetServer({
     tabs: v.tabs,
     receipts: v.receipts,
     cards: v.cards,
-    takeBack: [...new Set([...keep, ...(takeBack ? [takeBack] : [])])],
+    takeBack: [...new Set([...keep, ...more])],
   });
 }
+
+/** 0.9.5 (save): whether a kind is still shared (then it isn't taken back). */
+const stillShared = (v: Shares, t: TakeBack) => (t === 'receipts' ? v.receipts : t === 'cards' ? v.cards : v.tabs.includes(t as Section));
 
 /** This phone's tabs on, for what it now shares (so a shared Keg or Pharmacy tab shows here too). */
 async function showSharedTabs(v: Shares) {
@@ -224,7 +231,7 @@ function JoinedPage({ joined, info, onDone }: { joined: { label?: string | null;
       </div>
       <div className="card" style={{ gap: 8 }}>
         <label className="field" style={{ margin: 0 }}>
-          <span style={{ fontSize: 16, fontWeight: 500 }}>What to call it on this phone</span>
+          <span style={{ fontSize: 15, fontWeight: 500 }}>What to call it on this phone</span>
           <input className="input" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} />
         </label>
         <span className="small">Just a name for you. A phone belongs to one house at a time.</span>
@@ -355,7 +362,7 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
             <Icon name="home" size={20} />
           </span>
           <span style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-            <strong style={{ fontSize: 18 }}>{label}</strong>
+            <strong style={{ fontSize: 17 }}>{label}</strong>
             <span className="small">
               Your Restock server{info.household ? `, ${info.household}` : ''}
               {phones ? ` · ${plural(phones, 'phone')}` : ''}
@@ -373,8 +380,7 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
           {info.serverAway ? ` · Away: ${addressText(info.serverAway)}` : ''}
         </span>
         <span className="small">
-          The server keeps {keep ? `${keep} months` : 'everything'} of prices and receipts{keep ? ' (its Keep data for)' : ', until someone deletes it there'}. This phone keeps
-          your "Keep price history for" and moves older prices there{moved ? `: ${moved} so far` : ''}.
+          {serverKeepText(keep)} This phone keeps your "Keep price history for" and moves older prices there{moved ? `: ${moved} so far` : ''}.
         </span>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn small primary" aria-expanded={sharing} onClick={() => setSharing((s) => !s)}>
@@ -425,24 +431,36 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
   );
 }
 
-/** What this phone shares, changed later: saved straight away. */
+/**
+ * What this phone shares, changed later. 0.9.5 (save): held until Save settings, with the "Also
+ * take it off the server" question still asked when a switch goes off; both are done on Save.
+ */
 export function SharesEditor({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => void }) {
   const nav = useNav();
+  const draft = useDraftState();
   const [value, setValue] = useState<Shares>(sharesOf(info));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => setValue(sharesOf(info)), [info.myTabs?.join(), info.shareReceipts, info.shareCards]);
+  const takeBacks = useRef<Set<TakeBack>>(new Set());
+  useEffect(() => {
+    setValue(sharesOf(info));
+    takeBacks.current.clear();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [info.myTabs?.join(), info.shareReceipts, info.shareCards, draft.epoch]);
   const change = async (v: Shares, takeBack?: TakeBack) => {
-    const was = value;
     setValue(v);
-    try {
-      const i = await saveShares(v, takeBack, info);
-      await showSharedTabs(v);
-      onInfo(i);
-      nav.toast(takeBack ? 'Saved. It comes off the server at the next sync' : 'Saved');
-    } catch (e) {
-      setValue(was);
-      nav.toast(errText(e));
-    }
+    for (const t of [...takeBacks.current]) if (stillShared(v, t)) takeBacks.current.delete(t);
+    if (takeBack) takeBacks.current.add(takeBack);
+    const tbs = [...takeBacks.current];
+    await stage(
+      'shares',
+      v,
+      async () => {
+        const i = await saveShares(v, tbs, info);
+        await showSharedTabs(v);
+        onInfo(i);
+        if (tbs.length) nav.toast('Saved. It comes off the server at the next sync');
+      },
+      sharesOf(info),
+    );
   };
   return (
     <>
@@ -473,7 +491,7 @@ function HandoverCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) 
     if (!out.ok) return;
     const ok = await confirmAction(`Hand ${hh} to your server?`, {
       detail:
-        "The server becomes the household's owner: it adds and removes phones, and keeps the household's key, so it can read what the phones share with it (to merge it, keep history and show Restock in a browser). The other phones carry on; each one updates to Restock 0.9.4 to keep syncing with the server.",
+        "The server becomes the household's owner: it adds and removes phones, and keeps the household's key, so it can read what the phones share with it (to merge it, keep history and show Restock in a browser). The other phones carry on; each one updates to Restock 0.9.4 or newer to keep syncing with the server.",
       action: 'Hand it over',
       danger: false,
     });
@@ -492,9 +510,9 @@ function HandoverCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) 
   return (
     <div className="card" style={{ gap: 8, borderColor: 'var(--green)' }}>
       <span className="eyebrow green" style={{ margin: 0 }}>
-        New in Restock 0.9.4
+        Your server can do more
       </span>
-      <strong style={{ fontSize: 16 }}>Hand this household to the server</strong>
+      <strong style={{ fontSize: 15 }}>Hand this household to the server</strong>
       <span className="small">
         Your server can be the house: it does the owner phone's job around the clock, keeps years of prices, and gives you Restock in a browser with no
         linking. This phone stays the owner until the server has taken over, so nothing is lost if something goes wrong part way.
@@ -525,6 +543,7 @@ function HandoverCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) 
 // ---------- the screen ----------
 
 export function RestockServerScreen() {
+  useSettingsDraft(); // 0.9.5 (save): what this phone shares waits for Save settings
   const nav = useNav();
   const settings = useLive(getSettings, []);
   const [info, setInfo] = useState<SyncInfo>();
@@ -757,6 +776,7 @@ export function RestockServerScreen() {
 
       {p?.server && p.suggestLocal && !joined && <SuggestLocalBackup text={suggestLocalText(p)} />}
 
+      <SaveBar onlyWhenChanged />
       {choice && (
         <HouseChoiceSheet
           choice={choice}

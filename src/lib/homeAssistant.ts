@@ -1,7 +1,8 @@
 import { Capacitor } from '@capacitor/core';
-import { allGroups, allListEntries, deleteListEntries, getKV, insertEntryOp, nowIso, putKV, queryRows, runOps, uid, updateListEntry } from './db';
+import { allGroups, allListEntries, deleteListEntries, getKV, getSettings, insertEntryOp, nowIso, putKV, queryRows, runOps, uid, updateListEntry } from './db';
+import { activeSections } from '../shops';
 import { changed, onChange } from './live';
-import { emptyState, HaError, haLineId, haLists, restApi, syncRound, type HaState, type Line, type Store, type Transport } from './haSync';
+import { emptyState, HaError, haLineId, haLists, onHaList, restApi, syncRound, type HaState, type Line, type Store, type Transport } from './haSync';
 import { RestockNative } from './sql/native';
 import { HA_CONFIG, HA_STATE, HA_STATUS, haPairingResets, LIST_ALIASES, LOCAL_ONLY_KV, onHaPairingReset, resetHaPairing } from './haKeys';
 import {
@@ -20,6 +21,7 @@ import {
   type HaPhone,
 } from './listPicks';
 import type { ListEntry } from '../types';
+import { background } from './undo';
 
 // 0.9.3: Settings → Home Assistant. The shopping list both ways with a Home Assistant to-do list,
 // straight from this phone (no Restock server). One phone per household does it (the household's
@@ -243,7 +245,8 @@ export class PairingRestarted extends Error {
 }
 
 /**
- * Restock's side, in the database: the grocery list's lines and the Pantry tab's items.
+ * Restock's side, in the database: the grocery list's and General's lines (and ones made from Home
+ * Assistant's list, wherever they went), and the items of the tabs that are on (0.9.5: Keg and Health too).
  * `resets`: haPairingResets() when the round began (before its config was read). If the pairing
  * is started afresh after that, the round stops before changing anything, and doesn't save its
  * pairing (made for the old list or the old database) over the fresh one.
@@ -254,10 +257,11 @@ export function dbStore(resets?: number): Store {
   return {
     async lines() {
       const groups = new Map((await allGroups()).map((g) => [g.id, g.section ?? 'pantry']));
-      return (await allListEntries()).filter((e) => ((e.groupId ? groups.get(e.groupId) : undefined) ?? e.section ?? 'pantry') === 'pantry').map(toLine);
+      return (await allListEntries()).filter((e) => onHaList(e.id, (e.groupId ? groups.get(e.groupId) : undefined) ?? e.section ?? 'pantry')).map(toLine);
     },
     async items() {
-      return (await allGroups()).filter((g) => (g.section ?? 'pantry') === 'pantry').map((g) => ({ id: g.id, name: g.name }));
+      const on = activeSections(await getSettings());
+      return (await allGroups()).filter((g) => on.includes(g.section ?? 'pantry')).map((g) => ({ id: g.id, name: g.name, section: g.section ?? 'pantry' }));
     },
     aliases: getAliases,
     async addLine(l, itemUid) {
@@ -265,15 +269,16 @@ export function dbStore(resets?: number): Store {
       // 0.9.4: made from an item, its id comes from the list and the item (haLineId), added only if
       // it isn't there yet (another runner made it), as HaSync.java's DbStore does.
       const id = itemUid ? haLineId((await getHaConfig()).entity, itemUid) : FROM_HA + uid();
-      const op = insertEntryOp({ id, text: l.text, qty: l.qty, groupId: l.groupId, section: 'pantry', checked: l.checked, createdAt: nowIso() });
-      await runOps([{ ...op, sql: op.sql.replace('INSERT INTO', 'INSERT OR IGNORE INTO') }]);
+      const op = insertEntryOp({ id, text: l.text, qty: l.qty, groupId: l.groupId, section: l.section ?? 'pantry', checked: l.checked, createdAt: nowIso() });
+      // 0.9.5 (final review): a round's writes wait for (and are never part of) an action someone is doing.
+      await background(() => runOps([{ ...op, sql: op.sql.replace('INSERT INTO', 'INSERT OR IGNORE INTO') }]));
       return id;
     },
     async updateLine(id, patch) {
-      await updateListEntry(id, patch);
+      await background(() => updateListEntry(id, patch));
     },
     async removeLines(ids) {
-      await deleteListEntries(ids);
+      await background(() => deleteListEntries(ids));
     },
     async loadState() {
       if (since === undefined) since = haPairingResets();

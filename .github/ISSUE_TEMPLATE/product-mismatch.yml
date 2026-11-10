@@ -25,8 +25,8 @@ body:
   - type: dropdown
     id: store
     attributes:
-      label: Store
-      options: [Coles, Woolworths, Aldi, A bottle shop, A pharmacy, A shop I added myself, More than one]
+      label: Shop
+      options: [Coles, Woolworths, Aldi, A bottle shop, A chemist, A shop I added myself, More than one]
   - type: textarea
     id: detail
     attributes:
@@ -35,4 +35,4 @@ body:
     id: version
     attributes:
       label: Restock version
-      placeholder: 0.9.4
+      placeholder: 0.9.5

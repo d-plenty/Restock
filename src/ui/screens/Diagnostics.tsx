@@ -153,13 +153,13 @@ export function DiagnosticsScreen() {
       <div className="eyebrow">Send search details</div>
       <div className="card">
         <p className="small" style={{ margin: 0 }}>
-          If a shop's search looks wrong, run one search here. Restock searches the shop's online store (not your branch) and saves exactly what
+          If a shop's search looks wrong, run one search here. Restock searches the shop's website (not your branch) and saves exactly what
           the shop sent back into a file you can send to the developer, so the connection can be fixed. Nothing from your pantry, lists or
           settings goes in it.
         </p>
         <p className="small" style={{ margin: 0 }}>
           The shop's answer can still be about you: if you're signed in to Woolworths inside Restock, Woolworths answers for your account (its
-          store's prices and stock, and possibly what's in your trolley). Open the file and check it before you send it.
+          branch's prices and stock, and possibly what's in your trolley). Open the file and check it before you send it.
         </p>
         <label className="field">
           <span>Shop</span>
@@ -285,14 +285,14 @@ function SearchTest() {
         <p className="small" style={{ margin: 0 }}>
           Searches a list of everyday words (milk, Western Star, Panadol, VB…) at each of your shops, the way Restock does, and saves what came
           back in one file you can send to the developer, so search can be made better. One search at a time with a pause in between. The file
-          has the shops' answers and the test words: nothing from your pantry, lists or settings, and no store numbers.
+          has the shops' answers and the test words: nothing from your pantry, lists or settings, and no branch numbers.
         </p>
         <label className="field">
           <span>Which shops</span>
           <select className="input" value={which} disabled={!!progress} onChange={(e) => setWhich(e.target.value as 'all' | Section)}>
             <option value="pantry">Supermarkets</option>
             <option value="keg">Bottle shops</option>
-            <option value="pharmacy">Pharmacies</option>
+            <option value="pharmacy">Chemists</option>
             <option value="all">All three</option>
           </select>
         </label>

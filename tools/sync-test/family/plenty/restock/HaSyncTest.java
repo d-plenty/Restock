@@ -124,7 +124,7 @@ public class HaSyncTest {
         }
 
         static HaSync.Line copy(HaSync.Line l) {
-            return new HaSync.Line(l.id, l.text, l.qty, l.checked, l.groupId);
+            return new HaSync.Line(l.id, l.text, l.qty, l.checked, l.groupId, l.section);
         }
 
         @Override
@@ -137,7 +137,7 @@ public class HaSyncTest {
         @Override
         public List<HaMatch.Named> items() {
             List<HaMatch.Named> o = new ArrayList<>();
-            for (HaMatch.Named p : pantry) o.add(new HaMatch.Named(p.id, p.name));
+            for (HaMatch.Named p : pantry) o.add(new HaMatch.Named(p.id, p.name, p.section));
             return o;
         }
 
@@ -150,7 +150,7 @@ public class HaSyncTest {
         public String addLine(HaSync.Line l, String uid) {
             String id = uid != null ? HaSync.haLineId(entity, uid) : prefix + (++n);
             for (HaSync.Line x : shared[0]) if (x.id.equals(id)) return id;
-            shared[0].add(new HaSync.Line(id, l.text, l.qty, l.checked, l.groupId));
+            shared[0].add(new HaSync.Line(id, l.text, l.qty, l.checked, l.groupId, l.section));
             return id;
         }
 
@@ -184,7 +184,10 @@ public class HaSyncTest {
 
     static List<HaMatch.Named> named(JSONArray a) throws Exception {
         List<HaMatch.Named> o = new ArrayList<>();
-        for (int i = 0; i < a.length(); i++) o.add(new HaMatch.Named(a.getJSONObject(i).getString("id"), a.getJSONObject(i).getString("name")));
+        for (int i = 0; i < a.length(); i++) {
+            JSONObject x = a.getJSONObject(i);
+            o.add(new HaMatch.Named(x.getString("id"), x.getString("name"), x.has("section") ? x.getString("section") : null));
+        }
         return o;
     }
 
@@ -254,7 +257,7 @@ public class HaSyncTest {
                 case "line": {
                     MemStore a = stores.get("a");
                     String id = s.has("id") ? s.getString("id") : s.has("idOf") ? HaSync.haLineId(entity, s.getString("idOf")) : "r" + (++a.n);
-                    shared[0].add(new HaSync.Line(id, s.getString("text"), s.optDouble("qty", 1), s.optBoolean("checked", false), s.has("groupId") ? s.getString("groupId") : null));
+                    shared[0].add(new HaSync.Line(id, s.getString("text"), s.optDouble("qty", 1), s.optBoolean("checked", false), s.has("groupId") ? s.getString("groupId") : null, s.has("section") ? s.getString("section") : null));
                     break;
                 }
                 case "update": {
@@ -270,7 +273,7 @@ public class HaSyncTest {
                     break;
                 case "rename":
                     for (int k = 0; k < pantry.size(); k++)
-                        if (pantry.get(k).id.equals(s.getString("groupId"))) pantry.set(k, new HaMatch.Named(pantry.get(k).id, s.getString("name")));
+                        if (pantry.get(k).id.equals(s.getString("groupId"))) pantry.set(k, new HaMatch.Named(pantry.get(k).id, s.getString("name"), pantry.get(k).section));
                     break;
                 case "state": {
                     HaSync.State st = new HaSync.State();
@@ -299,7 +302,7 @@ public class HaSyncTest {
                     JSONArray haList = new JSONArray();
                     for (HaSync.Item h : ha.list) haList.put(new JSONArray().put(h.uid).put(h.summary).put(h.completed ? "completed" : "needs_action"));
                     JSONArray lines = new JSONArray();
-                    for (HaSync.Line l : shared[0]) lines.put(new JSONArray().put(l.id).put(l.text).put(l.qty).put(l.checked).put(l.groupId == null ? JSONObject.NULL : l.groupId));
+                    for (HaSync.Line l : shared[0]) lines.put(new JSONArray().put(l.id).put(l.text).put(l.qty).put(l.checked).put(l.groupId == null ? JSONObject.NULL : l.groupId).put(l.section == null ? JSONObject.NULL : l.section));
                     out.put(new JSONObject().put("r", r).put("calls", new JSONArray(ha.calls)).put("ha", haList).put("lines", lines).put("state", stateOf(store.state)));
                     break;
                 }
@@ -516,10 +519,12 @@ public class HaSyncTest {
         ha.list.add(new HaSync.Item("u1", "2 milk", false));
         ha.list.add(new HaSync.Item("u2", "oat milk", false));
         HaSync.syncRound(HaSync.restApi(fakeTransport(ha, entity), entity), new HaSync.DbStore(db, entity, HaSync.pairingResets()), 1_000_000);
-        List<JSONObject> lines = db.query("SELECT id, text, item_id, qty FROM list_entries WHERE section = 'pantry' ORDER BY text");
+        List<JSONObject> lines = db.query("SELECT id, text, item_id, qty, section FROM list_entries WHERE section IN ('pantry', 'general') ORDER BY text");
         check(lines.size() == 2 && lines.get(0).getString("id").equals(HaSync.haLineId(entity, "u1")) && lines.get(0).getString("item_id").equals("g-milk") && lines.get(0).getInt("qty") == 2,
             "a voice add that's one pantry item: linked, 2 of it, id haLineId(entity, uid)");
-        check(lines.get(1).getString("id").equals(HaSync.haLineId(entity, "u2")) && lines.get(1).isNull("item_id"), "one that isn't: plain words, still haLineId");
+        check(lines.get(1).getString("id").equals(HaSync.haLineId(entity, "u2")) && lines.get(1).isNull("item_id") && "general".equals(lines.get(1).optString("section")),
+            "0.9.5: one that matches nothing: plain words on the General list, still haLineId");
+        check("pantry".equals(lines.get(0).optString("section")), "the pantry item's line is on the grocery list");
         check(count(db, "SELECT COUNT(*) AS n FROM sync_log WHERE tbl = 'list_entries' AND pk = ? AND device = ?", HaSync.haLineId(entity, "u1"), ME) == 1, "the triggers noted the line as this phone's change (it goes to the household)");
         check(ha.calls.stream().noneMatch(c -> c.startsWith("add")), "keg lines (and a line linked to a keg item) aren't sent to Home Assistant");
         // A second runner (no pairing notes, the same database: a phone and the server before ha:phone settled).
@@ -529,7 +534,7 @@ public class HaSyncTest {
                 return new HaSync.State();
             }
         }, 1_000_000);
-        check(count(db, "SELECT COUNT(*) AS n FROM list_entries WHERE section = 'pantry'") == 2, "a second runner pairs with the lines already there: nothing doubled");
+        check(count(db, "SELECT COUNT(*) AS n FROM list_entries WHERE section IN ('pantry', 'general')") == 2, "a second runner pairs with the lines already there: nothing doubled");
         check(ha.list.size() == 2, "and nothing doubled in Home Assistant");
         // The state as saved, read back the same.
         HaSync.State st = HaSync.State.parse(HaSync.kv(db, HaSync.HA_STATE));
@@ -539,6 +544,37 @@ public class HaSyncTest {
         HaSync.putKv(db, HaSync.LIST_ALIASES, "{\"loaf\":\"g-beer\",\"odd\":5}");
         Map<String, String> al = HaSync.aliases(db);
         check(al.size() == 2 && "g-milk".equals(al.get("bread")) && "g-beer".equals(al.get("loaf")), "aliases from the household's rows and the old local ones, checked");
+        db.close();
+
+        // 0.9.5: Keg on (switched on, a bottle shop picked): a voice add of a Keg item goes on the Keg
+        // list, stays paired (its id says it came from Home Assistant), and its tick goes back.
+        db = fresh(dir);
+        HaSync.putKv(db, "settings", new JSONObject().put("sections", new JSONObject().put("keg", true).put("pharmacy", false))
+            .put("enabledChains", new JSONArray().put("coles").put("danmurphys").put("chemistwarehouse")).toString());
+        item(db, "g-milk", "Milk", "pantry");
+        item(db, "k-ale", "Pale ale", "keg");
+        item(db, "h-sun", "Sunscreen", "pharmacy");
+        listLine(db, "keg-hand", "Ice", "keg", "2026-11-01T00:00:01.000Z");
+        listLine(db, "gen-hand", "Batteries", "general", "2026-11-01T00:00:02.000Z");
+        FakeHa hk = new FakeHa();
+        hk.list.add(new HaSync.Item("u1", "pale ale", false));
+        hk.list.add(new HaSync.Item("u2", "sunscreen", false));
+        hk.n = 2;
+        HaSync.syncRound(HaSync.restApi(fakeTransport(hk, entity), entity), new HaSync.DbStore(db, entity, HaSync.pairingResets()), 1_000_000);
+        String aleId = HaSync.haLineId(entity, "u1"), sunId = HaSync.haLineId(entity, "u2");
+        List<JSONObject> ale = db.query("SELECT item_id, section FROM list_entries WHERE id = ?", aleId);
+        List<JSONObject> sun = db.query("SELECT item_id, section FROM list_entries WHERE id = ?", sunId);
+        check(ale.size() == 1 && "k-ale".equals(ale.get(0).optString("item_id")) && "keg".equals(ale.get(0).optString("section")),
+            "0.9.5: a voice add of a Keg item (Keg on): linked, on the Keg list");
+        check(sun.size() == 1 && sun.get(0).isNull("item_id") && "general".equals(sun.get(0).optString("section")),
+            "0.9.5: Health off: its item isn't matched, so it goes on General");
+        check(hk.calls.contains("add Batteries") && hk.calls.stream().noneMatch(c -> c.equals("add Ice")),
+            "0.9.5: a General line added by hand goes to Home Assistant; a Keg line added by hand still doesn't");
+        db.exec("UPDATE list_entries SET checked = 1 WHERE id = ?", aleId);
+        HaSync.syncRound(HaSync.restApi(fakeTransport(hk, entity), entity), new HaSync.DbStore(db, entity, HaSync.pairingResets()), 1_060_000);
+        boolean aleDone = false;
+        for (HaSync.Item h : hk.list) if (h.uid.equals("u1")) aleDone = h.completed;
+        check(aleDone && count(db, "SELECT COUNT(*) AS n FROM list_entries WHERE id = ?", aleId) == 1, "0.9.5: ticked on the Keg list: completed in Home Assistant, still paired");
         db.close();
 
         // A pairing started afresh mid-round (a new list picked, a restore): the round changes nothing and doesn't save.

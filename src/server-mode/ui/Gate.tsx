@@ -8,6 +8,7 @@ import { ApiError, isV3, serverInfo } from '../api';
 import { checkPassphrase } from '../passphrase';
 import { login, loginV3, setPassphrase, setUpHouse, startLink, startPhoneLogin, startPhoneLoginV3, signOut, type Session } from '../session';
 import { Qr } from './Qr';
+import { InstallHelpLink } from '../pwa/InstallHelp'; // 0.9.5 (PWA)
 
 function Frame({ title, children, foot }: { title: string; children: ReactNode; foot?: ReactNode }) {
   return (
@@ -17,7 +18,7 @@ function Frame({ title, children, foot }: { title: string; children: ReactNode; 
           <Logo size={44} />
           <div>
             <div className="small">Restock server</div>
-            <h1 style={{ margin: 0, fontSize: 26 }}>{title}</h1>
+            <h1 style={{ margin: 0, fontSize: 24 }}>{title}</h1>
           </div>
         </div>
         {children}
@@ -117,6 +118,8 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
       <button className="btn block" onClick={() => setPhone(true)}>
         <Icon name="phone" size={18} /> Sign in with a phone
       </button>
+      {/* 0.9.5 (PWA): "On iPhone?" steps. */}
+      {house && <InstallHelpLink className="linkish small gate-install" />}
     </Frame>
   );
 }

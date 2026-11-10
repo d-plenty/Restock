@@ -1,4 +1,5 @@
-import { updateSettings } from '../../lib/db';
+// 0.9.5 (save): waits for Save settings on a settings screen (settingsDraft.ts).
+import { afterSave, updateSettings } from '../../lib/settingsDraft';
 import { textOn } from '../../lib/theme';
 import { pushWidgetsSoon } from '../../lib/widgets';
 import type { Settings } from '../../types';
@@ -16,7 +17,7 @@ export function WidgetSettings({ settings }: { settings: Settings }) {
   const w = settings.widgets;
   const set = async (patch: Partial<Settings['widgets']>) => {
     await updateSettings({ widgets: { ...w, ...patch } });
-    pushWidgetsSoon(300);
+    await afterSave('widgets', () => pushWidgetsSoon(300));
   };
   const dark = settings.theme === 'dark';
   const bg = w.background === 'colour' ? w.colour : dark ? '#15213f' : '#ffffff';

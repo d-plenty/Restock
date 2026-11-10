@@ -44,6 +44,13 @@ const paths: Record<string, ReactNode> = {
       <path d="M12 7.5v9M7.5 12h9" stroke="#fff" strokeWidth="2.6" />
     </>
   ),
+  // 0.9.5: the General list (a shopping bag, in plain strokes).
+  general: (
+    <>
+      <path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z" />
+      <path d="M9 8V6.5a3 3 0 0 1 6 0V8" />
+    </>
+  ),
   scan: <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M11 8v8M15 8v8" />,
   list: <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />,
   back: <path d="M15 18l-6-6 6-6" />,
@@ -608,7 +615,7 @@ export function PriceChart({ readings, typical }: { readings: PriceReading[]; ty
           <>
             <line x1={pad.l} x2={W - pad.r} y1={y(typical)} y2={y(typical)} strokeDasharray="4 4" style={{ stroke: 'var(--muted)' }} />
             <text x={W - pad.r} y={y(typical) - 5} fontSize="11" textAnchor="end" style={muted}>
-              normal {money(typical)}
+              usual {money(typical)}
             </text>
           </>
         )}
@@ -634,7 +641,7 @@ export function PriceChart({ readings, typical }: { readings: PriceReading[]; ty
         )}
       </svg>
       <p className="small" style={{ margin: 0 }}>
-        Dots are specials. The dashed line is the normal price.
+        Dots are specials. The dashed line is the usual price.
       </p>
     </div>
   );
@@ -1084,7 +1091,7 @@ export function ProductPreview({ product: p, onClose, action }: { product: Previ
       </div>
       {p.price !== undefined && (
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-          <span className="num" style={{ fontSize: 26, fontWeight: 700 }}>
+          <span className="num" style={{ fontSize: 24, fontWeight: 700 }}>
             {money(p.price)}
           </span>
           {p.wasPrice && p.wasPrice > p.price && (
@@ -1134,7 +1141,7 @@ function DetailsPanel({ product: p }: { product: PreviewProduct }) {
   if (state === 'loading') return <p className="small">Getting ingredients, allergens and nutrition…</p>;
   if (state === 'none') {
     return (
-      <p className="small">No details found for this one. The store's website (below) has the full ingredients, allergens and nutrition panel.</p>
+      <p className="small">No details found for this one. The shop's website (below) has the full ingredients, allergens and nutrition panel.</p>
     );
   }
   const d = state;

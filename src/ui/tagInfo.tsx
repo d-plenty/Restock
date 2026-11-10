@@ -79,30 +79,30 @@ export function InfoTag({
 const LEGEND = (
   <div className="legend">
     <div>
-      <span className="tag great">GREAT DEAL</span> {Math.round(GREAT_SALE * 100)}% or more off its normal price
+      <span className="tag great">GREAT DEAL</span> {Math.round(GREAT_SALE * 100)}% or more off its usual price
     </div>
     <div>
-      <span className="tag good">ON SALE</span> {Math.round(GOOD_SALE * 100)}% or more off
+      <span className="tag good">ON SPECIAL</span> {Math.round(GOOD_SALE * 100)}% or more off
     </div>
     <div>
-      <span className="tag small">SMALL SAVING</span> any drop below its normal price, under {Math.round(GOOD_SALE * 100)}%
+      <span className="tag small">SMALL SAVING</span> any drop below its usual price, under {Math.round(GOOD_SALE * 100)}%
     </div>
     <div>
-      <span className="tag wait">WAIT</span> on sale, but it's been at least 5% cheaper recently (never at half price or better)
+      <span className="tag wait">WAIT</span> on special, but it's been at least 5% cheaper recently (never at half price or better)
     </div>
     <div>
-      <span className="tag fake">FAKE SALE</span> tagged as a special or promotion on the shop's website, but no cheaper than its normal price
+      <span className="tag fake">FAKE SALE</span> tagged as a special or promotion on the shop's website, but no cheaper than its usual price
     </div>
     <div>
-      <span className="tag normal">NORMAL PRICE</span> not on sale
+      <span className="tag normal">USUAL PRICE</span> not on special
     </div>
   </div>
 );
 
 function basisText(o: Option): string {
-  if (o.stats.fromMarket) return 'shared price history (hotprices.org), matched to your store';
+  if (o.stats.fromMarket) return 'shared price history (hotprices.org), matched to your shop';
   if (o.verdict.basis === 'history') return `the ${o.stats.spanDays} days of prices Restock has seen`;
-  if (o.verdict.basis === 'was-price') return 'the store\'s own "was" price (Restock is still learning this one)';
+  if (o.verdict.basis === 'was-price') return 'the shop\'s own "was" price (Restock is still learning this one)';
   return 'nothing yet';
 }
 
@@ -128,7 +128,7 @@ function FakeWhy({ o }: { o: Option }) {
       {was !== undefined ? (
         <p className="small">
           {shops} website shows it as a special: {money(cur?.price)}, "was {money(was)}". But going by {basisText(o)}, its usual price is{' '}
-          {money(normal)}, so it isn't any cheaper than normal. The "was" price is higher than it has usually been.
+          {money(normal)}, so it isn't any cheaper than usual. The "was" price is higher than it has usually been.
         </p>
       ) : (
         <p className="small">
@@ -164,7 +164,7 @@ export function VerdictBody({ o }: { o: Option }) {
           {o.multi && <span className="k">{multiText(o.multi)}</span>}
         </div>
         <div className="stat">
-          <span className="k">Normal</span>
+          <span className="k">Usual</span>
           <span className="v num">{money(o.stats.typical ?? cur?.wasPrice)}</span>
         </div>
         <div className="stat">
@@ -172,7 +172,7 @@ export function VerdictBody({ o }: { o: Option }) {
           <span className="v num">{money(o.stats.low)}</span>
         </div>
       </div>
-      <p className="small">The normal price comes from {basisText(o)}.</p>
+      <p className="small">The usual price comes from {basisText(o)}.</p>
       {o.verdict.kind === 'fake' && <FakeWhy o={o} />}
       <div className="title" style={{ fontSize: 15 }}>
         What the labels mean
@@ -194,12 +194,12 @@ export function VerdictInfoTag({ o }: { o: Option }) {
 /** A pantry item's one status tag, explained using the option it's about. */
 export function ActionInfoTag({ rec, action, great }: { rec: Recommendation; action: ActionKind; great?: boolean }) {
   const map: Record<ActionKind, [string, string]> = {
-    buy: ['good', great ? 'GREAT DEAL' : 'ON SALE'],
+    buy: ['good', great ? 'GREAT DEAL' : 'ON SPECIAL'],
     alt: ['alt', 'SWAP & SAVE'],
     small: ['small', 'SMALL SAVING'],
     wait: ['wait', 'WAIT'],
     skip: ['fake', 'FAKE SALE'],
-    none: ['normal', 'NORMAL PRICE'],
+    none: ['normal', 'USUAL PRICE'],
   };
   const [cls, label] = map[action];
   const o = action === 'alt' ? rec.alt : rec.best;
@@ -221,7 +221,7 @@ export function CheapestInfoTag({ o, options }: { o: Option; options: Option[] }
   return (
     <InfoTag className="best" label="CHEAPEST" title="Why it's the cheapest">
       <p className="small" style={{ fontSize: 15, margin: 0 }}>
-        Of the stores with your picks, {chainName(o.product.chain)} is cheapest for you today
+        Of the shops with your picks, {chainName(o.product.chain)} is cheapest for you today
         {o.multi ? `, when you buy ${o.multi.n} (${multiText(o.multi)})` : ''}.
       </p>
       <div className="card flush">
@@ -245,7 +245,7 @@ export function CheapestInfoTag({ o, options }: { o: Option; options: Option[] }
         ))}
       </div>
       <p className="small">
-        "Cheapest" uses the price you'd pay: member prices only if you've added that store's card, and multi-buys at their price each. Your shopping
+        "Cheapest" uses the price you'd pay: member prices only if you've added that shop's card, and multi-buys at their price each. Your shopping
         list only uses a multi-buy price when you're buying the full set.
       </p>
     </InfoTag>
@@ -278,7 +278,7 @@ export function MemberInfoTag({ chain, hasCard }: { chain: Chain; hasCard?: bool
       <p style={{ margin: 0 }}>This price is only for {program} members.</p>
       <p className="small" style={{ fontSize: 15 }}>
         {hasCard === false
-          ? `You haven't added a ${program} card, so Restock uses the normal price for you. Add your card under Loyalty cards on Home to count it.`
+          ? `You haven't added a ${program} card, so Restock uses the usual price for you. Add your card under Loyalty cards on Home to count it.`
           : `Restock counts it because you've added your ${program} card. Remember to scan it at the checkout.`}
       </p>
     </InfoTag>
@@ -290,13 +290,13 @@ export function StockInfoTag({ o, label }: { o: Option; label?: string }) {
   return (
     <InfoTag className="fake wrap" label={label ?? `OUT OF STOCK ${where.toUpperCase()}`} title={`Out of stock ${where}`}>
       <p style={{ margin: 0 }}>
-        {chainName(o.product.chain)}'s website says {describe(o)} is out of stock {where === 'online' ? 'at its online store' : where}.
+        {chainName(o.product.chain)}'s website says {describe(o)} is out of stock {where === 'online' ? 'online' : where}.
       </p>
       <p className="small" style={{ fontSize: 15 }}>
         {where === 'online'
-          ? "Online stock is checked at the shop's default online store, not your branch, so your local shop may still have it."
-          : "This is Coles' own stock count for your store, from its website. It can be a little behind the shelf."}{' '}
-        Restock picks another of your picks or another store while it's out, and checks again at the next price check.
+          ? "Online stock is checked on the shop's website, not at your branch, so your local shop may still have it."
+          : "This is Coles' own stock count for your branch, from its website. It can be a little behind the shelf."}{' '}
+        Restock picks another of your picks or another shop while it's out, and checks again at the next price check.
       </p>
     </InfoTag>
   );

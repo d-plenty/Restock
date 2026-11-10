@@ -2,7 +2,7 @@ import { useFullRefresh } from '../refresh';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { nameHasSize } from '../../lib/naming';
 import { lookupBarcode, scanBarcode } from '../../lib/barcode';
-import { serverMode } from '../../server-mode/flag';
+import { serverMode, serverUi } from '../../server-mode/flag';
 import { PhoneOnlyNote } from '../../server-mode/ui/PhoneOnly';
 import {
   addListEntry,
@@ -22,12 +22,12 @@ import {
   updateSettings,
   cachedSettings,
 } from '../../lib/db';
-import { buzz } from '../../lib/listActions';
+import { buzz, scannedLine } from '../../lib/listActions';
 import { loadRecommendations } from '../../lib/recs';
 import { lineCost, type Option } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
 import { aroundPlan, cheaperThan, recommendedStores, shopTotals, type ShopTotals } from '../../lib/shopTotals';
-import { entryRows, undoable } from '../../lib/undo';
+import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { money, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
@@ -52,7 +52,7 @@ import { SendToShopSheet } from './SendToShop';
 import { PickItemSheet } from './PickItem';
 import { linesToPick, pickWord } from '../../lib/homeAssistant';
 import { useNav } from '../nav';
-import { activeSections, enabledIn, SECTION_NAMES, SECTION_PLACE, searchChainsIn, type Section, type StoreChain } from '../../shops';
+import { enabledIn, LIST_NAMES, LIST_PLACE, listSectionsOn, priceSource, searchChainsIn, SECTIONS, type ListSection, type Section, type StoreChain } from '../../shops';
 import { CardBarcode, PROGRAMS } from './Cards';
 import { ShopTotalsCard } from '../shopTotalsCard';
 
@@ -64,13 +64,23 @@ export interface Ctx {
   recs: Recommendation[];
   /** The order to show shops in: this list's shops, then Other, then Any shop. */
   order: ShopKey[];
-  /** "Shopping list", "Bottle shop list" or "Pharmacy list". */
+  /** "Shopping list", "Bottle shop list" or "Health list". */
   title: string;
 }
 
-/** Which list a line is on: its pantry item's tab, or the tab it was added from. */
-export const entrySection = (e: ListEntry, groups: Map<string, Section>): Section =>
+/** Which list a line is on: its pantry item's tab, or the tab it was added from (0.9.5: or General). */
+export const entrySection = (e: ListEntry, groups: Map<string, Section>): ListSection =>
   (e.groupId ? groups.get(e.groupId) : undefined) ?? e.section ?? 'pantry';
+/**
+ * The tab whose shops a line is searched at (Find the cheapest): its own, and for a General line the
+ * supermarkets (what it's searched for becomes a pantry item, so it moves to Groceries).
+ */
+export const searchTabOf = (s: ListSection | undefined): Section | undefined => (s === 'general' ? 'pantry' : s);
+/** The shops a list's lines can be put at by hand (a line's Shop): its tab's, and for General every tab's that is on. */
+export function listShops(enabled: readonly string[], section: ListSection, on: readonly ListSection[]): StoreChain[] {
+  if (section !== 'general') return enabledIn(enabled, section);
+  return SECTIONS.filter((x) => on.includes(x)).flatMap((x) => enabledIn(enabled, x));
+}
 export const recFor = (c: Ctx, e: ListEntry) => (e.groupId ? c.recs.find((r) => r.group.id === e.groupId) : undefined);
 /** What to buy: the cheapest of your picks, in stock, by the chosen measure (with "Any size", as many packs as it takes). */
 export const lineFor = (c: Ctx, e: ListEntry) => (e.groupId ? c.totals.pickFor.get(e.groupId) : undefined);
@@ -122,15 +132,24 @@ export async function shareText(text: string): Promise<'shared' | 'copied'> {
   return 'copied';
 }
 
+/** 0.9.5 (undo): a list line's tick, as an undoable action ("Ticked Milk · Undo"). */
+export const tickEntry = (e: { id: string; text: string }, checked: boolean, name = e.text) =>
+  act(`${checked ? 'Ticked' : 'Unticked'} ${name}`, () => updateListEntry(e.id, { checked }));
+/** 0.9.5 (undo): a new amount; pressing + a few times is one Undo. */
+export const setQty = (e: { id: string; text: string }, qty: number, name = e.text) =>
+  act(`${name}: ${qty} on your list`, () => updateListEntry(e.id, { qty }), { merge: `qty:${e.id}` });
+/** 0.9.5 (undo): lines off the list, as one undoable action. */
+export const removeEntries = (ids: string[], label: string) => act(label, () => deleteListEntries(ids));
+
 export function Stepper({ e }: { e: ListEntry }) {
   const q = qtyOf(e);
   return (
     <span className="stepper" role="group" aria-label={`How many ${e.text}`}>
-      <button aria-label="One fewer" disabled={q <= 1} onClick={() => updateListEntry(e.id, { qty: q - 1 })}>
+      <button aria-label="One fewer" disabled={q <= 1} onClick={() => void setQty(e, q - 1)}>
         −
       </button>
       <span className="num">{q}</span>
-      <button aria-label="One more" onClick={() => updateListEntry(e.id, { qty: q + 1 })}>
+      <button aria-label="One more" onClick={() => void setQty(e, q + 1)}>
         +
       </button>
     </span>
@@ -153,26 +172,29 @@ function stockNote(c: Ctx, e: ListEntry): { kind: 'second' | 'out'; text: string
   return { kind: 'out', text: `Out of stock ${stockWhere(p.chain, true)}` };
 }
 
-export const LIST_TITLE: Record<Section, string> = { pantry: 'Shopping list', keg: 'Bottle shop list', pharmacy: 'Pharmacy list' };
+export const LIST_TITLE: Record<ListSection, string> = { pantry: 'Shopping list', keg: 'Bottle shop list', pharmacy: 'Health list', general: 'General list' };
 /** What to type in the add box, for each list. */
-export const ADD_HINT: Record<Section, string> = {
-  pantry: 'Add anything — e.g. bananas',
-  keg: 'Add anything — e.g. a bag of ice',
-  pharmacy: 'Add anything — e.g. sunscreen',
+export const ADD_HINT: Record<ListSection, string> = {
+  pantry: 'Add anything, like bananas',
+  keg: 'Add anything, like a bag of ice',
+  pharmacy: 'Add anything, like sunscreen',
+  general: 'Add anything, like batteries',
 };
 
 /**
- * One tab's list (Pantry, Keg or Pharmacy, each with its own shops) and its totals, worked out from
+ * One tab's list (Pantry, Keg or Health, each with its own shops) and its totals, worked out from
  * every line and item. `picked`: the list asked for (the grocery list if that tab isn't on).
- * 0.9.3: also what the web's desktop list shows.
+ * 0.9.3: also what the web's desktop list shows. 0.9.5: or General, a list with no pantry items:
+ * its lines go under Any shop unless one is picked for them, from any tab's shops.
  */
-export function listSums(allEntries: ListEntry[], allRecs: Recommendation[], settings: Settings, picked: Section) {
-  const sectionsOn = activeSections(settings);
-  const section: Section = sectionsOn.includes(picked) ? picked : 'pantry';
+export function listSums(allEntries: ListEntry[], allRecs: Recommendation[], settings: Settings, picked: ListSection) {
+  const sectionsOn = listSectionsOn(settings);
+  const section: ListSection = sectionsOn.includes(picked) ? picked : 'pantry';
   const groupSection = new Map(allRecs.map((r) => [r.group.id, r.group.section ?? 'pantry']));
   const entries = allEntries.filter((e) => entrySection(e, groupSection) === section);
   const recs = allRecs.filter((r) => (r.group.section ?? 'pantry') === section);
-  const shops = searchChainsIn(settings.enabledChains, section);
+  const all = listShops(settings.enabledChains, section, sectionsOn);
+  const shops = section === 'general' ? [...new Set(all.map(priceSource))] : searchChainsIn(settings.enabledChains, section);
   // Store totals count what's still to buy; the per-row picks include ticked rows too, so
   // a ticked item keeps its shop and price (and counts towards the trolley total).
   const totals = shopTotals(entries, recs, shops, settings.listCompare);
@@ -183,7 +205,7 @@ export function listSums(allEntries: ListEntry[], allRecs: Recommendation[], set
     settings.listCompare,
   );
   const names = new Map(recs.map((r) => [r.group.id, r.group.name]));
-  const order: ShopKey[] = [...shops, ...enabledIn(settings.enabledChains, section).filter((x) => !shops.includes(x)), 'other', 'any'];
+  const order: ShopKey[] = [...shops, ...all.filter((x) => !shops.includes(x)), 'other', 'any'];
   const c: Ctx = { totals: picks, recs, order, title: LIST_TITLE[section] };
   return { sectionsOn, section, groupSection, entries, recs, shops, totals, picks, names, c };
 }
@@ -192,24 +214,30 @@ export function listSums(allEntries: ListEntry[], allRecs: Recommendation[], set
  * "Add anything" on a list: what's typed, your own pantry items that match it, and adding a line
  * (or one more of a pantry item already on the list). 0.9.3: also the web's desktop list.
  */
-export function useListAdd(entries: ListEntry[], recs: Recommendation[], section: Section) {
-  const nav = useNav();
+export function useListAdd(entries: ListEntry[], recs: Recommendation[], section: ListSection) {
   const [text, setText] = useState('');
-  const add = async (value: string, groupId?: string) => {
+  /** `said`: the Undo toast's words, when not the usual "Milk added to your shopping list". */
+  const add = async (value: string, groupId?: string, said?: string) => {
     const t = value.trim();
     if (!t) return;
-    const existing = groupId ? entries.find((e) => !e.checked && e.groupId === groupId) : undefined;
-    if (existing) await updateListEntry(existing.id, { qty: qtyOf(existing) + 1 });
-    else
-      await addListEntry({
-        id: uid(),
-        text: t,
-        groupId,
-        qty: 1,
-        section,
-        checked: false,
-        createdAt: nowIso(),
-      });
+    // 0.9.5: a pantry item added on General (a scan) goes on its own tab's list, as it would anywhere.
+    const item = groupId && section === 'general' ? (await allGroups()).find((g) => g.id === groupId) : undefined;
+    const all = item ? await allListEntries() : entries;
+    const existing = groupId ? all.find((e) => !e.checked && e.groupId === groupId) : undefined;
+    // 0.9.5 (undo): "Milk added to your shopping list · Undo".
+    await act(said ?? (existing ? `One more ${t} on your shopping list` : `${t} added to your shopping list`), async () => {
+      if (existing) await updateListEntry(existing.id, { qty: qtyOf(existing) + 1 });
+      else
+        await addListEntry({
+          id: uid(),
+          text: t,
+          groupId,
+          qty: 1,
+          section: item ? (item.section ?? 'pantry') : section,
+          checked: false,
+          createdAt: nowIso(),
+        });
+    });
     buzz();
     setText('');
   };
@@ -234,21 +262,22 @@ export function useListAdd(entries: ListEntry[], recs: Recommendation[], section
   const exactPantry = recs.find((r) => r.group.name.trim().toLowerCase() === typed);
   const addFromPantry = async (r: Recommendation) => {
     await add(r.group.name, r.group.id);
-    nav.toast(`${r.group.name} added from your pantry`);
   };
   return { text, setText, add, pantryMatches, exactPantry, addFromPantry };
 }
 
 export function ListScreen() {
   const nav = useNav();
+  // 0.9.5 (web search): on a Restock server's web page, its shop search and camera Scan (main.tsx hands them in).
+  const webSearch = serverMode ? serverUi.current?.webSearch : undefined;
   const allEntries = useLive(allListEntries, []);
   const allRecs = useLive(loadRecommendations, []);
   const allCats = useLive(allCategories, []);
   const settings = useLive(getSettings, []);
-  const [picked0, setSection] = useState<Section>(nav.section);
+  const [picked0, setSection] = useState<ListSection>(nav.section);
   // Opening the list from Home picks the grocery list even when the List tab is already open.
   useEffect(() => setSection(nav.section), [nav.section]);
-  const [view, setView] = useState<'all' | 'shop'>('shop');
+  const [view, setView] = useState<'all' | 'shop' | 'aisle'>('shop');
   const [sending, setSending] = useState<'woolworths' | 'coles'>();
   const [editing, setEditing] = useState<ListEntry>();
   const [selecting, setSelecting] = useState(false);
@@ -276,7 +305,7 @@ export function ListScreen() {
   if (!allEntries || !allRecs || !allCats || !settings || !sums) return <div className="screen" />;
   const { sectionsOn, section, groupSection, entries, recs, shops, totals, names, c } = sums;
   const categories = allCats.filter((x) => x.section === section);
-  const openCount = (sec: Section) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;
+  const openCount = (sec: ListSection) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;
 
   const pick = (id: string) =>
     setPicked((p) => {
@@ -300,13 +329,13 @@ export function ListScreen() {
       const group = (await allGroups()).find((g) => groupProductIds(g).includes(product.id));
       if (group) {
         await add(group.name, group.id);
-        nav.toast(`${group.name} added`);
         return;
       }
     }
     const info = await lookupBarcode(out.code);
-    await add(info.name ?? `Item ${out.code}`);
-    nav.toast(info.name ? `${info.name} added` : 'Added. Tap it to rename.');
+    // 0.9.5 (final review): one toast, with its Undo ("Added. Tap it to rename · Undo").
+    const line = scannedLine(info.name, out.code);
+    await add(line.text, undefined, line.said);
   };
 
   // A to Z by default (0.7.4), within each shop.
@@ -356,12 +385,14 @@ export function ListScreen() {
               {isPicked && <Icon name="check" size={16} />}
             </button>
           ) : (
-            <input
-              type="checkbox"
-              checked={e.checked}
-              onChange={(ev) => updateListEntry(e.id, { checked: ev.target.checked })}
-              aria-label={`Got ${title}`}
-            />
+            <label className="tick-hit">
+              <input
+                type="checkbox"
+                checked={e.checked}
+                onChange={(ev) => void tickEntry(e, ev.target.checked, title)}
+                aria-label={`Got ${title}`}
+              />
+            </label>
           )}
           {!selecting &&
             (previewOf(e) ? (
@@ -396,13 +427,13 @@ export function ListScreen() {
               </span>
               {deal && (
                 <span className="small">
-                  {view === 'all' ? `${chainName(deal.product.chain)} · ` : ''}
+                  {view !== 'shop' ? `${chainName(deal.product.chain)} · ` : ''}
                   {line?.packs && line.packs > 1 ? <span className="num">{line.packs} × </span> : null}
                   {deal.product.name}
                   {size}
                 </span>
               )}
-              {!deal && view === 'all' && shop !== 'any' && <span className="small">{chainName(shop)}</span>}
+              {!deal && view !== 'shop' && shop !== 'any' && <span className="small">{chainName(shop)}</span>}
               {!deal && rec && <span className="small">No price yet</span>}
               {deal?.multi && !line?.packs && qtyOf(e) < deal.multi.n && !e.checked && (
                 <span className="small" style={{ color: 'var(--green)' }}>
@@ -440,7 +471,7 @@ export function ListScreen() {
             <button
               className="icon-btn"
               aria-label={`Find the cheapest ${title}`}
-              onClick={() => nav.push({ name: 'add', query: e.text, forList: true, replaceEntry: e.id, section: e.section })}
+              onClick={() => nav.push({ name: 'add', query: e.text, forList: true, replaceEntry: e.id, section: searchTabOf(e.section) })}
               style={{ width: 36, height: 36 }}
             >
               <Icon name="search" size={18} />
@@ -488,7 +519,7 @@ export function ListScreen() {
         <div className="seg" role="tablist" aria-label="Which list">
           {sectionsOn.map((sec) => (
             <button key={sec} role="tab" aria-selected={sec === section} className={sec === section ? 'on' : ''} onClick={() => setSection(sec)}>
-              <Icon name={sec} size={17} /> {sec === 'pantry' ? 'Groceries' : SECTION_NAMES[sec]}
+              <Icon name={sec} size={17} /> {LIST_NAMES[sec]}
               {openCount(sec) > 0 && <span className="count">{openCount(sec)}</span>}
             </button>
           ))}
@@ -534,12 +565,14 @@ export function ListScreen() {
         }}
         style={{ display: 'flex', gap: 8 }}
       >
-        <input className="input" placeholder={ADD_HINT[section]} aria-label="Add an item" value={text} onChange={(e) => setText(e.target.value)} />
+        <input className="input" placeholder={(settings.a11y?.text ?? 1) >= 1.3 ? 'Add anything' : ADD_HINT[section]} aria-label="Add an item" value={text} onChange={(e) => setText(e.target.value)} />
         {!serverMode && (
           <button type="button" className="btn" aria-label="Scan a barcode to add" style={{ width: 52, padding: 0 }} onClick={scanToList}>
             <Icon name="scan" />
           </button>
         )}
+        {/* 0.9.5 (web search): on a Restock server's web page (an iPhone), its camera Scan, by the add box. */}
+        {serverMode && webSearch && <webSearch.Scan section={searchTabOf(section) ?? 'pantry'} />}
       </form>
       {/* Typed something: add just the name, or look it up at your shops for this trip (0.7.3). */}
       {pantryMatches.length > 0 && (
@@ -571,28 +604,58 @@ export function ListScreen() {
             <Icon name="plus" size={18} /> <span className="clip">Add "{text.trim()}"</span>
           </button>
           {serverMode ? (
-            <PhoneOnlyNote compact />
+            // 0.9.5 (web search): Search the shops (when the household turned it on), or a link to Settings.
+            webSearch ? <webSearch.ListButton text={text} list={section} /> : <PhoneOnlyNote compact />
           ) : (
             <button
               className="btn primary"
               onClick={() => {
-                nav.push({ name: 'add', query: text.trim(), forList: true, section });
+                nav.push({ name: 'add', query: text.trim(), forList: true, section: searchTabOf(section) });
                 setText('');
               }}
             >
-              <Icon name="search" size={18} /> Find cheapest
+              <Icon name="search" size={18} /> Search the shops
             </button>
           )}
         </div>
       )}
 
+      {/* 0.9.5 (web search): what the shops have for what was typed or scanned. */}
+      {webSearch && <webSearch.ListPanel list={section} onAdded={() => setText('')} />}
+
       {!entries.length && (
         <div className="empty">
-          <p>This list is empty. Type anything above, scan a barcode, or tap the cart next to anything in {SECTION_PLACE[section]}.</p>
+          <p>This list is empty. Type anything above, scan a barcode, or tap the cart next to anything in {LIST_PLACE[section]}.</p>
         </div>
       )}
 
       {view === 'all' && open.length > 0 && <div className="card flush">{open.map((e) => renderRow(e))}</div>}
+
+      {/* 0.9.5: Aisle group, the same grouping as the web: each category in your order, then Other. */}
+      {view === 'aisle' &&
+        open.length > 0 &&
+        [
+          ...categories.map((cat) => ({ key: cat.id, name: cat.name, items: open.filter((e) => (recFor(c, e)?.group.categoryId ?? e.categoryId) === cat.id) })),
+          {
+            key: 'other',
+            name: 'Other',
+            items: open.filter((e) => !categories.some((cat) => cat.id === (recFor(c, e)?.group.categoryId ?? e.categoryId))),
+          },
+        ]
+          .filter((g) => g.items.length)
+          .map((g) => (
+            <section className="card flush" key={g.key} aria-label={g.name}>
+              <div className="row shop-head open">
+                <span className="grow shop-head-main">
+                  <span className="title">{g.name}</span>
+                  <span className="small">
+                    {g.items.length} item{g.items.length === 1 ? '' : 's'}
+                  </span>
+                </span>
+              </div>
+              {g.items.map((e) => renderRow(e))}
+            </section>
+          ))}
 
       {view === 'shop' && shopsInList.length > 1 && !selecting && (
         <div className="list-head">
@@ -702,8 +765,10 @@ export function ListScreen() {
             className="btn"
             onClick={async () => {
               const n = done.length;
-              const undo = await undoable(() => deleteListEntries(done.map((e) => e.id)), entryRows(done.map((e) => e.id)));
-              nav.toast(`Cleared ${n} ticked item${n === 1 ? '' : 's'}`, undo);
+              await removeEntries(
+                done.map((e) => e.id),
+                `Cleared ${n} ticked item${n === 1 ? '' : 's'}`,
+              );
             }}
           >
             Clear {done.length} ticked item{done.length === 1 ? '' : 's'}
@@ -725,8 +790,7 @@ export function ListScreen() {
             onClick={async () => {
               // 0.9.0: one write for all of them, so the list reloads once, not once per item.
               const ids = [...picked];
-              await runOps([checkEntriesOp(ids)]);
-              nav.toast(`${ids.length} marked as got`);
+              await act(`${ids.length} marked as got`, () => runOps([checkEntriesOp(ids)]));
               stopSelecting();
             }}
           >
@@ -738,8 +802,7 @@ export function ListScreen() {
             onClick={async () => {
               const n = picked.size;
               const ids = [...picked];
-              const undo = await undoable(() => deleteListEntries(ids), entryRows(ids));
-              nav.toast(`${n} removed from your shopping list`, undo);
+              await removeEntries(ids, `${n} removed from your shopping list`);
               stopSelecting();
             }}
           >
@@ -764,8 +827,11 @@ export function ListScreen() {
               <button aria-pressed={view === 'shop'} onClick={() => setView('shop')}>
                 By shop
               </button>
+              <button aria-pressed={view === 'aisle'} onClick={() => setView('aisle')}>
+                Aisle group
+              </button>
               <button aria-pressed={view === 'all'} onClick={() => setView('all')}>
-                All together
+                One list
               </button>
             </div>
           </div>
@@ -864,7 +930,7 @@ export function ListScreen() {
         <EditEntry
           entry={editing}
           categories={categories}
-          shops={enabledIn(settings.enabledChains, section)}
+          shops={listShops(settings.enabledChains, section, sectionsOn)}
           deal={dealFor(c, editing) ?? recFor(c, editing)?.options[0]}
           name={recFor(c, editing)?.group.name}
           onClose={() => setEditing(undefined)}
@@ -885,7 +951,7 @@ const onlyAt = (recs: Recommendation[], chains: StoreChain[]): Recommendation[] 
 function ShopRow({ e, name, onOpen, extra, children }: { e: ListEntry; name: string; onOpen?: () => void; extra?: ReactNode; children: ReactNode }) {
   const tick = (ev: { target: { checked: boolean } }) => {
     buzz(10);
-    void updateListEntry(e.id, { checked: ev.target.checked });
+    void tickEntry(e, ev.target.checked, name);
   };
   if (!serverMode)
     return (
@@ -897,7 +963,9 @@ function ShopRow({ e, name, onOpen, extra, children }: { e: ListEntry; name: str
     );
   return (
     <div className={`shoprow${e.checked ? ' got' : ''}`}>
-      <input type="checkbox" checked={e.checked} onChange={tick} aria-label={`Got ${name}`} />
+      <label className="tick-hit">
+        <input type="checkbox" checked={e.checked} onChange={tick} aria-label={`Got ${name}`} />
+      </label>
       {onOpen ? (
         <button type="button" className="shoprow-open" onClick={onOpen} aria-label={`${name}, open the item`}>
           {children}
@@ -1167,14 +1235,16 @@ function ShoppingMode({
       toast("That isn't on this list.");
       return;
     }
-    await updateListEntry(match.id, { checked: true });
     const r = recFor(c, match)!;
     const o = r.options.find((x) => x.product.barcode === out.code);
     const want = dealFor(c, match);
     const name = r.group.name;
-    if (o && want && o.product.id !== want.product.id)
-      toast(`${name} ticked. Restock picked ${want.product.name}, ${money(want.price)}, at ${chainName(want.product.chain)}.`);
-    else toast(`${name} ticked${want?.price !== undefined ? `, ${money(want.price)}` : ''}.`);
+    // 0.9.5 (undo): the message comes with Undo.
+    const said =
+      o && want && o.product.id !== want.product.id
+        ? `${name} ticked. Restock picked ${want.product.name}, ${money(want.price)}, at ${chainName(want.product.chain)}.`
+        : `${name} ticked${want?.price !== undefined ? `, ${money(want.price)}` : ''}.`;
+    await act(said, () => updateListEntry(match.id, { checked: true }));
   };
 
   const shelfLook = (e: ListEntry): PreviewProduct | undefined => {
@@ -1382,13 +1452,13 @@ export function EditEntry({
   const [categoryId, setCategoryId] = useState(entry.categoryId ?? '');
   const linked = !!entry.groupId;
   const save = async () => {
-    await updateListEntry(entry.id, {
+    await act(`Changed ${name ?? entry.text}`, () => updateListEntry(entry.id, {
       ...(linked ? {} : { text: text.trim() || entry.text }),
       chain: (chain || undefined) as Chain | undefined,
       categoryId: categoryId || undefined,
       // The price was that shop's; a different shop means it's not known any more.
       ...((chain || undefined) !== entry.chain ? { price: undefined } : {}),
-    });
+    }));
     onClose();
   };
   // A one-off buy found at a shop keeps what it is, so it has a photo and details too (0.7.3).
@@ -1433,7 +1503,7 @@ export function EditEntry({
           className="btn"
           onClick={() => {
             onClose();
-            nav.push({ name: 'add', query: entry.text, forList: true, replaceEntry: entry.id, section: entry.section });
+            nav.push({ name: 'add', query: entry.text, forList: true, replaceEntry: entry.id, section: searchTabOf(entry.section) });
           }}
         >
           <Icon name="search" size={18} /> {oneOff ? 'Find a cheaper one' : 'Find the cheapest'}
@@ -1481,9 +1551,8 @@ export function EditEntry({
       <button
         className="btn danger"
         onClick={async () => {
-          const undo = await undoable(() => deleteListEntries([entry.id]), entryRows([entry.id]));
+          await removeEntries([entry.id], `${name ?? entry.text} removed from your shopping list`);
           onClose();
-          nav.toast('Removed from your shopping list', undo);
         }}
       >
         <Icon name="trash" size={18} /> Remove from shopping list

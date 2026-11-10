@@ -1,9 +1,11 @@
 import sys, json, sqlite3
 db = sqlite3.connect(sys.argv[1], isolation_level=None)
 db.row_factory = sqlite3.Row
-for sql in [s for step in json.load(open(sys.argv[2])) for s in step]:
-    db.execute(sql)
-db.execute("PRAGMA user_version = 99")
+# 0.9.5: "keep" opens a database file made before (a phone updated to this version) as it is.
+if len(sys.argv) < 4 or sys.argv[3] != 'keep':
+    for sql in [s for step in json.load(open(sys.argv[2])) for s in step]:
+        db.execute(sql)
+    db.execute("PRAGMA user_version = 99")
 out = sys.stdout
 for line in sys.stdin:
     m = json.loads(line)

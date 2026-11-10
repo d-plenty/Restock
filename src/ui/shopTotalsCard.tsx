@@ -233,7 +233,7 @@ function StoreDetail({
 function AroundDetail({ t, onOpenItem, onClose }: { t: Totals; onOpenItem: (groupId: string) => void; onClose: () => void }) {
   return (
     <Sheet title="Shopping around" onClose={onClose}>
-      <p className="small">The cheapest of each item, from whichever store has it in stock.</p>
+      <p className="small">The cheapest of each item, from whichever shop has it in stock.</p>
       <div className="card flush">
         {t.around.lines.map((l) => (
           <SwapLine
@@ -276,35 +276,35 @@ function HowPicked({ totals, min, onClose }: { totals: Totals; min: number; onCl
           .slice(0, 4)
       : [];
   return (
-    <Sheet title="How Restock picks a store" onClose={onClose}>
+    <Sheet title="How Restock picks a shop" onClose={onClose}>
       {by === 'unit' ? (
         <p className="small">
-          Your list is on <strong>Best value</strong>, so Restock prices <strong>the same shopping</strong> at each store: every item at the size you
-          usually buy, from your picks at each store and its regular packs (Any size items: the cheapest way to get that amount). A bulk pack,
-          or a store only selling a bigger or smaller size, can't tip it. Ones you'd also take don't count here.
+          Your list is on <strong>Best value</strong>, so Restock prices <strong>the same shopping</strong> at each shop: every item at the size you
+          usually buy, from your picks at each shop and its regular packs (Any size items: the cheapest way to get that amount). A bulk pack,
+          or a shop only selling a bigger or smaller size, can't tip it. Ones you'd also take don't count here.
         </p>
       ) : (
         <p className="small">
-          Your list is on <strong>Lowest price</strong>, so Restock compares what you'd pay <strong>at the till</strong> at each store, whatever the
+          Your list is on <strong>Lowest price</strong>, so Restock compares what you'd pay <strong>at the till</strong> at each shop, whatever the
           pack sizes.
         </p>
       )}
       <p className="small">
-        <strong>Shop around</strong> is recommended: every item from the shop that has it cheapest. If one store has everything on your list and
-        shopping around wouldn't save {min < 0.005 ? 'anything' : `at least ${money(min)}`} over it, that store is recommended instead. Change{' '}
+        <strong>Shop around</strong> is recommended: every item from the shop that has it cheapest. If one shop has everything on your list and
+        shopping around wouldn't save {min < 0.005 ? 'anything' : `at least ${money(min)}`} over it, that shop is recommended instead. Change{' '}
         {min < 0.005 ? 'this' : `the ${money(min)}`} in Settings → Shopping list.
       </p>
       <p className="small">
-        <strong>If you only go to one store</strong>, the best one is the cheapest, unless it only just wins (by under $2, or 3%) or one item alone makes the difference. Then the store that's
-        cheapest for more of your items is recommended instead, so one big special at a store that's dearer for everything else doesn't decide it.
+        <strong>If you only go to one shop</strong>, the best one is the cheapest, unless it only just wins (by under $2, or 3%) or one item alone makes the difference. Then the shop that's
+        cheapest for more of your items is recommended instead, so one big special at a shop that's dearer for everything else doesn't decide it.
       </p>
       <p className="small">
-        A store that's missing a few items (up to {fewMissing(n)} of your {n}) can still be recommended, if it's clearly cheaper (by over $2, or 3%)
-        even after buying those few at the next cheapest shop. A store missing more than that isn't one store any more, so it isn't recommended as one.
+        A shop that's missing a few items (up to {fewMissing(n)} of your {n}) can still be recommended, if it's clearly cheaper (by over $2, or 3%)
+        even after buying those few at the next cheapest shop. A shop missing more than that isn't one shop any more, so it isn't recommended as one.
       </p>
       <div className="card flush">
         <div className="row small" style={{ fontWeight: 700 }}>
-          <span className="grow">Store</span>
+          <span className="grow">Shop</span>
           <span style={{ width: 80, textAlign: 'right' }}>Same shopping</span>
           <span style={{ width: 74, textAlign: 'right' }}>At the till</span>
         </div>
@@ -386,7 +386,7 @@ function HowPicked({ totals, min, onClose }: { totals: Totals; min: number; onCl
         </p>
       )}
       <p className="small">
-        The <strong>Best value / Lowest price</strong> switch at the top of the list changes how stores are compared, and which packs are picked.
+        The <strong>Best value / Lowest price</strong> switch at the top of the list changes how shops are compared, and which packs are picked.
       </p>
     </Sheet>
   );
@@ -444,11 +444,11 @@ export function ShopTotalsCard({
           ? `Everything on your list is cheapest at ${chainName(plan.stops[0].chain)}.`
           : plan.complete && plan.saving !== undefined && plan.saving > 0.005
             ? `Every item at its cheapest shop. ${money(plan.saving)} less than ${chainName(plan.complete.chain)} alone${
-                withLines.filter((s) => !s.missing.length).length === 1 ? ', the only store with everything' : ', the cheapest store with everything'
+                withLines.filter((s) => !s.missing.length).length === 1 ? ', the only shop with everything' : ', the cheapest shop with everything'
               }.`
             : plan.complete
               ? 'Every item at its cheapest shop.'
-              : 'Every item at its cheapest shop. No one store has everything on your list.'}
+              : 'Every item at its cheapest shop. No one shop has everything on your list.'}
         {` About ${money(plan.aroundOther)} ${otherWord}.`}
       </span>
       {plan.stops.length > 1 && (
@@ -536,7 +536,7 @@ export function ShopTotalsCard({
               <span className="grow">
                 <span className="title">Shop around</span>
                 <span className="small">
-                  {plan.stops.length} stores: {plan.stops.map((x) => chainName(x.chain)).join(', ')}
+                  {plan.stops.length} shops: {plan.stops.map((x) => chainName(x.chain)).join(', ')}
                 </span>
               </span>
               <span className="num price-col">{money(plan.around)}</span>
@@ -552,8 +552,8 @@ export function ShopTotalsCard({
       {several && (
         <>
           <div className="section-head">
-            <span className="eyebrow-in">{storeWins ? 'Other stores' : 'If you only go to one store'}</span>
-            <button className="info-btn" onClick={() => setHow(true)} aria-label="How Restock picks a store">
+            <span className="eyebrow-in">{storeWins ? 'Other shops' : 'If you only go to one shop'}</span>
+            <button className="info-btn" onClick={() => setHow(true)} aria-label="How Restock picks a shop">
               <Icon name="info" size={20} />
             </button>
           </div>

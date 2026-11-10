@@ -355,7 +355,7 @@ public class RestockNativePlugin extends Plugin {
         // "/\elsewhere", which a browser would take to another site.
         boolean allowed = known && StoreWeb.onSite(chain, url) != null;
         if (!known || !allowed) {
-            call.reject("Not a store address Restock uses");
+            call.reject("Not a shop address Restock uses");
             return;
         }
         webThread.execute(() -> {

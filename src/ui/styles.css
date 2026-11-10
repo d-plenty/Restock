@@ -1,253 +1,5 @@
-:root {
-  /* Australian: sand, flag navy ink, Australian green and gold. */
-  --bg: #f6f4ea;
-  --surface: #ffffff;
-  --sunken: #efeadb;
-  --ink: #0f1d3d;
-  --ink-2: #2b3756;
-  --muted: #5a6175;
-  --line: #e6e0cc;
-  --line-2: #d9d2bb;
-  /* Green for words (links, ghost buttons): a shade darker than the flag green so it reads on sand. */
-  --green: #007a38;
-  --pharm: #1f9d55;
-  --green-ink: #005a2a;
-  --green-bg: #dcefe1;
-  --blue: #1f4e8c;
-  --blue-bg: #e1eaf7;
-  --amber-ink: #7a3f04;
-  --amber-bg: #fbebd3;
-  --red-ink: #8a1c1c;
-  --red-bg: #f8e1df;
-  --flybuys: #007dc2;
-  --flybuys-silver: #c9ced3;
-  --everyday: #fd6400;
-  --green-solid: #00843d;
-  --line-soft: #f0ebdb;
-  --dash: #a9a38c;
-  --amber-ink-2: #5a2e03;
-  --blue-ink: #173a69;
-  --small-bg: #e8f4ec;
-  --small-line: #8cc7a1;
-  --seg: #ece6d4;
-  --on-ink: #ffffff;
-  --bar: #0f1d3d;
-  --shadow: rgba(15, 29, 61, 0.08);
-  --gold: #ffcd00;
-  --gold-ink: #6b5200;
-  --gold-bg: #fff3bf;
-  --navy: #012169;
-  --navy-2: #0b2f86;
-  --on-accent: #ffffff;
-  --tabbar-bg: var(--navy);
-  --tab-ink: rgba(255, 255, 255, 0.74);
-  --tab-on: var(--gold);
-  --shade-bg: var(--navy);
-  --bubble-ring: var(--gold);
-  /* The biggest of: Capacitor's injected value, the WebView's own, and Android's (see theme.ts). */
-  --top: max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px), var(--native-top, 0px));
-  --bottom: max(var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px), var(--native-bottom, 0px));
-  color-scheme: light;
-}
-
-/* Dark mode: picked in Settings, or following the phone when set to "System". */
-:root[data-theme='dark'] {
-  --bg: #0a1120;
-  --surface: #111b30;
-  --sunken: #18233c;
-  --ink: #eef1f7;
-  --ink-2: #c8cfdd;
-  --muted: #98a2b8;
-  --line: #22304d;
-  --line-2: #2d3d5e;
-  --green: #4fca8a;
-  --pharm: #3fbf73;
-  --green-ink: #9fe3bd;
-  --green-bg: #12321f;
-  --blue: #96b9ee;
-  --blue-bg: #1c2b42;
-  --amber-ink: #f3c27a;
-  --amber-bg: #3a2b13;
-  --red-ink: #f4a29c;
-  --red-bg: #3e1f1d;
-  --green-solid: #00843d;
-  --line-soft: #1a2540;
-  --dash: #3b4a6b;
-  --amber-ink-2: #f7d9aa;
-  --blue-ink: #c3d7f6;
-  --small-bg: #10281a;
-  --small-line: #2f6b47;
-  --seg: #172240;
-  --on-ink: #0a1120;
-  --bar: #22304d;
-  --shadow: rgba(0, 0, 0, 0.45);
-  --gold: #ffcd00;
-  --gold-ink: #ffd84d;
-  --gold-bg: #3a300c;
-  --navy: #0b2470;
-  --navy-2: #12348f;
-  --tabbar-bg: #0b1a44;
-  --shade-bg: #0b1a44;
-  color-scheme: dark;
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-theme='system'] {
-    --bg: #0a1120;
-    --surface: #111b30;
-    --sunken: #18233c;
-    --ink: #eef1f7;
-    --ink-2: #c8cfdd;
-    --muted: #98a2b8;
-    --line: #22304d;
-    --line-2: #2d3d5e;
-    --green: #4fca8a;
-    --pharm: #3fbf73;
-    --green-ink: #9fe3bd;
-    --green-bg: #12321f;
-    --blue: #96b9ee;
-    --blue-bg: #1c2b42;
-    --amber-ink: #f3c27a;
-    --amber-bg: #3a2b13;
-    --red-ink: #f4a29c;
-    --red-bg: #3e1f1d;
-    --green-solid: #00843d;
-    --line-soft: #1a2540;
-    --dash: #3b4a6b;
-    --amber-ink-2: #f7d9aa;
-    --blue-ink: #c3d7f6;
-    --small-bg: #10281a;
-    --small-line: #2f6b47;
-    --seg: #172240;
-    --on-ink: #0a1120;
-    --bar: #22304d;
-    --shadow: rgba(0, 0, 0, 0.45);
-    --gold: #ffcd00;
-    --gold-ink: #ffd84d;
-    --gold-bg: #3a300c;
-    --navy: #0b2470;
-    --navy-2: #12348f;
-    --tabbar-bg: #0b1a44;
-    --shade-bg: #0b1a44;
-    color-scheme: dark;
-  }
-}
-
-/* The Plain style: Restock's original neutral colours, without the navy bars. */
-:root[data-style='plain'] {
-  --bg: #f5f4ef;
-  --surface: #ffffff;
-  --sunken: #ecebe3;
-  --ink: #1b1f1d;
-  --ink-2: #3a3f3c;
-  --muted: #5b615d;
-  --line: #e4e2d9;
-  --line-2: #d9d7ce;
-  --green: #17643f;
-  --pharm: #1f9d55;
-  --green-ink: #0e4a2d;
-  --green-bg: #ddefe4;
-  --blue: #1f4e8c;
-  --blue-bg: #e1eaf7;
-  --amber-ink: #7a3f04;
-  --amber-bg: #fbebd3;
-  --red-ink: #8a1c1c;
-  --red-bg: #f8e1df;
-  --flybuys: #007dc2;
-  --flybuys-silver: #c9ced3;
-  --everyday: #fd6400;
-  --green-solid: #17643f;
-  --line-soft: #efede6;
-  --dash: #a9a699;
-  --amber-ink-2: #5a2e03;
-  --blue-ink: #173a69;
-  --small-bg: #e9f3ec;
-  --small-line: #9cc9ad;
-  --seg: #e8e6dd;
-  --on-ink: #ffffff;
-  --bar: #1b1f1d;
-  --shadow: rgba(0, 0, 0, 0.08);
-  --tabbar-bg: var(--surface);
-  --tab-ink: var(--muted);
-  --tab-on: var(--green);
-  --shade-bg: var(--bg);
-  --bubble-ring: var(--surface);
-}
-:root[data-style='plain'][data-theme='dark'] {
-  --bg: #111412;
-  --surface: #1a1e1c;
-  --sunken: #252a27;
-  --ink: #eceee9;
-  --ink-2: #c9cec8;
-  --muted: #a1a8a2;
-  --line: #2e3430;
-  --line-2: #3b423d;
-  --green: #66c993;
-  --pharm: #3fbf73;
-  --green-ink: #a6e3c0;
-  --green-bg: #183a28;
-  --blue: #96b9ee;
-  --blue-bg: #1c2b42;
-  --amber-ink: #f3c27a;
-  --amber-bg: #3a2b13;
-  --red-ink: #f4a29c;
-  --red-bg: #3e1f1d;
-  --green-solid: #1d7a48;
-  --line-soft: #262b28;
-  --dash: #4d5550;
-  --amber-ink-2: #f7d9aa;
-  --blue-ink: #c3d7f6;
-  --small-bg: #172a1f;
-  --small-line: #3f6b51;
-  --seg: #222724;
-  --on-ink: #111412;
-  --bar: #2f3833;
-  --shadow: rgba(0, 0, 0, 0.4);
-  --tabbar-bg: var(--surface);
-  --tab-ink: var(--muted);
-  --tab-on: var(--green);
-  --shade-bg: var(--bg);
-  --bubble-ring: var(--surface);
-  color-scheme: dark;
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-style='plain'][data-theme='system'] {
-    --bg: #111412;
-    --surface: #1a1e1c;
-    --sunken: #252a27;
-    --ink: #eceee9;
-    --ink-2: #c9cec8;
-    --muted: #a1a8a2;
-    --line: #2e3430;
-    --line-2: #3b423d;
-    --green: #66c993;
-    --pharm: #3fbf73;
-    --green-ink: #a6e3c0;
-    --green-bg: #183a28;
-    --blue: #96b9ee;
-    --blue-bg: #1c2b42;
-    --amber-ink: #f3c27a;
-    --amber-bg: #3a2b13;
-    --red-ink: #f4a29c;
-    --red-bg: #3e1f1d;
-    --green-solid: #1d7a48;
-    --line-soft: #262b28;
-    --dash: #4d5550;
-    --amber-ink-2: #f7d9aa;
-    --blue-ink: #c3d7f6;
-    --small-bg: #172a1f;
-    --small-line: #3f6b51;
-    --seg: #222724;
-    --on-ink: #111412;
-    --bar: #2f3833;
-    --shadow: rgba(0, 0, 0, 0.4);
-    --tabbar-bg: var(--surface);
-    --tab-ink: var(--muted);
-    --tab-on: var(--green);
-    --shade-bg: var(--bg);
-    --bubble-ring: var(--surface);
-    color-scheme: dark;
-  }
-}
+/* Colours, corners, text sizes and spacing come from tokens.css (0.9.5), shared with the web page. */
+@import './tokens.css';
 
 * {
   box-sizing: border-box;
@@ -262,7 +14,7 @@ body,
   background: var(--bg);
   color: var(--ink);
   font-family: system-ui, 'Roboto', 'Segoe UI', sans-serif;
-  font-size: 17px;
+  font-size: var(--fs-lg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -347,7 +99,7 @@ a {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 500;
   color: var(--tab-ink);
   padding: 6px 0;
@@ -367,13 +119,13 @@ a {
   left: 28%;
   right: 28%;
   height: 3px;
-  border-radius: 0 0 3px 3px;
+  border-radius: 0 0 var(--r-full) var(--r-full);
   background: var(--tab-on);
 }
 
 /* Six tabs (Pantry, Keg and Pharmacy all on): a little tighter. */
 .tabs[style*='repeat(6'] .tab {
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 .tabs[style*='repeat(6'] .tab svg {
   width: 21px;
@@ -391,7 +143,7 @@ a {
   z-index: 1;
   width: 50px;
   height: 50px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   background: var(--green-solid);
   color: var(--on-accent);
   display: grid;
@@ -421,7 +173,7 @@ a {
 
 h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: var(--fs-3xl);
   font-weight: 700;
   letter-spacing: -0.4px;
   line-height: 1.15;
@@ -429,12 +181,12 @@ h1 {
 
 h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 700;
 }
 
 .eyebrow {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.8px;
   text-transform: uppercase;
@@ -449,12 +201,12 @@ h2 {
 }
 
 .sub {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
 .small {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
   line-height: 1.4;
 }
@@ -469,7 +221,7 @@ p {
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -518,7 +270,7 @@ p {
 }
 
 .title {
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 600;
 }
 
@@ -529,7 +281,7 @@ p {
 }
 
 .banner {
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -547,7 +299,7 @@ p {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='5940 480 3100 4080'%3E%3Cpath fill='white' fill-opacity='.22' d='M7560 3840L7629 4056L7841 3976L7716 4164L7911 4280L7685 4300L7716 4524L7560 4360L7404 4524L7435 4300L7209 4280L7404 4164L7279 3976L7491 4056ZM6300 1845L6369 2061L6581 1981L6456 2169L6651 2285L6425 2305L6456 2529L6300 2365L6144 2529L6175 2305L5949 2285L6144 2169L6019 1981L6231 2061ZM7560 480L7629 696L7841 616L7716 804L7911 920L7685 940L7716 1164L7560 1000L7404 1164L7435 940L7209 920L7404 804L7279 616L7491 696ZM8680 1509L8749 1725L8961 1645L8836 1833L9031 1949L8805 1969L8836 2193L8680 2029L8524 2193L8555 1969L8329 1949L8524 1833L8399 1645L8611 1725ZM8064 2520L8113 2662L8264 2665L8144 2756L8187 2900L8064 2814L7941 2900L7984 2756L7864 2665L8015 2662Z'/%3E%3C/svg%3E")
       no-repeat right 16px center / auto 78%,
     linear-gradient(120deg, var(--navy), var(--navy-2));
-  color: #fff;
+  color: var(--white);
 }
 :root:not([data-style='plain']) .banner.green .big {
   color: var(--gold);
@@ -570,14 +322,14 @@ p {
 }
 
 .banner .big {
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   font-weight: 700;
 }
 
 .thumb {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--sunken);
   flex-shrink: 0;
   display: flex;
@@ -590,7 +342,7 @@ p {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: #fff;
+  background: var(--white);
 }
 
 /* ---------- chips & tags ---------- */
@@ -598,10 +350,10 @@ p {
 .tag {
   display: inline-flex;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   padding: 3px 8px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   white-space: nowrap;
   letter-spacing: 0.2px;
 }
@@ -635,12 +387,12 @@ p {
 }
 .tag.flybuys {
   background: var(--flybuys);
-  color: #fff;
+  color: var(--white);
   border: 1px solid var(--flybuys-silver);
 }
 .tag.everyday {
   background: var(--everyday);
-  color: #1b1f1d;
+  color: var(--fixed-ink);
 }
 
 .tags {
@@ -674,7 +426,7 @@ p {
   place-items: center;
   width: 64px;
   height: 52px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--green-solid);
   color: var(--on-accent);
 }
@@ -755,7 +507,7 @@ details.dropdown[open] > summary {
 
 /* .seg and .seg button are defined once, further down (forms). */
 .seg .count {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
   font-weight: 600;
 }
@@ -771,11 +523,11 @@ details.dropdown[open] > summary {
 .chip {
   height: 36px;
   padding: 0 14px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   border: 1px solid var(--line-2);
   background: var(--surface);
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   white-space: nowrap;
   flex-shrink: 0;
@@ -802,21 +554,21 @@ details.dropdown[open] > summary {
 .dot {
   width: 12px;
   height: 12px;
-  border-radius: 6px;
+  border-radius: var(--r-full);
   flex-shrink: 0;
   display: inline-block;
 }
 .dot.woolworths {
-  background: #178841;
+  background: var(--shop-woolworths);
 }
 .dot.coles {
-  background: #e01a22;
+  background: var(--shop-coles);
 }
 .dot.aldi {
-  background: #00005f;
+  background: var(--aldi-dot);
 }
 .dot.other {
-  background: #a9a699;
+  background: var(--dash);
 }
 
 /* ---------- buttons ---------- */
@@ -824,10 +576,10 @@ details.dropdown[open] > summary {
 .btn {
   height: 50px;
   padding: 0 18px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   border: 1px solid var(--line-2);
   background: var(--surface);
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -856,8 +608,8 @@ details.dropdown[open] > summary {
 .btn.small {
   height: 36px;
   padding: 0 12px;
-  border-radius: 12px;
-  font-size: 13px;
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
@@ -872,7 +624,7 @@ details.dropdown[open] > summary {
 .icon-btn {
   width: 44px;
   height: 44px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   border: 1px solid var(--line-2);
   background: var(--surface);
   display: inline-flex;
@@ -887,7 +639,7 @@ details.dropdown[open] > summary {
   grid-auto-columns: minmax(0, 1fr);
   gap: 4px;
   padding: 3px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   /* A white track like the Home tiles, with the picked one outlined in the accent (0.8.9). */
   background: var(--surface);
   border: 1px solid var(--line-2);
@@ -901,10 +653,10 @@ details.dropdown[open] > summary {
   background: transparent;
   color: var(--ink-2);
   font: inherit;
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 600;
   padding: 9px 4px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   display: flex;
   gap: 6px;
   justify-content: center;
@@ -930,7 +682,7 @@ details.dropdown[open] > summary {
 }
 
 .field > span {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--ink-2);
 }
@@ -939,10 +691,10 @@ details.dropdown[open] > summary {
 select.input {
   height: 48px;
   padding: 0 14px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   border: 1px solid var(--line-2);
   background: var(--surface);
-  font-size: 17px;
+  font-size: var(--fs-lg);
   width: 100%;
   min-width: 0;
 }
@@ -988,7 +740,7 @@ select.input {
 
 .stat {
   background: var(--bg);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
@@ -1001,13 +753,13 @@ select.input {
 }
 
 .stat .k {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: inherit;
   opacity: 0.85;
 }
 
 .stat .v {
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 600;
 }
 
@@ -1033,7 +785,7 @@ select.input {
 .sheet {
   background: var(--bg);
   width: 100%;
-  border-radius: 20px 20px 0 0;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
   padding: 18px 18px calc(var(--bottom) + 18px);
   display: flex;
   flex-direction: column;
@@ -1056,9 +808,9 @@ select.input {
   gap: 12px;
   background: var(--ink);
   color: var(--on-ink);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 12px 14px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   z-index: 40;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
   cursor: pointer;
@@ -1067,7 +819,7 @@ select.input {
 
 .progress {
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--r-full);
   background: var(--line-2);
   overflow: hidden;
 }
@@ -1083,7 +835,7 @@ select.input {
 }
 
 .loyalty {
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -1094,11 +846,11 @@ select.input {
 .loyalty.flybuys {
   background: var(--flybuys);
   border: 2px solid var(--flybuys-silver);
-  color: #fff;
+  color: var(--white);
 }
 .loyalty.everyday {
   background: var(--everyday);
-  color: #1b1f1d;
+  color: var(--fixed-ink);
 }
 .loyalty.other {
   background: var(--surface);
@@ -1106,14 +858,14 @@ select.input {
 }
 
 .barcode-panel {
-  background: #fff;
-  border-radius: 12px;
+  background: var(--white);
+  border-radius: var(--r-md);
   padding: 14px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  color: #1b1f1d;
+  color: var(--fixed-ink);
 }
 
 .barcode-panel svg {
@@ -1124,7 +876,7 @@ select.input {
 .swatch {
   width: 30px;
   height: 30px;
-  border-radius: 15px;
+  border-radius: var(--r-full);
   flex-shrink: 0;
 }
 .swatch.flybuys {
@@ -1147,7 +899,7 @@ select.input {
 .steps > div {
   flex: 1;
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--r-full);
   background: var(--line-2);
 }
 
@@ -1161,8 +913,8 @@ select.input {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: #000;
-  color: #fff;
+  background: var(--black);
+  color: var(--white);
   display: flex;
   flex-direction: column;
 }
@@ -1173,7 +925,7 @@ select.input {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  background: #000;
+  background: var(--black);
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -1194,18 +946,18 @@ select.input {
   flex: 1;
   text-align: center;
   font-weight: 700;
-  font-size: 17px;
+  font-size: var(--fs-lg);
 }
 
 .icon-btn.dark {
   background: rgba(255, 255, 255, 0.16);
   border-color: transparent;
-  color: #fff;
+  color: var(--white);
 }
 
 .icon-btn.dark[aria-pressed='true'] {
-  background: #fff;
-  color: #000;
+  background: var(--white);
+  color: var(--black);
 }
 
 .scanner-frame {
@@ -1213,8 +965,8 @@ select.input {
   margin: auto;
   width: min(78vw, 360px);
   height: min(42vw, 190px);
-  border: 3px solid #fff;
-  border-radius: 16px;
+  border: 3px solid var(--white);
+  border-radius: var(--r-lg);
   box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.35);
 }
 
@@ -1229,7 +981,7 @@ select.input {
 
 .scanner-msg {
   text-align: center;
-  font-size: 15px;
+  font-size: var(--fs-body);
   margin: 0;
 }
 
@@ -1242,7 +994,7 @@ select.input {
 .explain {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 0 14px;
 }
 .explain > summary {
@@ -1251,7 +1003,7 @@ select.input {
   align-items: center;
   gap: 8px;
   min-height: 46px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 600;
   color: var(--green-ink);
   cursor: pointer;
@@ -1274,7 +1026,7 @@ select.input {
 }
 .explain-body {
   padding: 0 0 14px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   line-height: 1.45;
   color: var(--ink-2);
   display: flex;
@@ -1290,8 +1042,8 @@ select.input {
   bottom: 0;
   z-index: 3;
   background: var(--bar);
-  color: #fff;
-  border-radius: 16px;
+  color: var(--white);
+  border-radius: var(--r-lg);
   padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
@@ -1300,12 +1052,13 @@ select.input {
 }
 .selectbar-top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 .selectbar .chip {
   background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  color: var(--white);
   border-color: rgba(255, 255, 255, 0.25);
 }
 .selectbar-actions {
@@ -1324,14 +1077,14 @@ select.input {
 .pick {
   width: 24px;
   height: 24px;
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   border: 2px solid var(--line-2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   background: var(--surface);
-  color: #fff;
+  color: var(--white);
 }
 .pick.on {
   background: var(--green-solid);
@@ -1341,7 +1094,7 @@ select.input {
 .cart-btn {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink-2);
@@ -1364,14 +1117,14 @@ select.input {
 .shortcut {
   border: 1px solid var(--line);
   background: var(--surface);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   min-height: 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--ink-2);
   padding: 8px 4px;
@@ -1390,7 +1143,7 @@ select.input {
 .perm-icon {
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--green-bg);
   color: var(--green-ink);
   display: flex;
@@ -1399,7 +1152,7 @@ select.input {
   flex-shrink: 0;
 }
 .perm-state {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -1445,12 +1198,12 @@ select.input {
   flex: 1;
 }
 .badge {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   padding: 2px 7px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--green-solid);
-  color: #fff;
+  color: var(--white);
 }
 .store-pick {
   display: flex;
@@ -1492,7 +1245,7 @@ select.input {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   color: var(--ink-2);
 }
 .ticks li {
@@ -1511,7 +1264,7 @@ select.input {
   align-items: flex-end;
   justify-content: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
   overflow: hidden;
   padding-bottom: 6px;
@@ -1537,7 +1290,7 @@ select.input {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   color: var(--ink-2);
 }
 
@@ -1545,7 +1298,7 @@ select.input {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 .checkline .linkish {
@@ -1561,7 +1314,7 @@ select.input {
   background: none;
   color: var(--green-bg);
   font-weight: 800;
-  font-size: 15px;
+  font-size: var(--fs-body);
   padding: 6px 4px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1572,16 +1325,16 @@ select.input {
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   overflow: hidden;
   flex-shrink: 0;
 }
 .stepper button {
-  width: 32px;
-  height: 34px;
+  width: var(--hit);
+  height: var(--hit);
   border: none;
   background: var(--surface);
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--ink-2);
 }
@@ -1592,12 +1345,12 @@ select.input {
   min-width: 22px;
   text-align: center;
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .hint {
   flex-direction: row;
   align-items: flex-start;
-  font-size: 15px;
+  font-size: var(--fs-body);
   color: var(--ink-2);
   background: var(--green-bg);
   border-color: transparent;
@@ -1672,8 +1425,8 @@ select.input {
   align-items: center;
   padding: 0 20px;
   font-weight: 700;
-  font-size: 15px;
-  color: #fff;
+  font-size: var(--fs-body);
+  color: var(--white);
 }
 .swipe-under.right {
   justify-content: flex-start;
@@ -1682,7 +1435,7 @@ select.input {
 }
 .swipe-under.left {
   justify-content: flex-end;
-  background: #b3261e;
+  background: var(--danger-solid);
   opacity: 0.75;
 }
 .swipe-under.armed {
@@ -1691,12 +1444,12 @@ select.input {
 
 .scanner-msg.warn {
   background: rgba(255, 196, 0, 0.18);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 8px 10px;
 }
 .btn.scanner-photo {
   background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  color: var(--white);
   border-color: rgba(255, 255, 255, 0.3);
 }
 /* Product names get two lines before they're cut off. */
@@ -1713,8 +1466,8 @@ select.input {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
-  border-radius: 16px;
+  background: var(--white);
+  border-radius: var(--r-lg);
   min-height: 220px;
   max-height: 46vh;
   overflow: hidden;
@@ -1737,7 +1490,7 @@ select.input {
   background: none;
   padding: 0;
   flex-shrink: 0;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   position: relative;
 }
 
@@ -1748,7 +1501,7 @@ select.input {
 }
 .detail-block p {
   margin: 4px 0 0;
-  font-size: 15px;
+  font-size: var(--fs-body);
   line-height: 1.45;
   color: var(--ink-2);
   white-space: pre-line;
@@ -1756,7 +1509,7 @@ select.input {
 table.nutrition {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   margin-top: 6px;
 }
 table.nutrition th {
@@ -1778,7 +1531,7 @@ table.nutrition td.num {
   bottom: -4px;
   width: 20px;
   height: 20px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--surface);
   border: 1px solid var(--line);
   display: flex;
@@ -1820,14 +1573,14 @@ table.nutrition td.num {
 }
 .tag.best {
   background: var(--green-solid);
-  color: #fff;
+  color: var(--white);
   border-color: transparent;
 }
 .legend {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
 }
 .legend .tag {
@@ -1854,7 +1607,7 @@ table.nutrition td.num {
   display: inline-block;
   width: 18px;
   height: 18px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   border: 2px solid var(--line);
   border-top-color: var(--green);
   animation: spin 0.8s linear infinite;
@@ -1868,7 +1621,8 @@ table.nutrition td.num {
 /* Stays at the bottom of the screen while the list scrolls. */
 .sticky-cta {
   position: sticky;
-  bottom: 0;
+  /* The screen's bottom padding: so the bar sits right on the tabs, with nothing showing under it. */
+  bottom: -24px;
   margin: 0 -18px -24px;
   padding: 10px 18px 12px;
   background: linear-gradient(to top, var(--bg) 75%, transparent);
@@ -1894,14 +1648,9 @@ table.nutrition td.num {
 .eyebrow[id] {
   scroll-margin-top: calc(var(--top) + 12px);
 }
-/* On the shopping list, pop-up messages sit above the pinned Start shopping button. */
-.app:has(.sticky-cta) .toast {
-  bottom: calc(var(--bottom) + 146px);
-}
-
 .loading-bar {
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--line);
   overflow: hidden;
 }
@@ -1938,11 +1687,6 @@ table.nutrition td.num {
   zoom: var(--text-zoom, 1);
 }
 /* High contrast: darker secondary text and lines, solid borders on cards. */
-:root[data-contrast='high'] {
-  --muted: var(--ink-2);
-  --line: var(--line-2);
-  --dash: var(--ink-2);
-}
 :root[data-contrast='high'] .card,
 :root[data-contrast='high'] .row,
 :root[data-contrast='high'] .input,
@@ -1987,7 +1731,7 @@ table.nutrition td.num {
 }
 .swatch {
   aspect-ratio: 1;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   border: 2px solid color-mix(in srgb, var(--ink) 12%, transparent);
   display: grid;
   place-items: center;
@@ -2019,8 +1763,8 @@ table.nutrition td.num {
   position: relative;
   min-height: 100%;
   overflow: hidden;
-  background: #012169;
-  color: #fff;
+  background: var(--brand-navy);
+  color: var(--on-navy);
 }
 .welcome-flag {
   position: absolute;
@@ -2050,7 +1794,7 @@ table.nutrition td.num {
 }
 .welcome-hello {
   margin-top: 24px;
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2058,39 +1802,39 @@ table.nutrition td.num {
 }
 .welcome-brand {
   margin: 2px 0 0;
-  font-size: 46px;
+  font-size: var(--fs-display);
   font-weight: 800;
   letter-spacing: -1px;
-  color: #fff;
+  color: var(--on-navy);
 }
 .welcome-tag {
   margin: 16px 0 0;
-  font-size: 30px;
+  font-size: var(--fs-3xl);
   line-height: 1.12;
   font-weight: 800;
-  color: #ffcd00;
+  color: var(--gold);
 }
 .welcome-desc {
   margin: 14px 0 0;
-  font-size: 17px;
+  font-size: var(--fs-lg);
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.86);
 }
 .welcome-tag2 {
   margin: 14px 0 0;
-  font-size: 19px;
+  font-size: var(--fs-xl);
   font-weight: 800;
-  color: #ffcd00;
+  color: var(--gold);
 }
 .welcome-made {
   margin: 22px 0 0;
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
 }
 .welcome-free {
   margin: 4px 0 0;
-  font-size: 15px;
+  font-size: var(--fs-body);
   color: rgba(255, 255, 255, 0.78);
 }
 .welcome-actions {
@@ -2105,12 +1849,12 @@ table.nutrition td.num {
 .welcome-go {
   width: 100%;
   padding: 18px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   border: none;
-  font-size: 21px;
+  font-size: var(--fs-xl);
   font-weight: 800;
-  color: #fff;
-  background: #1f8352;
+  color: var(--on-navy);
+  background: var(--brand-green);
   box-shadow:
     0 8px 22px rgba(0, 0, 0, 0.35),
     inset 0 0 0 2px rgba(255, 205, 0, 0.55);
@@ -2119,7 +1863,7 @@ table.nutrition td.num {
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 15px;
+  font-size: var(--fs-body);
   text-decoration: underline;
   text-underline-offset: 3px;
   padding: 6px;
@@ -2138,10 +1882,10 @@ table.nutrition td.num {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 700;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--green-bg);
   color: var(--green);
 }
@@ -2155,7 +1899,7 @@ table.nutrition td.num {
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   padding: 11px;
   display: flex;
   flex-direction: column;
@@ -2168,7 +1912,7 @@ table.nutrition td.num {
 .setup-ic {
   width: 32px;
   height: 32px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   display: grid;
   place-items: center;
   background: var(--sunken);
@@ -2179,11 +1923,11 @@ table.nutrition td.num {
   color: var(--green);
 }
 .setup-tt {
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 800;
 }
 .setup-td {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
   line-height: 1.3;
 }
@@ -2191,10 +1935,10 @@ table.nutrition td.num {
   position: absolute;
   top: 10px;
   right: 9px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--sunken);
   color: var(--muted);
 }
@@ -2212,7 +1956,7 @@ table.nutrition td.num {
 }
 .setup-foot.sticky {
   position: sticky;
-  bottom: 0;
+  bottom: -24px;
   margin: 0 -18px -24px;
   padding: 14px 18px calc(var(--bottom) + 18px);
   background: linear-gradient(to top, var(--bg) 78%, transparent);
@@ -2229,7 +1973,7 @@ table.nutrition td.num {
   z-index: 60;
   background: var(--surface);
   border: 2px solid var(--green);
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -2252,9 +1996,9 @@ table.nutrition td.num {
   margin-top: 4px;
 }
 .tour-hi {
-  outline: 3px solid var(--gold, #ffcd00) !important;
+  outline: 3px solid var(--gold) !important;
   outline-offset: 3px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.18);
   position: relative;
   z-index: 5;
@@ -2264,7 +2008,7 @@ table.nutrition td.num {
 }
 
 .checked-ago {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 .checked-ago.old {
@@ -2276,9 +2020,9 @@ table.nutrition td.num {
 .crop {
   position: relative;
   margin: 0 auto;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   overflow: hidden;
-  background: #000;
+  background: var(--black);
   touch-action: none;
 }
 .crop canvas,
@@ -2290,24 +2034,24 @@ table.nutrition td.num {
 }
 .crop-edge {
   fill: rgba(255, 205, 0, 0.12);
-  stroke: var(--gold, #ffcd00);
+  stroke: var(--gold);
   stroke-linejoin: round;
 }
 .crop-dot {
   fill: rgba(255, 255, 255, 0.92);
-  stroke: var(--gold, #ffcd00);
+  stroke: var(--gold);
   cursor: grab;
 }
 .crop-dot:focus-visible {
   outline: none;
-  fill: var(--gold, #ffcd00);
+  fill: var(--gold);
 }
 .receipt-photo {
   display: block;
   width: 100%;
   max-height: 60vh;
   object-fit: contain;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--line);
 }
 
@@ -2322,7 +2066,7 @@ table.nutrition td.num {
   width: 32px;
   height: 32px;
   flex: none;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   background: var(--red-bg);
   color: var(--red-ink);
 }
@@ -2347,7 +2091,7 @@ table.nutrition td.num {
   width: 22px;
   height: 22px;
   flex: none;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   border: 1.5px solid currentColor;
   font:
     700 12px/1 Georgia,
@@ -2366,13 +2110,13 @@ table.nutrition td.num {
   place-items: center;
   width: 52px;
   height: 52px;
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   background: var(--green);
-  color: #fff;
-  box-shadow: inset 0 0 0 2px var(--gold, #ffcd00);
+  color: var(--white);
+  box-shadow: inset 0 0 0 2px var(--gold);
 }
 .soon-body {
-  font-size: 15px;
+  font-size: var(--fs-body);
   line-height: 1.55;
 }
 .soon-body p,
@@ -2388,8 +2132,8 @@ table.nutrition td.num {
 /* ---------- 0.6.0: widget preview ---------- */
 .widget-wall {
   padding: 18px;
-  border-radius: 12px;
-  background: radial-gradient(circle at 20% 20%, #4e7fc4 0, transparent 55%), radial-gradient(circle at 80% 80%, #e2a33b 0, transparent 50%), #2b3f63;
+  border-radius: var(--r-md);
+  background: radial-gradient(circle at 20% 20%, var(--blue) 0, transparent 55%), radial-gradient(circle at 80% 80%, color-mix(in srgb, var(--brand-gold) 70%, transparent) 0, transparent 50%), var(--brand-navy);
 }
 .widget-preview {
   position: relative;
@@ -2397,8 +2141,8 @@ table.nutrition td.num {
   gap: 3px;
   max-width: 220px;
   padding: 12px 14px;
-  border-radius: 16px;
-  font-size: 13px;
+  border-radius: var(--r-lg);
+  font-size: var(--fs-sm);
   isolation: isolate;
 }
 .widget-preview-bg {
@@ -2417,7 +2161,7 @@ table.nutrition td.num {
   flex: none;
   margin: -6px -6px 0 0;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   background: transparent;
   color: var(--green);
   cursor: pointer;
@@ -2444,7 +2188,7 @@ table.nutrition td.num {
   min-width: 0;
   height: 38px;
   padding: 0 10px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-family: ui-monospace, 'Roboto Mono', monospace;
 }
 .receipt-line .icon-btn {
@@ -2456,7 +2200,7 @@ table.nutrition td.num {
 .thumb-btn .info-dot {
   width: 24px;
   height: 24px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   right: -6px;
   bottom: -6px;
   background: var(--green-solid);
@@ -2497,7 +2241,7 @@ table.nutrition td.num {
 .list-product-photo .thumb {
   width: 96px;
   height: 96px;
-  border-radius: 16px;
+  border-radius: var(--r-lg);
 }
 
 /* ---------- 0.6.8: price history ---------- */
@@ -2517,7 +2261,7 @@ table.nutrition td.num {
 }
 .ph-lab,
 .ph-sec {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   letter-spacing: 0.6px;
   text-transform: uppercase;
@@ -2527,13 +2271,13 @@ table.nutrition td.num {
   margin-bottom: -6px;
 }
 .ph-big {
-  font-size: 34px;
+  font-size: var(--fs-display);
   font-weight: 800;
   letter-spacing: -0.5px;
   line-height: 1.1;
 }
 .ph-each {
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 600;
   color: var(--muted);
   letter-spacing: 0;
@@ -2541,8 +2285,8 @@ table.nutrition td.num {
 .ph-pill {
   margin-left: auto;
   padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 12px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
   font-weight: 800;
   letter-spacing: 0.4px;
   text-align: center;
@@ -2564,14 +2308,14 @@ table.nutrition td.num {
   color: var(--red-ink);
 }
 .ph-sub {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
   margin-top: -10px;
 }
 .ph-tip {
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 12px 14px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   line-height: 1.4;
   display: flex;
   flex-direction: column;
@@ -2591,7 +2335,7 @@ table.nutrition td.num {
 }
 .ph-chart {
   background: var(--sunken);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 8px 4px 4px;
 }
 .ph-scale {
@@ -2605,8 +2349,8 @@ table.nutrition td.num {
   right: 0;
   top: 38px;
   height: 10px;
-  border-radius: 5px;
-  background: linear-gradient(90deg, var(--green-solid), #9bd1ae 45%, var(--seg) 100%);
+  border-radius: var(--r-full);
+  background: linear-gradient(90deg, var(--green-solid), color-mix(in srgb, var(--green-solid) 40%, var(--surface)) 45%, var(--seg) 100%);
 }
 .ph-mark {
   position: absolute;
@@ -2614,7 +2358,7 @@ table.nutrition td.num {
   width: 22px;
   height: 22px;
   margin-left: -11px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   border: 3px solid var(--surface);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   background: var(--muted);
@@ -2623,7 +2367,7 @@ table.nutrition td.num {
   background: var(--green-solid);
 }
 .ph-mark.sale {
-  background: #5fb07c;
+  background: color-mix(in srgb, var(--green-solid) 65%, var(--surface));
 }
 .ph-mark.today {
   width: 14px;
@@ -2636,18 +2380,18 @@ table.nutrition td.num {
 .ph-pin {
   position: absolute;
   top: 0;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   background: var(--ink);
   color: var(--bg);
   padding: 3px 8px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   white-space: nowrap;
 }
 .ph-lbl {
   position: absolute;
   top: 60px;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   line-height: 1.25;
   color: var(--muted);
   white-space: nowrap;
@@ -2655,13 +2399,13 @@ table.nutrition td.num {
 .ph-lbl b {
   display: block;
   color: var(--ink);
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .ph-often {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
 }
 .ph-often b {
@@ -2670,7 +2414,7 @@ table.nutrition td.num {
 .ph-meter {
   flex: 1;
   height: 14px;
-  border-radius: 7px;
+  border-radius: var(--r-full);
   background: var(--seg);
   overflow: hidden;
 }
@@ -2678,7 +2422,7 @@ table.nutrition td.num {
   display: block;
   height: 100%;
   background: var(--green-solid);
-  border-radius: 7px;
+  border-radius: var(--r-full);
 }
 .ph-weeks {
   display: grid;
@@ -2688,7 +2432,7 @@ table.nutrition td.num {
 }
 .ph-weeks i {
   height: 16px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: var(--seg);
 }
 .ph-weeks i.sale {
@@ -2710,7 +2454,7 @@ table.nutrition td.num {
   background: none;
   padding: 0;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--green);
   text-align: left;
@@ -2727,7 +2471,7 @@ table.nutrition td.num {
   flex-direction: column;
   gap: 6px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--sunken);
 }
 .fake-why p {
@@ -2776,7 +2520,7 @@ table.nutrition td.num {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 800;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -2788,13 +2532,13 @@ table.nutrition td.num {
   flex-wrap: wrap;
 }
 .home-list-total .num {
-  font-size: 38px;
+  font-size: var(--fs-display);
   font-weight: 800;
   letter-spacing: -0.8px;
   line-height: 1;
 }
 .home-list-how {
-  font-size: 15px;
+  font-size: var(--fs-body);
   color: var(--muted);
   font-weight: 600;
 }
@@ -2803,9 +2547,9 @@ table.nutrition td.num {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--sunken);
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .home-list-alt .grow {
   flex: 1;
@@ -2814,15 +2558,15 @@ table.nutrition td.num {
   font-weight: 700;
 }
 .home-list-more {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--amber-bg);
   color: var(--amber-ink);
 }
 .home-list-save {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--green);
 }
@@ -2859,7 +2603,7 @@ details.more summary {
   min-width: 0;
 }
 .ph-count {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--ink-2);
   font-weight: 500;
 }
@@ -2875,7 +2619,7 @@ details.more summary {
   width: 100%;
   text-align: left;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   border: 1.5px solid var(--line-2);
   background: var(--surface);
   color: var(--ink);
@@ -2889,7 +2633,7 @@ details.more summary {
 .ph-radio {
   width: 18px;
   height: 18px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   border: 2px solid var(--line-2);
   flex: none;
 }
@@ -2905,18 +2649,18 @@ details.more summary {
 }
 .ph-size {
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--fs-body);
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
 }
 .ph-size .tag {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 2px 6px;
 }
 .ph-name {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2925,18 +2669,18 @@ details.more summary {
 .ph-row-price {
   text-align: right;
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--fs-body);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
 }
 .ph-row-price small {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--green-ink);
 }
 .ph-row-price small.out {
-  color: var(--red-ink, #b3261e);
+  color: var(--red-ink);
 }
 
 /* The ticked list in the add panel (0.7.3): scrolls on its own; prices always in full. */
@@ -2991,7 +2735,7 @@ details.pick-more > summary {
   cursor: pointer;
   min-height: 40px;
   font-weight: 600;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 details.pick-more > summary::-webkit-details-marker {
   display: none;
@@ -3010,7 +2754,7 @@ details.pick-more > .field {
 .pick-dot {
   width: 22px;
   height: 22px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   border: 2px solid var(--surface);
   box-shadow: 0 0 0 1px var(--line-2);
   flex: none;
@@ -3067,7 +2811,7 @@ details.fold-inline {
 .tag.beta {
   margin-left: 6px;
   vertical-align: 1px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 2px 6px;
 }
 @keyframes toast-in {
@@ -3090,13 +2834,8 @@ details.fold-inline {
   gap: 2px;
 }
 /* Aldi's navy dot, lighter in dark mode so it shows on the dark background. */
-:root[data-theme='dark'] .chain-dot.aldi {
-  background: #6f8fe0 !important;
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-theme='system'] .chain-dot.aldi {
-    background: #6f8fe0 !important;
-  }
+.chain-dot.aldi {
+  background: var(--aldi-dot) !important;
 }
 /* Long tags ("Out of stock at Thuringowa Central") wrap instead of running off the screen. */
 .tag {
@@ -3162,11 +2901,11 @@ details.fold-inline {
   gap: 6px;
   min-height: 72px;
   padding: 10px 4px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   border: 1px solid var(--line-2);
   background: var(--surface);
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   line-height: 1.2;
   text-align: center;
@@ -3203,8 +2942,8 @@ details.fold-inline {
   aspect-ratio: 1;
   padding: 0;
   overflow: hidden;
-  background: #fff;
-  border-radius: 16px;
+  background: var(--white);
+  border-radius: var(--r-lg);
   display: grid;
   place-items: center;
 }
@@ -3232,9 +2971,9 @@ details.fold-inline {
 .sync-code-text {
   display: block;
   word-break: break-all;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--card-2, rgba(0, 0, 0, 0.05));
   user-select: all;
 }
@@ -3245,14 +2984,14 @@ details.fold-inline {
   flex-direction: column;
   gap: 6px;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--card);
 }
 
 /* 0.8.5: a choice in a list of rows, with the picked one (and a recommended one) in green. */
 .row.choice {
   border: 2px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--r-md);
 }
 .row.choice.picked {
   border-color: var(--green);
@@ -3279,87 +3018,45 @@ details.fold-inline {
   flex-shrink: 0;
 }
 
-/* True black in dark mode, for OLED screens (0.8.9): every background is black, so those pixels are
-   off. Cards keep a faint edge so they still read as cards. Works with both styles; the navy
-   bars go black too (the gold line and savings banner keep their colour). */
-:root[data-black='1'][data-theme][data-style] {
-  --bg: #000000;
-  --surface: #0a0a0a;
-  --sunken: #141414;
-  --line: #262626;
-  --line-2: #333333;
-  --line-soft: #1a1a1a;
-  --dash: #4a4a4a;
-  --seg: #141414;
-  --on-ink: #000000;
-  --bar: #262626;
-  --tabbar-bg: #000000;
-  --shade-bg: #000000;
-  --shadow: rgba(0, 0, 0, 0);
-}
-:root[data-black='1'][data-contrast='high'][data-theme][data-style] {
-  --muted: var(--ink-2);
-  --line: #4d4d4d;
-  --line-2: #4d4d4d;
-  --dash: var(--ink-2);
-}
-
 /* ---------- 0.9.0: one look everywhere ----------
    Text: 30 screen titles, 17 card headings, 15 item names, 13 details, 12 capitals for section labels
    (11 in tags). Corners: 16 cards and sheets, 12 buttons and boxes, round tags and icon buttons.
    Buttons: 48 main, 36 small and chips, 40 round icons. Deal colours (--good, amber, red, blue, grey)
    never follow the accent colour, so a green GREAT DEAL stays green whatever accent is picked. */
-:root {
-  --good-ink: #0b6b34;
-  --good-bg: #dcf1e3;
-}
-:root[data-theme='dark'] {
-  --good-ink: #8fe0b2;
-  --good-bg: #12321f;
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-theme='system'] {
-    --good-ink: #8fe0b2;
-    --good-bg: #12321f;
-  }
-}
-:root[data-black='1'][data-theme][data-style] {
-  --good-bg: #10301e;
-}
 h1 {
-  font-size: 30px;
+  font-size: var(--fs-3xl);
   font-weight: 800;
   letter-spacing: -0.5px;
 }
 h2,
 .section-head .title {
-  font-size: 17px;
+  font-size: var(--fs-lg);
 }
 .title {
   font-weight: 700;
 }
 .small,
 .sub {
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 .eyebrow {
   letter-spacing: 0.08em;
 }
 .card {
-  border-radius: 16px;
+  border-radius: var(--r-lg);
 }
 .btn {
   height: 48px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
 }
 .btn.small {
   height: 36px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
 }
 .icon-btn {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
 }
 .seg button {
   height: 36px;
@@ -3368,8 +3065,8 @@ h2,
 .tag {
   height: 22px;
   padding: 0 9px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
   font-weight: 800;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -3394,15 +3091,15 @@ h2,
 .badge {
   height: 22px;
   padding: 0 9px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
   font-weight: 800;
   letter-spacing: 0.04em;
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
   background: var(--green-solid);
-  color: var(--on-accent, #fff);
+  color: var(--on-accent);
 }
 /* Dashed outlines only mean "add something". */
 .btn.ghost {
@@ -3437,8 +3134,8 @@ select.input,
 select {
   appearance: none;
   -webkit-appearance: none;
-  border-radius: 12px;
-  font-size: 15px;
+  border-radius: var(--r-md);
+  font-size: var(--fs-body);
   font-weight: 600;
   padding-right: 40px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
@@ -3454,7 +3151,7 @@ input[type='checkbox'].switch,
   margin: 0 0 0 auto;
   width: 46px;
   height: 28px;
-  border-radius: 14px;
+  border-radius: var(--r-full);
   background: var(--line-2);
   position: relative;
   flex-shrink: 0;
@@ -3468,8 +3165,8 @@ input[type='checkbox'].switch::after {
   left: 3px;
   width: 22px;
   height: 22px;
-  border-radius: 50%;
-  background: #fff;
+  border-radius: var(--r-full);
+  background: var(--white);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   transition: left 0.15s;
 }
@@ -3533,7 +3230,7 @@ input[type='checkbox'].switch:focus-visible {
 }
 .price-col {
   font-weight: 800;
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
@@ -3560,7 +3257,7 @@ input[type='checkbox'].switch:focus-visible {
 }
 .hero-title {
   flex: 1;
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 800;
   color: var(--ink);
 }
@@ -3570,7 +3267,7 @@ input[type='checkbox'].switch:focus-visible {
   gap: 8px;
 }
 .hero-big {
-  font-size: 28px;
+  font-size: var(--fs-3xl);
   font-weight: 800;
   letter-spacing: -0.5px;
 }
@@ -3589,17 +3286,17 @@ input[type='checkbox'].switch:focus-visible {
   gap: 6px;
   height: 28px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--surface);
   border: 1px solid var(--line-2);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
 }
 .shop-totals .section-head {
   padding-top: 12px;
 }
 .eyebrow-in {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -3613,7 +3310,7 @@ input[type='checkbox'].switch:focus-visible {
   gap: 6px;
 }
 .have {
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 700;
 }
 .have.all {
@@ -3635,29 +3332,29 @@ input[type='checkbox'].switch:focus-visible {
   gap: 4px;
   padding: 18px 18px 16px;
   border: none;
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   text-align: left;
   font: inherit;
 }
 .cat-kicker {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 800;
   letter-spacing: 0.08em;
   color: var(--gold);
 }
 .cat-entry-title,
 .cat-cover h2 {
-  font-size: 26px;
+  font-size: var(--fs-2xl);
   font-weight: 800;
   line-height: 1.1;
   max-width: 78%;
-  color: #fff;
+  color: var(--white);
 }
 .cat-cover h2 {
-  font-size: 30px;
+  font-size: var(--fs-3xl);
 }
 .cat-lede {
-  font-size: 15px;
+  font-size: var(--fs-body);
   opacity: 0.9;
   max-width: 80%;
 }
@@ -3677,10 +3374,10 @@ input[type='checkbox'].switch:focus-visible {
   flex-direction: column;
 }
 .cat-stats b {
-  font-size: 26px;
+  font-size: var(--fs-2xl);
 }
 .cat-stats small {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   opacity: 0.85;
 }
 .cat-pages {
@@ -3705,8 +3402,8 @@ input[type='checkbox'].switch:focus-visible {
 .cat-num {
   width: 36px;
   height: 36px;
-  border-radius: 12px;
-  color: #fff;
+  border-radius: var(--r-md);
+  color: var(--white);
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -3715,7 +3412,7 @@ input[type='checkbox'].switch:focus-visible {
 }
 .cat-shop {
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   overflow: hidden;
   background: var(--surface);
 }
@@ -3724,15 +3421,15 @@ input[type='checkbox'].switch:focus-visible {
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  color: #fff;
+  color: var(--white);
 }
 .cat-band-name {
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 800;
   flex: 1;
 }
 .cat-band-sub {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   opacity: 0.92;
 }
@@ -3749,15 +3446,15 @@ input[type='checkbox'].switch:focus-visible {
   gap: 4px;
   padding: 10px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--surface);
   min-width: 0;
 }
 .cat-photo {
   height: 96px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   border: 1px solid var(--line-soft);
-  background: #fff;
+  background: var(--white);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3775,8 +3472,8 @@ input[type='checkbox'].switch:focus-visible {
   left: 6px;
   height: 22px;
   padding: 0 8px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
   font-weight: 800;
   letter-spacing: 0.04em;
   display: inline-flex;
@@ -3794,7 +3491,7 @@ input[type='checkbox'].switch:focus-visible {
   color: var(--good-ink);
 }
 .cat-name {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   line-height: 1.25;
   min-height: 33px;
@@ -3812,16 +3509,16 @@ input[type='checkbox'].switch:focus-visible {
   padding-right: 38px;
 }
 .cat-price b {
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   font-weight: 800;
   letter-spacing: -0.4px;
 }
 .cat-price s {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 .cat-note {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--good-ink);
   padding-right: 38px;
@@ -3832,10 +3529,10 @@ input[type='checkbox'].switch:focus-visible {
   bottom: 8px;
   width: 34px;
   height: 34px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   border: none;
   background: var(--green-solid);
-  color: var(--on-accent, #fff);
+  color: var(--on-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3851,11 +3548,11 @@ input[type='checkbox'].switch:focus-visible {
   gap: 0;
 }
 .pagedots button {
-  width: 28px;
-  height: 28px;
+  width: var(--hit);
+  height: var(--hit);
   padding: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: none;
   display: flex;
   align-items: center;
@@ -3865,11 +3562,11 @@ input[type='checkbox'].switch:focus-visible {
   content: '';
   width: 8px;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: var(--line-2);
 }
 .pagedots button.on {
-  width: 36px;
+  width: var(--hit);
 }
 .pagedots button.on::before {
   width: 22px;
@@ -3878,7 +3575,7 @@ input[type='checkbox'].switch:focus-visible {
 .list-head .linkish {
   text-decoration: none;
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--fs-body);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -3925,7 +3622,7 @@ select {
 /* In-store view (0.9.0): the same cards as everywhere else, and a bar for how far through you are. */
 .shop-progress {
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--r-full);
   background: var(--sunken);
   overflow: hidden;
   margin-top: 6px;
@@ -3933,7 +3630,7 @@ select {
 .shop-progress span {
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--r-full);
   background: var(--green-solid);
   transition: width 0.2s;
 }
@@ -3950,14 +3647,14 @@ select {
 }
 .shopmode-list section > .eyebrow + .shoprow {
   border-top: 1px solid var(--line);
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
 }
 .shopmode-list section > .shoprow:last-child {
   border-bottom: 1px solid var(--line);
-  border-radius: 0 0 16px 16px;
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
 }
 .shopmode-list section > .eyebrow + .shoprow:last-child {
-  border-radius: 16px;
+  border-radius: var(--r-lg);
 }
 .shop-gap-btns {
   display: flex;
@@ -3982,10 +3679,10 @@ select {
   display: block;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--card);
   font-family: ui-monospace, 'Roboto Mono', monospace;
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: 0.5px;
   line-height: 1.6;
@@ -4091,14 +3788,10 @@ select {
 :root[data-text] #layers {
   zoom: var(--text-zoom, 1);
 }
-:root:has(.sticky-cta) #layers .toast {
-  bottom: calc(var(--bottom) + 146px);
-}
-
 /* 0.9.1: Settings → Sync and backups, in two groups. */
 .group-head {
   margin: 4px 2px -6px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 700;
   color: var(--ink);
   scroll-margin-top: calc(var(--top) + 12px);
@@ -4110,13 +3803,13 @@ select {
 .seg.range-seg button {
   padding-left: 2px;
   padding-right: 2px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   white-space: nowrap;
 }
 
 /* 0.9.3: Sync and backups. The strip says whether everything is kept somewhere else, or names what needs you. */
 .sync-strip {
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -4137,7 +3830,7 @@ select {
 }
 .sync-strip-head strong {
   flex: 1;
-  font-size: 16px;
+  font-size: var(--fs-body);
   color: var(--ink);
 }
 .sync-strip-cells {
@@ -4150,10 +3843,10 @@ select {
   flex-direction: column;
   gap: 2px;
   padding: 8px 10px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--surface);
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 500;
 }
 .sync-strip-cell .small {
@@ -4165,7 +3858,7 @@ select {
 .sync-house-ic {
   width: 40px;
   height: 40px;
-  border-radius: 20px;
+  border-radius: var(--r-full);
   flex: none;
   display: flex;
   align-items: center;
@@ -4180,18 +3873,18 @@ select {
 /* 0.9.4: Sync and backups as on the "Restock sync redesign" canvas: nothing set up yet, the three
    ways to sync (your server first), and the ways in use with a dot each. */
 .sync-alone {
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   background: var(--amber-bg);
   color: var(--amber-ink-2);
-  font-size: 14px;
+  font-size: var(--fs-md);
   line-height: 1.45;
 }
 .sync-alone strong {
-  font-size: 16px;
+  font-size: var(--fs-body);
   color: var(--amber-ink);
 }
 .sync-choice {
@@ -4199,7 +3892,7 @@ select {
   flex-direction: column;
   gap: 8px;
   padding: 16px;
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
@@ -4229,7 +3922,7 @@ button.sync-choice:disabled {
 .sync-choice-ic {
   width: 44px;
   height: 44px;
-  border-radius: 22px;
+  border-radius: var(--r-xl);
   flex: none;
   display: flex;
   align-items: center;
@@ -4244,12 +3937,12 @@ button.sync-choice:disabled {
 .sync-choice-go {
   color: var(--green);
   font-weight: 600;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .sync-dot {
   width: 10px;
   height: 10px;
-  border-radius: 5px;
+  border-radius: var(--r-full);
   flex: none;
   box-sizing: border-box;
   border: 2px solid var(--muted);
@@ -4257,4 +3950,411 @@ button.sync-choice:disabled {
 .sync-dot.on {
   border: 0;
   background: var(--green);
+}
+
+/* ---------- 0.9.5 (undo) ---------- */
+/* The Undo message is lifted clear of Start shopping, the Save bar, the Add tab's bar and the select
+   bar by toastLift.ts. */
+.toast.has-undo {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.toast .toast-undo {
+  min-height: 44px;
+  min-width: 64px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+}
+.toast .toast-undo:focus-visible {
+  outline: 3px solid var(--green-bg);
+  outline-offset: 1px;
+}
+
+/* The web's big white Undo in the sidebar foot (DeskUndo.tsx). White in every theme. */
+.dk-undo {
+  width: 100%;
+  min-height: 56px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: var(--r-md);
+  background: var(--white);
+  color: var(--brand-navy);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  animation: dk-undo-in 0.2s ease-out;
+  transition: opacity 0.7s ease;
+}
+.dk-undo:hover {
+  background: var(--fixed-hover);
+}
+.dk-undo:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+.dk-undo.fading {
+  opacity: 0;
+}
+.dk-undo-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dk-undo-text strong {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+.dk-undo-what {
+  font-size: var(--fs-sm);
+  color: var(--fixed-ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+@keyframes dk-undo-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dk-undo {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ---------- 0.9.5 (save) ---------- */
+/* The big green "Save settings" button (SaveBar.tsx). */
+.btn.save-green {
+  background: var(--green-solid);
+  border-color: var(--green-solid);
+  color: var(--on-accent);
+  min-height: 48px;
+  padding: 0 22px;
+  font-size: var(--fs-body);
+  font-weight: 800;
+}
+.btn.save-green:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.btn.danger-ghost {
+  color: var(--red-ink);
+}
+/* Phone: pinned to the bottom of a settings screen, above the tabs. */
+.save-bar {
+  position: sticky;
+  bottom: -24px;
+  z-index: 6;
+  margin: 12px -18px -24px;
+  padding: 10px 18px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+.save-bar .btn.save-green {
+  flex: none;
+}
+.save-bar-text {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-md);
+  color: var(--ink-2);
+}
+.save-bar.dirty .save-bar-text {
+  color: var(--ink);
+  font-weight: 700;
+}
+.save-bar-text.err,
+.dk-save-text.err {
+  color: var(--red-ink);
+}
+/* Web: in the page header (top right) and at the foot of the page. */
+.dk-save {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dk-save.foot {
+  margin: 28px 0 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  justify-content: flex-end;
+}
+.dk-save-text {
+  font-size: var(--fs-md);
+  color: var(--ink-2);
+}
+.dk-save.dirty .dk-save-text {
+  color: var(--ink);
+  font-weight: 700;
+}
+.dk-save .btn.save-green {
+  min-height: 52px;
+  padding: 0 28px;
+  font-size: var(--fs-lg);
+}
+
+/* ---------- 0.9.5 (look): one product on the phone and the web ----------
+   Sizes and colours come from tokens.css. These rules make the shared parts behave the same
+   everywhere, and fix what the crawls found at the largest text size. */
+
+/* Tap areas: anything small (chips, small buttons, segments, round icon buttons, tags you tap)
+   keeps its look but takes a 44 px tap. :where() keeps this from beating a rule that places
+   the control itself. */
+:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .ph-src, .dk-name, .dk-line-open, .dk-linkish, .cat-name-open, .cat-add, .shoprow-open) {
+  position: relative;
+}
+:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .dk-name, .dk-line-open, .dk-linkish, .cat-name-open, .cat-add)::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, var(--hit));
+  height: max(100%, var(--hit));
+  transform: translate(-50%, -50%);
+}
+.tag.tag-btn::after {
+  left: 50%;
+  right: auto;
+  width: max(100%, var(--hit));
+  transform: translate(-50%, -50%);
+}
+.ph-src {
+  min-height: var(--hit);
+}
+/* Tick boxes: 24 px to see, and the whole row (its label) is what you tap. */
+.check input[type='checkbox']:not(.switch),
+.check input[type='radio'],
+.row input[type='checkbox']:not(.switch) {
+  width: 24px;
+  height: 24px;
+}
+.check {
+  cursor: pointer;
+}
+
+/* Headers: a long title wraps, so the buttons beside it stay on the screen. */
+.topbar h1 {
+  min-width: 0;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+.topbar > .icon-btn,
+.topbar > .btn {
+  flex-shrink: 0;
+}
+
+:root[data-text='1.3'] .topbar h1,
+:root[data-text='1.5'] .topbar h1 {
+  font-size: var(--fs-2xl);
+}
+
+/* Item names in lists wrap to two lines instead of being cut. */
+.row .title.clip,
+.row-main .title.clip {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+/* The details under a name wrap to two lines too. At Larger and Largest text the price goes under
+   the name, and at Largest the pantry row's picture steps aside (it's still a long press away). */
+.row .small.clip,
+.row-main .small.clip {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+:root[data-text='1.3'] .row-main,
+:root[data-text='1.5'] .row-main {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+:root[data-text='1.3'] .row-main > .grow,
+:root[data-text='1.5'] .row-main > .grow {
+  flex-basis: calc(100% - 40px);
+}
+:root[data-text='1.5'] .row .thumb-btn {
+  display: none;
+}
+/* Rows of chips scroll sideways; room above and below for their tap areas, so they never
+   scroll up and down too. */
+.chips {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  margin-top: -4px;
+  margin-bottom: -4px;
+}
+.chips.jump {
+  margin-top: -10px;
+}
+/* Price history's shop switch: one shop a line when the text is big, so names aren't cut. */
+:root[data-text='1.3'] .seg.ph-shops,
+:root[data-text='1.5'] .seg.ph-shops {
+  grid-auto-flow: row;
+  grid-template-columns: minmax(0, 1fr);
+}
+/* The five chart ranges: the number over its unit. */
+.seg.range-seg button {
+  height: auto;
+  min-height: var(--hit);
+  padding: 4px 2px;
+}
+.range-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+.range-label b {
+  font-size: var(--fs-body);
+}
+.range-label span {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+/* A chip with a long label (Use a short name: …) wraps inside the sheet. */
+.chip.wrap {
+  height: auto;
+  min-height: var(--h-control-sm);
+  padding: 8px 14px;
+  white-space: normal;
+  text-align: left;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+/* The scanner's frame is sized by its box, not the window, so it fits at any text size. */
+.scanner-frame {
+  width: min(78%, 360px);
+  height: auto;
+  aspect-ratio: 36 / 19;
+}
+.scanner-frame.square {
+  width: min(70%, 300px);
+  height: auto;
+  aspect-ratio: 1;
+}
+.sync-qr {
+  width: min(280px, 72%);
+}
+/* Shopping list: Start shopping sits on a solid bar, so the list never shows through it. */
+.sticky-cta {
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+/* Add "honey" and Search the shops: side by side when there's room, else one under the other. */
+.two.add-choices {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+}
+
+/* Four lists (Groceries, Keg, Health, General): two by two, so every name and count shows. */
+.seg[aria-label='Which list']:has(> :nth-child(4)) {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* A tick box that isn't inside its row's label (the web list: the name opens the item) sits in a
+   44 px box of its own, so the tap still lands. */
+.tick-hit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  margin: -10px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.tick-hit input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--green);
+}
+
+/* A row's main button (opens the item) is a full 44 px tall, like the row's other buttons. */
+.row-main,
+.shop-head-main {
+  min-height: var(--hit);
+}
+/* Setup's tiles: two across, one across at Largest text, so long words never push past the edge. */
+.setup-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.setup-tile {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+:root[data-text='1.5'] .setup-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Larger and Largest text: the list switch drops its icons, and three or four lists go two by two. */
+:root[data-text='1.3'] .seg[aria-label='Which list'] svg,
+:root[data-text='1.5'] .seg[aria-label='Which list'] svg {
+  display: none;
+}
+:root[data-text='1.3'] .seg[aria-label='Which list']:has(> :nth-child(3)),
+:root[data-text='1.5'] .seg[aria-label='Which list']:has(> :nth-child(3)) {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* Price history's product names wrap to two lines rather than being cut. */
+.ph-name {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+/* Three or more shops in price history: a size smaller, so "Woolworths" fits. */
+.seg.ph-shops:has(> :nth-child(3)) button {
+  font-size: var(--fs-sm);
+}
+/* The colour swatches in Look and colours get a 44 px tap too. */
+:where(.swatch) {
+  position: relative;
+}
+:where(.swatch)::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, var(--hit));
+  height: max(100%, var(--hit));
+  transform: translate(-50%, -50%);
+}
+/* Larger and Largest text: a shop's heading on the list puts its total and buttons under its name. */
+:root[data-text='1.3'] .shop-head,
+:root[data-text='1.5'] .shop-head {
+  flex-wrap: wrap;
+}
+:root[data-text='1.3'] .shop-head > .shop-head-main,
+:root[data-text='1.5'] .shop-head > .shop-head-main {
+  flex: 1 1 100%;
+}
+:root[data-text='1.3'] .shop-head > .price-col,
+:root[data-text='1.5'] .shop-head > .price-col {
+  margin-right: auto;
 }

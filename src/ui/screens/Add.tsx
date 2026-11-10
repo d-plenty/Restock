@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { lookupBarcode, productCode, scanBarcode, type BarcodeInfo } from '../../lib/barcode';
 import { displayName, identifyBarcode, QUICK_PICKS, searchTermFor, weakName } from '../../lib/lookup';
 import { PackReader } from '../PackReader';
@@ -13,7 +14,6 @@ import {
   allGroups,
   allProducts,
   findProductByBarcode,
-  findProductByStore,
   getGroup,
   getProducts,
   cachedSettings,
@@ -23,10 +23,10 @@ import {
   readingsFor,
   uid,
   updateGroup,
-  updateProduct,
   updateSettings,
 } from '../../lib/db';
-import { addGroupToList } from '../../lib/listActions';
+import { pickItemFor } from '../../lib/listPicks';
+import { addToList } from '../../lib/listActions'; // 0.9.5 (undo)
 import { genericName, nameHasSize } from '../../lib/naming';
 import { shareTextFile } from '../../lib/backup';
 import { slim } from '../../lib/searchTest';
@@ -63,7 +63,7 @@ import { shopDetails } from '../../stores/details';
 import { BlockedError, isNative, NativeOnlyError, promoLabel } from '../../stores/http';
 import { recordHealth } from '../../lib/health';
 import { isExactBarcode, rankAll, score, tokens, type RankQuery } from '../../stores/rank';
-import { chainName, mainProductIds, searchStoreId, stockKnown, type AlertLevel, type Chain, type Group, type Product } from '../../types';
+import { chainName, mainProductIds, searchStoreId, stockKnown, type AlertLevel, type Chain, type Group, type ListEntry } from '../../types';
 import {
   activeSections,
   enabledIn,
@@ -77,11 +77,14 @@ import {
   kindOf as shopKindOf,
 } from '../../shops';
 
+// Short enough to show in full at 390 px wide with the largest text (0.9.5: "Or search a proc…").
 const SEARCH_PLACEHOLDER: Record<Section, string> = {
-  pantry: 'Or search a product name',
-  keg: 'Or search a beer, wine or spirit',
-  pharmacy: 'Or search a medicine or product',
+  pantry: 'Search products',
+  keg: 'Search drinks',
+  pharmacy: 'Search Health',
 };
+/** Small buttons and links still get a 44 px target. */
+const TAP: CSSProperties = { minHeight: 44 };
 import {
   ChainDot,
   ChainName,
@@ -99,7 +102,25 @@ import {
 } from '../components';
 import { useNav } from '../nav';
 import { OtherSizesCard } from '../OtherSizes';
+import { keyOf, sheetOpenAfter, tickMessage, togglePick } from './addPicks';
+import { addItemForLineUndoable, addItemFromPicks, pickedWords, saveStoreProducts } from './addSave';
 import { AlertPicker } from './Item';
+
+/**
+ * 0.9.5: "Search the shops" from the Pick sheet, for a list line that matches nothing in the pantry
+ * ("chopsticks" from Home Assistant). The Add tab's own search, ticks and bar; adding makes the
+ * pantry item and links the line to it.
+ */
+export interface ForLine {
+  entry: ListEntry;
+  /** The line's words ("chopsticks"). */
+  word: string;
+  /** "Always use this for chopsticks". */
+  always: boolean;
+  onAlways: (on: boolean) => void;
+  /** The line now is this item (`made`: a new one). `linked` false: the line had gone meanwhile. */
+  onDone: (group: { id: string; name: string }, made: boolean, linked: boolean) => void;
+}
 
 type ChainResult =
   | { status: 'loading' }
@@ -149,7 +170,6 @@ const FIRST_PAGE = 5;
 const MORE_PAGE = 10;
 type Target = 'pantry' | 'list' | 'both';
 
-const keyOf = (sp: StoreProduct) => `${sp.chain}:${sp.storeProductId}`;
 
 /**
  * The same product at another shop, found by opening the shop's own page for its top few results:
@@ -194,6 +214,7 @@ export function AddScreen({
   forList,
   replaceEntry,
   overlay,
+  forLine,
 }: {
   barcode?: string;
   attachTo?: string;
@@ -208,6 +229,8 @@ export function AddScreen({
   forList?: boolean;
   replaceEntry?: string;
   overlay?: boolean;
+  /** Inside the Pick sheet: make a pantry item for this list line (see ForLine). */
+  forLine?: ForLine;
 }) {
   const nav = useNav();
   const settings = useLive(getSettings, []);
@@ -277,7 +300,6 @@ export function AddScreen({
   const [recs, setRecs] = useState<Partial<Record<Chain, { same?: StoreProduct; like: StoreProduct[] }>>>({});
   const [recBusy, setRecBusy] = useState<Chain[]>([]);
   const recFor = useRef<string | undefined>(undefined);
-  const recCard = useRef<HTMLDivElement>(null);
   // Products already in your pantry, so search results can say so.
   const pantry = useLive(async () => {
     const [products, groups] = await Promise.all([allProducts(), allGroups()]);
@@ -341,21 +363,18 @@ export function AddScreen({
   };
 
   const [lastText, setLastText] = useState('');
-  // The add panel pops up for a moment each time something's ticked, then shrinks to a slim bar
-  // so the rest of the results can be seen. Touching the panel keeps it open.
+  // 0.9.5: ticking only ever puts it in the bar at the bottom. The sheet to name it and add it opens
+  // from the bar's green arrow, never by itself (0.9.4 popped it up for a second on every tick).
   const [panelOpen, setPanelOpen] = useState(false);
-  const [panelHeld, setPanelHeld] = useState(false);
-  const lastPicks = useRef(0);
+  useEffect(() => setPanelOpen((open) => sheetOpenAfter(open, { kind: 'picks', size: picks.size })), [picks.size]);
+  // What a screen reader hears when something's ticked or unticked.
+  const [said, setSaid] = useState('');
+  const lastPicks = useRef(picks);
   useEffect(() => {
-    const grew = picks.size > lastPicks.current;
-    lastPicks.current = picks.size;
-    if (!picks.size) return setPanelOpen(false);
-    if (!grew) return;
-    setPanelOpen(true);
-    if (panelHeld) return;
-    const t = setTimeout(() => setPanelOpen(false), 1100);
-    return () => clearTimeout(t);
-  }, [picks.size, panelHeld]);
+    const msg = tickMessage(lastPicks.current, picks);
+    lastPicks.current = picks;
+    if (msg) setSaid(msg);
+  }, [picks]);
   // The height left above the keyboard, so the add panel never grows taller than what can be seen.
   useEffect(() => {
     const vv = window.visualViewport;
@@ -693,7 +712,6 @@ export function AddScreen({
     setRecAnchor(anchor);
     setRecs({});
     setRecBusy(todo);
-    setTimeout(() => recCard.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 200);
     const typed = lastText.toLowerCase().trim();
     const terms = [...new Set([anchor.brand ? `${anchor.brand} ${kind}` : '', kind].map((t) => t.toLowerCase().trim()))].filter(
       (t) => t && t !== typed,
@@ -788,14 +806,9 @@ export function AddScreen({
 
   const toggle = (sp: StoreProduct) => {
     setPicks((prev) => {
-      const next = new Map(prev);
-      const k = keyOf(sp);
-      if (next.has(k)) next.delete(k);
-      else {
-        next.set(k, sp);
-        if (!name && !attachTo)
-          setName(scanned?.name && !weakName(scanned) ? genericName(scanned.name, scanned.brand) : genericName(sp.name, sp.brand));
-      }
+      const next = togglePick(prev, sp);
+      if (next.has(keyOf(sp)) && !name && !attachTo)
+        setName(scanned?.name && !weakName(scanned) ? genericName(scanned.name, scanned.brand) : genericName(sp.name, sp.brand));
       return next;
     });
     // Ticked one? Look for the same thing at the other stores, so it's one tap to tick them all.
@@ -822,47 +835,8 @@ export function AddScreen({
   };
 
   /** Save each picked store product (or reuse it if it's already tracked) with today's price. */
-  const saveProducts = async (): Promise<string[]> => {
-    const ids: string[] = [];
-    for (const sp of picks.values()) {
-      const existing = await findProductByStore(sp.chain, sp.storeProductId);
-      let id = existing?.id;
-      if (!id) {
-        id = uid();
-        const product: Product = {
-          id,
-          chain: sp.chain,
-          name: sp.name,
-          brand: sp.brand,
-          size: sp.size,
-          barcode: sp.barcode ?? (isExactBarcode(rankQ, sp) || as === 'main' ? rankQ.barcode : undefined),
-          storeProductId: sp.storeProductId,
-          imageUrl: sp.imageUrl,
-          inStock: sp.inStock,
-          stockAt: sp.inStock === undefined ? undefined : nowIso(),
-          createdAt: nowIso(),
-        };
-        await addProduct(product);
-      } else {
-        // Always overwrite, so a stale "out of stock" is cleared when the store stops saying so.
-        await updateProduct(id, { inStock: sp.inStock, stockAt: sp.inStock === undefined ? undefined : nowIso() });
-      }
-      if (sp.price !== undefined) {
-        await addReading({
-          productId: id,
-          date: nowIso(),
-          price: sp.price,
-          wasPrice: sp.wasPrice,
-          isSpecial: sp.isSpecial,
-          memberOnly: sp.memberOnly,
-          promo: sp.promo,
-          source: 'auto',
-        });
-      }
-      if (!ids.includes(id)) ids.push(id);
-    }
-    return ids;
-  };
+  const barcodeFor = (sp: StoreProduct) => sp.barcode ?? (isExactBarcode(rankQ, sp) || as === 'main' ? rankQ.barcode : undefined);
+  const saveProducts = (): Promise<string[]> => saveStoreProducts(picks.values(), barcodeFor);
 
   const cheapestPick = () => [...picks.values()].filter((p) => p.price !== undefined).sort((a, b) => a.price! - b.price!)[0];
   const cheapestChain = (): Chain | undefined => cheapestPick()?.chain ?? [...picks.values()][0]?.chain;
@@ -871,6 +845,8 @@ export function AddScreen({
     if (!attachGroup || !picks.size) return;
     setSaving(true);
     try {
+      // 0.9.5 (undo): the whole attach is one Undo.
+      await act(as === 'alt' ? `Added to Would also take for ${attachGroup.name}` : `Added to My picks for ${attachGroup.name}`, async () => {
       const ids = await saveProducts();
       const all = new Set([attachGroup.usualProductId, ...attachGroup.sameProductIds, ...attachGroup.altProductIds]);
       if (as === 'alt') {
@@ -889,7 +865,7 @@ export function AddScreen({
           altProductIds: attachGroup.altProductIds.filter((id) => !fresh.includes(id)),
         });
       }
-      nav.toast(as === 'alt' ? `Added to Would also take for ${attachGroup.name}` : `Added to My picks for ${attachGroup.name}`);
+      });
       nav.pop();
     } finally {
       setSaving(false);
@@ -902,26 +878,32 @@ export function AddScreen({
     try {
       const first = [...picks.values()][0];
       const itemName = name.trim() || genericName(first.name, first.brand);
-      let groupId: string | undefined;
-      if (target !== 'list') {
-        const ids = await saveProducts();
-        const group: Group = {
-          id: uid(),
-          name: itemName,
-          categoryId: categoryId || undefined,
-          usualProductId: ids[0],
-          sameProductIds: ids.slice(1),
-          altProductIds: [],
-          alertLevel,
-          alertPct: alertLevel === 'custom' ? alertPct : undefined,
-          allowBulk,
-          allowMulti,
-          section,
-          createdAt: nowIso(),
-        };
-        await addGroup(group);
-        groupId = group.id;
+      const item = { name: itemName, section, categoryId, alertLevel, alertPct, allowBulk, allowMulti };
+      if (forLine) {
+        // From the Pick sheet: the new item, and the list line becomes it.
+        // 0.9.5 (final review): with an Undo, as every other add.
+        const { group, linked } = await addItemForLineUndoable(
+          forLine.entry,
+          picks.values(),
+          item,
+          forLine.always,
+          (r) => pickedWords(r.group.name, { made: true, linked: r.linked, always: forLine.always, word: forLine.word, place: SECTION_PLACE[section] }),
+          barcodeFor,
+        );
+        reset();
+        forLine.onDone(group, true, linked);
+        return;
       }
+      let groupId: string | undefined;
+      // 0.9.5 (undo): the new item, its products and prices, and its list line: one Undo.
+      const said =
+        target === 'list'
+          ? `${itemName} added to your shopping list`
+          : target === 'both'
+            ? `${itemName} added to ${SECTION_PLACE[section]} and shopping list`
+            : `${itemName} added to ${SECTION_PLACE[section]}`;
+      await act(said, async () => {
+      if (target !== 'list') groupId = (await addItemFromPicks(picks.values(), item, barcodeFor)).id;
       if (target !== 'pantry') {
         const one = groupId ? undefined : cheapestPick();
         await addListEntry({
@@ -949,13 +931,7 @@ export function AddScreen({
         });
         if (replaceEntry) await deleteListEntries([replaceEntry]);
       }
-      nav.toast(
-        target === 'list'
-          ? `${itemName} added to your shopping list`
-          : target === 'both'
-            ? `${itemName} added to ${SECTION_PLACE[section]} and shopping list`
-            : `${itemName} added to ${SECTION_PLACE[section]}`,
-      );
+      });
       reset();
       if (overlay) nav.pop();
       if (groupId) nav.push({ name: 'item', groupId });
@@ -999,24 +975,125 @@ export function AddScreen({
         ? 'Add another pick'
         : onlyChain
           ? `Find it at ${chainName(onlyChain)}`
-          : 'Find at another store'
+          : 'Find at another shop'
     : forList
       ? 'Find the cheapest'
       : 'Add an item';
   const hint = attachGroup
     ? as === 'alt'
-      ? `Tick products you'd happily buy instead of ${attachGroup.name}. They'll show up when they're on sale and cheaper than yours.`
+      ? `Tick products you'd happily buy instead of ${attachGroup.name}. They'll show up when they're on special and cheaper than yours.`
       : another
         ? `Tick another product you buy as ${attachGroup.name}, at any shop. It's kept alongside the ones you have, and Restock shows whichever is cheapest.`
-        : `Tick ${attachGroup.name} at each store that sells it. Restock then shows you whichever store is cheapest.`
-    : forList
-      ? 'Tick the ones you’d buy, at any shop. The cheapest of them goes on your shopping list for this trip only.'
-      : 'Tick what you buy at each store (it can be a different product at each one), so Restock can tell you where it’s cheapest. You can add ones you’d also take later, from the item’s page.';
+        : `Tick ${attachGroup.name} at each shop that sells it. Restock then shows you whichever shop is cheapest.`
+    : forLine
+      ? `Tick what you'd buy as "${forLine.word}" at each shop, then tap the bar at the bottom to add it to your pantry.`
+      : forList
+        ? 'Tick the ones you’d buy, at any shop. The cheapest of them goes on your Shopping list for this trip only. Then tap the bar at the bottom.'
+        : 'Tick what you buy at each shop (it can be a different product at each one), so Restock can tell you where it’s cheapest. Then tap the bar at the bottom to add it. You can add ones you’d also take later, from the item’s page.';
+
+  // A ticked product that's already a pantry item: from the Pick sheet, the line can just be that item.
+  const trackedPick = forLine ? [...picks.keys()].map((k) => pantry?.get(k)).find((g): g is Group => !!g) : undefined;
+  const useTracked = async (g: Group) => {
+    if (!forLine) return;
+    setSaving(true);
+    try {
+      const linked = await pickItemFor(forLine.entry, g, forLine.always);
+      reset();
+      forLine.onDone(g, false, linked);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const sheetTitle = forLine
+    ? 'Add to your pantry'
+    : attachGroup
+      ? as === 'alt'
+        ? 'Would also take'
+        : `Add to ${attachGroup.name}`
+      : forList
+        ? 'Add to your shopping list'
+        : 'Add what you ticked';
+
+  // "Picked for you at your other shops", in the sheet the bar opens (0.9.5: not on the page).
+  const recShown = !!recAnchor && picks.has(keyOf(recAnchor));
+  const pickedChains = new Set([...picks.values()].map((p) => p.chain));
+  const recShops = recShown
+    ? (searched.filter((c) => c !== recAnchor!.chain && !pickedChains.has(c) && (recs[c as Chain]?.same || recs[c as Chain]?.like.length)) as Chain[])
+    : [];
+  const picksForYou = recShown && recAnchor && (
+    // Not a card in a card: in the sheet the rows need all the width they can get (largest text).
+    <div role="group" aria-label="Picked for you at your other shops" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="eyebrow green">Picked for you at your other shops</div>
+      <span className="small">
+        Like the {recAnchor.name} you ticked at {chainName(recAnchor.chain)} ({money(recAnchor.price)}). Tick the ones you want here, or close this
+        and tick your own in each shop's results.
+      </span>
+      {recBusy.length > 0 && (
+        <span className="small" role="status">
+          Searching {recBusy.map((c) => chainName(c)).join(' and ')} for it…
+          <LoadingBar seconds={15} />
+        </span>
+      )}
+      {searched
+        .filter((c) => c !== recAnchor.chain && recs[c as Chain])
+        .map((c) => {
+          const r = recs[c as Chain]!;
+          const rows = [...(r.same ? [r.same] : []), ...r.like];
+          return (
+            <div key={c} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="small" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ChainDot chain={c} />{' '}
+                {r.same
+                  ? `Same product at ${chainName(c)}`
+                  : rows.length
+                    ? `Most like it at ${chainName(c)}`
+                    : `Nothing like it at ${chainName(c)}`}
+              </span>
+              {rows.length > 0 && (
+                <div className="card flush" style={{ boxShadow: 'none' }}>
+                  {rows.map((sp) => (
+                    <label key={keyOf(sp)} className={`row${picks.has(keyOf(sp)) ? ' selected' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={picks.has(keyOf(sp))}
+                        onChange={() => toggle(sp)}
+                        aria-label={`Tick ${sp.name} at ${chainName(sp.chain)}`}
+                      />
+                      <MoreInfo src={sp.imageUrl ?? photoFor(sp)} name={sp.name} onOpen={() => setPreview(sp)} />
+                      <span className="grow" style={{ minWidth: 0 }}>
+                        <span className="title" style={{ fontSize: 15 }}>
+                          {sp.name}
+                        </span>
+                        {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
+                        {unitTextOf(sp) && <span className="small">{unitTextOf(sp)}</span>}
+                        {sp === r.same && (
+                          <span className="tag great" style={{ whiteSpace: 'normal' }}>
+                            Same product
+                          </span>
+                        )}
+                      </span>
+                      <span className="num" style={{ fontWeight: 700, flex: 'none' }}>
+                        {money(sp.price)}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+    </div>
+  );
 
   return (
-    <div className="screen">
-      {overlay ? <TopBar title={title} /> : <h1>{title}</h1>}
-      {!attachGroup && !onlyChain && sectionsOn.length > 1 && (
+    // Inside the Pick sheet the sheet scrolls, so the bar at the bottom stays in view there too.
+    <div className="screen" style={forLine ? { padding: 0, overflow: 'visible', flex: 'none' } : undefined}>
+      {forLine ? null : overlay ? <TopBar title={title} /> : <h1>{title}</h1>}
+      {/* Read out when something's ticked or unticked (the bar at the bottom shows it). */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {said}
+      </div>
+      {!forLine && !attachGroup && !onlyChain && sectionsOn.length > 1 && (
         <div className="seg" role="tablist" aria-label="Which shops to search">
           {sectionsOn.map((sec) => (
             <button key={sec} role="tab" aria-selected={sec === section} className={sec === section ? 'on' : ''} onClick={() => switchSection(sec)}>
@@ -1026,18 +1103,20 @@ export function AddScreen({
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn primary" style={{ flex: 1 }} onClick={doScan}>
-          <Icon name="scan" /> Scan a barcode
-        </button>
-        {!attachTo && (
-          <button className="btn" onClick={() => setStocktake(true)} aria-label="Scan several things in a row">
-            Scan several
+      {!forLine && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn primary" style={{ flex: '1 1 auto' }} onClick={doScan}>
+            <Icon name="scan" /> Scan a barcode
           </button>
-        )}
-      </div>
-      {!attachTo && !overlay && settings?.receipts.enabled && (
-        <button className="btn ghost small" style={{ alignSelf: 'flex-start' }} onClick={() => nav.push({ name: 'receipt' })}>
+          {!attachTo && (
+            <button className="btn" style={{ flex: '1 1 auto' }} onClick={() => setStocktake(true)} aria-label="Scan several things in a row">
+              Scan several
+            </button>
+          )}
+        </div>
+      )}
+      {!forLine && !attachTo && !overlay && settings?.receipts.enabled && (
+        <button className="btn ghost small" style={{ alignSelf: 'flex-start', ...TAP }} onClick={() => nav.push({ name: 'receipt' })}>
           <Icon name="receipt" size={16} /> Add a receipt
         </button>
       )}
@@ -1059,10 +1138,11 @@ export function AddScreen({
           type="search"
           placeholder={SEARCH_PLACEHOLDER[section]}
           aria-label={`Search ${SECTION_SHOPS[section]}`}
+          enterKeyHint="search"
           value={term}
           onChange={(e) => setTerm(e.target.value)}
         />
-        <button className="btn" type="submit" aria-label="Search" style={{ width: 52, padding: 0 }}>
+        <button className="btn" type="submit" aria-label="Search" style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }}>
           <Icon name="search" />
         </button>
       </form>
@@ -1075,6 +1155,7 @@ export function AddScreen({
             </div>
             <button
               className="linkish small"
+              style={TAP}
               onClick={() => {
                 clearRecentSearches();
                 setRecent([]);
@@ -1105,6 +1186,7 @@ export function AddScreen({
           Searched for <strong>{searchedFor}</strong>.{' '}
           <button
             className="linkish"
+            style={TAP}
             onClick={() => document.querySelector<HTMLInputElement>('.screen input[type="search"], .screen input.input')?.focus()}
           >
             Change it
@@ -1125,8 +1207,8 @@ export function AddScreen({
             <button
               className="btn primary"
               onClick={async () => {
-                const added = await addGroupToList(known);
-                nav.toast(added ? `${known.name} added to your shopping list` : `${known.name} is already on your shopping list`);
+                const added = await addToList(known); // 0.9.5 (undo)
+                if (!added) nav.toast(`${known.name} is already on your shopping list`);
                 reset();
               }}
             >
@@ -1136,8 +1218,8 @@ export function AddScreen({
               Open it
             </button>
           </div>
-          <button className="linkish small" style={{ alignSelf: 'flex-start' }} onClick={() => void handleBarcode(scanned.barcode, true)}>
-            Search the stores anyway
+          <button className="linkish small" style={{ alignSelf: 'flex-start', ...TAP }} onClick={() => void handleBarcode(scanned.barcode, true)}>
+            Search the shops anyway
           </button>
         </div>
       )}
@@ -1328,7 +1410,7 @@ export function AddScreen({
             {candidates.map((c) => (
               <div key={keyOf(c.sp)} className="row" style={{ gap: 10 }}>
                 <MoreInfo src={c.sp.imageUrl ?? photoFor(c.sp)} name={c.sp.name} onOpen={() => setPreview(c.sp)} />
-                <button className="row-main" style={{ color: 'inherit', font: 'inherit' }} onClick={() => choose(c)} aria-label={`It's ${c.sp.name}`}>
+                <button className="row-main" style={{ color: 'inherit', font: 'inherit', ...TAP }} onClick={() => choose(c)} aria-label={`It's ${c.sp.name}`}>
                   <span className="grow" style={{ textAlign: 'left' }}>
                     <span className="title" style={{ fontSize: 15 }}>
                       {c.sp.name}
@@ -1351,66 +1433,6 @@ export function AddScreen({
         <div className="banner grey" style={{ fontSize: 13 }}>
           Restock couldn't be sure which product this is at your shops, so nothing's ticked yet. Tick it at one shop and Restock ticks the same
           product at the others.
-        </div>
-      )}
-
-      {recAnchor && picks.size > 0 && (
-        <div className="card best-match" ref={recCard} style={{ scrollMarginTop: 12 }}>
-          <div className="eyebrow green">Picked for you at your other shops</div>
-          <span className="small">
-            Like the {recAnchor.name} you ticked at {chainName(recAnchor.chain)} ({money(recAnchor.price)}). Tick the ones you want, or keep scrolling
-            to pick your own.
-          </span>
-          {recBusy.length > 0 && (
-            <span className="small" role="status">
-              Searching {recBusy.map((c) => chainName(c)).join(' and ')} for it…
-              <LoadingBar seconds={15} />
-            </span>
-          )}
-          {searched
-            .filter((c) => c !== recAnchor.chain && recs[c as Chain])
-            .map((c) => {
-              const r = recs[c as Chain]!;
-              const rows = [...(r.same ? [r.same] : []), ...r.like];
-              return (
-                <div key={c} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span className="small" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <ChainDot chain={c} />{' '}
-                    {r.same
-                      ? `Same product at ${chainName(c)}`
-                      : rows.length
-                        ? `Most like it at ${chainName(c)}`
-                        : `Nothing like it at ${chainName(c)}`}
-                  </span>
-                  {rows.length > 0 && (
-                    <div className="card flush" style={{ boxShadow: 'none' }}>
-                      {rows.map((sp) => (
-                        <label key={keyOf(sp)} className={`row${picks.has(keyOf(sp)) ? ' selected' : ''}`}>
-                          <input
-                            type="checkbox"
-                            checked={picks.has(keyOf(sp))}
-                            onChange={() => toggle(sp)}
-                            aria-label={`Tick ${sp.name} at ${chainName(sp.chain)}`}
-                          />
-                          <MoreInfo src={sp.imageUrl ?? photoFor(sp)} name={sp.name} onOpen={() => setPreview(sp)} />
-                          <span className="grow">
-                            <span className="title" style={{ fontSize: 15 }}>
-                              {sp.name}
-                            </span>
-                            {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
-                            {unitTextOf(sp) && <span className="small">{unitTextOf(sp)}</span>}
-                            {sp === r.same && <span className="tag great">Same product</span>}
-                          </span>
-                          <span className="num" style={{ fontWeight: 700 }}>
-                            {money(sp.price)}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
         </div>
       )}
 
@@ -1445,7 +1467,7 @@ export function AddScreen({
 
       {!isNative() && anyResults && (
         <div className="banner grey">
-          <strong>Store search works in the Android app</strong>
+          <strong>Shop search works in the Android app</strong>
           <span style={{ fontSize: 13 }}>In this preview you can still add items by hand.</span>
         </div>
       )}
@@ -1498,7 +1520,7 @@ export function AddScreen({
                   {r.status === 'ok' && r.items.length > 1 && (
                     <select
                       className="input"
-                      style={{ width: 'auto', height: 36, padding: '0 8px', fontSize: 13 }}
+                      style={{ width: 'auto', maxWidth: '60%', height: 44, padding: '0 8px', fontSize: 13 }}
                       value={sortBy[chain] ?? 'relevant'}
                       onChange={(e) => setSortBy((m) => ({ ...m, [chain]: e.target.value as SortKey }))}
                       aria-label={`Sort ${chainName(chain)} results`}
@@ -1525,7 +1547,7 @@ export function AddScreen({
                     {r.message}
                     {settings && (
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                        <button className="btn small" onClick={() => void searchChain(chain, lastText, rankQ, searchStoreId(settings, chain))}>
+                        <button className="btn small" style={TAP} onClick={() => void searchChain(chain, lastText, rankQ, searchStoreId(settings, chain))}>
                           <Icon name="refresh" size={16} /> Try again
                         </button>
                         {r.blocked && (
@@ -1543,7 +1565,7 @@ export function AddScreen({
                       </>
                     )}
                     {(useAlt ? firstCount > 0 : true) && (
-                      <button className="linkish small" onClick={() => setOriginal((m) => ({ ...m, [chain]: !m[chain] }))}>
+                      <button className="linkish small" style={TAP} onClick={() => setOriginal((m) => ({ ...m, [chain]: !m[chain] }))}>
                         {useAlt ? `Show what it found for “${lastText}” (${firstCount})` : `Show ${chainName(chain)}’s ${alt.kind} instead`}
                       </button>
                     )}
@@ -1561,7 +1583,7 @@ export function AddScreen({
                 {unlikely && (
                   <p className="small">
                     Nothing like it at {chainName(chain)}.{' '}
-                    <button className="linkish small" onClick={() => setShowUnlikely((m) => ({ ...m, [chain]: true }))}>
+                    <button className="linkish small" style={TAP} onClick={() => setShowUnlikely((m) => ({ ...m, [chain]: true }))}>
                       Show what {chainName(chain)} found ({pool.length})
                     </button>
                   </p>
@@ -1576,7 +1598,12 @@ export function AddScreen({
                       return (
                         <Hold key={k} onLong={() => setPreview(sp)}>
                           <label className={`row${picked ? ' selected' : ''}`}>
-                            <input type="checkbox" checked={picked} onChange={() => toggle(sp)} aria-label={`Select ${sp.name}`} />
+                            <input
+                              type="checkbox"
+                              checked={picked}
+                              onChange={() => toggle(sp)}
+                              aria-label={`Tick ${sp.name} at ${chainName(sp.chain)}, ${money(sp.price)}`}
+                            />
                             <button
                               type="button"
                               className="thumb-btn"
@@ -1644,17 +1671,17 @@ export function AddScreen({
                   </div>
                 )}
                 {left > 0 && (
-                  <button className="btn ghost small" onClick={() => setShowing((m) => ({ ...m, [chain]: limit + MORE_PAGE }))}>
+                  <button className="btn ghost small" style={TAP} onClick={() => setShowing((m) => ({ ...m, [chain]: limit + MORE_PAGE }))}>
                     Show more ({left})
                   </button>
                 )}
                 {left <= 0 && more && r.status === 'ok' && (
-                  <button className="btn ghost small" disabled={r.loadingMore} onClick={() => void loadMore(chain)}>
+                  <button className="btn ghost small" style={TAP} disabled={r.loadingMore} onClick={() => void loadMore(chain)}>
                     {r.loadingMore ? `Getting more from ${chainName(chain)}…` : `Get more from ${chainName(chain)}`}
                   </button>
                 )}
                 {first.status === 'ok' && !rankQ.barcode && isNative() && (
-                  <button className="linkish small" style={{ alignSelf: 'flex-end' }} onClick={() => void reportWrong(chain)}>
+                  <button className="linkish small" style={{ alignSelf: 'flex-end', ...TAP }} onClick={() => void reportWrong(chain)}>
                     Wrong results? Save them for the developer
                   </button>
                 )}
@@ -1671,9 +1698,10 @@ export function AddScreen({
               <ChainDot chain={x.chain} /> {x.name} · {money(x.price)}
             </span>
           ))}
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
               className="btn small primary"
+              style={TAP}
               onClick={() => {
                 setPicks((prev) => {
                   const next = new Map(prev);
@@ -1685,7 +1713,7 @@ export function AddScreen({
             >
               <Icon name="check" size={16} /> Tick {suggest.length === 1 ? 'it' : 'them'} too
             </button>
-            <button className="btn small" onClick={() => setSuggest([])}>
+            <button className="btn small" style={TAP} onClick={() => setSuggest([])}>
               No thanks
             </button>
           </div>
@@ -1696,13 +1724,21 @@ export function AddScreen({
         Can't find it? Add it by hand
       </button>
 
-      {picks.size > 0 && !panelOpen && (
-        <button className="card add-mini" onClick={() => setPanelOpen(true)} aria-label="Open the add panel">
+      {picks.size > 0 && (
+        // The bar: what's ticked and where. Tap it (or its green arrow) to name it and add it.
+        <button
+          className="card add-mini"
+          onClick={() => setPanelOpen((open) => sheetOpenAfter(open, { kind: 'arrow', size: picks.size }))}
+          aria-haspopup="dialog"
+          aria-expanded={panelOpen}
+          aria-label={`${picks.size} ticked at ${tickedShops([...picks.values()])}. Tap to add.`}
+        >
           <span className="grow add-mini-text">
             <span className="title" style={{ fontSize: 15 }}>
               {picks.size} ticked · tap to add
             </span>
             <span className="small clip">{tickedShops([...picks.values()])}</span>
+            {recShops.length > 0 && <span className="small clip">Picked for you at {recShops.map((c) => chainName(c)).join(' and ')}</span>}
           </span>
           <span className="add-mini-arrow" aria-hidden="true">
             <span style={{ display: 'inline-flex', transform: 'rotate(-90deg)' }}>
@@ -1712,69 +1748,34 @@ export function AddScreen({
         </button>
       )}
       {picks.size > 0 && panelOpen && (
-        <div
-          className="card add-panel"
-          style={{ position: 'sticky', bottom: 0, boxShadow: '0 -6px 20px rgba(0,0,0,0.08)' }}
-          onPointerDown={() => setPanelHeld(true)}
-          onFocus={(e) => {
-            setPanelHeld(true);
-            // Typing with the keyboard up: the panel scrolls inside itself (it's no taller than the
-            // space left), and the box being typed in is brought into view.
-            const el = e.target as HTMLElement;
-            if (el.matches('input:not([type=checkbox]), textarea, select'))
-              setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 350);
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            {/* Its own scrolling list, so 15 ticked cans never push the arrow or the buttons away. */}
-            <div className="small grow picked-list" style={{ minWidth: 0 }}>
-              {[...picks.values()].map((p) => (
-                <div key={keyOf(p)} className="picked-line">
-                  <ChainDot chain={p.chain} />
-                  <span className="clip grow">{p.name}</span>
-                  <span className="num picked-price">{money(p.price)}</span>
-                </div>
-              ))}
-            </div>
-            {/* The same big green button as the one that opens the panel, pointing down. */}
-            <button
-              className="add-mini-arrow"
-              style={{ border: 'none', cursor: 'pointer' }}
-              aria-label="Shrink the add panel"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPanelHeld(false);
-                setPanelOpen(false);
-              }}
-            >
-              <span style={{ display: 'inline-flex', transform: 'rotate(90deg)' }}>
-                <Icon name="chevron" size={26} />
-              </span>
-            </button>
+        <Sheet title={sheetTitle} onClose={() => setPanelOpen((open) => sheetOpenAfter(open, { kind: 'close' }))}>
+          {/* Its own scrolling list, so 15 ticked cans never push the buttons away. */}
+          <div className="small picked-list" style={{ minWidth: 0 }} aria-label="Ticked" role="list">
+            {[...picks.values()].map((p) => (
+              <div key={keyOf(p)} className="picked-line" role="listitem">
+                <ChainDot chain={p.chain} />
+                <span className="clip grow">{p.name}</span>
+                <span className="num picked-price">{money(p.price)}</span>
+              </div>
+            ))}
           </div>
-          {forList && !attachGroup ? (
+          {forLine ? (
             <>
+              {trackedPick && (
+                <div className="banner grey" style={{ fontSize: 14 }}>
+                  <span>
+                    You already have this in your pantry as <strong>{trackedPick.name}</strong>.
+                  </span>
+                  <button className="btn small" style={TAP} disabled={saving} onClick={() => void useTracked(trackedPick)}>
+                    Use {trackedPick.name}
+                  </button>
+                </div>
+              )}
               <label className="field">
-                <span>Name on your shopping list</span>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Coffee" />
+                <span>Name in your pantry</span>
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chopsticks" />
               </label>
-              <button className="btn primary" onClick={() => save('list')} disabled={saving}>
-                <Icon name="cart" size={18} /> Add to shopping list
-              </button>
-              <p className="small" style={{ margin: 0 }}>
-                Just for this trip, at the cheapest of what you ticked. It doesn't go in your pantry, and Restock won't keep watching its price.
-              </p>
-            </>
-          ) : attachGroup ? (
-            <button className="btn primary" onClick={saveAttach} disabled={saving}>
-              {as === 'alt' ? 'Add to Would also take' : `Add to ${attachGroup.name}`}
-            </button>
-          ) : (
-            <>
-              <label className="field">
-                <span>Name in {SECTION_PLACE[section]} and shopping list</span>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Honey" />
-              </label>
+              {picksForYou}
               <details className="explain">
                 <summary>
                   <Icon name="bell" size={18} />
@@ -1792,60 +1793,115 @@ export function AddScreen({
                   <AlertPicker level={alertLevel} pct={alertPct} onChange={(l, p) => (setAlertLevel(l), setAlertPct(p))} />
                 </div>
               </details>
-              <label className="check" style={{ padding: '4px 2px' }}>
-                <input type="checkbox" className="switch" checked={allowBulk} onChange={(e) => setAllowBulk(e.target.checked)} />
-                <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <span className="title" style={{ fontSize: 15 }}>
-                    Swap for bulk packs to save money
-                  </span>
-                  <span className="small">
-                    Let Restock suggest a bigger pack you'd also take (like a 6-pack instead of one) as a swap when it's cheaper per 100 g. Leave it
-                    off if you only ever want this size.
-                  </span>
-                </span>
+              <label className="check" style={{ padding: '4px 2px', minHeight: 44 }}>
+                <input type="checkbox" checked={forLine.always} onChange={(e) => forLine.onAlways(e.target.checked)} />
+                <span>Always use this for "{forLine.word}"</span>
               </label>
-              <label className="check" style={{ padding: '4px 2px' }}>
-                <input type="checkbox" className="switch" checked={allowMulti} onChange={(e) => setAllowMulti(e.target.checked)} />
-                <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <span className="title" style={{ fontSize: 15 }}>
-                    Multi-buy to save money
-                  </span>
-                  <span className="small">
-                    Count deals like "2 for $12" when they're cheaper each. Leave it off if you only buy one at a time: then a multi-buy isn't treated
-                    as a sale, and you see the price for one.
-                  </span>
-                </span>
-              </label>
-              {tabHidden ? (
-                <div className="two">
-                  <button className="btn primary" onClick={() => save('list')} disabled={saving}>
-                    <Icon name="cart" size={18} /> Shopping list
-                  </button>
-                  <button className="btn" onClick={() => save('both')} disabled={saving}>
-                    <Icon name={section} size={18} /> Track it too
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="two">
-                    <button className="btn primary" onClick={() => save('pantry')} disabled={saving}>
-                      <Icon name={section} size={18} /> Add to {SECTION_NAMES[section].toLowerCase()}
-                    </button>
-                    <button className="btn primary" onClick={() => save('list')} disabled={saving}>
-                      <Icon name="cart" size={18} /> Shopping list
-                    </button>
-                  </div>
-                  <button className="btn" onClick={() => save('both')} disabled={saving}>
-                    Add to both
-                  </button>
-                </>
-              )}
+              <button className="btn primary" onClick={() => save('pantry')} disabled={saving}>
+                <Icon name="pantry" size={18} /> Add to pantry
+              </button>
               <p className="small" style={{ margin: 0 }}>
-                Shopping list adds it for this trip only, at the price shown. Restock won't keep watching its price.
+                The "{forLine.entry.text}" line on your Shopping list becomes this item, with its price and cheapest shop.
               </p>
             </>
+          ) : (
+            forList && !attachGroup ? (
+              <>
+                <label className="field">
+                  <span>Name on your Shopping list</span>
+                  <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Coffee" />
+                </label>
+                {picksForYou}
+                <button className="btn primary" onClick={() => save('list')} disabled={saving}>
+                  <Icon name="cart" size={18} /> Add to list
+                </button>
+                <p className="small" style={{ margin: 0 }}>
+                  Just for this trip, at the cheapest of what you ticked. It doesn't go in your pantry, and Restock won't keep watching its price.
+                </p>
+              </>
+            ) : attachGroup ? (
+              <button className="btn primary" onClick={saveAttach} disabled={saving}>
+                {as === 'alt' ? 'Add to Would also take' : `Add to ${attachGroup.name}`}
+              </button>
+            ) : (
+              <>
+                <label className="field">
+                  <span>Name in {SECTION_PLACE[section]} and Shopping list</span>
+                  <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Honey" />
+                </label>
+                {picksForYou}
+                <details className="explain">
+                  <summary>
+                    <Icon name="bell" size={18} />
+                    <span>Category and alerts</span>
+                  </summary>
+                  <div className="explain-body">
+                    <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Category">
+                      <option value="">No category</option>
+                      {categories?.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <AlertPicker level={alertLevel} pct={alertPct} onChange={(l, p) => (setAlertLevel(l), setAlertPct(p))} />
+                  </div>
+                </details>
+                <label className="check" style={{ padding: '4px 2px' }}>
+                  <input type="checkbox" className="switch" checked={allowBulk} onChange={(e) => setAllowBulk(e.target.checked)} />
+                  <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <span className="title" style={{ fontSize: 15 }}>
+                      Swap for bulk packs to save money
+                    </span>
+                    <span className="small">
+                      Let Restock suggest a bigger pack you'd also take (like a 6-pack instead of one) as a swap when it's cheaper per 100 g. Leave it
+                      off if you only ever want this size.
+                    </span>
+                  </span>
+                </label>
+                <label className="check" style={{ padding: '4px 2px' }}>
+                  <input type="checkbox" className="switch" checked={allowMulti} onChange={(e) => setAllowMulti(e.target.checked)} />
+                  <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <span className="title" style={{ fontSize: 15 }}>
+                      Multi-buy to save money
+                    </span>
+                    <span className="small">
+                      Count deals like "2 for $12" when they're cheaper each. Leave it off if you only buy one at a time: then a multi-buy isn't treated
+                      as a sale, and you see the price for one.
+                    </span>
+                  </span>
+                </label>
+                {tabHidden ? (
+                  <div className="two">
+                    <button className="btn primary" onClick={() => save('list')} disabled={saving}>
+                      <Icon name="cart" size={18} /> Add to list
+                    </button>
+                    <button className="btn" onClick={() => save('both')} disabled={saving}>
+                      <Icon name={section} size={18} /> Track it too
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="two">
+                      <button className="btn primary" onClick={() => save('pantry')} disabled={saving}>
+                        <Icon name={section} size={18} /> Add to {SECTION_NAMES[section].toLowerCase()}
+                      </button>
+                      <button className="btn primary" onClick={() => save('list')} disabled={saving}>
+                        <Icon name="cart" size={18} /> Add to list
+                      </button>
+                    </div>
+                    <button className="btn" onClick={() => save('both')} disabled={saving}>
+                      Add to both
+                    </button>
+                  </>
+                )}
+                <p className="small" style={{ margin: 0 }}>
+                  Add to list puts it on your Shopping list for this trip only, at the price shown. Restock won't keep watching its price.
+                </p>
+              </>
+            )
           )}
-        </div>
+        </Sheet>
       )}
 
       {stocktake && <Stocktake section={section} onClose={() => setStocktake(false)} />}
@@ -1876,6 +1932,7 @@ export function AddScreen({
           categories={categories ?? []}
           section={section}
           shops={settings ? enabledIn(settings.enabledChains, section) : []}
+          forLine={forLine}
           onClose={() => setManual(false)}
           onDone={(groupId) => {
             setManual(false);
@@ -1889,7 +1946,7 @@ export function AddScreen({
   );
 }
 
-function ManualSheet({
+export function ManualSheet({
   attachTo,
   as,
   defaultName,
@@ -1897,6 +1954,7 @@ function ManualSheet({
   categories,
   section,
   shops,
+  forLine,
   onClose,
   onDone,
 }: {
@@ -1908,10 +1966,11 @@ function ManualSheet({
   section: Section;
   /** This tab's shops, to pick from. */
   shops: StoreChain[];
+  /** 0.9.5, from the Pick sheet: only "Add to pantry", and the list line becomes the new item. */
+  forLine?: ForLine;
   onClose: () => void;
   onDone: (groupId?: string) => void;
 }) {
-  const nav = useNav();
   const [name, setName] = useState(defaultName);
   const [chain, setChain] = useState<Chain>(shops[0] ?? 'other');
   const [size, setSize] = useState('');
@@ -1936,45 +1995,54 @@ function ManualSheet({
 
   const saveAs = async (target: Target) => {
     const n = name.trim();
-    if (target === 'list') {
-      await addListEntry({ id: uid(), text: n, chain, categoryId: categoryId || undefined, section, checked: false, createdAt: nowIso() });
-      nav.toast(`${n} added to your shopping list`);
-      onDone();
-      return;
-    }
-    const id = uid();
-    await addProduct({ id, chain, name: n, size: size || undefined, barcode: as === 'main' ? barcode : undefined, createdAt: nowIso() });
-    // "$4.50" works as well as "4.50" (0.9.0).
-    const p = parseMoney(price);
-    if (p > 0) await addReading({ productId: id, date: nowIso(), price: p, isSpecial: special, memberOnly: false, source: 'manual' });
-    if (attachTo) {
-      if (as === 'alt') await updateGroup(attachTo.id, { altProductIds: [...attachTo.altProductIds, id] });
-      else {
-        const notAt = (attachTo.notAt ?? []).filter((c) => c !== chain);
-        if (!attachTo.usualProductId) await updateGroup(attachTo.id, { usualProductId: id, notAt });
-        else await updateGroup(attachTo.id, { sameProductIds: [...attachTo.sameProductIds, id], notAt });
-      }
-      nav.toast(`Added to ${attachTo.name}`);
-      onDone(attachTo.id);
-      return;
-    }
-    const groupId = uid();
-    await addGroup({
-      id: groupId,
-      name: n,
-      categoryId: categoryId || undefined,
-      usualProductId: id,
-      sameProductIds: [],
-      altProductIds: [],
-      alertLevel: 'good',
-      section,
-      createdAt: nowIso(),
-    });
-    if (target === 'both') {
-      await addListEntry({ id: uid(), text: n, groupId, categoryId: categoryId || undefined, section, checked: false, createdAt: nowIso() });
-    }
-    nav.toast(target === 'both' ? `${n} added to ${SECTION_PLACE[section]} and shopping list` : `${n} added to ${SECTION_PLACE[section]}`);
-    onDone(groupId);
+    // 0.9.5 (undo): whatever this adds is one Undo; what to do after comes back from it.
+    const next = await act(
+      (r: { said?: string }) => r.said ?? null,
+      async (): Promise<{ said?: string; after: () => void }> => {
+        if (target === 'list') {
+          await addListEntry({ id: uid(), text: n, chain, categoryId: categoryId || undefined, section, checked: false, createdAt: nowIso() });
+          return { said: `${n} added to your shopping list`, after: () => onDone() };
+        }
+        const id = uid();
+        await addProduct({ id, chain, name: n, size: size || undefined, barcode: as === 'main' ? barcode : undefined, createdAt: nowIso() });
+        // "$4.50" works as well as "4.50" (0.9.0).
+        const p = parseMoney(price);
+        if (p > 0) await addReading({ productId: id, date: nowIso(), price: p, isSpecial: special, memberOnly: false, source: 'manual' });
+        if (attachTo) {
+          if (as === 'alt') await updateGroup(attachTo.id, { altProductIds: [...attachTo.altProductIds, id] });
+          else {
+            const notAt = (attachTo.notAt ?? []).filter((c) => c !== chain);
+            if (!attachTo.usualProductId) await updateGroup(attachTo.id, { usualProductId: id, notAt });
+            else await updateGroup(attachTo.id, { sameProductIds: [...attachTo.sameProductIds, id], notAt });
+          }
+          return { said: `Added to ${attachTo.name}`, after: () => onDone(attachTo.id) };
+        }
+        const groupId = uid();
+        await addGroup({
+          id: groupId,
+          name: n,
+          categoryId: categoryId || undefined,
+          usualProductId: id,
+          sameProductIds: [],
+          altProductIds: [],
+          alertLevel: 'good',
+          section,
+          createdAt: nowIso(),
+        });
+        if (forLine) {
+          const linked = await pickItemFor(forLine.entry, { id: groupId, name: n }, forLine.always);
+          return { after: () => forLine.onDone({ id: groupId, name: n }, true, linked) };
+        }
+        if (target === 'both') {
+          await addListEntry({ id: uid(), text: n, groupId, categoryId: categoryId || undefined, section, checked: false, createdAt: nowIso() });
+        }
+        return {
+          said: target === 'both' ? `${n} added to ${SECTION_PLACE[section]} and shopping list` : `${n} added to ${SECTION_PLACE[section]}`,
+          after: () => onDone(groupId),
+        };
+      },
+    );
+    next.after();
   };
 
   return (
@@ -2024,7 +2092,20 @@ function ManualSheet({
           </select>
         </label>
       )}
-      {attachTo ? (
+      {forLine ? (
+        <>
+          <label className="check" style={{ padding: '4px 2px', minHeight: 44 }}>
+            <input type="checkbox" checked={forLine.always} onChange={(e) => forLine.onAlways(e.target.checked)} />
+            <span>Always use this for "{forLine.word}"</span>
+          </label>
+          <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
+            Add to pantry
+          </button>
+          <p className="small" style={{ margin: 0 }}>
+            The "{forLine.entry.text}" line on your Shopping list becomes this item.
+          </p>
+        </>
+      ) : attachTo ? (
         <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
           {as === 'alt' ? 'Add to Would also take' : `Add to ${attachTo.name}`}
         </button>
@@ -2035,7 +2116,7 @@ function ManualSheet({
               Add to {SECTION_NAMES[section].toLowerCase()}
             </button>
             <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('list')}>
-              Shopping list
+              Add to list
             </button>
           </div>
           <button className="btn" disabled={!name.trim() || saving} onClick={() => save('both')}>
@@ -2067,12 +2148,12 @@ function Stocktake({ section, onClose }: { section: Section; onClose: () => void
         const product = await findProductByBarcode(out.code);
         const group = product && (await allGroups()).find((g) => groupProductIds(g).includes(product.id));
         if (group) {
-          const added = await addGroupToList(group);
+          const added = await addToList(group); // 0.9.5 (undo)
           setLines((l) => [{ code: out.code, name: group.name, groupId: group.id, status: added ? 'added' : 'already' }, ...l]);
         } else {
           const info = await lookupBarcode(out.code);
           const name = info.name ? genericName(info.name, info.brand) : `Item ${out.code}`;
-          await addListEntry({ id: uid(), text: name, qty: 1, section, checked: false, createdAt: nowIso() });
+          await act(`${name} added to your shopping list`, () => addListEntry({ id: uid(), text: name, qty: 1, section, checked: false, createdAt: nowIso() })); // 0.9.5 (undo)
           setLines((l) => [{ code: out.code, name, status: 'new' }, ...l]);
         }
       }

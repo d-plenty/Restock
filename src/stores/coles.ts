@@ -190,7 +190,7 @@ const noted = new Set<string>();
 function noteFallback(store: string, why: string) {
   if (noted.has(store)) return;
   noted.add(store);
-  void Promise.resolve(logProblem('coles', 'search', `Your Coles store (${store}) didn't answer (${why}), so the online prices were used.`)).catch(
+  void Promise.resolve(logProblem('coles', 'search', `Your Coles branch (${store}) didn't answer (${why}), so the online prices were used.`)).catch(
     () => undefined,
   );
 }

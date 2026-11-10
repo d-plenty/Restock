@@ -31,7 +31,7 @@ html.server-mode .app.dk {
   top: 8px;
   z-index: 50;
   padding: 10px 16px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--surface);
   color: var(--ink);
   font-weight: 700;
@@ -43,8 +43,8 @@ html.server-mode .app.dk {
 /* ---------- the sidebar ---------- */
 
 .dk-nav {
-  background: var(--navy);
-  color: #fff;
+  background: var(--chrome-bg);
+  color: var(--on-navy);
   padding: 24px 14px 18px;
   display: flex;
   flex-direction: column;
@@ -64,14 +64,14 @@ html.server-mode .app.dk {
 .dk-mark {
   width: 32px;
   height: 32px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   background: var(--gold);
-  color: #012169;
+  color: var(--brand-navy);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 18px;
+  font-size: var(--fs-lg);
   flex-shrink: 0;
 }
 .dk-brand-text {
@@ -80,11 +80,11 @@ html.server-mode .app.dk {
   min-width: 0;
 }
 .dk-brand-text strong {
-  font-size: 18px;
+  font-size: var(--fs-lg);
 }
 .dk-brand-text span {
-  font-size: 13px;
-  color: #c3cde8;
+  font-size: var(--fs-sm);
+  color: var(--on-navy-muted);
 }
 .dk-nav-item {
   display: flex;
@@ -92,17 +92,17 @@ html.server-mode .app.dk {
   gap: 12px;
   min-height: 44px;
   padding: 0 12px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   border: 0;
   background: transparent;
-  color: #e3e8f5;
-  font-size: 15px;
+  color: var(--on-navy-muted);
+  font-size: var(--fs-body);
   font-weight: 500;
   text-align: left;
   width: 100%;
 }
 .dk-nav-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--on-navy-hover);
 }
 .dk-nav-item[aria-current='page'] {
   background: var(--navy-2);
@@ -117,10 +117,10 @@ html.server-mode .app.dk {
   min-width: 24px;
   height: 22px;
   padding: 0 6px;
-  border-radius: 11px;
+  border-radius: var(--r-full);
   background: var(--gold);
-  color: #012169;
-  font-size: 12px;
+  color: var(--brand-navy);
+  font-size: var(--fs-xs);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -128,7 +128,7 @@ html.server-mode .app.dk {
 }
 .dk-nav-rule {
   height: 1px;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--on-navy-line);
   margin: 12px 8px;
 }
 .dk-nav-foot {
@@ -139,16 +139,16 @@ html.server-mode .app.dk {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 /* 0.9.4: Sync now and Sign out always in the sidebar's foot (section 15). */
 .dk-foot-btn {
   min-height: 44px;
-  border-radius: 22px;
-  border: 1px solid #5a74b8;
+  border-radius: var(--r-md);
+  border: 1px solid var(--on-navy-line);
   background: transparent;
-  color: #fff;
-  font-size: 15px;
+  color: var(--on-navy);
+  font-size: var(--fs-body);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -157,12 +157,12 @@ html.server-mode .app.dk {
   cursor: pointer;
 }
 .dk-foot-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--on-navy-hover);
 }
 .dk-foot-btn.primary {
   border-color: var(--gold);
   background: var(--gold);
-  color: #012169;
+  color: var(--brand-navy);
 }
 .dk-foot-btn.primary:hover {
   filter: brightness(1.06);
@@ -187,8 +187,8 @@ html.server-mode .app.dk {
 .dk-sync-dot {
   width: 8px;
   height: 8px;
-  border-radius: 4px;
-  background: #4fca8a;
+  border-radius: var(--r-xs);
+  background: var(--on-navy-ok);
   flex-shrink: 0;
 }
 .dk-sync.trouble .dk-sync-dot {
@@ -198,7 +198,7 @@ html.server-mode .app.dk {
   animation: strip-pulse 1s ease-in-out infinite alternate;
 }
 .dk-sync-sub {
-  color: #c3cde8;
+  color: var(--on-navy-muted);
 }
 
 /* ---------- pages ---------- */
@@ -232,13 +232,20 @@ html.server-mode .app.dk {
 }
 .dk-head h1 {
   margin: 0;
-  font-size: 30px;
-  font-weight: 700;
+  font-size: var(--fs-3xl);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  flex-grow: 1;
+}
+.dk-head-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   flex-grow: 1;
 }
 .dk-head-sub,
 .dk-date {
-  font-size: 16px;
+  font-size: var(--fs-body);
   color: var(--muted);
   font-weight: 400;
 }
@@ -255,12 +262,12 @@ html.server-mode .app.dk {
 }
 .dk-sub {
   display: block;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
   line-height: 1.4;
 }
 .dk-sub-inline {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
   font-weight: 400;
 }
@@ -277,7 +284,7 @@ html.server-mode .app.dk {
   color: var(--green);
 }
 .dk-was {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 .dk-gap {
@@ -287,9 +294,9 @@ html.server-mode .app.dk {
   border: 0;
   background: none;
   padding: 4px 2px;
-  min-height: 32px;
+  min-height: var(--h-control-sm);
   color: var(--green);
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 .dk-linkish:hover {
@@ -300,7 +307,7 @@ html.server-mode .app.dk {
   background: none;
   padding: 0;
   color: var(--ink);
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 600;
   text-align: left;
   display: inline-flex;
@@ -312,8 +319,9 @@ html.server-mode .app.dk {
 }
 .dk-section-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 12px;
+  gap: 8px 12px;
 }
 .dk-section-head > h2,
 .dk-section-head > h3 {
@@ -321,10 +329,10 @@ html.server-mode .app.dk {
 }
 .dk-page .card > h2,
 .dk-section-head > h2 {
-  font-size: 18px;
+  font-size: var(--fs-lg);
 }
 .dk-wide > .dk-section-head > h2 {
-  font-size: 20px;
+  font-size: var(--fs-xl);
 }
 .dk-split {
   display: flex;
@@ -348,7 +356,7 @@ html.server-mode .app.dk {
   gap: 16px;
 }
 .dk-aside > h2 {
-  font-size: 18px;
+  font-size: var(--fs-lg);
 }
 .dk-toolbar {
   display: flex;
@@ -370,22 +378,24 @@ html.server-mode .app.dk {
   align-items: center;
 }
 
-/* A switch of two or three, as on the concepts: a sand track, the one picked white and outlined. */
+/* A switch of two or three: the phone's segmented control (styles.css .seg), so both look the same:
+   a white track, the one picked tinted green and outlined (0.9.5). */
 .dk-seg {
   display: inline-flex;
-  background: var(--seg);
-  border-radius: 22px;
-  padding: 4px;
-  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  padding: 3px;
+  gap: 4px;
 }
 .dk-seg button {
-  min-height: 36px;
-  padding: 0 16px;
-  border-radius: 18px;
+  min-height: var(--h-control-sm);
+  padding: 0 14px;
+  border-radius: var(--r-sm);
   border: 0;
   background: transparent;
   color: var(--ink-2);
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -393,29 +403,23 @@ html.server-mode .app.dk {
 }
 .dk-seg button[aria-pressed='true'],
 .dk-seg button[aria-selected='true'] {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow:
-    inset 0 0 0 1.5px var(--green),
-    0 1px 2px var(--shadow);
-}
-.dk-seg.big {
-  border-radius: 24px;
+  background: var(--green-bg);
+  color: var(--green-ink);
+  box-shadow: inset 0 0 0 1.5px var(--green);
 }
 .dk-seg.big button {
   min-height: 40px;
-  padding: 0 22px;
-  font-size: 15px;
-  border-radius: 20px;
+  padding: 0 20px;
+  font-size: var(--fs-body);
 }
 .dk-pill {
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  border-radius: 10px;
+  border-radius: var(--r-full);
   background: var(--green-solid);
   color: var(--on-accent);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -432,7 +436,7 @@ html.server-mode .app.dk {
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--r-lg);
   padding: 18px 20px;
   display: flex;
   flex-direction: column;
@@ -446,22 +450,22 @@ button.dk-tile:hover {
 }
 .dk-tile-lab,
 .dk-tile-sub {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 .dk-tile-big {
-  font-size: 28px;
+  font-size: var(--fs-3xl);
   font-weight: 700;
   line-height: 1.15;
 }
 .dk-tile.navy {
   background: var(--navy);
   border-color: var(--navy);
-  color: #fff;
+  color: var(--on-navy);
 }
 .dk-tile.navy .dk-tile-lab,
 .dk-tile.navy .dk-tile-sub {
-  color: #c3cde8;
+  color: var(--on-navy-muted);
 }
 .dk-tile.navy .dk-tile-big {
   color: var(--gold);
@@ -489,12 +493,12 @@ button.dk-tile:hover {
   align-items: center;
   gap: 12px;
   min-height: 36px;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .dk-check input,
 .dk-line input[type='checkbox'] {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   accent-color: var(--green-solid);
   flex-shrink: 0;
 }
@@ -510,7 +514,7 @@ button.dk-tile:hover {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .dk-drop .dk-name {
   flex: 1;
@@ -523,19 +527,19 @@ button.dk-tile:hover {
 .dk-table-wrap {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--r-lg);
   overflow-x: auto;
 }
 .dk-table {
   width: 100%;
   min-width: 600px;
   border-collapse: collapse;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .dk-table th {
   text-align: left;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   padding: 14px 12px;
 }
@@ -619,14 +623,14 @@ button.dk-tile:hover {
 }
 .dk-addform .input {
   height: 48px;
-  border-radius: 24px;
-  padding: 0 20px;
-  font-size: 16px;
+  border-radius: var(--r-md);
+  padding: 0 16px;
+  font-size: var(--fs-lg);
 }
 .dk-addform .btn {
   height: 48px;
-  border-radius: 24px;
-  padding: 0 22px;
+  border-radius: var(--r-md);
+  padding: 0 20px;
 }
 .dk-addbox.compact .dk-addform .input,
 .dk-addbox.compact .dk-addform .btn {
@@ -654,9 +658,9 @@ button.dk-tile:hover {
 }
 .dk-search .input {
   height: 44px;
-  border-radius: 22px;
+  border-radius: var(--r-md);
   padding-left: 40px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   color: var(--ink);
 }
 .dk-sort {
@@ -667,7 +671,7 @@ button.dk-tile:hover {
 .dk-sort .input {
   width: auto;
   height: 38px;
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 
 /* ---------- Pantry's side panel ---------- */
@@ -684,7 +688,7 @@ button.dk-tile:hover {
   box-sizing: border-box;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: var(--r-xl);
   padding: 22px;
   display: flex;
   flex-direction: column;
@@ -707,7 +711,7 @@ button.dk-tile:hover {
   gap: 4px;
 }
 .dk-panel-head h2 {
-  font-size: 22px;
+  font-size: var(--fs-2xl);
 }
 .dk-panel-head h2:focus {
   outline: none;
@@ -718,14 +722,14 @@ button.dk-tile:hover {
   gap: 8px;
 }
 .dk-panel-part h3 {
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .dk-verdict {
   padding: 12px 14px;
   gap: 2px;
 }
 .small-ink {
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 .dk-around {
   display: flex;
@@ -737,8 +741,8 @@ button.dk-tile:hover {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 12px;
-  font-size: 15px;
+  border-radius: var(--r-md);
+  font-size: var(--fs-body);
 }
 .dk-around-row.best {
   background: var(--green-bg);
@@ -752,12 +756,12 @@ button.dk-tile:hover {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .dk-form-row select.input {
   width: auto;
   height: 40px;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .dk-money {
   display: inline-flex;
@@ -768,7 +772,7 @@ button.dk-tile:hover {
 .dk-money .input {
   width: 110px;
   height: 40px;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .dk-panel-actions {
   display: flex;
@@ -777,7 +781,7 @@ button.dk-tile:hover {
 }
 .dk-panel-actions .btn {
   height: 44px;
-  border-radius: 22px;
+  border-radius: var(--r-md);
 }
 
 /* ---------- the shopping list ---------- */
@@ -802,7 +806,7 @@ button.dk-tile:hover {
 }
 .dk-col-head h2 {
   flex-grow: 1;
-  font-size: 18px;
+  font-size: var(--fs-lg);
 }
 .dk-line {
   display: flex;
@@ -830,7 +834,7 @@ button.dk-tile:hover {
   align-self: flex-start;
 }
 .dk-line-title {
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 500;
   cursor: pointer;
 }
@@ -895,10 +899,16 @@ button.dk-tile:hover {
   gap: 8px;
 }
 .dk-badge {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 8px;
+  /* The phone's tag pill (styles.css .tag). */
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0 9px;
+  border-radius: var(--r-full);
+  white-space: nowrap;
 }
 .dk-badge.blue {
   background: var(--blue-bg);
@@ -915,12 +925,12 @@ button.dk-tile:hover {
 }
 .dk-stats > div {
   background: var(--bg);
-  border-radius: 14px;
+  border-radius: var(--r-md);
   padding: 12px 14px;
 }
 .dk-stat {
   display: block;
-  font-size: 26px;
+  font-size: var(--fs-2xl);
   font-weight: 700;
 }
 .dk-activity {
@@ -930,7 +940,7 @@ button.dk-tile:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 .dk-activity li {
   display: flex;
@@ -943,7 +953,7 @@ button.dk-tile:hover {
 .dk-locked {
   background: var(--sunken);
   border: 1px dashed var(--dash);
-  border-radius: 18px;
+  border-radius: var(--r-lg);
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
@@ -968,14 +978,14 @@ button.dk-tile:hover {
   flex: 1 1 140px;
   min-height: 64px;
   box-sizing: border-box;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--line);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   gap: 2px;
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
 }
 
@@ -983,7 +993,7 @@ button.dk-tile:hover {
 
 .dk-eyebrow {
   margin: 8px 0 -8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1011,7 +1021,7 @@ button.dk-tile:hover {
   gap: 2px;
 }
 .dk-line-name {
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 600;
 }
 .dk-set.greyed {
@@ -1021,9 +1031,9 @@ button.dk-tile:hover {
   color: var(--ink-2);
 }
 .dk-where {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   padding: 6px 12px;
-  border-radius: 14px;
+  border-radius: var(--r-md);
   border: 1px dashed var(--dash);
   background: var(--surface);
   color: var(--muted);
@@ -1031,8 +1041,8 @@ button.dk-tile:hover {
 select.input.dk-select {
   width: auto;
   min-width: 140px;
-  height: 40px;
-  font-size: 15px;
+  height: var(--hit);
+  font-size: var(--fs-body);
 }
 .dk-set-form {
   flex-direction: column;
@@ -1047,11 +1057,11 @@ select.input.dk-select {
 .dk-phone-pick button {
   min-height: 56px;
   padding: 8px 18px;
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   border: 1px solid var(--line-2);
   background: var(--surface);
   color: var(--ink);
-  font-size: 15px;
+  font-size: var(--fs-body);
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -1067,7 +1077,7 @@ select.input.dk-select {
   gap: 16px;
 }
 .dk-phone-card h3 {
-  font-size: 17px;
+  font-size: var(--fs-lg);
 }
 .dk-phone-card dl {
   margin: 0;
@@ -1079,7 +1089,7 @@ select.input.dk-select {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .dk-dl-row dt {
   color: var(--muted);
@@ -1129,7 +1139,7 @@ html.server-desk .sheet-back {
 html.server-desk .sheet {
   width: min(560px, 100%);
   max-height: 86vh;
-  border-radius: 20px;
+  border-radius: var(--r-xl);
   padding-bottom: 20px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
 }
@@ -1185,7 +1195,7 @@ html.server-desk .toast:hover {
   gap: 10px;
 }
 .house-label {
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 600;
 }
 .house-tight {
@@ -1221,7 +1231,7 @@ html.server-desk .toast:hover {
   gap: 4px 16px;
   padding: 12px 20px;
   border-top: 1px solid var(--line-soft);
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .house-log li:first-child {
   border-top: 0;
@@ -1240,7 +1250,7 @@ html.server-desk .toast:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 17px;
+  font-size: var(--fs-lg);
 }
 .house-pad {
   padding: 0 16px 8px;
@@ -1255,10 +1265,10 @@ html.server-desk .toast:hover {
 .house-recovery {
   display: block;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--sunken);
   color: var(--ink);
-  font-size: 20px;
+  font-size: var(--fs-xl);
   letter-spacing: 0.04em;
   word-break: break-word;
   text-align: center;
@@ -1293,7 +1303,7 @@ html.server-desk .toast:hover {
 .dk-table td.dk-item-cell .thumb {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
 }
 .dk-item-words {
   min-width: 0;
@@ -1307,7 +1317,7 @@ html.server-desk .toast:hover {
 .dk-line .thumb {
   width: 36px;
   height: 36px;
-  border-radius: 9px;
+  border-radius: var(--r-sm);
 }
 /* A list line's name opens the item; only the checkbox ticks. */
 .dk-line-open {
@@ -1339,4 +1349,756 @@ html.server-desk .toast:hover {
 .input.house-name-input {
   width: min(260px, 100%);
   min-width: 0;
+}
+
+/* ---------- 0.9.5 (task 184) ---------- */
+
+/* Home's Good buys: a grid that fits its column. Narrow: stacked; 520 px+: the shop and how good
+   under the item; 900 px+ (1920 wide windows): five columns under a header. */
+.dk-buys-wrap {
+  container-type: inline-size;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.dk-buys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dk-buys-head {
+  display: none;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  padding: 14px 20px;
+}
+.dk-buy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'item price'
+    'where where'
+    'how how'
+    'act act';
+  gap: 6px 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-top: 1px solid var(--line-soft);
+}
+.dk-buys > .dk-buy:first-child {
+  border-top: 0;
+}
+.dk-buy-item {
+  grid-area: item;
+  min-width: 0;
+}
+.dk-buy-where {
+  grid-area: where;
+  white-space: nowrap;
+  font-size: var(--fs-md);
+}
+.dk-buy-price {
+  grid-area: price;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.dk-buy-how {
+  grid-area: how;
+  min-width: 0;
+}
+.dk-buy-how .dk-sub {
+  margin-top: 2px;
+}
+.dk-buy-act {
+  grid-area: act;
+}
+.dk-buy-act .btn {
+  width: 100%;
+  min-height: 44px;
+  white-space: nowrap;
+}
+@container (min-width: 520px) {
+  .dk-buy {
+    grid-template-columns: auto minmax(0, 1fr) 92px 148px;
+    grid-template-areas:
+      'item item price act'
+      'where how how act';
+    padding: 14px 20px;
+    gap: 4px 16px;
+  }
+  .dk-buy-how {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+  }
+  .dk-buy-how .dk-sub {
+    margin-top: 0;
+  }
+  .dk-buy-where {
+    align-self: center;
+  }
+}
+@container (min-width: 900px) {
+  .dk-buys-head,
+  .dk-buy {
+    grid-template-columns: minmax(200px, 1.6fr) minmax(130px, 1fr) 92px minmax(170px, 1.3fr) 148px;
+    grid-template-areas: 'item where price how act';
+    gap: 0 16px;
+  }
+  .dk-buys-head {
+    display: grid;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .dk-buy-price {
+    align-items: flex-start;
+  }
+  .dk-buy-how {
+    display: block;
+  }
+  .dk-buy-how .dk-sub {
+    margin-top: 2px;
+  }
+}
+
+/* The item panel: the photo on top, then its name (the close button stays at the name's right). */
+.dk-panel > .dk-photo {
+  height: 220px;
+}
+
+/* My catalogue at desktop widths: three deals across. */
+.dk-phone-page .cat-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* The Aisle group tip. */
+.dk-aisle-tip {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+.dk-aisle-tip > .grow {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dk-cat-line {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.dk-cat-line > label {
+  flex: 1 1 180px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dk-cat-line select {
+  flex: 0 1 220px;
+  min-width: 160px;
+}
+
+/* ---------- 0.9.5: the Data tab (ui/DeskData.tsx, DeskDataManage.tsx, DeskDataDialog.tsx) ----------
+   Charts take the theme's tokens, so light, dark and true black all work; one accent a chart. The
+   storage bar's kinds have their own five colours (light and dark), and its legend gives each size. */
+:root {
+  --dd-c1: var(--chart-1);
+  --dd-c2: var(--chart-2);
+  --dd-c3: var(--chart-3);
+  --dd-c4: var(--chart-4);
+  --dd-c5: var(--chart-5);
+  --dd-c6: var(--chart-6);
+}
+.dd-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.dd-intro {
+  margin: -8px 0 0;
+  max-width: 820px;
+}
+.dd-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: stretch;
+}
+.dd-wide-card {
+  flex: 2 1 520px;
+}
+.dd-side-card {
+  flex: 1 1 320px;
+}
+.dd-row > .dd-side-card:last-child:not(:first-child) {
+  align-self: flex-start;
+}
+.dd-even > * {
+  flex: 1 1 360px;
+}
+.dd-card {
+  min-width: 0;
+  padding: 18px 20px;
+  border-radius: var(--r-lg);
+  gap: 12px;
+}
+.dd-card h2 {
+  font-size: var(--fs-lg);
+}
+.dd-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.dd-card-head > h2 {
+  flex-grow: 1;
+}
+.dd-tight {
+  margin: -4px 0 0;
+}
+.dd-empty {
+  margin: 0;
+  padding: 28px 16px;
+  border-radius: var(--r-md);
+  background: var(--sunken);
+  color: var(--ink-2);
+  text-align: center;
+  font-size: var(--fs-body);
+}
+.dd-anchor {
+  scroll-margin-top: 16px;
+}
+
+/* The charts. */
+.dd-chart-box {
+  width: 100%;
+  min-width: 0;
+}
+.dd-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.dd-chart text {
+  font-family: inherit;
+}
+.dd-grid {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+}
+.dd-axis {
+  stroke: var(--line-2);
+  stroke-width: 1;
+}
+.dd-tick {
+  font-size: var(--fs-xs);
+  fill: var(--muted);
+}
+.dd-value {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  fill: var(--ink-2);
+}
+.dd-bar {
+  fill: var(--green);
+}
+/* This month, still going: the same colour, lighter, with an outline (not colour alone). */
+.dd-bar.now {
+  fill: var(--green);
+  fill-opacity: 0.35;
+  stroke: var(--green);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.dd-line {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.dd-usual {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 5;
+}
+.dd-special {
+  fill: var(--blue);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.dd-dot {
+  fill: var(--surface);
+  stroke: var(--blue);
+  stroke-width: 2.5;
+}
+.dd-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.dd-key > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dd-numbers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dd-numbers > .dk-linkish {
+  align-self: flex-start;
+  min-height: 44px;
+}
+.dd-numbers-table {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.dd-mini {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.dd-mini th,
+.dd-mini td {
+  text-align: left;
+  padding: 6px 12px;
+  border-top: 1px solid var(--line-soft);
+  font-variant-numeric: tabular-nums;
+}
+.dd-mini thead th {
+  border-top: 0;
+  color: var(--muted);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+.dd-mini tbody th {
+  font-weight: 500;
+}
+
+/* Where you shop: bars across, the numbers written on each. */
+.dd-shops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dd-shops li {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.dd-shop-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-md);
+}
+.dd-shop-line strong {
+  white-space: nowrap;
+}
+.dd-shop-track {
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--line-soft);
+  overflow: hidden;
+}
+.dd-shop-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--blue);
+}
+
+/* Price over time: the item picker. */
+.dd-picker {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+}
+.dd-find {
+  flex: 0 1 200px;
+  min-width: 150px;
+}
+.dd-picker select.input {
+  flex: 0 1 260px;
+  min-width: 0;
+  max-width: 100%;
+}
+/* 0.9.5 (look): Price over time's header is one row: the title, then Item, its list and Find. */
+.dd-picker #dd-find-count:empty {
+  display: none;
+}
+@media (min-width: 1000px) {
+  .dd-card-head:has(> .dd-picker) {
+    flex-wrap: nowrap;
+  }
+  .dd-card-head > .dd-picker {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+  }
+  .dd-picker #dd-find-count {
+    position: absolute;
+    margin-top: 64px;
+    right: 18px;
+  }
+  .dd-card:has(#dd-find-count) {
+    position: relative;
+  }
+}
+
+/* What you buy most. */
+.dd-table-wrap {
+  border-radius: var(--r-md);
+}
+.dd-table {
+  min-width: 560px;
+  font-size: var(--fs-md);
+}
+.dd-table td .dk-sub {
+  display: block;
+}
+.dd-item {
+  text-align: left;
+  font-weight: 600;
+  min-height: 44px;
+}
+
+/* Storage. */
+.dd-used {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.dd-used-big {
+  font-size: var(--fs-3xl);
+  font-weight: 700;
+}
+.dd-stack {
+  display: flex;
+  height: 16px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--line-soft);
+  gap: 2px;
+}
+.dd-seg {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+}
+.dd-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--fs-md);
+}
+.dd-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dd-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-xs);
+  flex-shrink: 0;
+}
+.dd-c-prices {
+  background: var(--dd-c1);
+}
+.dd-c-receipts {
+  background: var(--dd-c2);
+}
+.dd-c-stats {
+  background: var(--dd-c3);
+}
+.dd-c-logs {
+  background: var(--dd-c4);
+}
+.dd-c-backups {
+  background: var(--dd-c5);
+}
+.dd-c-other {
+  background: var(--dd-c6);
+}
+
+/* The downloads. */
+.dd-export {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.dd-export-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 64px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dd-export-btn:hover:not(:disabled) {
+  border-color: var(--green);
+  box-shadow: 0 2px 10px var(--shadow);
+}
+.dd-export-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.dd-export-btn > svg {
+  color: var(--green);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.dd-export-btn .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Manage data. */
+.dd-fieldset {
+  border: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dd-fieldset legend {
+  padding: 0;
+  margin-bottom: 4px;
+  color: var(--muted);
+}
+.dd-kinds {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 2px 18px;
+}
+.dd-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+.dd-radio input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--green-solid);
+  flex-shrink: 0;
+}
+.dd-custom {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.input.dd-months {
+  width: 88px;
+  height: 44px;
+}
+.dd-date .input {
+  flex: 0 1 220px;
+}
+.dd-date {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.dd-note {
+  background: var(--sunken);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  color: var(--ink-2);
+}
+.dd-note ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dd-note p {
+  margin: 6px 0 0;
+}
+.dd-note p:first-child {
+  margin-top: 0;
+}
+.dd-save-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 4px;
+}
+.btn.dd-save {
+  min-width: 180px;
+}
+.dd-band {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 18px 20px;
+  border-radius: var(--r-lg);
+}
+.dd-band > .grow {
+  flex: 1 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dd-band-danger {
+  border-color: var(--red-ink);
+  border-style: dashed;
+}
+.btn.dd-danger-solid {
+  background: var(--red-ink);
+  border-color: var(--red-ink);
+  color: var(--on-ink);
+}
+.btn.dd-danger-solid:disabled {
+  background: var(--sunken);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+/* The two checks. */
+.dd-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 4px;
+}
+.dd-dialog .dk-eyebrow {
+  margin: 0;
+}
+.dd-dialog p {
+  margin: 0;
+}
+.dd-goes,
+.dd-stays {
+  border-radius: var(--r-md);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dd-goes {
+  background: var(--red-bg);
+  color: var(--red-ink);
+}
+.dd-goes ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-md);
+}
+.dd-none {
+  color: var(--ink-2);
+}
+.dd-stays {
+  background: var(--green-bg);
+  color: var(--green-ink);
+}
+.dd-dialog-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 4px;
+}
+.dd-dialog-btns > .grow {
+  flex: 1 1 0;
+}
+@media (max-width: 560px) {
+  .dd-dialog-btns > .btn {
+    flex: 1 1 100%;
+  }
+  .dd-dialog-btns > .grow {
+    display: none;
+  }
+}
+/* Inside the phone layout: the cards keep a gutter and nothing scrolls sideways. */
+.house-narrow .dd-page {
+  padding: 0 16px 24px;
+}
+.house-narrow .dd-card,
+.house-narrow .dd-band {
+  padding: 14px 16px;
+}
+.house-narrow .dk-seg {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.house-narrow .dd-tiles {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.house-narrow .dd-tiles .dk-tile {
+  padding: 12px 14px;
+}
+.house-narrow .dd-tiles .dk-tile-big {
+  font-size: var(--fs-2xl);
+}
+.house-narrow .dk-seg button {
+  padding: 0 11px;
+  white-space: nowrap;
+  min-height: 40px;
+}
+
+/* 0.9.5 (look): fields and dropdowns on the web are at least 44 px tall, as on the phone; the skip
+   link too. */
+html.server-mode select.input,
+html.server-mode .dk-money .input {
+  height: auto;
+  min-height: var(--hit);
+}
+.dk-skip {
+  min-height: var(--hit);
+}
+
+/* A setting's name is its switch's label: a full 44 px tall to tap. */
+.dk-set > label.grow {
+  min-height: var(--hit);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }

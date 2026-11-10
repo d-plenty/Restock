@@ -7,7 +7,7 @@ You'll end up with `app-release.apk`, which installs on any Android 8.0 or newer
 - [Linux](#1-install-nodejs-and-java-21) (Fedora, Ubuntu, Debian and friends): the main path, every step below
 - [macOS](#macos)
 - [Windows](#windows)
-- [Building again](#building-again), [Testing](#testing-your-changes), [Signing](#signing), [Troubleshooting](#if-something-goes-wrong)
+- [Building again](#building-again), [Testing](#testing-your-changes), [The Restock server's web app](#the-restock-servers-web-app-and-core), [Signing](#signing), [Troubleshooting](#if-something-goes-wrong)
 
 ---
 
@@ -197,6 +197,20 @@ adb logcat -s RestockCheck
 ```
 
 Tapping **Check now** in the app runs exactly the same code as the background check, so it's the quickest way to test it.
+
+## The Restock server's web app and core
+
+The [Restock server](https://github.com/d-plenty/restock-server) runs two things built from this repo: the web app (also what goes on an iPhone's home screen) and the core (the merge engine, Home Assistant's sync and the shop search). You only need these if you work on the server or build its image yourself; its Docker build makes them on its own.
+
+```bash
+cd ~/restock
+git clone https://github.com/d-plenty/restock-server.git server   # once: the server's code, inside this checkout
+npm run build:server-web     # the web app, into server/public/app/
+npm run build:server-core    # the core, into server/core/restock-core.mjs
+cd server && npm test        # the server's tests, with that core
+```
+
+The server needs Node 22.13 or newer. How to run it is in [its README](https://github.com/d-plenty/restock-server#readme).
 
 ## Signing
 

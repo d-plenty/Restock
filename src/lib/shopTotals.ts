@@ -1,4 +1,4 @@
-import type { Chain, ListEntry } from '../types';
+import type { Chain, ListEntry, Product } from '../types';
 import { inSheets, rollsIn } from './units';
 import { notAtChains } from './picks';
 import { isBulk, lineCost, productQty, type Option, type Recommendation } from './verdict';
@@ -136,9 +136,8 @@ function anySize(opts: Option[], ref: Option | undefined, by: CompareBy, qty: nu
   const priced = opts.filter((o) => o.price !== undefined);
   if (!ref || !want?.qty) return best(opts, by, qty);
   const ways = priced.map((o) => {
-    const [q, r] = alike(o, ref);
-    if (!q.qty || !r.qty || q.unit !== r.unit) return { o, packs: qty, cost: lineCost(o, qty), sized: false };
-    const packs = Math.max(1, Math.ceil((r.qty * qty) / q.qty - 1e-9));
+    const packs = packsFor(o.product, ref.product, qty);
+    if (packs === undefined) return { o, packs: qty, cost: lineCost(o, qty), sized: false };
     return { o, packs, cost: lineCost(o, packs), sized: true };
   });
   if (!ways.length) return best(opts, by, qty);
@@ -150,6 +149,17 @@ function anySize(opts: Option[], ref: Option | undefined, by: CompareBy, qty: nu
   const inStock = pickFrom(ways.filter((w) => w.o.product.inStock !== false));
   const way = inStock ?? pickFrom(ways);
   return { pick: way!.o, outOfStock: !inStock, packs: way!.sized ? way!.packs : undefined };
+}
+
+/**
+ * "Any size": how many of `pick` it takes to get `qty` times the amount of `usual` (three 500 g bags
+ * for 1.5 kg), or undefined when their amounts can't be set against each other. The list's own
+ * count (anySize); 0.9.5 (final review): the server's spending counts the same.
+ */
+export function packsFor(pick: Product, usual: Product, qty: number): number | undefined {
+  const [q, r] = alike({ product: pick } as Option, { product: usual } as Option);
+  if (!q.qty || !r.qty || q.unit !== r.unit) return undefined;
+  return Math.max(1, Math.ceil((r.qty * qty) / q.qty - 1e-9));
 }
 
 /** Your usual product for an item (to size the best-value comparison). */

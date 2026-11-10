@@ -97,6 +97,8 @@ export function lineSummary(name: string, qty: number | undefined): string {
 export interface NamedItem {
   id: string;
   name: string;
+  /** 0.9.5: the item's tab ('pantry', 'keg' or 'pharmacy'; none is the pantry). */
+  section?: string;
 }
 
 /**

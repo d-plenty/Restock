@@ -1,7 +1,8 @@
 import { SHOPS, type Section, type StoreChain } from '../shops';
 import type { Receipt, Settings } from '../types';
 import { allReceipts, deleteReceipts, getSettings } from './db';
-import { deletePhoto } from './receiptFiles';
+import { deletePhoto, readPhoto, writePhoto } from './receiptFiles';
+import { act, background } from './undo';
 import { KEEP_MONTHS } from './settingsCheck';
 
 // Receipts: how long they're kept, and reading the shop, date and total off the words the reader
@@ -41,7 +42,8 @@ export async function tidyReceipts(s?: Settings): Promise<number> {
   const keep = settings.receipts?.keepMonths;
   if (!KEEP_MONTHS.includes(keep) || keep === 0) return 0;
   const gone = expired(await allReceipts(), keep);
-  await removeReceipts(gone);
+  // 0.9.5 (final review): a tidy-up, never part of an action someone is doing.
+  if (gone.length) await background(() => removeReceipts(gone));
   return gone.length;
 }
 
@@ -49,6 +51,26 @@ export async function removeReceipts(list: Receipt[]): Promise<void> {
   for (const r of list) for (const path of [r.photo, ...(r.pages ?? [])]) if (path) await deletePhoto(path);
   await deleteReceipts(list.map((r) => r.id));
 }
+
+/**
+ * 0.9.5 (undo): delete receipts so Undo brings them back, photos too (kept in memory until the
+ * Undo is gone).
+ */
+export const removeReceiptsUndoable = (list: Receipt[], label: string) =>
+  act(label, async (ctx) => {
+    const photos: [string, string][] = [];
+    for (const r of list)
+      for (const path of [r.photo, ...(r.pages ?? [])])
+        if (path) {
+          const data = await readPhoto(path);
+          if (data) photos.push([path, data]);
+        }
+    if (photos.length)
+      ctx.onUndo(async () => {
+        for (const [path, data] of photos) await writePhoto(path, data);
+      });
+    await removeReceipts(list);
+  });
 
 // ---------- reading a receipt ----------
 

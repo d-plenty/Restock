@@ -2,8 +2,9 @@ import type { ReactNode } from 'react';
 import { Icon, TopBar } from '../components';
 import { useNav } from '../nav';
 
-// Settings → Coming soon: what's planned, each with a page saying what it'll do. Nothing here is
-// switched on yet.
+// Settings → Coming soon: what's planned, each with a page saying what it'll do. 0.9.5: some have a
+// first part already (spending in the server's Data tab, Restock on iPhone through the server,
+// Restock's own F-Droid repo); each page says what's here and what's still to come.
 
 interface Soon {
   id: string;
@@ -35,13 +36,19 @@ export const SOON: Soon[] = [
   {
     id: 'spending',
     icon: 'chart',
-    title: 'Spending summary',
-    short: 'What you spent and saved, month by month',
+    title: 'Spending on your phone',
+    short: 'On a Restock server now, in its Data tab. On the phone later',
     body: (
       <>
-        <p>A simple monthly look at what you spent at each shop, from your kept receipts, and what Restock's deals saved you.</p>
         <p>
-          It stays on your phone like everything else. Budgeting itself is planned as a separate app that works with Restock, so this stays light.
+          With a Restock server, it's here now: the server's <strong>Data</strong> tab shows what you spent each month, where you shop and what you
+          saved on specials. It's worked out from what you tick off your shopping list (the price at the shop you ticked it at, times how many), not
+          from receipts.
+        </p>
+        <p>Still to come: the same simple summary on the phone itself, with no server.</p>
+        <p>
+          Later, when reading receipts is better, a switch to use your receipts for spending instead. Restock isn't a budgeting app, so this stays
+          light.
         </p>
       </>
     ),
@@ -49,14 +56,24 @@ export const SOON: Soon[] = [
   {
     id: 'iphone',
     icon: 'phone',
-    title: 'iPhone version',
-    short: 'Restock on iOS, working with the Android version',
+    title: 'iPhone app',
+    short: 'Restock on iPhone works now, through your server. An App Store app later',
     body: (
       <>
-        <p>The same Restock on iPhone, so a household with both kinds of phone can share a pantry and list with local sync.</p>
         <p>
-          Restock is built so most of it already works on iPhone; the parts that talk to Android (background checks, widgets, alerts) need an iPhone
-          version of their own.
+          You can use Restock on iPhone now, through your own Restock server. Open the server's https address in Safari, tap Share, then{' '}
+          <strong>Add to Home Screen</strong>. It opens like an app, and your Shopping list works with no signal.
+        </p>
+        <p>
+          The server's sign-in page has the steps under <strong>On iPhone?</strong>, and so does the{' '}
+          <a href="https://github.com/d-plenty/Restock#restock-on-iphone" target="_blank" rel="noreferrer">
+            README
+          </a>
+          . It needs an https address, such as a Cloudflare tunnel or Tailscale's https.
+        </p>
+        <p>
+          Still to come: a real iPhone app, with background price checks, alerts, widgets and Wi-Fi sync between phones. That needs a developer
+          with an Apple developer account.
         </p>
       </>
     ),
@@ -65,20 +82,23 @@ export const SOON: Soon[] = [
     id: 'github',
     icon: 'download',
     title: 'F-Droid',
-    short: 'Install and update Restock from F-Droid',
+    short: 'Restock in the main F-Droid repository',
     body: (
       <>
         <p>
-          Restock's code is already public on{' '}
+          You can already get Restock through F-Droid, from{' '}
+          <a href="https://d-plenty.github.io/Restock/" target="_blank" rel="noreferrer">
+            Restock's own F-Droid repo
+          </a>
+          . Add it in F-Droid (or Droid-ify or Neo Store) and it keeps Restock up to date. It has every release, signed with the same key as the
+          APK on GitHub.
+        </p>
+        <p>
+          Still to come: Restock in the main F-Droid repository, built by F-Droid from the public code on{' '}
           <a href="https://github.com/d-plenty/Restock" target="_blank" rel="noreferrer">
             GitHub
           </a>
-          . Anyone can read it, check what it does with their data, report problems and suggest ideas there, and each new version's APK is
-          downloadable from its Releases page.
-        </p>
-        <p>
-          Next, Restock goes on F-Droid, the app store for free and open-source Android apps, so it can be installed and kept up to date without
-          downloading APKs by hand.
+          , so you can find it in F-Droid without adding a repo.
         </p>
       </>
     ),
@@ -87,27 +107,30 @@ export const SOON: Soon[] = [
     id: 'sharedprices',
     icon: 'tag',
     title: 'Shared prices',
-    short: 'A free public website of price history, so new items are judged from day one',
+    short: 'Shop prices shared between Restock servers, so new items are judged from day one',
     body: (
       <>
         <p>
           Every price Restock sees could help everyone else: a new item would arrive with months of history, so you'd know straight away whether its
           "special" is real.
         </p>
-        <p>If you choose to share (it's off unless you turn it on), Restock would send:</p>
+        <p>
+          The plan is a shared, decentralised network: Restock servers share shop price data with each other, instead of sending it to one
+          central website or company. The prices will never be sold.
+        </p>
+        <p>It only ever shares prices and products:</p>
         <ul>
-          <li>Prices from searches and price checks: each product's shop, name, size, price, "was" price and the date.</li>
-          <li>Prices from your receipts: each item, the price paid and the date, as read off the receipt.</li>
+          <li>Each product's shop, name, brand, size and barcode.</li>
+          <li>Its prices by day: the usual price, any special or multi-buy, and the date.</li>
         </ul>
-        <p>And it would never send:</p>
+        <p>And never anything personal:</p>
         <ul>
-          <li>What you searched for, what's in your pantry, or what's on your list or ticked off.</li>
-          <li>Receipt photos, totals, or anything that says who you are or where you live. No account, no phone ID.</li>
+          <li>Who you are, your loyalty cards, your branch or where you live.</li>
+          <li>What you searched for, your pantry, your shopping list or what you ticked off, or your receipts. No account, no phone ID.</li>
         </ul>
         <p>
-          The shared prices would live on a free public website run by the developer, open to anyone, with no account needed. New phones could
-          download the last six months of history, and the prices could be browsed on the website too. Restock would ask the shops for permission
-          before this is offered publicly.
+          It will be opt-in: nothing is shared unless you turn it on. The first step is here: a Restock server can download a full export file in
+          an open, documented format. Restock will check the shops' terms before any prices are shared publicly.
         </p>
       </>
     ),
@@ -133,7 +156,7 @@ export function ComingSoon() {
           </button>
         ))}
       </div>
-      <p className="small">On the way. Nothing here is switched on yet.</p>
+      <p className="small">On the way. Each page says what's here already and what's still to come.</p>
     </>
   );
 }
@@ -154,7 +177,7 @@ export function SoonScreen({ id }: { id: string }) {
         </p>
       </div>
       <div className="card soon-body">{s.body}</div>
-      <p className="small">Not switched on yet. It'll show up in Settings when it's ready.</p>
+      <p className="small">It'll show up in Settings when it's ready.</p>
     </div>
   );
 }

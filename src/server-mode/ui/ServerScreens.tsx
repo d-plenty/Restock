@@ -11,10 +11,13 @@ import { Icon, ThemePicker, TopBar, timeAgo } from '../../ui/components';
 import { useNav, type Screen } from '../../ui/nav';
 import { PROGRAMS } from '../../ui/screens/Cards';
 import { api, isV3, serverInfo, type Activity, type Device } from '../api';
-import { deleteLocalCopy, downloadBackup, householdInfo, memberNames, onStatus, syncNow, syncStatus } from '../live';
+import { deleteLocalCopy, downloadBackup, householdInfo, memberNames, onStatus, syncNow, syncStatus, unsentChanges } from '../live';
+import { askSignOutUnsent } from '../../lib/confirm';
 import { canChangeVault, inviteCode, session, signOut, signOutEverywhere, type Session } from '../session';
 import { PassphraseForm } from './Gate';
 import { ActivityLogs } from './DeskActivity';
+import { DeskData } from './DeskData';
+import { DeskDataManage } from './DeskDataManage';
 import { PassphraseV3, SignOutChoices } from './DeskHouseSettings';
 import { HandoverCard, ServerAndPhones } from './DeskServer';
 import { DeskSettings, Line } from './DeskSettings';
@@ -55,6 +58,8 @@ export function ServerStrip() {
         <nav className="strip-links" aria-label="Server">
           <button onClick={() => nav.push({ name: 'server', page: 'phones' })}>{isV3() ? 'Server' : 'Phones'}</button>
           <button onClick={() => nav.push({ name: 'server', page: 'activity' })}>Activity</button>
+          {/* 0.9.5: the Data tab. */}
+          {isV3() && <button onClick={() => nav.push({ name: 'server', page: 'data' })}>Data</button>}
           <button onClick={() => nav.push({ name: 'server', page: 'account' })}>Account</button>
         </nav>
       </div>
@@ -77,6 +82,8 @@ export function ServerTab() {
 export function serverScreen(top: Screen): ReactNode | undefined {
   switch (top.name) {
     case 'server':
+      if (isV3() && top.page === 'data') return <DeskData narrow />;
+      if (isV3() && top.page === 'data-manage') return <DeskDataManage narrow />;
       if (isV3()) return top.page === 'phones' ? <ServerAndPhones narrow /> : top.page === 'activity' ? <ActivityLogs narrow /> : <AccountPage />;
       return top.page === 'phones' ? <PhonesPage /> : top.page === 'activity' ? <ActivityPage /> : <AccountPage />;
     case 'settings':
@@ -361,6 +368,10 @@ export function fileLabel(f: string, names: Map<string, string>): string {
 /** Signs out, then takes this browser's copy away and starts again at the sign-in page. */
 export async function leave(how: () => Promise<void>) {
   const id = session()?.webId;
+  // 0.9.5 (review): changes made here that no round has sent yet (offline, say) go with the copy.
+  // One more try to send them first; still not sent, ask (Stay signed in · Sign out).
+  if (unsentChanges() > 0) await syncNow().catch(() => undefined);
+  if (unsentChanges() > 0 && !(await askSignOutUnsent())) return;
   try {
     await how();
   } finally {
@@ -457,6 +468,7 @@ export function AccountPage({ onSession }: { onSession?: (s: Session) => void })
               if (!window.confirm('Sign out every browser signed in to this server, this one too?')) return;
               setBusy(true);
               await leave(() => signOutEverywhere());
+              setBusy(false); // 0.9.5 (review): stayed signed in (changes not sent yet)
             }}
           >
             Sign out everywhere
@@ -551,7 +563,7 @@ export function ServerCards() {
         <div key={c.id} className={`loyalty ${c.program} card-locked`} aria-label={`${c.program === 'other' ? c.label : PROGRAMS[c.program]?.name ?? c.label}: kept on your phones for privacy`}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{c.program === 'other' ? c.label : (PROGRAMS[c.program]?.name ?? c.label)}</div>
-            <div style={{ fontSize: 12 }}>{PROGRAMS[c.program]?.use.split('—')[0]}</div>
+            <div style={{ fontSize: 12 }}>{PROGRAMS[c.program]?.use.split(',')[0]}</div>
           </div>
           <div className="card-locked-panel">
             <Icon name="lock" size={18} /> Kept on your phones for privacy

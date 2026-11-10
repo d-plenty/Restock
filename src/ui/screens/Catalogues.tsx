@@ -8,7 +8,7 @@ import { storeChoice, type Settings } from '../../types';
 import { ChainDot, Icon, TopBar } from '../components';
 import { useNav } from '../nav';
 
-const GROUP: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Pharmacy' };
+const GROUP: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health' };
 
 /**
  * Your shops, by tab: every shop you've ticked, or made a store your primary or second one, on a
@@ -89,8 +89,8 @@ export function CataloguesScreen() {
       {/* Your own catalogue first (0.9.0): this week's deals on the things you track. */}
       <button className="banner green cat-entry" onClick={() => nav.push({ name: 'mycatalogue' })}>
         <span className="cat-kicker">NEW · YOUR RESTOCK CATALOGUE</span>
-        <span className="cat-entry-title">Made from what you buy</span>
-        <span className="cat-lede">This week's sales on the things you track, a page for each shop.</span>
+        <span className="cat-entry-title">Specials on the things you buy</span>
+        <span className="cat-lede">This week's specials on everything you track, a page for each shop.</span>
         <span className="btn small cat-open">Open my catalogue</span>
       </button>
       <div className="eyebrow">The shops' own catalogues</div>
@@ -111,7 +111,7 @@ export function CataloguesScreen() {
       ))}
       {!groups.length && <p className="small">Pick your shops in Settings → My shops to see their catalogues here.</p>}
       <p className="small">
-        Catalogue prices can differ by state and store. Your items' prices are checked automatically, so you don't need to hunt for them here.
+        Catalogue prices can differ by state and branch. Your items' prices are checked automatically, so you don't need to hunt for them here.
       </p>
     </div>
   );

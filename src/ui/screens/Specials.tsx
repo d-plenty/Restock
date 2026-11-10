@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { addListEntry, allGroups, nowIso, uid } from '../../lib/db';
 import { likeYourPantry, loadSpecials, type SpecialsList } from '../../lib/specials';
 import { money } from '../../lib/units';
@@ -34,20 +35,22 @@ export function SpecialsScreen() {
   const filterMine = mine && pantryNames.length > 0;
 
   const addToList = async (p: StoreProduct) => {
-    await addListEntry({ id: uid(), text: p.name, chain: p.chain, price: p.price, section: 'pantry', checked: false, createdAt: nowIso() });
-    nav.toast(`${p.name} added to your shopping list`);
+    // 0.9.5 (undo)
+    await act(`${p.name} added to your shopping list`, () =>
+      addListEntry({ id: uid(), text: p.name, chain: p.chain, price: p.price, section: 'pantry', checked: false, createdAt: nowIso() }),
+    );
   };
 
   return (
     <div className="screen">
       <TopBar title="Specials" />
-      <p className="sub">This week's half price at Woolworths and Coles. Specials change on Wednesdays.</p>
+      <p className="sub">This week's half-price specials at Woolworths and Coles. They change on Wednesdays.</p>
       <div className="chips" role="group" aria-label="Which specials">
         <button className="chip" aria-pressed={filterMine} disabled={!pantryNames.length} onClick={() => setMine(true)}>
-          Like what I buy
+          Things I buy
         </button>
         <button className="chip" aria-pressed={!filterMine} onClick={() => setMine(false)}>
-          Everything
+          All specials
         </button>
         <button className="chip" onClick={() => void load(true)} disabled={busy} aria-label="Refresh the specials">
           <Icon name="refresh" size={15} /> Refresh
@@ -80,7 +83,7 @@ export function SpecialsScreen() {
               </div>
             )}
             {!l.error && !items.length && (
-              <p className="small">{filterMine ? 'Nothing like what you buy this week.' : 'No half-price specials found.'}</p>
+              <p className="small">{filterMine ? 'Nothing like the things you buy this week.' : 'No half-price specials found.'}</p>
             )}
             {items.length > 0 && (
               <div className="card flush">
@@ -98,7 +101,7 @@ export function SpecialsScreen() {
                     </span>
                     <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <button className="btn small primary" onClick={() => void addToList(p)} aria-label={`Add ${p.name} to your shopping list`}>
-                        <Icon name="cartPlus" size={16} /> List
+                        <Icon name="cartPlus" size={16} /> Add to list
                       </button>
                       <button className="btn small" onClick={() => nav.push({ name: 'add', query: p.name })} aria-label={`Track ${p.name}`}>
                         Track
@@ -118,7 +121,7 @@ export function SpecialsScreen() {
       <a className="btn block" href="https://www.aldi.com.au/special-buys" style={{ textDecoration: 'none' }}>
         <Icon name="external" size={17} /> Open Aldi Special Buys
       </a>
-      <p className="small">"List" adds it for this trip only. "Track" adds it to your pantry so Restock watches its price.</p>
+      <p className="small">"Add to list" is for this trip only. "Track" adds it to your pantry so Restock watches its price.</p>
     </div>
   );
 }

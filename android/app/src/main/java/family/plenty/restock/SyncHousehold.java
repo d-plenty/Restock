@@ -288,7 +288,7 @@ final class SyncHousehold implements SyncEngine.Household {
             out.put("kex", m.getString("kex"));
             Object k = m.opt("keepMonths");
             int km = k instanceof Number ? ((Number) k).intValue() : 0;
-            boolean ok = k instanceof Number && ((Number) k).doubleValue() == km && (km == 3 || km == 6 || km == 9 || km == 12);
+            boolean ok = k instanceof Number && ((Number) k).doubleValue() == km && keepMonthsOk(km);
             out.put("keepMonths", ok ? (Object) km : JSONObject.NULL);
             return out;
         } catch (Exception ex) {
@@ -339,11 +339,16 @@ final class SyncHousehold implements SyncEngine.Household {
     /** 0.9.4: a month for "Keep data for" (a year's 365.25 days over 12), as engine.ts MONTH_MS. */
     static final long MONTH_MS = 2_629_800_000L;
 
-    /** 0.9.4: keepCutoff (engine.ts): ms of now − keepMonths months, or -1 for none (Until I delete, or not a choice). */
+    /** 0.9.5: Auto delete: any whole number of months from 1 to 120 (engine.ts keepMonthsOk). 0.9.4 took 3, 6, 9 or 12 only. */
+    static boolean keepMonthsOk(int km) {
+        return km >= 1 && km <= 120;
+    }
+
+    /** 0.9.4: keepCutoff (engine.ts): ms of now − keepMonths months, or -1 for none (off, or not a whole number 1 to 120). */
     static long keepCutoff(Object keepMonths, long now) {
         if (!(keepMonths instanceof Number)) return -1;
         int km = ((Number) keepMonths).intValue();
-        if (km != 3 && km != 6 && km != 9 && km != 12) return -1;
+        if (((Number) keepMonths).doubleValue() != km || !keepMonthsOk(km)) return -1;
         return now - km * MONTH_MS;
     }
 
@@ -1120,7 +1125,7 @@ final class SyncHousehold implements SyncEngine.Household {
                 e.db.exec("DELETE FROM sync_log WHERE tbl = ? AND NOT (pk LIKE 'alias:%' OR pk LIKE 'keep:%')", SharedSettings.TABLE);
             }
             e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'folder_got:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%' OR key LIKE 'server_webpub:%' OR key LIKE 'server_photorefs:%'"
-                + " OR key LIKE 'server_keysver:%' OR key LIKE 'server_bad:%' OR key LIKE 'folder_bad:%'");
+                + " OR key LIKE 'server_keysver:%' OR key LIKE 'server_bad:%' OR key LIKE 'folder_bad:%' OR key LIKE 'catchup:%' OR key LIKE 'catchup_peer:%'");
             // A marker that keeps the highest number (not a record: sync skips it).
             e.db.exec("INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq) VALUES ('_seq', 'floor', 0, '', 1, ?)", top.get(0).optLong("top", 0));
             e.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");

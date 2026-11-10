@@ -29,7 +29,7 @@ export function csvFiles(s: Snapshot): { name: string; text: string }[] {
   }
   const sectionName = (sec: string | undefined) => SECTION_NAMES[(sec ?? 'pantry') as keyof typeof SECTION_NAMES] ?? sec ?? '';
 
-  const pantry: unknown[][] = [['Tab', 'Item', 'Category', 'Kind', 'Shop', 'Product', 'Brand', 'Size', 'Barcode', 'Latest price', 'Normal price', 'On special', 'Checked']];
+  const pantry: unknown[][] = [['Tab', 'Item', 'Category', 'Kind', 'Shop', 'Product', 'Brand', 'Size', 'Barcode', 'Latest price', 'Usual price', 'On special', 'Checked']];
   for (const g of s.groups) {
     const kinds: [string, string][] = [
       ...[g.usualProductId, ...(g.sameProductIds ?? [])].filter((x): x is string => !!x).map((id) => [id, 'My pick'] as [string, string]),
@@ -64,7 +64,7 @@ export function csvFiles(s: Snapshot): { name: string; text: string }[] {
     list.push([g?.name ?? e.text, e.qty ?? 1, e.chain ? chainName(e.chain) : '', e.checked ? 'Yes' : 'No', day(e.createdAt)]);
   }
 
-  const prices: unknown[][] = [['Date', 'Shop', 'Product', 'Size', 'Price', 'Normal price', 'On special', 'Member price', 'Deal']];
+  const prices: unknown[][] = [['Date', 'Shop', 'Product', 'Size', 'Price', 'Usual price', 'On special', 'Member price', 'Deal']];
   for (const r of [...s.prices].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))) {
     const p = products.get(r.productId);
     if (!p || p.id.startsWith('demo-')) continue;

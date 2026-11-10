@@ -43,10 +43,17 @@ final class HaMatch {
     static final class Named {
         final String id;
         final String name;
+        /** 0.9.5: the item's tab ("pantry", "keg" or "pharmacy"; null is the pantry). */
+        final String section;
 
         Named(String id, String name) {
+            this(id, name, null);
+        }
+
+        Named(String id, String name, String section) {
             this.id = id;
             this.name = name;
+            this.section = section;
         }
     }
 

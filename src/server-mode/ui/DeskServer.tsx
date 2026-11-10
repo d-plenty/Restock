@@ -20,7 +20,6 @@ import {
   dayText,
   errText,
   isThisBrowser,
-  keepLabel,
   newPhoneCode,
   phoneName,
   sharesText,
@@ -250,7 +249,7 @@ function PhonesCard({ phones, error, reload }: { phones?: Phone[]; error?: strin
               {[
                 sharesText(p),
                 p.lastSeen ? `synced ${timeAgo(p.lastSeen)}` : 'not synced yet',
-                p.api === 2 ? 'needs Restock 0.9.4' : p.version ? `Restock ${p.version}` : undefined,
+                p.api === 2 ? 'needs Restock 0.9.4 or newer' : p.version ? `Restock ${p.version}` : undefined,
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -337,8 +336,9 @@ function KeptCard() {
         </div>
       </div>
       <span className="small">
-        Keep data for: <strong>{settings ? keepLabel(settings.keepMonths) : '…'}</strong>. Prices, receipts and logs older than that go. Change it in
-        Settings.
+        Auto delete:{' '}
+        <strong>{settings ? (settings.keepMonths === null || settings.keepMonths === undefined ? 'Off' : `after ${settings.keepMonths} months`) : '…'}</strong>. Change it, or see
+        what's kept, in Data.
       </span>
       <button className="dk-linkish dk-self-start" onClick={() => nav.push({ name: 'server', page: 'activity' })}>
         Activity and logs
@@ -503,7 +503,7 @@ export function HandoverCard() {
       ) : (
         <>
           <ol className="small steps">
-            <li>On the owner phone (Restock 0.9.4): Settings → Sync and backups → Your server → Hand this household to the server.</li>
+            <li>On the owner phone (Restock 0.9.4 or newer): Settings → Sync and backups → Your server → Hand this household to the server.</li>
             <li>Scan this code. It works once, for 10 minutes.</li>
             <li>When the phone says it's done, reload this page and sign in again.</li>
           </ol>

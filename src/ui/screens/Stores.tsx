@@ -1,5 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import { getSettings, nowIso, uid, updateSettings } from '../../lib/db';
+import { nowIso, uid, updateSettings as saveNow } from '../../lib/db';
+// 0.9.5 (save): on My shops, changes wait for Save settings (settingsDraft.ts); in the setup steps they're saved at once.
+import { getSettings, hasUnsaved, saveDraft, updateSettings } from '../../lib/settingsDraft';
+import { SaveBar, useSettingsDraft } from '../SaveBar';
 import { request as askPermission } from '../../lib/permissions';
 import { describePosition, findPickedShops, nearbyStores, searchArea, type Area, type NearbyStore } from '../../lib/places';
 import { RestockNative } from '../../lib/sql/native';
@@ -112,7 +115,7 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
     setWait(harder ? 30 : 20);
     setError(undefined);
     try {
-      await updateSettings({ area });
+      await saveNow({ area }); // 0.9.5 (save): where you searched isn't a setting to save
       if (harder) {
         const more = await findPickedShops(area.lat, area.lon, section, picked);
         setStores((cur) => {
@@ -242,7 +245,7 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
-          <button className="btn" type="submit" aria-label="Search" style={{ width: 52, padding: 0 }} disabled={!!busy}>
+          <button className="btn" type="submit" aria-label="Search" style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }} disabled={!!busy}>
             <Icon name="search" />
           </button>
         </form>
@@ -338,7 +341,7 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
                           className="chip"
                           aria-pressed={isBranch(cur, 'primary', s, mine, stores)}
                           onClick={() => choose(s, 'primary')}
-                          aria-label={`Make ${s.name} your primary store`}
+                          aria-label={`Make ${s.name} your main branch`}
                         >
                           Primary
                         </button>
@@ -346,7 +349,7 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
                           className="chip"
                           aria-pressed={isBranch(cur, 'secondary', s, mine, stores)}
                           onClick={() => choose(s, 'secondary')}
-                          aria-label={`Make ${s.name} your second store`}
+                          aria-label={`Make ${s.name} your second branch`}
                         >
                           2nd
                         </button>
@@ -384,7 +387,7 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
             </button>
           )}
           <p className="small">
-            Store locations © OpenStreetMap contributors. Independent shops without a chain name aren't listed; add their website with "Other"
+            Shop locations © OpenStreetMap contributors. Independent shops without a chain name aren't listed; add their website with "Other"
             instead.
           </p>
         </>
@@ -643,12 +646,12 @@ export function SectionSwitch({ settings, section }: { settings: Settings; secti
           <Icon name={section} size={22} />
           <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <span className="title" style={{ fontSize: 15 }}>
-              {section === 'keg' ? 'Bottle shops (Keg tab)' : 'Pharmacies (Pharmacy tab)'}
+              {section === 'keg' ? 'Bottle shops (Keg tab)' : 'Chemists (Health tab)'}
             </span>
             <span className="small">
               {section === 'keg'
                 ? 'Track beer, wine and spirits prices at the bottle shops you pick. Kept separate from groceries.'
-                : 'Track medicine, first aid and personal care prices at the pharmacies you pick. Kept separate from groceries.'}
+                : 'Track medicine, first aid and personal care prices at the chemists you pick. Kept separate from groceries.'}
             </span>
           </span>
           <input type="checkbox" className="switch" checked={on} onChange={(e) => void turn(e.target.checked)} aria-label={`Use the ${SECTION_NAMES[section]} tab`} />
@@ -660,7 +663,7 @@ export function SectionSwitch({ settings, section }: { settings: Settings; secti
                 Show {SECTION_NAMES[section]} in the bottom bar
               </span>
               <span className="small">
-                Turn this off if you only buy {section === 'keg' ? 'a drink' : 'from a pharmacy'} now and then. You can still search these shops on
+                Turn this off if you only buy {section === 'keg' ? 'a drink' : 'from a chemist'} now and then. You can still search these shops on
                 Add and put things on your shopping list without tracking them.
               </span>
             </span>
@@ -714,7 +717,7 @@ function ManualNames({ settings, section }: { settings: Settings; section: Secti
     <details className="explain">
       <summary>
         <Icon name="pencil" size={18} />
-        <span>Type store names yourself</span>
+        <span>Type branch names yourself</span>
       </summary>
       <div className="explain-body">
         {chains.map((chain) => {
@@ -728,8 +731,8 @@ function ManualNames({ settings, section }: { settings: Settings; section: Secti
                 <input
                   key={`p-${s.primary ?? ''}`}
                   className="input"
-                  placeholder="Primary store"
-                  aria-label={`${chainName(chain)} primary store`}
+                  placeholder="Main branch"
+                  aria-label={`${chainName(chain)} main branch`}
                   defaultValue={s.primary ?? ''}
                   onBlur={(e) => void setStore(chain, 'primary', e.target.value.trim())}
                 />
@@ -737,7 +740,7 @@ function ManualNames({ settings, section }: { settings: Settings; section: Secti
                   key={`s-${s.secondary ?? ''}`}
                   className="input"
                   placeholder="Second (optional)"
-                  aria-label={`${chainName(chain)} second store`}
+                  aria-label={`${chainName(chain)} second branch`}
                   defaultValue={s.secondary ?? ''}
                   onBlur={(e) => void setStore(chain, 'secondary', e.target.value.trim())}
                 />
@@ -746,8 +749,8 @@ function ManualNames({ settings, section }: { settings: Settings; section: Secti
                 <input
                   className="input"
                   inputMode="numeric"
-                  placeholder="Advanced: Coles store ID (4 digits)"
-                  aria-label="Coles store ID"
+                  placeholder="Advanced: Coles branch number (4 digits)"
+                  aria-label="Coles branch number"
                   defaultValue={s.storeId ?? ''}
                   onBlur={(e) => void setStore(chain, 'storeId', e.target.value.trim())}
                 />
@@ -788,7 +791,7 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
         {/* Keyed by tab only: picking a shop or a branch must not throw away the list you're looking at. */}
         <NearbyFinder key="pantry" settings={settings} section="pantry" />
         <ManualNames settings={settings} section="pantry" />
-        <div className="eyebrow">3 · Check your stores</div>
+        <div className="eyebrow">3 · Check your shops</div>
         <LocalPrices settings={settings} />
       </>
     );
@@ -813,8 +816,8 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
           <p className="small">
             Prices come from each shop's website, so they're the online price.
             {section === 'pharmacy'
-              ? ' Some pharmacies only show prices in store, or set them per store; those may come up with nothing.'
-              : ' Some bottle shops set prices per store, so your local one can differ.'}
+              ? ' Some chemists only show prices in the shop, or set them per branch; those may come up with nothing.'
+              : ' Some bottle shops set prices per branch, so your local one can differ.'}
           </p>
         </>
       )}
@@ -866,7 +869,7 @@ function branchText(st: StoreChoice): string {
   const primary = cleanStoreName(st.primary);
   const second = cleanStoreName(st.secondary);
   if (!primary && !second) return 'No branch picked yet (pick one below)';
-  return [primary && `Your store: ${primary}`, second && `2nd: ${second}`].filter(Boolean).join(' · ');
+  return [primary && `Your branch: ${primary}`, second && `2nd: ${second}`].filter(Boolean).join(' · ');
 }
 
 /** Bottle shops and pharmacies: the shops in use and your branch at each, at a glance. */
@@ -894,6 +897,7 @@ function SelectedSummary({ settings, section }: { settings: Settings; section: S
 }
 
 export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
+  useSettingsDraft(); // 0.9.5 (save)
   const settings = useLive(getSettings, []);
   const nav = useNav();
   const [tab, setTab] = useState<Section>(section);
@@ -911,16 +915,20 @@ export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
       {settings && (
         <button
           className="btn primary block"
-          onClick={() => {
-            const label = tab === 'pantry' ? 'Supermarkets' : tab === 'keg' ? 'Bottle shops' : 'Pharmacies';
+          onClick={async () => {
+            // 0.9.5 (save): Done saves what's changed, then goes back.
+            const changed = hasUnsaved();
+            if (changed && !(await saveDraft())) return;
+            const label = tab === 'pantry' ? 'Supermarkets' : tab === 'keg' ? 'Bottle shops' : 'Chemists';
             const summary = shopSummary(settings, tab);
-            nav.toast(summary === 'Off' ? `${label} are off.` : `${label} saved: ${summary}`);
+            if (changed) nav.toast(summary === 'Off' ? `${label} are off.` : `${label} saved: ${summary}`);
             nav.pop();
           }}
         >
           <Icon name="check" size={18} /> Done
         </button>
       )}
+      <SaveBar />
     </div>
   );
 }
@@ -1000,7 +1008,7 @@ function WoolworthsAccount({ settings }: { settings: Settings }) {
           a.signedIn
             ? a.storeId
               ? { ok: true, text: `Signed in. Your store: ${a.storeName ?? `Woolworths store ${a.storeId}`}.` }
-              : { ok: false, text: 'Signed in, but no store is picked yet. Tap "Change store", choose Pick up and your store, then tap Done.' }
+              : { ok: false, text: 'Signed in, but no branch is picked yet. Tap "Change branch", choose Pick up and your local shop, then tap Done.' }
             : { ok: false, text: "Woolworths says you're not signed in. Try again, and tap Done once you're in." },
         );
     } catch (e) {
@@ -1018,7 +1026,7 @@ function WoolworthsAccount({ settings }: { settings: Settings }) {
         on
           ? acct?.storeId
             ? `Signed in · prices and stock at ${acct.storeName ?? `store ${acct.storeId}`}`
-            : 'Signed in · no store picked yet'
+            : 'Signed in · no branch picked yet'
           : 'Not signed in · online prices only, no stock'
       }
       info={{
@@ -1026,11 +1034,11 @@ function WoolworthsAccount({ settings }: { settings: Settings }) {
         body: (
           <>
             <p className="small">
-              <strong>Signed in:</strong> your own store's prices and stock, and you can send your shopping list straight into your Woolworths
+              <strong>Signed in:</strong> your own branch's prices and stock, and you can send your shopping list straight into your Woolworths
               trolley.
             </p>
             <p className="small">
-              <strong>Not signed in:</strong> Woolworths' online prices. No stock is shown, as online stock isn't reliable for your store.
+              <strong>Not signed in:</strong> Woolworths' online prices. No stock is shown, as online stock isn't reliable for your branch.
             </p>
             <p className="small">
               You sign in on Woolworths' own page, so your password goes to Woolworths, not Restock. Restock then asks the Woolworths website for
@@ -1049,11 +1057,11 @@ function WoolworthsAccount({ settings }: { settings: Settings }) {
             onClick={() =>
               void go(
                 'store',
-                async () => (await openWoolworths('Choose Pick up and your store at the top of the page. Then tap Done.'), checkWoolworths()),
+                async () => (await openWoolworths('Choose Pick up and your local shop at the top of the page. Then tap Done.'), checkWoolworths()),
               )
             }
           >
-            Change store
+            Change branch
           </button>
           <button className="btn small" disabled={!!busy} onClick={() => void go('check', checkWoolworths)}>
             {busy === 'check' ? 'Checking…' : 'Check again'}
@@ -1102,14 +1110,14 @@ function ColesStore({ settings }: { settings: Settings }) {
       const found = await colesAtStore('milk', no);
       setTest(
         found.length
-          ? { ok: true, text: `Coles answered for store ${no}: ${found.length} products for "milk", with your store's prices and stock.` }
-          : { ok: false, text: `Coles answered for store ${no} but found nothing. Check the store number.` },
+          ? { ok: true, text: `Coles answered for branch ${no}: ${found.length} products for "milk", with your branch's prices and stock.` }
+          : { ok: false, text: `Coles answered for branch ${no} but found nothing. Check the branch number.` },
       );
     } catch (e) {
       setTest({
         ok: false,
         text: isNative()
-          ? `Coles didn't answer for store ${no} (${errText(e)}). Restock will use its online prices until it does.`
+          ? `Coles didn't answer for branch ${no} (${errText(e)}). Restock will use its online prices until it does.`
           : 'Testing works in the Android app.',
       });
     }
@@ -1145,7 +1153,7 @@ function ColesStore({ settings }: { settings: Settings }) {
   const saveTyped = async (key: 'branchStoreNo' | 'branchStoreNo2', value: string) => {
     const n = value.trim() ? colesStoreNo(value) : undefined;
     if (value.trim() && !n) {
-      setError("That doesn't look like a Coles store link or number. It's the number at the end of the store's page address, like …/kirwan-0844.");
+      setError("That doesn't look like a Coles branch link or number. It's the number at the end of the branch page's address, like …/kirwan-0844.");
       return;
     }
     setError(undefined);
@@ -1157,14 +1165,14 @@ function ColesStore({ settings }: { settings: Settings }) {
       <input
         className="input"
         inputMode="url"
-        placeholder="Store number, or the store page's link"
+        placeholder="Branch number, or the branch page's link"
         value={texts[key]}
         onChange={(e) => setTexts((t) => ({ ...t, [key]: e.target.value }))}
         onBlur={(e) => void saveTyped(key, e.target.value)}
       />
     </label>
   );
-  const where = (name: string | undefined, no: string) => `${name ? cleanStoreName(name) : 'your store'} (store ${no})`;
+  const where = (name: string | undefined, no: string) => `${name ? cleanStoreName(name) : 'your branch'} (branch ${no})`;
   return (
     <AccountCard
       chain="coles"
@@ -1176,17 +1184,17 @@ function ColesStore({ settings }: { settings: Settings }) {
           : 'Online prices only, no stock'
       }
       info={{
-        title: 'Your Coles store',
+        title: 'Your Coles branch',
         body: (
           <>
             <p className="small">
-              Coles answers for any of its stores by store number, without signing in. With your store chosen, Restock shows that store's own prices
-              and stock instead of the online store's. This is new, so it's marked Beta: if Coles doesn't answer for your store, Restock uses the
+              Coles answers for any of its branches by branch number, without signing in. With your branch chosen, Restock shows that branch's own prices
+              and stock instead of the website's. This is new, so it's marked Beta: if Coles doesn't answer for your branch, Restock uses the
               online prices and notes it in Settings → Troubleshooting → Diagnostics.
             </p>
             <p className="small">
-              <strong>Choose your Coles store</strong> opens Coles' store finder inside Restock. Tap your store, and Restock picks up its number by
-              itself and comes back. The number is the four digits at the end of the store page's address, for example …/kirwan-0844.
+              <strong>Choose your Coles branch</strong> opens Coles' shop finder inside Restock. Tap your shop, and Restock picks up its number by
+              itself and comes back. The number is the four digits at the end of the branch page's address, for example …/kirwan-0844.
             </p>
             <p className="small">
               <strong>Signing in to Coles</strong> isn't needed for prices. It's for sending your list into your Coles trolley, once Restock has
@@ -1200,7 +1208,7 @@ function ColesStore({ settings }: { settings: Settings }) {
       {on ? (
         <div className="chips" style={{ flexWrap: 'wrap' }}>
           <button className="btn small" disabled={busy} onClick={() => void choose('primary')}>
-            Change store
+            Change branch
           </button>
           <button className="btn small" disabled={test.busy} onClick={() => void runTest()}>
             {test.busy ? 'Asking Coles…' : 'Test it'}
@@ -1211,7 +1219,7 @@ function ColesStore({ settings }: { settings: Settings }) {
         </div>
       ) : (
         <button className="btn primary" disabled={busy || !isNative()} onClick={() => void choose('primary')}>
-          {busy ? 'Opening Coles…' : isNative() ? 'Choose your Coles store' : 'Choosing your store works in the Android app'}
+          {busy ? 'Opening Coles…' : isNative() ? 'Choose your Coles branch' : 'Choosing your branch works in the Android app'}
         </button>
       )}
       {!on && st.branchStoreNo && (
@@ -1227,10 +1235,10 @@ function ColesStore({ settings }: { settings: Settings }) {
       {on && st.branchStoreNo2 && (
         <div className="chips" style={{ flexWrap: 'wrap' }}>
           <button className="btn small" disabled={busy} onClick={() => void choose('secondary')}>
-            Change 2nd store
+            Change 2nd branch
           </button>
           <button className="btn small ghost" onClick={() => void save('secondary', undefined)}>
-            Remove 2nd store
+            Remove 2nd branch
           </button>
         </div>
       )}
@@ -1248,10 +1256,10 @@ function ColesStore({ settings }: { settings: Settings }) {
         <summary className="small">Other ways</summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 8 }}>
           <p className="small" style={{ margin: 0 }}>
-            Know the store number? Type it here, or paste the store page's link. Picking a branch on the map above fills it in too, when the map knows
+            Know the branch number? Type it here, or paste the branch page's link. Picking a branch on the map above fills it in too, when the map knows
             it.
           </p>
-          {field('branchStoreNo', 'Your Coles store number')}
+          {field('branchStoreNo', 'Your Coles branch number')}
           {field('branchStoreNo2', '2nd Coles (optional, for its stock)')}
           <div className="row" style={{ padding: 0, minHeight: 0, gap: 8 }}>
             <span className="grow small">
@@ -1300,7 +1308,7 @@ function LocalPrices({ settings }: { settings: Settings }) {
   return (
     <div className="card">
       <p className="small" style={{ margin: 0 }}>
-        Your own store's prices and stock, where the shop allows it:
+        Your own branch's prices and stock, where the shop allows it:
       </p>
       {woolies && <WoolworthsAccount settings={settings} />}
       {coles && <ColesStore settings={settings} />}

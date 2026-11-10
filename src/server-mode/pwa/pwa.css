@@ -1,0 +1,167 @@
+/* 0.9.5: the web app on a phone's home screen (and its notices). Uses the app's own tokens. */
+
+.pwa-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: var(--fs-body);
+  line-height: 1.35;
+  background: var(--sunken);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.pwa-banner svg {
+  flex-shrink: 0;
+}
+.pwa-banner .grow {
+  flex: 1;
+  min-width: 0;
+}
+.pwa-banner-sub {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.pwa-banner.offline {
+  background: var(--amber-bg);
+}
+.pwa-banner.refused {
+  background: var(--red-bg);
+}
+.pwa-banner.update {
+  background: var(--green-bg);
+}
+.pwa-banner-btn {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: var(--fs-body);
+  flex-shrink: 0;
+}
+.pwa-banner-close {
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: none;
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+/* On a wide screen the notices sit at the top of the page, with its own corners. */
+.dk-main > .pwa-banner {
+  border-radius: 0;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+/* Scan a barcode, over the Shopping list on a phone. */
+/* While the offline notice shows, the strip's own "Can't reach the server" line steps aside. */
+html.pwa-offline .server-strip .strip-main {
+  display: none;
+}
+
+/* Inside the install sheet. */
+.pwa-h {
+  margin: 6px 0 0;
+  font-size: var(--fs-lg);
+}
+.pwa-steps {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.4;
+}
+.pwa-steps svg {
+  vertical-align: -3px;
+}
+.pwa-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  line-height: 1.4;
+}
+.pwa-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.pwa-note.good {
+  background: var(--green-bg);
+}
+.pwa-note.warn {
+  background: var(--amber-bg);
+}
+.dk-nav-foot .pwa-install-link {
+  margin: 10px auto 0;
+  color: var(--on-navy);
+  opacity: 0.9;
+  background: none;
+  border: none;
+  min-height: 44px;
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-md);
+  text-decoration: underline;
+}
+
+.gate-install {
+  align-self: center;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* From the home screen (standalone): no page bounce or text resizing, and nothing under the
+   notch, the home bar or the rounded corners. The phone layout already pads with --top/--bottom. */
+@media (display-mode: standalone) {
+  html.server-mode {
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  html.server-mode .app {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  html.server-mode .dk-nav {
+    padding-top: calc(24px + var(--top));
+    padding-bottom: calc(18px + var(--bottom));
+  }
+  html.server-mode .dk-page {
+    padding-top: calc(28px + var(--top));
+    padding-bottom: calc(56px + var(--bottom));
+  }
+  html.server-mode .dk-main > .pwa-banner {
+    padding-top: calc(10px + var(--top));
+  }
+  html.server-mode .dk-main > .pwa-banner ~ .dk-page {
+    padding-top: 28px;
+  }
+}
+
+/* 0.9.5 (web search): the Scan button next to the Shopping list's add box (phone layout). */
+.btn.scan-btn {
+  flex: none;
+  width: 52px;
+  padding: 0;
+}
+/* 0.9.5 (web search): while a shop search has ticks, its tick bar is the bar at the bottom. */
+html.web-ticking .sticky-cta {
+  display: none;
+}

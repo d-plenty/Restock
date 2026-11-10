@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { allListEntries, getSettings } from '../../lib/db';
-import { addGroupToList } from '../../lib/listActions';
+import { addAllToList, addToList } from '../../lib/listActions'; // 0.9.5 (undo)
 import { buildCatalogue, type CatalogueDeal, type CataloguePage, type MyCatalogue } from '../../lib/myCatalogue';
 import { loadRecommendations } from '../../lib/recs';
 import { nameHasSize } from '../../lib/naming';
@@ -9,8 +9,12 @@ import { useLive } from '../../lib/useLive';
 import { activeSections, chainName, searchChainsIn, shopColor } from '../../shops';
 import { Icon, TopBar } from '../components';
 import { useNav } from '../nav';
+import { serverMode } from '../../server-mode/flag';
+import { pageForKey, PageArrows } from '../../server-mode/ui/deskShared';
 
 // My catalogue (0.9.0): this week's deals on the things you track, a page per shop. See myCatalogue.ts.
+// 0.9.5, the web: Previous / Next above and below the pages (with "Page 3 of 7"), and ← → when the
+// pages have focus; a deal's photo or name opens the item.
 
 const DAY = new Intl.DateTimeFormat('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
 const weekText = (c: MyCatalogue) => `${DAY.format(c.from)} – ${DAY.format(c.to)}`;
@@ -25,22 +29,46 @@ export function MyCatalogueScreen() {
   }, []);
   const pagesRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(0);
+  // The page Previous / Next / a key asked for, while the smooth scroll gets there (the scroll's
+  // in-between positions don't change the page number meanwhile).
+  const aim = useRef<{ page: number; until: number }>(undefined);
 
   if (!data) return <div className="screen" />;
   const { catalogue: c, listed } = data;
+  const count = c.pages.length + 1;
   const goTo = (i: number) => {
     const el = pagesRef.current;
+    aim.current = { page: i, until: Date.now() + 900 };
+    setPage(i);
     if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
   };
+  const onScroll = (el: HTMLDivElement) => {
+    const at = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+    const a = aim.current;
+    if (a && Date.now() < a.until && at !== a.page) return;
+    aim.current = undefined;
+    setPage(at);
+  };
+  // ← → on the pages, or on Previous / Next (not while typing or in a menu).
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.target as HTMLElement).closest?.('input, select, textarea')) return;
+    const to = pageForKey(e.key, page, count);
+    if (to === undefined) return;
+    e.preventDefault();
+    if (to !== page) goTo(to);
+  };
+  const pageName = (i: number) => (i ? chainName(c.pages[i - 1].chain) : 'Cover');
+  const arrows = (where: 'top' | 'bottom') =>
+    serverMode ? <PageArrows page={Math.min(page, count - 1)} count={count} name={pageName(Math.min(page, count - 1))} onGo={goTo} where={where} /> : null;
   const add = async (d: CatalogueDeal) => {
-    const added = await addGroupToList(d.rec.group);
-    nav.toast(added ? `${d.rec.group.name} added to your list` : `${d.rec.group.name} is already on your list`);
+    const added = await addToList(d.rec.group); // 0.9.5 (undo)
+    if (!added) nav.toast(`${d.rec.group.name} is already on your list`);
   };
   const salesDeals = c.pages.filter((p) => p.kind === 'sales').flatMap((p) => p.deals);
   const addAll = async () => {
-    let n = 0;
-    for (const g of new Map(salesDeals.map((d) => [d.rec.group.id, d.rec.group])).values()) if (await addGroupToList(g)) n++;
-    nav.toast(n ? `${n} item${n === 1 ? '' : 's'} added to your list` : 'They were all on your list already');
+    // 0.9.5 (undo): "Added 32 to your shopping list", and one Undo takes all 32 off again.
+    const n = await addAllToList([...new Map(salesDeals.map((d) => [d.rec.group.id, d.rec.group])).values()]);
+    if (!n) nav.toast('They were all on your list already');
   };
 
   return (
@@ -49,21 +77,25 @@ export function MyCatalogueScreen() {
       {!c.pages.length ? (
         <div className="empty">
           <p>
-            Nothing on sale from your items this week yet. Restock builds this catalogue from the things you track, after a price check.
+            Nothing on special from your items this week yet. Restock builds this catalogue from the things you track, after a price check.
           </p>
         </div>
       ) : (
-        <>
+        <div className="cat-deck" style={{ display: 'flex', flexDirection: 'column', gap: 14 }} onKeyDown={serverMode ? onKey : undefined}>
+          {arrows('top')}
           <div
             className="cat-pages"
             ref={pagesRef}
-            onScroll={(e) => setPage(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth)))}
+            onScroll={(e) => onScroll(e.currentTarget)}
+            {...(serverMode
+              ? { tabIndex: 0, role: 'region', 'aria-roledescription': 'catalogue', 'aria-label': 'My catalogue pages. Use the left and right arrow keys to turn the page.' }
+              : {})}
           >
             <section className="cat-page" aria-label="Cover">
               <div className="banner green cat-cover">
                 <span className="cat-kicker">{weekText(c).toUpperCase()}</span>
-                <h2>This week's deals on what you buy</h2>
-                <span className="cat-lede">Only things you track. Only real sales.</span>
+                <h2>Specials on the things you buy</h2>
+                <span className="cat-lede">Only things you track. Only real specials.</span>
                 <span className="cat-stats">
                   <span>
                     <b className="big">{money(c.saving)}</b>
@@ -138,7 +170,8 @@ export function MyCatalogueScreen() {
               />
             ))}
           </div>
-        </>
+          {arrows('bottom')}
+        </div>
       )}
     </div>
   );
@@ -153,6 +186,7 @@ function DealTile({ d, listed, onAdd, onOpen }: { d: CatalogueDeal; listed: bool
   const o = d.option;
   const [broken, setBroken] = useState(false);
   const size = o.product.size ? tidySize(o.product.size, o.product.name) : undefined;
+  const name = `${o.product.name}${o.product.size && size && !nameHasSize(o.product.name, o.product.size) ? ` ${size}` : ''}`;
   return (
     <div className="cat-deal">
       <button className="cat-photo" onClick={onOpen} aria-label={`Open ${d.rec.group.name}`}>
@@ -165,10 +199,13 @@ function DealTile({ d, listed, onAdd, onOpen }: { d: CatalogueDeal; listed: bool
       <span className={`cat-burst${o.multi ? ' multi' : d.badge === 'CHEAPEST' || d.badge === 'SAME PRICE' ? ' plain' : ''}`}>
         {d.badge}
       </span>
-      <span className="cat-name">
-        {o.product.name}
-        {o.product.size && size && !nameHasSize(o.product.name, o.product.size) ? ` ${size}` : ''}
-      </span>
+      {serverMode ? (
+        <button type="button" className="cat-name cat-name-open" onClick={onOpen}>
+          {name}
+        </button>
+      ) : (
+        <span className="cat-name">{name}</span>
+      )}
       <span className="cat-price">
         <b className="num">{o.multi ? `${o.multi.n} for ${money(o.multi.total)}` : money(o.price)}</b>
         {d.was !== undefined && <s className="num">{money(d.was)}</s>}

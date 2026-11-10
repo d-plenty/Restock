@@ -55,7 +55,7 @@ export interface HouseholdSettings {
   inHousehold: boolean;
   name: string;
   nameOn: ChangedOn;
-  /** "Groceries, Keg and Pharmacy · receipts shared". Owner phone only. */
+  /** "Groceries, Keg and Health · receipts shared". Owner phone only. */
   shares: string;
   /** "Declan's phone is the owner". Owner phone only. */
   owner: string;
@@ -86,7 +86,7 @@ export const SHOP_AROUND_MINS = [0, 0.5, 1, 2, 5, 10];
 export const NEW_ITEM_PCTS = [10, 15, 20, 30, 40, 50];
 export { PRODUCT_ORDERS };
 
-const TAB_TITLE: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg (bottle shops)', pharmacy: 'Pharmacy' };
+const TAB_TITLE: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg (bottle shops)', pharmacy: 'Health' };
 
 function sharesText(tabs: string[], receipts: boolean): string {
   const names = tabs.map((t) => (t === 'pantry' ? 'Groceries' : (SECTION_NAMES[t as Section] ?? t)));

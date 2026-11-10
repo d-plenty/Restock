@@ -1,26 +1,26 @@
 # Fine print
 
-_Last updated 6 November 2026_
+_Last updated 10 November 2026_
 
 ## In short
 
-- Restock isn't connected with any supermarket, bottle shop or pharmacy.
+- Restock isn't connected with any supermarket, bottle shop or chemist.
 - Prices and stock can be wrong or out of date. Always check the shelf and your receipt.
 - The app is free and comes with no guarantee.
 
-## Not affiliated with any store
+## Not affiliated with any shop
 
 Restock is an independent project. It isn't made, endorsed or supported by Coles, Woolworths, Aldi, Dan Murphy's, BWS, Liquorland, Chemist Warehouse, Priceline or any other retailer. Their names belong to them and are used only to say which shop a price came from.
 
 ## Prices and stock can be wrong
 
-Prices, specials, member prices and stock come from each store's website and can be wrong, late or different in your store or state. "In stock" means the store's online stock, not the shelf near you. Verdicts like "Great deal" or "Wait" are worked out from the price history on your phone and are only a guide. Always check the shelf price and your receipt.
+Prices, specials, member prices and stock come from each shop's website and can be wrong, late or different at your branch or in your state. "In stock" means the shop's online stock, not the shelf near you. Verdicts like "Great deal" or "Wait" are worked out from the price history on your phone and are only a guide. Always check the shelf price and your receipt.
 
-Bottle shop and pharmacy prices are the online prices on each shop's website. Many pharmacies and some bottle shops set prices per store, or show some prices only in store, so the price at your local shop can be different, and some shops may show nothing at all.
+Bottle shop and chemist prices are the online prices on each shop's website. Many chemists and some bottle shops set prices per branch, or show some prices only in the shop, so the price at your local shop can be different, and some shops may show nothing at all.
 
 ## Product information
 
-Product names and details, including the ingredients, allergens and nutrition shown under Product details, come from the stores and Open Food Facts. They can be incomplete or out of date, and recipes change. Always check the packet, and never rely on Restock for allergies or dietary needs.
+Product names and details, including the ingredients, allergens and nutrition shown under Product details, come from the shops and Open Food Facts. They can be incomplete or out of date, and recipes change. Always check the packet, and never rely on Restock for allergies or dietary needs.
 
 Restock is not medical advice. For medicines, read the label and ask a pharmacist or doctor. Prescription medicines aren't priced by Restock.
 
@@ -28,9 +28,11 @@ Restock is not medical advice. For medicines, read the label and ask a pharmacis
 
 The Keg tab is for adults 18 and over. Restock only compares prices; please drink responsibly. For help, call the National Alcohol and Other Drug Hotline on 1800 250 015.
 
-## Fair use of store websites
+## Fair use of shop websites
 
-Restock only checks the items you track, one at a time with pauses in between, like a person browsing. Please use it for your own household shopping. A store may change its website or block requests at any time, and some features may stop working until the app is updated.
+Restock only checks the items you track, one at a time with pauses in between, like a person browsing. Please use it for your own household shopping. A shop may change its website or block requests at any time, and some features may stop working until the app is updated.
+
+If you turn on "Let the web page search the shops" on your own Restock server, it searches only when someone presses Search on its web page, one search at a time, and never in the background. A shop may block searches from a server; then search on a phone.
 
 ## Data and battery
 

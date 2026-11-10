@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ACCENTS, AUS_GREEN, ICON_COLOURS, nearestIcon } from '../../lib/looks';
-import { updateSettings } from '../../lib/db';
+// 0.9.5 (save): on a settings screen these wait for Save settings (settingsDraft.ts).
+import { afterSave, updateSettings } from '../../lib/settingsDraft';
 import { RestockNative } from '../../lib/sql/native';
 import { textOn } from '../../lib/theme';
 import { isNative } from '../../stores/http';
@@ -21,24 +22,32 @@ export function LookSettings({ settings }: { settings: Settings }) {
   const setIcon = async (id: string) => {
     await setLook({ icon: id });
     if (!isNative()) return;
-    const real = id === 'match' ? nearestIcon(accent).id : id;
-    setIconBusy(true);
-    try {
-      await RestockNative.setAppIcon({ id: real });
-      nav.toast('App icon changed. If it disappeared from your home screen, add it again from the app list.');
-    } catch {
-      nav.toast("Couldn't change the icon on this phone.");
-    } finally {
-      setIconBusy(false);
-    }
+    // 0.9.5 (save): the app icon changes once it's saved (with the accent it's saved with).
+    await afterSave('icon', async (s) => {
+      const real = s.look.icon === 'match' ? nearestIcon(s.look.accent ?? AUS_GREEN).id : s.look.icon;
+      setIconBusy(true);
+      try {
+        await RestockNative.setAppIcon({ id: real });
+        nav.toast('App icon changed. If it disappeared from your home screen, add it again from the app list.');
+      } catch {
+        nav.toast("Couldn't change the icon on this phone.");
+      } finally {
+        setIconBusy(false);
+      }
+    });
   };
 
   // With "Match my accent colour", the icon follows the accent (only when the nearest icon changes).
   const setAccent = async (hex: string | undefined) => {
     await setLook({ accent: hex });
     if (look.icon !== 'match' || !isNative()) return;
-    const next = nearestIcon(hex ?? AUS_GREEN).id;
-    if (next !== nearestIcon(accent).id) await RestockNative.setAppIcon({ id: next }).catch(() => undefined);
+    const was = nearestIcon(accent).id;
+    // 0.9.5 (save): once it's saved.
+    await afterSave('icon-accent', async (s) => {
+      if (s.look.icon !== 'match') return;
+      const next = nearestIcon(s.look.accent ?? AUS_GREEN).id;
+      if (next !== was) await RestockNative.setAppIcon({ id: next }).catch(() => undefined);
+    });
   };
 
   return (

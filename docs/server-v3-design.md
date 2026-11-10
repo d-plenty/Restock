@@ -616,3 +616,63 @@ Overlaps resolved: `RestockNativePlugin.java` is split by section (P3 sync metho
   - Sign out and Sync now always in the sidebar foot; each sign-out and backup option explained;
   - Specials and catalogues: every followed shop with its website, specials and catalogue links, like the phone, plus This week's specials and My catalogue on Home, from what phones shared;
   - Settings: Keep data for 3, 6, 9 or 12 months, or Until I delete.
+
+## 16. 0.9.5: Let the web page search the shops
+
+Declan's rule was "the server never contacts the shops". Browsers can't read the shops' sites (cross-site), so
+the web page couldn't add things not yet in the pantry. Decided 10 Nov 2026 (option B): a server setting, **Let
+the web page search the shops**, off by default, that lets the server run the same search a phone runs, and only
+when a signed-in browser presses Search. The wire details are in `docs/server-protocol.md` "v3, 0.9.5".
+
+- **Same search as the phone.** The core build bundles the phone's shop connections (src/stores/*) with a Node
+  transport (`src/stores/node.ts`, set through a one-line hook in `http.ts`; Capacitor is replaced by a stub in
+  the core build only) and `src/server-core/search.ts`: the same query clean-up, ranking and top picks as Add,
+  the household's shops on that tab and its Coles branch.
+- **What it can't do:** the phone's hidden browser. Coles (always through it on a phone), Aldi, Dan Murphy's and
+  BWS fall back to it when a bot check refuses a direct request; the server just says "<Shop> blocked the search
+  from your server. Search it on a phone instead." Expected from the code: Woolworths and Aldi (direct JSON APIs
+  the phone already tries first) and Dan Murphy's / BWS (their API) are the likeliest to answer; Coles is the
+  likeliest to be blocked (its site's bot protection, which is why the phone uses its hidden browser); built-in
+  bottle shops and chemists with a known search page answer only when the page carries its products as data.
+  `server/scripts/try-search.mjs` checks this from Declan's own server.
+- **Shops people added are never searched from the server**: their addresses are household data any member can
+  set, so asking them would let a member point the server at any address (SSRF). Only the built-in shops' hosts.
+- **Limits:** 10 searches a minute per browser, 60 an hour per server, one at a time; 100 characters; 10 s a
+  shop; 3 MB an answer; redirects only within the same shop; cookies for one search; no shop sign-ins.
+- **Track and Add to list** save a product from the search the server kept (15 minutes, that browser only), so the
+  price saved is the one the shop gave the server, not one a browser sends. The server writes the records itself
+  (owner `srv-<sid>`, origin the browser), which is how they reach the phones (the web's own file never carries
+  prices).
+- **Privacy:** the log says a search happened, by which browser, on which tab, and how each shop answered; never
+  what was searched for. The shops see the server's address instead of a phone's (README and PRIVACY: "never"
+  becomes "only if you turn it on").
+
+
+## 17. 0.9.5: the General shopping list
+
+- **Data:** a list line with `list_entries.section = 'general'` (shops.ts `ListSection = Section | 'general'`). No
+  items, categories, shops or prices of its own: General is a list only. A line linked to a pantry item is on its
+  item's list wherever its section says (as before).
+- **What goes there:** a Home Assistant add that matches nothing (`haSync.ts` `haListFor`: the pantry's items
+  first, then Keg's, then Health's, of the tabs that are on; one match links it on that tab's list, none goes on
+  General), and whatever someone adds on the General tab. Nothing else moves there by itself.
+- **Home Assistant's list** is still one to-do list: the grocery list's and General's lines, and any line made
+  from Home Assistant's list (its id starts `ha-`) wherever it went, so a voice add that went to Keg still ticks
+  and goes both ways (`onHaList`, in all three stores: `homeAssistant.ts`, `HaSync.java`, the server's `ha.mjs`).
+- **Sharing:** General goes with the groceries. `tabOf` (`engine.ts`, `SyncEngine.java`, take-back too) answers
+  `pantry` for a `general` line, so a phone sharing groceries shares it, the server keeps it from such a phone,
+  and `clearForJoin` clears it with the groceries.
+- **Older phones (0.9.4 and before):** their `tabOf` answers `general`, a tab they don't sync, so `apply` passes a
+  General line over without keeping or logging it (and a 0.9.4 server or web page the same). Nothing crashes,
+  nothing is lost (it stays on the devices that have it; the old phone has no copy to change or delete), and it
+  never shows on another list there. When such a device updates, its first sync reads everything again once
+  (`catchUpLists`: `folder_seen`/`server_seen` cleared, then `sync_meta lists_v = "95"`; the server does it when
+  it opens `household.db`), and the General lines come in. 0.9.5 (review): what's read again unchanged (a file
+  with the sum it had, noted as `catchup:<key>`; a Wi-Fi phone up to where this one had got, `catchup_peer:<id>`,
+  pulled once from 0 without moving `got`) only brings General lines never had here (`catchUpEntries`: no row,
+  no change noted), nothing else: an old file (a browser signed out long ago, a stale cloud copy) still holds
+  records deleted so long ago that the delete was tidied away. A file that changed since is read as always; a
+  full read again (sharing more, leaving, another folder) drops the catch-up notes. Archives aren't read again.
+- **Backups:** a General line is written without a section and with `list: "general"`; 0.9.5 puts it back on
+  General, 0.9.4 restores it on Groceries (a line with no section), rather than keeping a section it would take
+  for a tab it doesn't share.

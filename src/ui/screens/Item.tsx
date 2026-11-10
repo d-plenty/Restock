@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { groupRows, productRows, undoable } from '../../lib/undo';
+import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import {
   addReading,
   allCategories,
@@ -14,13 +14,14 @@ import {
   updateGroup,
   updateProduct,
 } from '../../lib/db';
-import { addGroupToList } from '../../lib/listActions';
+import { addToList as addToListUndoable } from '../../lib/listActions'; // 0.9.5 (undo)
 import { MARKET_SOURCE } from '../../lib/market';
 import { genericName, nameHasSize } from '../../lib/naming';
 import { orderOptions, PRODUCT_ORDERS, shopRank } from '../../lib/productOrder';
 import { ensureNotificationPermission, notificationsAllowed, scheduleReminders } from '../../lib/notify';
 import { isNative } from '../../stores/http';
 import { serverMode, serverUi } from '../../server-mode/flag';
+import { firstPhoto, ItemPhoto } from '../../server-mode/ui/deskShared';
 import { getSettings, updateSettings } from '../../lib/db';
 import { loadRecommendations } from '../../lib/recs';
 import { formatUnitPrice, money, parseMoney, tidySize } from '../../lib/units';
@@ -84,7 +85,7 @@ export function AlertPicker({ level, pct, onChange }: { level: AlertLevel; pct: 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="title" style={{ fontSize: 15 }}>
-        Tell me when it's on sale
+        Tell me when it's on special
       </div>
       <div className="card flush radio-list" role="radiogroup" aria-label="Alerts">
         {ALERT_LEVELS.map((a) => (
@@ -116,15 +117,15 @@ export function AlertPicker({ level, pct, onChange }: { level: AlertLevel; pct: 
       </div>
       <Explain title="How alerts and sales work">
         <p>
-          <strong>Normal price</strong> is the middle of the non-sale prices Restock has seen over the last 6 months. Until there's a few weeks of
-          history, it uses the store's own "was" price.
+          <strong>Usual price</strong> is the middle of the regular prices Restock has seen over the last 6 months. Until there's a few weeks of
+          history, it uses the shop's own "was" price.
         </p>
         <p>
-          <strong>On sale</strong>: {GOOD_SALE * 100}% or more below normal. <strong>Great deal</strong>: {GREAT_SALE * 100}% or more.{' '}
+          <strong>On special</strong>: {GOOD_SALE * 100}% or more below usual. <strong>Great deal</strong>: {GREAT_SALE * 100}% or more.{' '}
           <strong>Small saving</strong>: any price drop under {GOOD_SALE * 100}%, even 5c.
         </p>
         <p>
-          <strong>Wait</strong> means it's on sale, but it's been at least 5% cheaper than this in the last 6 months, so a better sale is likely.
+          <strong>Wait</strong> means it's on special, but it's been at least 5% cheaper than this in the last 6 months, so a better sale is likely.
         </p>
         <p>
           Alerts arrive after a price check (in the background, or when you tap Check prices &amp; stock), once per deal. Alternatives (swap &amp;
@@ -154,7 +155,7 @@ function AlertsPrompt({ name }: { name: string }) {
       <Icon name="bell" />
       <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span className="title" style={{ fontSize: 15 }}>
-          Want a heads-up when {name} is on sale?
+          Want a heads-up when {name} is on special?
         </span>
         <span className="small">Restock can send a notification after each price check.</span>
       </span>
@@ -182,7 +183,19 @@ function AlertsPrompt({ name }: { name: string }) {
 
 /** The usual amount, for "Any size": "300 g", or the usual product when its amount isn't known. */
 /** The price history chart's range buttons, short enough for five across a phone (0.9.1). */
-const RANGE_SHORT: Record<number, string> = { 4: '1 mth', 8: '8 wks', 13: '3 mths', 26: '6 mths', 52: '1 yr' };
+const RANGE_SHORT: Record<number, string> = { 4: '1 month', 8: '2 months', 13: '3 months', 26: '6 months', 52: '1 year' };
+
+/** "2 months" as a 2 over "months" (the range buttons, 0.9.5). */
+function RangeLabel({ text }: { text: string }) {
+  const m = text.match(/^(\d+)\s+(.+)$/);
+  if (!m) return <>{text}</>;
+  return (
+    <span className="range-label">
+      <b>{m[1]}</b>
+      <span>{m[2]}</span>
+    </span>
+  );
+}
 
 function amountOf(rec: Recommendation): string {
   const u = usualOption(rec);
@@ -311,12 +324,11 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   // there go (they'd never come up), with Undo.
   const notAtShop = async (c: StoreChain) => {
     const there = alts.filter((o) => o.product.chain === c);
-    const undo = await undoable(async () => {
+    await act(`${group.name}: not at ${chainName(c)}`, async () => {
       for (const o of there) await removeProductFromGroup((await getGroup(group.id)) ?? group, o.product.id);
       const now = (await getGroup(group.id)) ?? group;
       await updateGroup(group.id, { notAt: [...new Set([...(now.notAt ?? []), c])] });
-    }, groupRows([group.id]));
-    nav.toast(`${group.name}: not at ${chainName(c)}`, undo);
+    }); // 0.9.5 (undo)
   };
   const searchName = mains[0]?.product.name ?? group.name;
 
@@ -325,8 +337,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
     if (adding.current) return;
     adding.current = true;
     try {
-      const added = !onList && (await addGroupToList(group));
-      nav.toast(added ? 'Added to your shopping list' : 'Already on your shopping list');
+      const added = !onList && (await addToListUndoable(group)); // 0.9.5 (undo)
+      if (!added) nav.toast('Already on your shopping list');
     } finally {
       adding.current = false;
     }
@@ -404,6 +416,13 @@ export function ItemScreen({ groupId }: { groupId: string }) {
 
   return (
     <div className="screen">
+      {/* 0.9.5, the web on a server: the item's big photo at the top (its first letter if none). */}
+      {serverMode && (
+        <ItemPhoto
+          src={firstPhoto(rec.options.find((o) => o.product.id === group.usualProductId)?.product, rec.best?.product, ...rec.options.map((o) => o.product))}
+          name={group.name}
+        />
+      )}
       <TopBar
         title={group.name}
         right={
@@ -445,7 +464,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             {learning === 0
               ? 'Restock has only just started watching it.'
               : `Restock has ${learning} day${learning === 1 ? '' : 's'} of prices so far.`}{' '}
-            It still tells you about specials, but until it knows the usual price it compares against the store's "was" price, which can flatter a
+            It still tells you about specials, but until it knows the usual price it compares against the shop's "was" price, which can flatter a
             sale. It takes about 4 to 8 weeks.
           </span>
           {appSettings &&
@@ -523,8 +542,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
                         : setRangeWeeks(w)
                     }
                   >
-                    {/* 0.9.1: five choices now, so short labels fit a phone. */}
-                    {RANGE_SHORT[w] ?? historyLabel(w)}
+                    {/* 0.9.1: five choices; 0.9.5 (look): the number over its unit, so all five fit a phone at any text size. */}
+                    <RangeLabel text={RANGE_SHORT[w] ?? historyLabel(w)} />
                   </button>
                 ))}
               </div>
@@ -541,7 +560,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           {mains.length > 2 ? (
             <select
               className="input"
-              style={{ width: 'auto', height: 34, padding: '0 8px', fontSize: 13 }}
+              style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 14 }}
               value={order}
               onChange={(e) => void updateSettings({ productOrder: e.target.value as typeof order })}
               aria-label="Order of products"
@@ -570,7 +589,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
                   role="radio"
                   aria-checked={!!group.anySize === any}
                   aria-pressed={!!group.anySize === any}
-                  onClick={() => void updateGroup(group.id, { anySize: any })}
+                  onClick={() => void act(`${group.name}: ${any ? 'any size' : 'this size'}`, () => updateGroup(group.id, { anySize: any }))}
                 >
                   {any ? 'Any size' : 'This size'}
                 </button>
@@ -586,12 +605,12 @@ export function ItemScreen({ groupId }: { groupId: string }) {
         {mains.map((o) => row(o, mains.length > 1 && o === rec.best && !tiedWithBest(rec).length ? 'cheapest' : undefined))}
         {mains.length > 1 && tiedWithBest(rec).length > 0 && (
           <p className="small" style={{ padding: '0 14px 12px' }}>
-            {sameAt(rec.best!, tiedWithBest(rec), mains)} — buy it wherever suits you.
+            {sameAt(rec.best!, tiedWithBest(rec), mains)}, so buy it wherever suits you.
           </p>
         )}
         {!mains.length && (
           <p className="small" style={{ padding: '0 14px 12px' }}>
-            Not linked to a store product yet.
+            Not linked to a shop's product yet.
           </p>
         )}
         {missingChains.map((c) => (
@@ -628,7 +647,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
               className="btn small"
               onClick={async () => {
                 const g = (await getGroup(group.id)) ?? group;
-                await updateGroup(group.id, { notAt: (g.notAt ?? []).filter((x) => x !== c) });
+                await act(`${group.name}: buying it at ${chainName(c)} again`, () => updateGroup(group.id, { notAt: (g.notAt ?? []).filter((x) => x !== c) }));
               }}
             >
               Buy it here again
@@ -660,7 +679,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           <span className="small">{alts.length || 'None yet'}</span>
         </div>
         <p className="small" style={{ padding: '0 14px 6px' }}>
-          Only for Swap &amp; save: Restock tells you when one of these is on sale for less than your pick. They don't count when shops are compared.
+          Only for Swap &amp; save: Restock tells you when one of these is on special for less than your pick. They don't count when shops are compared.
         </p>
         {alts.map((o) => row(o, rec.alt === o ? 'swap' : undefined))}
         <button className="row" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'alt', query: group.name })}>
@@ -711,9 +730,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
               onClick={async () => {
                 setSheet(undefined);
                 const name = group.name;
-                const undo = await undoable(() => deleteGroup(group.id), groupRows([group.id]));
+                await act(`${name} deleted`, () => deleteGroup(group.id)); // 0.9.5 (undo)
                 nav.pop();
-                nav.toast(`${name} deleted`, undo);
               }}
             >
               <Icon name="trash" size={18} />
@@ -755,7 +773,8 @@ export function EditSheet({
 
   const save = async () => {
     const t = parseFloat(target.replace(/[^0-9.]/g, ''));
-    await updateGroup(group.id, {
+    // 0.9.5 (undo)
+    await act(`Saved ${name.trim() || group.name}`, () => updateGroup(group.id, {
       name: name.trim() || group.name,
       categoryId: categoryId || undefined,
       alertLevel,
@@ -763,7 +782,7 @@ export function EditSheet({
       allowBulk,
       allowMulti,
       targetPrice: Number.isFinite(t) && t > 0 ? Math.round(t * 100) / 100 : undefined,
-    });
+    }));
     onClose();
   };
 
@@ -774,7 +793,7 @@ export function EditSheet({
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
       </label>
       {suggested && suggested.toLowerCase() !== name.trim().toLowerCase() && (
-        <button className="chip" style={{ alignSelf: 'flex-start' }} onClick={() => setName(suggested)}>
+        <button className="chip wrap" style={{ alignSelf: 'flex-start' }} onClick={() => setName(suggested)}>
           Use a short name: {suggested}
         </button>
       )}
@@ -838,10 +857,9 @@ export function EditSheet({
         className="btn danger"
         onClick={async () => {
           const name = group.name;
-          const undo = await undoable(() => deleteGroup(group.id), groupRows([group.id]));
+          await act(`${name} deleted`, () => deleteGroup(group.id)); // 0.9.5 (undo)
           onClose();
           nav.pop();
-          nav.toast(`${name} deleted`, undo);
         }}
       >
         <Icon name="trash" size={18} /> Delete item
@@ -862,29 +880,32 @@ function PriceSheet({ options, onClose }: { options: Option[]; onClose: () => vo
   const save = async () => {
     if (!productId || !(p > 0)) return;
     const w = parseMoney(was);
-    await addReading({
-      productId,
-      date: nowIso(),
-      price: p,
-      wasPrice: w > p ? w : undefined,
-      // A member price is a special for card holders (0.9.0), so it never becomes the normal price.
-      isSpecial: special || member,
-      memberOnly: member,
-      source: 'manual',
-    });
+    // 0.9.5 (undo): a price typed in by mistake can be taken back.
+    await act(`Price ${money(p)} added`, () =>
+      addReading({
+        productId,
+        date: nowIso(),
+        price: p,
+        wasPrice: w > p ? w : undefined,
+        // A member price is a special for card holders (0.9.0), so it never becomes the normal price.
+        isSpecial: special || member,
+        memberOnly: member,
+        source: 'manual',
+      }),
+    );
     onClose();
   };
 
   return (
     <Sheet title="Enter a price" onClose={onClose}>
-      <p className="small">Seen a price in store or in the catalogue? Add it here. It counts towards the history like any other check.</p>
+      <p className="small">Seen a price in the shop or in the catalogue? Add it here. It counts towards the history like any other check.</p>
       {options.length > 1 && (
         <label className="field">
           <span>Product</span>
           <select className="input" value={productId} onChange={(e) => setProductId(e.target.value)}>
             {options.map((o) => (
               <option key={o.product.id} value={o.product.id}>
-                {chainName(o.product.chain)} — {o.product.name}
+                {chainName(o.product.chain)} · {o.product.name}
               </option>
             ))}
           </select>
@@ -926,7 +947,6 @@ function PriceSheet({ options, onClose }: { options: Option[]; onClose: () => vo
 
 function OptionSheet({ group, option, options, onClose }: { group: Group; option: Option; options: Option[]; onClose: () => void }) {
   const id = option.product.id;
-  const nav = useNav();
   const [looking, setLooking] = useState(false);
   const [qty, setQty] = useState(option.product.qty?.toString() ?? '');
   const [unit, setUnit] = useState(option.product.qtyUnit ?? productQty(option.product).unit ?? 'ea');
@@ -939,19 +959,20 @@ function OptionSheet({ group, option, options, onClose }: { group: Group; option
     const alts = group.altProductIds.filter((x) => x !== id);
     if (isAlt) mains.push(id);
     else alts.push(id);
-    await updateGroup(group.id, { usualProductId: mains[0], sameProductIds: mains.slice(1), altProductIds: alts });
+    await act(isAlt ? `${option.product.name} is one of your picks` : `${option.product.name} moved to Would also take`, () =>
+      updateGroup(group.id, { usualProductId: mains[0], sameProductIds: mains.slice(1), altProductIds: alts }),
+    ); // 0.9.5 (undo)
     onClose();
   };
 
   const remove = async () => {
-    const undo = await undoable(() => removeProductFromGroup(group, id), productRows(group.id, id));
+    await act(`${option.product.name} removed`, () => removeProductFromGroup(group, id)); // 0.9.5 (undo)
     onClose();
-    nav.toast(`${option.product.name} removed`, undo);
   };
 
   const saveSize = async () => {
     const n = parseFloat(qty);
-    await updateProduct(id, n > 0 ? { qty: n, qtyUnit: unit } : { qty: undefined, qtyUnit: undefined });
+    await act(`Size saved for ${option.product.name}`, () => updateProduct(id, n > 0 ? { qty: n, qtyUnit: unit } : { qty: undefined, qtyUnit: undefined })); // 0.9.5 (undo)
     onClose();
   };
 
@@ -1038,7 +1059,7 @@ function HowItWorks() {
           </p>
           <p>
             <strong>Would also take</strong> are others you'd happily buy when they're cheaper, like another home brand. They're only for Swap
-            &amp; save: when one is on sale for less than your pick (per 100 g, per litre or per item), it shows up next to yours.
+            &amp; save: when one is on special for less than your pick (per 100 g, per litre or per item), it shows up next to yours.
           </p>
           <p>
             <strong>This size</strong> compares shops on the amount of your usual product, buying one of your picks for each on your list.{' '}
@@ -1049,7 +1070,7 @@ function HowItWorks() {
             <strong>Not here</strong>, on a shop with none of your picks, tells Restock you don't buy it there. It stops asking you to find it, and
             that shop counts as not having it.
           </p>
-          <p>If a pick and one you'd also take are both on sale, your pick comes first. Bigger packs only come up as swaps if you've said yes to bulk packs (Edit).</p>
+          <p>If a pick and one you'd also take are both on special, your pick comes first. Bigger packs only come up as swaps if you've said yes to bulk packs (Edit).</p>
         </Sheet>
       )}
     </>
@@ -1066,7 +1087,7 @@ function StockUpTip({ stats, readings }: { stats: PriceStats; readings: { date: 
     return (
       <div className="banner green" style={{ paddingTop: 10, paddingBottom: 10 }}>
         <strong>A good time to stock up</strong>
-        <span style={{ fontSize: 13 }}>It only goes on sale about every {stats.cycleWeeks} weeks, so this price may not be back for a while.</span>
+        <span style={{ fontSize: 13 }}>It only goes on special about every {stats.cycleWeeks} weeks, so this price may not be back for a while.</span>
       </div>
     );
   }
@@ -1080,8 +1101,8 @@ function StockUpTip({ stats, readings }: { stats: PriceStats; readings: { date: 
       <strong>{days > 2 ? `Next sale likely around ${when}` : 'A sale is due about now'}</strong>
       <span style={{ fontSize: 13 }}>
         {days > 2
-          ? `It goes on sale about every ${stats.cycleWeeks} weeks. If you can wait, maybe hold off.`
-          : `It goes on sale about every ${stats.cycleWeeks} weeks and the last one was a while ago.`}
+          ? `It goes on special about every ${stats.cycleWeeks} weeks. If you can wait, maybe hold off.`
+          : `It goes on special about every ${stats.cycleWeeks} weeks and the last one was a while ago.`}
       </span>
     </div>
   );
@@ -1240,7 +1261,7 @@ function PriceHistory({
   const off = v.discount !== undefined && v.discount > 0.004 ? `${Math.round(v.discount * 100)}% OFF` : undefined;
   const pill =
     v.kind === 'great' || v.kind === 'good' || v.kind === 'small'
-      ? { cls: 'green', text: off ?? 'ON SALE' }
+      ? { cls: 'green', text: off ?? 'ON SPECIAL' }
       : v.kind === 'wait'
         ? { cls: 'amber', text: off ? `${off} · WAIT` : 'WAIT' }
         : v.kind === 'fake'
@@ -1265,7 +1286,7 @@ function PriceHistory({
               ? {
                   cls: 'amber',
                   title: 'Worth waiting',
-                  body: `${saleOff >= 0.45 && saleOff <= 0.55 ? `It's half price (${money(stats.usualSale)})` : `It's usually ${money(stats.usualSale)} on sale (${Math.round(saleOff * 100)}% off)`}${cycle}.`,
+                  body: `${saleOff >= 0.45 && saleOff <= 0.55 ? `It's half price (${money(stats.usualSale)})` : `It's usually ${money(stats.usualSale)} on special (${Math.round(saleOff * 100)}% off)`}${cycle}.`,
                 }
               : undefined;
 
@@ -1327,10 +1348,10 @@ function PriceHistory({
     onSaleNow || weeksSinceSale === undefined || weeksSinceSale < 1
       ? undefined
       : stats.cycleWeeks && weeksSinceSale >= stats.cycleWeeks * 0.8
-        ? `Last on sale ${weeksSinceSale === 1 ? 'a week' : `${weeksSinceSale} weeks`} ago, so another sale is likely soon.`
+        ? `Last on special ${weeksSinceSale === 1 ? 'a week' : `${weeksSinceSale} weeks`} ago, so another sale is likely soon.`
         : stats.cycleWeeks
-          ? `Last on sale ${weeksSinceSale === 1 ? 'a week' : `${weeksSinceSale} weeks`} ago. Sales usually come round every ~${stats.cycleWeeks} weeks.`
-          : `Last on sale ${weeksSinceSale === 1 ? 'a week' : `${weeksSinceSale} weeks`} ago.`;
+          ? `Last on special ${weeksSinceSale === 1 ? 'a week' : `${weeksSinceSale} weeks`} ago. Sales usually come round every ~${stats.cycleWeeks} weeks.`
+          : `Last on special ${weeksSinceSale === 1 ? 'a week' : `${weeksSinceSale} weeks`} ago.`;
 
   const ownWeeks = allReadings.length ? Math.max(1, Math.round((now - Date.parse(allReadings[0].date)) / WEEK)) : 0;
   const source = market
@@ -1430,10 +1451,10 @@ function PriceHistory({
 
       {shareText && (
         <>
-          <div className="ph-sec">How often it's on sale</div>
+          <div className="ph-sec">How often it's on special</div>
           {/* The bar is the share of the time it's been on sale, not a countdown (0.7.4). */}
           <div className="ph-often">
-            <div className="ph-meter" role="img" aria-label={`On sale ${Math.round((share ?? 0) * 100)}% of the time`}>
+            <div className="ph-meter" role="img" aria-label={`On special ${Math.round((share ?? 0) * 100)}% of the time`}>
               <i style={{ width: `${Math.max(3, Math.round((share ?? 0) * 100))}%` }} />
             </div>
             <span>
@@ -1443,11 +1464,11 @@ function PriceHistory({
             </span>
           </div>
           <div className="small" style={{ marginTop: -4 }}>
-            The bar shows how much of the time it's been on sale ({Math.round((share ?? 0) * 100)}%).
+            The bar shows how much of the time it's been on special ({Math.round((share ?? 0) * 100)}%).
             {nextSaleText ? ` ${nextSaleText}` : ''}
           </div>
           {ownShare !== undefined && (
-            <div className="ph-weeks" aria-label={`On sale ${saleWeeks} of the last ${known} weeks with prices`}>
+            <div className="ph-weeks" aria-label={`On special ${saleWeeks} of the last ${known} weeks with prices`}>
               {strip.map((x, i) => (
                 <i key={i} className={x} />
               ))}
@@ -1469,18 +1490,18 @@ function PriceHistory({
       {why &&
         (market ? (
           <p className="small" style={{ margin: 0 }}>
-            Normal, usual sale and lowest come from shared price history ({MARKET_SOURCE}): {market.days} days at {chainName(o.product.chain)}, on
+            Usual, usual sale and lowest come from shared price history ({MARKET_SOURCE}): {market.days} days at {chainName(o.product.chain)}, on
             sale {Math.round(market.saleShare * 100)}% of the time{stats.cycleWeeks ? `, about every ${stats.cycleWeeks} weeks` : ''}.
             {stats.marketScale && stats.marketScale !== 1
-              ? ` Adjusted ${Math.round(Math.abs(stats.marketScale - 1) * 100)}% ${stats.marketScale > 1 ? 'up' : 'down'} to match your store's prices.`
+              ? ` Adjusted ${Math.round(Math.abs(stats.marketScale - 1) * 100)}% ${stats.marketScale > 1 ? 'up' : 'down'} to match your shop's prices.`
               : ''}{' '}
             Restock switches to this phone's own prices after about 4 weeks.
           </p>
         ) : (
           <p className="small" style={{ margin: 0 }}>
             {stats.readings} price{stats.readings === 1 ? '' : 's'} seen over {stats.spanDays} days
-            {stats.low !== undefined ? ` · lowest ${money(stats.low)}` : ''}. Normal is the usual non-sale price over the last 6 months; a week counts
-            as on sale when it was on special or under its normal price.
+            {stats.low !== undefined ? ` · lowest ${money(stats.low)}` : ''}. The usual price is the middle regular price over the last 6 months; a week counts
+            as on special when it was on special or under its usual price.
           </p>
         ))}
     </div>

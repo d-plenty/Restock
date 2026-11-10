@@ -40,6 +40,19 @@ for tag in base090 base091 v092; do
   java -cp "$OS/classes:$ORGJSON" family.plenty.restock.OldReader "$OS" "$O/old-reader" "$tag"
 done
 
+# 0.9.5: the General list, between 0.9.5 phones and with a phone still on 0.9.4 (its own sync code,
+# from the v094 tag, on a database file the test then opens with this version's code: the update).
+OLD094=""
+if git rev-parse -q --verify "refs/tags/v094" >/dev/null 2>&1; then
+  OS=$O/old-v094
+  rm -rf $OS && mkdir -p $OS/src $OS/classes
+  git archive v094 android/app/src/main/java | tar -x -C $OS/src
+  cp tools/sync-test/bridge.py $O/migrations.json $OS/
+  javac -nowarn -d $OS/classes -cp "$ORGJSON" -sourcepath $OS/src/android/app/src/main/java tools/sync-test/old/OldPhone094.java tools/sync-test/family/plenty/restock/TestDb.java
+  OLD094="$OS/classes:$ORGJSON;$(cd $OS && pwd)"
+fi
+RESTOCK_OLD094="$OLD094" java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncTest095 "$O"
+
 bash tools/sync-test/web-parity.sh
 # 0.9.4: Home Assistant's round in Java (HaSync.java) against haSync.ts, on shared fixtures.
 bash tools/sync-test/ha-parity.sh
@@ -96,7 +109,7 @@ if grep -qs "/api/v3/" "$SERVER_DIR"/src/v3/*.mjs; then
   else
     echo "Old phone checks for 0.9.3 on a v3 server skipped: no v093 tag here."
   fi
-  RESTOCK_OLD093="$OLD093" java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncServerV3Test "$O" "${URLS[@]}" "$D/v3state"
+  RESTOCK_OLD093="$OLD093" RESTOCK_OLD094="$OLD094" java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncServerV3Test "$O" "${URLS[@]}" "$D/v3state"
 else
   echo "Restock server v3 scenarios skipped: this server has no /api/v3 yet."
 fi

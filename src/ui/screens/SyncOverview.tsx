@@ -119,7 +119,7 @@ export function SyncOverview({ settings, info, onInfo }: { settings: Settings; i
                 <span className="eyebrow green" style={{ margin: 0 }}>
                   Recommended
                 </span>
-                <strong style={{ fontSize: 18 }}>Your Restock server</strong>
+                <strong style={{ fontSize: 17 }}>Your Restock server</strong>
               </span>
             </span>
             <span className="small">
@@ -133,7 +133,7 @@ export function SyncOverview({ settings, info, onInfo }: { settings: Settings; i
               <span className="sync-choice-ic wifi" aria-hidden="true">
                 <Icon name="wifi" size={22} />
               </span>
-              <strong style={{ fontSize: 18 }}>Phones on your Wi-Fi (no server)</strong>
+              <strong style={{ fontSize: 17 }}>Phones on your Wi-Fi (no server)</strong>
             </span>
             <span className="small">
               No server and no account. Phones swap changes straight to each other when they're on the same Wi-Fi. Nothing leaves your home.
@@ -144,7 +144,7 @@ export function SyncOverview({ settings, info, onInfo }: { settings: Settings; i
               <span className="sync-choice-ic folder" aria-hidden="true">
                 <Icon name="folder" size={22} />
               </span>
-              <strong style={{ fontSize: 18 }}>A cloud drive folder</strong>
+              <strong style={{ fontSize: 17 }}>A cloud drive folder</strong>
             </span>
             <span className="small">
               Use a folder your drive app keeps in step, like Google Drive, Dropbox, OneDrive, Syncthing or Nextcloud, or a WebDAV server. Each phone
@@ -160,7 +160,7 @@ export function SyncOverview({ settings, info, onInfo }: { settings: Settings; i
                 <Icon name="home" size={20} />
               </span>
               <span style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                <strong style={{ fontSize: 18 }}>{house ? serverName(info) : (paired && info?.household) || settings.household.name}</strong>
+                <strong style={{ fontSize: 17 }}>{house ? serverName(info) : (paired && info?.household) || settings.household.name}</strong>
                 <span className="small">
                   {house
                     ? `Your Restock server${info?.household ? `, ${info.household}` : ''}${phones.length ? ` · ${phones.length} phone${phones.length === 1 ? '' : 's'}` : ''}`

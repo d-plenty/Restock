@@ -12,7 +12,7 @@ import {
   type Settings,
 } from '../types';
 import { changed } from './live';
-import { DEFAULT_SECTION_CATEGORIES, SECTIONS, setCustomShops, shopDef, type Section } from '../shops';
+import { asListSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, setCustomShops, shopDef, type ListSection, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
 import { migrate } from './sql/schema';
 import { toPicks } from './picks';
@@ -40,8 +40,21 @@ function sql(): SqlDriver {
   return driver;
 }
 
+// 0.9.5 (undo): while an undoable action runs, undo.ts sees each write first, to remember the rows
+// it touches as they were (so one Undo puts the whole action back, with the same ids).
+let watchWrites: ((ops: SqlOp[]) => Promise<void>) | undefined;
+export function setWriteWatcher(fn: typeof watchWrites): void {
+  watchWrites = fn;
+}
+// 0.9.5 (undo): erasing or restoring starts again from nothing to undo (undo.ts clearUndo).
+let resetWatcher: (() => void) | undefined;
+export function setResetWatcher(fn: typeof resetWatcher): void {
+  resetWatcher = fn;
+}
+
 async function write(ops: SqlOp[]): Promise<void> {
   if (!ops.length) return;
+  if (watchWrites) await watchWrites(ops);
   if (ops.length === 1) await sql().run(ops[0].sql, ops[0].params);
   else await sql().batch(ops);
   changed();
@@ -120,7 +133,7 @@ const toEntry = (r: Row): ListEntry => ({
   categoryId: opt(r.category_id as string | null),
   qty: Math.max(1, Number(r.qty ?? 1) || 1),
   price: r.price === null || r.price === undefined ? undefined : Number(r.price),
-  section: r.section === null || r.section === undefined ? undefined : asSection(r.section),
+  section: r.section === null || r.section === undefined ? undefined : asListSection(r.section),
   product: parseListProduct(r.product),
   checked: Number(r.checked) === 1,
   createdAt: r.created_at as string,
@@ -921,10 +934,11 @@ export function withSafePhotos(r: Receipt): Receipt {
 }
 
 /** Which list a shopping list line is on: its item's tab, or the tab it was added from (List.tsx entrySection). */
-const lineTab = (e: ListEntry, itemTabs: Map<string, Section>): Section =>
-  (e.groupId ? itemTabs.get(e.groupId) : undefined) ?? (e.section ? asSection(e.section) : 'pantry');
+const lineTab = (e: ListEntry, itemTabs: Map<string, Section>): ListSection =>
+  (e.groupId ? itemTabs.get(e.groupId) : undefined) ?? (e.section ? asListSection(e.section) : 'pantry');
 
 export async function restoreSnapshot(s: Snapshot): Promise<void> {
+  resetWatcher?.(); // 0.9.5 (undo)
   // 0.9.0: this phone's automatic-backup password (never in a backup) and its app version stay.
   // 0.9.3: and its Home Assistant settings; which line is which item there starts afresh (the
   // next round pairs them by their words, so nothing is removed from either list).
@@ -1123,6 +1137,7 @@ export async function restoreParts(
   renames: Map<string, string> = new Map(),
   opts: { household?: boolean } = {},
 ): Promise<void> {
+  resetWatcher?.(); // 0.9.5 (undo)
   const ops: SqlOp[] = [];
   const before = await allGroups();
   if (parts.pantry) {
@@ -1169,7 +1184,9 @@ export async function restoreParts(
     const groupIds = new Set(items.map((g) => g.id));
     const backupTabs = new Map(s.groups.map((g) => [g.id, asSection(g.section)]));
     const hereTabs = new Map(before.map((g) => [g.id, asSection(g.section)]));
-    const tabs = new Set<Section>([...secs, ...s.list.map((e) => lineTab(e, backupTabs))]);
+    const tabs = new Set<ListSection>([...secs, ...s.list.map((e) => lineTab(e, backupTabs))]);
+    // 0.9.5: General goes with the grocery list.
+    if (tabs.has('pantry')) tabs.add('general');
     for (const e of await allListEntries()) if (tabs.has(lineTab(e, hereTabs))) ops.push({ sql: 'DELETE FROM list_entries WHERE id = ?', params: [e.id] });
     s.list.forEach((e) => {
       const keep = e.groupId && groupIds.has(e.groupId);
@@ -1223,6 +1240,7 @@ export function refresh(): void {
  * new sync identity.
  */
 export async function eraseEverything(): Promise<void> {
+  resetWatcher?.(); // 0.9.5 (undo)
   const tables = await sql().query<{ name: string }>(
     "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('sync_meta')",
   );

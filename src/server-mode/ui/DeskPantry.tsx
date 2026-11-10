@@ -6,13 +6,13 @@ import {
   allCategories,
   allListEntries,
   cardChains,
-  deleteListEntries,
   getSettings,
   groupProductIds,
   readingsFor,
   updateGroup,
 } from '../../lib/db';
-import { addGroupToList } from '../../lib/listActions';
+import { addToList, takeOffList } from '../../lib/listActions'; // 0.9.5 (undo)
+import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { loadRecommendations } from '../../lib/recs';
 import { money, parseMoney, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
@@ -25,8 +25,7 @@ import { EditSheet } from '../../ui/screens/Item';
 import { DEAL_RANK, underTarget } from '../../ui/screens/Pantry';
 import { ActionInfoTag } from '../../ui/tagInfo';
 import { PhoneOnlyNote } from './PhoneOnly';
-import { DeskHead, takeOpenItem } from './deskShared';
-import { thumbOf } from './DeskSpecials';
+import { DeskHead, firstPhoto, ItemPhoto, takeOpenItem } from './deskShared';
 import { serverHistory } from '../live';
 import type { PriceReading } from '../../types';
 
@@ -47,6 +46,12 @@ const EMPTY: Record<Section, string> = {
 const onSale = (r: Recommendation) => r.action === 'buy' || r.action === 'alt' || r.action === 'small';
 /** The weeks of history the chart shows: about three months, like the phone's "3 mths". */
 const CHART_WEEKS = 13;
+
+/** An item's photo: the deal shown, then your pick, the best, any other with one. */
+export function recPhoto(r: Pick<Recommendation, 'options' | 'best' | 'group'>, deal?: Option): string | undefined {
+  const usual = r.options.find((o) => o.product.id === r.group.usualProductId);
+  return firstPhoto(deal?.product, usual?.product, r.best?.product, ...r.options.map((o) => o.product));
+}
 
 function alertText(r: Recommendation): string {
   if (r.group.targetPrice !== undefined) return `Under ${money(r.group.targetPrice)}`;
@@ -156,7 +161,7 @@ export function DeskPantry({ section }: { section: Section }) {
                     return (
                       <tr key={r.group.id} className={isOpen ? 'on' : undefined} onClick={() => setOpen(r.group.id)}>
                         <td className="dk-item-cell">
-                          <Thumb src={thumbOf((deal ?? r.options[0])?.product.imageUrl)} />
+                          <Thumb src={recPhoto(r, deal)} />
                           <span className="dk-item-words">
                           <button
                             className="dk-name"
@@ -287,15 +292,14 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
 
   const toggleList = async () => {
     if (listed) {
-      await deleteListEntries([listed]);
-      nav.toast(`${group.name} taken off your shopping list`);
+      await takeOffList([listed], group.name); // 0.9.5 (undo)
       return;
     }
     if (adding.current) return;
     adding.current = true;
     try {
-      const added = await addGroupToList(group);
-      nav.toast(added ? `${group.name} added to your shopping list` : 'Already on your shopping list');
+      const added = await addToList(group); // 0.9.5 (undo)
+      if (!added) nav.toast('Already on your shopping list');
     } finally {
       adding.current = false;
     }
@@ -307,17 +311,23 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
     const next = t !== undefined ? Math.round(t * 100) / 100 : undefined;
     setTarget(undefined);
     if (next === group.targetPrice) return;
-    await updateGroup(group.id, { targetPrice: next });
-    nav.toast(next !== undefined ? `We'll say when ${group.name} is ${money(next)} or less` : 'Price alert cleared');
+    // 0.9.5 (undo)
+    await act(next !== undefined ? `We'll say when ${group.name} is ${money(next)} or less` : `Price alert cleared for ${group.name}`, () =>
+      updateGroup(group.id, { targetPrice: next }),
+    );
   };
   const setLevel = async (level: AlertLevel) => {
-    await updateGroup(group.id, { alertLevel: level, alertPct: level === 'custom' ? (group.alertPct ?? 30) : undefined });
+    // 0.9.5 (undo)
+    await act(`Alerts changed for ${group.name}`, () =>
+      updateGroup(group.id, { alertLevel: level, alertPct: level === 'custom' ? (group.alertPct ?? 30) : undefined }),
+    );
   };
 
   return (
     <aside className="dk-panel" id="dk-item-panel" aria-label={group.name}>
+      {/* 0.9.5: the item's big photo first, above its name (the letter if there's none). */}
+      <ItemPhoto src={recPhoto(rec)} name={group.name} />
       <div className="dk-panel-head">
-        <Thumb src={thumbOf((chartOpt ?? rec.options[0])?.product.imageUrl)} />
         <div className="grow">
           <h2 ref={head} tabIndex={-1}>
             {group.name}
@@ -375,7 +385,7 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
       <section className="dk-panel-part" aria-labelledby="dk-al">
         <h3 id="dk-al">Alert</h3>
         <div className="dk-form-row">
-          <label htmlFor="dk-alert-level">Tell me when it's on sale</label>
+          <label htmlFor="dk-alert-level">Tell me when it's on special</label>
           <select id="dk-alert-level" className="input" value={group.alertLevel} onChange={(e) => void setLevel(e.target.value as AlertLevel)}>
             {ALERT_LEVELS.map((a) => (
               <option key={a.id} value={a.id}>

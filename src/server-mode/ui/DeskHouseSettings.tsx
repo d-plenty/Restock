@@ -1,27 +1,19 @@
-// 0.9.4: the house's own settings on the web (protocol v3): Keep data for, the passphrase, the
+// 0.9.4: the house's own settings on the web (protocol v3): Keep data for (0.9.5: Auto delete, now in Data), the passphrase, the
 // encrypted backup, the recovery key, Home Assistant, the household's default branch per shop, and
 // the sign-out options, each one saying what it does. Used by Settings (DeskSettings.tsx) at both
 // widths.
 import { useState, type ReactNode } from 'react';
 import { confirmAction } from '../../lib/confirm';
-import { keepCutoff } from '../engine';
 import { useLive } from '../../lib/useLive';
 import { Icon, Sheet } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { checkPassphrase } from '../passphrase';
 import { changeHousePassphrase, session } from '../session';
 import {
-  ADMIN_NOTE,
-  askThenConfirm,
-  canAdmin,
   branchShops,
   downloadEncryptedBackup,
   errText,
-  KEEP_CHOICES,
-  keepLabel,
-  pruneBefore,
   recoveryKey,
-  saveHouseSettings,
   setDefaultBranch,
   useHouseSettings,
   type DefaultBranch,
@@ -30,84 +22,21 @@ import { signOutAll, signOutHere } from './settingsData';
 
 type LineProps = { title: string; sub?: ReactNode; children?: ReactNode; greyed?: boolean; htmlFor?: string };
 
-/** Keep data for: 3, 6, 9 or 12 months, or Until I delete (then Delete older data now). */
+/**
+ * 0.9.5: Auto delete (0.9.4's Keep data for) moved to the Data tab, with the two checks before
+ * anything is deleted; Settings says where it is and what it's set to.
+ */
 export function KeepDataFor({ Line }: { Line: (p: LineProps) => ReactNode }) {
   const nav = useNav();
-  const { data, error, reload } = useHouseSettings();
-  const [busy, setBusy] = useState(false);
-  const [before, setBefore] = useState('');
-  const change = async (v: string) => {
-    const months = v === 'forever' ? null : Number(v);
-    const was = data?.keepMonths === undefined ? 12 : data.keepMonths;
-    setBusy(true);
-    try {
-      // Shorter than now: what's older goes at once, so the passphrase again first (0.9.4).
-      if (months !== null && (was === null || months < was)) {
-        const done = await askThenConfirm(
-          `Keep data for ${keepLabel(months).toLowerCase()}?`,
-          `Prices, receipts (unless pinned), their photos and logs older than ${keepLabel(months).toLowerCase()} are deleted from the server now. Each phone keeps its own copy for as long as it keeps prices.`,
-          'Keep less',
-          (c) => saveHouseSettings({ keepMonths: months }, c),
-        );
-        if (!done) return;
-      } else await saveHouseSettings({ keepMonths: months });
-      nav.toast(`Keeping data for ${keepLabel(months).toLowerCase()}`);
-      reload();
-    } catch (e) {
-      nav.toast(errText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const prune = async () => {
-    if (!before) return;
-    const iso = new Date(`${before}T00:00:00`).toISOString();
-    try {
-      const done = await askThenConfirm(
-        `Delete everything before ${new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}?`,
-        "Prices (each product keeps its latest), receipts that aren't pinned, their photos and logs. This can't be undone. Phones keep their own copies.",
-        'Delete older data',
-        (c) => pruneBefore(iso, c),
-      );
-      if (!done) return;
-      nav.toast('Deleted older data from the server');
-    } catch (e) {
-      nav.toast(errText(e));
-    }
-  };
-  const value = data ? (data.keepMonths === null ? 'forever' : String(data.keepMonths ?? 12)) : '';
-  const cut = data?.keepMonths ? keepCutoff(data.keepMonths, Date.now()) : null;
+  const { data } = useHouseSettings();
+  const m = data?.keepMonths;
+  const now = m === undefined ? '' : m === null ? ' It is off.' : ` It deletes data older than ${m} months.`;
   return (
-    <>
-      <Line
-        title="Keep data for"
-        htmlFor="dk-keep"
-        sub={
-          error ??
-          (cut
-            ? `Prices, receipts, photos and logs from before ${new Date(cut).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })} are deleted, once a day. Each product keeps its latest price.`
-            : 'Nothing is deleted until you say so.')
-        }
-      >
-        <select id="dk-keep" className="input dk-select" disabled={!data || busy || !canAdmin()} title={canAdmin() ? undefined : ADMIN_NOTE} value={value} onChange={(e) => void change(e.target.value)}>
-          {KEEP_CHOICES.map((c) => (
-            <option key={String(c.months)} value={c.months === null ? 'forever' : String(c.months)}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </Line>
-      {data?.keepMonths === null && (
-        <Line title="Delete older data now" htmlFor="dk-prune" sub="Everything from before this day: prices (each product keeps its latest), receipts that aren't pinned, and logs.">
-          <span className="dk-btns">
-            <input id="dk-prune" type="date" className="input dk-select" value={before} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setBefore(e.target.value)} />
-            <button className="btn small danger" disabled={!before} onClick={() => void prune()}>
-              Delete
-            </button>
-          </span>
-        </Line>
-      )}
-    </>
+    <Line title="Auto delete" sub={`Auto delete is in Data, with cleaning up and deleting what's on the server.${now}`}>
+      <button className="btn small" onClick={() => nav.push({ name: 'server', page: 'data-manage' })}>
+        Open Data
+      </button>
+    </Line>
   );
 }
 
@@ -360,8 +289,8 @@ export function BranchSheet({ onClose }: { onClose: () => void }) {
                   <input
                     className="input house-storeno"
                     inputMode="numeric"
-                    aria-label="Coles store number (optional)"
-                    placeholder="Store no."
+                    aria-label="Coles branch number (optional)"
+                    placeholder="Branch no."
                     value={cur.storeNo ?? ''}
                     maxLength={5}
                     onChange={(e) => set({ storeNo: e.target.value.replace(/\D/g, '') || undefined })}

@@ -174,7 +174,7 @@ export function PartsPicker({
         row(
           'settings',
           'Settings and shops',
-          'Your shops and stores, alerts, theme, price checks and other settings',
+          'Your shops and branches, alerts, theme, price checks and other settings',
           counts.hasSettings,
           parts.settings,
           (v) => set({ settings: v }),

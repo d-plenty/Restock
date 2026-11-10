@@ -12,8 +12,9 @@ import { useNav } from '../../ui/nav';
 import { PassphraseForm } from './Gate';
 import { DeskHead, WhereNote } from './deskShared';
 import { BackupSheet, BranchSheet, KeepDataFor, PassphraseV3, RecoverySheet, SignOutChoices } from './DeskHouseSettings';
-import { ADMIN_NOTE, canAdmin, errText, house, saveHouseSettings, useHouseSettings } from './houseData';
+import { ADMIN_NOTE, canAdmin, house, saveHouseSettings, useHouseSettings } from './houseData';
 import { HA_SHARED } from './ServerHomeAssistant';
+import { WebSearchSwitch } from './WebShopSearch'; // 0.9.5 (web search)
 import {
   categoriesData,
   downloadBrowserBackup,
@@ -21,11 +22,6 @@ import {
   PRODUCT_ORDERS,
   removePhone,
   serverAccount,
-  setListCompare,
-  setNewItemPct,
-  setProductOrder,
-  setRecalls,
-  setShopAroundMin,
   setTabShops,
   setTheme,
   SHOP_AROUND_MINS,
@@ -39,8 +35,16 @@ import {
   type ShopsForTab,
 } from './settingsData';
 import type { ProductOrder } from '../../types';
+// 0.9.5 (save): the household's settings and this browser's look are held until Save settings.
+import { changeHousehold } from './settingsData';
+import { saveDraft } from '../../lib/settingsDraft';
+import { DeskSave, useDraftPart, useSettingsDraft } from '../../ui/SaveBar';
 
 type Part = 'household' | 'phones';
+
+/** 0.9.5 (save): household settings and this browser's look, changed but not saved yet. */
+type Pending = Partial<Pick<HouseholdSettings, 'shopAroundMin' | 'listCompare' | 'newItemPct' | 'productOrder' | 'recalls' | 'theme'>>;
+const pendingChanges = (h: HouseholdSettings, p: Pending) => (Object.keys(p) as (keyof Pending)[]).filter((k) => p[k] !== undefined && p[k] !== h[k]);
 
 const WHERE: Record<Exclude<ChangedOn, 'web'>, string> = { owner: 'Change this on the owner phone', phone: 'Change this on your phone' };
 
@@ -86,7 +90,7 @@ function CategoriesSheet({ sections, onClose }: { sections: HouseholdSettings['c
   const cats = (all ?? []).filter((c) => c.section === section);
   return (
     <Sheet title="Categories" onClose={onClose}>
-      <p className="small">In aisle order: the shopping list's By aisle follows it. Changes here reach every phone.</p>
+      <p className="small">In aisle order: the shopping list's Aisle group view follows it. Changes here reach every phone.</p>
       {sections.length > 1 && (
         <div className="seg" role="group" aria-label="Which tab">
           {sections.map((s) => (
@@ -182,7 +186,7 @@ function ShopsSheet({ tab, onClose }: { tab: ShopsForTab; onClose: () => void })
       {tab.section !== 'pantry' && (
         <label className="check card" style={{ flexDirection: 'row' }}>
           <input type="checkbox" className="switch" checked={on} onChange={(e) => setOn(e.target.checked)} />
-          <span className="title">The {tab.section === 'keg' ? 'Keg' : 'Pharmacy'} tab is on</span>
+          <span className="title">The {tab.section === 'keg' ? 'Keg' : 'Health'} tab is on</span>
         </label>
       )}
       <fieldset className="card flush dk-fieldset" disabled={!on}>
@@ -210,27 +214,31 @@ function HouseName({ fallback }: { fallback: string }) {
   const { data, reload } = useHouseSettings();
   const [name, setName] = useState<string>();
   const shown = name ?? data?.name ?? fallback;
+  // 0.9.5 (save): saved with Save settings.
+  const dirty = name !== undefined && !!shown.trim() && shown.trim() !== data?.name;
+  useDraftPart(
+    {
+      dirty: () => dirty,
+      save: async () => {
+        await saveHouseSettings({ name: shown.trim() });
+        setName(undefined);
+        reload();
+        nav.toast('Renamed. Phones see it at their next sync.');
+      },
+      discard: () => setName(undefined),
+    },
+    [dirty, shown],
+  );
   return (
     <Line title="Household name" htmlFor="dk-house-name" sub="Shown on this page and when a phone joins. Each phone can call the server what it likes.">
       <form
         className="dk-btns house-name-form"
-        onSubmit={async (e) => {
+        onSubmit={(e) => {
           e.preventDefault();
-          if (!shown.trim() || shown.trim() === data?.name) return;
-          try {
-            await saveHouseSettings({ name: shown.trim() });
-            setName(undefined);
-            reload();
-            nav.toast('Renamed. Phones see it at their next sync.');
-          } catch (err) {
-            nav.toast(errText(err));
-          }
+          void saveDraft();
         }}
       >
         <input id="dk-house-name" className="input dk-select house-name-input" disabled={!canAdmin()} value={shown} maxLength={60} onChange={(e) => setName(e.target.value)} />
-        <button className="btn small" type="submit" disabled={!shown.trim() || shown.trim() === data?.name}>
-          Save
-        </button>
       </form>
     </Line>
   );
@@ -250,12 +258,37 @@ function HouseholdPart() {
   const [changing, setChanging] = useState(false);
   const [msg, setMsg] = useState<string>();
   const [saving, setSaving] = useState(false);
+  // 0.9.5 (save): changes waiting for Save settings, shown in place of what's set (hv).
+  const [pend, setPend] = useState<Pending>({});
+  const dirty = !!h && pendingChanges(h, pend).length > 0;
+  useDraftPart(
+    {
+      dirty: () => dirty,
+      save: async () => {
+        if (!h) return;
+        const { theme, ...house } = Object.fromEntries(pendingChanges(h, pend).map((k) => [k, pend[k]])) as Pending;
+        const patch = {
+          ...(house.shopAroundMin !== undefined ? { shopAroundMin: house.shopAroundMin } : {}),
+          ...(house.newItemPct !== undefined ? { defaultThresholdPct: house.newItemPct } : {}),
+          ...(house.listCompare !== undefined ? { listCompare: house.listCompare } : {}),
+          ...(house.productOrder !== undefined ? { productOrder: house.productOrder } : {}),
+          ...(house.recalls !== undefined ? { recallsEnabled: house.recalls } : {}),
+        };
+        if (Object.keys(patch).length) await changeHousehold(patch);
+        if (theme) await setTheme(theme);
+        setPend({});
+      },
+      discard: () => setPend({}),
+    },
+    [dirty, pend, h],
+  );
   if (!h) return <div aria-busy="true" />;
+  const hv = { ...h, ...pend };
   const where = (on: ChangedOn) => (on === 'web' ? null : <WhereNote>{WHERE[on]}</WhereNote>);
   const catCount = h.categories.reduce((s, c) => s + c.count, 0);
   const editable = h.settingsOn === 'web';
-  // A change that didn't take (not in a household yet, a value the household can't have) says why.
-  const tryIt = (fn: () => Promise<unknown>) => void fn().catch((e) => nav.toast(e instanceof Error ? e.message : String(e)));
+  // 0.9.5 (save): a change that doesn't take (not in a household yet, a value the household can't have) says why on the Save bar.
+  const hold = (p: Pending) => setPend((was) => ({ ...was, ...p })); // 0.9.5 (save)
   return (
     <>
       <p className="small dk-tight">
@@ -270,7 +303,7 @@ function HouseholdPart() {
       {v3 ? (
         <Group id="dk-s-household" title="Household">
           <HouseName fallback={h.name} />
-          <Line title="What each phone shares" sub="Each phone chooses: Groceries (pantry and shopping list), Keg, Pharmacy, receipts, loyalty cards." greyed>
+          <Line title="What each phone shares" sub="Each phone chooses: Groceries (pantry and shopping list), Keg, Health, receipts, loyalty cards." greyed>
             <WhereNote>Change this on each phone</WhereNote>
           </Line>
           <Line title="Adding and removing phones" sub="This server is the household's owner.">
@@ -317,7 +350,7 @@ function HouseholdPart() {
             </button>
           </Line>
         ) : (
-          <Line title="Which branch" sub="The store each phone shops at (its main and second branch) stays on that phone, with its sign-ins." greyed>
+          <Line title="Which branch" sub="The branch each phone shops at (its main and second branch) stays on that phone, with its sign-ins." greyed>
             {where('phone')}
           </Line>
         )}
@@ -329,8 +362,8 @@ function HouseholdPart() {
             id="dk-shop-around"
             className="input dk-select"
             disabled={!editable}
-            value={String(h.shopAroundMin)}
-            onChange={(e) => tryIt(() => setShopAroundMin(Number(e.target.value)))}
+            value={String(hv.shopAroundMin)}
+            onChange={(e) => hold({ shopAroundMin: Number(e.target.value) })}
           >
             {SHOP_AROUND_MINS.map((v) => (
               <option key={v} value={String(v)}>
@@ -340,13 +373,13 @@ function HouseholdPart() {
           </select>
         </Line>
         <Line title="The list's cheapest" htmlFor="dk-compare" sub="Best value compares per 100 g, litre or item; lowest price compares the shelf price" greyed={!editable}>
-          <select id="dk-compare" className="input dk-select" disabled={!editable} value={h.listCompare} onChange={(e) => tryIt(() => setListCompare(e.target.value as 'unit' | 'price'))}>
+          <select id="dk-compare" className="input dk-select" disabled={!editable} value={hv.listCompare} onChange={(e) => hold({ listCompare: e.target.value as 'unit' | 'price' })}>
             <option value="unit">Best value</option>
             <option value="price">Lowest price</option>
           </select>
         </Line>
         <Line title="Price alerts start at" htmlFor="dk-new-alert" sub="For new items: tell us when it's this much under its usual price" greyed={!editable}>
-          <select id="dk-new-alert" className="input dk-select" disabled={!editable} value={String(h.newItemPct)} onChange={(e) => tryIt(() => setNewItemPct(Number(e.target.value)))}>
+          <select id="dk-new-alert" className="input dk-select" disabled={!editable} value={String(hv.newItemPct)} onChange={(e) => hold({ newItemPct: Number(e.target.value) })}>
             {[...new Set([...NEW_ITEM_PCTS, h.newItemPct])]
               .sort((x, y) => x - y)
               .map((p) => (
@@ -357,7 +390,7 @@ function HouseholdPart() {
           </select>
         </Line>
         <Line title="An item's products" htmlFor="dk-order" sub="The order they're listed in on an item's page" greyed={!editable}>
-          <select id="dk-order" className="input dk-select" disabled={!editable} value={h.productOrder} onChange={(e) => tryIt(() => setProductOrder(e.target.value as ProductOrder))}>
+          <select id="dk-order" className="input dk-select" disabled={!editable} value={hv.productOrder} onChange={(e) => hold({ productOrder: e.target.value as ProductOrder })}>
             {PRODUCT_ORDERS.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
@@ -371,7 +404,7 @@ function HouseholdPart() {
           </button>
         </Line>
         <Line title="Recall alerts" htmlFor="dk-recalls" sub="Each phone checks daily against the official Australian recall lists" greyed={!editable}>
-          <input id="dk-recalls" type="checkbox" className="switch" disabled={!editable} checked={h.recalls} onChange={(e) => tryIt(() => setRecalls(e.target.checked))} />
+          <input id="dk-recalls" type="checkbox" className="switch" disabled={!editable} checked={hv.recalls} onChange={(e) => hold({ recalls: e.target.checked })} />
         </Line>
       </Group>
 
@@ -399,6 +432,8 @@ function HouseholdPart() {
             </p>
           )}
           <KeepDataFor Line={Line} />
+          {/* 0.9.5 (web search): Let the web page search the shops (off by default). */}
+          <WebSearchSwitch Line={Line} />
           {!canAdmin() && (
             <p className="dk-set small" role="note">
               {ADMIN_NOTE.replace('change this', 'change the server’s settings, back it up or see the recovery key')}
@@ -483,7 +518,7 @@ function HouseholdPart() {
                 ['dark', 'Dark'],
               ] as const
             ).map(([v, label]) => (
-              <button key={v} aria-pressed={h.theme === v} onClick={() => void setTheme(v)}>
+              <button key={v} aria-pressed={hv.theme === v} onClick={() => hold({ theme: v })}>
                 {label}
               </button>
             ))}
@@ -636,6 +671,7 @@ function PhonesPart() {
 }
 
 export function DeskSettings({ narrow }: { narrow?: boolean } = {}) {
+  useSettingsDraft(); // 0.9.5 (save)
   const [part, setPart] = useState<Part>('household');
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const parts: { id: Part; label: string }[] = [
@@ -673,10 +709,17 @@ export function DeskSettings({ narrow }: { narrow?: boolean } = {}) {
             </button>
           ))}
         </div>
+        {/* 0.9.5 (save): the big green Save settings, top right. */}
+        <DeskSave />
       </DeskHead>
       <div role="tabpanel" id={`dk-panel-${part}`} aria-labelledby={`dk-tab-${part}`} className="dk-stack">
-        {part === 'household' ? <HouseholdPart /> : <PhonesPart />}
+        {/* 0.9.5 (save): Household stays (hidden) while Phones shows, so its changes wait there. */}
+        <div hidden={part !== 'household'} className="dk-stack">
+          <HouseholdPart />
+        </div>
+        {part === 'phones' && <PhonesPart />}
       </div>
+      <DeskSave foot />
     </div>
   );
 }

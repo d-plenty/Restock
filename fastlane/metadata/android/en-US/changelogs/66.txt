@@ -1,0 +1,7 @@
+New General list, for Home Assistant adds that match nothing you track.
+Pharmacy is now Health.
+Undo after most changes. Settings wait for Save settings.
+Add: tapping a result ticks it; the arrow opens the details.
+Pick my item searches the shops when nothing matches.
+Server: a Data tab (spending, charts, downloads, Auto delete), opt-in shop search from the web page, and Restock on iPhone.
+Still local first: no server needed.

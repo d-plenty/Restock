@@ -76,7 +76,10 @@ public class SyncServerV3Test {
         fresh = args[3];
         stateDir = args[4];
         String only = args.length > 5 ? args[5] : "";
-        if (only.isEmpty() || only.contains("H")) houseScenarios();
+        if (only.isEmpty() || only.contains("H")) {
+            houseScenarios();
+            generalScenarios();
+        }
         if (only.isEmpty() || only.contains("O")) handoverScenarios();
         if (only.isEmpty() || only.contains("B")) bringScenarios();
         System.out.println(fails == 0 ? "server v3 scenarios: all passed" : "server v3 scenarios: " + fails + " failed");
@@ -246,6 +249,55 @@ public class SyncServerV3Test {
             a.h.serverRow() == null || !Integer.valueOf(3).equals(a.h.serverRow().opt("keepMonths")) || !in40 || in150 || !"1".equals(left),
             "keep " + (a.h.serverRow() == null ? null : a.h.serverRow().opt("keepMonths")) + ", archive 40 " + in40 + ", archive 150 " + in150 + ", left here " + left + (off.error != null ? " (" + off.error + ")" : ""));
 
+        // ---------- 0.9.5: Auto delete takes any whole number of months (0.9.4 took 3, 6, 9 or 12) ----------
+        web(house, "keep", "2");
+        Thread.sleep(500);
+        a.db.exec("INSERT OR REPLACE INTO products (id, chain, name, created_at) VALUES ('p2', 'coles', 'Oats 750g', 'x')");
+        for (long ago : new long[] { 75, 40, 1 })
+            a.db.exec("INSERT INTO prices (product_id, date, price, was_price, is_special, member_only, source) VALUES ('p2', ?, 4.10, NULL, 0, 0, 'check')", ServerOffload.iso(now - ago * DAY));
+        round(a);
+        ServerSync.Round off2 = round(a);
+        boolean in40b = archiveHas(a, ServerOffload.month(ServerOffload.iso(now - 40 * DAY)), ServerOffload.iso(now - 40 * DAY));
+        boolean in75 = archiveHas(a, ServerOffload.month(ServerOffload.iso(now - 75 * DAY)), ServerOffload.iso(now - 75 * DAY));
+        String left2 = a.one("SELECT COUNT(*) FROM prices WHERE product_id = 'p2'");
+        Object km2 = a.h.serverRow() == null ? null : a.h.serverRow().opt("keepMonths");
+        report("W16a with Auto delete after 2 months: the phone reads 2, a 40-day-old price moves to the server, a 75-day-old one is tidied here",
+            !Integer.valueOf(2).equals(km2) || !in40b || in75 || !"1".equals(left2),
+            "keep " + km2 + ", archive 40 " + in40b + ", archive 75 " + in75 + ", left here " + left2 + (off2.error != null ? " (" + off2.error + ")" : ""));
+
+        // ---------- 0.9.5: Ask phones to resend: the phone's whole file once more, every price in it ----------
+        // A price whose change is older than the file's 60 days (so it never went up), dated recently (so it isn't offloaded).
+        a.db.exec("INSERT OR REPLACE INTO products (id, chain, name, created_at) VALUES ('p9', 'coles', 'Rice 1kg', 'x')");
+        a.db.exec("INSERT INTO prices (product_id, date, price, was_price, is_special, member_only, source) VALUES ('p9', ?, 3.20, NULL, 0, 0, 'check')", ServerOffload.iso(now - 10 * DAY));
+        a.db.exec("UPDATE sync_log SET stamp = ? WHERE tbl = 'prices' AND pk LIKE 'p9%'", now - 70 * DAY);
+        round(a);
+        int pBefore = new JSONObject(web(house, "history", "p9")).getJSONArray("prices").length();
+        JSONObject asked = new JSONObject(web(house, "resend"));
+        round(a);
+        int after = new JSONObject(web(house, "history", "p9")).getJSONArray("prices").length();
+        String resent = a.e.meta("server_resent");
+        round(a);
+        int again = new JSONObject(web(house, "history", "p9")).getJSONArray("prices").length();
+        JSONObject twice = new JSONObject(web(house, "resend"));
+        report("W16b Ask phones to resend: the phone sends every price it has once (nothing doubles); asking again the same day is refused",
+            pBefore != 0 || asked.optInt("status") != 200 || after != 1 || again != 1 || resent == null || !resent.equals(String.valueOf(s(a).resendAsked(System.currentTimeMillis()))) || twice.optInt("status") != 429,
+            "before " + pBefore + ", asked " + asked + ", after " + after + ", again " + again + ", resent " + resent + ", twice " + twice.optInt("status"));
+        // 0.9.5 (review): a resend that fails isn't tried every round (it sends everything): a day later once, a size refusal not again.
+        {
+            long rAt = s(a).resendAsked(System.currentTimeMillis()), tNow = System.currentTimeMillis();
+            a.e.setMeta("server_resent", null);
+            s(a).resendFailed(rAt, tNow, new Exception("Can't reach your Restock server."));
+            String w1 = a.e.meta("server_resend_wait"), r1 = a.e.meta("server_resent");
+            s(a).resendFailed(rAt, tNow, new Exception("Can't reach your Restock server."));
+            String r2 = a.e.meta("server_resent");
+            a.e.setMeta("server_resent", null);
+            s(a).resendFailed(rAt, tNow, new Exception("The server says a file is too big, or it's full."));
+            String r3 = a.e.meta("server_resent");
+            a.e.setMeta("server_resent", resent);
+            report("W16c a resend that fails waits a day, then is answered; one too big for the server is answered at once",
+                w1 == null || r1 != null || !String.valueOf(rAt).equals(r2) || !String.valueOf(rAt).equals(r3), "wait " + w1 + ", then " + r1 + "/" + r2 + ", too big " + r3);
+        }
+
         // ---------- leaving: nothing is deleted on the server, unless it takes back what it shared ----------
         rounds(a, c);
         boolean aHadStout = "Stout".equals(has(a, "c-keg"));
@@ -305,6 +357,67 @@ public class SyncServerV3Test {
         String sp3 = String.valueOf(f3.opt("specials")), ca3 = String.valueOf(f3.opt("catalogues"));
         report("W19b a Pharmacy tab it keeps to itself: no Pharmacy specials or catalogue in its file (the groceries' still go)",
             sp3.contains("Sunscreen") || ca3.contains("chemistwarehouse") || !sp3.contains("Tim Tam") || !ca3.contains("coles"), sp3 + " " + ca3);
+    }
+
+    // ---------- 0.9.5: the General list through the house, with a phone still on 0.9.4 ----------
+
+    static void generalScenarios() throws Exception {
+        SyncFamily.Phone g = phone("g7"), r = phone("r8");
+        s(g).join3(web(house, "invite", "G's phone"), false);
+        s(r).join3(web(house, "invite", "R's phone"), false);
+        rounds(g, r);
+        SyncTest095.line(g, "gs-chop", "Chopsticks", "general");
+        SyncTest095.line(g, "gs-tea", "Tea", "pantry");
+        rounds(g, r);
+        rounds(g, r);
+        report("GV1 a General line goes through the house to a phone sharing groceries, as General",
+            !"general".equals(SyncTest095.sectionOf(r, "gs-chop")) || !"pantry".equals(SyncTest095.sectionOf(r, "gs-tea")), "r " + SyncTest095.sectionOf(r, "gs-chop"));
+        String old = System.getenv("RESTOCK_OLD094");
+        if (old == null || old.isEmpty()) {
+            System.out.println("  (the 0.9.4 phone on the house skipped: no v094 tag here)");
+            return;
+        }
+        String[] op = old.split(";");
+        String dbFile = op[1] + "/old094-server.db";
+        new java.io.File(dbFile).delete();
+        try (SyncTest095.Old q = new SyncTest095.Old(op[0], op[1], dbFile, "q9srv")) {
+            JSONObject j = q.send("join3 " + web(house, "invite", "Old phone"));
+            JSONObject r1 = q.send("round");
+            Thread.sleep(1600);
+            JSONObject r2 = q.send("round");
+            JSONObject l = q.lines();
+            report("GV2 a 0.9.4 phone on the house: no problem, it gets the groceries, the General line isn't on any of its lists",
+                j.has("problem") || !r2.isNull("error") || !l.has("gs-tea") || l.has("gs-chop"), j + " " + r1 + " " + r2 + " " + l.keySet());
+            q.send("line qs-own - Bread");
+            q.send("tick gs-tea");
+            q.send("round");
+            Thread.sleep(1600);
+            rounds(g, r);
+            SyncTest095.line(g, "gs-late", "Tape", "general");
+            rounds(g, r);
+            q.send("round");
+            Thread.sleep(1600);
+            q.send("round");
+            JSONObject l2 = q.lines();
+            report("GV3 its changes come through the house, the General lines stay as they were (on the house too), and still none reach it",
+                !"Bread".equals(g.one("SELECT text FROM list_entries WHERE id = 'qs-own'")) || !"1".equals(g.one("SELECT checked FROM list_entries WHERE id = 'gs-tea'"))
+                    || !"general".equals(SyncTest095.sectionOf(g, "gs-chop")) || !"general".equals(SyncTest095.sectionOf(r, "gs-late")) || l2.has("gs-chop") || l2.has("gs-late"),
+                "g qs-own " + SyncTest095.sectionOf(g, "qs-own") + ", r gs-late " + SyncTest095.sectionOf(r, "gs-late") + ", old " + l2.keySet());
+            q.quit();
+        }
+        // The old phone updates: its database, opened by this version. Its first round reads the house's file again.
+        SyncFamily.Phone b = new SyncFamily.Phone("q9srv", new TestDb(SyncFamily.dir, dbFile, true), "server");
+        b.e.photos = new SyncTest091.MapPhotos();
+        ServerSync.Round rb = round(b);
+        round(b);
+        report("GV4 updated, it reads the house's file again once: the General lines come in, on General",
+            rb.error != null || !"general".equals(SyncTest095.sectionOf(b, "gs-chop")) || !"general".equals(SyncTest095.sectionOf(b, "gs-late")) || !"1".equals(b.one("SELECT checked FROM list_entries WHERE id = 'gs-tea'")),
+            "error " + rb.error + ", gs-chop " + SyncTest095.sectionOf(b, "gs-chop") + ", gs-late " + SyncTest095.sectionOf(b, "gs-late"));
+        b.db.exec("UPDATE list_entries SET checked = 1, checked_at = 11 WHERE id = 'gs-chop'");
+        round(b);
+        rounds(g);
+        report("GV5 and its ticks on General go through the house", !"1".equals(g.one("SELECT checked FROM list_entries WHERE id = 'gs-chop'")), "g gs-chop " + g.one("SELECT checked FROM list_entries WHERE id = 'gs-chop'"));
+        b.db.close();
     }
 
     static ServerFolder listed(SyncFamily.Phone p) throws Exception {

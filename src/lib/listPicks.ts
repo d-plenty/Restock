@@ -26,6 +26,7 @@ import { HA_STATE, LIST_ALIASES } from './haKeys';
 import { matchKey, parseLine } from './haMatch';
 import { ALIAS_PREFIX, checkListRow, decode, HA_PHONE, KEEP_PREFIX } from './sharedSettings';
 import type { ListEntry } from '../types';
+import { background } from './undo';
 
 /** Lines made from Home Assistant's list start with this (homeAssistant.ts dbStore.addLine). */
 export const FROM_HA = 'ha-';
@@ -112,7 +113,14 @@ async function legacyPicks(): Promise<Set<string>> {
 /** Whether a list line needs "Pick my …" (see the top of this file). */
 export function needsMatch(e: ListEntry, keeps: ReadonlySet<string>, legacy: ReadonlySet<string> = new Set()): boolean {
   return (
-    (e.id.startsWith(FROM_HA) || legacy.has(e.id)) && !e.groupId && !e.product && !e.checked && (e.section ?? 'pantry') === 'pantry' && !keeps.has(e.id) && !!e.text.trim()
+    (e.id.startsWith(FROM_HA) || legacy.has(e.id)) &&
+    !e.groupId &&
+    !e.product &&
+    !e.checked &&
+    // 0.9.5: or on General, where what matched nothing goes.
+    ((e.section ?? 'pantry') === 'pantry' || e.section === 'general') &&
+    !keeps.has(e.id) &&
+    !!e.text.trim()
   );
 }
 
@@ -150,7 +158,11 @@ export async function pickItemFor(entry: ListEntry, group: { id: string; name: s
   if (already && !now.checked) {
     await updateListEntry(already.id, { qty: Math.max(1, already.qty ?? 1) + Math.max(1, now.qty ?? 1) });
     await deleteListEntries([now.id]);
-  } else await updateListEntry(now.id, { groupId: group.id, text: group.name });
+  } else {
+    // 0.9.5: a line from General moves to the item's own list.
+    const tab = now.section === 'general' ? ((await allGroups()).find((g) => g.id === group.id)?.section ?? 'pantry') : undefined;
+    await updateListEntry(now.id, { groupId: group.id, text: group.name, ...(tab ? { section: tab } : {}) });
+  }
   return true;
 }
 
@@ -172,7 +184,8 @@ export async function tidyKeeps(now = Date.now()): Promise<number> {
      WHERE s.k LIKE 'keep:%' AND NOT EXISTS (SELECT 1 FROM list_entries e WHERE e.id = substr(s.k, 6))`,
     [now - KEEP_TIDY_AFTER_MS],
   ).catch(() => []);
-  if (gone.length) await runOps(gone.map((g) => ({ sql: `DELETE FROM ${TABLE} WHERE k = ?`, params: [g.k] })));
+  // 0.9.5 (final review): never part of an action someone is doing (its Undo leaves this alone).
+  if (gone.length) await background(() => runOps(gone.map((g) => ({ sql: `DELETE FROM ${TABLE} WHERE k = ?`, params: [g.k] }))));
   return gone.length;
 }
 

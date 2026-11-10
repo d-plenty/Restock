@@ -384,7 +384,9 @@ export async function refreshHouseKeys(): Promise<boolean> {
   if (!g?.keys) return false;
   const fresh = Object.entries(g.keys).some(([v, k]) => s.keys[v] !== k);
   const h = g.household && typeof g.household === 'object' ? g.household : undefined;
-  remember({ ...s, keys: { ...s.keys, ...g.keys }, webId: g.webId ?? s.webId, household: h?.name ?? s.household, ownerPub: s.ownerPub ?? h?.owner_pub });
+  // 0.9.5 (review): the household's owner key as the server has it now: a new household (Delete
+  // everything, set up again) has another, and live.ts drops a copy of the old one.
+  remember({ ...s, keys: { ...s.keys, ...g.keys }, webId: g.webId ?? s.webId, household: h?.name ?? s.household, ownerPub: h?.owner_pub ?? s.ownerPub });
   return fresh;
 }
 

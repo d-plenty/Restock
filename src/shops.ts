@@ -6,11 +6,28 @@
 
 export type Section = 'pantry' | 'keg' | 'pharmacy';
 export const SECTIONS: Section[] = ['pantry', 'keg', 'pharmacy'];
-export const SECTION_NAMES: Record<Section, string> = { pantry: 'Pantry', keg: 'Keg', pharmacy: 'Pharmacy' };
-/** "Added to your pantry / keg / pharmacy list". */
-export const SECTION_PLACE: Record<Section, string> = { pantry: 'your pantry', keg: 'your keg', pharmacy: 'your pharmacy list' };
+export const SECTION_NAMES: Record<Section, string> = { pantry: 'Pantry', keg: 'Keg', pharmacy: 'Health' };
+/** "Added to your pantry / keg / Health list". */
+export const SECTION_PLACE: Record<Section, string> = { pantry: 'your pantry', keg: 'your keg', pharmacy: 'your Health list' };
 /** What the shops in each section are called in sentences. */
-export const SECTION_SHOPS: Record<Section, string> = { pantry: 'supermarkets', keg: 'bottle shops', pharmacy: 'pharmacies' };
+export const SECTION_SHOPS: Record<Section, string> = { pantry: 'supermarkets', keg: 'bottle shops', pharmacy: 'chemists' };
+
+/**
+ * 0.9.5: the shopping lists. Each tab's own (Groceries is the Pantry tab's), and General: a list only,
+ * with no pantry and no shops of its own, for what Home Assistant adds that matches nothing (and for
+ * anything put there by hand). Its lines are list_entries with section 'general'. For sharing it goes
+ * with Groceries (listShareTab), so a phone that shares Groceries shares General too.
+ */
+export type ListSection = Section | 'general';
+export const LIST_SECTIONS: ListSection[] = ['pantry', 'keg', 'pharmacy', 'general'];
+/** The tab names on the list (phone and web). */
+export const LIST_NAMES: Record<ListSection, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', general: 'General' };
+/** "Nothing on your General list", "tap the cart next to anything in your pantry". */
+export const LIST_PLACE: Record<ListSection, string> = { ...SECTION_PLACE, general: 'your pantry' };
+/** A list_entries section as stored: anything this version doesn't know is the grocery list. */
+export const asListSection = (v: unknown): ListSection => (v === 'keg' || v === 'pharmacy' || v === 'general' ? v : 'pantry');
+/** The tab a list's lines are shared with (household sync, the server, What this phone shares): General goes with Groceries. */
+export const listShareTab = (s: ListSection | null | undefined): Section => (s === 'keg' || s === 'pharmacy' ? s : 'pantry');
 
 export type GroceryChain = 'woolworths' | 'coles' | 'aldi';
 export type LiquorChain =
@@ -109,7 +126,7 @@ export const SHOPS: ShopDef[] = [
     color: '#0d5c3b',
     website: 'https://www.danmurphys.com.au',
     search: 'https://www.danmurphys.com.au/search?searchTerm={q}',
-    catalogue: { url: 'https://www.danmurphys.com.au/discover/catalogues', note: 'For your nearest store.' },
+    catalogue: { url: 'https://www.danmurphys.com.au/discover/catalogues', note: 'For your nearest branch.' },
     map: /dan murphy/i,
   }),
   L({
@@ -119,7 +136,7 @@ export const SHOPS: ShopDef[] = [
     color: '#f26b21',
     website: 'https://bws.com.au',
     search: 'https://bws.com.au/search?searchTerm={q}',
-    catalogue: { url: 'https://bws.com.au/discover/catalogue', note: 'For your nearest store.' },
+    catalogue: { url: 'https://bws.com.au/discover/catalogue', note: 'For your nearest branch.' },
     map: /\bbws\b|beer wine spirits/i,
   }),
   L({
@@ -369,6 +386,8 @@ export function sectionOn(settings: { sections?: Partial<Record<Section, boolean
 }
 
 export const activeSections = (settings: Parameters<typeof sectionOn>[0]): Section[] => SECTIONS.filter((s) => sectionOn(settings, s));
+/** 0.9.5: the shopping lists shown (List tab and the web): the tabs that are on, then General, always. */
+export const listSectionsOn = (settings: Parameters<typeof sectionOn>[0]): ListSection[] => [...activeSections(settings), 'general'];
 
 /** Starting categories for each tab. */
 export const DEFAULT_SECTION_CATEGORIES: Record<Section, string[]> = {

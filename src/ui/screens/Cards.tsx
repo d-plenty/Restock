@@ -2,16 +2,15 @@ import JsBarcode from 'jsbarcode';
 import { useEffect, useRef, useState } from 'react';
 import { scanBarcode } from '../../lib/barcode';
 import { addCard, allCards, deleteCard, nowIso, uid } from '../../lib/db';
-import { cardRows, undoable } from '../../lib/undo';
+import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { useLive } from '../../lib/useLive';
 import type { CardProgram, LoyaltyCard } from '../../types';
 import { Icon, Sheet, TopBar } from '../components';
-import { useNav } from '../nav';
 
 export const PROGRAMS: Record<CardProgram, { name: string; use: string }> = {
   flybuys: { name: 'Flybuys', use: 'Coles member prices' },
   everyday: { name: 'Everyday Rewards', use: 'Woolworths member prices' },
-  other: { name: 'Other card', use: 'Any barcode card — not linked to prices' },
+  other: { name: 'Other card', use: 'Any barcode card, not linked to prices' },
 };
 
 export function CardBarcode({ value }: { value: string }) {
@@ -34,7 +33,6 @@ export function CardBarcode({ value }: { value: string }) {
 }
 
 export function CardsScreen() {
-  const nav = useNav();
   const cards = useLive(allCards, []);
   const [selectedId, setSelectedId] = useState<string>();
   const [adding, setAdding] = useState(false);
@@ -51,7 +49,7 @@ export function CardsScreen() {
         <div className={`loyalty ${selected.program}`}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{selected.program === 'other' ? selected.label : PROGRAMS[selected.program].name}</div>
-            <div style={{ fontSize: 12 }}>{PROGRAMS[selected.program].use.split('—')[0]}</div>
+            <div style={{ fontSize: 12 }}>{PROGRAMS[selected.program].use.split(',')[0]}</div>
           </div>
           <div className="barcode-panel">
             <CardBarcode value={selected.number} />
@@ -107,8 +105,7 @@ export function CardsScreen() {
           onClick={async () => {
             const id = selected.id;
             setSelectedId(undefined);
-            const undo = await undoable(() => deleteCard(id), cardRows(id));
-            nav.toast('Card removed. Member prices for that store stop counting.', undo);
+            await act('Card removed. Member prices for that shop stop counting.', () => deleteCard(id)); // 0.9.5 (undo)
           }}
         >
           <Icon name="trash" size={18} /> Remove this card
@@ -133,7 +130,6 @@ export function CardsScreen() {
 }
 
 function AddCard({ onClose, onAdded }: { onClose: () => void; onAdded: (c: LoyaltyCard) => void }) {
-  const nav = useNav();
   const [program, setProgram] = useState<CardProgram>('flybuys');
   const [label, setLabel] = useState('');
   const [number, setNumber] = useState('');
@@ -159,12 +155,11 @@ function AddCard({ onClose, onAdded }: { onClose: () => void; onAdded: (c: Loyal
       createdAt: nowIso(),
     };
     try {
-      await addCard(card);
+      await act(`${card.label} added`, () => addCard(card)); // 0.9.5 (undo)
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
-    nav.toast(`${card.label} added`);
     onAdded(card);
   };
 

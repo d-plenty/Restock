@@ -107,18 +107,20 @@ export interface ServerRow {
   keepMonths: number | null;
 }
 
-/** 0.9.4: "Keep data for" choices, in months (null: Until I delete). */
+/** 0.9.4: "Keep data for" choices, in months (null: Until I delete). 0.9.4 phones only understand these. */
 export const KEEP_MONTHS = [3, 6, 9, 12] as const;
+/** 0.9.5: Auto delete (0.9.4's "Keep data for"): any whole number of months from 1 to 120 (null: off). As SyncHousehold.keepMonthsOk. */
+export const keepMonthsOk = (m: unknown): m is number => typeof m === 'number' && Number.isInteger(m) && m >= 1 && m <= 120;
 /** 0.9.4: a month for "Keep data for": a year's 365.25 days over 12, in ms (the same in Java and Node). */
 export const MONTH_MS = 2_629_800_000;
 
 /**
  * 0.9.4: the cut-off for "Keep data for" `keepMonths` at `now` (ms): an ISO time; data dated before it
  * goes (prices by `date`, receipts by `scanned_at`, archive months wholly before it, logs by `at`).
- * null (Until I delete), or a value that isn't one of the choices: no cut-off.
+ * null (off), or a value that isn't a whole number of months from 1 to 120 (0.9.5): no cut-off.
  */
 export function keepCutoff(keepMonths: number | null | undefined, now: number = Date.now()): string | null {
-  if (keepMonths === null || keepMonths === undefined || !(KEEP_MONTHS as readonly number[]).includes(keepMonths) || !Number.isFinite(now)) return null;
+  if (!keepMonthsOk(keepMonths) || !Number.isFinite(now)) return null;
   return new Date(now - keepMonths * MONTH_MS).toISOString();
 }
 
@@ -128,7 +130,7 @@ export function parseServerRow(v: string | null | undefined): ServerRow | null {
   try {
     const m = JSON.parse(v) as Partial<ServerRow>;
     if (!m || m.v !== 3 || typeof m.sid !== 'string' || typeof m.home !== 'string' || typeof m.kex !== 'string') return null;
-    const keep = m.keepMonths === null || m.keepMonths === undefined ? null : (KEEP_MONTHS as readonly number[]).includes(m.keepMonths) ? m.keepMonths : null;
+    const keep = keepMonthsOk(m.keepMonths) ? m.keepMonths : null;
     return { v: 3, sid: m.sid, home: m.home, away: typeof m.away === 'string' ? m.away : null, kex: m.kex, keepMonths: keep };
   } catch {
     return null;
@@ -160,6 +162,8 @@ export const CLOCK_SLACK_MS = 24 * 3600 * 1000;
 export const OLD_DELETE_MS = 180 * 24 * 3600 * 1000;
 export const DELETE_WINS = new Set(['items', 'list_entries', 'products', 'categories', 'cards', 'receipts']);
 export const ALL_TABS = ['pantry', 'keg', 'pharmacy'];
+/** 0.9.5: sync_meta lists_v once catchUpLists has read everything again (SyncEngine.LISTS_V). */
+export const LISTS_V = '95';
 export const LOCAL_PRODUCT_COLUMNS = new Set(['in_stock', 'stock_at', 'in_stock_2']);
 /** What the web's own file never carries (SyncFolder.writeOwn leaves prices out; the rest is the web's choice). */
 export const WEB_LEAVES_OUT = ['prices', 'household', 'cards'];
@@ -292,8 +296,54 @@ export class WebSyncEngine {
     return n;
   }
 
+  /**
+   * SyncEngine.catchUpLists (0.9.5): the first time this version syncs, every other device's file is
+   * read again, once. A 0.9.4 web page or server passed over General list lines (a tab it didn't
+   * know); read again, they come in now. Nothing of this device's is sent again. True when there
+   * was something to read again.
+   * 0.9.5 (review): a file read again unchanged (the sum it had: `catchup:folder_seen:<name>`) only
+   * brings General lines that aren't here at all (catchUpEntries): an old file (a browser signed out
+   * long ago, a stale cloud copy) still holds records deleted so long ago that the delete was tidied
+   * away, and must not bring them back. A file that changed since is read as always.
+   */
+  catchUpLists(): boolean {
+    if (this.meta('lists_v') === LISTS_V) return false;
+    const any = this.db.query("SELECT 1 FROM sync_meta WHERE key LIKE 'folder_seen:%' LIMIT 1").length > 0;
+    if (any)
+      this.db.transaction(() => {
+        this.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) SELECT 'catchup:' || key, value FROM sync_meta WHERE key LIKE 'folder_seen:%'");
+        this.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'");
+      });
+    this.setMeta('lists_v', LISTS_V);
+    return any;
+  }
+
+  /** 0.9.5 (review): is this file being read again by catchUpLists, unchanged (`sum` as it was)? */
+  catchingUp(name: string, sum: string): boolean {
+    const was = this.meta('catchup:folder_seen:' + name);
+    return was !== null && was === sum;
+  }
+
+  /**
+   * 0.9.5 (review), SyncEngine.catchUpEntries: what a catch-up read takes from a file: only General
+   * list lines (section 'general') this device has never had (no row, no change noted). Nothing else.
+   */
+  catchUpEntries(entries: Entry[] | null | undefined): Entry[] {
+    const out: Entry[] = [];
+    for (const x of Array.isArray(entries) ? entries : []) {
+      if (!x || typeof x !== 'object' || x.tbl !== 'list_entries' || typeof x.pk !== 'string' || truthy(x.deleted)) continue;
+      const row = x.row && typeof x.row === 'object' ? x.row : null;
+      if (!row || str(row, 'section') !== 'general' || String(row.id ?? '') !== x.pk) continue;
+      if (this.db.query('SELECT 1 FROM list_entries WHERE id = ?', [x.pk]).length) continue;
+      if (this.db.query("SELECT 1 FROM sync_log WHERE tbl = 'list_entries' AND pk = ?", [x.pk]).length) continue;
+      out.push(x);
+    }
+    return out;
+  }
+
   /** SyncEngine.noteTabs: sharing more now? Go through everything again. */
   noteTabs(): boolean {
+    const caught = this.catchUpLists();
     const now = this.tabs();
     const was = this.meta('tabs_eff');
     const before = was === null ? null : parseTabs(was);
@@ -305,7 +355,8 @@ export class WebSyncEngine {
       this.db.transaction(() => {
         this.db.exec('UPDATE sync_peers SET got = 0');
         this.db.exec('UPDATE sync_log SET seq = seq + (SELECT COALESCE(MAX(seq), 0) FROM sync_log)');
-        this.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'");
+        // 0.9.5 (review): a full read again (catch-up markers too: everything is read as always).
+        this.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'catchup:%'");
       });
       this.releaseHeld();
     }
@@ -317,7 +368,7 @@ export class WebSyncEngine {
     }
     const r = receipts ? '1' : '0';
     if (r !== rwas) this.setMeta('receipts_eff', r);
-    return again;
+    return again || caught;
   }
 
   chainTab(chain: string | null): string | null {
@@ -343,8 +394,9 @@ export class WebSyncEngine {
       case 'items':
         return str(row, 'section') ?? 'pantry';
       case 'list_entries': {
+        // 0.9.5: a General line (section 'general') is shared with the groceries.
         const s = str(row, 'section');
-        if (s !== null) return s;
+        if (s !== null) return s === 'general' ? 'pantry' : s;
         const item = str(row, 'item_id');
         if (item !== null) {
           const r = this.db.query('SELECT section FROM items WHERE id = ?', [item]);
@@ -831,6 +883,26 @@ export class WebSyncEngine {
       this.setMeta(seenKey, sum);
       return -1;
     }
+    // 0.9.5 (review): read again unchanged by catchUpLists: only General lines never had here.
+    const catchKey = 'catchup:' + seenKey;
+    if (this.meta(catchKey) !== null) {
+      const unchanged = this.meta(catchKey) === sum;
+      this.setMeta(catchKey, null);
+      if (unchanged) {
+        let n = 0;
+        let few = this.catchUpEntries(m.entries);
+        if (this.role === 'server' && few.length) few = this.serverFilter(few, device, device.startsWith('web-') ? null : parseShares(m.shares));
+        this.applyingFrom = this.role === 'server' ? device : null;
+        try {
+          n = few.length ? this.apply(few) : 0;
+        } finally {
+          this.applyingFrom = null;
+        }
+        this.lastDropped = 0;
+        this.setMeta(seenKey, sum);
+        return n;
+      }
+    }
     // Another browser's file can't change the household, loyalty cards or prices (as on a phone).
     let entries = device.startsWith('web-') && Array.isArray(m.entries) ? m.entries.filter((x) => !x || typeof x !== 'object' || !NOT_FROM_A_BROWSER.has(String(x.tbl))) : m.entries;
     // 0.9.4, the server: only what that phone shares (D9), and nothing older than Keep data for (D14).
@@ -1091,6 +1163,15 @@ export class WebSyncEngine {
       entries: c.entries,
     };
     return { msg, mark };
+  }
+
+  /**
+   * 0.9.5 (review): how many of this browser's own changes no file it wrote has carried yet (made
+   * since ownFile's last mark): what Sign out would lose (the PWA, offline).
+   */
+  unsent(): number {
+    const sent = Number(String(this.meta('folder_top') ?? '0').split('/')[0]) || 0;
+    return num(this.db.query("SELECT COUNT(*) AS n FROM sync_log WHERE seq > ? AND device = ? AND tbl NOT IN ('_seq', 'prices', 'household', 'cards')", [sent, this.device()])[0]?.n);
   }
 
   /** After the own file was written (the mark ownFile gave, so edits made meanwhile still go next time). */

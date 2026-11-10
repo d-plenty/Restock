@@ -1,4 +1,4 @@
-import { activeSections, chainName, SECTIONS, type Section } from '../shops';
+import { activeSections, chainName, LIST_SECTIONS, listSectionsOn, type ListSection } from '../shops';
 import { allGroups, allListEntries, getSettings } from './db';
 import { onChange } from './live';
 import { loadRecommendations } from './recs';
@@ -22,24 +22,25 @@ export interface WidgetData {
 
 /**
  * The list lines the widget shows (0.9.0): only from tabs that are switched on, and in the list's
- * own order, A to Z by name the way the List tab sorts them (Groceries first, then Keg, then Pharmacy).
+ * own order, A to Z by name the way the List tab sorts them (Groceries first, then Keg, then Health, then General).
  */
 export function widgetList(
   entries: ListEntry[],
   groups: Pick<Group, 'id' | 'name' | 'section'>[],
   settings: Parameters<typeof activeSections>[0],
 ): { open: ListEntry[]; label: (e: ListEntry) => string } {
-  const on = activeSections(settings);
+  // 0.9.5: and General's, after the others.
+  const on = listSectionsOn(settings);
   const byId = new Map(groups.map((g) => [g.id, g]));
   // A line's tab: its pantry item's, or the tab it was added from (List.tsx entrySection).
-  const tab = (e: ListEntry): Section => {
+  const tab = (e: ListEntry): ListSection => {
     const g = e.groupId ? byId.get(e.groupId) : undefined;
     return g ? (g.section ?? 'pantry') : (e.section ?? 'pantry');
   };
   const label = (e: ListEntry) => (e.groupId && byId.get(e.groupId)?.name) || e.text;
   const open = entries
     .filter((e) => !e.checked && on.includes(tab(e)))
-    .sort((a, b) => SECTIONS.indexOf(tab(a)) - SECTIONS.indexOf(tab(b)) || label(a).localeCompare(label(b), undefined, { sensitivity: 'base' }));
+    .sort((a, b) => LIST_SECTIONS.indexOf(tab(a)) - LIST_SECTIONS.indexOf(tab(b)) || label(a).localeCompare(label(b), undefined, { sensitivity: 'base' }));
   return { open, label };
 }
 

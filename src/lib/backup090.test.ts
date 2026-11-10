@@ -65,7 +65,7 @@ describe('spreadsheets', () => {
     const files = csvFiles(await snapshot());
     expect(files.map((f) => f.name)).toEqual(['restock-pantry.csv', 'restock-shopping-list.csv', 'restock-price-history.csv']);
     const [pantry, list, prices] = files.map((f) => f.text.replace('﻿', '').split('\r\n'));
-    expect(pantry[0]).toBe('Tab,Item,Category,Kind,Shop,Product,Brand,Size,Barcode,Latest price,Normal price,On special,Checked');
+    expect(pantry[0]).toBe('Tab,Item,Category,Kind,Shop,Product,Brand,Size,Barcode,Latest price,Usual price,On special,Checked');
     expect(pantry.length).toBeGreaterThan(3);
     expect(list).toContain('Bin bags,2,,No,2026-11-09');
     // Sample items' prices are left out (they aren't real).

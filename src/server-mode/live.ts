@@ -10,6 +10,7 @@ import type { Database } from 'sql.js';
 import { ensureDefaults, getKV, getSettings, householdContext, initDb, putKV, updateSettings } from '../lib/db';
 import { applyRows } from '../lib/sharedSettings';
 import { tidyKeeps } from '../lib/listPicks';
+import { background } from '../lib/undo';
 import { changed, onChange } from '../lib/live';
 import { createSqlJsDriver } from '../lib/sql/sqljs';
 import { setPhotoSource } from '../lib/receiptFiles';
@@ -105,12 +106,52 @@ export function localCopyStore(s: Session): { restore: () => Promise<Uint8Array 
   };
 }
 
+/**
+ * 0.9.5 (review): a copy is of another household when the owner key it pinned isn't the one the
+ * session has (the household was deleted and set up again, or replaced). Such a copy is never used:
+ * its records would go into the new household.
+ */
+export function copyIsOtherHousehold(copyPin: string | null | undefined, ownerPub: string | null | undefined): boolean {
+  return !!copyPin && !!ownerPub && copyPin !== ownerPub;
+}
+
+/** 0.9.5 (review): `restore`, but a copy of another household is deleted and not used (the page starts afresh). */
+export function guardedRestore(restore: () => Promise<Uint8Array | undefined>, pinOf: (bytes: Uint8Array) => string | null, ownerPub: string | undefined, drop: () => Promise<void>): () => Promise<Uint8Array | undefined> {
+  return async () => {
+    const bytes = await restore();
+    if (!bytes) return bytes;
+    let pin: string | null = null;
+    try {
+      pin = pinOf(bytes);
+    } catch {
+      pin = null;
+    }
+    if (!copyIsOtherHousehold(pin, ownerPub)) return bytes;
+    await drop();
+    return undefined;
+  };
+}
+
 /** Opens (or makes) this web id's copy. Used as the app's database opener (lib/boot.ts). */
 export async function openServerDatabase(s: Session): Promise<void> {
   const [{ default: initSqlJs }, { default: wasmUrl }] = await Promise.all([import('sql.js'), import('sql.js/dist/sql-wasm-browser.wasm?url')]);
+  const store = localCopyStore(s);
+  let SQL: Awaited<ReturnType<typeof initSqlJs>> | undefined;
+  const pinOf = (bytes: Uint8Array): string | null => {
+    if (!SQL) return null;
+    const d = new SQL.Database(bytes);
+    try {
+      const v = d.exec("SELECT value FROM sync_meta WHERE key = 'owner_pin'")[0]?.values[0]?.[0];
+      return typeof v === 'string' ? v : null;
+    } finally {
+      d.close();
+    }
+  };
   const driver = await createSqlJsDriver({
-    load: () => initSqlJs({ locateFile: () => wasmUrl }),
-    ...localCopyStore(s),
+    load: async () => (SQL = await initSqlJs({ locateFile: () => wasmUrl })),
+    // 0.9.5 (review): the PWA's offline copy is this same copy, so it's checked here too.
+    restore: guardedRestore(store.restore, pinOf, s.ownerPub, () => deleteLocalCopy(s.webId)),
+    persist: store.persist,
   });
   await initDb(driver);
   raw = driver.raw;
@@ -187,6 +228,8 @@ export function syncNow(): Promise<RoundResult | undefined> {
   running = (async () => {
     const s = session();
     if (!s || !engine) return undefined;
+    // 0.9.5 (review): this copy is of another household: it goes, and the page starts from the server's.
+    if (copyIsOtherHousehold(engine.meta('owner_pin'), s.ownerPub)) return dropOtherCopy(s);
     setStatus({ busy: true });
     try {
       const house = s.v === 3;
@@ -198,6 +241,7 @@ export function syncNow(): Promise<RoundResult | undefined> {
       if (house && r.unread > 0 && Date.now() - keysAskedAt > 5 * 60_000) {
         keysAskedAt = Date.now();
         const now = (await refreshHouseKeys().catch(() => false)) ? session() : undefined;
+        if (now && copyIsOtherHousehold(engine.meta('owner_pin'), now.ownerPub)) return dropOtherCopy(now);
         if (now) {
           keys = { webId: now.webId, webPriv: '', webPub: '', keys: { ...now.keys } };
           r = await syncRound(engine, api3, keys, undefined, { v3: true });
@@ -206,9 +250,11 @@ export function syncNow(): Promise<RoundResult | undefined> {
       if (r.shared.length) await keepShared(r.shared).catch(() => undefined);
       if (!firstDone) {
         firstDone = true;
-        await ensureDefaults();
+        await background(() => ensureDefaults());
       }
-      await fitSettings(engine);
+      // 0.9.5 (final review): never part of an action someone is doing on the page.
+      const e = engine;
+      await background(() => fitSettings(e));
       // 0.9.3: "Keep it as just …" notes of lines that are gone (an older phone deleted them, say).
       await tidyKeeps().catch(() => 0);
       persist?.();
@@ -224,6 +270,16 @@ export function syncNow(): Promise<RoundResult | undefined> {
     }
   })().finally(() => (running = undefined));
   return running;
+}
+
+/** 0.9.5 (review): a copy of another household: no more rounds with it, deleted, and the page opens again. */
+async function dropOtherCopy(s: Session): Promise<undefined> {
+  stop();
+  engine = undefined;
+  await deleteLocalCopy(s.webId);
+  setStatus({ busy: false, error: 'This browser had a copy of a household that is gone. Opening the one on the server.' });
+  if (typeof location !== 'undefined') location.reload();
+  return undefined;
 }
 
 let timer: ReturnType<typeof setInterval> | undefined;
@@ -259,6 +315,9 @@ export function stop(): void {
     document.removeEventListener('visibilitychange', onFocus);
   }
 }
+
+/** 0.9.5 (review): this browser's changes that haven't reached the server yet (Sign out warns). */
+export const unsentChanges = (): number => engine?.unsent() ?? 0;
 
 /** The phones' names, from the household record (member:<device>). */
 export function memberNames(): Map<string, string> {

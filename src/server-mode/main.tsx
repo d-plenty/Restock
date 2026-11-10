@@ -15,16 +15,39 @@ import { Checking, LinkScreen, LoginScreen, ReleasedScreen, SetPassphraseScreen,
 import { AddPhonePanel, ServerStrip, ServerTab, serverScreen } from './ui/ServerScreens';
 import { Desktop } from './ui/Desktop';
 import { serverUi } from './flag';
+import { atSignIn, noteServer, openOffline, signedOut, startPwa, watchCopy } from './pwa/boot';
+import { PwaBanners } from './pwa/Banners';
+// 0.9.5 (web search): Let the web page search the shops; the Scan button sits by the add box now.
+import { setBarcodeSearch } from './pwa/scan';
+import { webSearchUi } from './ui/WebShopSearch';
+import { barcodeSearch } from './ui/webSearch';
+import { useNetworkWatch } from './pwa/offline';
 import './server.css';
 
+// 0.9.5: the home screen web app (service worker, offline list, notices). 0.9.5 (web search): the
+// Scan a barcode button moved next to the Shopping list's add box (List.tsx, DeskList.tsx).
+startPwa();
+// 0.9.5 (web search): a scanned barcode no household product has searches the shops, when that's on.
+setBarcodeSearch((code, section) => barcodeSearch(code, section));
+function PhoneStrip() {
+  return (
+    <>
+      <ServerStrip />
+      <PwaBanners />
+    </>
+  );
+}
+
 serverUi.current = {
-  Strip: ServerStrip,
+  Strip: PhoneStrip,
   Tab: ServerTab,
   screen: serverScreen,
   // 0.9.3: the desktop layout, from 1000 px wide.
   Desktop,
   // 0.9.4: the full item page shows the server's older prices too (as the desktop side panel does).
   olderPrices: serverHistory,
+  // 0.9.5 (web search): the Pick sheet's and the phone layout's list's shop search, and its Scan button.
+  webSearch: webSearchUi,
   refresh: async () => {
     const r = await syncNow();
     if (!r) return syncStatus().error ?? "Couldn't reach the server";
@@ -51,6 +74,7 @@ function ServerRoot() {
     setStage({ at: 'checking' });
     try {
       const info = await probeServer();
+      noteServer(info);
       if (isV3()) {
         if (info.mode === 'released') return setStage({ at: 'released' });
         const s = recall();
@@ -77,6 +101,9 @@ function ServerRoot() {
         forget();
         return setStage({ at: 'login' });
       }
+      // 0.9.5: no connection, but this browser has the kept session's own copy: open it offline.
+      const off = await openOffline(e);
+      if (off) return setStage({ at: 'app', s: off });
       setStage({ at: 'offline', why: e instanceof Error ? e.message : String(e) });
     }
   }, []);
@@ -88,6 +115,7 @@ function ServerRoot() {
       stop();
       forget();
       if (s) void deleteLocalCopy(s.webId);
+      signedOut();
       setStage({ at: 'login' });
     });
     // A new passphrase means a new web id, and so a fresh copy under it.
@@ -111,6 +139,10 @@ function ServerRoot() {
   useEffect(() => {
     document.documentElement.classList.add('server-mode');
   }, []);
+  // 0.9.5: at a house's sign-in page, a copy left by a session that's gone is deleted.
+  useEffect(() => {
+    if (stage.at === 'login' && isV3()) void atSignIn();
+  }, [stage.at]);
 
   switch (stage.at) {
     case 'checking':
@@ -143,6 +175,8 @@ function ServerRoot() {
   }
 }
 
+const sync = () => void syncNow();
+
 /** The real app, on this web id's copy. */
 function Household({ s }: { s: Session }) {
   const [ready, setReady] = useState(false);
@@ -161,8 +195,15 @@ function Household({ s }: { s: Session }) {
       start();
     });
     setReady(true);
-    return () => stop();
+    // 0.9.5: when the list last came from the server (for the offline notice).
+    const unwatch = s.viaPhone ? undefined : watchCopy(s.webId);
+    return () => {
+      unwatch?.();
+      stop();
+    };
   }, [s]);
+  // 0.9.5: back online, a round straight away.
+  useNetworkWatch(sync);
   return ready ? <App /> : null;
 }
 

@@ -28,8 +28,10 @@ tar czf ~/restock-signing-key-backup.tar.gz -C ~ .restock
    - `package.json` → `"version"`
    - `package-lock.json` → the two `"version"` lines at the top (lines 3 and 9)
    - `android/app/build.gradle` → `versionCode` and `versionName`
-   - `README.md` → the beta badge
+   - `README.md` → the release candidate badge, and the version in "Check your download"
    - `.github/ISSUE_TEMPLATE/*.yml` → the version placeholder
+   - `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` → what's new, in 500 characters or fewer (F-Droid shows it)
+   - The server, if it changed with this release: `version` in `server/package.json`, `server/restock/config.yaml` and `server/restock/Dockerfile`, and `RESTOCK_REF` in `server/Dockerfile` (`v<version>`). Its README says how to release it.
 2. **Check it:**
    ```bash
    cd ~/restock
@@ -52,7 +54,7 @@ tar czf ~/restock-signing-key-backup.tar.gz -C ~ .restock
    git push
    git push --tags
    ```
-6. **Publish on GitHub:** Releases → **Draft a new release** → choose the tag → title `Restock 0.x.y` → write what's new in plain words → drag in the APK, plus a copy of it named `restock.apk` (the README's download link always points at that name in the latest release) → **Publish release**.
+6. **Publish on GitHub:** Releases → **Draft a new release** → choose the tag → title `Restock 0.x.y`, or `Restock 0.x.y (release candidate N)` before 1.0 → write what's new in plain words → drag in the APK, plus a copy of it named `restock.apk` (the README's download link always points at that name in the latest release) → **Publish release**.
 7. **Add the checksum** to the release notes so people can check their download:
    ```bash
    sha256sum ~/restock-$VERSION.apk

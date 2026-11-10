@@ -1,0 +1,330 @@
+/* 0.9.5 (look): Restock's design tokens. The one place for colour, corner radius, text size,
+   spacing and control sizes, on the phone and on the server's web page (styles.css imports this
+   first; desk.css, server.css and pwa.css only use these names).
+
+   Colour roles (base name, then the role name new code can use):
+     --bg            page ground (cream in light)             --surface      cards, sheets, boxes
+     --sunken        surface-2: wells, tracks, quiet fills    --ink          text
+     --ink-2         secondary text                           --muted        text-muted (≥ 4.5:1 on bg, surface, sunken)
+     --line          border                                   --line-2       border-strong (controls)
+     --green         accent text/links                        --green-solid  accent fill (primary buttons)
+     --navy, --gold  the flag colours (bars, sidebar, savings banner)
+     --good-*        success (GREAT DEAL)   --amber-*  warning (WAIT)   --red-*  danger (FAKE SALE)
+     --blue-*        info (SWAP & SAVE)     --focus    focus ring
+   Brand: navy #012169, gold #ffcd00, green #007a38, cream #f6f4ea. They never change.
+   Themes: light (default), dark (data-theme=dark, or system + the phone's dark mode), true black
+   (data-black=1, while dark), and the Plain style (data-style=plain). Accent colours picked in
+   Look and colours override --green, --green-solid, --green-ink, --green-bg, --on-accent,
+   --small-bg and --small-line (lib/theme.ts); the deal colours never follow the accent. */
+
+:root {
+  /* ---------- scales ---------- */
+  /* Corners: tiny bars, small boxes, buttons and fields, cards, sheets and dialogs, pills and circles. */
+  --r-xs: 4px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-full: 999px;
+  /* Text: tags and fine print, details, table text, body and item names, card headings and
+     fields, section numbers, page numbers, screen titles, big figures, letter placeholders. */
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-body: 15px;
+  --fs-lg: 17px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+  --fs-3xl: 30px;
+  --fs-display: 38px;
+  --fs-hero: 64px;
+  /* Spacing. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  /* Controls: main buttons and fields, small buttons, chips and segments, round icon buttons, and
+     the smallest tap area anything gets (small things get an invisible 44 px hit box). */
+  --h-control: 48px;
+  --h-control-sm: 36px;
+  --h-icon: 40px;
+  --hit: 44px;
+
+  /* ---------- fixed colours (same in every theme) ---------- */
+  --brand-navy: #012169;
+  --brand-gold: #ffcd00;
+  --brand-green: #007a38;
+  --brand-cream: #f6f4ea;
+  --white: #ffffff;
+  --black: #000000;
+  /* Text on white panels that stay white in dark mode (the web's Undo, photo boxes). */
+  --fixed-ink: #0f1d3d;
+  --fixed-ink-2: #2b3756;
+  --fixed-hover: #e1eaf7;
+  /* On the navy bars and sidebar. */
+  --on-navy: #ffffff;
+  --on-navy-muted: #c3cde8;
+  --on-navy-line: rgba(255, 255, 255, 0.35);
+  --on-navy-hover: rgba(255, 255, 255, 0.1);
+  --on-navy-ok: #4fca8a;
+  /* Shops and loyalty cards keep their own colours. */
+  --shop-woolworths: #178841;
+  --shop-coles: #e01a22;
+  --shop-aldi: #00005f;
+  --flybuys: #0072b3;
+  --flybuys-silver: #c9ced3;
+  --everyday: #fd6400;
+  --danger-solid: #b3261e;
+  --scrim: rgba(15, 29, 61, 0.45);
+
+  /* ---------- light (Australian style) ---------- */
+  --bg: #f6f4ea;
+  --surface: #ffffff;
+  --sunken: #efeadb;
+  --ink: #0f1d3d;
+  --ink-2: #2b3756;
+  --muted: #5a6175;
+  --line: #e6e0cc;
+  --line-2: #d9d2bb;
+  --dash: #a9a38c;
+  --green: #007a38;
+  --green-solid: #007a38;
+  --green-ink: #005a2a;
+  --green-bg: #dcefe1;
+  --pharm: #1f9d55;
+  --blue: #1f4e8c;
+  --blue-bg: #e1eaf7;
+  --amber-ink: #7a3f04;
+  --amber-bg: #fbebd3;
+  --red-ink: #8a1c1c;
+  --red-bg: #f8e1df;
+  --good-ink: #005a2a;
+  --good-bg: #dcefe1;
+  --gold: #ffcd00;
+  --navy: #012169;
+  --navy-2: #0b2f86;
+  --on-accent: #ffffff;
+  --shadow: rgba(15, 29, 61, 0.08);
+  --tabbar-bg: var(--navy);
+  /* The bars around the app (the phone's tab bar, the web's sidebar and top strip) in the
+     Australian style; text on them is --on-navy. */
+  --chrome-bg: var(--tabbar-bg);
+  --tab-ink: var(--on-navy-muted);
+  --tab-on: var(--gold);
+  --shade-bg: var(--navy);
+  --bubble-ring: var(--gold);
+  --aldi-dot: var(--shop-aldi);
+  /* Chart colours (web Data tab). */
+  --chart-1: #012169;
+  --chart-2: #007a38;
+  --chart-3: var(--gold);
+  --chart-4: #7d97d6;
+  --chart-5: var(--dash);
+  --chart-6: var(--line-2);
+
+  /* Derived: the same in every theme, worked out from the ones above. */
+  --line-soft: var(--sunken);
+  --seg: var(--sunken);
+  --on-ink: var(--surface);
+  --bar: var(--ink);
+  --amber-ink-2: var(--amber-ink);
+  --blue-ink: var(--blue);
+  --small-bg: color-mix(in srgb, var(--green-solid) 10%, var(--bg));
+  --small-line: color-mix(in srgb, var(--green-solid) 40%, var(--bg));
+
+  /* Role names. */
+  --surface-2: var(--sunken);
+  --text: var(--ink);
+  --text-2: var(--ink-2);
+  --text-muted: var(--muted);
+  --border: var(--line);
+  --border-strong: var(--line-2);
+  --accent: var(--green);
+  --accent-solid: var(--green-solid);
+  --success: var(--good-ink);
+  --success-bg: var(--good-bg);
+  --warning: var(--amber-ink);
+  --warning-bg: var(--amber-bg);
+  --danger: var(--red-ink);
+  --danger-bg: var(--red-bg);
+  --info: var(--blue);
+  --info-bg: var(--blue-bg);
+  --focus: var(--green);
+
+  --top: max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px), var(--native-top, 0px));
+  --bottom: max(var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px), var(--native-bottom, 0px));
+  color-scheme: light;
+}
+
+/* ---------- dark (Australian style) ---------- */
+:root[data-theme='dark'] {
+  --bg: #0a1120;
+  --surface: #111b30;
+  --sunken: #18233c;
+  --ink: #eef1f7;
+  --ink-2: #c8cfdd;
+  --muted: #98a2b8;
+  --line: #22304d;
+  --line-2: #2d3d5e;
+  --dash: #3b4a6b;
+  --green: #4fca8a;
+  --green-ink: #9fe3bd;
+  --green-bg: #12321f;
+  --pharm: #4fca8a;
+  --blue: #96b9ee;
+  --blue-bg: #1c2b42;
+  --amber-ink: #f3c27a;
+  --amber-bg: #3a2b13;
+  --red-ink: #f4a29c;
+  --red-bg: #3e1f1d;
+  --good-ink: #9fe3bd;
+  --good-bg: #12321f;
+  --navy: #0b2470;
+  --navy-2: #0b2f86;
+  --shadow: rgba(0, 0, 0, 0.45);
+  --tabbar-bg: #0b1a44;
+  --shade-bg: #0b1a44;
+  --on-ink: var(--bg);
+  --bar: var(--line);
+  --aldi-dot: #7d97d6;
+  --chart-1: #96b9ee;
+  --chart-2: #4fca8a;
+  --chart-4: #c48cf0;
+  --chart-5: var(--muted);
+  --chart-6: var(--dash);
+  --scrim: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] {
+    --bg: #0a1120;
+    --surface: #111b30;
+    --sunken: #18233c;
+    --ink: #eef1f7;
+    --ink-2: #c8cfdd;
+    --muted: #98a2b8;
+    --line: #22304d;
+    --line-2: #2d3d5e;
+    --dash: #3b4a6b;
+    --green: #4fca8a;
+    --green-ink: #9fe3bd;
+    --green-bg: #12321f;
+    --pharm: #4fca8a;
+    --blue: #96b9ee;
+    --blue-bg: #1c2b42;
+    --amber-ink: #f3c27a;
+    --amber-bg: #3a2b13;
+    --red-ink: #f4a29c;
+    --red-bg: #3e1f1d;
+    --good-ink: #9fe3bd;
+    --good-bg: #12321f;
+    --navy: #0b2470;
+    --navy-2: #0b2f86;
+    --shadow: rgba(0, 0, 0, 0.45);
+    --tabbar-bg: #0b1a44;
+    --shade-bg: #0b1a44;
+    --on-ink: var(--bg);
+    --bar: var(--line);
+    --aldi-dot: #7d97d6;
+    --chart-1: #96b9ee;
+    --chart-2: #4fca8a;
+    --chart-4: #c48cf0;
+    --chart-5: var(--muted);
+    --chart-6: var(--dash);
+    --scrim: rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+
+/* ---------- the Plain style: Restock's original neutral colours, without the navy bars ---------- */
+:root[data-style='plain'] {
+  --bg: #f5f4ef;
+  --sunken: #ecebe3;
+  --ink: #1b1f1d;
+  --ink-2: #3a3f3c;
+  --muted: #5a6175;
+  --line: #e4e2d9;
+  --line-2: #d9d7ce;
+  --dash: #a9a38c;
+  --green: #17643f;
+  --green-solid: #17643f;
+  --green-ink: #005a2a;
+  --green-bg: #dcefe1;
+  --shadow: rgba(0, 0, 0, 0.08);
+  --tabbar-bg: var(--surface);
+  --tab-ink: var(--muted);
+  --tab-on: var(--green);
+  --shade-bg: var(--bg);
+  --bubble-ring: var(--surface);
+  /* The web's sidebar keeps light text, so in the Plain style it's a neutral dark, not navy. */
+  --chrome-bg: #1b1f1d;
+}
+:root[data-style='plain'][data-theme='dark'] {
+  --bg: #111412;
+  --surface: #1a1e1c;
+  --sunken: #252a27;
+  --ink: #eef1f7;
+  --ink-2: #c8cfdd;
+  --muted: #98a2b8;
+  --line: #2e3430;
+  --line-2: #3b423d;
+  --dash: #4d4d4d;
+  --green: #4fca8a;
+  --green-solid: #17643f;
+  --green-ink: #9fe3bd;
+  --green-bg: #183a28;
+  --shadow: rgba(0, 0, 0, 0.4);
+  --chrome-bg: #1a1e1c;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style='plain'][data-theme='system'] {
+    --bg: #111412;
+    --surface: #1a1e1c;
+    --sunken: #252a27;
+    --ink: #eef1f7;
+    --ink-2: #c8cfdd;
+    --muted: #98a2b8;
+    --line: #2e3430;
+    --line-2: #3b423d;
+    --dash: #4d4d4d;
+    --green: #4fca8a;
+    --green-solid: #17643f;
+    --green-ink: #9fe3bd;
+    --green-bg: #183a28;
+    --shadow: rgba(0, 0, 0, 0.4);
+    --chrome-bg: #1a1e1c;
+  }
+}
+
+/* ---------- true black, in dark mode, for OLED screens (0.8.9) ----------
+   Every background is black, so those pixels are off. Cards keep a faint edge so they still read
+   as cards. Works with both styles; the navy bars go black too (the gold line and savings banner
+   keep their colour). */
+:root[data-black='1'][data-theme][data-style] {
+  --bg: #000000;
+  --surface: #0a0a0a;
+  --sunken: #141414;
+  --line: #262626;
+  --line-2: #333333;
+  --dash: #4d4d4d;
+  --tabbar-bg: #000000;
+  --shade-bg: #000000;
+  --chrome-bg: #000000;
+  --shadow: rgba(0, 0, 0, 0);
+}
+
+/* ---------- high contrast (Settings, Accessibility) ---------- */
+:root[data-contrast='high'] {
+  --muted: var(--ink-2);
+  --line: var(--line-2);
+  --dash: var(--ink-2);
+}
+:root[data-black='1'][data-contrast='high'][data-theme][data-style] {
+  --muted: var(--ink-2);
+  --line: #4d4d4d;
+  --line-2: #4d4d4d;
+  --dash: var(--ink-2);
+}

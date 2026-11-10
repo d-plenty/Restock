@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { BACKUP_EVERY, BACKUP_KEEP, everyLabel, maybeAutoBackup } from '../../lib/autoBackup';
 import { askPassword, confirmAction } from '../../lib/confirm';
 import { getSettings, priceHistorySpan, updateSettings } from '../../lib/db';
+// 0.9.5 (save): Settings → Automatic backups waits for Save settings (settingsDraft.ts).
+import * as draft from '../../lib/settingsDraft';
 import { useLive } from '../../lib/useLive';
 import { RestockNative } from '../../lib/sql/native';
 import { isNative } from '../../stores/http';
@@ -23,8 +25,8 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
   // 0.9.1: say how much price history goes in.
   const span = useLive(priceHistorySpan, []);
   const set = async (patch: Partial<Settings['autoBackup']>) => {
-    const latest = await getSettings();
-    return updateSettings({ autoBackup: { ...latest.autoBackup, ...patch } });
+    const latest = await draft.getSettings();
+    return draft.updateSettings({ autoBackup: { ...latest.autoBackup, ...patch } });
   };
 
   const pick = async (): Promise<boolean> => {
@@ -44,10 +46,12 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
   const toggle = async (on: boolean) => {
     if (on && !b.folder && !(await pick())) return;
     await set({ enabled: on });
-    if (on) {
+    // 0.9.5 (save): the first one once it's saved.
+    await draft.afterSave('first-backup', async (s) => {
+      if (!s.autoBackup.enabled) return;
       const name = await maybeAutoBackup().catch(() => undefined);
       if (name) nav.toast(`First backup saved: ${name}`);
-    }
+    });
   };
 
   // 0.9.0: lock automatic backups with a password.
@@ -62,7 +66,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
     if (again === undefined) return;
     if (again !== pw) return nav.toast('Those didn’t match. Nothing changed.');
     await set({ password: pw });
-    nav.toast('Automatic backups will be locked with your password');
+    nav.toast(draft.draftOpen() ? 'Save settings to lock automatic backups with your password' : 'Automatic backups will be locked with your password');
   };
   const removePassword = async () => {
     const ok = await confirmAction('Stop locking automatic backups?', {
@@ -73,6 +77,8 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
   };
 
   const now = async () => {
+    // 0.9.5 (save): it backs up with the saved settings (the folder, the password).
+    if (draft.hasUnsaved()) return nav.toast('Save settings first, then back up now.');
     setBusy(true);
     try {
       const name = await maybeAutoBackup(true);
@@ -118,7 +124,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
         </span>
         <select
           className="input"
-          style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+          style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
           value={b.everyDays}
           aria-label="How often to back up"
           onChange={(e) => void set({ everyDays: parseInt(e.target.value, 10) })}
@@ -140,7 +146,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
         </span>
         <select
           className="input"
-          style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+          style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
           value={b.keep}
           aria-label="How many automatic backups to keep"
           onChange={(e) => void set({ keep: parseInt(e.target.value, 10) })}

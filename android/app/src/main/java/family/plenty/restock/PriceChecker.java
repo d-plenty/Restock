@@ -447,7 +447,7 @@ final class PriceChecker {
                     if (!seen.contains(tkey)) {
                         seenList.add(tkey);
                         seen.add(tkey);
-                        lines.add(String.format(Locale.ROOT, "%s — $%.2f at %s, under your $%.2f target", item.name, rec.best.price,
+                        lines.add(String.format(Locale.ROOT, "%s: $%.2f at %s, under your $%.2f target", item.name, rec.best.price,
                             Deals.chainName(rec.best.product.chain), target));
                     }
                 }
@@ -470,9 +470,9 @@ final class PriceChecker {
                 }
                 // Stock-up nudge: a real sale on something that only goes on sale every few weeks.
                 if (stockUp && deal.stats.cycleWeeks != null && deal.stats.cycleWeeks >= 4 && cur.special) {
-                    what += String.format(Locale.ROOT, " · usually on sale every %d weeks, a good time to stock up", deal.stats.cycleWeeks);
+                    what += String.format(Locale.ROOT, " · usually on special every %d weeks, a good time to stock up", deal.stats.cycleWeeks);
                 }
-                lines.add(item.name + " — " + rec.headline + what);
+                lines.add(item.name + ": " + rec.headline + what);
             }
         }
         weeklySummary(context, db, settings, onSpecial, weekSaving);
@@ -503,7 +503,7 @@ final class PriceChecker {
             return;
         }
         String title = onSpecial == 1 ? "1 of your items is on special this week" : onSpecial + " of your items are on special this week";
-        lines.add(saving >= 0.5 ? String.format(Locale.ROOT, "Saving about $%.0f against normal prices. Open Restock to see them.", saving)
+        lines.add(saving >= 0.5 ? String.format(Locale.ROOT, "Saving about $%.0f against usual prices. Open Restock to see them.", saving)
             : "Open Restock to see what's worth buying.");
         notify(context, title, lines, NOTIFICATION_ID + 1);
     }

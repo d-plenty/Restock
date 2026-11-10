@@ -94,21 +94,49 @@ final class HaSync {
         }
     }
 
-    /** A line on Restock's grocery list. */
+    /** A line on Restock's grocery list, or General's (0.9.5). */
     static final class Line {
         String id;
         String text;
         double qty;
         boolean checked;
         String groupId;
+        /** 0.9.5: the list a new line goes on (addLine); null for the grocery list. */
+        String section;
 
         Line(String id, String text, double qty, boolean checked, String groupId) {
+            this(id, text, qty, checked, groupId, null);
+        }
+
+        Line(String id, String text, double qty, boolean checked, String groupId, String section) {
             this.id = id;
             this.text = text;
             this.qty = qty;
             this.checked = checked;
             this.groupId = groupId;
+            this.section = section;
         }
+    }
+
+    /** Tabs whose items a voice add is matched to, first to last (haSync.ts MATCH_ORDER). */
+    private static final String[] MATCH_ORDER = { "pantry", "keg", "pharmacy" };
+
+    static String tabOfItem(HaMatch.Named i) {
+        return "keg".equals(i.section) || "pharmacy".equals(i.section) ? i.section : "pantry";
+    }
+
+    /** 0.9.5 (haSync.ts onHaList): a line on Home Assistant's list: on the grocery list or General, or made from Home Assistant's list. */
+    static boolean onHaList(String id, String list) {
+        return list == null || list.isEmpty() || "pantry".equals(list) || "general".equals(list) || id.startsWith(FROM_HA);
+    }
+
+    /** 0.9.5 (haSync.ts haListFor): the matches on the first tab with any, and the list it goes on (General for none). */
+    static String haListFor(List<HaMatch.Named> found, List<HaMatch.Named> out) {
+        for (String t : MATCH_ORDER) {
+            for (HaMatch.Named i : found) if (tabOfItem(i).equals(t)) out.add(i);
+            if (!out.isEmpty()) return t;
+        }
+        return "general";
     }
 
     /** One side as it was at the last round. */
@@ -634,11 +662,13 @@ final class HaSync {
             for (Item h : w.looseItems()) {
                 if (h.completed || HaMatch.jsTrim(h.summary).isEmpty()) continue;
                 HaMatch.Parsed said = HaMatch.parseLine(h.summary);
-                List<HaMatch.Named> found = HaMatch.candidates(h.summary, pantry, aliases);
+                // 0.9.5: or a Keg or Health item; on the list of the tab it matched, and General when nothing did.
+                List<HaMatch.Named> found = new ArrayList<>();
+                String section = haListFor(HaMatch.candidates(h.summary, pantry, aliases), found);
                 HaMatch.Named one = found.size() == 1 ? found.get(0) : null;
                 // "2 Minute Noodles" is an item, not two of "Minute Noodles".
                 boolean whole = one != null && HaMatch.matchKey(one.name).equals(HaMatch.matchKey(h.summary));
-                Line line = one != null ? new Line(null, one.name, whole ? 1 : said.qty, false, one.id) : new Line(null, said.name, said.qty, false, null);
+                Line line = one != null ? new Line(null, one.name, whole ? 1 : said.qty, false, one.id, section) : new Line(null, said.name, said.qty, false, null, section);
                 String id = store.addLine(line, h.uid);
                 // 0.9.4: its line was there already (another runner made it from the same item): pair with that.
                 Line there = byId.get(id);
@@ -648,7 +678,7 @@ final class HaSync {
                 }
                 // Taken by a line already paired with another item (paired by its words): a line of its own.
                 if (there != null) id = store.addLine(line, null);
-                Line added = new Line(id, line.text, line.qty, line.checked, line.groupId);
+                Line added = new Line(id, line.text, line.qty, line.checked, line.groupId, line.section);
                 byId.put(id, added);
                 w.keep(new Pair(id, h.uid, new Side(summaryOf(added, names), false), new Side(h.summary, false)));
                 out.came++;
@@ -681,6 +711,44 @@ final class HaSync {
 
     static String asSection(Object v) {
         return "keg".equals(v) || "pharmacy".equals(v) ? (String) v : "pantry";
+    }
+
+    /** 0.9.5: a list line's section as stored (General too; anything else is the grocery list). */
+    static String asListSection(Object v) {
+        return "general".equals(v) ? "general" : asSection(v);
+    }
+
+    /**
+     * 0.9.5: the tabs that are on (shops.ts activeSections): the pantry, and Keg and Health when
+     * switched on with a shop picked (a built-in one, or one added in settings for that tab).
+     */
+    static Set<String> tabsOn(SyncEngine.Db db) throws Exception {
+        Set<String> on = new HashSet<>();
+        on.add("pantry");
+        String raw = kv(db, "settings");
+        if (raw == null) return on;
+        JSONObject st;
+        try {
+            st = new JSONObject(raw);
+        } catch (Exception bad) {
+            return on;
+        }
+        JSONObject secs = st.optJSONObject("sections");
+        JSONArray chains = st.optJSONArray("enabledChains");
+        JSONArray custom = st.optJSONArray("customShops");
+        for (String t : new String[] { "keg", "pharmacy" }) {
+            if (secs == null || !secs.optBoolean(t, false) || chains == null) continue;
+            for (int i = 0; i < chains.length() && !on.contains(t); i++) {
+                String c = chains.optString(i, "");
+                if (Shops.known(c) && t.equals(Shops.section(c))) on.add(t);
+                else if (custom != null)
+                    for (int k = 0; k < custom.length(); k++) {
+                        JSONObject x = custom.optJSONObject(k);
+                        if (x != null && c.equals(x.optString("id")) && t.equals(x.optString("section"))) on.add(t);
+                    }
+            }
+        }
+        return on;
     }
 
     static String kv(SyncEngine.Db db, String key) throws Exception {
@@ -723,8 +791,9 @@ final class HaSync {
             for (JSONObject e : db.query("SELECT * FROM list_entries ORDER BY created_at")) {
                 String group = e.isNull("item_id") ? null : e.optString("item_id", null);
                 String section = group != null ? groups.get(group) : null;
-                if (section == null) section = e.isNull("section") ? "pantry" : asSection(e.opt("section"));
-                if (!"pantry".equals(section)) continue;
+                if (section == null) section = e.isNull("section") ? "pantry" : asListSection(e.opt("section"));
+                // 0.9.5: the grocery list's and General's, and lines made from Home Assistant's list.
+                if (!onHaList(e.getString("id"), section)) continue;
                 double q = e.isNull("qty") ? 1 : e.optDouble("qty", 1);
                 if (Double.isNaN(q) || q == 0) q = 1;
                 out.add(new Line(e.getString("id"), e.optString("text", ""), Math.max(1, q), e.optLong("checked", 0) == 1, group));
@@ -735,8 +804,12 @@ final class HaSync {
         @Override
         public List<HaMatch.Named> items() throws Exception {
             List<HaMatch.Named> out = new ArrayList<>();
-            for (JSONObject g : db.query("SELECT * FROM items ORDER BY name COLLATE NOCASE"))
-                if ("pantry".equals(asSection(g.opt("section")))) out.add(new HaMatch.Named(g.getString("id"), g.optString("name", "")));
+            // 0.9.5: the items of every tab that's on, with their tab.
+            Set<String> on = tabsOn(db);
+            for (JSONObject g : db.query("SELECT * FROM items ORDER BY name COLLATE NOCASE")) {
+                String tab = asSection(g.opt("section"));
+                if (on.contains(tab)) out.add(new HaMatch.Named(g.getString("id"), g.optString("name", ""), tab));
+            }
             return out;
         }
 
@@ -751,8 +824,8 @@ final class HaSync {
             String id = uid != null ? haLineId(entity, uid) : FROM_HA + UUID.randomUUID();
             long now = System.currentTimeMillis();
             db.exec(
-                "INSERT OR IGNORE INTO list_entries (id, text, item_id, chain, category_id, qty, price, section, product, checked, created_at, checked_at, qty_at) VALUES (?, ?, ?, NULL, NULL, ?, NULL, 'pantry', NULL, ?, ?, ?, ?)",
-                id, l.text, l.groupId, (long) Math.max(1, l.qty), l.checked ? 1 : 0, nowIso(now), now, now);
+                "INSERT OR IGNORE INTO list_entries (id, text, item_id, chain, category_id, qty, price, section, product, checked, created_at, checked_at, qty_at) VALUES (?, ?, ?, NULL, NULL, ?, NULL, ?, NULL, ?, ?, ?, ?)",
+                id, l.text, l.groupId, (long) Math.max(1, l.qty), l.section == null ? "pantry" : l.section, l.checked ? 1 : 0, nowIso(now), now, now);
             return id;
         }
 

@@ -46,6 +46,15 @@ public class SyncFamily {
             f = new SyncFolder(e, h, prefix, "server".equals(prefix) ? ServerSync.PRICES_MS : 0);
         }
 
+        /** 0.9.5: a phone on a database that's there already (an older version's, now updated: TestDb "keep"). */
+        Phone(String id, TestDb existing, String prefix) throws Exception {
+            this.id = id;
+            db = existing;
+            e = new SyncEngine(db);
+            h = new SyncHousehold(e);
+            f = new SyncFolder(e, h, prefix, "server".equals(prefix) ? ServerSync.PRICES_MS : 0);
+        }
+
         SyncEngine.Transport lan(Phone from) {
             return m -> {
                 byte[] k = from.h.key();

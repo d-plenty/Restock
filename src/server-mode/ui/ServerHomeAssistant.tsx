@@ -7,10 +7,14 @@ import { timeAgo } from '../../ui/components';
 import { api3, type HaConfig } from '../api';
 import { HousePage } from './DeskServer';
 import { ADMIN_NOTE, canAdmin, errText, useHa } from './houseData';
+// 0.9.5 (save): the form is held until the big green Save settings (top right and at the bottom).
+import { saveDraft } from '../../lib/settingsDraft';
+import { DeskSave, useDraftPart, useSettingsDraft } from '../../ui/SaveBar';
 
 export const HA_SHARED = 'Every phone and browser on this server shares this Home Assistant shopping list.';
 
 export function ServerHomeAssistant({ narrow }: { narrow?: boolean }) {
+  useSettingsDraft(); // 0.9.5 (save)
   const { data, error, reload } = useHa();
   const [address, setAddress] = useState('');
   const [token, setToken] = useState('');
@@ -50,13 +54,38 @@ export function ServerHomeAssistant({ narrow }: { narrow?: boolean }) {
       }
       return { text: r.message ?? (r.ok ? 'Connected to Home Assistant.' : "Couldn't connect."), bad: !r.ok };
     });
-  const save = () =>
-    run('Saving…', async () => {
-      await api3.putHomeAssistant(body());
-      setToken('');
-      reload();
-      return { text: enabled ? `Saved. ${HA_SHARED}` : 'Saved. Home Assistant is off on the server.' };
-    });
+  // 0.9.5 (save): what's typed or switched here, against what the server has.
+  const fromServer = () => {
+    if (!data) return;
+    setAddress(data.address ?? '');
+    setEntity(data.entity ?? '');
+    setEnabled(!!data.enabled);
+    setPhoneOff(!!data.phone && data.offOn === data.phone);
+    setToken('');
+  };
+  const dirty =
+    !!data &&
+    canAdmin() &&
+    (address.trim() !== (data.address ?? '') ||
+      entity.trim() !== (data.entity ?? '') ||
+      enabled !== !!data.enabled ||
+      !!token.trim() ||
+      (!!data.phone && phoneOff !== (data.offOn === data.phone)));
+  useDraftPart(
+    {
+      dirty: () => dirty,
+      save: async () => {
+        setMsg(undefined);
+        await api3.putHomeAssistant(body());
+        setToken('');
+        reload();
+        setMsg({ text: enabled ? `Saved. ${HA_SHARED}` : 'Saved. Home Assistant is off on the server.' });
+      },
+      discard: fromServer,
+    },
+    [dirty, address, entity, enabled, token, phoneOff, data],
+  );
+  const save = () => void saveDraft();
   const syncNow = () =>
     run('Syncing…', async () => {
       const r = await api3.syncHomeAssistant();
@@ -65,7 +94,7 @@ export function ServerHomeAssistant({ narrow }: { narrow?: boolean }) {
     });
   const waiting = !!data?.phone && data.phoneApi !== null && (data.phoneApi ?? 2) < 3 && data.offOn !== data.phone;
   return (
-    <HousePage narrow={narrow} title="Home Assistant">
+    <HousePage narrow={narrow} title="Home Assistant" actions={<DeskSave />}>
       <p className="small dk-tight">
         The shopping list both ways with Home Assistant's to-do list, run by this server every minute. {HA_SHARED} Phones on this server don't run their own.
       </p>
@@ -166,9 +195,6 @@ export function ServerHomeAssistant({ narrow }: { narrow?: boolean }) {
           <button className="btn" type="button" disabled={!!busy || !address.trim()} onClick={() => void test()}>
             {busy === 'Testing…' ? busy : 'Test connection'}
           </button>
-          <button className="btn primary" type="submit" disabled={!!busy}>
-            {busy === 'Saving…' ? busy : 'Save'}
-          </button>
           {data?.enabled && (
             <button className="btn" type="button" disabled={!!busy} onClick={() => void syncNow()}>
               {busy === 'Syncing…' ? busy : 'Sync now'}
@@ -182,6 +208,7 @@ export function ServerHomeAssistant({ narrow }: { narrow?: boolean }) {
           </span>
         )}
       </form>
+      <DeskSave foot />
     </HousePage>
   );
 }

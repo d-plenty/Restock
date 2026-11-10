@@ -17,6 +17,7 @@ import {
   handoverKey,
   joinKey,
   keepCutoff,
+  keepMonthsOk,
   keysFileKey,
   loginKeyOf,
   loginProof,
@@ -187,12 +188,21 @@ describe('v3 test vectors (made with Node’s own crypto)', () => {
     expect(ownerOnly('server')).toBe(true);
     expect(parseServerRow(s.entry.row.v)).toMatchObject({ v: 3, sid: 'k3x9q2', kex: k.serverKex.pub, keepMonths: 12 });
     expect(parseServerRow('{"v":2}')).toBe(null);
-    expect(parseServerRow(JSON.stringify({ ...JSON.parse(s.entry.row.v), keepMonths: 7 }))?.keepMonths).toBe(null);
+    // 0.9.5: Auto delete takes any whole number of months from 1 to 120.
+    const withKeep = (keepMonths: unknown) => parseServerRow(JSON.stringify({ ...JSON.parse(s.entry.row.v), keepMonths }))?.keepMonths;
+    expect(withKeep(7)).toBe(7);
+    expect(withKeep(1)).toBe(1);
+    expect(withKeep(120)).toBe(120);
+    for (const bad of [0, 121, 2.5, -3, '6', true]) expect(withKeep(bad)).toBe(null);
   });
 
   it('keepCutoff', () => {
     for (const c of V.keepCutoff.cases) expect(keepCutoff(c.keepMonths, V.keepCutoff.now)).toBe(c.cutoff);
-    expect(keepCutoff(5, V.keepCutoff.now)).toBe(null);
+    // 0.9.5: any whole number of months 1 to 120; anything else is off.
+    expect(keepCutoff(5, V.keepCutoff.now)).toBe(new Date(V.keepCutoff.now - 5 * V.keepCutoff.monthMs).toISOString());
+    for (const bad of [0, 121, 2.5, -1, NaN]) expect(keepCutoff(bad, V.keepCutoff.now)).toBe(null);
+    expect([1, 7, 60, 120].every(keepMonthsOk)).toBe(true);
+    expect([0, 121, 1.5, null, undefined, '3'].some(keepMonthsOk)).toBe(false);
   });
 });
 

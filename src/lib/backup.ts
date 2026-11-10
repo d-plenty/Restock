@@ -1,7 +1,7 @@
 import { sharedPrices, type SharedPrices } from './sharedPrices';
 import { RestockNative } from './sql/native';
 import { SECTIONS, shopDef, type Section } from '../shops';
-import type { Group, Product, Settings } from '../types';
+import type { Group, ListEntry, Product, Settings } from '../types';
 import {
   getSettings,
   mergeSettings,
@@ -96,6 +96,7 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
     parts: { ...picked, password: undefined, serverPhotos: undefined },
     tables: withoutSecrets(pickSnapshot(all, picked, { prices: parts.prices })),
   };
+  file.tables.list = toBackupList(file.tables.list);
   // With "Share prices" on (the default) and price history in the file. 0.9.0: made from what's in
   // this file only (the tabs picked), not from everything on the phone.
   if (parts.prices && (await getSettings()).sharePrices !== 'no') file.sharedPrices = sharedPrices(file.tables);
@@ -122,6 +123,32 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
   }
   const json = JSON.stringify(file);
   return parts.password ? lockBackup(json, parts.password) : json;
+}
+
+/** A General line as a backup keeps it (0.9.5): no section, and `list: 'general'`. */
+type BackupLine = ListEntry & { list?: 'general' };
+
+/**
+ * 0.9.5: General's lines go in a backup without a section, marked `list: 'general'`. 0.9.5 and later
+ * put them back on General (fromBackupList); 0.9.4 and older, which don't know General, read a line
+ * with no section as the grocery list's, so they show it there and sync it as one, rather than
+ * keeping a section they'd take for a tab they don't share.
+ */
+export function toBackupList(list: ListEntry[]): BackupLine[] {
+  return list.map((e) => {
+    if (e.section !== 'general') return e;
+    const { section: _, ...rest } = e;
+    return { ...rest, list: 'general' };
+  });
+}
+
+/** A backup's list lines as they were: General's back on General (toBackupList). */
+export function fromBackupList(list: BackupLine[]): ListEntry[] {
+  return list.map((e) => {
+    if (!e || typeof e !== 'object' || !('list' in e)) return e;
+    const { list: mark, ...rest } = e;
+    return mark === 'general' && !rest.groupId ? { ...rest, section: 'general' } : rest;
+  });
 }
 
 /**
@@ -238,7 +265,7 @@ export function readBackup(text: string): BackupSummary {
     products: t.products ?? [],
     groups: t.groups ?? [],
     prices: t.prices ?? [],
-    list: t.list ?? [],
+    list: fromBackupList(t.list ?? []),
     cards: t.cards ?? [],
     categories: t.categories ?? [],
     kv: t.kv ?? [],
@@ -357,7 +384,7 @@ export async function importBackup(text: string, opts: { stayInSetup?: string } 
     products: t.products ?? [],
     groups: t.groups ?? [],
     prices: t.prices ?? [],
-    list: t.list ?? [],
+    list: fromBackupList(t.list ?? []),
     cards: t.cards ?? [],
     categories: t.categories ?? [],
     kv,

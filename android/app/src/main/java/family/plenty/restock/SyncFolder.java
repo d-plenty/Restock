@@ -268,6 +268,9 @@ final class SyncFolder {
             if (data == null) continue;
             String seenKey = p + "_seen:" + name;
             String sum = hash(data);
+            // 0.9.5 (review): read again unchanged after the update (SyncEngine.catchUpLists).
+            String catchKey = "catchup:" + seenKey;
+            boolean catchingUp = sum.equals(e.meta(catchKey));
             if (sum.equals(e.meta(seenKey))) {
                 if (ver != null) e.setMeta(verKey, ver);
                 continue;
@@ -290,6 +293,7 @@ final class SyncFolder {
             // as a phone (or as another browser) by what it puts in its file.
             if (server() && !name.equals(fileFor(device))) {
                 e.setMeta(seenKey, sum);
+                e.setMeta(catchKey, null);
                 continue;
             }
             // 0.9.2: the web app's file names its public key; only a browser with the serverKey could write it, so
@@ -297,6 +301,15 @@ final class SyncFolder {
             if (server() && device.startsWith("web-") && m.optString("webPub", "").length() > 0) e.setMeta("server_webpub:" + device.substring(4), m.optString("webPub"));
             if (device.isEmpty() || device.equals(me) || e.householdValue("removed:" + device) != null) {
                 e.setMeta(seenKey, sum);
+                e.setMeta(catchKey, null);
+                continue;
+            }
+            if (catchingUp) {
+                // Only the General lines this phone never had; nothing else of an old file.
+                int n = e.apply(e.catchUpEntries(m.optJSONArray("entries")));
+                e.setMeta(seenKey, sum);
+                e.setMeta(catchKey, null);
+                res.received += n;
                 continue;
             }
             // 0.9.2: the photos that phone moved to the server (another phone mustn't delete one it uses).
@@ -320,6 +333,7 @@ final class SyncFolder {
             if (seen != null) e.setSeen(device, seen.optLong(me, 0));
             e.markSynced(device, now);
             e.setMeta(seenKey, sum);
+            e.setMeta(catchKey, null);
             res.received += n;
             res.phones++;
         }

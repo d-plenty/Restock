@@ -1017,7 +1017,7 @@ final class SyncHub {
         engine.setMeta("folder", uri == null || uri.isEmpty() ? null : uri);
         engine.setMeta("folder_top", null);
         engine.setMeta("folder_keys", null);
-        engine.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'");
+        engine.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'catchup:folder_seen:%'");
         if (uri == null || !(uri.startsWith("https://") || uri.startsWith("http://"))) {
             engine.setMeta("dav_user", null);
             engine.setMeta("dav_pass", null);

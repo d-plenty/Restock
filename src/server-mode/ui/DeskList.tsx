@@ -1,13 +1,12 @@
 // 0.9.3: the shopping list at desktop widths: each shop in its own column with its total, then
 // Anywhere. The same picks, totals and add box as the phone's list (List.tsx listSums, useListAdd).
 import { useMemo, useState, type ReactNode } from 'react';
-import { allCategories, allListEntries, deleteListEntries, getSettings, updateListEntry, updateSettings } from '../../lib/db';
+import { allCategories, allListEntries, getSettings, updateSettings } from '../../lib/db';
 import { linesToPick, pickWord } from '../../lib/homeAssistant';
 import { loadRecommendations } from '../../lib/recs';
-import { entryRows, undoable } from '../../lib/undo';
 import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
-import { enabledIn, SECTION_NAMES, type Section } from '../../shops';
+import { LIST_NAMES, type ListSection } from '../../shops';
 import { chainName, type ListEntry } from '../../types';
 import { ChainName, Icon, Thumb } from '../../ui/components';
 import { useNav } from '../../ui/nav';
@@ -17,6 +16,7 @@ import {
   entrySection,
   lineFor,
   listAsText,
+  listShops,
   listSums,
   priceOf,
   qtyOf,
@@ -25,6 +25,8 @@ import {
   shopOf,
   Stepper,
   useListAdd,
+  removeEntries, // 0.9.5 (undo)
+  tickEntry, // 0.9.5 (undo)
   type Ctx,
   type ShopKey,
 } from '../../ui/screens/List';
@@ -32,12 +34,17 @@ import { PickItemSheet } from '../../ui/screens/PickItem';
 import { ShopTotalsCard } from '../../ui/shopTotalsCard';
 import { PhoneOnlyNote } from './PhoneOnly';
 import { DeskHead } from './deskShared';
+import { AisleTip } from './DeskAisleTip';
 import { thumbOf } from './DeskSpecials';
+import { ScanButton } from '../pwa/WebScanner'; // 0.9.5 (PWA)
+// 0.9.5 (web search): Search the shops from the add box (Let the web page search the shops).
+import { ShopSearchButton, ShopSearchPanel } from './WebShopSearch';
+import { askShops, enterDoes, useWebSearchOn } from './webSearch';
 
 type View = 'shop' | 'aisle' | 'all';
 const VIEWS: { id: View; label: string }[] = [
   { id: 'shop', label: 'By shop' },
-  { id: 'aisle', label: 'By aisle' },
+  { id: 'aisle', label: 'Aisle group' },
   { id: 'all', label: 'One list' },
 ];
 
@@ -57,24 +64,28 @@ export function DeskAddBox({
   label,
   placeholder,
   compact,
+  shopSearch,
 }: {
   adder: ReturnType<typeof useListAdd>;
   label: string;
   placeholder: string;
   compact?: boolean;
+  /** 0.9.5 (web search): the list it adds to, so it can search the shops (when the setting is on). */
+  shopSearch?: ListSection;
 }) {
   const nav = useNav();
   const { text, setText, add, pantryMatches, exactPantry, addFromPantry } = adder;
   const id = compact ? 'dk-add-home' : 'dk-add-list';
+  const searchOn = useWebSearchOn(); // 0.9.5 (web search)
   const submit = async () => {
     const t = text.trim();
     if (!t) return;
+    // 0.9.5 (web search): Enter with nothing in the pantry like it searches the shops, when that's on.
+    const does = enterDoes({ text: t, exactPantry: !!exactPantry, pantryMatches: pantryMatches.length, searchOn: shopSearch ? searchOn : false });
     // A name you already track adds that item, not a blank copy of it.
-    if (exactPantry) await addFromPantry(exactPantry);
-    else {
-      await add(t);
-      nav.toast(`"${t}" added to your shopping list`);
-    }
+    if (does === 'pantry' && exactPantry) await addFromPantry(exactPantry);
+    else if (does === 'search' && shopSearch) askShops({ q: t, list: shopSearch });
+    else await add(t); // 0.9.5 (undo): add says so, with Undo
   };
   return (
     <div className={`dk-addbox${compact ? ' compact' : ''}`}>
@@ -97,10 +108,23 @@ export function DeskAddBox({
           onChange={(e) => setText(e.target.value)}
           aria-describedby={pantryMatches.length ? `${id}-matches` : undefined}
         />
+        {/* 0.9.5 (PWA): scan a barcode with the camera. */}
+        <ScanButton section={nav.section} onSaid={(t) => nav.toast(t)} />
         <button className="btn primary" type="submit">
           <Icon name="plus" size={18} /> Add
         </button>
       </form>
+      {/* 0.9.5 (web search): Search the shops for what's typed, or (off) a link to the setting. */}
+      {shopSearch && text.trim() && !exactPantry && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {searchOn && (
+            <button type="button" className="btn" onClick={() => void add(text) /* 0.9.5 (undo): add says so, with Undo */}>
+              <Icon name="plus" size={18} /> <span className="clip">Add "{text.trim()}" as it is</span>
+            </button>
+          )}
+          <ShopSearchButton text={text} list={shopSearch} className="btn primary" />
+        </div>
+      )}
       {pantryMatches.length > 0 && (
         <div className="card flush dk-matches" id={`${id}-matches`} role="group" aria-label="In your pantry">
           {pantryMatches.map((r) => {
@@ -131,7 +155,7 @@ export function DeskList() {
   const allCats = useLive(allCategories, []);
   const settings = useLive(getSettings, []);
   const toPick = useLive(linesToPick, []);
-  const [picked, setPicked] = useState<Section>(nav.section);
+  const [picked, setPicked] = useState<ListSection>(nav.section);
   const [view, setViewState] = useState<View>(loadView);
   const [editing, setEditing] = useState<ListEntry>();
   const [picking, setPicking] = useState<ListEntry>();
@@ -148,6 +172,7 @@ export function DeskList() {
     [allEntries, allRecs, settings, picked],
   );
   const adder = useListAdd(sums?.entries ?? [], sums?.recs ?? [], sums?.section ?? 'pantry');
+  const searchOn = useWebSearchOn(); // 0.9.5 (web search)
   if (!allEntries || !allRecs || !allCats || !settings || !sums) return <div className="dk-page" aria-busy="true" />;
   const { sectionsOn, section, groupSection, entries, totals, names, c } = sums;
   const categories = allCats.filter((x) => x.section === section);
@@ -156,7 +181,7 @@ export function DeskList() {
   const open = entries.filter((e) => !e.checked).sort(az);
   const done = entries.filter((e) => e.checked).sort(az);
   const total = open.reduce((s, e) => s + (priceOf(c, e) ?? 0), 0);
-  const openCount = (sec: Section) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;
+  const openCount = (sec: ListSection) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;
   const pickLines = open.filter((e) => !e.groupId && toPick?.has(e.id));
 
   const columns: { key: string; title: ReactNode; label: string; items: ListEntry[]; any?: boolean }[] =
@@ -164,8 +189,8 @@ export function DeskList() {
       ? c.order
           .map((shop: ShopKey) => ({
             key: shop,
-            title: shop === 'any' ? 'Anywhere' : <ChainName chain={shop} />,
-            label: shop === 'any' ? 'Anywhere' : chainName(shop),
+            title: shop === 'any' ? 'Any shop' : <ChainName chain={shop} />,
+            label: shop === 'any' ? 'Any shop' : chainName(shop),
             items: open.filter((e) => shopOf(c, e) === shop),
             any: shop === 'any',
           }))
@@ -194,13 +219,15 @@ export function DeskList() {
     return (
       <div key={e.id} className={`dk-line${e.checked ? ' done' : ''}`}>
         {/* 0.9.4 (section 15): only the checkbox ticks; the name opens the product (or, for a typed line, its details). */}
-        <input
-          type="checkbox"
-          id={`dk-got-${e.id}`}
-          checked={e.checked}
-          aria-label={`Got ${qtyOf(e) > 1 ? `${qtyOf(e)} × ` : ''}${title}`}
-          onChange={(ev) => void updateListEntry(e.id, { checked: ev.target.checked })}
-        />
+        <label className="tick-hit">
+          <input
+            type="checkbox"
+            id={`dk-got-${e.id}`}
+            checked={e.checked}
+            aria-label={`Got ${qtyOf(e) > 1 ? `${qtyOf(e)} × ` : ''}${title}`}
+            onChange={(ev) => void tickEntry(e, ev.target.checked, title) /* 0.9.5 (undo) */}
+          />
+        </label>
         {rec?.best?.product.imageUrl || deal?.product.imageUrl ? <Thumb src={thumbOf((deal ?? rec?.best)?.product.imageUrl)} /> : null}
         <span className="grow">
           <button
@@ -239,7 +266,7 @@ export function DeskList() {
   return (
     <div className="dk-page">
       <DeskHead
-        title={sectionsOn.length > 1 ? (section === 'pantry' ? 'Shopping list' : `${SECTION_NAMES[section]} list`) : 'Shopping list'}
+        title={section === 'pantry' ? 'Shopping list' : `${LIST_NAMES[section]} list`}
         sub={
           <span className="num">
             {open.length} to buy{total > 0 ? ` · about ${money(total)}` : ''}
@@ -260,7 +287,7 @@ export function DeskList() {
           <div className="dk-seg" role="group" aria-label="Which list">
             {sectionsOn.map((sec) => (
               <button key={sec} aria-pressed={sec === section} onClick={() => setPicked(sec)}>
-                <Icon name={sec} size={16} /> {sec === 'pantry' ? 'Groceries' : SECTION_NAMES[sec]}
+                <Icon name={sec} size={16} /> {LIST_NAMES[sec]}
                 {openCount(sec) > 0 && <span className="dk-pill">{openCount(sec)}</span>}
               </button>
             ))}
@@ -278,11 +305,13 @@ export function DeskList() {
         )}
       </div>
 
-      <DeskAddBox adder={adder} label="Add to the list" placeholder="Add something: milk, 2 bread, dog food…" />
+      <DeskAddBox adder={adder} label="Add to the list" placeholder="Add something: milk, 2 bread, dog food…" shopSearch={section} />
       <p className="small dk-tight">
         Matches your pantry as you type. Anything added here, on a phone or by voice in Home Assistant shows up everywhere.
       </p>
-      {adder.text.trim() && !adder.exactPantry && <PhoneOnlyNote compact text="Finding the cheapest at your shops is done on a phone. Add it here as it is, or pick it from your pantry." />}
+      {adder.text.trim() && !adder.exactPantry && searchOn !== true && <PhoneOnlyNote compact text="Finding the cheapest at your shops is done on a phone. Add it here as it is, or pick it from your pantry." />}
+      {/* 0.9.5 (web search): what the shops have for what was typed or scanned. */}
+      <ShopSearchPanel list={section} wide onAdded={() => adder.setText('')} />
 
       {pickLines.slice(0, 3).map((e) => (
         <div key={e.id} className="banner amber dk-ha">
@@ -301,6 +330,8 @@ export function DeskList() {
         </div>
       )}
 
+      {/* 0.9.5 (task 184, DeskAisleTip.tsx): most lines in Other → a tip with a quick way to set categories. */}
+      {view === 'aisle' && <AisleTip lines={open} categories={categories} categoryOf={(e) => catOf(c, e)} groupOf={(e) => recFor(c, e)?.group} labelOf={labelOf} />}
       {columns.length > 0 && (
         <div className={`dk-cols${view === 'all' ? ' one' : ''}`}>
           {columns.map((col) => {
@@ -337,8 +368,11 @@ export function DeskList() {
             className="btn"
             onClick={async () => {
               const n = done.length;
-              const undo = await undoable(() => deleteListEntries(done.map((e) => e.id)), entryRows(done.map((e) => e.id)));
-              nav.toast(`Cleared ${n} ticked item${n === 1 ? '' : 's'}`, undo);
+              // 0.9.5 (undo)
+              await removeEntries(
+                done.map((e) => e.id),
+                `Cleared ${n} ticked item${n === 1 ? '' : 's'}`,
+              );
             }}
           >
             Clear ticked off
@@ -374,7 +408,7 @@ export function DeskList() {
         <EditEntry
           entry={editing}
           categories={categories}
-          shops={enabledIn(settings.enabledChains, section)}
+          shops={listShops(settings.enabledChains, section, sectionsOn)}
           deal={dealFor(c, editing) ?? recFor(c, editing)?.options[0]}
           name={recFor(c, editing)?.group.name}
           onClose={() => setEditing(undefined)}

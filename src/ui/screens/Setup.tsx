@@ -67,7 +67,7 @@ const ALL_TILES: Tile[] = [
     sub: 'Woolworths, Coles, Aldi',
     icon: 'cart',
     heading: 'Where do you shop?',
-    intro: 'Pick your supermarkets and nearest stores.',
+    intro: 'Pick your supermarkets and nearest branches.',
   },
   {
     id: 'keg',
@@ -79,11 +79,11 @@ const ALL_TILES: Tile[] = [
   },
   {
     id: 'pharmacy',
-    title: 'Pharmacies',
-    sub: 'Pharmacy tab',
+    title: 'Chemists',
+    sub: 'Health tab',
     icon: 'pharmacy',
-    heading: 'Track pharmacies too?',
-    intro: 'Medicine, first aid and personal care on a Pharmacy tab of its own, kept apart from groceries.',
+    heading: 'Track chemists too?',
+    intro: 'Medicine, first aid and personal care on a Health tab of its own, kept apart from groceries.',
   },
   {
     id: 'permissions',
@@ -125,7 +125,7 @@ const ALL_TILES: Tile[] = [
     icon: 'chart',
     heading: 'Judge deals from day one?',
     intro:
-      "On its own, Restock needs about 4 to 8 weeks of watching an item before it knows its normal price. It still tells you about specials straight away, but can't say how good they are.",
+      "On its own, Restock needs about 4 to 8 weeks of watching an item before it knows its usual price. It still tells you about specials straight away, but can't say how good they are.",
   },
   {
     id: 'look',
@@ -138,11 +138,11 @@ const ALL_TILES: Tile[] = [
   {
     id: 'accounts',
     title: 'Cards and shop accounts',
-    sub: 'Member prices, your own store',
+    sub: 'Member prices, your own branch',
     icon: 'card',
     heading: 'Loyalty cards and shop accounts',
     intro:
-      'Add your Flybuys and Everyday Rewards cards so member prices count. Sign in to Woolworths or pick your Coles store, and prices and stock are for your local shop.',
+      'Add your Flybuys and Everyday Rewards cards so member prices count. Sign in to Woolworths or pick your Coles branch, and prices and stock are for your local shop.',
   },
   {
     id: 'checks',
@@ -364,7 +364,7 @@ function Welcome({ onSetUp, onRestore, onJoin }: { onSetUp: () => void; onRestor
           Prove it.
         </p>
         <p className="welcome-desc">
-          Restock watches prices at the stores you choose, and tells you when a special is real, when to wait, and when to swap.
+          Restock watches prices at the shops you choose, and tells you when a special is real, when to wait, and when to swap.
         </p>
         <p className="welcome-tag2">Find out if the special is really special.</p>
         <p className="welcome-made">Made in Australia, for Australian shoppers</p>
@@ -395,7 +395,7 @@ function MarketSetup({ settings }: { settings: Settings }) {
       <div className="title">Download shared price history</div>
       <p className="small">
         Restock can download months of real Coles and Woolworths prices collected by public price trackers (for now, {MARKET_SOURCE}, an open-source
-        project that records both stores every day). From that it works out each product's normal price, usual sale price and how often it goes on
+        project that records both shops every day). From that it works out each product's usual price, usual sale price and how often it goes on
         sale, so new items get a proper verdict straight away. Aldi isn't covered yet.
       </p>
       <ul className="ticks">
@@ -458,7 +458,7 @@ function AccountsTile() {
       <button className="row" onClick={() => nav.push({ name: 'stores', section: 'pantry' })}>
         <Icon name="cart" size={18} />
         <span className="grow">
-          <span className="title">Woolworths sign-in and your Coles store</span>
+          <span className="title">Woolworths sign-in and your Coles branch</span>
           <span className="small">Your local shop's prices and stock</span>
         </span>
         <Icon name="chevron" size={18} />

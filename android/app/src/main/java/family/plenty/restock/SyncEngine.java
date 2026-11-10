@@ -416,7 +416,7 @@ final class SyncEngine {
             }
             case "list_entries": {
                 String s = str(r, "section");
-                if (s != null) return s;
+                if (s != null) return listTab(s);
                 if (str(r, "item_id") != null) return str(r, "item_here") == null ? null : str(r, "item_section");
                 String chain = str(r, "chain");
                 return chain != null ? chainTab(chain) : "pantry";
@@ -575,6 +575,7 @@ final class SyncEngine {
         } catch (Exception ex) {
             // next time
         }
+        boolean caught = catchUpLists();
         Set<String> now = tabs();
         String was = meta("tabs_eff");
         Set<String> before = was == null ? null : parseTabs(was);
@@ -588,8 +589,9 @@ final class SyncEngine {
             db.transaction(() -> {
                 db.exec("UPDATE sync_peers SET got = 0");
                 db.exec("UPDATE sync_log SET seq = seq + (SELECT COALESCE(MAX(seq), 0) FROM sync_log)");
-                // And the folder's files are read again, for what this phone left out before.
-                db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%'");
+                // And the folder's files are read again, for what this phone left out before (all of
+                // them, so no catch-up read either: 0.9.5 review).
+                db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%' OR key LIKE 'catchup:%' OR key LIKE 'catchup_peer:%'");
             });
             releaseHeld();
         }
@@ -601,7 +603,60 @@ final class SyncEngine {
         }
         String r = receipts ? "1" : "0";
         if (!r.equals(rwas)) setMeta("receipts_eff", r);
-        return again;
+        return again || caught;
+    }
+
+    /** 0.9.5: what catchUpLists notes once it has read everything again (sync_meta lists_v). */
+    static final String LISTS_V = "95";
+
+    /**
+     * 0.9.5: the first sync on this version reads everything the others have again (Wi-Fi: from the
+     * start; a folder's or the server's files: again), once. A phone on 0.9.4 or older passed over
+     * what it didn't know: General list lines (list_entries.section 'general', which it takes for a
+     * tab it doesn't share, so it neither keeps nor logs them). Read again, they come in now. Only
+     * what comes in: nothing of this phone's is sent again. True when there was anything to read again.
+     */
+    boolean catchUpLists() throws Exception {
+        if (LISTS_V.equals(meta("lists_v"))) return false;
+        boolean any = !db.query("SELECT 1 FROM sync_peers WHERE got > 0 LIMIT 1").isEmpty()
+            || !db.query("SELECT 1 FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'server_seen:%' LIMIT 1").isEmpty();
+        if (any) {
+            // 0.9.5 (review): what's read again unchanged (a file with the sum it had, a Wi-Fi phone up to
+            // where this one had got) only brings General lines this phone never had (catchUpEntries):
+            // an old file still holds records deleted so long ago that the delete was tidied away.
+            db.transaction(() -> {
+                db.exec("INSERT OR REPLACE INTO sync_meta (key, value) SELECT 'catchup:' || key, value FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'server_seen:%'");
+                db.exec("INSERT OR REPLACE INTO sync_meta (key, value) SELECT 'catchup_peer:' || device, got FROM sync_peers WHERE got > 0");
+                db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%'");
+            });
+        }
+        setMeta("lists_v", LISTS_V);
+        return any;
+    }
+
+    /**
+     * 0.9.5 (review): what a catch-up read (catchUpLists) takes in: only General list lines (section
+     * 'general') this phone has never had (no row, no change noted). Nothing else.
+     */
+    JSONArray catchUpEntries(JSONArray entries) throws Exception {
+        JSONArray out = new JSONArray();
+        if (entries == null) return out;
+        for (int i = 0; i < entries.length(); i++) {
+            JSONObject x = entries.optJSONObject(i);
+            if (x == null || !"list_entries".equals(x.optString("tbl")) || x.optBoolean("deleted", false)) continue;
+            String pk = x.optString("pk", "");
+            JSONObject row = x.optJSONObject("row");
+            if (pk.isEmpty() || row == null || !"general".equals(str(row, "section")) || !pk.equals(row.optString("id", ""))) continue;
+            if (!db.query("SELECT 1 FROM list_entries WHERE id = ?", pk).isEmpty()) continue;
+            if (!db.query("SELECT 1 FROM sync_log WHERE tbl = 'list_entries' AND pk = ?", pk).isEmpty()) continue;
+            out.put(x);
+        }
+        return out;
+    }
+
+    /** 0.9.5: the tab a list line's own section is shared with: General goes with the groceries (shops.ts listShareTab). */
+    static String listTab(String section) {
+        return "general".equals(section) ? "pantry" : section;
     }
 
     /**
@@ -678,8 +733,9 @@ final class SyncEngine {
                 return s == null ? "pantry" : s;
             }
             case "list_entries": {
+                // 0.9.5: a General line (section 'general') is shared with the groceries.
                 String s = str(row, "section");
-                if (s != null) return s;
+                if (s != null) return listTab(s);
                 String item = str(row, "item_id");
                 if (item != null) {
                     List<JSONObject> r = db.query("SELECT section FROM items WHERE id = ?", item);
@@ -1221,6 +1277,11 @@ final class SyncEngine {
             in.append(in.length() == 0 ? "?" : ", ?");
             args.add(t);
         }
+        // 0.9.5: the General list goes with the groceries.
+        if (tabs.contains("pantry")) {
+            in.append(in.length() == 0 ? "?" : ", ?");
+            args.add("general");
+        }
         final String inList = in.length() == 0 ? "NULL" : in.toString();
         final Object[] a = args.toArray();
         db.transaction(() -> {
@@ -1389,6 +1450,29 @@ final class SyncEngine {
             all.put("to", peer);
             r.received += apply(send(t, all, true).optJSONArray("entries"));
             setMeta("rehousehold", null);
+        }
+
+        // 0.9.5 (review): read again once after the update (catchUpLists), up to where this phone had
+        // got: only the General lines it never had (catchUpEntries). Where it had got stays, so what's
+        // newer comes in below as always.
+        String catchUp = meta("catchup_peer:" + peer);
+        if (catchUp != null) {
+            long upTo = Long.parseLong(catchUp.matches("\\d{1,18}") ? catchUp : "0");
+            long at = 0;
+            for (int guard = 0; guard < 10000 && at < upTo; guard++) {
+                JSONObject pull = new JSONObject();
+                pull.put("op", "pull");
+                pull.put("device", me);
+                pull.put("since", at);
+                pull.put("tabs", tabsJson(mine));
+                if (modern) pull.put("to", peer);
+                JSONObject got = send(t, pull, modern);
+                r.received += apply(catchUpEntries(got.optJSONArray("entries")));
+                long top = got.optLong("top", at);
+                if (top <= at || !got.optBoolean("more", false)) break;
+                at = top;
+            }
+            setMeta("catchup_peer:" + peer, null);
         }
 
         long since = 0;

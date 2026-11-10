@@ -49,7 +49,7 @@ export function AddOnServer({ back }: { back?: boolean }) {
       <TopBar title="Add" back={!!back} />
       <PhoneOnlyNote />
       <div className="card">
-        <h2 style={{ margin: 0, fontSize: 18 }}>Look up a barcode</h2>
+        <h2 style={{ margin: 0, fontSize: 17 }}>Look up a barcode</h2>
         <p className="small" style={{ margin: 0 }}>
           Finds it among your household's own products.
         </p>

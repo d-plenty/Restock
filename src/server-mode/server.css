@@ -6,8 +6,8 @@
   flex-direction: column;
   gap: 2px;
   padding: calc(var(--top) + 6px) 12px 4px;
-  background: var(--navy);
-  color: #fff;
+  background: var(--chrome-bg);
+  color: var(--on-navy);
   border-bottom: 3px solid var(--gold);
   position: relative;
   z-index: 9;
@@ -20,9 +20,16 @@
   align-items: center;
   gap: 8px;
 }
+.strip-top {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+/* 0.9.5 (look): the household's name is never cut; the links go under it when there isn't room. */
 .strip-top .strip-name {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  white-space: normal;
+  overflow: visible;
 }
 .strip-main {
   min-width: 0;
@@ -37,11 +44,11 @@
 }
 .strip-name {
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--fs-body);
   max-width: 100%;
 }
 .strip-sub {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   opacity: 0.88;
   min-height: 24px;
   display: flex;
@@ -52,7 +59,7 @@
 .strip-dot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   background: var(--gold);
   animation: strip-pulse 1s ease-in-out infinite alternate;
   flex-shrink: 0;
@@ -69,16 +76,29 @@
 }
 .strip-links button {
   border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  font-size: 13px;
+  background: var(--on-navy-hover);
+  color: var(--on-navy);
+  font-size: var(--fs-sm);
   font-weight: 600;
-  padding: 6px 9px;
-  border-radius: 8px;
-  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  min-height: var(--h-control-sm);
+  position: relative;
+}
+.strip-links button::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: var(--hit);
+  transform: translateY(-50%);
+}
+.strip-main {
+  min-height: var(--hit);
 }
 .strip-links button:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--on-navy-line);
 }
 /* The app's screens already leave room for the phone's status bar; under the strip they don't need to. */
 .server-mode .server-strip ~ .screen {
@@ -91,10 +111,10 @@
   align-items: flex-start;
   margin: 0;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--sunken);
   color: var(--ink-2);
-  font-size: 15px;
+  font-size: var(--fs-body);
   line-height: 1.4;
 }
 .phone-only svg {
@@ -103,7 +123,7 @@
 }
 .phone-only.compact {
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .server-gate .screen {
@@ -131,7 +151,7 @@
 }
 .card-title {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--fs-lg);
 }
 .steps {
   margin: 0;
@@ -154,7 +174,7 @@
 }
 .meter-bar {
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--r-full);
   background: var(--sunken);
   overflow: hidden;
 }
@@ -183,11 +203,11 @@
   gap: 8px;
   justify-content: center;
   padding: 18px 12px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: rgba(255, 255, 255, 0.9);
-  color: #1b1f1d;
+  color: var(--fixed-ink);
   font-weight: 600;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 
 details.card > summary {
@@ -242,7 +262,7 @@ details.card > summary {
   box-sizing: border-box;
   background: var(--bg);
   color: var(--ink);
-  border-radius: 28px;
+  border-radius: var(--r-xl);
   padding: 36px clamp(20px, 5vw, 44px);
   display: flex;
   flex-direction: column;
@@ -252,19 +272,19 @@ details.card > summary {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 20px;
+  font-size: var(--fs-xl);
 }
 .setup-mark {
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--gold);
-  color: #012169;
+  color: var(--brand-navy);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 20px;
+  font-size: var(--fs-xl);
 }
 .setup-steps {
   display: flex;
@@ -273,7 +293,7 @@ details.card > summary {
 .setup-steps span {
   flex: 1;
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--r-full);
   background: var(--line);
 }
 .setup-steps span.done {
@@ -281,12 +301,12 @@ details.card > summary {
 }
 .setup-card h1 {
   margin: 0;
-  font-size: 30px;
+  font-size: var(--fs-3xl);
   line-height: 1.2;
 }
 .setup-lede {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--fs-body);
   line-height: 1.55;
   color: var(--ink-2);
 }
@@ -296,15 +316,15 @@ details.card > summary {
   gap: 20px;
 }
 .setup-label {
-  font-size: 16px;
+  font-size: var(--fs-body);
   font-weight: 600;
 }
 .input.setup-input {
   height: 52px;
-  font-size: 18px;
+  font-size: var(--fs-lg);
 }
 .setup-help {
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--muted);
 }
 .setup-help.center {
@@ -313,22 +333,22 @@ details.card > summary {
 .setup-note {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   line-height: 1.5;
   color: var(--ink-2);
 }
 .setup-note strong {
-  font-size: 15px;
+  font-size: var(--fs-body);
   color: var(--ink);
 }
 .btn.setup-go {
   min-height: 56px;
-  font-size: 18px;
+  font-size: var(--fs-lg);
 }
 
 /* 0.9.4 (design 15): in shopping mode on the web, a line opens its product; only the checkbox ticks. */
@@ -347,4 +367,150 @@ details.card > summary {
 /* Shopping mode covers the app; a product opened from it shows on top, and Back returns to the trip. */
 .app:has(> .overlay) .shopmode {
   display: none;
+}
+
+/* ---------- 0.9.5 (task 184): product photos, catalogue pages, specials (both web layouts) ---------- */
+
+/* An item's big photo: a fixed box, so nothing moves while it loads or if there's none. */
+.dk-photo {
+  flex-shrink: 0;
+  width: 100%;
+  height: 240px;
+  box-sizing: border-box;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.dk-photo img {
+  max-width: 100%;
+  max-height: 100%;
+  padding: 14px;
+  box-sizing: border-box;
+  object-fit: contain;
+}
+.dk-photo.none {
+  background: var(--sunken);
+  border-color: var(--line-soft);
+}
+.dk-photo-letter {
+  font-size: var(--fs-hero);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--muted);
+}
+.screen > .dk-photo.big {
+  height: 280px;
+}
+.dk-photo.sheet {
+  height: 220px;
+}
+.dk-photo.sheet .dk-photo-letter {
+  font-size: var(--fs-hero);
+}
+@media (max-width: 599px) {
+  .screen > .dk-photo.big {
+    height: 220px;
+  }
+}
+
+/* Previous / Page 3 of 7 / Next, above and below My catalogue's pages. */
+.dk-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dk-pager-btn {
+  min-width: 128px;
+  min-height: 48px;
+}
+.dk-pager-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.dk-pager-at {
+  font-weight: 700;
+  text-align: center;
+  min-width: 0;
+}
+.dk-pager-name {
+  font-weight: 600;
+  color: var(--muted);
+}
+@media (max-width: 479px) {
+  .dk-pager-btn {
+    min-width: 0;
+    padding: 0 12px;
+  }
+  .dk-pager-name {
+    display: none;
+  }
+}
+.cat-pages:focus-visible {
+  outline: 3px solid var(--green);
+  outline-offset: 2px;
+  border-radius: var(--r-md);
+}
+.cat-name-open {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cat-name-open:hover {
+  text-decoration: underline;
+}
+
+/* A special: its photo and name open it (the item, or its product sheet). */
+.house-special-open {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.house-special-open:hover .title {
+  text-decoration: underline;
+}
+.dk-sheet-name {
+  font-size: var(--fs-lg);
+  line-height: 1.3;
+}
+.dk-sheet-price {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.dk-sheet-now {
+  font-size: var(--fs-2xl);
+  font-weight: 800;
+}
+
+/* 0.9.5 (look): a special's Track and Add to list go under its name when the row is narrow, so the
+   name is never squeezed to a few letters. */
+.row.house-special {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 8px;
+}
+.row.house-special > .house-special-open {
+  flex: 1 1 220px;
 }

@@ -24,7 +24,7 @@ const STEPS: Step[] = [
     tab: 'home',
     find: '.banner.green',
     title: 'Your week at a glance',
-    text: 'Home shows what is genuinely worth buying this week, and roughly how much you save against normal prices.',
+    text: 'Home shows what is genuinely worth buying this week, and roughly how much you save against usual prices.',
   },
   {
     tab: 'home',

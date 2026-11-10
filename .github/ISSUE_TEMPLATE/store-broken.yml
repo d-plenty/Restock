@@ -1,11 +1,11 @@
-name: Store stopped working
-description: Searching or price checks fail for a supermarket, bottle shop or pharmacy
+name: Shop stopped working
+description: Searching or price checks fail for a supermarket, bottle shop or chemist
 labels: [store]
 body:
   - type: dropdown
     id: store
     attributes:
-      label: Which store?
+      label: Which shop?
       options: [Coles, Woolworths, Aldi, "Dan Murphy's", BWS, Liquorland, Liquorland Warehouse, Liquorland Cellars, The Bottle-O, Cellarbrations, Thirsty Camel, Porters Liquor, Chemist Warehouse, My Chemist, Amcal, Discount Drug Stores, Guardian / PharmaSave, Priceline Pharmacy, Soul Pattinson, TerryWhite Chemmart, Blooms The Chemist, Good Price Pharmacy, Pharmacy 4 Less, Direct Chemist Outlet, Star Discount Chemist, Capital Chemist, National Pharmacies, Chempro, A shop I added myself]
     validations:
       required: true
@@ -23,7 +23,7 @@ body:
     id: state
     attributes:
       label: Which state or territory are you in?
-      description: Some shops price by state or by store. Your suburb isn't needed.
+      description: Some shops price by state or by branch. Your suburb isn't needed.
       options: [QLD, NSW, VIC, ACT, TAS, SA, WA, NT]
   - type: textarea
     id: details
@@ -38,13 +38,13 @@ body:
   - type: dropdown
     id: open
     attributes:
-      label: Did "Open <store>" in Settings → Troubleshooting help?
+      label: Did "Open <shop>" in Settings → Troubleshooting help?
       options: [Didn't try, "Yes, it works again", "No, still failing"]
   - type: input
     id: version
     attributes:
       label: Restock version
-      placeholder: 0.9.4
+      placeholder: 0.9.5
     validations:
       required: true
   - type: textarea

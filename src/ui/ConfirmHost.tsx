@@ -36,6 +36,24 @@ export function ConfirmHost() {
       </Sheet>
     );
   }
+  // 0.9.5 (save): Save · Discard · Keep editing.
+  if (req.choices) {
+    return (
+      <Sheet title={req.title} onClose={() => req.resolve(false)}>
+        {req.detail && <p style={{ color: 'var(--ink-2)' }}>{req.detail}</p>}
+        {req.choices.map((c, i) => (
+          <button
+            key={c.id}
+            autoFocus={i === 0}
+            className={`btn${c.kind === 'save' ? ' primary save-green' : c.kind === 'danger' ? ' danger-ghost' : c.kind === 'primary' ? ' primary' : ''}`}
+            onClick={() => req.resolve(true, c.id)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </Sheet>
+    );
+  }
   return (
     <Sheet title={req.title} onClose={() => req.resolve(false)}>
       {req.detail && <p style={{ color: 'var(--ink-2)' }}>{req.detail}</p>}

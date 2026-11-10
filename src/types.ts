@@ -1,7 +1,7 @@
 // Core data types. Everything here is stored on the device in SQLite.
 
-import type { Chain, CustomShop, Section, StoreChain } from './shops';
-export type { Chain, CustomShop, Section, StoreChain } from './shops';
+import type { Chain, CustomShop, ListSection, Section, StoreChain } from './shops';
+export type { Chain, CustomShop, ListSection, Section, StoreChain } from './shops';
 export { chainName } from './shops';
 
 /** Base unit used for unit-price comparison. */
@@ -152,8 +152,12 @@ export interface ListEntry {
   qty?: number;
   /** The shelf price when it was added, for lines not linked to a pantry item (a one-off buy). */
   price?: number;
-  /** Which list it's on, for lines that aren't linked to a pantry item. Linked lines follow their item. */
-  section?: Section;
+  /**
+   * Which list it's on, for lines that aren't linked to a pantry item. Linked lines follow their item.
+   * 0.9.5: 'general' is the General list (no pantry): lines Home Assistant added that matched nothing,
+   * or put there by hand.
+   */
+  section?: ListSection;
   /** For a one-off buy found at a shop (0.7.3): what it is, so the list can show its photo and details. */
   product?: ListProduct;
   checked: boolean;

@@ -26,6 +26,9 @@ import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { LoadingBar, TopBar } from '../components';
 import { useNav } from '../nav';
+// 0.9.5 (save): the switch, the list and the address wait for Save settings; Test connection and Sync now run straight away.
+import { stage, staged } from '../../lib/settingsDraft';
+import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar';
 
 /**
  * 0.9.4: which of the page's three states (design section 9): a phone household (or a phone on its
@@ -123,6 +126,8 @@ export function InHouse({ house, saved }: { house: HaHouse; saved: boolean }) {
  * 0.9.4: in a phone household it says it isn't server-wide; in a house, InHouse.
  */
 export function HomeAssistantScreen() {
+  useSettingsDraft(); // 0.9.5 (save)
+  useDraftState(); // shows what's waiting to be saved (staged)
   const nav = useNav();
   const config = useLive(getHaConfig, []);
   const saved = useLive(haTokenSaved, []);
@@ -155,7 +160,10 @@ export function HomeAssistantScreen() {
   if (who.house && pageState(who) !== 'phone') return <InHouse house={who.house} saved={saved} />;
   // Another phone in the household syncs with Home Assistant (this one stopped, or never started).
   const elsewhere = who.inHousehold && !!who.device && !who.mine ? phoneLabel(who.name) : undefined;
-  const on = config.enabled && !elsewhere;
+  const savedOn = config.enabled && !elsewhere;
+  // 0.9.5 (save): the switch as it'll be once saved.
+  const on = staged<boolean>('ha-on') ?? savedOn;
+  const entityShown = staged<string>('ha-entity') ?? config.entity;
 
   const typedToken = saved && !changing ? undefined : token.trim();
   const tidy = tidyAddress(address ?? '');
@@ -177,6 +185,9 @@ export function HomeAssistantScreen() {
       }
       const entity = got.lists.some((l) => l.id === config.entity) ? config.entity : (got.lists.find((l) => l.id === DEFAULT_LIST)?.id ?? got.lists[0]?.id ?? config.entity);
       await saveHaConfig({ address: tidy, entity });
+      // 0.9.5 (save): Test connection saved the address and the list, so nothing's waiting for those.
+      await stage('ha-address', tidy, async () => undefined, tidy);
+      await stage('ha-entity', entity, async () => undefined, entity);
       setAddress(tidy);
       if (tooOld(got.version)) setProblem(`This is Home Assistant ${got.version}. The shopping list needs ${MIN_HA_VERSION} or newer: update Home Assistant first.`);
       else if (!got.lists.length)
@@ -189,9 +200,13 @@ export function HomeAssistantScreen() {
     }
   };
 
-  const toggle = async (turnOn: boolean) => {
+  /** The switch (held until Save), or `now` for "Move it here". */
+  const toggle = async (turnOn: boolean, rightAway = false) => {
     setProblem(undefined);
-    if (!turnOn) return void (await saveHaConfig({ enabled: false }));
+    if (!rightAway) {
+      if (!turnOn) return void (await stage('ha-on', false, () => saveHaConfig({ enabled: false }), savedOn));
+      if (!config.address || !saved) return setProblem('Add the address and a token, then tap Test connection first.');
+    } else if (!turnOn) return void (await saveHaConfig({ enabled: false }));
     if (!config.address || !saved) return setProblem('Add the address and a token, then tap Test connection first.');
     // One phone per household: moving it here stops it on the other phone.
     const now = await haPhone();
@@ -204,8 +219,12 @@ export function HomeAssistantScreen() {
       });
       if (!ok) return;
     }
-    await takeHomeAssistant();
-    await syncNow();
+    const go = async () => {
+      await takeHomeAssistant();
+      await syncNow();
+    };
+    if (rightAway) await go();
+    else await stage('ha-on', true, go, savedOn);
   };
 
   const syncNow = async () => {
@@ -221,9 +240,9 @@ export function HomeAssistantScreen() {
 
   const saveAddress = async () => {
     const t = tidyAddress(address ?? '');
-    if (!t || t === config.address) return;
+    if (!t) return;
     setAddress(t);
-    await saveHaConfig({ address: t });
+    await stage('ha-address', t, () => saveHaConfig({ address: t }), config.address);
     // Not while a new token is being typed in: Test connection saves it for this address.
     if (saved && !changing) setProblem("The token only goes to the address it was saved for. Tap Change and paste it in again for this address.");
   };
@@ -241,8 +260,7 @@ export function HomeAssistantScreen() {
   };
 
   const pickList = async (entity: string) => {
-    if (entity === config.entity) return;
-    await saveHaConfig({ entity });
+    await stage('ha-entity', entity, () => saveHaConfig({ entity }), config.entity);
   };
 
   const lists = tested?.lists.length ? tested.lists : [{ id: config.entity, name: config.entity }];
@@ -279,7 +297,7 @@ export function HomeAssistantScreen() {
             One phone in your household talks to Home Assistant, and your list still comes to this phone through your household's sync.
             {saved ? ' Your token stays saved here, so this phone can take over any time.' : ''}
           </span>
-          <button className="btn small" style={{ alignSelf: 'flex-start' }} disabled={!haAvailable() || !!busy} onClick={() => void toggle(true)}>
+          <button className="btn small" style={{ alignSelf: 'flex-start' }} disabled={!haAvailable() || !!busy} onClick={() => void toggle(true, true)}>
             Move it here
           </button>
         </div>
@@ -406,8 +424,8 @@ export function HomeAssistantScreen() {
           </span>
           <select
             className="input"
-            style={{ width: 'auto', maxWidth: '55%', height: 38, padding: '0 8px', fontSize: 15 }}
-            value={config.entity}
+            style={{ width: 'auto', maxWidth: '55%', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
+            value={entityShown}
             aria-label="Home Assistant's list"
             disabled={!tested}
             onChange={(e) => void pickList(e.target.value)}
@@ -463,7 +481,7 @@ export function HomeAssistantScreen() {
           list, and your other phones, even with Restock closed.
         </span>
         <span className="small">
-          <strong>Only the groceries list.</strong> Keg and Pharmacy lists stay in Restock. Something new goes across
+          <strong>Only the groceries list.</strong> Keg and Health lists stay in Restock. Something new goes across
           while it's still to buy, and ticking off works both ways.
         </span>
         <span className="small">
@@ -475,6 +493,7 @@ export function HomeAssistantScreen() {
           nothing goes anywhere but your Home Assistant.
         </span>
       </div>
+      <SaveBar />
     </div>
   );
 }

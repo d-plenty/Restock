@@ -6,7 +6,7 @@
 //   node tools/sync-test/server-v3.mjs <command> <server url> <state file> [args...]
 //
 // Commands: setup <house name> | setup2 | invite <label> | invite2 | handover | remove <device> |
-// phones | keep <months|null> | health
+// phones | keep <months|null> | health | resend | history <product id>
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -104,9 +104,24 @@ switch (cmd) {
     const w = await web3();
     const now = await w.get('/api/v3/settings');
     const keepMonths = args[0] === 'null' ? null : Number(args[0]);
-    // Keeping less needs the passphrase again (sent always: it's only checked when it matters).
-    const r = await w.put('/api/v3/settings', { ...(now.body && typeof now.body === 'object' ? now.body : {}), keepMonths, confirm: await w.confirm() });
+    // Keeping less needs the passphrase again and (0.9.5) the typed DELETE (sent always: only checked when it matters).
+    const { autoDelete: _a, ...was } = now.body && typeof now.body === 'object' ? now.body : {};
+    const r = await w.put('/api/v3/settings', { ...was, keepMonths, typed: 'DELETE', confirm: await w.confirm() });
     if (r.status !== 200) fail('settings', r);
+    console.log(JSON.stringify(r.body));
+    break;
+  }
+  case 'resend': {
+    // 0.9.5: Ask phones to resend (Data page). Prints the status and the answer.
+    const w = await web3();
+    const r = await w.post('/api/v3/data/resend');
+    console.log(JSON.stringify({ status: r.status, ...(r.body && typeof r.body === 'object' ? r.body : {}) }));
+    break;
+  }
+  case 'history': {
+    const w = await web3();
+    const r = await w.get('/api/v3/history?product=' + encodeURIComponent(args[0] ?? ''));
+    if (r.status !== 200) fail('history', r);
     console.log(JSON.stringify(r.body));
     break;
   }

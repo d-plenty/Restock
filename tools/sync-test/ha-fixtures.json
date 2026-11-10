@@ -1153,6 +1153,148 @@
      "op": "round"
     }
    ]
+  },
+  {
+   "name": "0.9.5: what matches nothing goes on General, the rest on the list of what it matches",
+   "pantry": [
+    {
+     "id": "g-milk",
+     "name": "Milk",
+     "section": "pantry"
+    },
+    {
+     "id": "k-milk",
+     "name": "Milk",
+     "section": "keg"
+    },
+    {
+     "id": "k-ale",
+     "name": "Pale ale",
+     "section": "keg"
+    },
+    {
+     "id": "h-sun",
+     "name": "Sunscreen",
+     "section": "pharmacy"
+    },
+    {
+     "id": "h-band",
+     "name": "Bandaids",
+     "section": "pharmacy"
+    },
+    {
+     "id": "k-band",
+     "name": "Bandaids",
+     "section": "keg"
+    }
+   ],
+   "aliases": {
+    "ice": "k-ale"
+   },
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "chopsticks"
+    },
+    {
+     "op": "seed",
+     "summary": "2 milk"
+    },
+    {
+     "op": "seed",
+     "summary": "pale ale"
+    },
+    {
+     "op": "seed",
+     "summary": "Sunscreen"
+    },
+    {
+     "op": "seed",
+     "summary": "bandaids"
+    },
+    {
+     "op": "seed",
+     "summary": "ice"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "round"
+    }
+   ]
+  },
+  {
+   "name": "0.9.5: lines on General and Keg from Home Assistant still tick and go both ways",
+   "pantry": [
+    {
+     "id": "g-milk",
+     "name": "Milk",
+     "section": "pantry"
+    },
+    {
+     "id": "k-ale",
+     "name": "Pale ale",
+     "section": "keg"
+    }
+   ],
+   "steps": [
+    {
+     "op": "seed",
+     "summary": "chopsticks"
+    },
+    {
+     "op": "seed",
+     "summary": "pale ale"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "haSet",
+     "uid": "u1",
+     "status": "completed"
+    },
+    {
+     "op": "update",
+     "patch": {
+      "checked": true
+     },
+     "text": "Pale ale"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "update",
+     "patch": {
+      "checked": false
+     },
+     "text": "chopsticks"
+    },
+    {
+     "op": "haRemove",
+     "uid": "u2"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "line",
+     "text": "batteries",
+     "section": "general"
+    },
+    {
+     "op": "round"
+    },
+    {
+     "op": "remove",
+     "text": "chopsticks"
+    },
+    {
+     "op": "round"
+    }
+   ]
   }
  ],
  "expect": {
@@ -2053,14 +2195,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ],
       [
        "ha-640b3fee418a5070430f7bca",
        "Eggs",
        2,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ]
      ],
      "state": {
@@ -2114,14 +2258,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ],
       [
        "ha-640b3fee418a5070430f7bca",
        "Eggs",
        2,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ]
      ],
      "state": {
@@ -2177,14 +2323,16 @@
        "oat milk",
        1,
        false,
-       null
+       null,
+       "general"
       ],
       [
        "ha-640b3fee418a5070430f7bca",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -2235,7 +2383,8 @@
        "bread",
        1,
        false,
-       "g-bread2"
+       "g-bread2",
+       "pantry"
       ]
      ],
      "state": {
@@ -2304,7 +2453,8 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ]
      ],
      "state": {
@@ -2345,7 +2495,8 @@
        "Milk",
        1,
        true,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ]
      ],
      "state": {
@@ -2387,7 +2538,8 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ]
      ],
      "state": {
@@ -2443,6 +2595,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -2450,6 +2603,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ],
       [
@@ -2457,7 +2611,8 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ]
      ],
      "state": {
@@ -2520,6 +2675,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ],
       [
@@ -2527,7 +2683,8 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ]
      ],
      "state": {
@@ -2576,6 +2733,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -2627,6 +2785,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -2634,6 +2793,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -2684,6 +2844,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -2725,6 +2886,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -2770,6 +2932,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -2839,14 +3002,16 @@
        "Milk",
        2,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "r2",
        "Eggs",
        1,
        true,
-       "g-eggs"
+       "g-eggs",
+       null
       ]
      ],
      "state": {
@@ -2888,14 +3053,16 @@
        "Milk",
        2,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "r2",
        "Eggs",
        1,
        true,
-       "g-eggs"
+       "g-eggs",
+       null
       ]
      ],
      "state": {
@@ -2937,14 +3104,16 @@
        "Milk",
        3,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "r2",
        "Eggs",
        1,
        true,
-       "g-eggs"
+       "g-eggs",
+       null
       ]
      ],
      "state": {
@@ -2987,7 +3156,8 @@
        "oat milk",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -3028,7 +3198,8 @@
        "almond milk",
        2,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -3071,7 +3242,8 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ]
      ],
      "state": {
@@ -3112,7 +3284,8 @@
        "Milk",
        3,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ]
      ],
      "state": {
@@ -3154,7 +3327,8 @@
        "Milk",
        3,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ]
      ],
      "state": {
@@ -3212,13 +3386,15 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "r2",
        "bananas",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3226,14 +3402,16 @@
        "Eggs",
        1,
        true,
-       "g-eggs"
+       "g-eggs",
+       null
       ],
       [
        "ha-dab2a7bc169d956dead757f2",
        "tea",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -3313,13 +3491,15 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "r2",
        "bananas",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3327,14 +3507,16 @@
        "Eggs",
        1,
        true,
-       "g-eggs"
+       "g-eggs",
+       null
       ],
       [
        "ha-dab2a7bc169d956dead757f2",
        "tea",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -3407,13 +3589,15 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "r2",
        "tea",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -3470,6 +3654,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3477,6 +3662,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3484,6 +3670,7 @@
        "plums",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3491,6 +3678,7 @@
        "figs",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -3541,6 +3729,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3548,6 +3737,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3555,6 +3745,7 @@
        "plums",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3562,6 +3753,7 @@
        "figs",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -3642,6 +3834,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3649,6 +3842,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3656,6 +3850,7 @@
        "plums",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3663,6 +3858,7 @@
        "figs",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -3749,6 +3945,7 @@
        "Молоко",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3756,6 +3953,7 @@
        "牛奶",
        2,
        false,
+       null,
        null
       ],
       [
@@ -3763,6 +3961,7 @@
        "🍌",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3770,7 +3969,8 @@
        "Хлеб",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -3850,6 +4050,7 @@
        "Молоко",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3857,6 +4058,7 @@
        "牛奶",
        2,
        false,
+       null,
        null
       ],
       [
@@ -3864,6 +4066,7 @@
        "🍌",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3871,7 +4074,8 @@
        "Хлеб",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -3951,6 +4155,7 @@
        "Молоко",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3958,6 +4163,7 @@
        "牛奶",
        2,
        false,
+       null,
        null
       ],
       [
@@ -3965,6 +4171,7 @@
        "🍌",
        1,
        false,
+       null,
        null
       ],
       [
@@ -3972,7 +4179,8 @@
        "Хлеб",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -4052,6 +4260,7 @@
        "Молоко",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4059,6 +4268,7 @@
        "牛奶",
        2,
        false,
+       null,
        null
       ],
       [
@@ -4066,6 +4276,7 @@
        "🍌",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4073,7 +4284,8 @@
        "Хлеб",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -4166,6 +4378,7 @@
        "Молоко",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4173,6 +4386,7 @@
        "牛奶",
        2,
        false,
+       null,
        null
       ],
       [
@@ -4180,6 +4394,7 @@
        "🍌",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4187,13 +4402,15 @@
        "Хлеб",
        1,
        false,
-       null
+       null,
+       "general"
       ],
       [
        "r4",
        "Кефир 2%",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4201,6 +4418,7 @@
        "Молоко 2%",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -4307,6 +4525,7 @@
        "Молоко",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4314,6 +4533,7 @@
        "牛奶",
        2,
        false,
+       null,
        null
       ],
       [
@@ -4321,6 +4541,7 @@
        "🍌",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4328,13 +4549,15 @@
        "Хлеб",
        1,
        false,
-       null
+       null,
+       "general"
       ],
       [
        "r4",
        "Кефир 2%",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4342,6 +4565,7 @@
        "Молоко 2%",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -4433,6 +4657,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4440,6 +4665,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -4492,6 +4718,7 @@
        "apples",
        1,
        true,
+       null,
        null
       ],
       [
@@ -4499,6 +4726,7 @@
        "pears",
        1,
        true,
+       null,
        null
       ]
      ],
@@ -4555,6 +4783,7 @@
        "apples",
        1,
        true,
+       null,
        null
       ],
       [
@@ -4562,6 +4791,7 @@
        "pears",
        1,
        true,
+       null,
        null
       ]
      ],
@@ -4626,6 +4856,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4633,14 +4864,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -4691,6 +4924,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4698,14 +4932,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -4756,6 +4992,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4763,14 +5000,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -4837,6 +5076,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4844,14 +5084,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -4902,6 +5144,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4909,14 +5152,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -4988,6 +5233,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -4995,14 +5241,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -5053,6 +5301,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -5060,14 +5309,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -5118,6 +5369,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -5125,14 +5377,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -5183,6 +5437,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -5190,14 +5445,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -5287,6 +5544,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -5294,14 +5552,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -5352,6 +5612,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -5359,14 +5620,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -5417,6 +5680,7 @@
        "apples",
        3,
        false,
+       null,
        null
       ],
       [
@@ -5424,14 +5688,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -5490,6 +5756,7 @@
        "apples",
        3,
        false,
+       null,
        null
       ]
      ],
@@ -5531,6 +5798,7 @@
        "apples",
        3,
        false,
+       null,
        null
       ]
      ],
@@ -5587,6 +5855,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -5594,14 +5863,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -5652,6 +5923,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -5659,14 +5931,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -5717,6 +5991,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -5724,20 +5999,23 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ],
       [
        "r3",
        "pears",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -5812,6 +6090,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -5819,20 +6098,23 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ],
       [
        "r3",
        "pears",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -5913,6 +6195,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -5920,20 +6203,23 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ],
       [
        "r3",
        "pears",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -6014,6 +6300,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -6021,14 +6308,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -6079,6 +6368,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -6086,14 +6376,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -6144,6 +6436,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -6151,20 +6444,23 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ],
       [
        "r3",
        "pears",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -6224,6 +6520,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -6265,6 +6562,7 @@
        "pears",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -6321,6 +6619,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -6328,14 +6627,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -6386,6 +6687,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -6393,14 +6695,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -6472,6 +6776,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -6479,21 +6784,24 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ],
       [
        "ha-dab2a7bc169d956dead757f2",
        "Eggs",
        1,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ]
      ],
      "state": {
@@ -6573,6 +6881,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -6580,21 +6889,24 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ],
       [
        "ha-dab2a7bc169d956dead757f2",
        "Eggs",
        1,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ]
      ],
      "state": {
@@ -6674,6 +6986,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -6681,14 +6994,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -6739,6 +7054,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -6746,14 +7062,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -6810,7 +7128,8 @@
        "Eggs",
        1,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ]
      ],
      "state": {
@@ -6851,7 +7170,8 @@
        "Eggs",
        1,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ]
      ],
      "state": {
@@ -6907,6 +7227,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -6914,14 +7235,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -6972,6 +7295,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -6979,14 +7303,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -7037,6 +7363,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -7044,14 +7371,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -7102,6 +7431,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -7109,14 +7439,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "bread",
        1,
        false,
-       null
+       null,
+       "pantry"
       ]
      ],
      "state": {
@@ -7213,6 +7545,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ]
      ],
@@ -7279,14 +7612,16 @@
        "oat milk",
        1,
        false,
-       null
+       null,
+       "general"
       ],
       [
        "ha-640b3fee418a5070430f7bca",
        "Eggs",
        2,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ]
      ],
      "state": {
@@ -7340,14 +7675,16 @@
        "oat milk (2L)",
        1,
        false,
-       null
+       null,
+       "general"
       ],
       [
        "ha-640b3fee418a5070430f7bca",
        "Eggs",
        2,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ]
      ],
      "state": {
@@ -7402,14 +7739,16 @@
        "oat milk (1L)",
        1,
        false,
-       null
+       null,
+       "general"
       ],
       [
        "ha-640b3fee418a5070430f7bca",
        "Eggs",
        2,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ]
      ],
      "state": {
@@ -7463,14 +7802,16 @@
        "oat milk (1L)",
        1,
        false,
-       null
+       null,
+       "general"
       ],
       [
        "ha-640b3fee418a5070430f7bca",
        "Eggs",
        2,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ]
      ],
      "state": {
@@ -7526,6 +7867,7 @@
        "coffee",
        1,
        false,
+       null,
        null
       ],
       [
@@ -7533,7 +7875,8 @@
        "tea",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -7629,56 +7972,64 @@
        "2 Minute Noodles",
        1,
        false,
-       "g-noodles"
+       "g-noodles",
+       "pantry"
       ],
       [
        "ha-640b3fee418a5070430f7bca",
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ],
       [
        "ha-6011ec49cb598ce85aa412eb",
        "bread",
        2,
        false,
-       null
+       null,
+       "general"
       ],
       [
        "ha-dab2a7bc169d956dead757f2",
        "Eggs",
        2,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ],
       [
        "ha-a36a7e3ce8d981a8660ec346",
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ],
       [
        "ha-ada0943ce72275a5f2a73911",
        "loaf of bread",
        1,
        false,
-       null
+       null,
+       "general"
       ],
       [
        "ha-0cb404ce9ca06f04c81c2d71",
        "Weet-Bix",
        3,
        false,
-       "g-weetbix"
+       "g-weetbix",
+       "pantry"
       ],
       [
        "ha-4ca53e0e0fe3f65edd179b18",
        "Creme Brulee",
        1,
        false,
-       "g-creme"
+       "g-creme",
+       "pantry"
       ]
      ],
      "state": {
@@ -7820,56 +8171,64 @@
        "2 Minute Noodles",
        1,
        false,
-       "g-noodles"
+       "g-noodles",
+       "pantry"
       ],
       [
        "ha-640b3fee418a5070430f7bca",
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ],
       [
        "ha-6011ec49cb598ce85aa412eb",
        "bread",
        2,
        false,
-       null
+       null,
+       "general"
       ],
       [
        "ha-dab2a7bc169d956dead757f2",
        "Eggs",
        2,
        false,
-       "g-eggs"
+       "g-eggs",
+       "pantry"
       ],
       [
        "ha-a36a7e3ce8d981a8660ec346",
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ],
       [
        "ha-ada0943ce72275a5f2a73911",
        "loaf of bread",
        1,
        false,
-       null
+       null,
+       "general"
       ],
       [
        "ha-0cb404ce9ca06f04c81c2d71",
        "Weet-Bix",
        3,
        false,
-       "g-weetbix"
+       "g-weetbix",
+       "pantry"
       ],
       [
        "ha-4ca53e0e0fe3f65edd179b18",
        "Creme Brulee",
        1,
        false,
-       "g-creme"
+       "g-creme",
+       "pantry"
       ]
      ],
      "state": {
@@ -7975,14 +8334,16 @@
        "Juice",
        1,
        false,
-       "g-gone"
+       "g-gone",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "cheese",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -8036,14 +8397,16 @@
        "",
        1,
        false,
-       "g-gone"
+       "g-gone",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "cheese",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -8097,14 +8460,16 @@
        "",
        1,
        false,
-       "g-gone"
+       "g-gone",
+       null
       ],
       [
        "ha-9786e5c4b6067efdc7a41492",
        "cheese",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -8160,14 +8525,16 @@
        "Milk",
        1,
        false,
-       "g-milk"
+       "g-milk",
+       "pantry"
       ],
       [
        "ha-025dfa931656746e78d4ba58",
        "tea",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -8225,6 +8592,7 @@
        "apples",
        1,
        false,
+       null,
        null
       ],
       [
@@ -8232,7 +8600,8 @@
        "pears",
        1,
        false,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -8288,6 +8657,7 @@
        "apples",
        2,
        true,
+       null,
        null
       ],
       [
@@ -8295,7 +8665,8 @@
        "nashi pears",
        1,
        true,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -8349,6 +8720,7 @@
        "apples",
        2,
        true,
+       null,
        null
       ],
       [
@@ -8356,7 +8728,8 @@
        "nashi pears",
        1,
        true,
-       null
+       null,
+       "general"
       ]
      ],
      "state": {
@@ -8376,6 +8749,582 @@
         true,
         "2 × apples",
         true
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "0.9.5: what matches nothing goes on General, the rest on the list of what it matches": [
+    {
+     "r": {
+      "came": 6,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "chopsticks",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "2 milk",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "pale ale",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "Sunscreen",
+       "needs_action"
+      ],
+      [
+       "u5",
+       "bandaids",
+       "needs_action"
+      ],
+      [
+       "u6",
+       "ice",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "chopsticks",
+       1,
+       false,
+       null,
+       "general"
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Milk",
+       2,
+       false,
+       "g-milk",
+       "pantry"
+      ],
+      [
+       "ha-6011ec49cb598ce85aa412eb",
+       "Pale ale",
+       1,
+       false,
+       "k-ale",
+       "keg"
+      ],
+      [
+       "ha-dab2a7bc169d956dead757f2",
+       "Sunscreen",
+       1,
+       false,
+       "h-sun",
+       "pharmacy"
+      ],
+      [
+       "ha-a36a7e3ce8d981a8660ec346",
+       "Bandaids",
+       1,
+       false,
+       "k-band",
+       "keg"
+      ],
+      [
+       "ha-ada0943ce72275a5f2a73911",
+       "Pale ale",
+       1,
+       false,
+       "k-ale",
+       "keg"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "chopsticks",
+        false,
+        "chopsticks",
+        false
+       ],
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "2 × Milk",
+        false,
+        "2 milk",
+        false
+       ],
+       [
+        "ha-6011ec49cb598ce85aa412eb",
+        "u3",
+        "Pale ale",
+        false,
+        "pale ale",
+        false
+       ],
+       [
+        "ha-dab2a7bc169d956dead757f2",
+        "u4",
+        "Sunscreen",
+        false,
+        "Sunscreen",
+        false
+       ],
+       [
+        "ha-a36a7e3ce8d981a8660ec346",
+        "u5",
+        "Bandaids",
+        false,
+        "bandaids",
+        false
+       ],
+       [
+        "ha-ada0943ce72275a5f2a73911",
+        "u6",
+        "Pale ale",
+        false,
+        "ice",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "chopsticks",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "2 milk",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "pale ale",
+       "needs_action"
+      ],
+      [
+       "u4",
+       "Sunscreen",
+       "needs_action"
+      ],
+      [
+       "u5",
+       "bandaids",
+       "needs_action"
+      ],
+      [
+       "u6",
+       "ice",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "chopsticks",
+       1,
+       false,
+       null,
+       "general"
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Milk",
+       2,
+       false,
+       "g-milk",
+       "pantry"
+      ],
+      [
+       "ha-6011ec49cb598ce85aa412eb",
+       "Pale ale",
+       1,
+       false,
+       "k-ale",
+       "keg"
+      ],
+      [
+       "ha-dab2a7bc169d956dead757f2",
+       "Sunscreen",
+       1,
+       false,
+       "h-sun",
+       "pharmacy"
+      ],
+      [
+       "ha-a36a7e3ce8d981a8660ec346",
+       "Bandaids",
+       1,
+       false,
+       "k-band",
+       "keg"
+      ],
+      [
+       "ha-ada0943ce72275a5f2a73911",
+       "Pale ale",
+       1,
+       false,
+       "k-ale",
+       "keg"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "chopsticks",
+        false,
+        "chopsticks",
+        false
+       ],
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "2 × Milk",
+        false,
+        "2 milk",
+        false
+       ],
+       [
+        "ha-6011ec49cb598ce85aa412eb",
+        "u3",
+        "Pale ale",
+        false,
+        "pale ale",
+        false
+       ],
+       [
+        "ha-dab2a7bc169d956dead757f2",
+        "u4",
+        "Sunscreen",
+        false,
+        "Sunscreen",
+        false
+       ],
+       [
+        "ha-a36a7e3ce8d981a8660ec346",
+        "u5",
+        "Bandaids",
+        false,
+        "bandaids",
+        false
+       ],
+       [
+        "ha-ada0943ce72275a5f2a73911",
+        "u6",
+        "Pale ale",
+        false,
+        "ice",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    }
+   ],
+   "0.9.5: lines on General and Keg from Home Assistant still tick and go both ways": [
+    {
+     "r": {
+      "came": 2,
+      "went": 0,
+      "held": false
+     },
+     "calls": [
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "chopsticks",
+       "needs_action"
+      ],
+      [
+       "u2",
+       "pale ale",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "chopsticks",
+       1,
+       false,
+       null,
+       "general"
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Pale ale",
+       1,
+       false,
+       "k-ale",
+       "keg"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "chopsticks",
+        false,
+        "chopsticks",
+        false
+       ],
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "Pale ale",
+        false,
+        "pale ale",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 1,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "update u2 {\"status\":\"completed\"}"
+     ],
+     "ha": [
+      [
+       "u1",
+       "chopsticks",
+       "completed"
+      ],
+      [
+       "u2",
+       "pale ale",
+       "completed"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "chopsticks",
+       1,
+       true,
+       null,
+       "general"
+      ],
+      [
+       "ha-640b3fee418a5070430f7bca",
+       "Pale ale",
+       1,
+       true,
+       "k-ale",
+       "keg"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "chopsticks",
+        true,
+        "chopsticks",
+        true
+       ],
+       [
+        "ha-640b3fee418a5070430f7bca",
+        "u2",
+        "Pale ale",
+        true,
+        "pale ale",
+        true
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 1,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "update u1 {\"status\":\"needs_action\"}"
+     ],
+     "ha": [
+      [
+       "u1",
+       "chopsticks",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "chopsticks",
+       1,
+       false,
+       null,
+       "general"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "chopsticks",
+        false,
+        "chopsticks",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "add batteries",
+      "items"
+     ],
+     "ha": [
+      [
+       "u1",
+       "chopsticks",
+       "needs_action"
+      ],
+      [
+       "u3",
+       "batteries",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "ha-9786e5c4b6067efdc7a41492",
+       "chopsticks",
+       1,
+       false,
+       null,
+       "general"
+      ],
+      [
+       "r1",
+       "batteries",
+       1,
+       false,
+       null,
+       "general"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "ha-9786e5c4b6067efdc7a41492",
+        "u1",
+        "chopsticks",
+        false,
+        "chopsticks",
+        false
+       ],
+       [
+        "r1",
+        "u3",
+        "batteries",
+        false,
+        "batteries",
+        false
+       ]
+      ],
+      "pick": [],
+      "emptySince": null,
+      "emptyLast": null
+     }
+    },
+    {
+     "r": {
+      "came": 0,
+      "went": 1,
+      "held": false
+     },
+     "calls": [
+      "items",
+      "remove u1"
+     ],
+     "ha": [
+      [
+       "u3",
+       "batteries",
+       "needs_action"
+      ]
+     ],
+     "lines": [
+      [
+       "r1",
+       "batteries",
+       1,
+       false,
+       null,
+       "general"
+      ]
+     ],
+     "state": {
+      "pairs": [
+       [
+        "r1",
+        "u3",
+        "batteries",
+        false,
+        "batteries",
+        false
        ]
       ],
       "pick": [],

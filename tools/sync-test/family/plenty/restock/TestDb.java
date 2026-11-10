@@ -15,7 +15,17 @@ final class TestDb implements SyncEngine.Db {
     private int depth = 0;
 
     TestDb(String dir) throws Exception {
-        p = new ProcessBuilder("python3", dir + "/bridge.py", ":memory:", dir + "/migrations.json").redirectError(ProcessBuilder.Redirect.INHERIT).start();
+        this(dir, ":memory:", false);
+    }
+
+    /**
+     * 0.9.5: a database in the file `path` (a phone that's updated later: the same file opened again
+     * by this version's code). `keep`: it's there already, so it's opened as it is.
+     */
+    TestDb(String dir, String path, boolean keep) throws Exception {
+        p = keep
+            ? new ProcessBuilder("python3", dir + "/bridge.py", path, dir + "/migrations.json", "keep").redirectError(ProcessBuilder.Redirect.INHERIT).start()
+            : new ProcessBuilder("python3", dir + "/bridge.py", path, dir + "/migrations.json").redirectError(ProcessBuilder.Redirect.INHERIT).start();
         w = new BufferedWriter(new OutputStreamWriter(p.getOutputStream(), StandardCharsets.UTF_8));
         r = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8));
     }

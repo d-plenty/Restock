@@ -735,7 +735,7 @@ public final class Deals {
 
         if (best != null && !outOfStock && (best.kind == Kind.GREAT || best.kind == Kind.GOOD)) {
             rec.action = Action.BUY;
-            rec.headline = (best.kind == Kind.GREAT ? "Great deal at " : "On sale at ") + chainName(best.product.chain);
+            rec.headline = (best.kind == Kind.GREAT ? "Great deal at " : "On special at ") + chainName(best.product.chain);
             return rec;
         }
         if (alt != null) {
@@ -779,7 +779,7 @@ public final class Deals {
             case "woolworths": return "Woolworths";
             case "coles": return "Coles";
             case "aldi": return "Aldi";
-            default: return "other store";
+            default: return "another shop";
         }
     }
 

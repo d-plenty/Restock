@@ -327,7 +327,7 @@ the server's and the phones' (Java) tests read the same file.
   database's triggers (stamped and noted as `srv-<sid>`), then its note gets the signature, as a phone's
   collect signs. The server keeps `sync_meta owner_pin` = its own `owner_pub`.
 - **`server`** (new owner-only row, in `ownerOnly` on both sides): `{ "v": 3, "sid", "home", "away" (or
-  null), "kex" (server kex SPKI), "keepMonths" (3, 6, 9, 12 or null) }` (`parseServerRow`). Write `owner =
+  null), "kex" (server kex SPKI), "keepMonths" (0.9.4: 3, 6, 9, 12 or null; 0.9.5: a whole number 1–120 or null) }` (`parseServerRow`). Write `owner =
   srv-<sid>` before `server`, so a 0.9.3 phone (no `server` in its `ownerOnly`) takes `server` in
   through `legacyAllowed` as the owner's.
 - `member:<device>` = `{ "name": <label>, "pub": <the phone's my_pub> }`, signed by the server.
@@ -418,7 +418,7 @@ the server only, readable by that device only. A phone takes only a higher `keyv
   records it changed last.
 - The server's own file is a sync file like a phone's: everything but `cards`, prices changed in the last
   60 days, the household's rows with their signatures, `seen`; `name` is the house's name.
-- **Keep data for**: `keepCutoff(keepMonths, now)` = ISO time of `now − keepMonths × 2,629,800,000 ms`
+- **Auto delete** (0.9.4: Keep data for): `keepCutoff(keepMonths, now)` = ISO time of `now − keepMonths × 2,629,800,000 ms`
   (a year's 365.25 days over 12; null for Until I delete). Phones use the same arithmetic with
   `keepMonths` from the signed `server` row. Incoming prices dated before it are passed over unless
   nothing newer for that product is on the server or in the same file (the latest stays, as
@@ -555,3 +555,198 @@ All within the shapes above; the server (P2) already answers them.
   sync is turned off (D13); Wi-Fi sync stays, off by default for a phone that joined fresh. A `401 removed` makes
   the phone forget the household and keep everything (`notice = "server-removed"`); Leave is `DELETE
   /api/v3/devices/<me>` (best effort, after bringing offloaded receipt photos back if it can), then the same.
+
+### v3, 0.9.5: Let the web page search the shops
+
+The one time the server contacts a shop (Declan, 10 Nov 2026: option B). A server setting, **off by default**
+(and off on servers from before: a `state.json` without it is off), stored in `state.json` `settings.webSearch`
+(the server's own, not a household row: phones never see it). Only the admin turns it on or off.
+
+- `GET /api/v3/settings` adds `webSearch: boolean`. `PUT /api/v3/settings { webSearch: true | false }` (a
+  passphrase session, as every settings change; anything but a boolean is 400 `webSearch`). Logged
+  `web-search-on` / `web-search-off`. Turning it off also forgets every search kept for Track.
+- `POST /api/v3/search` (any signed-in browser, RestockWeb3; sealed answer)
+  `{ q, section?: "pantry" | "keg" | "pharmacy" (default "pantry"), chain?: "<one of the household's shops on that
+  tab>", barcode?: "<8–14 digits>" }` →
+  `{ search: "<id>", at, expires, text: "<q as searched: normaliseQuery>", section, shops: [answer…] }`, one
+  answer per shop, in the order the phone lists them:
+  - `{ chain, name, status: "ok", items: [product…], top: ["<storeProductId>"…], message? }`: `items` best first
+    (searchHelp `scoreAll`, counting where the shop put it, as Add.tsx), at most 40; `top` the ones the phone
+    would recommend (`topPicks`); `message` when a web shop's page had nothing the server could read.
+  - `{ chain, name, status: "blocked", blocked: true, message: "<Shop> blocked the search from your server.
+    Search it on a phone instead." }`: the shop turned the direct request away (where the phone would use its
+    hidden browser).
+  - `{ chain, name, status: "error", message }`: too slow (10 s), too big (3 MB), sent elsewhere, unreachable.
+  - `{ chain, name, status: "skipped", message }`: a shop people added (never asked from the server), or a
+    built-in web shop with no known search page.
+  - A product is the phone's `StoreProduct`: `{ chain, storeProductId, name, brand?, size?, barcode?, imageUrl?
+    (https only), price?, wasPrice? (the usual price, only above price), isSpecial, halfPrice? (exactly half),
+    memberOnly, promo?, unitPriceText? (the shop's), unitText? (the phone's unitTextOf), inStock?, itemId?,
+    itemName? }`; `itemId`/`itemName` when one of the household's pantry items already has that product.
+  - The shops: the household's shops on that tab (server `kv settings` `enabledChains`, `sections`; one per
+    website, `searchChainsIn`), Coles at the `branch:coles` row's `storeNo` (falling back to its online shop, as
+    the phone). With a barcode, Woolworths and Coles are also searched for the barcode itself (exact first).
+  - Errors (plain JSON): 403 `web-search-off` "Turn on Let the web page search the shops in Settings." (checked
+    first, before anything is read or counted); 401 `auth`; 403 `forbidden` for a phone; 400 `q` (empty, or over
+    100 characters), `barcode`, `section`, `chain` ("That isn't one of your shops."), `shops` (the tab is off or
+    has no shops); 429 `rate` (10 searches a minute per browser session) or `rate-server` (60 an hour for the
+    whole server), with `Retry-After`. One search runs at a time; the others wait their turn.
+- `POST /api/v3/search/add` (the same browser that searched, within 15 minutes; sealed answer)
+  `{ search: "<id>", picks: [{ chain, storeProductId }…] (1–6, from that search), target?: "pantry" | "list" |
+  "both" (default "pantry"), list?: "general" (the line on General instead of the tab's list: with `target "list"`
+  only, no category), name?, categoryId?, qty? (1–99, default 1) }` →
+  `{ item: { id, name, section } | null, products: ["<product id>"…], line: { id, list } | null }`. As the phone's Add
+  saves: for `pantry`/`both` each pick's product (an existing one with the same chain and shop id is reused) with
+  today's price as the shop gave it (`source "auto"`; the browser never sends a price), then a pantry item (first
+  pick = My pick, the others the same thing at other shops; `name` or `genericName`; alert "good"); for
+  `list`/`both` a list line (with the item, or on its own with the cheapest pick's chain, price and `product`
+  details). The search's tab is the item's and line's. Written by the server (its sync triggers: device
+  `srv-<sid>`), so they go out in the server's file to every phone (0.9.4 phones take them like any of the
+  server's rows; no new kinds); each record's `sync_log.origin` is the browser's `web-<id>`. Errors: 403
+  `web-search-off`; 410 `search-gone` (unknown, expired, or another browser's search); 400 `picks`, `target`,
+  `categoryId` (must be a category on that tab), `qty`, `list` (not a list of that tab or General, or General with Track).
+- How the server asks (`src/stores/node.ts`, through `http.ts` `setTransport`, only in the server's core build):
+  `fetch` with the phone's own URLs and headers for its direct requests (woolworths.ts, coles.ts, aldi.ts,
+  endeavour.ts; a built-in bottle shop or chemist's known search page, read for its JSON-LD or embedded data only),
+  `User-Agent: Restock server (self-hosted grocery price tracker)` unless the shop's connection sets its own;
+  https only, only the hosts in `SHOP_HOSTS` (the built-in shops' websites and search pages from shops.ts, and
+  `api.aldi.com.au`, `api.danmurphys.com.au`, `api.bws.com.au`), no port, no sign-in part; a redirect only to
+  another host of the same shop (at most 3); 10 s for each shop's whole search; 3 MB an answer (after unzipping);
+  cookies in a jar for that one search, dropped when it ends; nothing outside a search (no timer, no background).
+- Logged (srv_log activity): `shops-searched { tab, shops: { "<chain>": "<status>" } }` and
+  `added-from-search { tab, tracked, listed, shops }`, by the browser. Never what was searched for, nor its length.
+
+### v3, 0.9.5: Data (the web's Data tab)
+
+Server side in `server/src/v3/data.mjs`. Every endpoint below is a browser session's (RestockWeb3: no session
+401 `auth`, a bad MAC 401, a phone 403 `forbidden`); every 2xx answer is sealed, errors stay plain JSON.
+
+**Spending is what gets ticked off, not receipts.** Server table `srv_spend` (household.db, so it's in the
+encrypted backup and goes with Delete everything), one row a tick: `entry_id, checked_at` (ms; the key), `at`
+(ISO of checked_at), `chain`, `section`, `item_id`, `product_id`, `text` (the item's name, else the line's),
+`qty`, `price` (per pack), `total` (price × qty), `usual`, `special` (0/1), `src` (`line` | `price` | `none`).
+- Noted by a sweep of `list_entries` after every merge and every change the server makes itself (Home
+  Assistant, the web's own file, joins: whatever goes through the server's own file), and at start (so a server
+  updated with ticked lines on its list fills it in). Idempotent.
+- A line with `checked = 1` and `checked_at` set is one purchase. Price: the line's own `price` (per pack; the
+  list totals price × qty), else the newest price on or before the tick of the item's products at the line's
+  shop (its usual product first, then the same ones, then the ones it would also take), else, with no shop on the
+  line, the cheapest such price of its usual and same products (and that's its shop), else `price` null
+  ("ticked without a price", counted as `unpriced`). A one-off line found at a shop uses its `product`'s
+  `storeProductId` for its product.
+- `usual` is verdict.ts `computeStats().typical` ported (hasCard: the server can't know): the last reading of
+  each day in the 183 days to the tick, the median of those not on special, else the median of the shops'
+  "was" prices, else the shared history's `market.normal`. Saved on specials = Σ (usual − price) × qty over
+  purchases with both known and usual > price.
+- Unticked within 48 hours of the tick (the line still there, `checked = 0` with a later `checked_at`): that
+  purchase is taken back. Ticked again: a new one (a re-tick within 48 hours of an earlier tick replaces it, as
+  there was an untick between). A line cleared off the list keeps its purchase; one unticked later than 48 hours
+  (needed again) does too. Lines and items with `demo-` ids aren't counted.
+- Not noted when older than Auto delete's cut-off, or older than the last time statistics were deleted
+  (`sync_meta srv_spend_floor`), so a line still ticked on the list doesn't come back after a delete.
+
+**Reads**
+- `GET /api/v3/data/summary` → `{ kinds: { prices: { count, products, archives, oldest, bytes }, receipts: { count,
+  pinned, photos, oldest, bytes }, stats: { count, oldest, bytes }, logs: { count, activity, oldest, bytes },
+  backups: { count (files), folders, oldest, bytes, nightly: false, keptDays: 30 } }, total, other, database,
+  files, measured: "dbstat" | "estimate", disk: { free, size } | null, autoDelete: { months, cutoff }, resend:
+  { at, next }, at }`. Bytes: SQLite `dbstat` pages of each kind's tables and indexes (an estimate from row
+  lengths where dbstat isn't built in), plus `archive/` files (prices) and `photos/` files (receipts). The
+  server makes no nightly copies of its own (the backup is a download), so "backups" is its trash: `archive/`
+  and `photos/` files deleted or replaced, kept 30 days. `total` = household.db (+ WAL) + files/ + trash;
+  `other` = what isn't in a kind (sync bookkeeping, sync files). `disk` from `statfs` on the data folder.
+- `GET /api/v3/data/stats?period=<1–120 | all>` (months back from the start of this month, server's time zone;
+  default 12) → `{ period, from (ISO | null for all), to, spending: { total, count, unpriced, months: [{ month
+  "yyyy-mm", total, count, unpriced }] (every month in the period, oldest first) }, shops: [{ chain | null, total,
+  count, unpriced }] (biggest first), sections: [{ section, name, total, count }] (by shopping list: `pantry`
+  "Groceries", `keg`, `pharmacy` "Health", `general` "General" on its own; a line with none is the groceries'),
+  saved: { total, count },
+  itemsTracked (pantry items), productsTracked (with a price in the period), prices: { count, first (oldest date,
+  all time), inPeriod }, top: <the first page of top> }`. 400 `period` otherwise.
+- `GET /api/v3/data/top?period=&offset=(0…)&limit=(1–50, default 10)` → `{ items: [{ key, itemId | null, name,
+  times, qty, total, lastAt, lastPaid: { price, chain, at } | null, usual | null, cheapest: { chain, price,
+  productId, date } | null }], offset, limit, total }`, most often bought first. Lines without an item group by
+  their words (`key` = `text:<words>`).
+- `GET /api/v3/data/series?item=<item id>&period=` → `{ item: { id, name }, period, from, usual, chains: [{
+  chain, productId, usual }], weeks: [{ week ("yyyy-mm-dd", the Wednesday a specials week starts),
+  chain, price (the cheapest that week), special }], paid: [{ at, chain, price, qty }] (≤ 200) }`, over the
+  item's usual and same products (or, with none, the ones it would also take). 404 `not-found` for no such item.
+
+**Export: `restock-export` v1.** The browser builds the spreadsheet, CSV and full export file from it.
+- `GET /api/v3/data/export` → `{ format: "restock-export", v: 1, app: "restock-server", version, at, house: {
+  name }, autoDelete, tables: { items, products, categories, list, receipts, shops, settings, aliases,
+  spending }, paged: { prices: { count, path, limit }, ticked: { count, path, limit } }, truncated: [<table>] }`.
+  Rows are the household.db columns, cleaned: `items.same_product_ids`/`alt_product_ids` as arrays, `not_at`
+  and `list.product` parsed; `receipts` are metadata only (`id, scanned_at, shop, chain, receipt_date, total,
+  section, note, pinned, photos` (how many)), never their text or photos; `shops` = `[{ id, on, name?, website?,
+  section?, removed?, branch?: { name, storeNo? } }]` from `shop:` and `branch:` rows; `settings` = the other
+  household settings `{ k: value }`; `aliases` = `[{ words, item_id }]`; `spending` = all-time months as in
+  stats. Small tables are capped at 50,000 rows (named in `truncated`).
+- `GET /api/v3/data/export/prices?after=<id>&limit=(1–10000, default 5000)` and `…/export/ticked?…` → `{ table,
+  rows, next }` (keyset pages: ask again with `after = next` until `next` is null). `prices` rows: `id,
+  product_id, date, price, was_price, is_special, member_only, promo, source`; `ticked` rows: srv_spend's, with
+  `id`. The full export file is the first answer with `tables.prices` and `tables.ticked` filled from the pages
+  (and `paged` dropped).
+- Never in it: loyalty cards (no cards table at all; their numbers never reach household.db), receipt text, the
+  passphrase or anything made from it, keys (household, server, owner, kex, phones'), sessions, the recovery
+  key, the Home Assistant token or which phone runs it, `demo-` rows. A future import takes `format` and `v`
+  first and refuses a higher `v`.
+
+**Manage.** Every delete is two steps on the web; the server checks both: body `{ …, typed, confirm: { c, proof }
+}` (`confirm` as for Remove). Order: no `confirm` → 403 `confirm`; `typed` not exactly the word → 400 `typed`
+(the challenge isn't used); a wrong passphrase → 403 `current` (counts towards the lockout). Passphrase sessions
+only. Nothing here deletes the shopping list, the pantry (items, products), categories, household settings or
+each product's newest price (prune's rule: `date < MAX(date)` for that product); pinned receipts stay. Prices
+and receipts go quietly (no deletes go out to phones; a deleted receipt's sync record stays, so a phone's
+unchanged copy doesn't bring it back). Logged in srv_log activity with who (`data-deleted`,
+`deleted-everything`, `auto-delete-changed`, `phones-asked-to-resend`, `recounted`, `data-exported`).
+- `POST /api/v3/data/delete { kinds: ["prices" | "receipts" | "stats" | "logs" | "backups"…], before?: ISO
+  (in the past), typed: "DELETE", confirm }` → `{ deleted: { cutoff, prices, receipts, photos, archives, stats,
+  logs, backups }, kinds, before }` (counts; `before` null = everything of those kinds). `prices`: price history
+  (and `archive/` months wholly before the date); `receipts`: receipts and their photos (and those archive
+  months); `stats`: srv_spend; `logs`: srv_log (activity and logs); `backups`: trash folders made before the date
+  (all without one). Photos and archive files go to the trash (30 days) unless "backups" is in the same delete
+  without a date; rows in household.db are gone at once. 400 `kinds` / `before`. An archive month goes only when
+  everything in it goes (its prices only with `prices`, its receipts only with `receipts`) and never one holding
+  a pinned receipt; the rest stay, and what was deleted of them stays out when one is read again (sync_meta
+  `prices_floor`, `receipts_floor`).
+- `POST /api/v3/data/delete { kinds, before?, dryRun: true }` (0.9.5 review) → `{ counts: <as deleted>, kinds,
+  before, dryRun: true }`: exactly what that delete would take, by the same rules, deleting nothing. Any browser
+  session (no passphrase, no typed word). The web's Step 1 (Clean up, Delete…, Auto delete) shows these numbers.
+- `POST /api/v3/data/delete-everything { typed: "DELETE EVERYTHING", confirm }` → `{ ok, mode: "new", phones }`.
+  The household goes: household.db, every file, the trash, the household's keys and Home Assistant settings
+  (token included). Every phone is unlinked as by Remove: its next request is 401 `removed`, so it forgets the
+  household and keeps all its own things (`notice = "server-removed"`); it can be added again later. The admin's
+  sign-in and the server's settings (Auto delete, Let the web page search the shops) stay, and so does the
+  browser session that asked (its page wipes its own copy). 0.9.5 (review): every other browser session ends
+  (each one's copy of the household would go into the next one). Each household has an id (`state.house.id`)
+  and each session notes the one it was made for (`house`; a session from before 0.9.5 is of the one there is);
+  a browser's sync file from a session of another household is refused (409 `household`), and the web drops a
+  copy whose pinned owner key isn't the household's (live.ts, the PWA's offline copy too). A browser's file
+  whose session is gone is never merged again and goes to the trash (at a merge, a start, and nightly).
+  The server is new again: Set up this server (`POST /api/v3/setup { name }`).
+- **Auto delete** (replaces Keep data for; same `state.json settings.keepMonths`): `null` (off) or a whole
+  number of months 1–120. **New servers start off**; a server that has a value keeps it (0.9.4's default was 12);
+  a value that isn't one reads as 12. `GET /api/v3/data/autodelete` → `{ months, cutoff }`. `PUT
+  /api/v3/data/autodelete { months, typed?, confirm? }` → `{ months, cutoff, was, deleted: <as delete> | null }`;
+  turning it on or shortening it deletes at once, so it needs `typed: "DELETE"` and `confirm`; longer or off
+  needs neither. 400 `months`. `PUT /api/v3/settings { keepMonths }` takes the same values with the same checks,
+  and `GET /api/v3/settings` adds `autoDelete` (= `keepMonths`). Runs nightly (the 3 o'clock hour in the server's zone: `TZ`, else Node's local zone, else UTC; worked out with Intl, as the Data tab's months and days are,
+  at most once a day, and once soon after a start), over prices, receipts and photos, archives, statistics and
+  logs. The signed `server` row carries `keepMonths` as it is: a 0.9.4 phone reads a value other than 3, 6, 9, 12
+  as no cut-off (it shows Auto delete as off, offloads all it would, and the server passes over what's older than
+  its cut-off). 0.9.5 phones and the web (`parseServerRow`, `keepCutoff`, `SyncHousehold.keepMonthsOk`) take
+  any whole number 1–120.
+- **Ask phones to resend**: `POST /api/v3/data/resend` → `{ at, next }`; passphrase sessions only (403
+  `passphrase`); at most once a day (else 429 `rate` with `retryAfter`, `next`, which the web shows). The server re-signs its `server` row with `resend: <ms>`. A 0.9.5 phone
+  (`ServerSync.resendIfAsked`) seeing a `resend` it hasn't answered (`sync_meta server_resent`) writes its whole
+  file again with every price it has (not just the last 60 days' changes), once. The server merges it as any
+  file, so nothing doubles. A 0.9.4 phone's `parseServerRow` passes over the field. A resend that fails waits a
+  day (`server_resend_wait`) and is then answered; one refused for its size is answered at once: never every round.
+- **Recount**: `POST /api/v3/data/recount` → `{ added, removed, checked, repriced }`: the sweep, then every
+  purchase priced again from what's known now (the line's own price if it's still there with that tick). The
+  statistics are computed from srv_spend and prices when asked; nothing else is cached. Passphrase sessions
+  only (403 `passphrase`), one at a time and not within 60 seconds of the last (429 `busy` / `rate` with
+  `retryAfter`); 500 rows at a time, the server answering other requests in between.
+- `POST /api/v3/prune` (0.9.4's Delete older data) stays as it was (passphrase, no typed word): prices, receipts
+  (their photos and archive months) and logs, never the statistics; the Data tab uses `/api/v3/data/delete`.

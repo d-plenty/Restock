@@ -1,30 +1,36 @@
-<p><b>Half price? Prove it.</b> Restock watches prices at the Australian supermarkets, bottle shops and pharmacies you choose, and tells you in plain words when a special is real, when to wait, and when to swap.</p>
+<p><b>Half price? Prove it.</b> Restock watches prices at the Australian supermarkets, bottle shops and chemists you choose, and tells you in plain words when a special is real, when to wait, and when to swap.</p>
+
+<p><b>Local first.</b> Your list, pantry and prices live on your phone. With no signal in the shop, your list still opens, and you can tick things off and add things. Only searching the shops needs the internet. No account, and no server needed.</p>
 
 <p><b>What it tells you</b></p>
 <ul>
-<li><b>Great deal</b>: 30% or more below its normal price</li>
-<li><b>On sale</b>: 15% or more below normal</li>
-<li><b>Wait</b>: on sale, but it's been cheaper recently and usually comes back down</li>
-<li><b>Fake sale</b>: marked as a special at its normal price</li>
+<li><b>Great deal</b>: 30% or more below its usual price</li>
+<li><b>On special</b>: 15% or more below its usual price</li>
+<li><b>Wait for a better sale</b>: on special, but it's been cheaper lately and usually comes back down</li>
+<li><b>Fake sale</b>: marked as a special at its usual price</li>
 <li><b>Swap &amp; save</b>: something you'd happily buy instead is cheaper per 100 g, litre or item</li>
 </ul>
 
 <p><b>Features</b></p>
 <ul>
-<li>Coles, Woolworths and Aldi, plus bottle shops (18+) and pharmacies if you want them, and any other shop's website</li>
+<li>Coles, Woolworths and Aldi, plus bottle shops (Keg tab, 18+) and chemists (Health tab) if you want them, and any other shop's website</li>
+<li>Four shopping lists: Groceries, Keg, Health and General</li>
 <li>Built-in open-source barcode scanner; Restock finds the same product at each of your shops</li>
-<li>Sync with your household: phones in the same house share one pantry and shopping list straight to each other on your Wi-Fi, encrypted, with no Restock server or account. Away from home, sync through your own Nextcloud, another WebDAV server or a Syncthing folder, sealed so only your phones can read it</li>
-<li>Other sizes of this: the same can or bottle in other packs, compared per litre or per 100g</li>
+<li>Undo after most changes, and settings that wait for Save settings</li>
+<li>Sync with your household: phones in the same house share one pantry and shopping list straight to each other on your Wi-Fi, encrypted, with no account and no server needed. Away from home, sync through Nextcloud, another WebDAV server or a Syncthing folder, sealed so only your phones can read it</li>
+<li>Optional: your own Restock server at home (Docker or a Home Assistant app). It syncs around the clock, runs your Home Assistant shopping list, shows your spending and prices, and gives you Restock in a browser and on iPhone</li>
+<li>Your shopping list in Home Assistant, both ways, with voice adds</li>
+<li>Other sizes of this: the same can or bottle in other packs, compared per litre or per 100 g</li>
 <li>Search that works out what you mean: "butter" puts butter first, not peanut butter or butter chicken sauce</li>
-<li>Price history for each product at each shop: where today's price sits, how often it's on sale and when the next sale is likely</li>
-<li>My catalogue: this week's sales on the things you buy, a page for each shop</li>
-<li>Shopping list that recommends shopping around, or the one store with everything when shopping around saves less than your minimum, comparing the same shopping at each store</li>
+<li>Price history for each product at each shop: where today's price sits, how often it's on special and when the next special is likely</li>
+<li>My catalogue: specials on the things you buy, a page for each shop</li>
+<li>A Shopping list that suggests shopping around, or the one shop with everything when shopping around saves less than your minimum</li>
 <li>Background price checks and alerts, and a weekly deals summary</li>
 <li>Recall alerts from the official Australian recall lists (FSANZ, Product Safety Australia, TGA)</li>
 <li>Optional receipt scanning, read on the phone by a built-in open-source reader that works offline</li>
 <li>Shopping mode, widgets, shortcuts, backups, themes and accessibility settings</li>
 </ul>
 
-<p><b>Private by design.</b> Everything stays in a database on your phone. No account, no ads, no analytics, no tracking, and no Google Play services. The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists). Nothing goes to the people who make Restock.</p>
+<p><b>Private by design.</b> Everything stays in a database on your phone. No account, no ads, no analytics, no tracking, and no Google Play services. The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists), and to your own Home Assistant and Restock server if you connect them. Nothing goes to the people who make Restock.</p>
 
 <p>Restock isn't connected with any shop or government agency. Prices can be wrong or out of date. It reads each shop's public website from your phone, so the shops' own terms and privacy policies apply to those visits.</p>

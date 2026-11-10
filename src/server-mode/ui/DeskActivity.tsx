@@ -1,10 +1,11 @@
 // 0.9.4: Activity and logs for a house (from the server's srv_log, newest first): who joined, was
 // removed, signed in, uploaded; and the logs (merges, Home Assistant rounds, problems). Never
-// contents, never secrets. Both are kept for "Keep data for".
+// contents, never secrets. Both go with Auto delete (0.9.5; 0.9.4's "Keep data for").
 import { useRef, useState, type KeyboardEvent } from 'react';
 import { timeAgo } from '../../ui/components';
 import { HousePage } from './DeskServer';
-import { isTrouble, keepLabel, useActivity, useHouseSettings, usePhonesV3, whatOf, whoOf } from './houseData';
+import { logsKeepText } from '../../lib/autoDelete';
+import { isTrouble, useActivity, useHouseSettings, usePhonesV3, whatOf, whoOf } from './houseData';
 
 type Part = 'activity' | 'logs';
 
@@ -68,7 +69,7 @@ export function ActivityLogs({ narrow }: { narrow?: boolean }) {
         {part === 'activity'
           ? 'Who joined, was removed or left, signed in, and sent changes.'
           : 'What the server did: merging what phones sent, Home Assistant rounds, and anything that went wrong.'}{' '}
-        Never what's in your lists, and never a passphrase or token. Kept for {settings ? keepLabel(settings.keepMonths).toLowerCase() : 'as long as Keep data for says'}.
+        Never what's in your lists, and never a passphrase or token. {logsKeepText(settings ? (settings.keepMonths ?? null) : undefined)}
       </p>
       <div className="dk-seg big dk-self-start" role="tablist" aria-label="Show" onKeyDown={onKey}>
         {parts.map((p, i) => (

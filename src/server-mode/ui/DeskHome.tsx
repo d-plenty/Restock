@@ -1,8 +1,9 @@
 // 0.9.3: Home at desktop widths: this week's tiles, good buys, the list and small price drops.
 // The same data and sums as the phone's Home (Home.tsx weekDeals), laid out wide.
+import { todayText } from '../../lib/greeting';
 import { useMemo } from 'react';
-import { allListEntries, deleteListEntries, getSettings, updateListEntry } from '../../lib/db';
-import { addGroupToList } from '../../lib/listActions';
+import { allListEntries, getSettings } from '../../lib/db';
+import { addToList, takeOffList } from '../../lib/listActions'; // 0.9.5 (undo)
 import { loadRecommendations } from '../../lib/recs';
 import { nameHasSize } from '../../lib/naming';
 import { money, tidySize } from '../../lib/units';
@@ -12,7 +13,7 @@ import { chainName } from '../../shops';
 import { ChainName, Icon, SectionMark } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { weekDeals } from '../../ui/screens/Home';
-import { listSums, shopOf, useListAdd } from '../../ui/screens/List';
+import { listSums, shopOf, tickEntry, useListAdd } from '../../ui/screens/List';
 import { underTarget } from '../../ui/screens/Pantry';
 import { openRecalls } from '../../ui/screens/Recalls';
 import { ActionInfoTag } from '../../ui/tagInfo';
@@ -28,13 +29,21 @@ export function DeskHome() {
   const recalls = useLive(openRecalls, []);
   // Worked out again only when the data changes, not on every key typed in the add box.
   const sums = useMemo(
-    () => (allRecs && settings && allEntries ? { groceries: listSums(allEntries, allRecs, settings, 'pantry'), w: weekDeals(allRecs, settings, allEntries) } : undefined),
+    () =>
+      allRecs && settings && allEntries
+        ? {
+            groceries: listSums(allEntries, allRecs, settings, 'pantry'),
+            // 0.9.5: the General list counts on the Shopping list tile too.
+            general: listSums(allEntries, allRecs, settings, 'general').entries.filter((e) => !e.checked).length,
+            w: weekDeals(allRecs, settings, allEntries),
+          }
+        : undefined,
     [allRecs, settings, allEntries],
   );
   const adder = useListAdd(sums?.groceries.entries ?? [], sums?.groceries.recs ?? [], 'pantry');
   if (!allRecs || !settings || !allEntries || !sums) return <div className="dk-page" aria-busy="true" />;
-  const { groceries, w } = sums;
-  const today = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+  const { groceries, general, w } = sums;
+  const today = todayText();
 
   // On special this week: the same deals Home counts (on sale, swap & save, small savings), by shop.
   const byShop = new Map<string, number>();
@@ -47,6 +56,7 @@ export function DeskHome() {
     .map(([c, n]) => `${chainName(c)} ${n}`)
     .join(' · ');
   const open = w.entries.filter((e) => !e.checked);
+  const toBuy = open.length + general;
   const shops = w.totals.around.chains.length;
   const under = w.recs.filter(underTarget);
   const hits = w.recs.filter((r) => underTarget(r) || worthAlerting(r));
@@ -54,12 +64,11 @@ export function DeskHome() {
   const toggle = async (r: Recommendation) => {
     const id = w.listed.get(r.group.id);
     if (id) {
-      await deleteListEntries([id]);
-      nav.toast(`${r.group.name} taken off your shopping list`);
+      await takeOffList([id], r.group.name); // 0.9.5 (undo)
       return;
     }
-    const added = await addGroupToList(r.group);
-    nav.toast(added ? `${r.group.name} added to your shopping list` : `${r.group.name} is already on your list`);
+    const added = await addToList(r.group); // 0.9.5 (undo)
+    if (!added) nav.toast(`${r.group.name} is already on your list`);
   };
 
   const preview = groceries.entries
@@ -70,8 +79,8 @@ export function DeskHome() {
 
   return (
     <div className="dk-page">
-      <DeskHead title={greeting()} sub={<span className="dk-date">{today}</span>}>
-        <DeskAddBox adder={adder} label="Add to the shopping list" placeholder="Add to the list: milk, bread, dog food…" compact />
+      <DeskHead title={greeting()} above={today}>
+        <DeskAddBox adder={adder} label="Add to the shopping list" placeholder="Add to your shopping list: milk, bread, dog food…" compact />
       </DeskHead>
 
       <div className="dk-tiles">
@@ -83,8 +92,8 @@ export function DeskHome() {
           <span className="dk-tile-sub">{shopLine || 'Nothing on special yet'}</span>
         </button>
         <button className="dk-tile" onClick={() => nav.setTab('list', 'pantry')}>
-          <span className="dk-tile-lab">{w.on.length > 1 ? 'Grocery list' : 'Shopping list'}</span>
-          <span className="dk-tile-big">{open.length ? `${open.length} to buy` : 'Empty'}</span>
+          <span className="dk-tile-lab">Shopping list</span>
+          <span className="dk-tile-big">{toBuy ? `${toBuy} to buy` : 'Empty'}</span>
           <span className="dk-tile-sub num">
             {w.totals.around.total > 0
               ? `About ${money(w.totals.around.total)}${shops > 1 ? ` across ${shops} shops` : shops === 1 ? ` at ${chainName(w.totals.around.chains[0])}` : ''}`
@@ -95,7 +104,7 @@ export function DeskHome() {
           <span className="dk-tile-lab">Price alerts</span>
           <span className="dk-tile-big">{hits.length ? `${hits.length} hit` : 'None hit'}</span>
           <span className="dk-tile-sub">
-            {under.length ? `${under.length} below the price you set` : hits.length ? 'On sale the way your alerts ask' : 'Nothing at your alert prices yet'}
+            {under.length ? `${under.length} below the price you set` : hits.length ? 'On special the way your alerts ask' : 'Nothing at your alert prices yet'}
           </span>
         </button>
         {recalls && recalls.length > 0 ? (
@@ -126,57 +135,64 @@ export function DeskHome() {
               <p className="small">None of your items is on a good sale right now. Your phones keep checking, and new deals show up here.</p>
             </div>
           ) : (
-            <div className="dk-table-wrap">
-              <table className="dk-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Item</th>
-                    <th scope="col">Where</th>
-                    <th scope="col">Price</th>
-                    <th scope="col">How good</th>
-                    <th scope="col">
-                      <span className="sr-only">Shopping list</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {w.worth.map((r) => {
-                    const deal = (r.action === 'alt' ? r.alt : r.best)!;
-                    const listed = w.listed.has(r.group.id);
-                    const size = deal.product.size && !nameHasSize(deal.product.name, deal.product.size) ? tidySize(deal.product.size, deal.product.name) : undefined;
-                    const was = deal.stats.current?.wasPrice;
-                    const price = deal.multi ? deal.shelfPrice : deal.price;
-                    return (
-                      <tr key={r.group.id}>
-                        <td>
-                          <button className="dk-name" onClick={() => openItem(nav, r.group)}>
-                            <SectionMark section={r.group.section} />
-                            {r.group.name}
-                          </button>
-                          <span className="dk-sub clip">{r.action === 'alt' ? `Swap to ${deal.product.name}` : [deal.product.name, size].filter(Boolean).join(' · ')}</span>
-                        </td>
-                        <td className="dk-nowrap">
-                          <ChainName chain={deal.product.chain} />
-                        </td>
-                        <td className="num">
-                          <strong>{money(price)}</strong>
-                          {was !== undefined && was > (price ?? 0) && <s className="dk-was"> {money(was)}</s>}
-                        </td>
-                        <td>
-                          <ActionInfoTag rec={r} action={r.action} great={r.best?.verdict.kind === 'great'} />
-                          <span className="dk-sub">{r.detail}</span>
-                        </td>
-                        <td className="dk-end">
-                          <button className={`btn small${listed ? '' : ' dk-add'}`} aria-pressed={listed} onClick={() => void toggle(r)}>
-                            <Icon name={listed ? 'cartCheck' : 'cartPlus'} size={16} />
-                            {listed ? 'On the list' : 'Add to list'}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            // 0.9.5: a grid, not a table, so it fits its column at every width: five columns when
+            // there's room (1920), the shop and "how good" under the item (1280 and 1440), stacked
+            // on narrow screens. The Add to list button is never cut off.
+            <div className="dk-buys-wrap">
+              <div className="dk-buys-head" aria-hidden>
+                <span>Item</span>
+                <span>Where</span>
+                <span>Price</span>
+                <span>How good</span>
+                <span />
+              </div>
+              <ul className="dk-buys" aria-label="Good buys this week">
+                {w.worth.map((r) => {
+                  const deal = (r.action === 'alt' ? r.alt : r.best)!;
+                  const listed = w.listed.has(r.group.id);
+                  const size = deal.product.size && !nameHasSize(deal.product.name, deal.product.size) ? tidySize(deal.product.size, deal.product.name) : undefined;
+                  const was = deal.stats.current?.wasPrice;
+                  const price = deal.multi ? deal.shelfPrice : deal.price;
+                  return (
+                    <li key={r.group.id} className="dk-buy">
+                      <span className="dk-buy-item">
+                        <button className="dk-name" onClick={() => openItem(nav, r.group)}>
+                          <SectionMark section={r.group.section} />
+                          {r.group.name}
+                        </button>
+                        <span className="dk-sub clip">{r.action === 'alt' ? `Swap to ${deal.product.name}` : [deal.product.name, size].filter(Boolean).join(' · ')}</span>
+                      </span>
+                      <span className="dk-buy-where">
+                        <ChainName chain={deal.product.chain} />
+                      </span>
+                      <span className="dk-buy-price num">
+                        <strong>{money(price)}</strong>
+                        {was !== undefined && was > (price ?? 0) && (
+                          <s className="dk-was">
+                            <span className="sr-only">usual price </span>
+                            {money(was)}
+                          </s>
+                        )}
+                      </span>
+                      <span className="dk-buy-how">
+                        <ActionInfoTag rec={r} action={r.action} great={r.best?.verdict.kind === 'great'} />
+                        <span className="dk-sub">{r.detail}</span>
+                      </span>
+                      <span className="dk-buy-act">
+                        <button
+                          className={`btn small${listed ? '' : ' primary'}`}
+                          aria-pressed={listed}
+                          aria-label={listed ? `On the list: ${r.group.name}` : `Add to list: ${r.group.name}`}
+                          onClick={() => void toggle(r)}
+                        >
+                          <Icon name={listed ? 'cartCheck' : 'cartPlus'} size={16} />
+                          {listed ? 'On the list' : 'Add to list'}
+                        </button>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
           <p className="small">Prices come from your phones' checks. Your phones keep checking; this page shows what they found.</p>
@@ -185,19 +201,21 @@ export function DeskHome() {
         <aside className="dk-aside">
           <section className="card" aria-labelledby="dk-onlist">
             <div className="dk-section-head">
-              <h2 id="dk-onlist">On the list</h2>
+              <h2 id="dk-onlist">Shopping list</h2>
               <button className="dk-linkish" onClick={() => nav.setTab('list', 'pantry')}>
-                Open the list
+                Open it
               </button>
             </div>
-            {preview.length === 0 && <p className="small">Nothing on the grocery list.</p>}
+            {preview.length === 0 && <p className="small">Nothing on your shopping list.</p>}
             {preview.map((e) => {
               const shop = shopOf(groceries.c, e);
               const title = nameOf(e.groupId, e.text);
               return (
                 <div key={e.id} className={`dk-check${e.checked ? ' done' : ''}`}>
                   {/* 0.9.4: only the checkbox ticks; the name opens the item. */}
-                  <input type="checkbox" checked={e.checked} aria-label={`Got ${title}`} onChange={(ev) => void updateListEntry(e.id, { checked: ev.target.checked })} />
+                  <label className="tick-hit">
+                    <input type="checkbox" checked={e.checked} aria-label={`Got ${title}`} onChange={(ev) => void tickEntry(e, ev.target.checked, title) /* 0.9.5 (undo) */} />
+                  </label>
                   <span className="grow">
                     {e.groupId ? (
                       <button
@@ -238,7 +256,7 @@ export function DeskHome() {
                 </div>
               ))
             )}
-            {w.smalls.length > 0 && <span className="small">Small savings: under 15% off the normal price.</span>}
+            {w.smalls.length > 0 && <span className="small">Small savings: under 15% off the usual price.</span>}
           </section>
         </aside>
       </div>

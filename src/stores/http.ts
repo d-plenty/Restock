@@ -9,7 +9,7 @@ export const isNative = () => Capacitor.isNativePlatform();
 
 export class NativeOnlyError extends Error {
   constructor() {
-    super('Live store prices only work in the Android app.');
+    super('Live shop prices only work in the Android app.');
     this.name = 'NativeOnlyError';
   }
 }
@@ -106,6 +106,26 @@ export interface HttpResult {
   headers: Record<string, string>;
 }
 
+/** What a request asks for (the options of `request`). */
+export interface RequestOptions {
+  url: string;
+  method?: 'GET' | 'POST';
+  headers?: Record<string, string>;
+  body?: unknown;
+  timeoutMs?: number;
+  anonymous?: string;
+}
+
+/**
+ * 0.9.5: the Restock server's own way of asking a shop (src/stores/node.ts, for "Let the web page
+ * search the shops"). Set only by the server's core build; never on a phone or in the web app, where
+ * it stays undefined and `request` works exactly as before.
+ */
+let transport: ((opts: RequestOptions) => Promise<HttpResult>) | undefined;
+export function setTransport(t: ((opts: RequestOptions) => Promise<HttpResult>) | undefined) {
+  transport = t;
+}
+
 export async function request(opts: {
   url: string;
   method?: 'GET' | 'POST';
@@ -122,6 +142,7 @@ export async function request(opts: {
    */
   anonymous?: string;
 }): Promise<HttpResult> {
+  if (transport) return transport(opts);
   if (!isNative()) throw new NativeOnlyError();
   const headers: Record<string, string> = { 'User-Agent': MOBILE_UA, ...(opts.headers ?? {}) };
   if (opts.anonymous) {

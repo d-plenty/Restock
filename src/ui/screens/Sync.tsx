@@ -26,6 +26,9 @@ import { syncBackgroundSchedule } from '../../lib/check';
 import { scheduleReminders } from '../../lib/notify';
 import { Icon, LoadingBar, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
+// 0.9.5 (save): the sharing switches and this phone's name wait for Save settings.
+import { stage } from '../../lib/settingsDraft';
+import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar';
 
 // Settings → Sync (0.8.0): phones in the same household sync with each other on the same Wi-Fi.
 // No server, no account: one phone shows a QR code, the other scans it.
@@ -267,10 +270,22 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
 
 /** The tabs a household can share, in plain words. */
 export const SHARE_TABS: { tab: Section; title: string; sub: string }[] = [
-  { tab: 'pantry', title: 'Groceries', sub: 'Pantry, its shopping list and prices' },
+  { tab: 'pantry', title: 'Groceries', sub: 'Pantry, its shopping list (and General) and prices' },
   { tab: 'keg', title: 'Bottle shops', sub: 'Keg tab · 18+' },
-  { tab: 'pharmacy', title: 'Pharmacy', sub: 'Pharmacy tab' },
+  { tab: 'pharmacy', title: 'Health', sub: 'Health tab' },
 ];
+
+/** 0.9.5 (save): changes to this phone's sync settings, held until Save (SyncScreen). */
+type SyncPatch = {
+  name?: string;
+  shareCards?: boolean;
+  keepReady?: boolean;
+  tabs?: Section[];
+  householdTabs?: Section[];
+  householdReceipts?: boolean;
+  /** Tabs turned on: their shops and settings come across too (shareTab). */
+  addTabs?: Section[];
+};
 
 /** Ask "18 or over?" before anything Keg is shared to or from this phone. */
 export async function askAdult(): Promise<boolean> {
@@ -1281,7 +1296,7 @@ export function AddPhoneSheet({ info, onClose, onWifi }: { info: SyncInfo; onClo
 /** The personal things a phone can take back off a v3 server (never groceries). */
 export const PERSONAL: { kind: TakeBack; title: string }[] = [
   { kind: 'keg', title: 'Keg' },
-  { kind: 'pharmacy', title: 'Pharmacy' },
+  { kind: 'pharmacy', title: 'Health' },
   { kind: 'receipts', title: 'Receipts' },
   { kind: 'cards', title: 'Loyalty cards' },
 ];
@@ -1369,7 +1384,7 @@ export function LeaveServerSheet({ info, onClose, onDone }: { info: SyncInfo; on
               {andList(PERSONAL.filter((p) => personal.includes(p.kind)).map((p) => (p.kind === 'cards' ? 'loyalty cards' : p.kind === 'receipts' ? 'receipts' : p.title)))}.
             </>
           ) : info.house || info.serverApi === 3 ? (
-            "This phone didn't share anything personal (Keg, Pharmacy, receipts or loyalty cards)."
+            "This phone didn't share anything personal (Keg, Health, receipts or loyalty cards)."
           ) : (
             <>
               <strong style={{ color: 'var(--ink)' }}>On the server, nothing is deleted.</strong> What this phone shared stays there for the house: prices,
@@ -1431,8 +1446,27 @@ export function LeaveServerSheet({ info, onClose, onDone }: { info: SyncInfo; on
 }
 
 export function SyncScreen({ invite }: { invite?: boolean } = {}) {
+  useSettingsDraft(); // 0.9.5 (save)
   const nav = useNav();
   const [info, setInfo] = useState<SyncInfo>();
+  // 0.9.5 (save): changes waiting for Save, shown in place of what's set now (sh).
+  const draft = useDraftState();
+  const [pending, setPending] = useState<SyncPatch>({});
+  const [wifiPending, setWifiPending] = useState<boolean>();
+  useEffect(() => {
+    setPending({});
+    setWifiPending(undefined);
+  }, [draft.epoch]);
+  const sh = (i: SyncInfo): SyncInfo => ({
+    ...i,
+    ...(pending.name !== undefined ? { name: pending.name } : {}),
+    ...(pending.shareCards !== undefined ? { shareCards: pending.shareCards } : {}),
+    ...(pending.keepReady !== undefined ? { keepReady: pending.keepReady } : {}),
+    ...(pending.tabs !== undefined ? { myTabs: pending.tabs, tabs: pending.tabs } : {}),
+    ...(pending.householdTabs !== undefined ? { householdTabs: pending.householdTabs } : {}),
+    ...(pending.householdReceipts !== undefined ? { shareReceipts: pending.householdReceipts } : {}),
+    ...(wifiPending !== undefined ? { wifiSync: wifiPending } : {}),
+  });
   // 0.9.3: Settings' Start a household and Add a phone open the code straight away.
   const [inviting, setInviting] = useState(!!invite);
   const [joining, setJoining] = useState<string>();
@@ -1480,19 +1514,49 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
     }
   };
 
-  const set = async (patch: {
-    name?: string;
-    shareCards?: boolean;
-    keepReady?: boolean;
-    tabs?: Section[];
-    householdTabs?: Section[];
-    householdReceipts?: boolean;
-  }) => {
-    try {
-      setInfo(await RestockNative.syncSet(patch));
-    } catch (e) {
-      nav.toast(e instanceof Error ? e.message : String(e));
-    }
+  /** 0.9.5 (save): held until Save settings; then sent in one go. */
+  const set = async (patch: SyncPatch, addTab?: Section) => {
+    if (!info) return;
+    const next = { ...pending, ...patch };
+    const tabsAdded = addTab ? [...new Set([...(pending.addTabs ?? []), addTab])] : pending.addTabs;
+    const all: SyncPatch = { ...next, ...(tabsAdded?.length ? { addTabs: tabsAdded } : {}) };
+    setPending(all);
+    const was = info;
+    const now: SyncPatch = {
+      name: was.name,
+      shareCards: !!was.shareCards,
+      keepReady: was.keepReady !== false,
+      tabs: was.tabs ?? was.myTabs,
+      householdTabs: was.householdTabs,
+      householdReceipts: !!was.shareReceipts,
+    };
+    const { addTabs, ...plain } = all;
+    const current = Object.fromEntries(Object.keys(all).map((k) => [k, (now as Record<string, unknown>)[k]]));
+    await stage(
+      'sync-set',
+      all,
+      async () => {
+        let i = was;
+        // A tab turned on brings its shops and settings across (shareTab), as it did straight away before.
+        for (const t of addTabs ?? []) i = (await shareTab(i, t)) ?? i;
+        if (Object.keys(plain).length) i = await RestockNative.syncSet(plain);
+        setInfo(i);
+        setPending({});
+      },
+      current as SyncPatch,
+    );
+  };
+  const setWifi = async (on: boolean) => {
+    setWifiPending(on);
+    await stage(
+      'sync-wifi',
+      on,
+      async () => {
+        setInfo(await RestockNative.syncSetWifi({ on }));
+        setWifiPending(undefined);
+      },
+      info?.wifiSync !== false,
+    );
   };
 
   const leave = async () => {
@@ -1711,13 +1775,13 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
           {/* 0.9.4: Wi-Fi sync can be off (a phone in a server's house starts with it off). */}
           <div className="card flush">
             <label className="check">
-              <input type="checkbox" className="switch" checked={info.wifiSync !== false} onChange={(e) => void RestockNative.syncSetWifi({ on: e.target.checked }).then(setInfo, (er) => nav.toast(errText(er)))} />
+              <input type="checkbox" className="switch" checked={sh(info).wifiSync !== false} onChange={(e) => void setWifi(e.target.checked)} />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <span className="title" style={{ fontSize: 15 }}>
                   Phones on your Wi-Fi
                 </span>
                 <span className="small">
-                  {info.wifiSync !== false
+                  {sh(info).wifiSync !== false
                     ? 'On: swaps changes straight with the household\'s phones on this Wi-Fi, even when the internet is down.'
                     : 'Off · turn on to also swap changes at home when the internet is down.'}
                 </span>
@@ -1927,7 +1991,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                   <span className="title" style={{ fontSize: 15 }}>
                     What this phone shares with {serverName(info)}
                   </span>
-                  <span className="small">Groceries, Keg, Pharmacy, receipts and loyalty cards: each on or off for this phone.</span>
+                  <span className="small">Groceries, Keg, Health, receipts and loyalty cards: each on or off for this phone.</span>
                 </span>
                 <Icon name="chevron" size={18} />
               </button>
@@ -1939,7 +2003,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
               <span className="small">The household shares:</span>
               <TabsPicker
                 offered={SECTIONS}
-                value={info.householdTabs ?? SECTIONS}
+                value={sh(info).householdTabs ?? SECTIONS}
                 onChange={(v) => {
                   if (!v.length) return nav.toast('Pick at least one thing to share.');
                   void set({ householdTabs: v });
@@ -1951,13 +2015,17 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
             {info.isOwner ? 'This phone shares:' : `${info.household ?? 'The household'} shares these. This phone shares the ticked ones:`}
           </span>
           <TabsPicker
-            offered={info.householdTabs ?? SECTIONS}
-            value={(info.myTabs ?? SECTIONS).filter((t) => (info.householdTabs ?? SECTIONS).includes(t))}
+            offered={sh(info).householdTabs ?? SECTIONS}
+            value={(sh(info).myTabs ?? SECTIONS).filter((t) => (sh(info).householdTabs ?? SECTIONS).includes(t))}
             onChange={(v) => {
               if (!v.length) return nav.toast('Pick at least one, or stop syncing this phone.');
-              const added = v.find((t) => !(info.tabs ?? []).includes(t));
-              if (added) void shareTab(info, added).then((i) => i && setInfo(i));
-              else void set({ tabs: v });
+              // 0.9.5 (save): a tab turned on still asks 18 or over (Keg) now; it comes across on Save.
+              const added = v.find((t) => !(sh(info).tabs ?? []).includes(t));
+              if (added === 'keg')
+                void askAdult().then((ok) => {
+                  if (ok) void set({ tabs: v }, added);
+                });
+              else void set({ tabs: v }, added && !(info.tabs ?? []).includes(added) ? added : undefined);
             }}
           />
           <p className="small" style={{ marginTop: -4 }}>
@@ -1968,7 +2036,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
               <input
                 type="checkbox"
                 className="switch"
-                checked={!!info.shareReceipts}
+                checked={!!sh(info).shareReceipts}
                 disabled={!info.isOwner}
                 onChange={(e) => void set({ householdReceipts: e.target.checked })}
               />
@@ -1989,8 +2057,9 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
             <span>This phone's name</span>
             <input
               className="input"
-              defaultValue={info.name}
-              onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== info.name && void set({ name: e.target.value })}
+              key={`name-${draft.epoch}`}
+              defaultValue={sh(info).name}
+              onChange={(e) => e.target.value.trim() && void set({ name: e.target.value.trim() })}
             />
           </label>
           <p className="small" style={{ marginTop: -6 }}>
@@ -2002,7 +2071,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
 
           <div className="card flush">
             {!(info.house || info.serverApi === 3) && <label className="check">
-              <input type="checkbox" className="switch" checked={!!info.shareCards} onChange={(e) => void set({ shareCards: e.target.checked })} />
+              <input type="checkbox" className="switch" checked={!!sh(info).shareCards} onChange={(e) => void set({ shareCards: e.target.checked })} />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <span className="title" style={{ fontSize: 15 }}>
                   Share my loyalty cards
@@ -2011,7 +2080,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
               </span>
             </label>}
             <label className="check">
-              <input type="checkbox" className="switch" checked={info.keepReady !== false} onChange={(e) => void set({ keepReady: e.target.checked })} />
+              <input type="checkbox" className="switch" checked={sh(info).keepReady !== false} onChange={(e) => void set({ keepReady: e.target.checked })} />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <span className="title" style={{ fontSize: 15 }}>
                   Stay ready to sync
@@ -2153,6 +2222,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
           }}
         />
       )}
+      <SaveBar onlyWhenChanged />
       {away === 'nextcloud' && <NextcloudSheet onClose={() => setAway(undefined)} onDone={awayDone} />}
       {away === 'webdav' && <WebDavSheet onClose={() => setAway(undefined)} onDone={awayDone} />}
       {member && (

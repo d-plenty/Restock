@@ -14,6 +14,8 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** 0.9.5: the rest of a refusal's answer (a 429's retryAfter and next, say). */
+    readonly extra?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -104,7 +106,7 @@ async function call(method: string, path: string, body?: unknown, raw?: Uint8Arr
     const j = (await r
       .clone()
       .json()
-      .catch(() => ({}))) as { error?: string; message?: string };
+      .catch(() => ({}))) as { error?: string; message?: string; retryAfter?: unknown; next?: unknown };
     const code = typeof j.error === 'string' ? j.error : '';
     // This computer's clock is out: once more with the server's (the MAC covers the time).
     if (r.status === 401 && code === 'clock' && !retried) {
@@ -115,7 +117,8 @@ async function call(method: string, path: string, body?: unknown, raw?: Uint8Arr
       }
     }
     if (r.status === 401 && !opts.quiet401) onSignedOut?.();
-    throw new ApiError(r.status, code, typeof j.message === 'string' ? j.message : words(r.status, code));
+    const more = { ...(typeof j.retryAfter === 'number' ? { retryAfter: j.retryAfter } : {}), ...(typeof j.next === 'string' ? { next: j.next } : {}) };
+    throw new ApiError(r.status, code, typeof j.message === 'string' ? j.message : words(r.status, code), Object.keys(more).length ? more : undefined);
   }
   return r;
 }
@@ -280,6 +283,8 @@ export interface HouseSettings {
   name?: string;
   /** 3, 6, 9, 12, or null for Until I delete. */
   keepMonths?: number | null;
+  /** 0.9.5 (web search): "Let the web page search the shops" (off unless turned on). */
+  webSearch?: boolean;
 }
 
 export interface HaConfig {
@@ -327,6 +332,9 @@ export interface Confirm {
 const v3get = <T>(path: string) => answer<T>(call('GET', path));
 const v3send = <T>(method: string, path: string, body?: unknown, seal = false) => answer<T>(call(method, path, body ?? {}, undefined, undefined, { seal }));
 const enc3 = encodeURIComponent;
+/** 0.9.5: for the Data tab's calls (ui/houseData.ts): a sealed-answer GET, and a send (sealed body when `seal`). */
+export const v3Get = v3get;
+export const v3Send = v3send;
 
 export const api3 = {
   challenge: (user: string) => json<{ salt: string; c: string; kex: string; setup?: boolean }>(call('GET', `/api/v3/login/challenge?user=${enc3(user)}`)),

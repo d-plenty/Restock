@@ -161,6 +161,7 @@ async function run(f: Fixtures, sc: Scenario): Promise<unknown[]> {
         const id = s.id !== undefined ? (s.id as string) : s.idOf !== undefined ? haLineId(entity, s.idOf as string) : `r${++a.n}`;
         const l: Line = { id, text: s.text as string, qty: (s.qty as number) ?? 1, checked: (s.checked as boolean) ?? false };
         if (s.groupId !== undefined) l.groupId = s.groupId as string;
+        if (s.section !== undefined) l.section = s.section as Line['section'];
         shared.list.push(l);
         break;
       }
@@ -202,7 +203,8 @@ async function run(f: Fixtures, sc: Scenario): Promise<unknown[]> {
           r,
           calls: ha.calls,
           ha: ha.list.map((i) => [i.uid, i.summary, i.status]),
-          lines: shared.list.map((l) => [l.id, l.text, l.qty, l.checked, l.groupId ?? null]),
+          // 0.9.5: and the list a line went on (General for what matched nothing).
+          lines: shared.list.map((l) => [l.id, l.text, l.qty, l.checked, l.groupId ?? null, l.section ?? null]),
           state: stateOf(store.state),
         });
         break;

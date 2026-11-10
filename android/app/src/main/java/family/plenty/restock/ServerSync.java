@@ -29,6 +29,8 @@ import org.json.JSONObject;
 final class ServerSync {
     /** Prices changed within this long go in the phone's file on the server (a folder leaves them out). */
     static final long PRICES_MS = 60L * 24 * 3600 * 1000;
+    /** 0.9.5: "Ask phones to resend": every price this phone has goes in its file, once. */
+    static final long ALL_PRICES_MS = 100L * 365 * 24 * 3600 * 1000;
 
     final SyncEngine e;
     final SyncHousehold h;
@@ -93,7 +95,7 @@ final class ServerSync {
     void clearNotes() throws Exception {
         for (String k : new String[] { "server_top", "server_keys", "server_at", "server_unread", "server_files", "server_webkeys", "server_off_at", "server_off_prices", "server_off_waiting", "server_keysfile" })
             e.setMeta(k, null);
-        e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'server_seen:%' OR key LIKE 'server_ver:%' OR key LIKE 'server_webpub:%' OR key LIKE 'server_photorefs:%' OR key LIKE 'server_keysver:%' OR key LIKE 'server_bad:%'");
+        e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'server_seen:%' OR key LIKE 'server_ver:%' OR key LIKE 'server_webpub:%' OR key LIKE 'server_photorefs:%' OR key LIKE 'server_keysver:%' OR key LIKE 'server_bad:%' OR key LIKE 'catchup:server_seen:%'");
     }
 
     /**
@@ -308,6 +310,63 @@ final class ServerSync {
         return count != null && !count.equals(String.valueOf(names.size()));
     }
 
+    /**
+     * 0.9.5: when the household's owner-signed `server` row has a `resend` (ms) this phone hasn't
+     * answered yet ("Ask phones to resend" on the web's Data page), it writes its whole file again now,
+     * with every price it has (not just the last 60 days), once for each request. The server merges it
+     * as any file (nothing doubles); the next change writes the usual file. A 0.9.4 phone passes over it.
+     */
+    private void resendIfAsked(ServerFolder f, String nowIso, long now, Round out) {
+        long at = 0;
+        try {
+            at = resendAsked(now);
+            if (at <= 0 || String.valueOf(at).equals(e.meta("server_resent"))) return;
+            // 0.9.5 (review): a try that failed waits a day (not every round: it sends everything).
+            String wait = e.meta("server_resend_wait");
+            if (wait != null && wait.startsWith(at + ":") && now < Long.parseLong(wait.substring(wait.indexOf(':') + 1))) return;
+            e.setMeta("server_top", null);
+            SyncFolder.Result again = new SyncFolder(e, h, "server", ALL_PRICES_MS).sync(f, nowIso);
+            if (out.result != null) out.result.received += again.received;
+            e.setMeta("server_resent", String.valueOf(at));
+            e.setMeta("server_resend_wait", null);
+        } catch (Exception ex) {
+            resendFailed(at, now, ex);
+        }
+    }
+
+    /**
+     * 0.9.5 (review): a resend that failed. Turned down for its size (or the server is full): that
+     * request is answered, it won't fit tomorrow either (the usual file goes as always). Anything
+     * else: tried again in a day, once; a second failure answers it too. Never every round.
+     */
+    void resendFailed(long at, long now, Exception ex) {
+        if (at <= 0) return;
+        try {
+            String m = ex.getMessage() == null ? "" : ex.getMessage();
+            String wait = e.meta("server_resend_wait");
+            boolean tried = wait != null && wait.startsWith(at + ":");
+            if (tried || m.contains("too big") || m.contains("full")) {
+                e.setMeta("server_resent", String.valueOf(at));
+                e.setMeta("server_resend_wait", null);
+            } else {
+                e.setMeta("server_resend_wait", at + ":" + (now + 24L * 3600 * 1000));
+            }
+        } catch (Exception ignored) {
+            // next round
+        }
+    }
+
+    /** 0.9.5: the signed `server` row's `resend` (ms), or 0 (none, not a house's row, or from the future). */
+    long resendAsked(long now) {
+        try {
+            if (h.serverRow() == null) return 0;
+            long at = new JSONObject(e.householdValue("server")).optLong("resend", 0);
+            return at > 0 && at <= now + 24L * 3600 * 1000 ? at : 0;
+        } catch (Exception ex) {
+            return 0;
+        }
+    }
+
     /** One round with the server. Never throws: a problem is in `error`, and nothing is deleted then. */
     Round round(String nowIso, long now) {
         Round out = new Round();
@@ -323,6 +382,8 @@ final class ServerSync {
                 f = open();
                 out.result = roundSync(f, nowIso, out);
             }
+            // 0.9.5: the server asked phones to resend (its signed server row's `resend`).
+            if (v3()) resendIfAsked(f, nowIso, now, out);
             out.reached = f.reached();
             noteFileKey();
             List<String> names = f.names();

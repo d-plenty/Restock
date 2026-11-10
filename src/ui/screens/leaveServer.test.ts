@@ -68,13 +68,13 @@ describe('leaving the server (0.9.4)', () => {
     const html = render(house({ tabs: ['pantry', 'keg', 'pharmacy'], shareReceipts: true, shareCards: true }));
     expect(html).toContain('your phone found at your shops (Coles, Woolworths, Aldi and the others) stay on the server');
     expect(html).toContain("They're about the shops, not about you.");
-    for (const t of ['Keg', 'Pharmacy', 'Receipts', 'Loyalty cards']) expect(html).toContain(`>${t}</span>`);
+    for (const t of ['Keg', 'Health', 'Receipts', 'Loyalty cards']) expect(html).toContain(`>${t}</span>`);
     expect(html).toContain('Select all');
     expect(html).not.toMatch(/type="checkbox" checked/);
     expect(html).toContain('Only what this phone added comes off the server');
     expect(html).not.toContain('>Groceries<');
     const none = render(house());
-    expect(none).toContain("This phone didn't share anything personal (Keg, Pharmacy, receipts or loyalty cards).");
+    expect(none).toContain("This phone didn't share anything personal (Keg, Health, receipts or loyalty cards).");
     expect(none).not.toContain('Select all');
     expect(none).toContain('stay on the server');
   });

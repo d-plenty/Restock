@@ -32,6 +32,7 @@ export {
   TABLES,
   ALL_TABS,
   KEEP_MONTHS,
+  keepMonthsOk,
   MONTH_MS,
   SERVER_PRICES_MS,
   OLD_DELETE_MS,
@@ -120,10 +121,18 @@ export { applyRows, settingChangeOk, checkListRow, settingTab, isListRow, decode
 export { cleanSummary } from '../lib/phoneSummary';
 
 // ---------- Home Assistant (haSync.ts, haMatch.ts) ----------
-export { syncRound, syncRound as haSyncRound, restApi, haLists, haProblem, tooOld, haLineId, emptyState, summaryOf, HaError, MIN_HA_VERSION, EMPTY_HOLD_MS, EMPTY_GAP_MS, TOKEN_REFUSED } from '../lib/haSync';
+export { syncRound, syncRound as haSyncRound, restApi, haLists, haProblem, tooOld, haLineId, onHaList, emptyState, summaryOf, HaError, MIN_HA_VERSION, EMPTY_HOLD_MS, EMPTY_GAP_MS, TOKEN_REFUSED } from '../lib/haSync';
 export type { HaItem, HaApi, Transport, HaState, HaPair, Line, Store, RoundResult } from '../lib/haSync';
 export { matchKey, parseLine, lineSummary, candidates, matchOne } from '../lib/haMatch';
 export type { NamedItem } from '../lib/haMatch';
+
+// ---------- 0.9.5: Let the web page search the shops (search.ts, src/stores/node.ts) ----------
+export { configureShopSearch, searchShops, searchPlan, searchHow, foundOf, blockedMessage, genericName, SEARCH_LIMITS } from './search';
+export type { ShopAsk, ShopAnswer, FoundProduct } from './search';
+export { SHOP_HOSTS, shopOfHost } from '../stores/node';
+
+// ---------- 0.9.5 (final review): spending counts Any size packs as the list does (shopTotals.ts) ----------
+export { packsFor } from '../lib/shopTotals';
 
 // ---------- the database ----------
 export { MIGRATIONS };

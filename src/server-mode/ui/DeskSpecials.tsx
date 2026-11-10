@@ -4,6 +4,8 @@
 // catalogue (made here from your items' prices). Home shows a little of both (HomeSpecials).
 import { useMemo, useState } from 'react';
 import { addListEntry, allGroups, getSettings, nowIso, uid } from '../../lib/db';
+import { addToList } from '../../lib/listActions'; // 0.9.5 (undo)
+import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { buildCatalogue } from '../../lib/myCatalogue';
 import { loadRecommendations } from '../../lib/recs';
 import { likeYourPantry } from '../../lib/specials';
@@ -11,11 +13,14 @@ import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import { activeSections, chainName, searchChainsIn, type StoreChain } from '../../shops';
 import type { StoreProduct } from '../../stores/types';
-import { ChainDot, Icon, Thumb, timeAgo } from '../../ui/components';
+import type { Group } from '../../types';
+import { ChainDot, Icon, Sheet, storePageUrl, Thumb, timeAgo } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { HousePage } from './DeskServer';
-import { https, useFollowed, useShared } from './houseData';
+import { useFollowed, useShared } from './houseData';
+import { ItemPhoto, photoUrl } from './deskShared';
 import { memberNames } from '../live';
+import { useTrackSpecial } from './WebShopSearch'; // 0.9.5 (web search)
 
 const MINE_KEY = 'deskSpecialsMine';
 
@@ -27,8 +32,8 @@ function loadMine(): boolean {
   }
 }
 
-/** A shop's product picture: only an https one (anything the page's CSP doesn't allow shows the box). */
-export const thumbOf = (url: unknown) => (typeof url === 'string' ? https(url) : undefined);
+/** A shop's product picture: https, from a shop's picture host the page's CSP allows (else the box). */
+export const thumbOf = (url: unknown) => photoUrl(url);
 
 function useSpecialLists() {
   const shared = useShared();
@@ -44,30 +49,141 @@ function useSpecialLists() {
   return { shared, lists, pantry };
 }
 
-function useAddSpecial() {
+function useAddSpecial(opener: { index: Map<string, string>; groups: Map<string, Group> }) {
   const nav = useNav();
   return async (p: StoreProduct) => {
-    await addListEntry({ id: uid(), text: p.name, chain: p.chain, price: p.price, section: 'pantry', checked: false, createdAt: nowIso() });
-    nav.toast(`${p.name} added to your shopping list`);
+    // A special on something you track goes on the list as that item (its line, its quantity).
+    const id = trackedGroup(opener.index, p);
+    const group = id ? opener.groups.get(id) : undefined;
+    if (group) {
+      const added = await addToList(group); // 0.9.5 (undo)
+      if (!added) nav.toast(`${group.name} is already on your shopping list`);
+      return;
+    }
+    // 0.9.5 (undo)
+    await act(`${p.name} added to your shopping list`, () =>
+      addListEntry({ id: uid(), text: p.name, chain: p.chain, price: p.price, section: 'pantry', checked: false, createdAt: nowIso() }),
+    );
   };
 }
 
-function SpecialRow({ p, onAdd }: { p: StoreProduct; onAdd: (p: StoreProduct) => void }) {
+/** Words to match a special with a tracked product by name: lower case, letters and digits only. */
+const nameKey = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/×/g, 'x')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+/** "chain|shop's id" and "chain|name" → the pantry item that tracks that product (0.9.5). */
+export function trackedIndex(recs: { group: { id: string }; options: { product: { chain: string; storeProductId?: string; name: string } }[] }[]) {
+  const m = new Map<string, string>();
+  for (const r of recs)
+    for (const o of r.options) {
+      if (o.product.storeProductId) m.set(`${o.product.chain}|id|${o.product.storeProductId}`, r.group.id);
+      m.set(`${o.product.chain}|name|${nameKey(o.product.name)}`, r.group.id);
+    }
+  return m;
+}
+
+export const trackedGroup = (index: Map<string, string>, p: Pick<StoreProduct, 'chain' | 'storeProductId' | 'name'>) =>
+  (p.storeProductId ? index.get(`${p.chain}|id|${p.storeProductId}`) : undefined) ?? index.get(`${p.chain}|name|${nameKey(p.name)}`);
+
+/** Opens a special: its item page when you track it, else its product sheet. */
+function useOpenSpecial() {
+  const nav = useNav();
+  const recs = useLive(loadRecommendations, []);
+  const index = useMemo(() => trackedIndex(recs ?? []), [recs]);
+  const groups = useMemo(() => new Map((recs ?? []).map((r) => [r.group.id, r.group])), [recs]);
+  const [sheet, setSheet] = useState<StoreProduct>();
+  const open = (p: StoreProduct) => {
+    const groupId = trackedGroup(index, p);
+    if (groupId) nav.push({ name: 'item', groupId });
+    else setSheet(p);
+  };
+  return { open, index, groups, sheet, close: () => setSheet(undefined) };
+}
+
+/** 0.9.5 (web search): Track for an untracked special, when Let the web page search the shops is on. */
+type Tracker = ReturnType<typeof useTrackSpecial>;
+const trackKey = (p: StoreProduct) => `${p.chain}:${p.storeProductId}`;
+
+function SpecialRow({ p, onAdd, onOpen, tracked, tracker }: { p: StoreProduct; onAdd: (p: StoreProduct) => void; onOpen: (p: StoreProduct) => void; tracked: boolean; tracker?: Tracker }) {
   return (
     <div className="row house-special">
-      <Thumb src={thumbOf(p.imageUrl)} />
-      <span className="grow">
-        <span className="title clip">{p.name}</span>
-        <span className="small">
-          <strong className="num">{money(p.price)}</strong>
-          {p.wasPrice ? <s className="dk-was"> {money(p.wasPrice)}</s> : null}
-          {p.promo ? ` · ${p.promo}` : ''}
+      <button type="button" className="house-special-open" onClick={() => onOpen(p)} aria-label={`${p.name}, ${tracked ? 'open the item' : 'details'}`}>
+        <Thumb src={thumbOf(p.imageUrl)} />
+        <span className="grow">
+          <span className="title clip">{p.name}</span>
+          <span className="small">
+            <strong className="num">{money(p.price)}</strong>
+            {p.wasPrice ? <s className="dk-was"> {money(p.wasPrice)}</s> : null}
+            {p.promo ? ` · ${p.promo}` : ''}
+            {tracked ? ' · in your pantry' : ''}
+          </span>
         </span>
-      </span>
+      </button>
+      {/* 0.9.5 (web search): Track it, as on the phone. */}
+      {tracker?.on && !tracked && (
+        <button className="btn small" disabled={!!tracker.busy} onClick={() => void tracker.track(p)} aria-label={`Track ${p.name}`}>
+          <Icon name="pantry" size={16} /> {tracker.busy === trackKey(p) ? 'Tracking…' : 'Track'}
+        </button>
+      )}
       <button className="btn small primary" onClick={() => onAdd(p)} aria-label={`Add ${p.name} to your shopping list`}>
-        <Icon name="cartPlus" size={16} /> List
+        <Icon name="cartPlus" size={16} /> Add to list
       </button>
     </div>
+  );
+}
+
+/** A special you don't track yet: its photo, prices, the shop's page and Add to list. */
+export function SpecialSheet({ p, onAdd, onClose, tracker }: { p: StoreProduct; onAdd: (p: StoreProduct) => void; onClose: () => void; tracker?: Tracker }) {
+  const page = storePageUrl({ chain: p.chain, name: p.name, brand: p.brand, storeProductId: p.storeProductId });
+  return (
+    <Sheet title={chainName(p.chain)} onClose={onClose}>
+      <ItemPhoto src={photoUrl(p.imageUrl)} name={p.name} size="sheet" />
+      <span className="title dk-sheet-name">{p.name}</span>
+      <div className="dk-sheet-price">
+        <span className="num dk-sheet-now">{money(p.price)}</span>
+        {p.wasPrice && p.wasPrice > (p.price ?? 0) ? (
+          <span className="small num">
+            usual price <s>{money(p.wasPrice)}</s>
+          </span>
+        ) : null}
+        {p.promo && <span className="tag good">{p.promo.toUpperCase()}</span>}
+      </div>
+      <p className="small">
+        On special at {chainName(p.chain)} this week. It isn't in your pantry, so Restock doesn't watch its price.{' '}
+        {tracker?.on ? 'Track it to put it in your pantry.' : 'Add it to your pantry on a phone to do that.'}
+      </p>
+      {/* 0.9.5 (web search): Track, from the server's own search of that shop. */}
+      {tracker?.on && (
+        <button
+          className="btn"
+          disabled={!!tracker.busy}
+          onClick={() => {
+            void tracker.track(p);
+            onClose();
+          }}
+        >
+          <Icon name="pantry" size={18} /> Track it
+        </button>
+      )}
+      <button
+        className="btn primary"
+        onClick={() => {
+          onAdd(p);
+          onClose();
+        }}
+      >
+        <Icon name="cartPlus" size={18} /> Add to list
+      </button>
+      {page && (
+        <a className="btn" href={page} target="_blank" rel="noopener noreferrer">
+          <Icon name="external" size={18} /> See it on the {chainName(p.chain)} website
+        </a>
+      )}
+    </Sheet>
   );
 }
 
@@ -100,7 +216,9 @@ export function DeskSpecials({ narrow }: { narrow?: boolean }) {
   const followed = useFollowed();
   const { lists, pantry } = useSpecialLists();
   const [mine, setMineState] = useState(loadMine);
-  const add = useAddSpecial();
+  const opener = useOpenSpecial();
+  const add = useAddSpecial(opener);
+  const tracker = useTrackSpecial(); // 0.9.5 (web search)
   const names = memberNames();
   const setMine = (v: boolean) => {
     setMineState(v);
@@ -115,8 +233,8 @@ export function DeskSpecials({ narrow }: { narrow?: boolean }) {
     <HousePage narrow={narrow} title="Specials and catalogues">
       <button className="banner green cat-entry dk-self-start house-cat" onClick={() => nav.push({ name: 'mycatalogue' })}>
         <span className="cat-kicker">YOUR RESTOCK CATALOGUE</span>
-        <span className="cat-entry-title">Made from what you buy</span>
-        <span className="cat-lede">This week's sales on the things you track, a page for each shop.</span>
+        <span className="cat-entry-title">Specials on the things you buy</span>
+        <span className="cat-lede">This week's specials on everything you track, a page for each shop.</span>
         <span className="btn small cat-open">Open my catalogue</span>
       </button>
 
@@ -125,10 +243,10 @@ export function DeskSpecials({ narrow }: { narrow?: boolean }) {
           <h2 id="sp-week">This week's specials</h2>
           <div className="dk-seg" role="group" aria-label="Which specials">
             <button aria-pressed={filter} disabled={!pantry.length} onClick={() => setMine(true)}>
-              Like what I buy
+              Things I buy
             </button>
             <button aria-pressed={!filter} onClick={() => setMine(false)}>
-              Everything
+              All specials
             </button>
           </div>
         </div>
@@ -158,15 +276,14 @@ export function DeskSpecials({ narrow }: { narrow?: boolean }) {
                   {l.device.startsWith('srv-') ? 'Shared by your phones' : `From ${names.get(l.device) ?? 'a phone'}`}
                   {l.at ? `, ${timeAgo(l.at)}` : ''}
                 </span>
-                {items.length === 0 && <p className="small house-pad">{filter ? 'Nothing like what you buy this week.' : 'None this week.'}</p>}
+                {items.length === 0 && <p className="small house-pad">{filter ? 'Nothing like the things you buy this week.' : 'None this week.'}</p>}
                 {items.slice(0, 40).map((p) => (
-                  <SpecialRow key={p.storeProductId} p={p} onAdd={(x) => void add(x)} />
+                  <SpecialRow key={p.storeProductId} p={p} onAdd={(x) => void add(x)} onOpen={opener.open} tracked={!!trackedGroup(opener.index, p)} tracker={tracker} />
                 ))}
               </section>
             );
           })}
         </div>
-        <p className="small">"List" adds it for this trip only. To watch its price, add it to your pantry on a phone.</p>
       </section>
 
       <section className="dk-stack" aria-labelledby="sp-shops">
@@ -183,8 +300,10 @@ export function DeskSpecials({ narrow }: { narrow?: boolean }) {
           </section>
         ))}
         {followed && !followed.length && <p className="small">No shops picked yet. Pick them in Settings → Shops.</p>}
-        <p className="small">Catalogue prices can differ by state and store. Your items' prices are checked by your phones, so you don't need to hunt for them here.</p>
+        <p className="small">Catalogue prices can differ by state and branch. Your items' prices are checked by your phones, so you don't need to hunt for them here.</p>
       </section>
+      {opener.sheet && <SpecialSheet p={opener.sheet} onAdd={(x) => void add(x)} onClose={opener.close} tracker={tracker} />}
+      {tracker.sheet}
     </HousePage>
   );
 }
@@ -193,7 +312,9 @@ export function DeskSpecials({ narrow }: { narrow?: boolean }) {
 export function HomeSpecials() {
   const nav = useNav();
   const { lists, pantry } = useSpecialLists();
-  const add = useAddSpecial();
+  const opener = useOpenSpecial();
+  const add = useAddSpecial(opener);
+  const tracker = useTrackSpecial(); // 0.9.5 (web search)
   const cat = useLive(async () => {
     const [settings, recs] = await Promise.all([getSettings(), loadRecommendations()]);
     const chains = [...new Set(activeSections(settings).flatMap((s) => searchChainsIn(settings.enabledChains, s)))];
@@ -214,12 +335,12 @@ export function HomeSpecials() {
         </div>
         {picks.length === 0 ? (
           <div className="card">
-            <p className="small">{lists.length ? 'Nothing like what you buy on half price this week.' : 'None shared yet: your phones share the half-price lists they fetch.'}</p>
+            <p className="small">{lists.length ? 'Nothing like the things you buy is half price this week.' : 'None shared yet: your phones share the half-price lists they fetch.'}</p>
           </div>
         ) : (
           <div className="card flush">
             {picks.map((p) => (
-              <SpecialRow key={`${p.chain}-${p.storeProductId}`} p={p} onAdd={(x) => void add(x)} />
+              <SpecialRow key={`${p.chain}-${p.storeProductId}`} p={p} onAdd={(x) => void add(x)} onOpen={opener.open} tracked={!!trackedGroup(opener.index, p)} tracker={tracker} />
             ))}
           </div>
         )}
@@ -237,12 +358,12 @@ export function HomeSpecials() {
               <>
                 <span className="dk-stat num">{cat.items}</span>
                 <span className="dk-sub">
-                  of your items on sale this week{cat.saving > 0 ? `, saving about ${money(cat.saving)}` : ''}
+                  of your items on special this week{cat.saving > 0 ? `, saving about ${money(cat.saving)}` : ''}
                   {cat.halfPrice ? ` · ${cat.halfPrice} half price` : ''}
                 </span>
               </>
             ) : (
-              <p className="small">None of your items is on sale this week.</p>
+              <p className="small">None of your items is on special this week.</p>
             )
           ) : (
             <p className="small" aria-busy="true">
@@ -251,6 +372,8 @@ export function HomeSpecials() {
           )}
         </section>
       </aside>
+      {opener.sheet && <SpecialSheet p={opener.sheet} onAdd={(x) => void add(x)} onClose={opener.close} tracker={tracker} />}
+      {tracker.sheet}
     </div>
   );
 }

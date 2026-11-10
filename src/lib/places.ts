@@ -416,6 +416,6 @@ async function nearbyStoresFresh(lat: number, lon: number, section: Section, cha
   try {
     return await Promise.any([servers, backup]);
   } catch {
-    throw new Error("Couldn't reach the map servers. Check you're online and try again, or type your store names instead.");
+    throw new Error("Couldn't reach the map servers. Check you're online and try again, or type your branch names instead.");
   }
 }

@@ -15,6 +15,9 @@ import type { DesktopProps } from '../flag';
 import { syncNow } from '../live';
 import { session } from '../session';
 import { ActivityLogs } from './DeskActivity';
+// 0.9.5: the Data tab.
+import { DeskData } from './DeskData';
+import { DeskDataManage } from './DeskDataManage';
 import { HandoverCard, ServerAndPhones } from './DeskServer';
 import { DeskSpecials } from './DeskSpecials';
 import { ServerHomeAssistant } from './ServerHomeAssistant';
@@ -27,8 +30,15 @@ import { DeskPantry } from './DeskPantry';
 import { DeskSettings } from './DeskSettings';
 import { useNow, useStatus } from './ServerScreens';
 import '../desk.css';
+// 0.9.5 (PWA)
+import { PwaBanners } from '../pwa/Banners';
+import { InstallHelpLink } from '../pwa/InstallHelp';
+// 0.9.5 (undo) / 0.9.5 (save)
+import { UndoFoot } from './DeskUndo';
+import { askLeave } from '../../lib/confirm';
+import { canLeave, hasUnsaved } from '../../lib/settingsDraft';
 
-type Place = Tab | 'specials' | 'receipts' | 'household' | 'settings';
+type Place = Tab | 'specials' | 'receipts' | 'household' | 'data' | 'settings';
 
 /** Which sidebar entry a screen belongs to (by the first screen opened over the tab). */
 function placeOf(tab: Tab, stack: Screen[]): Place {
@@ -36,6 +46,7 @@ function placeOf(tab: Tab, stack: Screen[]): Place {
   if (!s) return tab;
   if (s.name === 'specials' || s.name === 'catalogues' || s.name === 'mycatalogue') return 'specials';
   if (s.name === 'receipts' || s.name === 'receipt') return 'receipts';
+  if (s.name === 'server' && (s.page === 'data' || s.page === 'data-manage')) return 'data';
   if (s.name === 'server' || s.name === 'cards') return 'household';
   if (s.name === 'settings' || s.name === 'household' || s.name === 'homeAssistant') return 'settings';
   return tab;
@@ -52,6 +63,8 @@ function deskScreen(top: Screen): ReactNode | undefined {
       <DeskHousehold extra={serverInfo()?.api === 3 && serverInfo()?.mode === 'v2' ? <HandoverCard /> : undefined} />
     );
   if (top.name === 'server' && top.page === 'activity' && house) return <ActivityLogs />;
+  if (top.name === 'server' && top.page === 'data' && house) return <DeskData />;
+  if (top.name === 'server' && top.page === 'data-manage' && house) return <DeskDataManage />;
   if (top.name === 'homeAssistant' && house) return <ServerHomeAssistant />;
   if (top.name === 'specials' || top.name === 'catalogues') return <DeskSpecials />;
   return undefined;
@@ -139,9 +152,14 @@ function SideNav({ tabs, place, go }: { tabs: Tab[]; place: Place; go: (p: Place
       {settings?.receipts.enabled && item('receipts', 'Receipts', 'receipt')}
       <div className="dk-nav-rule" role="separator" />
       {item('household', 'Server and phones', 'phone')}
+      {isV3() && item('data', 'Data', 'chart')}
       {item('settings', 'Settings', 'settings')}
       <div className="dk-nav-foot">
+        {/* 0.9.5 (undo): the big white Undo, for a few seconds after each change. */}
+        <UndoFoot />
         <SyncFoot />
+        {/* 0.9.5 (PWA): "On iPhone?" steps. */}
+        <InstallHelpLink className="pwa-install-link" />
       </div>
     </nav>
   );
@@ -171,6 +189,8 @@ export function Desktop({ tabs, tab, stack, overlay }: DesktopProps) {
   }, [place, top]);
 
   const go = (p: Place) => {
+    // 0.9.5 (save): changes not saved on a settings page: ask once, then go.
+    if (hasUnsaved()) return void canLeave(askLeave).then((ok) => ok && go(p));
     // The list opens on the tab being looked at (Keg's list from Keg), else the grocery list.
     if (p === 'list') nav.setTab('list', isSectionTab(tab) ? tab : 'pantry');
     else if (p === 'home' || isSectionTab(p as Tab)) nav.setTab(p as Tab);
@@ -178,7 +198,15 @@ export function Desktop({ tabs, tab, stack, overlay }: DesktopProps) {
       // Opened over the tab showing, the way the phone opens them (Back goes to the tab).
       nav.setTab(tab);
       nav.push(
-        p === 'specials' ? { name: 'specials' } : p === 'receipts' ? { name: 'receipts' } : p === 'household' ? { name: 'server', page: 'phones' } : { name: 'settings' },
+        p === 'specials'
+          ? { name: 'specials' }
+          : p === 'receipts'
+            ? { name: 'receipts' }
+            : p === 'household'
+              ? { name: 'server', page: 'phones' }
+              : p === 'data'
+                ? { name: 'server', page: 'data' }
+                : { name: 'settings' },
       );
     }
     // Keyboard and screen reader users land on the new page.
@@ -199,6 +227,8 @@ export function Desktop({ tabs, tab, stack, overlay }: DesktopProps) {
       </a>
       <SideNav tabs={tabs} place={place} go={go} />
       <main className="dk-main" id="dk-main" ref={main} tabIndex={-1}>
+        {/* 0.9.5 (PWA): new version, offline and install notices. */}
+        <PwaBanners />
         {page}
       </main>
     </div>

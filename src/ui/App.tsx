@@ -1,6 +1,6 @@
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { openDatabase } from '../lib/boot';
 import { wireSync } from '../lib/sync';
@@ -18,6 +18,7 @@ import { activeSections, type Section } from '../shops';
 import { ConfirmHost } from './ConfirmHost';
 import { ErrorBoundary } from './ErrorBoundary';
 import { ScannerHost } from './Scanner';
+import { placeToast } from './toastLift';
 import { AddScreen } from './screens/Add';
 import { CardsScreen } from './screens/Cards';
 import { CataloguesScreen } from './screens/Catalogues';
@@ -49,12 +50,15 @@ import { RestockServerScreen } from './screens/RestockServer';
 import { HomeAssistantScreen } from './screens/HomeAssistant';
 import { wireHomeAssistant } from '../lib/homeAssistant';
 import { serverMode, serverUi, useDesktopWidth } from '../server-mode/flag';
+import { onUndo, undo as undoStep, undoneText } from '../lib/undo'; // 0.9.5 (undo)
+import { canLeave, getSettings as shownSettings, hasUnsaved } from '../lib/settingsDraft'; // 0.9.5 (save)
+import { askLeave } from '../lib/confirm'; // 0.9.5 (save)
 
 const ALL_TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'pantry', label: 'Pantry', icon: 'pantry' },
   { id: 'keg', label: 'Keg', icon: 'keg' },
-  { id: 'pharmacy', label: 'Pharmacy', icon: 'pharmacy' },
+  { id: 'pharmacy', label: 'Health', icon: 'pharmacy' },
   { id: 'add', label: 'Add', icon: 'plus' },
   { id: 'list', label: 'List', icon: 'cart' },
 ];
@@ -75,9 +79,19 @@ function RestockApp() {
   const [section, setSection] = useState<Section>('pantry');
   const [stack, setStack] = useState<Screen[]>([]);
   const [toastMsg, setToastMsg] = useState<string>();
+  // 0.9.5 (look): the toast stays clear of the bars at the bottom of the screen (toastLift.ts).
+  const toastRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!toastMsg) return;
+    placeToast(toastRef.current);
+    const t = window.setInterval(() => placeToast(toastRef.current), 200);
+    return () => window.clearInterval(t);
+  }, [toastMsg]);
   const [toastUndo, setToastUndo] = useState<(() => void | Promise<void>) | undefined>(undefined);
   const toastTimer = useRef<number | undefined>(undefined);
   const settings = useLive(() => (ready ? getSettings() : Promise.resolve(undefined)), [ready]);
+  // 0.9.5 (save): the look and colours show while they're being changed, before Save (and go back on Discard).
+  const look = useLive(() => (ready ? shownSettings() : Promise.resolve(undefined)), [ready]);
   // 0.9.3: the web app on a Restock server, in a wide window: the desktop layout. Always false on a phone.
   const desk = useDesktopWidth();
 
@@ -122,34 +136,94 @@ function RestockApp() {
       .catch((e) => setBootError(e instanceof Error ? e.message : String(e)));
   }, []);
 
-  const toast = useCallback((msg: string, undo?: () => void | Promise<void>) => {
-    setToastMsg(msg);
-    setToastUndo(() => undo);
+  // 0.9.5 (undo): a message with Undo stays 5 seconds, and waits while it's touched or focused.
+  const toastLeft = useRef(0);
+  const toastHeld = useRef(false);
+  const startToastTimer = useCallback(() => {
     window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(
-      () => {
-        setToastMsg(undefined);
-        setToastUndo(undefined);
-      },
-      undo ? 4000 : 2800,
-    );
+    if (toastHeld.current) return;
+    toastTimer.current = window.setTimeout(() => {
+      setToastMsg(undefined);
+      setToastUndo(undefined);
+    }, toastLeft.current);
+  }, []);
+  const toast = useCallback(
+    (msg: string, undo?: () => void | Promise<void>) => {
+      setToastMsg(msg);
+      setToastUndo(() => undo);
+      toastHeld.current = false;
+      toastLeft.current = undo ? 5000 : 2800;
+      startToastTimer();
+    },
+    [startToastTimer],
+  );
+  const holdToast = useCallback(
+    (hold: boolean) => {
+      toastHeld.current = hold;
+      if (hold) window.clearTimeout(toastTimer.current);
+      else {
+        toastLeft.current = Math.max(toastLeft.current, 2500);
+        startToastTimer();
+      }
+    },
+    [startToastTimer],
+  );
+  // 0.9.5 (undo): every undoable action (undo.ts) offers Undo here. In the wide web layout the
+  // sidebar has its own big Undo button instead (Desktop.tsx UndoFoot).
+  const deskRef = useRef(desk);
+  deskRef.current = desk;
+  useEffect(
+    () =>
+      onUndo((e) => {
+        if (e.kind === 'added' && !deskRef.current)
+          toast(e.step.label, async () => {
+            const r = await undoStep(e.step.id);
+            if (r) toast(undoneText(r));
+          });
+        else if (e.kind === 'undone' && deskRef.current) toast(undoneText(e));
+      }),
+    [toast],
+  );
+
+  // 0.9.5 (undo): on the web, Ctrl+Z (Cmd+Z on a Mac) undoes the last change, outside text boxes.
+  useEffect(() => {
+    if (!serverMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'z' || e.shiftKey || e.altKey || !(e.ctrlKey || e.metaKey)) return;
+      const t = e.target as HTMLElement | null;
+      const typing = t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|range|color)$/.test((t as HTMLInputElement).type)));
+      if (typing) return;
+      e.preventDefault();
+      void undoStep().then((r) => {
+        if (r && !deskRef.current) toast(undoneText(r));
+      });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [toast]);
+
+  // 0.9.5 (save): leaving a settings screen with changes not saved asks first (settingsDraft.ts).
+  const leave = useCallback((go: () => void) => {
+    if (!hasUnsaved()) return go();
+    void canLeave(askLeave).then((ok) => ok && go());
   }, []);
 
   const nav: Nav = useMemo(
     () => ({
       tab,
       section,
-      setTab: (t, sec) => {
-        setStack([]);
-        setTab(t);
-        if (isSectionTab(t)) setSection(t);
-        else if (sec) setSection(sec);
-      },
-      push: (s) => setStack((st) => [...st, s]),
-      pop: () => setStack((st) => st.slice(0, -1)),
+      setTab: (t, sec) =>
+        leave(() => {
+          setStack([]);
+          setTab(t);
+          if (isSectionTab(t)) setSection(t);
+          else if (sec) setSection(sec);
+        }),
+      push: (s) => leave(() => setStack((st) => [...st, s])),
+      pop: () => leave(() => setStack((st) => st.slice(0, -1))),
       toast,
     }),
-    [tab, section, toast],
+    [tab, section, toast, leave],
   );
 
   // Android back button: one thing per press. The scanner, then the top sheet or shopping mode,
@@ -163,9 +237,9 @@ function RestockApp() {
       if (document.querySelector('.scanner')) {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
       } else if (closeTopLayer()) return;
-      else if (st.length) setStack(st.slice(0, -1));
+      else if (st.length) leave(() => setStack(st.slice(0, -1)));
       else if (runBackHandlers()) return;
-      else if (t !== 'home') setTab('home');
+      else if (t !== 'home') leave(() => setTab('home'));
       else CapApp.exitApp();
     });
     return () => {
@@ -261,7 +335,7 @@ function RestockApp() {
   }
   if (!ready || !settings) return <div className="app" />;
   setConnectionMode(settings.connection);
-  applyTheme(settings);
+  applyTheme(look ?? settings);
 
   if (!settings.onboarded) {
     return (
@@ -356,10 +430,18 @@ function RestockApp() {
   const layers = createPortal(
     <>
       <ScannerHost />
-      <Announcer text={toastMsg} />
+      <Announcer text={toastMsg && toastUndo ? `${toastMsg}. Undo button available.` : toastMsg} />
       {toastMsg && (
         <div
-          className="toast"
+          ref={toastRef}
+          className={`toast${toastUndo ? ' has-undo' : ''}`}
+          // 0.9.5 (undo): waits while a finger or the keyboard is on it.
+          onPointerEnter={() => holdToast(true)}
+          onPointerDown={() => holdToast(true)}
+          onPointerLeave={() => holdToast(false)}
+          onPointerUp={(e) => e.pointerType !== 'mouse' && holdToast(false)}
+          onFocus={() => holdToast(true)}
+          onBlur={() => holdToast(false)}
           // Tap it to make it go away, so it never sits over a button you need (0.7.3).
           onClick={(e) => {
             if ((e.target as HTMLElement).closest('.toast-undo')) return;
@@ -371,6 +453,7 @@ function RestockApp() {
           {toastUndo && (
             <button
               className="toast-undo"
+              aria-label={`Undo: ${toastMsg}`}
               onClick={async () => {
                 const run = toastUndo;
                 setToastMsg(undefined);

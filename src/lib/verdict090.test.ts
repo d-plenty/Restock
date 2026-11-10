@@ -122,10 +122,10 @@ describe('member prices without the card', () => {
 });
 
 describe('what the saving is measured against', () => {
-  it('says "was-price" only for the store’s was-price', () => {
+  it('says the shop’s "was" price only when it is one', () => {
     const v = judge(computeStats([r(0, 5, { isSpecial: true, wasPrice: 10 })], NOW));
     expect(v.basis).toBe('was-price');
-    expect(v.detail).toBe("50% off the store's was-price of $10.00.");
+    expect(v.detail).toBe('50% off the shop\'s "was" price of $10.00.');
   });
 
   it('says "its usual" for prices Restock has seen, before there is much history', () => {
@@ -135,9 +135,9 @@ describe('what the saving is measured against', () => {
     expect(v.detail).not.toContain('was-price');
   });
 
-  it('says "its normal" with enough history', () => {
+  it('says "its usual" with enough history', () => {
     const v = judge(computeStats(weekly(6, r(0, 7, { isSpecial: true, wasPrice: 10 })), NOW));
-    expect(v.detail).toBe('30% off its normal $10.00.');
+    expect(v.detail).toBe('30% off its usual $10.00.');
   });
 });
 

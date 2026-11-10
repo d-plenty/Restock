@@ -310,7 +310,7 @@ final class StoreWeb implements StoreClient.WebFetcher {
         boolean ok = done.await(30, TimeUnit.SECONDS);
         waiting.remove(id);
         String[] r = results.remove(id);
-        if (!ok || r == null) return new String[] {"-1", "The store took too long to answer"};
+        if (!ok || r == null) return new String[] {"-1", "The shop took too long to answer"};
         return r;
     }
 

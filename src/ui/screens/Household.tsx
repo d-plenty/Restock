@@ -1,14 +1,10 @@
 import { useState } from 'react';
 import { confirmAction } from '../../lib/confirm';
-import {
-  addCategory as addCategoryRow,
-  allCategories,
-  deleteCategory,
-  getSettings,
-  renameCategory,
-  swapCategories,
-  updateSettings,
-} from '../../lib/db';
+import { addCategory as addCategoryRow, allCategories, deleteCategory, renameCategory, swapCategories } from '../../lib/db';
+// 0.9.5 (save): the household's name waits for Save settings; categories change at once, with Undo.
+import { afterSave, getSettings, updateSettings } from '../../lib/settingsDraft';
+import { act } from '../../lib/undo';
+import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar';
 import { useLive } from '../../lib/useLive';
 import { RestockNative } from '../../lib/sql/native';
 import { MAX_SYNC_PHONES, syncInfo } from '../../lib/sync';
@@ -17,6 +13,8 @@ import { useNav } from '../nav';
 import { activeSections, SECTION_NAMES, type Section } from '../../shops';
 
 export function HouseholdScreen() {
+  useSettingsDraft(); // 0.9.5 (save)
+  const draft = useDraftState();
   const nav = useNav();
   const settings = useLive(getSettings, []);
   const sync = useLive(syncInfo, []);
@@ -31,20 +29,20 @@ export function HouseholdScreen() {
     const a = categories[index];
     const b = categories[index + dir];
     if (!a || !b) return;
-    await swapCategories(a, b);
+    await act(`Moved ${a.name} ${dir < 0 ? 'up' : 'down'}`, () => swapCategories(a, b)); // 0.9.5 (undo)
   };
 
   const addCategory = async () => {
     const name = newCat.trim();
     if (!name) return;
-    await addCategoryRow(name, section);
+    await act(`Category ${name} added`, () => addCategoryRow(name, section)); // 0.9.5 (undo)
     setNewCat('');
   };
 
   const remove = async (id: string, name: string) => {
-    const ok = await confirmAction(`Delete the "${name}" category?`, { detail: 'Items in it move to "Other".', action: 'Delete category' });
+    const ok = await confirmAction(`Delete the "${name}" category?`, { detail: 'Items in it move to "Other". You can undo it straight after.', action: 'Delete category' });
     if (!ok) return;
-    await deleteCategory(id);
+    await act(`Category ${name} deleted`, () => deleteCategory(id)); // 0.9.5 (undo)
   };
 
   return (
@@ -54,17 +52,19 @@ export function HouseholdScreen() {
       <label className="field">
         <span>Household name</span>
         <input
-          key={sync?.paired ? (sync.household ?? '') : settings.household.name}
+          key={sync?.paired ? (sync.household ?? '') : `name-${draft.epoch}` /* 0.9.5 (save): starts again after Discard */}
           className="input"
           // With local sync, the household's name is the owner phone's to change (0.8.5); in a server's
           // house (0.9.4), the server's page renames it.
           disabled={!!sync?.paired && !sync.isOwner}
           defaultValue={sync?.paired && sync.household ? sync.household : settings.household.name}
-          onBlur={(e) => {
+          // 0.9.5 (save): held until Save settings.
+          onChange={(e) => {
             const name = e.target.value.trim() || 'Our house';
             void updateSettings({ household: { name } });
-            // The owner's rename reaches the household's other phones (local sync).
-            if (sync?.paired && sync.isOwner) void RestockNative.syncSet({ household: name }).catch(() => undefined);
+            // The owner's rename reaches the household's other phones (local sync), once saved.
+            if (sync?.paired && sync.isOwner)
+              void afterSave('household-name', () => RestockNative.syncSet({ household: name }).catch(() => undefined));
           }}
         />
       </label>
@@ -135,10 +135,13 @@ export function HouseholdScreen() {
           <div className="row" key={c.id}>
             <input
               className="input"
-              style={{ height: 40 }}
+              style={{ height: 44 }}
               defaultValue={c.name}
               aria-label={`Category ${i + 1} name`}
-              onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== c.name && renameCategory(c.id, e.target.value.trim())}
+              onBlur={(e) => {
+                const to = e.target.value.trim();
+                if (to && to !== c.name) void act(`${c.name} renamed ${to}`, () => renameCategory(c.id, to)); // 0.9.5 (undo)
+              }}
             />
             <button
               className="icon-btn"
@@ -182,6 +185,7 @@ export function HouseholdScreen() {
           Add
         </button>
       </form>
+      <SaveBar />
     </div>
   );
 }

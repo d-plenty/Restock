@@ -26,6 +26,10 @@ import { candidates, lineSummary, matchKey, parseLine, type NamedItem } from './
 // - 0.9.4: a line made from Home Assistant's item has an id made from the list and the item
 //   (haLineId), so two runners (a phone and the server, or two phones before ha:phone settled) make
 //   the same line, and the second one's add finds it there and pairs with it instead of doubling.
+// - 0.9.5: Home Assistant's list is the grocery list and the General list together (onHaList). Something
+//   new there goes on the list of the item it matches: the pantry's first, then Keg's, then Health's
+//   (haListFor). Matching nothing at all, it goes on General. Such a line made on Keg or Health stays
+//   paired (its id starts "ha-"), so ticks and removes still go both ways.
 
 /** A to-do item in Home Assistant. */
 export interface HaItem {
@@ -185,25 +189,60 @@ export const EMPTY_GAP_MS = 30 * 60_000;
 
 export const emptyState = (): HaState => ({ pairs: [], pick: [] });
 
-/** A line on Restock's grocery list (the Pantry tab's). */
+/** The lists a line can be on (shops.ts ListSection). */
+export type HaListSection = 'pantry' | 'keg' | 'pharmacy' | 'general';
+
+/** A line on Restock's grocery list (the Pantry tab's), or General's. */
 export interface Line {
   id: string;
   text: string;
   qty: number;
   checked: boolean;
   groupId?: string;
+  /**
+   * 0.9.5: the list a new line goes on (addLine), when the round makes one. The stores' own lines
+   * may leave it out: the round doesn't use it.
+   */
+  section?: HaListSection;
+}
+
+/** Tabs whose items a voice add is matched to, first to last. */
+const MATCH_ORDER = ['pantry', 'keg', 'pharmacy'];
+const tabOfItem = (i: NamedItem): HaListSection => (i.section === 'keg' || i.section === 'pharmacy' ? i.section : 'pantry');
+
+/**
+ * 0.9.5: whether a line is on Home Assistant's list: one on the grocery list or General (`list`, where
+ * it shows: its item's tab, else its own section), or one made from Home Assistant's list (its id
+ * starts "ha-"), wherever it went. The stores (homeAssistant.ts, HaSync.java, the server's ha.mjs)
+ * each pick their lines with it.
+ */
+export function onHaList(id: string, list: string | null | undefined): boolean {
+  return !list || list === 'pantry' || list === 'general' || id.startsWith('ha-');
+}
+
+/**
+ * 0.9.5: what a new item in Home Assistant matches (the candidates), and the list it goes on. The
+ * matches are kept to the first tab with any (pantry, then Keg, then Health), so "milk" in the
+ * pantry and in Keg is the pantry's. None: General.
+ */
+export function haListFor(found: NamedItem[]): { found: NamedItem[]; section: HaListSection } {
+  for (const t of MATCH_ORDER) {
+    const here = found.filter((i) => tabOfItem(i) === t);
+    if (here.length) return { found: here, section: t as HaListSection };
+  }
+  return { found: [], section: 'general' };
 }
 
 /** Restock's side. */
 export interface Store {
-  /** The grocery list's lines. */
+  /** The lines on Home Assistant's list (onHaList): the grocery list's and General's, and ones made from Home Assistant's list. */
   lines(): Promise<Line[]>;
-  /** Pantry items (the Pantry tab's), for matching and their names. */
+  /** Items to match to, for matching and their names, with their tab (0.9.5: Keg's and Health's too, when those tabs are on). */
   items(): Promise<NamedItem[]>;
   /** Saved "Always use this for …" words (matchKey → item id). */
   aliases(): Promise<Record<string, string>>;
   /**
-   * Adds a line and returns its id. 0.9.4: `uid` is the Home Assistant item it's made from: the
+   * Adds a line (on the list `l.section`, the grocery list when it's left out) and returns its id. 0.9.4: `uid` is the Home Assistant item it's made from: the
    * store gives it the id haLineId(entity, uid), with INSERT OR IGNORE, and returns that id whether
    * it added the line or one was there already (made by another runner and synced here).
    */
@@ -402,16 +441,17 @@ export async function syncRound(api: HaApi, store: Store, now: number = Date.now
     await byWords();
 
     // 3. New in Home Assistant (still to buy): onto Restock's list, linked to a pantry item if it's clearly one.
+    // 0.9.5: or to a Keg or Health item; on the list of the tab it matched, and General when nothing did.
     for (const h of looseItems()) {
       if (done(h) || !h.summary.trim()) continue;
       const said = parseLine(h.summary);
-      const found = candidates(h.summary, pantry, aliases);
+      const { found, section } = haListFor(candidates(h.summary, pantry, aliases));
       const one = found.length === 1 ? found[0] : undefined;
       // "2 Minute Noodles" is an item, not two of "Minute Noodles".
       const whole = one && matchKey(one.name) === matchKey(h.summary);
       const line: Omit<Line, 'id'> = one
-        ? { text: one.name, qty: whole ? 1 : said.qty, checked: false, groupId: one.id }
-        : { text: said.name, qty: said.qty, checked: false };
+        ? { text: one.name, qty: whole ? 1 : said.qty, checked: false, groupId: one.id, section }
+        : { text: said.name, qty: said.qty, checked: false, section };
       let id = await store.addLine(line, h.uid);
       // 0.9.4: its line was there already (another runner made it from the same item): pair with that.
       const there = byId.get(id);

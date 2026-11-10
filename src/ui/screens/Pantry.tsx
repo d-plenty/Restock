@@ -1,8 +1,8 @@
 import { useFullRefresh } from '../refresh';
 import { useRef, useState } from 'react';
-import { allCategories, allListEntries, deleteGroup, deleteListEntries, updateGroup } from '../../lib/db';
-import { addGroupToList, buzz } from '../../lib/listActions';
-import { groupRows, undoable } from '../../lib/undo';
+import { allCategories, allListEntries, deleteGroup, updateGroup } from '../../lib/db';
+import { addAllToList, addToList, buzz, takeOffList } from '../../lib/listActions';
+import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { loadRecommendations } from '../../lib/recs';
 import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
@@ -53,9 +53,9 @@ function markSwiped() {
 const EMPTY: Record<Section, string> = {
   pantry: 'Your pantry is empty. Add the things you buy so Restock can watch their prices.',
   keg: 'Nothing in the keg yet. Add the beer, wine or spirits you buy, and Restock watches the bottle shops you picked.',
-  pharmacy: 'Nothing here yet. Add the medicine, first aid and personal care things you buy, and Restock watches the pharmacies you picked.',
+  pharmacy: 'Nothing here yet. Add the medicine, first aid and personal care things you buy, and Restock watches the chemists you picked.',
 };
-const SEARCH_HINT: Record<Section, string> = { pantry: 'Search your pantry', keg: 'Search your keg', pharmacy: 'Search your pharmacy items' };
+const SEARCH_HINT: Record<Section, string> = { pantry: 'Search your pantry', keg: 'Search your keg', pharmacy: 'Search your health items' };
 
 /** At or under the item's "alert me under $X" price at its cheapest shop. */
 export const underTarget = (r: Recommendation) =>
@@ -117,15 +117,14 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   const toggleList = async (r: Recommendation) => {
     const existing = onList.get(r.group.id);
     if (existing) {
-      await deleteListEntries([existing]);
-      nav.toast(`${r.group.name} taken off your shopping list`);
+      await takeOffList([existing], r.group.name); // 0.9.5 (undo)
     } else {
       // Checks the list itself (not what's on screen), and one add at a time, so a double tap adds it once.
       if (adding.current) return;
       adding.current = true;
       try {
-        const added = await addGroupToList(r.group);
-        nav.toast(added ? `${r.group.name} added to your shopping list` : 'Already on your shopping list');
+        const added = await addToList(r.group); // 0.9.5 (undo)
+        if (!added) nav.toast('Already on your shopping list');
       } finally {
         adding.current = false;
       }
@@ -139,9 +138,8 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       action: 'Delete',
     });
     if (!ok) return;
-    const undo = await undoable(() => deleteGroup(r.group.id), groupRows([r.group.id]));
+    await act(`${r.group.name} deleted`, () => deleteGroup(r.group.id)); // 0.9.5 (undo)
     buzz();
-    nav.toast(`${r.group.name} deleted`, undo);
   };
 
   const pick = (id: string) =>
@@ -165,28 +163,29 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
     adding.current = true;
     let added = 0;
     try {
-      for (const r of selected) if (await addGroupToList(r.group)) added++;
+      added = await addAllToList(selected.map((r) => r.group)); // 0.9.5 (undo)
     } finally {
       adding.current = false;
     }
-    nav.toast(added ? `${added} added to your shopping list` : 'Already on your shopping list');
+    if (!added) nav.toast('Already on your shopping list');
     stopEditing();
   };
 
   const deleteSelected = async () => {
     const n = selected.length;
     const ids = selected.map((r) => r.group.id);
-    const undo = await undoable(async () => {
+    await act(`${n} item${n === 1 ? '' : 's'} deleted`, async () => {
       for (const id of ids) await deleteGroup(id);
-    }, groupRows(ids));
-    nav.toast(`${n} item${n === 1 ? '' : 's'} deleted`, undo);
+    }); // 0.9.5 (undo)
     stopEditing();
   };
 
   const moveSelected = async (categoryId: string) => {
-    for (const r of selected) await updateGroup(r.group.id, { categoryId: categoryId || undefined });
+    const n = selected.length;
+    await act(`Category changed for ${n} item${n === 1 ? '' : 's'}`, async () => {
+      for (const r of selected) await updateGroup(r.group.id, { categoryId: categoryId || undefined });
+    }); // 0.9.5 (undo)
     setCategorySheet(false);
-    nav.toast('Category changed');
     stopEditing();
   };
 
@@ -276,7 +275,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                     : r.best?.price !== undefined
                       ? `Cheapest: ${chainName(r.best.product.chain)}`
                       : 'No price yet',
-                mains.length > 1 ? `${mains.length} stores` : '',
+                mains.length > 1 ? `${mains.length} shops` : '',
                 mains.length &&
                 mains.every((o) => !/\(sample\)/i.test(o.product.name)) &&
                 Math.max(...mains.map((o) => o.stats.spanDays)) < LEARNING_DAYS

@@ -8,7 +8,10 @@ import { shareCsv } from '../../lib/csvExport';
 import { RestockNative } from '../../lib/sql/native';
 import { syncInfo, type SyncInfo } from '../../lib/sync';
 import { isNative } from '../../stores/http';
-import { allCards, eraseEverything, getSettings, priceHistorySpan, pruneHistory, serverKeepsHistory, updateSettings } from '../../lib/db';
+import { allCards, eraseEverything, getSettings as savedSettings, priceHistorySpan, pruneHistory, serverKeepsHistory, updateSettings as saveNow } from '../../lib/db';
+// 0.9.5 (save): settings changed here wait for "Save settings" (settingsDraft.ts).
+import { afterSave, getSettings, updateSettings } from '../../lib/settingsDraft';
+import { SaveBar, useSettingsDraft } from '../SaveBar';
 import { loadDemo, removeDemo } from '../../lib/demo';
 import { syncBackgroundSchedule } from '../../lib/check';
 import { ensureNotificationPermission, scheduleReminders } from '../../lib/notify';
@@ -149,6 +152,7 @@ async function eraseAll() {
 }
 
 export function SettingsScreen() {
+  useSettingsDraft(); // 0.9.5 (save)
   const nav = useNav();
   const settings = useLive(getSettings, []);
   const cardCount = useLive(async () => (await allCards()).length, []);
@@ -256,7 +260,7 @@ export function SettingsScreen() {
         {row('Supermarkets', shopSummary(settings, 'pantry'), () => nav.push({ name: 'stores', section: 'pantry' }))}
         {row('Shop accounts and stock', shopAccountsSummary(settings), () => nav.push({ name: 'stores', section: 'pantry' }))}
         {row('Bottle shops (Keg tab)', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
-        {row('Pharmacies (Pharmacy tab)', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
+        {row('Chemists (Health tab)', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
         {row('Loyalty cards', cardCount ? `${cardCount} added` : 'Flybuys, Everyday Rewards', () => nav.push({ name: 'cards' }))}
         {row('Catalogues', 'This week at Coles, Woolworths and Aldi', () => nav.push({ name: 'catalogues' }))}
       </div>
@@ -384,13 +388,13 @@ export function SettingsScreen() {
               Keep price history for
             </span>
             <span className="small">
-              Longer means Restock knows each item's normal price and sale pattern better. It only takes a few megabytes on your phone either way,
+              Longer means Restock knows each item's usual price and sale pattern better. It only takes a few megabytes on your phone either way,
               and backups include all of it.
             </span>
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
             value={settings.historyWeeks}
             aria-label="Keep price history for"
             onChange={async (e) => {
@@ -408,8 +412,11 @@ export function SettingsScreen() {
                 if (!ok) return;
               }
               await updateSettings({ historyWeeks: weeks });
-              const removed = await pruneHistory(weeks);
-              nav.toast(removed ? `Removed ${removed} older price${removed === 1 ? '' : 's'}` : `Keeping ${historyLabel(weeks)} of prices`);
+              // 0.9.5 (save): older prices go once it's saved.
+              await afterSave('history', async (s) => {
+                const removed = await pruneHistory(s.historyWeeks);
+                if (removed) nav.toast(`Removed ${removed} older price${removed === 1 ? '' : 's'}`);
+              });
             }}
           >
             {HISTORY_WEEKS.map((w) => (
@@ -430,7 +437,7 @@ export function SettingsScreen() {
           <span className="grow">
             <span className="title">Shop around if it saves at least</span>
             <span className="small">
-              Below this, a store that has everything on your list is recommended instead, so you're not making extra stops for a few cents.
+              Below this, a shop that has everything on your list is recommended instead, so you're not making extra stops for a few cents.
             </span>
             <select
               className="input"
@@ -457,18 +464,18 @@ export function SettingsScreen() {
       <Explain title="How Restock judges a sale">
         {/* 0.9.0: says what the code does (verdict.ts computeStats and judge). */}
         <p>
-          Each product's <strong>normal price</strong> is the middle of the non-sale prices Restock has seen for it over the history you keep (
+          Each product's <strong>usual price</strong> is the middle of the regular prices Restock has seen for it over the history you keep (
           {historyLabel(settings.historyWeeks)}
-          {settings.historyWeeks === 8 ? ' unless you change it' : ''}). Until it has seen one at a non-sale price, it goes by the store's "was" price.
+          {settings.historyWeeks === 8 ? ' unless you change it' : ''}). Until it has seen one at a regular price, it goes by the shop's "was" price.
           {settings.marketData.enabled ? ' For its first 4 weeks or so, shared price history fills in.' : ''} Member prices only count if you've added that
           shop's card.
         </p>
         <p>
-          Only this week's specials (Wednesday to Tuesday) count as on sale. An older special, or a lower price last checked over {STALE_DAYS} days
+          Only this week's specials (Wednesday to Tuesday) count as on special. An older special, or a lower price last checked over {STALE_DAYS} days
           ago, isn't called a deal until prices are checked again.
         </p>
         <p>
-          Small saving: any drop under {GOOD_SALE * 100}% · On sale: {GOOD_SALE * 100}%+ · Great deal: {GREAT_SALE * 100}%+. "Wait" means it's been at
+          Small saving: any drop under {GOOD_SALE * 100}% · On special: {GOOD_SALE * 100}%+ · Great deal: {GREAT_SALE * 100}%+. "Wait" means it's been at
           least 5% cheaper recently (never at half price or better). Each pantry item picks which of these send an alert.
         </p>
         <p>
@@ -521,24 +528,24 @@ export function SettingsScreen() {
         {row('Permissions', 'Notifications, alarms, camera, location', () => nav.push({ name: 'permissions' }))}
         <details className="pick-more fold-inline">
           <summary>
-            <span className="grow">Advanced: store connections</span>
+            <span className="grow">Advanced: shop connections</span>
             <Icon name="chevron" size={18} />
           </summary>
           <label className="check">
             <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               <span className="title" style={{ fontSize: 15 }}>
-                Store connections
+                Shop connections
               </span>
               <span className="small">
-                Automatic asks stores directly and switches to a hidden in-app browser if that fails. Coles always uses the browser.
+                Automatic asks shops directly and switches to a hidden in-app browser if that fails. Coles always uses the browser.
               </span>
             </span>
             <select
               className="input"
-              style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+              style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
               value={settings.connection}
               onChange={(e) => updateSettings({ connection: e.target.value as Settings['connection'] })}
-              aria-label="Store connections"
+              aria-label="Shop connections"
             >
               <option value="auto">Automatic</option>
               <option value="browser">Always browser</option>
@@ -546,7 +553,7 @@ export function SettingsScreen() {
           </label>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <span className="grow" style={{ minWidth: 200 }}>
-              <span className="title">Store keeps saying it's blocked?</span>
+              <span className="title">Shop keeps saying it's blocked?</span>
               <span className="small">Open its website here once and tick its "I'm a person" box.</span>
             </span>
           </div>
@@ -619,7 +626,7 @@ export function SettingsScreen() {
       <div className="card flush">
         <UpdateRows settings={settings} />
         {row('Privacy policy', `Updated ${legal.updated}`, () => setReading('privacy'))}
-        {row('Fine print', 'Not affiliated with the stores, no warranty', () => setReading('disclaimer'))}
+        {row('Fine print', 'Not affiliated with the shops, no warranty', () => setReading('disclaimer'))}
       </div>
 
       <div className="eyebrow" id="s-soon">
@@ -656,6 +663,8 @@ export function SettingsScreen() {
           Source code and bug reports on GitHub
         </a>
       </p>
+      {/* 0.9.5 (save): "Unsaved changes · Save settings", above the tabs. */}
+      <SaveBar />
       {reading && <LegalSheet doc={reading} onClose={() => setReading(undefined)} />}
       {testing && <ConnectionsSheet settings={settings} onClose={() => setTesting(false)} />}
       {exporting && <ExportSheet onClose={() => setExporting(false)} onDone={(m) => nav.toast(m)} />}
@@ -715,11 +724,11 @@ function SharePrices({ settings }: { settings: Settings }) {
         </p>
         <p className="small">
           <strong>For now nothing leaves your phone.</strong> Restock adds a "shared prices" part to the backups you make, ready for when sharing
-          starts. Before any version sends prices anywhere, it will tell you and you can say no.
+          starts. Before any version sends prices anywhere, it will ask you first, and nothing is sent unless you say yes.
         </p>
         <p className="small">
           <strong>What's in it:</strong> for each product Restock has checked, the shop, name, brand, size and barcode, and each price with the
-          normal price, any special or multi-buy, and the day. <strong>Never:</strong> who you are, your loyalty cards, your branch or location,
+          usual price, any special or multi-buy, and the day. <strong>Never:</strong> who you are, your loyalty cards, your branch or location,
           your shopping list or what you ticked off, receipts, or anything you type about yourself.
         </p>
       </div>
@@ -766,7 +775,10 @@ function SharedHistory({ settings }: { settings: Settings }) {
           onChange={async (e) => {
             const enabled = e.target.checked;
             await updateSettings({ marketData: { ...md, enabled } });
-            if (enabled && !info?.count) void download(md.wifiOnly);
+            // 0.9.5 (save): the first download starts once it's saved.
+            await afterSave('market', (s) => {
+              if (s.marketData.enabled && !info?.count) void download(s.marketData.wifiOnly);
+            });
           }}
         />
         <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -830,7 +842,7 @@ function SharedHistory({ settings }: { settings: Settings }) {
 }
 
 /** Try each store and show whether it works, how long it took, or what went wrong. */
-const GROUP_LABEL: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Pharmacy' };
+const GROUP_LABEL: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health' };
 
 /** The shops you use, by tab (one per website, so Liquorland's three shops show once). Tabs that are off are left out. */
 function shopGroups(settings: Settings): { section: Section; chains: StoreChain[] }[] {
@@ -854,7 +866,7 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
   return (
     <Sheet title="Test connections" onClose={onClose}>
       <p className="small">
-        Restock searches each shop the same way it does when you add an item: supermarkets for "milk", bottle shops for "beer" and pharmacies for
+        Restock searches each shop the same way it does when you add an item: supermarkets for "milk", bottle shops for "beer" and chemists for
         "paracetamol".
       </p>
       {groups.map(({ section, chains: list }) => (
@@ -898,7 +910,7 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
         <Icon name="refresh" size={18} /> Test again
       </button>
       <p className="small">
-        Still failing? Try Store connections → Always use the browser, or open the store and tick "I'm not a robot" if it asks. If a store keeps
+        Still failing? Try Shop connections → Always use the browser, or open the shop and tick "I'm not a robot" if it asks. If a shop keeps
         failing, please{' '}
         <a href="https://github.com/d-plenty/Restock/issues/new/choose" target="_blank" rel="noreferrer">
           report it on GitHub
@@ -918,7 +930,8 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
       ...(patch.weekday !== undefined ? { checkWeekday: patch.weekday } : {}),
       ...(patch.on !== undefined ? { sync: { ...settings.sync, backgroundActivity: patch.on } } : {}),
     });
-    await syncBackgroundSchedule(s).catch(() => undefined);
+    // 0.9.5 (save): on a settings screen, once it's saved.
+    await afterSave('checks', (saved) => syncBackgroundSchedule(saved).catch(() => undefined), s);
   };
 
   return (
@@ -946,7 +959,7 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
             value={settings.checkIntervalHours}
             disabled={!settings.sync.backgroundActivity}
             onChange={(e) => setChecks({ hours: parseInt(e.target.value, 10) })}
@@ -974,7 +987,7 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
             </span>
             <select
               className="input"
-              style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+              style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
               value={settings.checkWeekday}
               disabled={!settings.sync.backgroundActivity}
               onChange={(e) => setChecks({ weekday: parseInt(e.target.value, 10) })}
@@ -999,7 +1012,8 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
     // Turning an alert on is the moment to ask for notifications.
     if (Object.values(patch).some((v) => v === true)) await ensureNotificationPermission().catch(() => false);
     const s = await updateSettings({ alerts: { ...settings.alerts, ...patch } });
-    await scheduleReminders(s).catch(() => undefined);
+    // 0.9.5 (save): on a settings screen, once it's saved.
+    await afterSave('reminders', (saved) => scheduleReminders(saved).catch(() => undefined), s);
   };
 
   return (
@@ -1018,7 +1032,7 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
             value={settings.alerts.catalogueWeekday}
             onChange={(e) => setAlerts({ catalogueWeekday: parseInt(e.target.value, 10) })}
             aria-label="Roundup day"
@@ -1041,7 +1055,7 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
           <input
             type="time"
             className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
             value={settings.alerts.dailyTime}
             onChange={(e) => setAlerts({ dailyTime: e.target.value || '07:30' })}
             aria-label="Reminder time"
@@ -1062,7 +1076,7 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
             <span className="title" style={{ fontSize: 15 }}>
               Stock-up tips
             </span>
-            <span className="small">On deals for things that only go on sale every few weeks: "a good time to stock up".</span>
+            <span className="small">On deals for things that only go on special every few weeks: "a good time to stock up".</span>
           </span>
         </label>
       </div>
@@ -1075,7 +1089,7 @@ function shopAccountsSummary(settings: Settings): string {
   const coles = settings.stores?.coles;
   const parts = [
     w?.signedIn ? `Woolworths: ${w.storeName ?? 'signed in'}` : 'Woolworths: online prices',
-    settings.localPrices && coles?.branchStoreNo ? `Coles: store ${coles.branchStoreNo}` : 'Coles: online prices',
+    settings.localPrices && coles?.branchStoreNo ? `Coles: branch ${coles.branchStoreNo}` : 'Coles: online prices',
   ];
   return parts.join(' · ');
 }
@@ -1118,7 +1132,9 @@ function UpdateRowsOn({ settings }: { settings: Settings }) {
     try {
       const info = await checkForUpdate(version);
       setFound(info);
-      await updateSettings({ updates: { notify: !!u?.notify, ...u, lastCheck: new Date().toISOString() } });
+      // 0.9.5 (save): when it last looked isn't a setting: kept at once.
+      const was = (await savedSettings()).updates;
+      await saveNow({ updates: { notify: !!was?.notify, ...was, lastCheck: new Date().toISOString() } });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1196,7 +1212,7 @@ function UpdateRowsOn({ settings }: { settings: Settings }) {
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
             value={u.everyDays === 7 ? 7 : 1}
             aria-label="How often to check for updates"
             onChange={(e) => void updateSettings({ updates: { ...u, everyDays: e.target.value === '1' ? 1 : 7 } })}

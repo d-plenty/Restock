@@ -1,8 +1,9 @@
+import { greeting, todayText } from '../../lib/greeting';
 import { useState } from 'react';
 import { refreshText, useFullRefresh } from '../refresh';
-import { allCards, allListEntries, deleteListEntries, getSettings, updateSettings } from '../../lib/db';
+import { allCards, allListEntries, getSettings, updateSettings } from '../../lib/db';
 import { loadDemo } from '../../lib/demo';
-import { addGroupToList } from '../../lib/listActions';
+import { addToList, takeOffList } from '../../lib/listActions'; // 0.9.5 (undo)
 import { aroundPlan, shopTotals } from '../../lib/shopTotals';
 import { loadRecommendations } from '../../lib/recs';
 import { money } from '../../lib/units';
@@ -91,7 +92,7 @@ export function HomeScreen() {
     refresh.run();
   };
 
-  const today = new Date().toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  const today = todayText();
 
   return (
     <div className="screen" {...refresh.props}>
@@ -99,7 +100,7 @@ export function HomeScreen() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div className="sub">{today}</div>
         <div className="topbar">
-          <h1>This week</h1>
+          <h1>{greeting()}</h1>
           <button className="icon-btn" aria-label="Settings" onClick={() => nav.push({ name: 'settings' })}>
             <Icon name="settings" size={20} />
           </button>
@@ -182,7 +183,7 @@ export function HomeScreen() {
             <span className="home-list-how">
               at the till, shopping around
               {totals.around.chains.length > 1
-                ? ` · ${totals.around.chains.length} stores`
+                ? ` · ${totals.around.chains.length} shops`
                 : totals.around.chains.length === 1
                   ? ` · ${chainName(totals.around.chains[0])}`
                   : ''}
@@ -205,9 +206,9 @@ export function HomeScreen() {
               )}
             </span>
           ) : (
-            !oneStop && <span className="small">No single store has everything. Tap to compare stores.</span>
+            !oneStop && <span className="small">No single shop has everything. Tap to compare shops.</span>
           )}
-          {listSaving > 0.5 && <span className="home-list-save">About {money(listSaving)} less than buying it all at normal prices</span>}
+          {listSaving > 0.5 && <span className="home-list-save">About {money(listSaving)} less than buying it all at usual prices</span>}
         </button>
       )}
 
@@ -220,7 +221,7 @@ export function HomeScreen() {
             <span className="big num">{saving > 0 ? `Save about ${money(saving)}` : 'Worth a look'}</span>
           </div>
           <span style={{ fontSize: 12, textAlign: 'right', opacity: 0.92 }}>
-            vs normal
+            vs usual
             <br />
             prices
           </span>
@@ -296,7 +297,7 @@ export function HomeScreen() {
           <ol>
             <li>Grab something you buy often, like a jar of peanut butter.</li>
             <li>Tap Add and scan its barcode, or type its name.</li>
-            <li>Tick it at each store that sells it. Restock then watches the prices for you.</li>
+            <li>Tick it at each shop that sells it. Restock then watches the prices for you.</li>
           </ol>
           <button className="btn primary" onClick={() => nav.setTab('add')}>
             <Icon name="scan" size={18} /> Add my first item
@@ -369,7 +370,7 @@ export function HomeScreen() {
           )}
         </>
       )}
-      {buys.length > 0 && <div className="eyebrow green">On sale now</div>}
+      {buys.length > 0 && <div className="eyebrow green">On special now</div>}
       {buys.map((r) => (
         <DealCard key={r.group.id} rec={r} listed={listed.get(r.group.id)} />
       ))}
@@ -416,12 +417,11 @@ export function HomeScreen() {
                 onClick={async () => {
                   const id = listed.get(r.group.id);
                   if (id) {
-                    await deleteListEntries([id]);
-                    nav.toast(`${r.group.name} taken off your shopping list`);
+                    await takeOffList([id], r.group.name); // 0.9.5 (undo)
                     return;
                   }
-                  const added = await addGroupToList(r.group);
-                  nav.toast(added ? `${r.group.name} added to your shopping list` : `${r.group.name} is already on your list`);
+                  const added = await addToList(r.group); // 0.9.5 (undo)
+                  if (!added) nav.toast(`${r.group.name} is already on your list`);
                 }}
               >
                 <Icon name={listed.get(r.group.id) ? 'cartCheck' : 'cartPlus'} size={22} />
@@ -447,14 +447,14 @@ export function HomeScreen() {
             <Icon name="close" size={18} />
           </span>
           <span style={{ flex: 1, fontSize: 13, color: 'var(--ink-2)' }}>
-            Fake sale: {r.group.name} is "on special" at its normal price. Skipped.
+            Fake sale: {r.group.name} is "on special" at its usual price. Skipped.
           </span>
         </button>
       ))}
 
       {normal.length > 0 && recs.length > 0 && (
         <button className="btn ghost" onClick={() => nav.setTab('pantry')}>
-          {normal.length} other item{normal.length === 1 ? '' : 's'} at normal price
+          {normal.length} other item{normal.length === 1 ? '' : 's'} at the usual price
         </button>
       )}
       {testing && <ConnectionsSheet settings={settings} onClose={() => setTesting(false)} />}
@@ -546,12 +546,11 @@ function DealCard({ rec, listed }: { rec: Recommendation; listed?: string }) {
           onClick={async () => {
             // Tap again to take it off, the same as on the Pantry tab.
             if (listed) {
-              await deleteListEntries([listed]);
-              nav.toast(`${rec.group.name} taken off your shopping list`);
+              await takeOffList([listed], rec.group.name); // 0.9.5 (undo)
               return;
             }
-            const added = await addGroupToList(rec.group);
-            nav.toast(added ? `${rec.group.name} added to your shopping list` : `${rec.group.name} is already on your list`);
+            const added = await addToList(rec.group); // 0.9.5 (undo)
+            if (!added) nav.toast(`${rec.group.name} is already on your list`);
           }}
         >
           <Icon name={listed ? 'cartCheck' : 'cartPlus'} size={22} />
@@ -565,7 +564,7 @@ function DealCard({ rec, listed }: { rec: Recommendation; listed?: string }) {
       )}
       {!isAlt && rec.alt && (
         <div className="small">
-          Also on sale: {rec.alt.product.name} at {chainName(rec.alt.product.chain)}, {money(rec.alt.price)}
+          Also on special: {rec.alt.product.name} at {chainName(rec.alt.product.chain)}, {money(rec.alt.price)}
         </div>
       )}
     </div>

@@ -58,7 +58,7 @@ export async function signInWoolworths(): Promise<ShopAccount> {
   await RestockNative.openStore({
     chain: 'woolworths',
     path: WOOLIES_SIGN_IN,
-    message: 'Sign in to your Woolworths account. If it asks, pick your store (Pick up). Then tap Done.',
+    message: 'Sign in to your Woolworths account. If it asks, pick your local shop (Pick up). Then tap Done.',
   });
   return checkWoolworths();
 }
@@ -133,12 +133,12 @@ export function colesStoreFromPage(url: string): { storeNo: string; name: string
  * so there's nothing to copy. Undefined if you close it first.
  */
 export async function pickColesStore(): Promise<{ storeNo: string; name: string } | undefined> {
-  if (!isNative()) throw new Error('Choosing your store works in the Android app.');
+  if (!isNative()) throw new Error('Choosing your branch works in the Android app.');
   const out = await RestockNative.openStore({
     chain: 'coles',
     path: '/find-stores',
     pickStore: true,
-    message: 'Search your suburb, then tap your Coles store. Restock picks up its store number by itself.',
+    message: 'Search your suburb, then tap your Coles shop. Restock picks up its number by itself.',
   });
   return out && out.storePage ? colesStoreFromPage(out.storePage) : undefined;
 }

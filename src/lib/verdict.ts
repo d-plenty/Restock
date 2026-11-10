@@ -34,11 +34,11 @@ export interface Verdict {
 
 export const VERDICT_LABEL: Record<VerdictKind, string> = {
   great: 'GREAT DEAL',
-  good: 'ON SALE',
+  good: 'ON SPECIAL',
   small: 'SMALL SAVING',
   wait: 'WAIT',
   fake: 'FAKE SALE',
-  normal: 'NORMAL PRICE',
+  normal: 'USUAL PRICE',
   nodata: 'NO PRICE YET',
 };
 
@@ -327,10 +327,10 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
 
   if (ref - p < 0.005) {
     if (isSpecial) {
-      return { kind: 'fake', headline: 'Fake sale', detail: 'Marked as a special, but this is its normal price.', discount, basis };
+      return { kind: 'fake', headline: 'Fake sale', detail: 'Marked as a special, but this is its usual price.', discount, basis };
     }
     if (p > ref * 1.03) return { kind: 'normal', headline: 'Pricier than usual', detail: `Usually ${money(ref)}.`, discount, basis };
-    return { kind: 'normal', headline: 'Normal price', detail: `Usually ${money(ref)}.`, discount, basis };
+    return { kind: 'normal', headline: 'Usual price', detail: `Usually ${money(ref)}.`, discount, basis };
   }
   // 0.9.0: a lower price from over two weeks ago may not be today's, so it isn't called a deal.
   if (stats.asOf !== undefined && stats.asOf - seen > STALE_DAYS * DAY) {
@@ -347,7 +347,7 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
   const enoughHistory = stats.readings >= 4 && stats.spanDays >= 21;
   // Half price is about as good as supermarket specials get, so it's never "wait".
   if (enoughHistory && stats.low !== undefined && stats.low < p * 0.95 && discount < HALF_PRICE) {
-    const cycle = stats.cycleWeeks ? ` It goes on sale about every ${stats.cycleWeeks} weeks.` : '';
+    const cycle = stats.cycleWeeks ? ` It goes on special about every ${stats.cycleWeeks} weeks.` : '';
     const when = stats.lowDate ? ` on ${shortDate(stats.lowDate)}` : stats.fromMarket ? ' in the shared price history' : '';
     return {
       kind: 'wait',
@@ -364,12 +364,12 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
   const vs = stats.fromMarket
     ? `its usual ${money(ref)} (from shared price history)`
     : basis === 'was-price'
-      ? `the store's was-price of ${money(ref)}`
+      ? `the shop's "was" price of ${money(ref)}`
       : enoughHistory
-        ? `its normal ${money(ref)}`
+        ? `its usual ${money(ref)}`
         : `its usual ${money(ref)}`;
   const kind: VerdictKind = discount >= GREAT_SALE ? 'great' : discount >= GOOD_SALE ? 'good' : 'small';
-  const headline = { great: 'Great deal', good: 'On sale', small: 'Small saving' }[kind as 'great' | 'good' | 'small'];
+  const headline = { great: 'Great deal', good: 'On special', small: 'Small saving' }[kind as 'great' | 'good' | 'small'];
   return { kind, headline, detail: `${deal}${pct(discount)} off ${vs}.`, saving, discount, basis };
 }
 
@@ -496,7 +496,7 @@ export function recommend(
   const cost = (o: Option) => (byUnit ? o.unitPrice! : o.price!);
   const cheapest = (list: Option[]) => list.reduce<Option | undefined>((b, o) => (!b || cost(o) < cost(b) ? o : b), undefined);
 
-  const base: Recommendation = { group, options, action: 'none', headline: 'Normal prices', detail: '', byUnit };
+  const base: Recommendation = { group, options, action: 'none', headline: 'Usual prices', detail: '', byUnit };
   if (!priced.length) return { ...base, headline: 'No prices yet', detail: 'Check prices or add one by hand.' };
 
   // Out-of-stock products only count when nothing else is available.
@@ -534,11 +534,11 @@ export function recommend(
       action: 'alt',
       headline: `Swap & save at ${chainLabel(alt.product.chain)}`,
       detail: outOfStock
-        ? `Yours (${describe(best!)}) is out of stock at ${chainLabel(best!.product.chain)}. Get ${describe(alt)} at ${chainLabel(alt.product.chain)} instead: it's in stock and on sale for ${money(alt.price!)}.`
+        ? `Yours (${describe(best!)}) is out of stock at ${chainLabel(best!.product.chain)}. Get ${describe(alt)} at ${chainLabel(alt.product.chain)} instead: it's in stock and on special for ${money(alt.price!)}.`
         : best
-          ? `Instead of yours, ${describe(best)} at ${chainLabel(best.product.chain)} for ${money(best.price!)}, get ${describe(alt)} at ${chainLabel(alt.product.chain)}, on sale for ${money(alt.price!)}.` +
+          ? `Instead of yours, ${describe(best)} at ${chainLabel(best.product.chain)} for ${money(best.price!)}, get ${describe(alt)} at ${chainLabel(alt.product.chain)}, on special for ${money(alt.price!)}.` +
             (byUnit ? ` That's ${unitText(alt)} instead of ${unitText(best)}.` : '')
-          : `${describe(alt)} is on sale at ${chainLabel(alt.product.chain)} for ${money(alt.price!)}.`,
+          : `${describe(alt)} is on special at ${chainLabel(alt.product.chain)} for ${money(alt.price!)}.`,
       saving: saving && saving > 0.004 ? saving : undefined,
     };
   }
@@ -553,7 +553,7 @@ export function recommend(
       headline: 'Out of stock online',
       detail: stockAlt
         ? `${stockAlt.product.name} is in stock at ${chainLabel(stockAlt.product.chain)}.`
-        : 'Your product is out of stock at every store it is linked to. Add an alternative to have a backup.',
+        : 'Your product is out of stock at every shop it is linked to. Add an alternative to have a backup.',
     };
   }
 
@@ -627,15 +627,15 @@ export function worthAlerting(rec: Recommendation): boolean {
 }
 
 export const ALERT_LEVELS: { id: Group['alertLevel']; label: string; explain: string }[] = [
-  { id: 'any', label: 'Any price drop', explain: 'Any price drop at all, even 5c below its normal price.' },
-  { id: 'good', label: 'Good sale (15%+)', explain: `At least ${GOOD_SALE * 100}% below its normal price.` },
-  { id: 'great', label: 'Great deal (30%+)', explain: `At least ${GREAT_SALE * 100}% below its normal price.` },
+  { id: 'any', label: 'Any price drop', explain: 'Any price drop at all, even 5c below its usual price.' },
+  { id: 'good', label: 'Good sale (15%+)', explain: `At least ${GOOD_SALE * 100}% below its usual price.` },
+  { id: 'great', label: 'Great deal (30%+)', explain: `At least ${GREAT_SALE * 100}% below its usual price.` },
   { id: 'custom', label: 'Custom', explain: 'Pick how much off it needs to be.' },
   { id: 'never', label: 'Never', explain: 'Keep tracking the price, but no alerts.' },
 ];
 
 function chainLabel(c: Chain): string {
-  return c === 'other' ? 'other store' : chainName(c);
+  return c === 'other' ? 'another shop' : chainName(c);
 }
 
 /**
