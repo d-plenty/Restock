@@ -76,6 +76,8 @@ final class SyncHub {
     private SyncWire.Server server;
     private NsdManager.RegistrationListener registration;
     private final ReentrantLock syncing = new ReentrantLock();
+    /** 0.9.3: when the 60-second check may next look at the server (it backs off after failures). */
+    private final ServerSync.PollGate pollGate = new ServerSync.PollGate();
     volatile String lastError;
     volatile String lastSyncAt;
     /** 0.9.0: folder sync's last problem, or null. */
@@ -98,6 +100,12 @@ final class SyncHub {
         engine.secrets = keystore;
         engine.photos = new AndroidPhotos(context);
         this.household = new SyncHousehold(engine);
+        // 0.9.3: the version this phone tells the web app (PhoneSummary).
+        try {
+            PhoneSummary.appVersion = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            PhoneSummary.appVersion = null;
+        }
         watchNetworks();
         // A phone joining from the first screen gets the owner's shop choices and settings once.
         household.settings = () -> {
@@ -192,6 +200,21 @@ final class SyncHub {
         String code = household.invite(localIp(), port());
         readvertise();
         return code;
+    }
+
+    /**
+     * 0.9.3: start a household with no code yet, this phone the owner: for the Restock server's
+     * Connect, on a phone that isn't in one. Works off the Wi-Fi too (no code to show). Does nothing
+     * if this phone is already in a household.
+     */
+    void startHousehold(String householdName, boolean shareCards, Set<String> tabs) throws Exception {
+        upgradeOldPairing();
+        if (household.paired()) return;
+        if (engine.meta("name") == null) engine.setMeta("name", defaultName());
+        household.create(householdName, null, tabs);
+        engine.setShareCards(shareCards);
+        engine.setMeta("notice", null);
+        start();
     }
 
     void closeInvite() throws Exception {
@@ -1127,9 +1150,47 @@ final class SyncHub {
         ServerSync.Round r = server().round(nowIso(), System.currentTimeMillis());
         serverReached = r.reached;
         serverError = r.error;
+        // 0.9.3: a round that worked (from any start) lets the quick check look every minute again.
+        if (r.error == null) pollGate.ok();
         if (r.error != null && r.cause != null) Log.w(TAG, "syncServer", r.cause);
         if (r.offload != null && (r.offload.changed || r.offload.pruned > 0)) changed();
         return r.result;
+    }
+
+    /**
+     * 0.9.3: the quick check while Restock is open (every 60 seconds, and when it comes back): one
+     * listing of the server's files, and a round only if another phone's (or a browser's) file
+     * changed or this phone's own needs writing. Never waits for a round already going (in the
+     * background, say): it just doesn't run. Answers how many changes came in, or -1 when it didn't
+     * look (no server, a round going, the server out of reach).
+     */
+    int pollServer() {
+        if (!serverOn() || key() == null) return -1;
+        // Backing off after the server was out of reach or a round failed (ServerSync.PollGate).
+        if (!pollGate.due(System.currentTimeMillis())) return -1;
+        if (!syncing.tryLock()) return -1;
+        try {
+            boolean news;
+            try {
+                news = server().anythingNew();
+            } catch (Exception e) {
+                pollGate.failed(System.currentTimeMillis());
+                return -1; // out of reach: a later check (or the background round) tries again
+            }
+            if (!news) {
+                pollGate.ok();
+                return 0;
+            }
+            SyncFolder.Result r = syncServer();
+            if (serverError != null) pollGate.failed(System.currentTimeMillis());
+            if (r == null) return -1;
+            if (r.rekeyed) readvertise();
+            if (r.phones > 0 && serverError == null) lastSyncAt = nowIso();
+            if (r.received > 0) changed();
+            return r.received;
+        } finally {
+            syncing.unlock();
+        }
     }
 
     JSONObject webCode(String code) throws Exception {

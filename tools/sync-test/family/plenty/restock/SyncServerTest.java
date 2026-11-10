@@ -180,6 +180,41 @@ public class SyncServerTest {
         round(b);
         report("V7 the web app's file merges like another phone's", !"From the web".equals(b.one("SELECT text FROM list_entries WHERE id = 'w1'")), "web file " + put + "; B has " + b.one("SELECT text FROM list_entries WHERE id = 'w1'"));
 
+        // 0.9.3: the quick check while Restock is open: one listing; news only when another file changed.
+        round(a);
+        round(a);
+        boolean calm = s(a).anythingNew();
+        b.db.exec("INSERT INTO list_entries (id, text, checked, created_at, qty, section) VALUES ('q1', 'Bread', 0, 'x', 1, 'pantry')");
+        boolean ownNews = s(b).anythingNew();
+        round(b);
+        boolean news = s(a).anythingNew();
+        round(a);
+        report("V31 the quick check: nothing new right after a round; a change here, or another phone's new file, is news", calm || !ownNews || !news || !"Bread".equals(a.one("SELECT text FROM list_entries WHERE id = 'q1'")),
+            "after a round " + calm + "; B's own change " + ownNews + "; B's file " + news);
+
+        // Review: the quick check backs off while the server is out of reach or its rounds fail.
+        ServerSync.PollGate gate = new ServerSync.PollGate();
+        long t0 = 1_000_000L;
+        boolean firstDue = gate.due(t0);
+        gate.failed(t0);
+        boolean waits = !gate.due(t0 + 60_000) && gate.due(t0 + 2 * 60_000);
+        for (int i = 0; i < 8; i++) gate.failed(t0);
+        boolean capped = !gate.due(t0 + 29 * 60_000) && gate.due(t0 + 30 * 60_000);
+        gate.ok();
+        boolean reset = gate.due(t0);
+        report("V34 the quick check backs off (2 min doubling to 30) after failures, and starts over once a round works", !firstDue || !waits || !capped || !reset,
+            "first " + firstDue + ", waits " + waits + ", capped " + capped + ", reset " + reset);
+
+        // 0.9.3: a household setting the web app changed (in its own file) reaches the phones.
+        ServerTestData.settings(b, 52);
+        JSONObject hsRow = new JSONObject().put("k", "shopAroundMin").put("v", "7");
+        JSONObject hs = new JSONObject().put("tbl", "household_settings").put("pk", "shopAroundMin").put("stamp", now + 1).put("device", "web-x").put("created", now + 1).put("deleted", false).put("row", hsRow);
+        web("webfile", ServerLink.b64u(sk), new JSONArray().put(entry).put(hs).toString());
+        round(b);
+        JSONObject bs = new JSONObject(b.one("SELECT value FROM kv WHERE key = 'settings'"));
+        report("V32 a household setting changed on the web reaches the phones through the server", bs.optInt("shopAroundMin") != 7 || bs.optInt("historyWeeks") != 52,
+            "B's settings " + bs);
+
         // Home address down: away is used.
         ServerFolder twoWay = new ServerFolder(List.of("http://127.0.0.1:1", url), "a1", ServerLink.privateKey(a.e.meta("server_dev_priv")));
         twoWay.names();
@@ -373,6 +408,9 @@ public class SyncServerTest {
         JSONObject state = SyncFolder.open(sk2, listed(a).read("restock-sync-a1.bin"));
         report("V26 the phone's own file lists its photos on the server (for the web)", !sha.equals(state.optJSONObject("photos") == null ? null : state.getJSONObject("photos").optString("receipts/r1.jpg")),
             "photos " + state.optJSONObject("photos"));
+        JSONObject sum = state.optJSONObject("summary");
+        report("V33 the phone's file on the server carries its settings summary for the web (0.9.3)", sum == null || sum.optInt("v") != 1 || sum.optInt("historyWeeks") != 4 || sum.has("autoBackup"),
+            "summary " + sum);
 
         // B has the same photo of the same receipt: it finds the server's copy and uses it.
         ServerTestData.settings(b, 4);

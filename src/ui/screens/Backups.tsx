@@ -8,6 +8,7 @@ import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
 import { Icon, timeAgo } from '../components';
 import { pricesIn } from './BackupParts';
+import { LOCAL_SUGGESTED } from '../../lib/protection';
 import { useNav } from '../nav';
 
 /**
@@ -199,6 +200,44 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * 0.9.3: with only phone-to-phone sync or a Restock server keeping a copy, suggest a backup on
+ * this phone as well: weekly, keeping the newest 4. One tap picks the folder and turns it on.
+ */
+export function SuggestLocalBackup({ text }: { text: string }) {
+  const nav = useNav();
+  const [busy, setBusy] = useState(false);
+  const turnOn = async () => {
+    if (!isNative()) return nav.toast('Picking a folder works in the Android app.');
+    setBusy(true);
+    try {
+      let f: { uri: string; name: string };
+      try {
+        f = await RestockNative.pickFolder();
+      } catch {
+        return;
+      }
+      const latest = await getSettings();
+      await updateSettings({
+        autoBackup: { ...latest.autoBackup, folder: f.uri, folderName: f.name, lastError: undefined, enabled: true, ...LOCAL_SUGGESTED },
+      });
+      const name = await maybeAutoBackup().catch(() => undefined);
+      nav.toast(name ? `Backing up weekly, keeping 4. First one saved: ${name}` : 'Backing up weekly, keeping the newest 4');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="banner amber" role="note" style={{ gap: 8 }}>
+      <strong>Also keep a backup on this phone</strong>
+      <span style={{ fontSize: 13 }}>{text}</span>
+      <button className="btn small" style={{ alignSelf: 'flex-start' }} disabled={busy} onClick={() => void turnOn()}>
+        {busy ? 'Setting it up…' : 'Back up weekly, keep 4'}
+      </button>
     </div>
   );
 }

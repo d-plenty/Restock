@@ -250,3 +250,43 @@ numbers are never shown (the web build strips them on read).
     `photos/…` file by a phone that wasn't the last to write it is answered 200 `{ deleted: null, kept: <name> }`
     and the file stays (that phone has let go of it; the phone that put it there deletes it). A missing file is
     still 404.
+- **(0.9.3) Household settings and the phones' summaries.** Additive: an older phone or web build passes
+  over both (an unknown table's entries and an unknown top-level field are skipped; checked against
+  0.9.0–0.9.2 in tools/sync-test).
+  - Entries of a new synced table, `household_settings` (`pk` = its `k`; `row` = `{ k, v }`, `v` JSON),
+    in every `restock-sync-*.bin` (phones' and the web's), as in folder and Wi-Fi sync. One row per
+    setting: `shopAroundMin`, `defaultThresholdPct`, `listCompare`, `productOrder`, `recalls.enabled`,
+    `tab:keg` / `tab:pharmacy` (on), `shop:<chain>` `{ on }` and, for shops people added,
+    `shop:custom-…` `{ on, shop: { id, name, website, section, search?, createdAt }, removed? }`. The later
+    change wins per row (`stamp`, then `device`), like any synced record; any phone and the web may write
+    them (no signature). Rows for a tab are only in the files of devices that sync that tab. The owner
+    phone seeds missing rows from its own settings with `stamp` 1, so any real change wins. Branches and
+    store numbers are never in them. Rules: `src/lib/sharedSettings.ts` (web) and `SharedSettings.java`.
+  - A phone's own `restock-sync-<device>.bin` **on a server** (not a folder's or WebDAV's) has a top-level
+    `summary`: `{ v: 1, version, checks: { everyHours, weekday?, background, lastAt?, lastItems? },
+    notifications: { catalogueDay, catalogueWeekday, daily, dailyTime?, greatDeals, monthly, stockUp,
+    stockUpTips }, accounts: { woolworths, coles } (signed in, yes/no), cards (a count), backups: { on,
+    everyDays, keep, lastAt?, photos }, historyWeeks, tabs, away ("none" | "folder" | "webdav" |
+    "nextcloud" | "server"), homeAssistant: { on, entity? }, look: { theme, text ("Normal" … "Largest") },
+    receipts, sharedPrices, updates: { on, everyDays (1 or 7) } }`. Built from an allow-list
+    (`PhoneSummary.java`) and checked again by the web (`src/lib/phoneSummary.ts`); never an address,
+    sign-in, password, token, card number, store number, area or folder. The web never writes one.
+  - Phones list `GET /api/v2/files` every 60 seconds while Restock is open, and run a round only when a
+    file's `version` changed (or their own file needs writing). Unchanged otherwise.
+  - The shopping list's rows, in the same `household_settings` table (they aren't settings: applying the
+    settings passes over them): `alias:<words>` → `"<item id>"` ("Always use this for 'milk'"; `<words>` as
+    `matchKey` in `src/lib/haMatch.ts` leaves them), `keep:<list line id>` → `true` ("Keep it as just
+    'milk'"), and `ha:phone` → `"<device id>"` (the one phone in the household that syncs the shopping list
+    with Home Assistant; never a `web-` id). Checked strictly (`checkListRow` in `src/lib/sharedSettings.ts`):
+    a key or value of any other shape, or a sample (`demo-`) item or line, is ignored. Any phone and the web
+    may write them; the later change wins per row. A phone with Home Assistant already on and no row yet
+    writes `ha:phone` with `stamp` 1 (like the seed), so a phone named elsewhere still wins. A phone that
+    leaves keeps its `alias:` and `keep:` rows.
+  - List lines that a phone made from Home Assistant's list have an `id` starting `ha-` (still just an id:
+    older phones and both sync engines treat it as one). A line like that, not linked to an item or a shop's
+    product and not ticked, shows "Pick my …" on every phone and the web unless a `keep:` row says not to.
+  - **The web reads a file's author from its name**, as phones on a server always have: in
+    `restock-sync-<device>.bin` (and a browser's `restock-sync-web-<webId>.bin`) the top-level `device` must
+    be `<device>`, or the whole file is passed over (noted as seen, nothing taken in). A browser's file never
+    changes `household`, `cards` or `prices` entries, on the web as on a phone. Unchanged for writers: every
+    device already writes its own name with its own id inside.

@@ -27,6 +27,16 @@ final class SyncKeystore implements SyncEngine.Secrets {
     static final String PREFIX = "ks1:";
     private static final int IV = 12;
     private SecretKey key;
+    /** The key store's name for the key (0.9.3: Home Assistant's token has a key of its own, "restock-ha"). */
+    private final String alias;
+
+    SyncKeystore() {
+        this(ALIAS);
+    }
+
+    SyncKeystore(String alias) {
+        this.alias = alias;
+    }
 
     private static KeyStore store() throws Exception {
         KeyStore ks = KeyStore.getInstance("AndroidKeyStore");
@@ -38,13 +48,13 @@ final class SyncKeystore implements SyncEngine.Secrets {
     private synchronized SecretKey key(boolean make) throws Exception {
         if (key != null) return key;
         KeyStore ks = store();
-        if (ks.containsAlias(ALIAS)) {
-            KeyStore.Entry e = ks.getEntry(ALIAS, null);
+        if (ks.containsAlias(alias)) {
+            KeyStore.Entry e = ks.getEntry(alias, null);
             if (e instanceof KeyStore.SecretKeyEntry) return key = ((KeyStore.SecretKeyEntry) e).getSecretKey();
         }
         if (!make) return null;
         KeyGenerator g = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
-        g.init(new KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+        g.init(new KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setKeySize(256)
@@ -96,7 +106,7 @@ final class SyncKeystore implements SyncEngine.Secrets {
         key = null;
         try {
             KeyStore ks = store();
-            if (ks.containsAlias(ALIAS)) ks.deleteEntry(ALIAS);
+            if (ks.containsAlias(alias)) ks.deleteEntry(alias);
         } catch (Exception e) {
             android.util.Log.w("RestockSync", "forget key", e);
         }

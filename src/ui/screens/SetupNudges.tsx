@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { updateSettings } from '../../lib/db';
+import { useLive } from '../../lib/useLive';
 import { syncAvailable, syncInfo, type SyncInfo } from '../../lib/sync';
 import { SECTION_NAMES, type Section } from '../../shops';
 import type { Settings } from '../../types';
@@ -32,7 +33,7 @@ function TabOffer({ settings }: { settings: Settings }) {
       </span>
       <span className="small">
         Share the {SECTION_NAMES[tab]} tab on this phone too? The household's {what.title.toLowerCase()} things come across at the next sync. You can
-        change it any time in Settings → Sync and backups → Local sync.
+        change it any time in Settings → Sync and backups → Phones and sharing.
       </span>
       <div style={{ display: 'flex', gap: 8 }}>
         <button
@@ -60,7 +61,9 @@ function TabOffer({ settings }: { settings: Settings }) {
 /** Home: "Finish setting up" (until done or dismissed) and "Take the tour" (until taken or dismissed). */
 export function SetupNudges({ settings }: { settings: Settings }) {
   const nav = useNav();
-  const left = tilesLeft(settings);
+  // 0.9.3: phone sync or a Restock server counts for the Backups tile.
+  const cover = useLive(syncInfo, []);
+  const left = tilesLeft(settings, cover);
   // Set up without anyone tapping Next (permissions allowed, a card added): counts as done.
   useEffect(() => {
     void noticeSetUpTiles();

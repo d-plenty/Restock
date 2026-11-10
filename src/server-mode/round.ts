@@ -63,7 +63,7 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
     }
   }
   /** A file none of the keys open: does a candidate open it, and does the file vouch for it? */
-  const tryCandidates = (bytes: Uint8Array): SyncFileMessage | undefined => {
+  const tryCandidates = (bytes: Uint8Array, name: string): SyncFileMessage | undefined => {
     for (const [v, key] of candidates) {
       let m: SyncFileMessage;
       try {
@@ -71,7 +71,7 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
       } catch {
         continue;
       }
-      if (!e.vouches(m)) continue;
+      if (!e.vouches(m, name)) continue;
       k.keys[v] = key;
       candidates.delete(v);
       res.newKeys = true;
@@ -100,7 +100,7 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
       try {
         m = openWithAny<SyncFileMessage>(k.keys, bytes).msg;
       } catch {
-        const got = candidates.size ? tryCandidates(bytes) : undefined;
+        const got = candidates.size ? tryCandidates(bytes, name) : undefined;
         if (!got) {
           res.unread++;
           continue;

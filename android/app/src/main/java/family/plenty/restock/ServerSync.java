@@ -84,7 +84,7 @@ final class ServerSync {
     void clearNotes() throws Exception {
         for (String k : new String[] { "server_top", "server_keys", "server_at", "server_unread", "server_files", "server_webkeys", "server_off_at", "server_off_prices", "server_off_waiting" })
             e.setMeta(k, null);
-        e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'server_seen:%' OR key LIKE 'server_ver:%' OR key LIKE 'server_webpub:%' OR key LIKE 'server_photorefs:%'");
+        e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'server_seen:%' OR key LIKE 'server_ver:%' OR key LIKE 'server_webpub:%' OR key LIKE 'server_photorefs:%' OR key LIKE 'server_keysver:%' OR key LIKE 'server_bad:%'");
     }
 
     /**
@@ -215,6 +215,62 @@ final class ServerSync {
         ServerOffload.Result offload;
     }
 
+    /**
+     * 0.9.3: the 60-second check backs off while the server can't be reached or its rounds fail
+     * (2, 4, 8, 16, then every 30 minutes), so a phone left open doesn't keep waking the radio and
+     * sending its file to a server that turns it down. A round that works starts it over.
+     */
+    static final class PollGate {
+        static final long FIRST_MS = 2 * 60_000L;
+        static final long MAX_MS = 30 * 60_000L;
+        private int fails;
+        private long until;
+
+        synchronized boolean due(long now) {
+            return now >= until;
+        }
+
+        synchronized void ok() {
+            fails = 0;
+            until = 0;
+        }
+
+        synchronized void failed(long now) {
+            fails = Math.min(fails + 1, 10);
+            until = now + Math.min(MAX_MS, FIRST_MS << (fails - 1));
+        }
+    }
+
+    /**
+     * 0.9.3: a quick look (one listing, for the 60-second check while Restock is open): has another
+     * phone's or a browser's file changed since this phone read it, has the owner's keys file changed,
+     * or does this phone's own file need writing? Only then is a round worth it. Throws if the server
+     * can't be reached.
+     */
+    boolean anythingNew() throws Exception {
+        if (!on() || key() == null) return false;
+        ServerFolder f = open();
+        List<String> names = f.names();
+        SyncFolder sf = new SyncFolder(e, h, "server", PRICES_MS);
+        if (!sf.ownUpToDate(names)) return true;
+        String mine = SyncFolder.fileFor(e.device());
+        String keys = sf.keysFile();
+        for (String n : names) {
+            if (n.equals(mine)) continue;
+            boolean sync = n.startsWith(SyncFolder.PREFIX) && n.endsWith(SyncFolder.SUFFIX);
+            boolean keysFile = n.equals(keys) || n.equals(SyncFolder.KEYS);
+            if (!sync && !keysFile) continue;
+            String ver = f.version(n);
+            // A server that gives no version: can't tell, so look properly.
+            if (ver == null) return true;
+            String noted = keysFile ? e.meta("server_keysver:" + n) : e.meta("server_ver:" + n);
+            if (!ver.equals(noted) && !ver.equals(e.meta("server_bad:" + n))) return true;
+        }
+        // A file another phone had that's gone (removed from the server): a round notes it.
+        String count = e.meta("server_files");
+        return count != null && !count.equals(String.valueOf(names.size()));
+    }
+
     /** One round with the server. Never throws: a problem is in `error`, and nothing is deleted then. */
     Round round(String nowIso, long now) {
         Round out = new Round();
@@ -226,6 +282,10 @@ final class ServerSync {
             noteFileKey();
             List<String> names = f.names();
             e.setMeta("server_files", String.valueOf(names.size()));
+            // 0.9.3: the keys files as this round saw them (anythingNew looks for a change).
+            e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'server_keysver:%'");
+            for (String n : names)
+                if ((n.startsWith("restock-sync-keys") && n.endsWith(".json")) && f.version(n) != null) e.setMeta("server_keysver:" + n, f.version(n));
             try {
                 writeWebKeys(f, names);
             } catch (Exception ex) {

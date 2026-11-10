@@ -3,11 +3,14 @@
 // into view, and a few seconds after an edit.
 
 import type { Database } from 'sql.js';
-import { ensureDefaults, getSettings, initDb, updateSettings } from '../lib/db';
+import { ensureDefaults, getSettings, householdContext, initDb, updateSettings } from '../lib/db';
+import { applyRows } from '../lib/sharedSettings';
+import { tidyKeeps } from '../lib/listPicks';
 import { changed, onChange } from '../lib/live';
 import { createSqlJsDriver } from '../lib/sql/sqljs';
 import { setPhotoSource } from '../lib/receiptFiles';
 import { SECTIONS, shopDef, shopsIn, type Section, type StoreChain } from '../shops';
+import type { Settings } from '../types';
 import { api } from './api';
 import { openWithAny, signedText, verifySig } from './crypto';
 import { WebSyncEngine } from './engine';
@@ -153,12 +156,18 @@ async function fitSettings(e: WebSyncEngine): Promise<void> {
     sections[sec as Exclude<Section, 'pantry'>] = on;
     if (on && ![...enabled].some((c) => shopDef(c)?.section === sec)) enabled.add(shopsIn(sec)[0].id);
   }
-  const next = [...enabled] as StoreChain[];
-  if (next.length !== st.enabledChains.length || sections.keg !== st.sections.keg || sections.pharmacy !== st.sections.pharmacy)
-    await updateSettings({ enabledChains: next, sections, adultConfirmed: st.adultConfirmed || sections.keg });
+  // 0.9.3: the household's own settings (shops picked, tabs on) win over the fitting, so the two
+  // never take turns (each save here starts another round).
+  const fitted: Record<string, unknown> = { enabledChains: [...enabled], sections, customShops: st.customShops };
+  const ctx = await householdContext();
+  if (ctx) applyRows(fitted, [...ctx.rows].map(([k, v]) => ({ k, v })), ctx.tabs, { adult: true });
+  const next = fitted.enabledChains as StoreChain[];
+  const secs = fitted.sections as Settings['sections'];
+  if (JSON.stringify(next) !== JSON.stringify(st.enabledChains) || secs.keg !== st.sections.keg || secs.pharmacy !== st.sections.pharmacy || JSON.stringify(fitted.customShops) !== JSON.stringify(st.customShops))
+    await updateSettings({ enabledChains: next, sections: secs, customShops: fitted.customShops as Settings['customShops'], adultConfirmed: st.adultConfirmed || secs.keg }, { local: true });
   // Receipts show when the household shares them (or some came from the phones' archives).
   const receipts = e.shareReceipts() || e.db.query('SELECT 1 FROM receipts LIMIT 1').length > 0;
-  if (receipts !== st.receipts.enabled) await updateSettings({ receipts: { ...st.receipts, enabled: receipts } });
+  if (receipts !== st.receipts.enabled) await updateSettings({ receipts: { ...st.receipts, enabled: receipts } }, { local: true });
 }
 
 let running: Promise<RoundResult | undefined> | undefined;
@@ -181,6 +190,8 @@ export function syncNow(): Promise<RoundResult | undefined> {
         await ensureDefaults();
       }
       await fitSettings(engine);
+      // 0.9.3: "Keep it as just …" notes of lines that are gone (an older phone deleted them, say).
+      await tidyKeeps().catch(() => 0);
       persist?.();
       applying = true;
       changed();

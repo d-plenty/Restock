@@ -96,7 +96,7 @@ describe('the privacy policy', () => {
 
   it('names every service the app talks to for barcodes and near me', () => {
     const text = render();
-    expect(legal.updated).toBe('9 November 2026');
+    expect(legal.updated).toBe('10 November 2026');
     for (const name of ['Open Food Facts', 'Open Beauty Facts', 'Open Products Facts', 'nominatim.openstreetmap.org', 'overpass-api.de', 'overpass.private.coffee'])
       expect(text).toContain(name);
     expect(text).not.toContain('mail.ru');

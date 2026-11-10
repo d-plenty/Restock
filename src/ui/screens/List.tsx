@@ -31,7 +31,7 @@ import { entryRows, undoable } from '../../lib/undo';
 import { money, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
-import { chainName, secondBranch, stockAtBranch, type Category, type Chain, type ListEntry, type LoyaltyCard } from '../../types';
+import { chainName, secondBranch, stockAtBranch, type Category, type Chain, type ListEntry, type LoyaltyCard, type Settings } from '../../types';
 import {
   ChainDot,
   ChainName,
@@ -49,15 +49,17 @@ import {
 } from '../components';
 import { MemberInfoTag, MultiInfoTag, StockInfoTag, SwapInfoTag, VerdictInfoTag } from '../tagInfo';
 import { SendToShopSheet } from './SendToShop';
+import { PickItemSheet } from './PickItem';
+import { linesToPick, pickWord } from '../../lib/homeAssistant';
 import { useNav } from '../nav';
 import { activeSections, enabledIn, SECTION_NAMES, SECTION_PLACE, searchChainsIn, type Section, type StoreChain } from '../../shops';
 import { CardBarcode, PROGRAMS } from './Cards';
 import { ShopTotalsCard } from '../shopTotalsCard';
 
-type ShopKey = Chain | 'any';
+export type ShopKey = Chain | 'any';
 
 /** Context every row needs, worked out once per render. */
-interface Ctx {
+export interface Ctx {
   totals: ShopTotals;
   recs: Recommendation[];
   /** The order to show shops in: this list's shops, then Other, then Any shop. */
@@ -69,18 +71,18 @@ interface Ctx {
 /** Which list a line is on: its pantry item's tab, or the tab it was added from. */
 export const entrySection = (e: ListEntry, groups: Map<string, Section>): Section =>
   (e.groupId ? groups.get(e.groupId) : undefined) ?? e.section ?? 'pantry';
-const recFor = (c: Ctx, e: ListEntry) => (e.groupId ? c.recs.find((r) => r.group.id === e.groupId) : undefined);
+export const recFor = (c: Ctx, e: ListEntry) => (e.groupId ? c.recs.find((r) => r.group.id === e.groupId) : undefined);
 /** What to buy: the cheapest of your picks, in stock, by the chosen measure (with "Any size", as many packs as it takes). */
-const lineFor = (c: Ctx, e: ListEntry) => (e.groupId ? c.totals.pickFor.get(e.groupId) : undefined);
-const dealFor = (c: Ctx, e: ListEntry) => lineFor(c, e)?.pick;
-const shopOf = (c: Ctx, e: ListEntry): ShopKey => e.chain ?? dealFor(c, e)?.product.chain ?? 'any';
-const qtyOf = (e: ListEntry) => Math.max(1, e.qty ?? 1);
+export const lineFor = (c: Ctx, e: ListEntry) => (e.groupId ? c.totals.pickFor.get(e.groupId) : undefined);
+export const dealFor = (c: Ctx, e: ListEntry) => lineFor(c, e)?.pick;
+export const shopOf = (c: Ctx, e: ListEntry): ShopKey => e.chain ?? dealFor(c, e)?.product.chain ?? 'any';
+export const qtyOf = (e: ListEntry) => Math.max(1, e.qty ?? 1);
 /** "3 × " for an Any size item that takes several packs (0.8.9). */
 const packsOf = (c: Ctx, e: ListEntry) => {
   const n = lineFor(c, e)?.packs;
   return n && n > 1 ? `${n} × ` : '';
 };
-const priceOf = (c: Ctx, e: ListEntry) => {
+export const priceOf = (c: Ctx, e: ListEntry) => {
   const l = lineFor(c, e);
   const d = l?.pick;
   if (!d && e.price !== undefined) return Math.round(e.price * qtyOf(e) * 100) / 100;
@@ -88,7 +90,7 @@ const priceOf = (c: Ctx, e: ListEntry) => {
 };
 
 /** The list as plain text, for sending to someone. */
-function listAsText(c: Ctx, open: ListEntry[], only?: ShopKey): string {
+export function listAsText(c: Ctx, open: ListEntry[], only?: ShopKey): string {
   const lines = [only ? `${c.title}: ${only === 'any' ? 'any shop' : chainName(only)} (from Restock)` : `${c.title} (from Restock)`, ''];
   for (const shop of c.order) {
     if (only && shop !== only) continue;
@@ -106,7 +108,7 @@ function listAsText(c: Ctx, open: ListEntry[], only?: ShopKey): string {
   return lines.join('\n').trim();
 }
 
-async function shareText(text: string): Promise<'shared' | 'copied'> {
+export async function shareText(text: string): Promise<'shared' | 'copied'> {
   try {
     if (isNative()) {
       const { Share } = await import('@capacitor/share');
@@ -120,7 +122,7 @@ async function shareText(text: string): Promise<'shared' | 'copied'> {
   return 'copied';
 }
 
-function Stepper({ e }: { e: ListEntry }) {
+export function Stepper({ e }: { e: ListEntry }) {
   const q = qtyOf(e);
   return (
     <span className="stepper" role="group" aria-label={`How many ${e.text}`}>
@@ -151,81 +153,48 @@ function stockNote(c: Ctx, e: ListEntry): { kind: 'second' | 'out'; text: string
   return { kind: 'out', text: `Out of stock ${stockWhere(p.chain, true)}` };
 }
 
-const LIST_TITLE: Record<Section, string> = { pantry: 'Shopping list', keg: 'Bottle shop list', pharmacy: 'Pharmacy list' };
+export const LIST_TITLE: Record<Section, string> = { pantry: 'Shopping list', keg: 'Bottle shop list', pharmacy: 'Pharmacy list' };
 /** What to type in the add box, for each list. */
-const ADD_HINT: Record<Section, string> = {
+export const ADD_HINT: Record<Section, string> = {
   pantry: 'Add anything — e.g. bananas',
   keg: 'Add anything — e.g. a bag of ice',
   pharmacy: 'Add anything — e.g. sunscreen',
 };
 
-export function ListScreen() {
-  const nav = useNav();
-  const allEntries = useLive(allListEntries, []);
-  const allRecs = useLive(loadRecommendations, []);
-  const allCats = useLive(allCategories, []);
-  const settings = useLive(getSettings, []);
-  const [picked0, setSection] = useState<Section>(nav.section);
-  // Opening the list from Home picks the grocery list even when the List tab is already open.
-  useEffect(() => setSection(nav.section), [nav.section]);
-  const [text, setText] = useState('');
-  const [view, setView] = useState<'all' | 'shop'>('shop');
-  const [sending, setSending] = useState<'woolworths' | 'coles'>();
-  const [editing, setEditing] = useState<ListEntry>();
-  const [selecting, setSelecting] = useState(false);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [menu, setMenu] = useState(false);
-  // Start shopping: first which shops you're going to today, then the in-store view for those.
-  const [choosingShops, setChoosingShops] = useState(false);
-  const [shopping, setShopping] = useState<StoreChain[]>();
-  const [skipToday, setSkipToday] = useState<Set<string>>(new Set());
-  const [preview, setPreview] = useState<ListEntry>();
-  // Shops opened on the list (0.9.0): each starts folded down to one line.
-  const [openShops, setOpenShops] = useState<Set<ShopKey>>(new Set());
-
-  const full = useFullRefresh();
-  // 0.9.0: the list's totals are worked out again only when the list, the prices or the settings
-  // change, not on every keystroke in "Add anything" (each one goes through every item and shop).
-  const sums = useMemo(() => {
-    if (!allEntries || !allRecs || !settings) return undefined;
-    // One list per tab (Pantry, Keg, Pharmacy), each with its own shops.
-    const sectionsOn = activeSections(settings);
-    const section: Section = sectionsOn.includes(picked0) ? picked0 : 'pantry';
-    const groupSection = new Map(allRecs.map((r) => [r.group.id, r.group.section ?? 'pantry']));
-    const entries = allEntries.filter((e) => entrySection(e, groupSection) === section);
-    const recs = allRecs.filter((r) => (r.group.section ?? 'pantry') === section);
-    const shops = searchChainsIn(settings.enabledChains, section);
-    // Store totals count what's still to buy; the per-row picks include ticked rows too, so
-    // a ticked item keeps its shop and price (and counts towards the trolley total).
-    const totals = shopTotals(entries, recs, shops, settings.listCompare);
-    const picks = shopTotals(
-      entries.map((e) => ({ ...e, checked: false })),
-      recs,
-      shops,
-      settings.listCompare,
-    );
-    const names = new Map(recs.map((r) => [r.group.id, r.group.name]));
-    return { sectionsOn, section, groupSection, entries, recs, shops, totals, picks, names };
-  }, [allEntries, allRecs, settings, picked0]);
-  if (!allEntries || !allRecs || !allCats || !settings || !sums) return <div className="screen" />;
-  const { sectionsOn, section, groupSection, entries, recs, shops, totals, picks, names } = sums;
-  const categories = allCats.filter((x) => x.section === section);
-  const openCount = (sec: Section) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;
+/**
+ * One tab's list (Pantry, Keg or Pharmacy, each with its own shops) and its totals, worked out from
+ * every line and item. `picked`: the list asked for (the grocery list if that tab isn't on).
+ * 0.9.3: also what the web's desktop list shows.
+ */
+export function listSums(allEntries: ListEntry[], allRecs: Recommendation[], settings: Settings, picked: Section) {
+  const sectionsOn = activeSections(settings);
+  const section: Section = sectionsOn.includes(picked) ? picked : 'pantry';
+  const groupSection = new Map(allRecs.map((r) => [r.group.id, r.group.section ?? 'pantry']));
+  const entries = allEntries.filter((e) => entrySection(e, groupSection) === section);
+  const recs = allRecs.filter((r) => (r.group.section ?? 'pantry') === section);
+  const shops = searchChainsIn(settings.enabledChains, section);
+  // Store totals count what's still to buy; the per-row picks include ticked rows too, so
+  // a ticked item keeps its shop and price (and counts towards the trolley total).
+  const totals = shopTotals(entries, recs, shops, settings.listCompare);
+  const picks = shopTotals(
+    entries.map((e) => ({ ...e, checked: false })),
+    recs,
+    shops,
+    settings.listCompare,
+  );
+  const names = new Map(recs.map((r) => [r.group.id, r.group.name]));
   const order: ShopKey[] = [...shops, ...enabledIn(settings.enabledChains, section).filter((x) => !shops.includes(x)), 'other', 'any'];
   const c: Ctx = { totals: picks, recs, order, title: LIST_TITLE[section] };
+  return { sectionsOn, section, groupSection, entries, recs, shops, totals, picks, names, c };
+}
 
-  const pick = (id: string) =>
-    setPicked((p) => {
-      const n = new Set(p);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
-  const stopSelecting = () => {
-    setSelecting(false);
-    setPicked(new Set());
-  };
-
+/**
+ * "Add anything" on a list: what's typed, your own pantry items that match it, and adding a line
+ * (or one more of a pantry item already on the list). 0.9.3: also the web's desktop list.
+ */
+export function useListAdd(entries: ListEntry[], recs: Recommendation[], section: Section) {
+  const nav = useNav();
+  const [text, setText] = useState('');
   const add = async (value: string, groupId?: string) => {
     const t = value.trim();
     if (!t) return;
@@ -263,10 +232,65 @@ export function ListScreen() {
         .slice(0, 4)
     : [];
   const exactPantry = recs.find((r) => r.group.name.trim().toLowerCase() === typed);
-  const addFromPantry = async (r: (typeof recs)[number]) => {
+  const addFromPantry = async (r: Recommendation) => {
     await add(r.group.name, r.group.id);
     nav.toast(`${r.group.name} added from your pantry`);
   };
+  return { text, setText, add, pantryMatches, exactPantry, addFromPantry };
+}
+
+export function ListScreen() {
+  const nav = useNav();
+  const allEntries = useLive(allListEntries, []);
+  const allRecs = useLive(loadRecommendations, []);
+  const allCats = useLive(allCategories, []);
+  const settings = useLive(getSettings, []);
+  const [picked0, setSection] = useState<Section>(nav.section);
+  // Opening the list from Home picks the grocery list even when the List tab is already open.
+  useEffect(() => setSection(nav.section), [nav.section]);
+  const [view, setView] = useState<'all' | 'shop'>('shop');
+  const [sending, setSending] = useState<'woolworths' | 'coles'>();
+  const [editing, setEditing] = useState<ListEntry>();
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [menu, setMenu] = useState(false);
+  // Start shopping: first which shops you're going to today, then the in-store view for those.
+  const [choosingShops, setChoosingShops] = useState(false);
+  const [shopping, setShopping] = useState<StoreChain[]>();
+  const [skipToday, setSkipToday] = useState<Set<string>>(new Set());
+  const [preview, setPreview] = useState<ListEntry>();
+  // Shops opened on the list (0.9.0): each starts folded down to one line.
+  const [openShops, setOpenShops] = useState<Set<ShopKey>>(new Set());
+  // 0.9.3: lines from Home Assistant to pick a pantry item for ("Pick my milk"), on every phone and the web (listPicks.ts).
+  const toPick = useLive(linesToPick, []);
+  const [picking, setPicking] = useState<ListEntry>();
+
+  const full = useFullRefresh();
+  // 0.9.0: the list's totals are worked out again only when the list, the prices or the settings
+  // change, not on every keystroke in "Add anything" (each one goes through every item and shop).
+  const sums = useMemo(
+    () => (!allEntries || !allRecs || !settings ? undefined : listSums(allEntries, allRecs, settings, picked0)),
+    [allEntries, allRecs, settings, picked0],
+  );
+  const adder = useListAdd(sums?.entries ?? [], sums?.recs ?? [], sums?.section ?? 'pantry');
+  if (!allEntries || !allRecs || !allCats || !settings || !sums) return <div className="screen" />;
+  const { sectionsOn, section, groupSection, entries, recs, shops, totals, names, c } = sums;
+  const categories = allCats.filter((x) => x.section === section);
+  const openCount = (sec: Section) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;
+
+  const pick = (id: string) =>
+    setPicked((p) => {
+      const n = new Set(p);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const stopSelecting = () => {
+    setSelecting(false);
+    setPicked(new Set());
+  };
+
+  const { text, setText, add, pantryMatches, exactPantry, addFromPantry } = adder;
 
   const scanToList = async () => {
     const out = await scanBarcode('Scan to add to your shopping list');
@@ -393,6 +417,11 @@ export function ListScreen() {
                 <MultiInfoTag o={deal} />
                 {member && <MemberInfoTag chain={deal.product.chain} hasCard={!deal.locked} />}
               </span>
+            )}
+            {!selecting && !e.groupId && !e.checked && toPick?.has(e.id) && (
+              <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => setPicking(e)}>
+                Pick my {pickWord(e.text)}
+              </button>
             )}
             {stockNote(c, e)?.kind === 'second' && (
               <span className="small" style={{ color: 'var(--green-ink)', fontWeight: 600 }}>
@@ -752,6 +781,8 @@ export function ListScreen() {
           </button>
         </Sheet>
       )}
+
+      {picking && <PickItemSheet entry={picking} onClose={() => setPicking(undefined)} />}
 
       {sending && (
         <SendToShopSheet
@@ -1298,7 +1329,7 @@ function ShoppingMode({
  * price, picked for you, unless you choose one), its category, open the pantry item, or take it off
  * the list. A pantry item's name comes from the pantry, so it isn't changed here.
  */
-function EditEntry({
+export function EditEntry({
   entry,
   categories,
   shops,

@@ -710,7 +710,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   );
 }
 
-function EditSheet({
+export function EditSheet({
   group,
   categories,
   suggested,

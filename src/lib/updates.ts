@@ -10,6 +10,7 @@ export const SELF_UPDATE = !import.meta.env.VITE_FDROID;
 /** Where official Restock releases are published. */
 export const RELEASES = 'https://github.com/d-plenty/Restock/releases';
 const LATEST = 'https://api.github.com/repos/d-plenty/Restock/releases/latest';
+const DAY = 86_400_000;
 const WEEK = 7 * 86_400_000;
 
 export interface UpdateInfo {
@@ -140,11 +141,34 @@ export async function installUpdate(url: string, sha256 = published.get(url)): P
   if (!isNative()) throw new Error('Updating works in the Android app.');
   const hex = sha256?.trim().toLowerCase();
   if (hex !== undefined && !HEX64.test(hex)) throw new Error("The update's SHA-256 couldn't be read, so it wasn't installed.");
-  const out = await RestockNative.installUpdate(hex ? { url, sha256: hex } : { url });
+  let out: { needsPermission?: boolean };
+  try {
+    out = await RestockNative.installUpdate(hex ? { url, sha256: hex } : { url });
+  } catch (e) {
+    // 0.9.3: the release's file was replaced after Restock last checked (a fixed upload, say). Ask
+    // GitHub again once, and try with what it publishes now; a second mismatch still refuses.
+    const fresh = hex && /didn't match what GitHub published/.test(e instanceof Error ? e.message : String(e)) ? await recheck(url) : undefined;
+    if (!fresh || fresh === hex) throw e;
+    out = await RestockNative.installUpdate({ url, sha256: fresh });
+  }
   return out.needsPermission ? 'permission' : 'started';
 }
 
-/** Once a week, when "Tell me when there's an update" is on. Returns a newer version not told about yet. */
-export function weeklyCheckDue(u: { notify: boolean; lastCheck?: string } | undefined, now = Date.now()): boolean {
-  return !!u?.notify && (!u.lastCheck || now - Date.parse(u.lastCheck) >= WEEK);
+/** 0.9.3: what GitHub publishes now for this APK address, if the latest release still has it. */
+async function recheck(url: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(LATEST, { headers: { Accept: 'application/vnd.github+json' } });
+    if (!res.ok) return undefined;
+    const info = readRelease((await res.json()) as GitHubRelease, '0');
+    return info.apkUrl === url && info.sha256 && HEX64.test(info.sha256) ? info.sha256.toLowerCase() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** When "Tell me when there's an update" is on: due once its interval (every 24 hours by default, or every 7 days) has passed. */
+export function weeklyCheckDue(u: { notify: boolean; lastCheck?: string; everyDays?: number } | undefined, now = Date.now()): boolean {
+  // 0.9.3: every 24 hours unless the person picked every 7 days.
+  const every = u?.everyDays === 7 ? WEEK : DAY;
+  return !!u?.notify && (!u.lastCheck || now - Date.parse(u.lastCheck) >= every);
 }

@@ -62,21 +62,6 @@ export const SOON: Soon[] = [
     ),
   },
   {
-    id: 'homeassistant',
-    icon: 'home',
-    title: 'Home Assistant',
-    short: 'Your shopping list in Home Assistant, both ways',
-    body: (
-      <>
-        <p>
-          Connect Restock to Home Assistant, so your shopping list shows there and changes go both ways: add milk from a kitchen tablet or by voice,
-          and it's on your Restock list.
-        </p>
-        <p>Deals and recall alerts could show up in Home Assistant too. This comes after hosted sync, as it uses the same server.</p>
-      </>
-    ),
-  },
-  {
     id: 'github',
     icon: 'download',
     title: 'F-Droid',

@@ -1002,6 +1002,7 @@ final class SyncHousehold implements SyncEngine.Household {
      * "Combine" would reuse numbers the others think they already have.
      */
     void forget() throws Exception {
+        // 0.9.3: also the household's settings (household_settings); this phone's settings stay as they are.
         for (String k : new String[] { "key", "keyv", "oldkey", "oldkey_until", "secret", "owner_secrets", "pair_token", "pair_until", "invite", "household", "tabs", "tabs_eff",
             "recovery", "recovery_saved", "owner_priv", "owner_pubkey", "owner_pin", "folder", "folder_top", "folder_keys", "folder_at", "folder_unread", "clock_warn", "rehousehold",
             // 0.9.1: the WebDAV or Nextcloud sign-in (only ever on this phone), receipts and tidying.
@@ -1017,7 +1018,15 @@ final class SyncHousehold implements SyncEngine.Household {
             List<JSONObject> top = e.db.query("SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log");
             e.db.exec("DELETE FROM household");
             e.db.exec("DELETE FROM sync_log WHERE tbl = 'household'");
-            e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'folder_got:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%' OR key LIKE 'server_webpub:%' OR key LIKE 'server_photorefs:%'");
+            // 0.9.3: the household's settings go too; this phone keeps its settings as they are now.
+            // Its "Always use this for …" and "Keep it as just …" rows stay (they're about its own
+            // items and lines, and go with them if it makes or joins another household).
+            if (SharedSettings.hasTable(e)) {
+                e.db.exec("DELETE FROM " + SharedSettings.TABLE + " WHERE NOT " + SharedSettings.KEPT_ON_LEAVING);
+                e.db.exec("DELETE FROM sync_log WHERE tbl = ? AND NOT (pk LIKE 'alias:%' OR pk LIKE 'keep:%')", SharedSettings.TABLE);
+            }
+            e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'folder_got:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%' OR key LIKE 'server_webpub:%' OR key LIKE 'server_photorefs:%'"
+                + " OR key LIKE 'server_keysver:%' OR key LIKE 'server_bad:%' OR key LIKE 'folder_bad:%'");
             // A marker that keeps the highest number (not a record: sync skips it).
             e.db.exec("INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq) VALUES ('_seq', 'floor', 0, '', 1, ?)", top.get(0).optLong("top", 0));
             e.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");

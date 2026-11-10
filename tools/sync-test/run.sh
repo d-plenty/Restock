@@ -4,6 +4,8 @@
 # (through Python's sqlite3) with Restock's own layout. Needs Java 17+, Python 3 and org.json on
 # the classpath (ORGJSON=/path/to/json.jar or a folder of its classes). Other plain-Java classes the
 # sync code uses (Net, and what it uses) are found through -sourcepath.
+# 0.9.3: household settings (SyncTest093), and phones on 0.9.0–0.9.2 reading a 0.9.3 phone's file
+# (tools/sync-test/old, compiled against each version's code from the repo's tags).
 # 0.9.2: then phones and a real Restock server (github.com/d-plenty/restock-server cloned next to
 # this repo, or RESTOCK_SERVER_DIR; needs Node 22+, no npm install there).
 # Run from the repo root:  ORGJSON=~/json-20240303.jar bash tools/sync-test/run.sh
@@ -20,6 +22,23 @@ javac -nowarn -d $O/classes -cp "$ORGJSON" -sourcepath android/app/src/main/java
 java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncTest090 "$O"
 java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncFamily "$O"
 java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncTest091 "$O"
+# 0.9.3: household-wide settings and the phone's summary for the web.
+java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncTest093 "$O"
+
+# 0.9.3: phones still on 0.9.0, 0.9.1 and 0.9.2 (their own sync code and database layout, from the
+# repo's tags) read a 0.9.3 phone's file: the new data is passed over, the rest comes in as before.
+for tag in base090 base091 v092; do
+  if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null 2>&1; then
+    echo "Old phone check for $tag skipped: no such tag here."
+    continue
+  fi
+  OS=$O/old-$tag
+  rm -rf $OS/src $OS/classes && mkdir -p $OS/src $OS/classes
+  git archive "$tag" android/app/src/main/java | tar -x -C $OS/src
+  cp tools/sync-test/bridge.py $OS/
+  javac -nowarn -d $OS/classes -cp "$ORGJSON" -sourcepath $OS/src/android/app/src/main/java tools/sync-test/old/OldReader.java tools/sync-test/family/plenty/restock/TestDb.java
+  java -cp "$OS/classes:$ORGJSON" family.plenty.restock.OldReader "$OS" "$O/old-reader" "$tag"
+done
 
 bash tools/sync-test/web-parity.sh
 

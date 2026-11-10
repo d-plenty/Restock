@@ -10,12 +10,14 @@ import { lineCost } from '../../lib/verdict';
 import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { isBlockMessage, isNative } from '../../stores/http';
-import { chainName, stockKnown } from '../../types';
+import { chainName, stockKnown, type ListEntry, type Settings } from '../../types';
 import { ChainDot, ChainName, Icon, LoadingBar, OpenStoreButton, Price, SectionMark, SwapBox, Thumb, timeAgo } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { ActionInfoTag, MemberInfoTag, MultiInfoTag } from '../tagInfo';
 import { failingStores, getHealth } from '../../lib/health';
 import { exportBackup, needsBackupNudge } from '../../lib/backup';
+import { syncInfo } from '../../lib/sync';
+import { protection } from '../../lib/protection';
 import { confirmAction } from '../../lib/confirm';
 import { useNav } from '../nav';
 import { RecallBanner } from './Recalls';
@@ -27,6 +29,8 @@ export function HomeScreen() {
   const nav = useNav();
   const allRecs = useLive(loadRecommendations, []);
   const settings = useLive(getSettings, []);
+  // 0.9.3: phone-to-phone sync or a Restock server counts as a copy kept elsewhere.
+  const sync = useLive(syncInfo, []);
   const allEntries = useLive(allListEntries, []);
   const health = useLive(getHealth, []);
   const failingAll = health ? failingStores(health) : [];
@@ -60,13 +64,10 @@ export function HomeScreen() {
   const cards = useLive(allCards, []);
   const [testing, setTesting] = useState(false);
   if (!allRecs || !settings || !allEntries) return <div className="screen" />;
-  // Deals from every tab that's switched on; the list summary is the grocery list.
-  const on = activeSections(settings);
-  const recs = allRecs.filter((r) => on.includes(r.group.section ?? 'pantry'));
+  const { on, recs, totals, oneStop, listSaving, listed, dealChain, dealRecs, dealShops, showing, buys, altDeals, smalls, waits, skips, normal, worth, saving } =
+    weekDeals(allRecs, settings, allEntries, picked);
   // Only warn about shops you still use, on a tab that's switched on.
   const failing = failingAll.filter((f) => on.some((sec) => searchChainsIn(settings.enabledChains, sec).includes(f.chain)));
-  const pantryIds = new Set(allRecs.filter((r) => (r.group.section ?? 'pantry') === 'pantry').map((r) => r.group.id));
-  const entries = allEntries.filter((e) => (e.groupId ? pantryIds.has(e.groupId) : (e.section ?? 'pantry') === 'pantry'));
   const oldest = recs.map((r) => r.group.createdAt).sort()[0];
   const backupNow = async () => {
     if (cards?.length) {
@@ -82,42 +83,7 @@ export function HomeScreen() {
       nav.toast(`Backup failed: ${e instanceof Error ? e.message : e}`);
     }
   };
-  // Items on the shopping list, by pantry item, with the list line (so the cart button can take it off again).
-  const listed = new Map(allEntries.filter((e) => !e.checked && e.groupId).map((e) => [e.groupId!, e.id]));
-  const totals = shopTotals(
-    entries,
-    recs.filter((r) => pantryIds.has(r.group.id)),
-    searchChainsIn(settings.enabledChains, 'pantry'),
-    settings.listCompare,
-  );
-  // The store with everything that the shopping list compares against, so Home and the list agree (0.9.0).
-  const oneStop = aroundPlan(totals, settings.listCompare, settings.shopAroundMin ?? 1).complete;
-  // What this week's list saves against everything's normal price. Not from a sale that may have
-  // ended, or a price that may be out of date (0.9.0): those aren't deals.
-  const listSaving = totals.around.lines.reduce((sum, l) => {
-    if (l.pick.verdict.stale) return sum;
-    const normal = l.pick.stats.typical ?? l.pick.stats.current?.wasPrice;
-    return normal && l.pick.price !== undefined ? sum + Math.max(0, normal * l.qty - lineCost(l.pick, l.qty)) : sum;
-  }, 0);
   const next = nextCheck(settings);
-
-  // Deals at one shop only, or all of them (0.7.4). The shop each deal is at: the swap's for a swap.
-  const dealChain = (r: (typeof recs)[number]) => (r.action === 'alt' ? r.alt : r.best)?.product.chain;
-  const dealRecs = recs.filter((r) => r.action === 'buy' || r.action === 'alt' || r.action === 'small');
-  // Every section follows the shop picked (0.7.5): sales, small savings, wait, fake sales, normal price.
-  const dealShops = [...new Set(recs.map(dealChain).filter((c): c is NonNullable<typeof c> => !!c))].sort((a, b) =>
-    chainName(a).localeCompare(chainName(b)),
-  );
-  const showing = picked.filter((c) => dealShops.includes(c as never));
-  const atShop = (r: (typeof recs)[number]) => !showing.length || showing.includes(dealChain(r) ?? '');
-  const buys = recs.filter((r) => r.action === 'buy' && atShop(r));
-  const altDeals = recs.filter((r) => r.action === 'alt' && atShop(r));
-  const smalls = recs.filter((r) => r.action === 'small' && atShop(r));
-  const waits = recs.filter((r) => r.action === 'wait' && atShop(r));
-  const skips = recs.filter((r) => r.action === 'skip' && atShop(r));
-  const normal = recs.filter((r) => r.action === 'none' && atShop(r));
-  const worth = [...buys, ...altDeals];
-  const saving = worth.reduce((sum, r) => sum + (r.saving ?? 0), 0);
 
   const runCheck = () => {
     if (refresh.busy) return;
@@ -278,7 +244,7 @@ export function HomeScreen() {
         </div>
       ))}
 
-      {!serverMode && recs.length > 0 && needsBackupNudge(settings, recs.length, oldest) && (
+      {!serverMode && sync && recs.length > 0 && needsBackupNudge(settings, recs.length, oldest, Date.now(), protection(false, sync).covered) && (
         <div className="card hint" style={{ flexDirection: 'column', gap: 8 }}>
           <strong>Back up your pantry</strong>
           <span>
@@ -494,6 +460,54 @@ export function HomeScreen() {
       {testing && <ConnectionsSheet settings={settings} onClose={() => setTesting(false)} />}
     </div>
   );
+}
+
+/**
+ * This week on Home: the deals from every tab that's switched on, and the grocery list's totals.
+ * `picked`: only deals at these shops (none: every shop). 0.9.3: also what the web's desktop Home shows.
+ */
+export function weekDeals(allRecs: Recommendation[], settings: Settings, allEntries: ListEntry[], picked: string[] = []) {
+  // Deals from every tab that's switched on; the list summary is the grocery list.
+  const on = activeSections(settings);
+  const recs = allRecs.filter((r) => on.includes(r.group.section ?? 'pantry'));
+  const pantryIds = new Set(allRecs.filter((r) => (r.group.section ?? 'pantry') === 'pantry').map((r) => r.group.id));
+  const entries = allEntries.filter((e) => (e.groupId ? pantryIds.has(e.groupId) : (e.section ?? 'pantry') === 'pantry'));
+  // Items on the shopping list, by pantry item, with the list line (so the cart button can take it off again).
+  const listed = new Map(allEntries.filter((e) => !e.checked && e.groupId).map((e) => [e.groupId!, e.id]));
+  const totals = shopTotals(
+    entries,
+    recs.filter((r) => pantryIds.has(r.group.id)),
+    searchChainsIn(settings.enabledChains, 'pantry'),
+    settings.listCompare,
+  );
+  // The store with everything that the shopping list compares against, so Home and the list agree (0.9.0).
+  const oneStop = aroundPlan(totals, settings.listCompare, settings.shopAroundMin ?? 1).complete;
+  // What this week's list saves against everything's normal price. Not from a sale that may have
+  // ended, or a price that may be out of date (0.9.0): those aren't deals.
+  const listSaving = totals.around.lines.reduce((sum, l) => {
+    if (l.pick.verdict.stale) return sum;
+    const normal = l.pick.stats.typical ?? l.pick.stats.current?.wasPrice;
+    return normal && l.pick.price !== undefined ? sum + Math.max(0, normal * l.qty - lineCost(l.pick, l.qty)) : sum;
+  }, 0);
+
+  // Deals at one shop only, or all of them (0.7.4). The shop each deal is at: the swap's for a swap.
+  const dealChain = (r: Recommendation) => (r.action === 'alt' ? r.alt : r.best)?.product.chain;
+  const dealRecs = recs.filter((r) => r.action === 'buy' || r.action === 'alt' || r.action === 'small');
+  // Every section follows the shop picked (0.7.5): sales, small savings, wait, fake sales, normal price.
+  const dealShops = [...new Set(recs.map(dealChain).filter((c): c is NonNullable<typeof c> => !!c))].sort((a, b) =>
+    chainName(a).localeCompare(chainName(b)),
+  );
+  const showing = picked.filter((c) => dealShops.includes(c as never));
+  const atShop = (r: Recommendation) => !showing.length || showing.includes(dealChain(r) ?? '');
+  const buys = recs.filter((r) => r.action === 'buy' && atShop(r));
+  const altDeals = recs.filter((r) => r.action === 'alt' && atShop(r));
+  const smalls = recs.filter((r) => r.action === 'small' && atShop(r));
+  const waits = recs.filter((r) => r.action === 'wait' && atShop(r));
+  const skips = recs.filter((r) => r.action === 'skip' && atShop(r));
+  const normal = recs.filter((r) => r.action === 'none' && atShop(r));
+  const worth = [...buys, ...altDeals];
+  const saving = worth.reduce((sum, r) => sum + (r.saving ?? 0), 0);
+  return { on, recs, pantryIds, entries, listed, totals, oneStop, listSaving, dealChain, dealRecs, dealShops, showing, buys, altDeals, smalls, waits, skips, normal, worth, saving };
 }
 
 function DealCard({ rec, listed }: { rec: Recommendation; listed?: string }) {

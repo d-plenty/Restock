@@ -13,7 +13,8 @@ import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
 import { Icon, Logo, TopBar, useBackHandler } from '../components';
 import { useNav } from '../nav';
-import { AutoBackupSettings } from './Backups';
+import { AutoBackupSettings, SuggestLocalBackup } from './Backups';
+import { protection, suggestLocalText } from '../../lib/protection';
 import { LegalSheet } from './Legal';
 import { AccessibilitySettings, LookSettings } from './Look';
 import { PermissionList } from './Permissions';
@@ -110,11 +111,12 @@ const ALL_TILES: Tile[] = [
   },
   {
     id: 'backups',
-    title: 'Auto backups',
-    sub: 'A copy to a folder',
+    title: 'Backups',
+    sub: 'A copy somewhere else',
     icon: 'download',
-    heading: 'Back up automatically?',
-    intro: 'Save a backup file into a folder on your phone every week, so a wrong uninstall never wipes your history.',
+    heading: 'Keep a copy somewhere else?',
+    intro:
+      'So a lost phone or a wrong uninstall never wipes your pantry, list and price history. Any one of these counts: a backup on this phone, phone-to-phone sync, or your own Restock server. Use one, two or all three.',
   },
   {
     id: 'history',
@@ -190,7 +192,7 @@ const ALL_TILES: Tile[] = [
     sub: 'Hear about new versions',
     icon: 'up',
     heading: 'Stay up to date',
-    intro: 'New versions of Restock come from GitHub. Restock can check once a week and tell you when there is one.',
+    intro: 'New versions of Restock come from GitHub. Restock can check every 24 hours (or every 7 days, if you’d rather) and tell you when there is one.',
   },
   {
     id: 'a11y',
@@ -228,9 +230,16 @@ const TILE_ORDER: TileId[] = [
 // The Updates tile only where Restock updates itself from GitHub (not F-Droid builds).
 export const TILES: Tile[] = TILE_ORDER.filter((id) => SELF_UPDATE || id !== 'updates').map((id) => ALL_TILES.find((t) => t.id === id)!);
 
+/** 0.9.3: what this phone syncs with, for the Backups tile (any of backup, phone sync or server counts). */
+export type Cover = { paired?: boolean; server?: boolean; members?: unknown[] } | null | undefined;
+
 /** A tile's status, as shown on it. */
-export function tileStatus(s: Settings, id: TileId): { text: string; ok: boolean } {
+export function tileStatus(s: Settings, id: TileId, cover?: Cover): { text: string; ok: boolean } {
   if (id === 'recalls') return { text: s.recalls.enabled ? 'On' : 'Off', ok: s.recalls.enabled };
+  if (id === 'backups') {
+    const p = protection(s.autoBackup.enabled, cover);
+    if (p.covered) return { text: p.short, ok: true };
+  }
   if (id === 'backups' && (s.autoBackup.enabled || s.setup.done.includes(id))) return { text: s.autoBackup.enabled ? 'On' : 'Off', ok: true };
   if (id === 'receipts' && (s.receipts.enabled || s.setup.done.includes(id))) return { text: s.receipts.enabled ? 'On' : 'Off', ok: true };
   // Shop tiles count as done when the tab is really on (shops picked), after a restore or joining a
@@ -246,8 +255,8 @@ export function tileStatus(s: Settings, id: TileId): { text: string; ok: boolean
 
 /** Tiles that still need a look: not done and not skipped. (Recall alerts are on by default, so they count as done.) */
 // Tiles still to go: not done, skipped, or already showing as set up (Keg on after a restore, say).
-export const tilesLeft = (s: Settings) =>
-  TILES.filter((t) => t.id !== 'recalls' && !s.setup.done.includes(t.id) && !s.setup.skipped.includes(t.id) && !tileStatus(s, t.id).ok);
+export const tilesLeft = (s: Settings, cover?: Cover) =>
+  TILES.filter((t) => t.id !== 'recalls' && !s.setup.done.includes(t.id) && !s.setup.skipped.includes(t.id) && !tileStatus(s, t.id, cover).ok);
 
 /**
  * 0.8.5: tiles that are set up, whether or not anyone tapped Next on them: every permission
@@ -456,6 +465,40 @@ function AccountsTile() {
   );
 }
 
+/**
+ * 0.9.3: Backups. Any of a backup on this phone, phone-to-phone sync or a Restock server counts;
+ * with only sync or a server, a backup on this phone is suggested as well.
+ */
+function BackupsTile({ settings }: { settings: Settings }) {
+  const nav = useNav();
+  const info = useLive(syncInfo, []);
+  const p = protection(settings.autoBackup.enabled, info);
+  return (
+    <>
+      <AutoBackupSettings settings={settings} inSetup />
+      <div className="card flush">
+        <button className="row" onClick={() => nav.push({ name: 'sync' })}>
+          <Icon name="swap" size={18} />
+          <span className="grow">
+            <span className="title">{p.phones ? 'Phone-to-phone sync is on' : 'Phone-to-phone sync'}</span>
+            <span className="small">Your other phones keep a copy. Works offline, no server needed.</span>
+          </span>
+          <Icon name="chevron" size={18} />
+        </button>
+        <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
+          <Icon name="refresh" size={18} />
+          <span className="grow">
+            <span className="title">{p.server ? 'Your Restock server is on' : 'Your own Restock server'}</span>
+            <span className="small">A small server you run at home keeps a copy, and you can use Restock in a browser.</span>
+          </span>
+          <Icon name="chevron" size={18} />
+        </button>
+      </div>
+      {p.suggestLocal && <SuggestLocalBackup text={suggestLocalText(p)} />}
+    </>
+  );
+}
+
 /** Sync: where it's at, and the way in (0.8.0). */
 function SyncTile() {
   const nav = useNav();
@@ -470,17 +513,19 @@ function SyncTile() {
         </span>
         <Icon name="chevron" size={18} />
       </button>
-      <div className="row">
+      <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
         <Icon name="refresh" size={18} />
         <span className="grow">
           <span className="title" style={{ fontSize: 15 }}>
             Restock server
           </span>
           <span className="small">
-            Sync from anywhere through a small server you run yourself, for when the phones aren't on the same Wi-Fi. Set it up later in Local sync.
+            Sync from anywhere through a small server you run yourself, for when the phones aren't on the same Wi-Fi. Connect starts the household
+            for you.
           </span>
         </span>
-      </div>
+        <Icon name="chevron" size={18} />
+      </button>
     </div>
   );
 }
@@ -509,7 +554,7 @@ function TileBody({ id, settings }: { id: TileId; settings: Settings }): ReactNo
     case 'recalls':
       return <RecallSettings settings={settings} inSetup />;
     case 'backups':
-      return <AutoBackupSettings settings={settings} inSetup />;
+      return <BackupsTile settings={settings} />;
     case 'history':
       return <MarketSetup settings={settings} />;
     case 'look':
@@ -610,7 +655,8 @@ export function SetupTiles({
   onContinue: () => void;
   inSettings?: boolean;
 }) {
-  const doneCount = TILES.filter((t) => tileStatus(settings, t.id).ok).length;
+  const cover = useLive(syncInfo, []);
+  const doneCount = TILES.filter((t) => tileStatus(settings, t.id, cover).ok).length;
   useEffect(() => {
     void noticeSetUpTiles();
   }, []);
@@ -638,7 +684,7 @@ export function SetupTiles({
       )}
       <div className="setup-grid">
         {TILES.map((t) => {
-          const st = tileStatus(settings, t.id);
+          const st = tileStatus(settings, t.id, cover);
           return (
             <button key={t.id} className={`setup-tile${st.ok ? ' done' : ''}`} onClick={() => onOpen(t.id)} aria-label={`${t.title}: ${st.text}`}>
               <span className="setup-ic">
@@ -682,7 +728,7 @@ function useTileWalk(onFinished: () => void) {
       return;
     }
     const s = await getSettings();
-    const left = tilesLeft(s);
+    const left = tilesLeft(s, await syncInfo().catch(() => undefined));
     const after = from ? TILES.findIndex((t) => t.id === from) : -1;
     const upcoming = left.find((t) => TILES.findIndex((x) => x.id === t.id) > after) ?? (from ? undefined : left[0]);
     if (upcoming) setOpenState(upcoming.id);
@@ -891,7 +937,7 @@ export function Onboarding() {
             <div className="card" style={{ gap: 6 }}>
               <strong>Share with your household again?</strong>
               <span className="small">
-                Backups don't include the household. To sync this phone, join with a new code from the owner phone (Settings → Sync and backups → Local sync → Add a phone
+                Backups don't include the household. To sync this phone, join with a new code from the owner phone (Settings → Sync and backups → Add a phone
                 there).
               </span>
               <button

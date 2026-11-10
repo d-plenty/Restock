@@ -14,6 +14,11 @@ import { shopDef, type Section, type StoreChain } from '../shops';
 // page is on another site is left out), and this phone never takes: shared price history (each
 // person turns that download on themselves), the owner's home area or position, shop store
 // numbers (Coles branch numbers, Aldi service points), the backup folder or any password.
+//
+// 0.9.3: this copy is the starting point only. Shops (for the tabs a phone syncs), Shop around,
+// the alert level, recalls, the list's cheapest and the order of products are household-wide from
+// now on (sharedSettings.ts): changed on any phone or the web app, every phone follows. The rest
+// carried here (price checks, history, the household's name) stays each phone's own after joining.
 
 /** Settings a joining phone takes from the household as they are. */
 export const CARRIED_SETTINGS = [

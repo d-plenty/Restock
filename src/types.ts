@@ -288,7 +288,8 @@ export interface Settings {
    */
   otherContainerSizes: boolean;
   /** New versions on GitHub (0.7.3): tell me once a week, when I last looked, and the last one I was told about. */
-  updates?: { notify: boolean; lastCheck?: string; told?: string };
+  /** everyDays (0.9.3): how often to check, 1 or 7 (every 24 hours if not set). */
+  updates?: { notify: boolean; lastCheck?: string; told?: string; everyDays?: number };
   /** Date of the privacy policy the person accepted. */
   privacyAccepted?: string;
   /** One-time hints already dismissed. */

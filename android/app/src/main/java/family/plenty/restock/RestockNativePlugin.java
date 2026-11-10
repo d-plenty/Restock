@@ -419,6 +419,62 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
+    // ---------- 0.9.3: Home Assistant (HomeAssistant.java) ----------
+
+    private final ExecutorService haThread = Executors.newSingleThreadExecutor();
+
+    /** Saves the long-lived access token, sealed on this phone. It's never handed back. */
+    @PluginMethod
+    public void haSaveToken(PluginCall call) {
+        final String token = call.getString("token", "");
+        final String address = call.getString("address", "");
+        haThread.execute(() -> {
+            try {
+                HomeAssistant.saveToken(getContext(), token, address);
+                call.resolve();
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Couldn't save the token.");
+            }
+        });
+    }
+
+    @PluginMethod
+    public void haForgetToken(PluginCall call) {
+        haThread.execute(() -> {
+            HomeAssistant.forget(getContext());
+            call.resolve();
+        });
+    }
+
+    /** Resolves {saved}: whether a token is saved (not the token). */
+    @PluginMethod
+    public void haHasToken(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("saved", HomeAssistant.hasToken(getContext()));
+        call.resolve(out);
+    }
+
+    /** A request to Home Assistant's API with the saved token (or `token`, typed in to test). Resolves {status, body}. */
+    @PluginMethod
+    public void haRequest(PluginCall call) {
+        final String address = call.getString("address", "");
+        final String method = call.getString("method", "GET");
+        final String path = call.getString("path", "");
+        final String body = call.getString("body");
+        final String token = call.getString("token");
+        haThread.execute(() -> {
+            try {
+                HomeAssistant.Answer a = HomeAssistant.request(getContext(), address, method, path, body, token);
+                JSObject out = new JSObject();
+                out.put("status", a.status);
+                out.put("body", a.body);
+                call.resolve(out);
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Couldn't reach Home Assistant.");
+            }
+        });
+    }
+
     /** Opens a page of a shop's website in the hidden browser and returns it once drawn. Resolves {status, html, url}. */
     @PluginMethod
     public void storeRender(PluginCall call) {
@@ -1175,6 +1231,24 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
+    /** 0.9.3: start a household with this phone as the owner, without showing a code (the Restock server's Connect). */
+    @PluginMethod
+    public void syncStartHousehold(PluginCall call) {
+        final String household = call.getString("household", "");
+        final boolean shareCards = Boolean.TRUE.equals(call.getBoolean("shareCards", false));
+        final java.util.Set<String> tabs = tabsFrom(call, "tabs");
+        syncThread.execute(() -> {
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                hub.startHousehold(household, shareCards, tabs);
+                SyncService.startIfWanted(getContext());
+                call.resolve(syncInfoObject(hub));
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Couldn't start the household." : e.getMessage(), e);
+            }
+        });
+    }
+
     /** 0.8.5: what a code's household is, before joining (name, owner, what it shares, the owner's settings). */
     @PluginMethod
     public void syncPeek(PluginCall call) {
@@ -1232,6 +1306,27 @@ public class RestockNativePlugin extends Plugin {
             call.resolve(r);
         });
     }
+
+    /**
+     * 0.9.3: the quick check with the Restock server while Restock is open (sync.ts, every 60 s).
+     * On its own thread, so it never waits behind a sync the screens started; SyncHub skips it while
+     * any round is going. Resolves { received } (-1: didn't look).
+     */
+    @PluginMethod
+    public void syncServerPoll(PluginCall call) {
+        pollThread.execute(() -> {
+            JSObject r = new JSObject();
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                r.put("received", hub.ready() ? hub.pollServer() : -1);
+            } catch (Exception e) {
+                r.put("received", -1);
+            }
+            call.resolve(r);
+        });
+    }
+
+    private final ExecutorService pollThread = Executors.newSingleThreadExecutor();
 
     /** Changes this phone's name, card sharing or "stay ready to sync". */
     @PluginMethod
@@ -1600,6 +1695,12 @@ public class RestockNativePlugin extends Plugin {
                 wm.cancelUniqueWork(RecallWorker.UNIQUE_NAME);
             } catch (Exception e) {
                 android.util.Log.w("Restock", "erase", e);
+            }
+            // 0.9.3: Home Assistant's token, and the key that sealed it.
+            try {
+                HomeAssistant.forget(getContext());
+            } catch (Exception e) {
+                android.util.Log.w("Restock", "erase Home Assistant token", e);
             }
             // 0.9.0: and what Restock keeps outside its database.
             eraseOutsideDatabase(getContext());

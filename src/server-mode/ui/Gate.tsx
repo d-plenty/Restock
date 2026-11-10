@@ -127,7 +127,7 @@ function PhoneLoginScreen({ onDone, onBack }: { onDone: (s: Session) => void; on
   return (
     <Frame title="Sign in with a phone">
       <ol className="small steps">
-        <li>On a phone in your household: Restock → Settings → Sync and backups → Local sync → Restock server.</li>
+        <li>On a phone in your household: Restock → Settings → Sync and backups → Restock server.</li>
         <li>
           Tap <b>Scan the web page's code</b> and point it at this code.
         </li>
@@ -267,7 +267,7 @@ export function LinkScreen({ onDone, addPhone }: { onDone: (s: Session) => void;
         added to this server.
       </p>
       <ol className="small steps">
-        <li>On that phone: Restock → Settings → Sync and backups → Local sync → Restock server.</li>
+        <li>On that phone: Restock → Settings → Sync and backups → Restock server.</li>
         <li>
           Tap <b>Scan the web page's code</b> and point it at this code.
         </li>

@@ -75,7 +75,11 @@ public class SyncWebParity {
         }
     }
 
-    /** The same folder for the web stand-in, which only has the serverKey (as its "household key"). */
+    /**
+     * The same folder for the web stand-in, which only has the serverKey (as its "household key").
+     * 0.9.3: it reads as a phone on a server does (SyncFolder "server": a file's author is its
+     * name), so the files are handed over sealed the way that expects (with the serverKey of its key).
+     */
     static final class ServerAsWeb implements SyncFolder.Folder {
         File dir() {
             return new File(work, "files");
@@ -91,7 +95,10 @@ public class SyncWebParity {
 
         public byte[] read(String name) throws Exception {
             File f = new File(dir(), name);
-            return f.exists() ? Files.readAllBytes(f.toPath()) : null;
+            if (!f.exists()) return null;
+            byte[] b = Files.readAllBytes(f.toPath());
+            if (!name.endsWith(".bin")) return b;
+            return SyncFolder.seal(SyncFolder.serverKey(serverKey), SyncFolder.open(serverKey, b));
         }
 
         public void write(String name, byte[] data) {
@@ -101,7 +108,8 @@ public class SyncWebParity {
 
     static void dump(SyncFamily.Phone p, String file) throws Exception {
         JSONObject out = new JSONObject();
-        String[][] t = { { "categories", "id" }, { "products", "id" }, { "items", "id" }, { "list_entries", "id" }, { "cards", "id" }, { "prices", "product_id, date" }, { "household", "k" }, { "receipts", "id" } };
+        String[][] t = { { "categories", "id" }, { "products", "id" }, { "items", "id" }, { "list_entries", "id" }, { "cards", "id" }, { "prices", "product_id, date" }, { "household", "k" }, { "receipts", "id" },
+            { "household_settings", "k" } };
         for (String[] x : t) {
             JSONArray rows = new JSONArray();
             for (JSONObject r : p.db.query("SELECT * FROM " + x[0] + " ORDER BY " + x[1])) rows.put(r);
@@ -111,6 +119,9 @@ public class SyncWebParity {
         for (JSONObject r : p.db.query("SELECT tbl, pk, stamp, device, deleted, created FROM sync_log WHERE tbl <> '_seq' ORDER BY tbl, pk")) log.put(r);
         out.put("sync_log", log);
         out.put("owner_pin", p.e.meta("owner_pin"));
+        // 0.9.3: the settings as stored (the household's rows applied to them).
+        String st = p.one("SELECT value FROM kv WHERE key = 'settings'");
+        out.put("settings", st == null ? JSONObject.NULL : new JSONObject(st));
         Files.writeString(new File(work, file).toPath(), out.toString(1));
     }
 
@@ -131,6 +142,10 @@ public class SyncWebParity {
         a.e.setShareCards(true);
         SyncFamily.sync(b, a);
         serverKey = serverKeyOf(a.h.key());
+        // 0.9.3: settings drifted apart (as 0.9.2 left them): the owner's seed the household's.
+        a.db.exec("INSERT OR REPLACE INTO kv (key, value) VALUES ('settings', ?)", base().put("enabledChains", new JSONArray().put("coles").put("aldi")).put("shopAroundMin", 3).toString());
+        b.db.exec("INSERT OR REPLACE INTO kv (key, value) VALUES ('settings', ?)", base().put("enabledChains", new JSONArray().put("woolworths")).put("shopAroundMin", 20).put("historyWeeks", 26).toString());
+        SyncFamily.sync(b, a);
 
         // Things both phones have.
         exec(a, "INSERT INTO categories (id, name, ord, section) VALUES ('c-a', 'Pantry', 0, 'pantry'), ('c-k', 'Beer', 0, 'keg')");
@@ -159,14 +174,32 @@ public class SyncWebParity {
         exec(b, "INSERT OR REPLACE INTO household (k, v) VALUES ('name', 'Forged by b2')"); // not signed by the owner: refused
         a.h.renameHousehold("Plenty house"); // signed: taken
         exec(b, "UPDATE products SET in_stock = 0, name = 'Milk 2 litre' WHERE id = 'p1'");
+        // 0.9.3: household settings changed apart: B's alert level, A's own shop (with a search page elsewhere: dropped).
+        SharedSettings.set(b.e, "defaultThresholdPct", 25);
+        SharedSettings.set(a.e, "shop:custom-xyz", new JSONObject().put("on", true).put("shop", new JSONObject().put("id", "custom-xyz").put("name", "Corner store")
+            .put("website", "https://corner.example.com").put("section", "pantry").put("search", "https://other.example.net/?q={q}").put("createdAt", "2026-11-01")));
+        SharedSettings.set(a.e, "shop:danmurphys", new JSONObject().put("on", true));
 
-        // The phones write their server files (with the phones' own SyncFolder), and one more file
-        // with prices (the phones' server files carry recent prices; the folder-sync file doesn't yet).
+        // The phones write their server files (with the phones' own SyncFolder), and A's gets its
+        // prices too (a phone's server file carries recent prices; the folder-sync file doesn't).
         a.f.sync(new ServerAsPhone(a.h.key()), NOW);
         b.f.sync(new ServerAsPhone(b.h.key()), NOW);
         JSONObject c = a.e.collect(0, null, 5_000_000, null, " AND tbl = 'prices'", true, 0);
-        JSONObject pm = new JSONObject().put("format", "restock-sync").put("v", 1).put("device", "a1").put("name", "Phone a1").put("keyv", 1).put("at", NOW).put("top", 0).put("entries", c.getJSONArray("entries"));
-        Files.write(new File(work, "files/restock-sync-a1prices.bin").toPath(), SyncFolder.seal(serverKey, pm));
+        File aFile = new File(work, "files/restock-sync-a1.bin");
+        JSONObject am = SyncFolder.open(serverKey, Files.readAllBytes(aFile.toPath()));
+        for (int i = 0; i < c.getJSONArray("entries").length(); i++) am.getJSONArray("entries").put(c.getJSONArray("entries").get(i));
+        Files.write(aFile.toPath(), SyncFolder.seal(serverKey, am));
+        // 0.9.3: files whose name and inside disagree (anyone with the serverKey, another browser say,
+        // could write them): refused on both sides, as a phone on a server refuses them. And another
+        // browser's own file: its list line comes in, its household change and loyalty card don't.
+        long t = System.currentTimeMillis();
+        forged("restock-sync-z9.bin", "b2", line("forged1", "Posing as b2", t));
+        forged("restock-sync-web-evil.bin", "web-other", line("forged2", "Posing as another browser", t));
+        JSONObject card = new JSONObject().put("tbl", "cards").put("pk", "k9").put("stamp", t).put("device", "web-other").put("created", t).put("deleted", false)
+            .put("row", new JSONObject().put("id", "k9").put("program", "flybuys").put("label", "From a browser").put("number", "").put("created_at", "x"));
+        JSONObject hhName = new JSONObject().put("tbl", "household").put("pk", "name").put("stamp", t + 99_000).put("device", "web-other").put("created", t).put("deleted", false)
+            .put("row", new JSONObject().put("k", "name").put("v", "Named by a browser"));
+        forged("restock-sync-web-other.bin", "web-other", line("webother1", "From another browser", t), card, hhName);
         JSONObject hh = new JSONObject();
         hh.put("keyv", 1);
         hh.put("serverKey", java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(serverKey));
@@ -175,12 +208,17 @@ public class SyncWebParity {
         Files.writeString(new File(work, "household.json").toPath(), hh.toString());
 
         // The web stand-in reads them, as a phone would.
-        SyncFamily.Phone ref = new SyncFamily.Phone(WEB);
+        SyncFamily.Phone ref = new SyncFamily.Phone(WEB, "server");
         ref.e.setMeta("key", SyncWire.encodeKey(serverKey));
         ref.e.setMeta("secret", "not-used");
         ref.e.setMeta("owner_pin", a.e.householdValue("owner_pub"));
+        // The web's settings before it takes anything in: the app's defaults (as the TypeScript side has them).
+        ref.db.exec("INSERT OR REPLACE INTO kv (key, value) VALUES ('settings', ?)", base().toString());
         ref.f.sync(new ServerAsWeb(), NOW);
         dump(ref, "java-1.json");
+        check(ref.one("SELECT 1 FROM list_entries WHERE id IN ('forged1', 'forged2')") == null, "the web stand-in refuses files whose name and inside disagree");
+        check(ref.one("SELECT 1 FROM list_entries WHERE id = 'webother1'") != null && ref.one("SELECT 1 FROM cards WHERE id = 'k9'") == null,
+            "another browser's file: its line comes in, its loyalty card doesn't");
         System.out.println("READY 1");
         System.out.flush();
         expect(in, "GO 1");
@@ -203,6 +241,15 @@ public class SyncWebParity {
         check("6008943212345678".equals(a.one("SELECT number FROM cards WHERE id = 'k1'")), "the web's blank card number doesn't overwrite a phone's card");
         check("Plenty house".equals(a.one("SELECT v FROM household WHERE k = 'name'")), "the household's name is untouched by the web");
         check(a.one("SELECT 1 FROM items WHERE id = 'i4'") == null, "the deleted item stays deleted on a1");
+        // 0.9.3: the web changed household settings (setHouseholdSettings): Shop around 9, Aldi off, Woolworths on.
+        for (SyncFamily.Phone x : new SyncFamily.Phone[] { a, b }) {
+            JSONObject st = new JSONObject(x.one("SELECT value FROM kv WHERE key = 'settings'"));
+            java.util.Set<String> ch = new java.util.TreeSet<>();
+            for (int i = 0; i < st.getJSONArray("enabledChains").length(); i++) ch.add(st.getJSONArray("enabledChains").getString(i));
+            check(st.optDouble("shopAroundMin") == 9 && ch.equals(new java.util.TreeSet<>(Arrays.asList("coles", "woolworths", "custom-xyz", "danmurphys")))
+                && st.optDouble("defaultThresholdPct") == 25, "the web's household settings reach " + x.id + ": " + st.opt("shopAroundMin") + " " + ch);
+        }
+        check(new JSONObject(b.one("SELECT value FROM kv WHERE key = 'settings'")).optInt("historyWeeks") == 26, "b2's own history setting is untouched");
         check(a.one("SELECT id FROM receipts WHERE id = 'r1' AND note = 'Checked on the web'") != null, "the web's note on a receipt reaches a1");
         }
 
@@ -220,6 +267,26 @@ public class SyncWebParity {
         System.out.println(fails == 0 ? "web parity (Java side): all passed" : "web parity (Java side): " + fails + " failed");
         System.out.println("DONE " + fails);
         System.exit(fails == 0 ? 0 : 1);
+    }
+
+    /** The settings fields the household shares, as the app's defaults have them. */
+    static JSONObject base() throws Exception {
+        return new JSONObject().put("onboarded", true).put("enabledChains", new JSONArray().put("woolworths").put("coles").put("aldi"))
+            .put("sections", new JSONObject().put("keg", false).put("pharmacy", false)).put("customShops", new JSONArray()).put("shopAroundMin", 1)
+            .put("defaultThresholdPct", 10).put("listCompare", "unit").put("recalls", new JSONObject().put("enabled", true)).put("historyWeeks", 8);
+    }
+
+    /** A list line as a change in a file. */
+    static JSONObject line(String id, String text, long t) throws Exception {
+        return new JSONObject().put("tbl", "list_entries").put("pk", id).put("stamp", t).put("device", "web-other").put("created", t).put("deleted", false)
+            .put("row", new JSONObject().put("id", id).put("text", text).put("checked", 0).put("created_at", "x").put("qty", 1).put("section", "pantry"));
+    }
+
+    /** A file in the server's folder, sealed with the serverKey, that says it's from `device`. */
+    static void forged(String name, String device, JSONObject... entries) throws Exception {
+        JSONObject m = new JSONObject().put("format", "restock-sync").put("v", 1).put("device", device).put("name", "Someone").put("keyv", 1).put("at", NOW).put("top", 1)
+            .put("entries", new JSONArray(Arrays.asList(entries)));
+        Files.write(new File(work, "files/" + name).toPath(), SyncFolder.seal(serverKey, m));
     }
 
     static void expect(BufferedReader in, String what) throws Exception {

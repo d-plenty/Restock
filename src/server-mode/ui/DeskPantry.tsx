@@ -1,0 +1,412 @@
+// 0.9.3: Pantry, Keg and Pharmacy at desktop widths: a table with category filters and search, and
+// the item picked in a side panel (its price history, Shop around, its alert, Add to list and Edit).
+// The same recommendations and filters as the phone's tab (Pantry.tsx) and item page (Item.tsx).
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  allCategories,
+  allListEntries,
+  cardChains,
+  deleteListEntries,
+  getSettings,
+  groupProductIds,
+  readingsFor,
+  updateGroup,
+} from '../../lib/db';
+import { addGroupToList } from '../../lib/listActions';
+import { loadRecommendations } from '../../lib/recs';
+import { money, parseMoney, tidySize } from '../../lib/units';
+import { useLive } from '../../lib/useLive';
+import { ALERT_LEVELS, computeStats, HISTORY_DAYS, multiBuy, tiedWithBest, withMarket, type Option, type Recommendation } from '../../lib/verdict';
+import { SECTION_NAMES, type Section } from '../../shops';
+import { chainName, type AlertLevel } from '../../types';
+import { ChainName, Icon, PriceChart } from '../../ui/components';
+import { useNav } from '../../ui/nav';
+import { EditSheet } from '../../ui/screens/Item';
+import { DEAL_RANK, underTarget } from '../../ui/screens/Pantry';
+import { ActionInfoTag } from '../../ui/tagInfo';
+import { PhoneOnlyNote } from './PhoneOnly';
+import { DeskHead, takeOpenItem } from './deskShared';
+
+type Filter = 'all' | 'sale' | string;
+type Sort = 'az' | 'sale' | 'recent';
+const SORTS: { id: Sort; label: string }[] = [
+  { id: 'az', label: 'A to Z' },
+  { id: 'sale', label: 'Deals first' },
+  { id: 'recent', label: 'Recently added' },
+];
+const SEARCH_HINT: Record<Section, string> = { pantry: 'Search the pantry', keg: 'Search the keg', pharmacy: 'Search your pharmacy items' };
+const EMPTY: Record<Section, string> = {
+  pantry: 'Your pantry is empty. Add the things you buy on a phone, and Restock watches their prices.',
+  keg: 'Nothing in the keg yet. Add the beer, wine or spirits you buy on a phone.',
+  pharmacy: 'Nothing here yet. Add the medicine, first aid and personal care things you buy on a phone.',
+};
+/** The same deals the phone's Pantry counts ("wait" isn't a deal yet). */
+const onSale = (r: Recommendation) => r.action === 'buy' || r.action === 'alt' || r.action === 'small';
+/** The weeks of history the chart shows: about three months, like the phone's "3 mths". */
+const CHART_WEEKS = 13;
+
+function alertText(r: Recommendation): string {
+  if (r.group.targetPrice !== undefined) return `Under ${money(r.group.targetPrice)}`;
+  if (r.group.alertLevel === 'never') return 'Off';
+  if (r.group.alertLevel === 'custom') return `${r.group.alertPct ?? 30}% off`;
+  // "Good sale (15%+)" → "Good sale": the table's column is narrow; the panel has the whole choice.
+  return (ALERT_LEVELS.find((a) => a.id === r.group.alertLevel)?.label ?? '').replace(/\s*\(.*\)$/, '');
+}
+
+export function DeskPantry({ section }: { section: Section }) {
+  const nav = useNav();
+  const allRecs = useLive(loadRecommendations, []);
+  const allCats = useLive(allCategories, []);
+  const entries = useLive(allListEntries, []);
+  const [q, setQ] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [sort, setSort] = useState<Sort>('az');
+  const [open, setOpen] = useState<string | undefined>(takeOpenItem);
+  const recs = useMemo(() => allRecs?.filter((r) => (r.group.section ?? 'pantry') === section), [allRecs, section]);
+  if (!recs || !allCats || !entries) return <div className="dk-page" aria-busy="true" />;
+  const categories = allCats.filter((c) => c.section === section);
+  const catName = new Map(categories.map((c) => [c.id, c.name]));
+  const onList = new Map(entries.filter((e) => !e.checked && e.groupId).map((e) => [e.groupId!, e.id]));
+
+  const shown = recs
+    .filter((r) => {
+      if (q && !`${r.group.name} ${r.options.map((o) => o.product.name).join(' ')}`.toLowerCase().includes(q.toLowerCase())) return false;
+      if (filter === 'sale') return onSale(r);
+      if (filter !== 'all') return r.group.categoryId === filter;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sort === 'az') return a.group.name.localeCompare(b.group.name);
+      if (sort === 'recent') return b.group.createdAt.localeCompare(a.group.createdAt);
+      return (DEAL_RANK[a.action] ?? 9) - (DEAL_RANK[b.action] ?? 9) || a.group.name.localeCompare(b.group.name);
+    });
+  const usedCats = categories.filter((c) => recs.some((r) => r.group.categoryId === c.id));
+
+  return (
+    <div className="dk-page">
+      <div className={`dk-with-panel${open ? ' has-panel' : ''}`}>
+        <section className="dk-wide" aria-label={SECTION_NAMES[section]}>
+          <DeskHead title={SECTION_NAMES[section]} sub={`${recs.length} item${recs.length === 1 ? '' : 's'}`}>
+            <div className="dk-search">
+              <Icon name="search" size={18} />
+              <label htmlFor="dk-pq" className="sr-only">
+                {SEARCH_HINT[section]}
+              </label>
+              <input id="dk-pq" className="input" type="search" placeholder={SEARCH_HINT[section]} value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+          </DeskHead>
+          {recs.length > 0 && (
+            <div className="dk-toolbar">
+              <div className="dk-chips" role="group" aria-label="Show">
+                <button className="chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
+                  All {recs.length}
+                </button>
+                {usedCats.map((c) => (
+                  <button key={c.id} className="chip" aria-pressed={filter === c.id} onClick={() => setFilter(c.id)}>
+                    {c.name}
+                  </button>
+                ))}
+                <button className="chip" aria-pressed={filter === 'sale'} onClick={() => setFilter('sale')}>
+                  On special {recs.filter(onSale).length}
+                </button>
+              </div>
+              <label className="dk-sort">
+                <span className="small">Sort</span>
+                <select className="input" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+                  {SORTS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+          {!recs.length && (
+            <div className="card">
+              <p className="small">{EMPTY[section]}</p>
+            </div>
+          )}
+          {recs.length > 0 && !shown.length && <p className="small">Nothing matches.</p>}
+          {shown.length > 0 && (
+            <div className="dk-table-wrap">
+              <table className="dk-table dk-pick">
+                <thead>
+                  <tr>
+                    <th scope="col">Item</th>
+                    <th scope="col">Best now</th>
+                    <th scope="col" className="dk-extra">
+                      Usually
+                    </th>
+                    <th scope="col">Verdict</th>
+                    <th scope="col" className="dk-extra">
+                      Alert
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((r) => {
+                    const deal = r.action === 'alt' ? r.alt : r.best;
+                    const mains = r.options.filter((o) => o.role === 'main');
+                    const size = deal?.product.size ? tidySize(deal.product.size, deal.product.name) : undefined;
+                    const isOpen = open === r.group.id;
+                    return (
+                      <tr key={r.group.id} className={isOpen ? 'on' : undefined} onClick={() => setOpen(r.group.id)}>
+                        <td>
+                          <button
+                            className="dk-name"
+                            aria-expanded={isOpen}
+                            aria-controls="dk-item-panel"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpen(isOpen ? undefined : r.group.id);
+                            }}
+                          >
+                            {r.group.name}
+                          </button>
+                          <span className="dk-sub clip">
+                            {[size, r.group.categoryId ? catName.get(r.group.categoryId) : undefined, onList.has(r.group.id) ? 'on the list' : undefined]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        </td>
+                        <td className="num dk-nowrap">
+                          {deal?.price !== undefined ? (
+                            <>
+                              <strong>{money(deal.price)}</strong>
+                              <span className="dk-sub">
+                                {mains.length > 1 && r.action !== 'alt' && tiedWithBest(r).length + 1 >= mains.length ? 'same everywhere' : chainName(deal.product.chain)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="dk-sub-inline">No price yet</span>
+                          )}
+                        </td>
+                        <td className="num dk-extra">{money(r.best?.stats.typical)}</td>
+                        <td className="dk-tags">
+                          {r.action !== 'none' ? (
+                            <ActionInfoTag rec={r} action={r.action} great={r.best?.verdict.kind === 'great'} />
+                          ) : (
+                            <span className="tag normal">{r.best?.price === undefined ? 'NO PRICE YET' : 'USUAL PRICE'}</span>
+                          )}
+                          {underTarget(r) && <span className="tag good">UNDER {money(r.group.targetPrice)}</span>}
+                        </td>
+                        <td className={`dk-nowrap dk-extra${r.group.targetPrice === undefined && r.group.alertLevel === 'never' ? ' dk-muted' : ''}`}>{alertText(r)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="small">Adding items and checking prices happen on your phones. Everything else about an item can be changed here.</p>
+        </section>
+        {open && <ItemPanel key={open} groupId={open} listed={onList.get(open)} onClose={() => setOpen(undefined)} nav={nav} />}
+      </div>
+    </div>
+  );
+}
+
+/** The item picked in the table: its price history, Shop around, alert, Add to list and Edit. */
+function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?: string; onClose: () => void; nav: ReturnType<typeof useNav> }) {
+  const data = useLive(async () => {
+    const rec = (await loadRecommendations()).find((r) => r.group.id === groupId);
+    if (!rec) return null;
+    const [readings, categories, cards, settings] = await Promise.all([readingsFor(groupProductIds(rec.group)), allCategories(), cardChains(), getSettings()]);
+    return { rec, readings, categories: categories.filter((c) => c.section === (rec.group.section ?? 'pantry')), cards, settings };
+  }, [groupId]);
+  const [picked, setPicked] = useState<string>();
+  const [editing, setEditing] = useState(false);
+  const [target, setTarget] = useState<string>();
+  const adding = useRef(false);
+  const head = useRef<HTMLHeadingElement>(null);
+  // Focus (and, where the panel sits under the table, scroll) to the item opened.
+  useEffect(() => head.current?.focus(), [groupId, data === undefined]);
+
+  if (data === undefined) return <aside className="dk-panel" id="dk-item-panel" aria-busy="true" />;
+  if (data === null)
+    return (
+      <aside className="dk-panel" id="dk-item-panel" aria-label="Item removed">
+        <div className="dk-panel-head">
+          <h2 ref={head} tabIndex={-1}>
+            Item removed
+          </h2>
+          <button className="icon-btn" aria-label="Close" onClick={onClose}>
+            <Icon name="close" size={20} />
+          </button>
+        </div>
+      </aside>
+    );
+
+  const { rec, readings, categories, cards } = data;
+  const group = rec.group;
+  const mains = rec.options.filter((o) => o.role === 'main');
+  const chartOpt = rec.options.find((o) => o.product.id === picked) ?? rec.best ?? mains[0] ?? rec.options[0];
+  // The chart: the last three months, a multi-buy week at its price each (as the item page draws it).
+  const from = Date.now() - CHART_WEEKS * 7 * 86_400_000;
+  const all = chartOpt ? (readings.get(chartOpt.product.id) ?? []) : [];
+  const shownReadings = all
+    .filter((r) => Date.parse(r.date) >= from)
+    .map((r) => {
+      if (group.allowMulti === false) return r;
+      const mb = multiBuy(r.promo);
+      return mb && mb.total / mb.n < r.price - 0.004 ? { ...r, price: Math.round((mb.total / mb.n) * 100) / 100, isSpecial: true } : r;
+    });
+  const stats = chartOpt
+    ? withMarket(computeStats(shownReadings, Date.now(), cards.has(chartOpt.product.chain), Math.max(HISTORY_DAYS, CHART_WEEKS * 7 + 1)), chartOpt.product.market)
+    : undefined;
+  // Shop around: your picks at each shop, cheapest first (the ones with no price last).
+  const around = [...mains].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+  const size = chartOpt?.product.size ? tidySize(chartOpt.product.size, chartOpt.product.name) : undefined;
+  const usual = rec.options.find((o) => o.product.id === group.usualProductId);
+  const alts = rec.options.filter((o) => o.role === 'alt');
+  const sub = [size, usual ? `My pick: ${usual.product.name}` : undefined, alts.length ? `Would also take ${alts.length} other${alts.length === 1 ? '' : 's'}` : undefined]
+    .filter(Boolean)
+    .join(' · ');
+
+  const toggleList = async () => {
+    if (listed) {
+      await deleteListEntries([listed]);
+      nav.toast(`${group.name} taken off your shopping list`);
+      return;
+    }
+    if (adding.current) return;
+    adding.current = true;
+    try {
+      const added = await addGroupToList(group);
+      nav.toast(added ? `${group.name} added to your shopping list` : 'Already on your shopping list');
+    } finally {
+      adding.current = false;
+    }
+  };
+  const saveTarget = async () => {
+    if (target === undefined) return;
+    const t = target.trim() ? parseMoney(target) : undefined;
+    if (target.trim() && (t === undefined || !(t > 0))) return nav.toast('Type a price, like 4.80');
+    const next = t !== undefined ? Math.round(t * 100) / 100 : undefined;
+    setTarget(undefined);
+    if (next === group.targetPrice) return;
+    await updateGroup(group.id, { targetPrice: next });
+    nav.toast(next !== undefined ? `We'll say when ${group.name} is ${money(next)} or less` : 'Price alert cleared');
+  };
+  const setLevel = async (level: AlertLevel) => {
+    await updateGroup(group.id, { alertLevel: level, alertPct: level === 'custom' ? (group.alertPct ?? 30) : undefined });
+  };
+
+  return (
+    <aside className="dk-panel" id="dk-item-panel" aria-label={group.name}>
+      <div className="dk-panel-head">
+        <div className="grow">
+          <h2 ref={head} tabIndex={-1}>
+            {group.name}
+          </h2>
+          {sub && <span className="dk-sub">{sub}</span>}
+        </div>
+        <button className="icon-btn" aria-label={`Close ${group.name}`} onClick={onClose}>
+          <Icon name="close" size={20} />
+        </button>
+      </div>
+
+      <div className={`banner ${rec.action === 'buy' || rec.action === 'small' ? 'green' : rec.action === 'alt' ? 'blue' : rec.action === 'wait' ? 'amber' : rec.action === 'skip' ? 'red' : 'grey'} dk-verdict`}>
+        <strong>{rec.headline}</strong>
+        {rec.detail && <span className="small-ink">{rec.detail}</span>}
+      </div>
+
+      <div className="dk-panel-actions">
+        <button className={`btn${listed ? '' : ' primary'}`} aria-pressed={!!listed} onClick={() => void toggleList()}>
+          <Icon name={listed ? 'cartCheck' : 'cartPlus'} size={18} /> {listed ? 'On the list' : 'Add to list'}
+        </button>
+        <button className="btn" onClick={() => setEditing(true)}>
+          <Icon name="pencil" size={18} /> Edit item
+        </button>
+        <button className="btn" onClick={() => nav.push({ name: 'item', groupId })}>
+          Open the full page
+        </button>
+      </div>
+      <section className="dk-panel-part" aria-labelledby="dk-ph">
+        <div className="dk-section-head">
+          <h3 id="dk-ph">Price, last 3 months</h3>
+          <span className="dk-sub">older weeks from your server</span>
+        </div>
+        {mains.length > 1 && (
+          <div className="dk-chips" role="group" aria-label="Which shop's price">
+            {mains.map((o) => (
+              <button key={o.product.id} className="chip" aria-pressed={o === chartOpt} onClick={() => setPicked(o.product.id)}>
+                <ChainName chain={o.product.chain} />
+              </button>
+            ))}
+          </div>
+        )}
+        {chartOpt && stats ? <PriceChart readings={shownReadings.slice(-400)} typical={stats.typical} /> : <p className="small">No prices yet.</p>}
+      </section>
+
+      <section className="dk-panel-part" aria-labelledby="dk-sa">
+        <h3 id="dk-sa">Shop around</h3>
+        {around.length === 0 && <p className="small">Not linked to a shop's product yet. Do that on a phone.</p>}
+        <div className="dk-around">
+          {around.map((o) => (
+            <AroundRow key={o.product.id} o={o} best={o === rec.best && o.price !== undefined} />
+          ))}
+        </div>
+      </section>
+
+      <section className="dk-panel-part" aria-labelledby="dk-al">
+        <h3 id="dk-al">Alert</h3>
+        <div className="dk-form-row">
+          <label htmlFor="dk-alert-level">Tell me when it's on sale</label>
+          <select id="dk-alert-level" className="input" value={group.alertLevel} onChange={(e) => void setLevel(e.target.value as AlertLevel)}>
+            {ALERT_LEVELS.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.id === 'custom' ? `Custom (${group.alertPct ?? 30}% off or more)` : a.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <form
+          className="dk-form-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveTarget();
+          }}
+        >
+          <label htmlFor="dk-alert-under">Tell me when it's under</label>
+          <span className="dk-money">
+            <span aria-hidden>$</span>
+            <input
+              id="dk-alert-under"
+              className="input"
+              inputMode="decimal"
+              placeholder="e.g. 4.80"
+              value={target ?? (group.targetPrice !== undefined ? group.targetPrice.toFixed(2) : '')}
+              onChange={(e) => setTarget(e.target.value)}
+              onBlur={() => void saveTarget()}
+              aria-describedby="dk-alert-help"
+            />
+          </span>
+        </form>
+        <span id="dk-alert-help" className="dk-sub">
+          At any of your shops, special or not. Leave it empty for no price alert. Your phones send the alerts.
+        </span>
+      </section>
+
+      <PhoneOnlyNote compact text="Checking prices now happens on your phones." />
+      {editing && <EditSheet group={group} categories={categories} onClose={() => setEditing(false)} />}
+    </aside>
+  );
+}
+
+function AroundRow({ o, best }: { o: Option; best: boolean }) {
+  const cur = o.stats.current;
+  const special = cur?.isSpecial && o.verdict.stale !== 'ended';
+  const note = o.product.inStock === false ? 'out of stock' : special ? 'special' : o.verdict.stale === 'ended' ? 'special, may have ended' : undefined;
+  return (
+    <div className={`dk-around-row${best ? ' best' : ''}`}>
+      <span className="grow">
+        <ChainName chain={o.product.chain} />
+        {note && <span className="dk-sub-inline"> · {note}</span>}
+        {best && <span className="sr-only"> (cheapest)</span>}
+      </span>
+      <strong className="num">{money(o.multi ? o.shelfPrice : o.price)}</strong>
+    </div>
+  );
+}

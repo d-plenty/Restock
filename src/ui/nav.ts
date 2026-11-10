@@ -32,7 +32,10 @@ export type Screen =
   | { name: 'permissions' }
   | { name: 'stores'; section?: Section }
   | { name: 'cards' }
-  | { name: 'sync' }
+  | { name: 'sync'; invite?: boolean }
+  | { name: 'restockServer' }
+  /** 0.9.3: Settings → Home Assistant (the shopping list both ways). */
+  | { name: 'homeAssistant' }
   | { name: 'household' }
   | { name: 'setup' }
   | { name: 'receipts' }

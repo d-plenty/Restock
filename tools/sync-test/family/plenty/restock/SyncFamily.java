@@ -32,13 +32,18 @@ public class SyncFamily {
         final SyncFolder f;
 
         Phone(String id) throws Exception {
+            this(id, "folder");
+        }
+
+        /** 0.9.3: `prefix` "server": its folder is read as a phone on a Restock server reads it. */
+        Phone(String id, String prefix) throws Exception {
             this.id = id;
             db = new TestDb(dir);
             e = new SyncEngine(db);
             e.setMeta("device", id);
             e.setMeta("name", "Phone " + id);
             h = new SyncHousehold(e);
-            f = new SyncFolder(e, h);
+            f = new SyncFolder(e, h, prefix, "server".equals(prefix) ? ServerSync.PRICES_MS : 0);
         }
 
         SyncEngine.Transport lan(Phone from) {

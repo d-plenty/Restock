@@ -96,13 +96,13 @@ export function HouseholdScreen() {
           </span>
           <Icon name="chevron" size={18} />
         </button>
-        <button className="row" onClick={() => nav.push({ name: 'sync' })}>
+        <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
           <Icon name="refresh" size={18} />
           <span className="grow">
             <span className="title" style={{ fontSize: 15 }}>
               Restock server
             </span>
-            <span className="small">Sync at home and away through a small server you run yourself. Set it up in Local sync.</span>
+            <span className="small">Sync at home and away through a small server you run yourself, and use Restock in a browser.</span>
           </span>
           <Icon name="chevron" size={18} />
         </button>

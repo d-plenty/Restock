@@ -1,0 +1,549 @@
+// 0.9.3: Settings at desktop widths, in two parts. Household: what the web can change for the whole
+// household, with what only the owner phone or each phone can change shown greyed. Phones: each
+// phone's own settings, greyed, to change on that phone. Everything it reads or changes goes
+// through settingsData.ts.
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { confirmAction } from '../../lib/confirm';
+import { useLive } from '../../lib/useLive';
+import { money } from '../../lib/units';
+import type { Section } from '../../shops';
+import { Icon, Sheet, timeAgo } from '../../ui/components';
+import { useNav } from '../../ui/nav';
+import { PassphraseForm } from './Gate';
+import { DeskHead, WhereNote } from './deskShared';
+import {
+  categoriesData,
+  downloadBrowserBackup,
+  NEW_ITEM_PCTS,
+  PRODUCT_ORDERS,
+  removePhone,
+  serverAccount,
+  setListCompare,
+  setNewItemPct,
+  setProductOrder,
+  setRecalls,
+  setShopAroundMin,
+  setTabShops,
+  setTheme,
+  SHOP_AROUND_MINS,
+  signOutAll,
+  signOutHere,
+  useHouseholdSettings,
+  usePhones,
+  useServerVersion,
+  type ChangedOn,
+  type HouseholdSettings,
+  type ShopsForTab,
+} from './settingsData';
+import type { ProductOrder } from '../../types';
+
+type Part = 'household' | 'phones';
+
+const WHERE: Record<Exclude<ChangedOn, 'web'>, string> = { owner: 'Change this on the owner phone', phone: 'Change this on your phone' };
+
+/** One line of a settings card: what it is, what it's set to, and the control or where to change it. */
+function Line({ title, sub, children, greyed, htmlFor }: { title: string; sub?: ReactNode; children?: ReactNode; greyed?: boolean; htmlFor?: string }) {
+  const words = (
+    <>
+      <strong className="dk-line-name">{title}</strong>
+      {sub && <span className="dk-sub">{sub}</span>}
+    </>
+  );
+  return (
+    <div className={`dk-set${greyed ? ' greyed' : ''}`}>
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className="grow">
+          {words}
+        </label>
+      ) : (
+        <span className="grow">{words}</span>
+      )}
+      {children}
+    </div>
+  );
+}
+
+function Group({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <>
+      <h2 className="dk-eyebrow" id={id}>
+        {title}
+      </h2>
+      <section className="card flush dk-set-card" aria-labelledby={id}>
+        {children}
+      </section>
+    </>
+  );
+}
+
+function CategoriesSheet({ sections, onClose }: { sections: HouseholdSettings['categories']; onClose: () => void }) {
+  const all = useLive(categoriesData.all, []);
+  const [section, setSection] = useState<Section>(sections[0]?.section ?? 'pantry');
+  const [name, setName] = useState('');
+  const cats = (all ?? []).filter((c) => c.section === section);
+  return (
+    <Sheet title="Categories" onClose={onClose}>
+      <p className="small">In aisle order: the shopping list's By aisle follows it. Changes here reach every phone.</p>
+      {sections.length > 1 && (
+        <div className="seg" role="group" aria-label="Which tab">
+          {sections.map((s) => (
+            <button key={s.section} aria-pressed={s.section === section} onClick={() => setSection(s.section)}>
+              {s.title}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="card flush">
+        {cats.map((c, i) => (
+          <div key={c.id} className="row">
+            <input
+              className="input"
+              defaultValue={c.name}
+              aria-label={`Name of the ${c.name} category`}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v && v !== c.name) void categoriesData.rename(c.id, v);
+              }}
+            />
+            <button className="icon-btn" aria-label={`Move ${c.name} up`} disabled={i === 0} onClick={() => void categoriesData.swap(c, cats[i - 1])}>
+              <Icon name="up" size={18} />
+            </button>
+            <button className="icon-btn" aria-label={`Move ${c.name} down`} disabled={i === cats.length - 1} onClick={() => void categoriesData.swap(c, cats[i + 1])}>
+              <Icon name="down" size={18} />
+            </button>
+            <button
+              className="icon-btn"
+              aria-label={`Delete ${c.name}`}
+              onClick={async () => {
+                const ok = await confirmAction(`Delete the "${c.name}" category?`, { detail: 'Items in it move to "Other".', action: 'Delete category', danger: true });
+                if (ok) await categoriesData.remove(c.id);
+              }}
+            >
+              <Icon name="trash" size={18} />
+            </button>
+          </div>
+        ))}
+        {all && cats.length === 0 && <p className="row small">No categories on this tab yet.</p>}
+      </div>
+      <form
+        style={{ display: 'flex', gap: 8 }}
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!name.trim()) return;
+          await categoriesData.add(name.trim(), section);
+          setName('');
+        }}
+      >
+        <input className="input" placeholder="New category" aria-label="New category" value={name} onChange={(e) => setName(e.target.value)} />
+        <button className="btn primary" type="submit" disabled={!name.trim()}>
+          Add
+        </button>
+      </form>
+    </Sheet>
+  );
+}
+
+/** Which shops a tab uses, for the whole household (and Keg or Pharmacy on or off). */
+function ShopsSheet({ tab, onClose }: { tab: ShopsForTab; onClose: () => void }) {
+  const nav = useNav();
+  const [picked, setPicked] = useState(() => new Set(tab.choices.filter((c) => c.picked).map((c) => c.id)));
+  const [on, setOn] = useState(tab.on);
+  const [busy, setBusy] = useState(false);
+  const flip = (id: string) =>
+    setPicked((was) => {
+      const next = new Set(was);
+      if (next.has(id as never)) next.delete(id as never);
+      else next.add(id as never);
+      return next;
+    });
+  const save = async () => {
+    if (on && picked.size === 0) return nav.toast('Pick at least one shop, or switch the tab off.');
+    setBusy(true);
+    try {
+      await setTabShops(
+        tab.section,
+        tab.choices.filter((c) => picked.has(c.id)).map((c) => c.id),
+        tab.section === 'pantry' ? undefined : on,
+      );
+      nav.toast(`${tab.title}: saved for every phone`);
+      onClose();
+    } catch (e) {
+      nav.toast(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet title={tab.title} onClose={onClose}>
+      <p className="small">The shops the household uses on this tab. Each phone keeps its own branch and shop sign-ins.</p>
+      {tab.section !== 'pantry' && (
+        <label className="check card" style={{ flexDirection: 'row' }}>
+          <input type="checkbox" className="switch" checked={on} onChange={(e) => setOn(e.target.checked)} />
+          <span className="title">The {tab.section === 'keg' ? 'Keg' : 'Pharmacy'} tab is on</span>
+        </label>
+      )}
+      <fieldset className="card flush dk-fieldset" disabled={!on}>
+        <legend className="sr-only">Shops on {tab.title}</legend>
+        {tab.choices.map((c) => (
+          <label key={c.id} className="check">
+            <input type="checkbox" checked={picked.has(c.id)} onChange={() => flip(c.id)} />
+            <span className="grow">{c.name}</span>
+          </label>
+        ))}
+      </fieldset>
+      <button className="btn primary" disabled={busy} onClick={() => void save()}>
+        Save for every phone
+      </button>
+      <button className="btn" onClick={onClose}>
+        Cancel
+      </button>
+    </Sheet>
+  );
+}
+
+function HouseholdPart() {
+  const nav = useNav();
+  const h = useHouseholdSettings();
+  const acct = serverAccount();
+  const version = useServerVersion();
+  const [cats, setCats] = useState(false);
+  const [shopsFor, setShopsFor] = useState<ShopsForTab>();
+  const [changing, setChanging] = useState(false);
+  const [msg, setMsg] = useState<string>();
+  const [saving, setSaving] = useState(false);
+  if (!h) return <div aria-busy="true" />;
+  const where = (on: ChangedOn) => (on === 'web' ? null : <WhereNote>{WHERE[on]}</WhereNote>);
+  const catCount = h.categories.reduce((s, c) => s + c.count, 0);
+  const editable = h.settingsOn === 'web';
+  // A change that didn't take (not in a household yet, a value the household can't have) says why.
+  const tryIt = (fn: () => Promise<unknown>) => void fn().catch((e) => nav.toast(e instanceof Error ? e.message : String(e)));
+  return (
+    <>
+      <p className="small dk-tight">
+        Household settings apply to every phone and go out with the next sync. Anything only a phone can change is shown greyed, with where to change it.
+      </p>
+      {!h.inHousehold && (
+        <p className="banner amber small" role="note">
+          This browser hasn't synced with your phones yet, so household settings can't be changed here for now.
+        </p>
+      )}
+
+      <Group id="dk-s-household" title="Household">
+        <Line title="Household name" sub={h.name} greyed={h.nameOn !== 'web'}>
+          {where(h.nameOn)}
+        </Line>
+        <Line title="What the household shares" sub={h.shares} greyed>
+          {where('owner')}
+        </Line>
+        <Line title="Owner phone, adding and removing phones" sub={h.owner} greyed>
+          {where('owner')}
+        </Line>
+      </Group>
+
+      <Group id="dk-s-shops" title="Shops">
+        {h.shops.map((t) => (
+          <Line
+            key={t.section}
+            title={t.title}
+            sub={t.on ? t.shops.map((s) => s.name).join(' · ') || 'None picked' : 'Switched off for the household'}
+            greyed={h.shopsOn !== 'web'}
+          >
+            {h.shopsOn === 'web' ? (
+              <button className="btn small" onClick={() => setShopsFor(t)} aria-label={`Change shops for ${t.title}`}>
+                Change shops
+              </button>
+            ) : (
+              where(h.shopsOn)
+            )}
+          </Line>
+        ))}
+        <Line title="Which branch" sub="The store each phone shops at (its main and second branch) stays on that phone, with its sign-ins." greyed>
+          {where('phone')}
+        </Line>
+      </Group>
+
+      <Group id="dk-s-list" title="Shopping list and deals">
+        <Line title="Shop around" htmlFor="dk-shop-around" sub="Only send an item to another shop if it saves at least this much" greyed={!editable}>
+          <select
+            id="dk-shop-around"
+            className="input dk-select"
+            disabled={!editable}
+            value={String(h.shopAroundMin)}
+            onChange={(e) => tryIt(() => setShopAroundMin(Number(e.target.value)))}
+          >
+            {SHOP_AROUND_MINS.map((v) => (
+              <option key={v} value={String(v)}>
+                {v === 0 ? 'Any saving' : money(v)}
+              </option>
+            ))}
+          </select>
+        </Line>
+        <Line title="The list's cheapest" htmlFor="dk-compare" sub="Best value compares per 100 g, litre or item; lowest price compares the shelf price" greyed={!editable}>
+          <select id="dk-compare" className="input dk-select" disabled={!editable} value={h.listCompare} onChange={(e) => tryIt(() => setListCompare(e.target.value as 'unit' | 'price'))}>
+            <option value="unit">Best value</option>
+            <option value="price">Lowest price</option>
+          </select>
+        </Line>
+        <Line title="Price alerts start at" htmlFor="dk-new-alert" sub="For new items: tell us when it's this much under its usual price" greyed={!editable}>
+          <select id="dk-new-alert" className="input dk-select" disabled={!editable} value={String(h.newItemPct)} onChange={(e) => tryIt(() => setNewItemPct(Number(e.target.value)))}>
+            {[...new Set([...NEW_ITEM_PCTS, h.newItemPct])]
+              .sort((x, y) => x - y)
+              .map((p) => (
+                <option key={p} value={String(p)}>
+                  {p}% off
+                </option>
+              ))}
+          </select>
+        </Line>
+        <Line title="An item's products" htmlFor="dk-order" sub="The order they're listed in on an item's page" greyed={!editable}>
+          <select id="dk-order" className="input dk-select" disabled={!editable} value={h.productOrder} onChange={(e) => tryIt(() => setProductOrder(e.target.value as ProductOrder))}>
+            {PRODUCT_ORDERS.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </Line>
+        <Line title="Categories" sub={`${catCount} categor${catCount === 1 ? 'y' : 'ies'}, in aisle order`}>
+          <button className="btn small" onClick={() => setCats(true)}>
+            Edit categories
+          </button>
+        </Line>
+        <Line title="Recall alerts" htmlFor="dk-recalls" sub="Each phone checks daily against the official Australian recall lists" greyed={!editable}>
+          <input id="dk-recalls" type="checkbox" className="switch" disabled={!editable} checked={h.recalls} onChange={(e) => tryIt(() => setRecalls(e.target.checked))} />
+        </Line>
+      </Group>
+
+      <Group id="dk-s-server" title="Your Restock server">
+        <Line title="Sign-in" sub={`User name ${acct.user}${version ? ` · Restock server ${version}` : ''}`}>
+          {acct.canChangePassphrase && !changing && (
+            <button className="btn small" onClick={() => setChanging(true)}>
+              Change passphrase
+            </button>
+          )}
+        </Line>
+        {changing && (
+          <div className="dk-set dk-set-form">
+            <PassphraseForm
+              user={acct.user}
+              submit="Change the passphrase"
+              onDone={() => {
+                setChanging(false);
+                setMsg('Changed. Other browsers need the new passphrase.');
+                window.dispatchEvent(new CustomEvent('restock-server-session'));
+              }}
+            />
+            <button className="btn small" onClick={() => setChanging(false)}>
+              Cancel
+            </button>
+          </div>
+        )}
+        {!acct.canChangePassphrase && (
+          <Line
+            title="Passphrase"
+            sub={acct.viaPhone ? 'Signed in with a phone: sign in with the passphrase to change it.' : 'Sign in again with the passphrase to change it.'}
+            greyed
+          />
+        )}
+        {msg && (
+          <p className="dk-set small" role="status">
+            {msg}
+          </p>
+        )}
+        <Line title="Address" sub={`At home: ${location.origin}`}>
+          <button className="btn small" onClick={() => nav.push({ name: 'server', page: 'phones' })}>
+            Phones and browsers
+          </button>
+        </Line>
+        <Line title="Price history" sub={h.historyText} greyed>
+          {where('phone')}
+        </Line>
+      </Group>
+
+      <Group id="dk-s-browser" title="This browser">
+        <Line title="Look" sub="Just for this browser">
+          <div className="dk-seg" role="group" aria-label="Look">
+            {(
+              [
+                ['system', 'Auto'],
+                ['light', 'Light'],
+                ['dark', 'Dark'],
+              ] as const
+            ).map(([v, label]) => (
+              <button key={v} aria-pressed={h.theme === v} onClick={() => void setTheme(v)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </Line>
+        <Line title="Download a backup" sub="Everything this browser has, as a Restock backup file. Loyalty card numbers aren't in it: they never leave the phones.">
+          <button
+            className="btn small"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await downloadBrowserBackup();
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <Icon name="download" size={16} /> Download
+          </button>
+        </Line>
+        <Line title="Sign out of this browser" sub="Forgets the household's keys here. Your phones aren't touched.">
+          <span className="dk-btns">
+            <button className="btn small danger" onClick={() => void signOutHere()}>
+              Sign out
+            </button>
+            <button
+              className="btn small"
+              onClick={async () => {
+                const ok = await confirmAction('Sign out every browser?', {
+                  detail: 'Every browser signed in to this server, this one too. Your phones keep syncing.',
+                  action: 'Sign out everywhere',
+                  danger: true,
+                });
+                if (ok) await signOutAll();
+              }}
+            >
+              Everywhere
+            </button>
+          </span>
+        </Line>
+      </Group>
+      {cats && <CategoriesSheet sections={h.categories} onClose={() => setCats(false)} />}
+      {shopsFor && <ShopsSheet tab={shopsFor} onClose={() => setShopsFor(undefined)} />}
+    </>
+  );
+}
+
+function PhonesPart() {
+  const { phones, error, reload } = usePhones();
+  const [picked, setPicked] = useState<string>();
+  const [msg, setMsg] = useState<string>();
+  if (error) return <p className="banner red small">{error}</p>;
+  if (!phones) return <div aria-busy="true" />;
+  if (!phones.length) return <p className="small">No phones use this server yet. Add one on Household and phones.</p>;
+  const p = phones.find((x) => x.device === picked) ?? phones.find((x) => x.isOwner) ?? phones[0];
+  return (
+    <>
+      <p className="small dk-tight">Each phone keeps its own copy of these. You can see them all here; change them on that phone.</p>
+      <p className="small dk-tight" role="note">
+        <strong>Home Assistant:</strong>{' '}
+        {phones.some((x) => x.homeAssistant)
+          ? `${phones.find((x) => x.homeAssistant)!.name} syncs your shopping list with it, for the whole household. To move it, turn Home Assistant on on another phone.`
+          : 'No phone syncs your shopping list with it. Turn it on on one phone (Settings → Home Assistant).'}
+      </p>
+      <div className="dk-phone-pick" role="group" aria-label="Phone">
+        {phones.map((x) => (
+          <button key={x.device} aria-pressed={x === p} onClick={() => (setPicked(x.device), setMsg(undefined))}>
+            <strong>{x.name}</strong>
+            <span className="dk-sub">
+              {[x.isOwner ? 'Owner' : undefined, x.homeAssistant ? 'Home Assistant' : undefined, x.version, x.lastSeen ? `synced ${timeAgo(x.lastSeen)}` : 'not seen yet'].filter(Boolean).join(' · ')}
+            </span>
+          </button>
+        ))}
+      </div>
+      {!p.sent && (
+        <p className="small dk-tight" role="note">
+          {p.name} hasn't sent its settings yet. They show here once it syncs with Restock 0.9.3 or newer.
+        </p>
+      )}
+      <div className="dk-grid">
+        {p.groups.map((g) => (
+          <section key={g.title} className="card dk-phone-card" aria-label={`${g.title} on ${p.name}`}>
+            <h3>{g.title}</h3>
+            <dl>
+              {g.rows.map((r) => (
+                <div key={r.label} className="dk-dl-row">
+                  <dt>{r.label}</dt>
+                  <dd className={p.sent ? undefined : 'dk-muted'}>{r.value}</dd>
+                </div>
+              ))}
+            </dl>
+            <WhereNote>{g.note}</WhereNote>
+          </section>
+        ))}
+      </div>
+      <section className="card dk-lost" aria-labelledby="dk-lost">
+        <span className="grow">
+          <strong id="dk-lost">Lost this phone?</strong>
+          <span className="dk-sub">Take it off the server so it can't sync here any more. The owner phone can also remove it from the household.</span>
+        </span>
+        <button
+          className="btn small danger"
+          onClick={async () => {
+            const ok = await confirmAction(`Remove ${p.name} from this server?`, {
+              detail: 'It stops syncing here. To take it out of the household too, remove it on the owner phone.',
+              action: 'Remove from the server',
+              danger: true,
+            });
+            if (!ok) return;
+            try {
+              await removePhone(p.device);
+              setMsg(`${p.name} was taken off this server.`);
+              setPicked(undefined);
+              reload();
+            } catch (e) {
+              setMsg(e instanceof Error ? e.message : String(e));
+            }
+          }}
+        >
+          Remove from the server
+        </button>
+      </section>
+      {msg && (
+        <p className="small" role="status">
+          {msg}
+        </p>
+      )}
+    </>
+  );
+}
+
+export function DeskSettings() {
+  const [part, setPart] = useState<Part>('household');
+  const tabs = useRef<(HTMLButtonElement | null)[]>([]);
+  const parts: { id: Part; label: string }[] = [
+    { id: 'household', label: 'Household' },
+    { id: 'phones', label: 'Phones' },
+  ];
+  // Left and Right move between the two, as tabs do.
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Home' && e.key !== 'End') return;
+    e.preventDefault();
+    const i = parts.findIndex((p) => p.id === part);
+    const n = e.key === 'Home' ? 0 : e.key === 'End' ? parts.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : parts.length - 1)) % parts.length;
+    setPart(parts[n].id);
+    tabs.current[n]?.focus();
+  };
+  return (
+    <div className="dk-page dk-narrow">
+      <DeskHead title="Settings">
+        <div className="dk-seg big" role="tablist" aria-label="Settings for" onKeyDown={onKey}>
+          {parts.map((p, i) => (
+            <button
+              key={p.id}
+              ref={(el) => {
+                tabs.current[i] = el;
+              }}
+              role="tab"
+              id={`dk-tab-${p.id}`}
+              aria-selected={part === p.id}
+              aria-controls={`dk-panel-${p.id}`}
+              tabIndex={part === p.id ? 0 : -1}
+              onClick={() => setPart(p.id)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </DeskHead>
+      <div role="tabpanel" id={`dk-panel-${part}`} aria-labelledby={`dk-tab-${part}`} className="dk-stack">
+        {part === 'household' ? <HouseholdPart /> : <PhonesPart />}
+      </div>
+    </div>
+  );
+}

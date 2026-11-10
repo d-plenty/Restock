@@ -1,4 +1,6 @@
+import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { cachedSettings, getSettings, reapplyHouseholdSettings } from './db';
 import { changed, onChange } from './live';
 import { RestockNative, type SyncInfo } from './sql/native';
 
@@ -82,17 +84,88 @@ let wired = false;
 let applying = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
+/** 0.9.3: how often a phone on a Restock server checks it while Restock is open. */
+export const SERVER_POLL_MS = 60_000;
+
+/**
+ * 0.9.3: while Restock is open and the phone uses a Restock server, a quick check every 60 s (and
+ * one when it comes back to the front): SyncHub looks at the server's list of files and only runs a
+ * round when something changed there. One at a time, never during a round, nothing in the background.
+ * `visible` and the timers are passed in for the tests. Returns a stop function.
+ */
+export function pollServer(opts: {
+  usesServer: () => Promise<boolean>;
+  poll: () => Promise<unknown>;
+  visible: () => boolean;
+  onVisible: (fn: () => void) => () => void;
+  every?: number;
+}): () => void {
+  let busy = false;
+  let stopped = false;
+  const tick = async () => {
+    if (busy || stopped || !opts.visible()) return;
+    busy = true;
+    try {
+      if (await opts.usesServer()) await opts.poll();
+    } catch {
+      // out of reach, or Restock busy: the next check tries again
+    } finally {
+      busy = false;
+    }
+  };
+  const id = setInterval(() => void tick(), opts.every ?? SERVER_POLL_MS);
+  const off = opts.onVisible(() => void tick());
+  return () => {
+    stopped = true;
+    clearInterval(id);
+    off();
+  };
+}
+
+/** Whether this phone uses a Restock server (asked again now and then, as it can change on the Sync screen). */
+let serverKnown: { on: boolean; at: number } | undefined;
+async function usesServer(): Promise<boolean> {
+  if (serverKnown && Date.now() - serverKnown.at < 5 * 60_000) return serverKnown.on;
+  const i = await syncInfo();
+  serverKnown = { on: !!(i.paired && i.server), at: Date.now() };
+  return serverKnown.on;
+}
+
 /**
  * Once at start-up: refresh screens when another phone's changes arrive, and send this phone's
- * own changes along shortly after they're made (while Restock is open).
+ * own changes along shortly after they're made (while Restock is open). 0.9.3: check the Restock
+ * server every 60 s while open, and bring the settings in line with the household's.
  */
 export function wireSync(): void {
   if (wired || !syncAvailable()) return;
   wired = true;
+  void reapplyHouseholdSettings().catch(() => undefined);
   void RestockNative.addListener('syncChanged', () => {
     applying = true;
+    serverKnown = undefined;
+    const before = cachedSettings()?.recalls.enabled;
     changed();
     setTimeout(() => (applying = false), 0);
+    // 0.9.3: the household turned recall alerts on or off: schedule (or stop) the daily check here.
+    void getSettings()
+      .then((s) => (before !== undefined && s.recalls.enabled !== before ? RestockNative.scheduleRecalls({ enabled: s.recalls.enabled }) : undefined))
+      .catch(() => undefined);
+  });
+  pollServer({
+    usesServer,
+    poll: () => RestockNative.syncServerPoll(),
+    visible: () => typeof document === 'undefined' || document.visibilityState !== 'hidden',
+    onVisible: (fn) => {
+      const h = () => {
+        if (document.visibilityState !== 'hidden') fn();
+      };
+      document.addEventListener('visibilitychange', h);
+      const resume = App.addListener('resume', fn);
+      return () => {
+        document.removeEventListener('visibilitychange', h);
+        void resume.then((x) => x.remove());
+      };
+    },
   });
   onChange(() => {
     if (applying) return;

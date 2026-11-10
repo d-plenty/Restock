@@ -20,6 +20,8 @@ import { lockBackup } from './backupLock';
 import { localDay } from './verdict';
 import { base64ToText, textToBase64 } from './base64';
 import { shareTextFile } from './shareFile';
+import { LIST_ALIASES, LOCAL_ONLY_KV } from './haKeys';
+import { aliasesForBackup } from './listPicks';
 
 export { shareTextFile };
 
@@ -82,6 +84,10 @@ export async function exportCounts() {
 /** The backup file's text, for the parts picked (everything by default). */
 export async function backupJson(parts: ExportParts = EVERYTHING): Promise<string> {
   const all = await snapshot();
+  // 0.9.3: "Always use this for …" are the household's rows now (listPicks.ts); a backup still has
+  // them where it always did (a restore moves them back into rows).
+  const aliases = await aliasesForBackup().catch(() => undefined);
+  if (aliases) all.kv = [...all.kv.filter((k) => k.key !== LIST_ALIASES), { key: LIST_ALIASES, value: aliases }];
   const picked: ExportParts = { ...parts, sections: parts.pantry ? (parts.sections ?? SECTIONS) : [] };
   const file: BackupFile = {
     app: 'restock',
@@ -118,11 +124,14 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
   return parts.password ? lockBackup(json, parts.password) : json;
 }
 
-/** The automatic backups' password never goes into a backup (it would be in the file it locks). */
+/**
+ * The automatic backups' password never goes into a backup (it would be in the file it locks).
+ * 0.9.3: nor this phone's Home Assistant settings (haKeys.ts; its token isn't in the database at all).
+ */
 function withoutSecrets(t: Snapshot): Snapshot {
   return {
     ...t,
-    kv: t.kv.map((k) => {
+    kv: t.kv.filter((k) => !LOCAL_ONLY_KV.includes(k.key)).map((k) => {
       if (k.key !== 'settings' || !k.value || typeof k.value !== 'object') return k;
       const v = k.value as { autoBackup?: { password?: string } };
       if (!v.autoBackup?.password) return k;
@@ -180,8 +189,11 @@ export function needsBackupNudge(
   items: number,
   oldestItemAt: string | undefined,
   now = Date.now(),
+  /** 0.9.3: phone-to-phone sync or a Restock server keeps a copy (Settings suggests a local backup as well). */
+  keptElsewhere = false,
 ): boolean {
   const DAY = 86_400_000;
+  if (keptElsewhere) return false;
   if (items < 3 || !oldestItemAt || now - Date.parse(oldestItemAt) < 7 * DAY) return false;
   if (s.lastBackupAt && now - Date.parse(s.lastBackupAt) < 30 * DAY) return false;
   if (s.backupNudgeAt && now - Date.parse(s.backupNudgeAt) < 30 * DAY) return false;

@@ -1,0 +1,5 @@
+Simpler Sync and backups, with a status strip; a backup, phone sync or your own server all count.
+Shops, Shop around and alert levels are now household-wide: set them once and every phone follows.
+The Restock server has its own screen and a desktop web app.
+New: your shopping list in Home Assistant, both ways, one phone per household, with "Pick my milk" everywhere.
+Phones check the server every minute while open. Update checks every 24 hours or 7 days.

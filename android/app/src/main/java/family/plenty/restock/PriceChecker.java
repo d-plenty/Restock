@@ -221,8 +221,15 @@ final class PriceChecker {
         // means everything was erased during the check: write nothing back and send nothing.
         JSONObject latest = readKv(db, "settings");
         if (latest == null) return result;
-        latest.put("lastCheck", now());
+        String at = now();
+        latest.put("lastCheck", at);
         writeKv(db, "settings", latest);
+        // 0.9.3: how many products this check looked at (the phone's summary for the web, PhoneSummary).
+        try {
+            writeKv(db, "lastCheckInfo", new JSONObject().put("at", at).put("checked", result.checked));
+        } catch (Exception e) {
+            Log.w(TAG, "last check info not saved", e);
+        }
         settings = latest;
 
         // Alerts first: the shared price history download can be slow, and the worker only gets about 10 minutes.

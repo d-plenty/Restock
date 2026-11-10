@@ -11,7 +11,7 @@ async function freshDb() {
 
 describe('sync change log (0.8.0)', () => {
   it('is the newest migration', () => {
-    expect(SYNC_VERSION).toBe(MIGRATIONS.length - 6);
+    expect(SYNC_VERSION).toBe(MIGRATIONS.length - 7);
   });
 
   it('notes adds, edits and deletes, and seeds what was already there', async () => {
@@ -65,7 +65,7 @@ describe('sync change log (0.8.0)', () => {
   it('0.9.1: notes receipts; an edit keeps when it was made, a delete then a new one makes it again', async () => {
     const d = await freshDb();
     // A phone on 0.9.0 with a receipt already kept.
-    const before = MIGRATIONS.length - 1;
+    const before = MIGRATIONS.length - 2;
     for (let v = 0; v < before; v++) for (const sql of MIGRATIONS[v]) await d.run(sql);
     await d.run(`PRAGMA user_version = ${before}`);
     await d.run(`INSERT INTO receipts (id, scanned_at, section) VALUES ('old', 'x', 'pantry')`);

@@ -10,11 +10,21 @@
 //   or the first one seen, as a phone that has just joined does).
 // - Loyalty card numbers are blanked as they come in: they never reach the browser's storage.
 // - No receipt photos are kept here (they're fetched from the server when a receipt is opened).
+// - 0.9.3: household settings (household_settings) come in like a phone's and are applied to the
+//   web's own settings the same way (sharedSettings.ts, SharedSettings.java); the web never seeds
+//   them (only the owner phone does). A phone's settings summary (phoneSummary.ts) is kept per
+//   phone for the web's Settings → Phones.
+// - 0.9.3: a file's author is its name (restock-sync-<device>.bin: the server lets each device write
+//   only its own), exactly as a phone on a server reads them (SyncFolder.readOthers): a file that
+//   names another device inside is passed over, and another browser's file never changes the
+//   household, loyalty cards or prices (SyncFolder.webEntries).
 //
 // Synchronous on purpose (the sql.js database itself, not the async driver), so nothing the
 // screens do can land in the middle of taking changes in.
 
 import { shopDef } from '../shops';
+import { applyRows, settingChangeOk, settingTab, type SettingsRoom } from '../lib/sharedSettings';
+import { cleanSummary } from '../lib/phoneSummary';
 
 export type Row = Record<string, unknown>;
 
@@ -48,6 +58,8 @@ export interface SyncFileMessage {
   seen?: Record<string, number>;
   entries?: Entry[];
   photos?: Record<string, string>;
+  /** 0.9.3: a phone's settings summary (its file on a Restock server only; phoneSummary.ts). */
+  summary?: unknown;
 }
 
 /** Mirrors SyncEngine.TABLES. */
@@ -60,6 +72,8 @@ export const TABLES: [string, string][] = [
   ['prices', "product_id || '|' || date"],
   ['household', 'k'],
   ['receipts', 'id'],
+  // 0.9.3: household-wide settings.
+  ['household_settings', 'k'],
 ];
 export const CLOCK_SLACK_MS = 24 * 3600 * 1000;
 export const OLD_DELETE_MS = 180 * 24 * 3600 * 1000;
@@ -68,6 +82,8 @@ export const ALL_TABS = ['pantry', 'keg', 'pharmacy'];
 export const LOCAL_PRODUCT_COLUMNS = new Set(['in_stock', 'stock_at', 'in_stock_2']);
 /** What the web's own file never carries (SyncFolder.writeOwn leaves prices out; the rest is the web's choice). */
 export const WEB_LEAVES_OUT = ['prices', 'household', 'cards'];
+/** What a browser's file can't change, wherever it came from (SyncFolder.WEB_LEAVES_OUT, webEntries). */
+const NOT_FROM_A_BROWSER = new Set(['household', 'cards', 'prices']);
 const PREFIX = 'restock-sync-';
 const SUFFIX = '.bin';
 
@@ -171,7 +187,11 @@ export class WebSyncEngine {
       });
     }
     const j = joinTabs(now);
-    if (j !== was) this.setMeta('tabs_eff', j);
+    if (j !== was) {
+      this.setMeta('tabs_eff', j);
+      // 0.9.3: syncing another tab (or one fewer): its household settings apply from now.
+      this.applySharedSettings();
+    }
     const r = receipts ? '1' : '0';
     if (r !== rwas) this.setMeta('receipts_eff', r);
     return again;
@@ -218,6 +238,8 @@ export class WebSyncEngine {
         const r = this.db.query('SELECT chain FROM products WHERE id = ?', [str(row, 'product_id')]);
         return r.length ? this.chainTab(str(r[0], 'chain')) : null;
       }
+      case 'household_settings':
+        return settingTab(str(row, 'k') ?? '', str(row, 'v'));
       default:
         return null;
     }
@@ -274,7 +296,8 @@ export class WebSyncEngine {
         const data = { ...row[0] };
         const tab = this.tabOf(tbl, data);
         if (tab !== null && !allowed.has(tab)) {
-          if (!moves || tbl === 'prices') continue;
+          // 0.9.3: a household setting of a tab this pair doesn't share is left out, never sent as moved.
+          if (!moves || tbl === 'prices' || tbl === 'household_settings') continue;
           e.deleted = true;
           e.moved = true;
           entries.push(e);
@@ -310,6 +333,8 @@ export class WebSyncEngine {
     const mine = this.tabs();
     const now = this.now();
     const receipts = this.shareReceipts();
+    let settings = false;
+    const room = this.settingsRoom();
     this.db.transaction(() => {
       this.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
       let clock = 0;
@@ -327,6 +352,8 @@ export class WebSyncEngine {
         const deleted = truthy(e.deleted);
         if (tbl === 'household' && !this.householdChangeAllowed(pk, device, e)) continue;
         if (tbl === 'receipts' && !receipts) continue;
+        // 0.9.3: household settings only of a sensible size and shape, and not without end.
+        if (tbl === 'household_settings' && !settingChangeOk(pk, e.row, deleted, room)) continue;
         if (stamp > now + CLOCK_SLACK_MS) this.setMeta('clock_warn', device);
         else clock = Math.max(clock, stamp);
         const hadRows = this.db.query('SELECT stamp, device, deleted, created FROM sync_log WHERE tbl = ? AND pk = ?', [tbl, pk]);
@@ -344,6 +371,7 @@ export class WebSyncEngine {
         }
         if (!wins) continue;
         if (deleted && truthy(e.moved)) {
+          if (tbl === 'household_settings') continue;
           const cur = this.db.query(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]);
           if (!cur.length) continue;
           const tab = this.tabOf(tbl, cur[0]);
@@ -361,15 +389,60 @@ export class WebSyncEngine {
           this.writeRow(tbl, tbl === 'cards' ? stripCard(row) : row, this.columnsOf(tbl, columns));
         }
         this.logEntry(tbl, pk, stamp, device, deleted, e.sig === null || e.sig === undefined ? null : String(e.sig), created);
+        if (tbl === 'household_settings') settings = true;
         changed++;
       }
       const was = this.meta('clock');
       let cur = was === null ? 0 : Number(was) || 0;
       if (cur > now + CLOCK_SLACK_MS) cur = 0;
       this.setMeta('clock', String(Math.min(Math.max(clock, cur), now + CLOCK_SLACK_MS)));
+      // 0.9.3: household settings that came in change the settings here (SyncEngine.apply).
+      if (settings) this.applySharedSettings();
       this.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
     });
     return changed;
+  }
+
+  /** 0.9.3: the household_settings table as it is, for settingChangeOk (counted once, when first asked). */
+  private settingsRoom(): SettingsRoom {
+    const counts = new Map<string, number>();
+    return {
+      has: (k) => this.db.query('SELECT 1 FROM household_settings WHERE k = ?', [k]).length > 0,
+      count: (prefix) => {
+        let n = counts.get(prefix);
+        if (n === undefined) {
+          n = num(this.db.query('SELECT COUNT(*) AS n FROM household_settings WHERE substr(k, 1, ?) = ?', [prefix.length, prefix])[0].n);
+          counts.set(prefix, n);
+        }
+        return n;
+      },
+      added: (k) => {
+        for (const [p, n] of counts) if (k.startsWith(p)) counts.set(p, n + 1);
+      },
+    };
+  }
+
+  /**
+   * 0.9.3: the household's settings rows, applied to the stored settings for the tabs synced here
+   * (SharedSettings.apply). Nothing when there are no settings yet. True when they changed.
+   */
+  applySharedSettings(): boolean {
+    const r = this.db.query("SELECT value FROM kv WHERE key = 'settings'");
+    if (!r.length) return false;
+    let s: Record<string, unknown>;
+    try {
+      const parsed = JSON.parse(String(r[0].value)) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+      s = parsed as Record<string, unknown>;
+    } catch {
+      return false;
+    }
+    const rows = this.db.query('SELECT k, v FROM household_settings ORDER BY k').map((x) => ({ k: String(x.k), v: String(x.v) }));
+    // The web app takes the household's Keg tab as it is (fitSettings confirms 18+ for it).
+    if (!rows.length || !applyRows(s, rows, this.tabs(), { adult: true })) return false;
+    this.db.exec("INSERT OR REPLACE INTO kv (key, value) VALUES ('settings', ?)", [JSON.stringify(s)]);
+    this.customTabs = undefined;
+    return true;
   }
 
   private columnsOf(tbl: string, cache: Map<string, Set<string>>): Set<string> {
@@ -475,9 +548,10 @@ export class WebSyncEngine {
    * the household's data can make either, so a new serverKey that opens such a file is the real one
    * (webkeys/ files are sealed to the web's public key, which anyone can do).
    */
-  vouches(m: SyncFileMessage): boolean {
+  vouches(m: SyncFileMessage, name: string): boolean {
     const device = typeof m.device === 'string' ? m.device : '';
-    if (!device || device.startsWith('web-') || this.householdValue('removed:' + device) !== null) return false;
+    // 0.9.3: only a phone's own file (its name says whose it is).
+    if (!device || fileDevice(name) !== device || device.startsWith('web-') || this.householdValue('removed:' + device) !== null) return false;
     const pin = this.meta('owner_pin');
     for (const x of Array.isArray(m.entries) ? m.entries : []) {
       if (!x || typeof x !== 'object' || x.tbl !== 'household' || typeof x.pk !== 'string') continue;
@@ -585,19 +659,30 @@ export class WebSyncEngine {
   /**
    * Takes in one device's file (SyncFolder.readOthers, for one file already opened). `sum` is
    * the file's hash, so the same file isn't taken in twice. Returns the number of changes, or -1
-   * when the file was passed over (this browser's own, an empty device, a removed phone).
+   * when the file was passed over (this browser's own, a removed phone, or one that names another
+   * device inside than its name says).
    */
   takeFile(name: string, sum: string, m: SyncFileMessage, at: string): number {
     const me = this.device();
     const seenKey = 'folder_seen:' + name;
-    const device = typeof m.device === 'string' ? m.device : '';
-    if (!device || device === me || this.householdValue('removed:' + device) !== null) {
+    // 0.9.3: who wrote it is the file's name (the server lets each device write only its own), as on
+    // a phone: a file that names another device inside is passed over, so nobody can pose as a phone
+    // (or another browser) by what they put in their file.
+    const device = fileDevice(name) ?? '';
+    if (!device || m.device !== device || device === me || this.householdValue('removed:' + device) !== null) {
       this.setMeta(seenKey, sum);
       return -1;
     }
-    const n = this.apply(m.entries);
+    // Another browser's file can't change the household, loyalty cards or prices (as on a phone).
+    const entries = device.startsWith('web-') && Array.isArray(m.entries) ? m.entries.filter((x) => !x || typeof x !== 'object' || !NOT_FROM_A_BROWSER.has(String(x.tbl))) : m.entries;
+    const n = this.apply(entries);
     if (n > 0) this.tidyCategories();
     this.notePeer(device, typeof m.name === 'string' ? m.name : null);
+    // 0.9.3: a phone's own settings, for Settings → Phones (only phones on a server send one), from
+    // that phone's own file (checked above), so another browser can't put words in a phone's mouth.
+    const summary = device.startsWith('web-') ? null : cleanSummary((m as { summary?: unknown }).summary);
+    const sentAt = typeof m.at === 'string' && m.at.length <= 40 && !Number.isNaN(Date.parse(m.at)) ? m.at : null;
+    if (summary) this.setMeta('phone_summary:' + device, JSON.stringify({ name: typeof m.name === 'string' ? m.name.slice(0, 80) : null, at: sentAt, summary }));
     const theirTop = Math.trunc(num(m.top));
     if (theirTop > 0) {
       const gotKey = 'folder_got:' + device;
@@ -737,6 +822,16 @@ function javaTrim(s: string): string {
 /** Is this a phone's (or another browser's) changes file? */
 export function isSyncFile(name: string): boolean {
   return name.startsWith(PREFIX) && name.endsWith(SUFFIX) && !name.startsWith('restock-sync-keys');
+}
+
+/**
+ * 0.9.3: whose changes file this is, by its name ("restock-sync-<device>.bin", a browser's
+ * "restock-sync-web-<webId>.bin"), or null when it isn't one (SyncFolder.fileFor, the other way).
+ */
+export function fileDevice(name: string): string | null {
+  if (!isSyncFile(name)) return null;
+  const d = name.slice(PREFIX.length, name.length - SUFFIX.length);
+  return /^[A-Za-z0-9_-]{1,80}$/.test(d) ? d : null;
 }
 
 /** The file names the server allows (docs/server-protocol.md "Files"). */

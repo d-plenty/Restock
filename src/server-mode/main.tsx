@@ -9,6 +9,7 @@ import { deleteLocalCopy, openServerDatabase, start, stop, syncNow, syncStatus }
 import { canChangeVault, forget, recall, session, type Session } from './session';
 import { Checking, LinkScreen, LoginScreen, SetPassphraseScreen } from './ui/Gate';
 import { AddPhonePanel, ServerStrip, ServerTab, serverScreen } from './ui/ServerScreens';
+import { Desktop } from './ui/Desktop';
 import { serverUi } from './flag';
 import './server.css';
 
@@ -16,6 +17,8 @@ serverUi.current = {
   Strip: ServerStrip,
   Tab: ServerTab,
   screen: serverScreen,
+  // 0.9.3: the desktop layout, from 1000 px wide.
+  Desktop,
   refresh: async () => {
     const r = await syncNow();
     if (!r) return syncStatus().error ?? "Couldn't reach the server";

@@ -64,9 +64,9 @@ The **normal price** is the middle of the non-sale prices over the history you k
 
 - **Your shops, your items.** Coles, Woolworths and Aldi, plus bottle shops (Keg tab, 18+) and pharmacies if you want them, and any other shop's website.
 - **Scan to add.** An open-source barcode scanner built in, with Open Food Facts lookup. Restock finds the same product at each of your shops and ticks it for you.
-- **Your own Restock server** (optional). Run [Restock server](https://github.com/d-plenty/restock-server) on your NAS or home server with one `docker run` command. Phones sync through it from anywhere, older prices and receipt photos move off the phone onto it, and you can use Restock on your computer in a browser. It's end-to-end encrypted: the server only ever holds sealed files.
+- **Your own Restock server** (optional). Run [Restock server](https://github.com/d-plenty/restock-server) on your NAS or home server with one `docker run` command, or as an app in Home Assistant. Phones sync through it from anywhere, older prices and receipt photos move off the phone onto it, and you can use Restock on your computer in a browser, laid out for a big screen: a sidebar, your pantry as a table with each item's price history beside it, the shopping list in shop columns, and Settings for the household and each phone. It's end-to-end encrypted: the server only ever holds sealed files.
 - **Other sizes of this.** Tick a product and Restock shows the same thing in other packs (375mL cans × 10, × 24, × 30), compared per litre or per 100g, so a 10-pack on special doesn't slip past your usual 30-pack. Bottles and other container sizes only if you switch them on.
-- **Local sync with your household.** Up to 6 phones in the same house share one pantry and shopping list, straight from one phone to another on your Wi-Fi. No account and no server. Away from home, phones can also sync through your Nextcloud, another WebDAV server (ownCloud, Synology, QNAP, TrueNAS and others) or a folder Syncthing keeps the same, sealed so only your phones can read it. The owner can also share kept receipts with the household. A recovery key lets another phone take over if the owner phone is lost. You pick what's shared: groceries, bottle shops (Keg) and pharmacy, each on or off, so a share house can share groceries and keep the rest separate. (Hosted sync, from anywhere through your own server, comes later.) Tick something off and it's off everyone's list.
+- **Local sync with your household.** Up to 6 phones in the same house share one pantry and shopping list, straight from one phone to another on your Wi-Fi. No account and no server. Away from home, phones can also sync through your Nextcloud, another WebDAV server (ownCloud, Synology, QNAP, TrueNAS and others) or a folder Syncthing keeps the same, sealed so only your phones can read it. The owner can also share kept receipts with the household. A recovery key lets another phone take over if the owner phone is lost. You pick what's shared: groceries, bottle shops (Keg) and pharmacy, each on or off, so a share house can share groceries and keep the rest separate. Tick something off and it's off everyone's list.
 - **My catalogue.** A catalogue made only from the things you buy: a page for each shop with this week's sales on your items (40% OFF, HALF PRICE, 2 FOR $5), and for a shop with no sales, a page of what it's cheapest for. Add one or all of them to your list.
 - **Shop around, or one store.** Your list puts each item at its cheapest shop and recommends shopping around, unless it saves less than your minimum (a dollar to start with, change it in Settings); then it recommends the one store that has everything.
 - **Honest shopping list.** "If you only go to one store" compares the *same shopping* at each store, every item at the size you usually buy, so one bulk deal can't tip the result. Tap ⓘ to see the working.
@@ -111,11 +111,12 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - **Local sync**: up to 6 phones in a household pair by scanning a one-time QR code from the owner phone (it works once, for 10 minutes, and never contains the household's key), then sync straight to each other whenever they're on the same Wi-Fi: when you open Restock, shortly after a change, and every 15 minutes or so in the background. Pantry, list (ticks too), prices, categories and alerts, plus loyalty cards if you choose. The owner picks what the household shares (groceries, Keg, Pharmacy) and each phone picks what it takes; a phone joining after setup gets the household's shops and settings for those, and is asked if they're 18 or over before Keg. Encrypted with a key only your phones have; no server and no account. If both phones change the same thing, the later change wins, except that a tick and a new amount on the same line both survive, and deleting something beats an edit made without knowing about it. **Sync away from home** (optional): sign in to Nextcloud, use another WebDAV server, or pick the same folder on each phone (one Syncthing keeps in sync); each phone leaves its changes there sealed with the household's key and picks up the others', prices and photos aside. **Receipts** (optional, set by the owner phone): kept receipts go to every phone, photos over the Wi-Fi only. **Recovery key**: the owner phone shows a key to save; if it's ever lost, another phone takes over as owner with it. The owner phone adds and removes phones (removing one changes the household's key) and can hand ownership to another phone. Pull down on Home, Pantry, Keg, Pharmacy or the list to sync; Check now on Home also checks prices.
 - **Start fresh, restore, or join your household** on the first screen; **Erase everything and start fresh** at the bottom of Settings (it asks twice).
 - **Setup tiles for everything**: sync, price checks, notifications, loyalty cards and shop accounts, widgets, updates and your household name, as well as shops, permissions, look, backups and the rest. Skip any of them.
+- **Sync and backups in one place**: your household on top, a strip that says whether everything is kept somewhere else (phone sync, a folder backup or your Restock server all count), then Wi-Fi, away from home and the Restock server, then backups.
 - **Backups**: export and restore exactly the parts you pick, plus optional automatic backups into a folder you choose. Lock any backup with a password (encrypted on the phone). Restock also keeps a copy from just before each update, so an update can be undone.
 - **Spreadsheets**: export your pantry, shopping list and price history as CSV files for Excel, Google Sheets, LibreOffice or Numbers.
 - **Look and colours**: Light, Dark or System, with true black for OLED screens; Australian or Plain; 24 accent colours; 16 app icon colours.
 - **Accessibility**: bigger text, high contrast, less motion and bigger buttons, checked with an automatic accessibility audit.
-- **Updates**: Settings → About and updates → Check for updates, or a weekly check if you turn it on. Android shows its own Install screen, and Restock tries again if GitHub is busy. Or install through [Restock's F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium and let them handle updates.
+- **Updates**: Settings → About and updates → Check for updates, or turn on **Tell me when there's an update** to check every 24 hours (or every 7 days, if you'd rather) when you open Restock. Android shows its own Install screen, and Restock tries again if GitHub is busy. Or install through [Restock's F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium and let them handle updates.
 - **Sharing prices**: product prices (shop, name, size, barcode and the prices on each day) are kept ready in your backups for a future shared, decentralised price network. Nothing is sent anywhere yet, nothing about you is ever included, and the data will never be sold. Turn it off in Settings → Shared prices.
 - **Shared price history (Beta)**: optionally download months of Coles and Woolworths history from [hotprices.org](https://hotprices.org) ([source](https://github.com/Javex/hotprices-au), MIT) so new items get a fair verdict from day one. Off by default.
 
@@ -126,7 +127,7 @@ The **normal price** is the middle of the non-sale prices over the history you k
 - Everything lives in a database **on your phone**. No account, no ads, no analytics, no tracking.
 - No Google Play services, Firebase or ML Kit, so it runs on de-Googled phones (GrapheneOS, CalyxOS, /e/OS).
 - Every permission is optional and explained, and asked for only when a feature needs it.
-- The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists, and GitHub if you check for updates). **Nothing goes to the people who make Restock.**
+- The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists, and GitHub if you check for updates), and to your own Home Assistant if you connect it. **Nothing goes to the people who make Restock.**
 - **Erase everything** (at the bottom of Settings) deletes your data, signs you out of the shops inside Restock and clears what the app saved, files it shared included. Backups can be locked with a password.
 
 Read the full **[privacy policy](PRIVACY.md)** and the **[fine print](DISCLAIMER.md)**.
@@ -187,7 +188,7 @@ Your phone asks each shop's own website, the same way you would by visiting it, 
 <details>
 <summary><strong>Can my partner and I share one list?</strong></summary>
 
-Yes, with **local sync**: up to 6 phones share one pantry and shopping list, straight from phone to phone on your home Wi-Fi. No account and no server. Start a household on one phone (Settings → Sync and backups → Local sync), pick what it shares (groceries, Keg, Pharmacy), and scan its one-time code with the others. Each phone can take all of it or just some, like groceries only. Changes made away from home catch up when you're both back on the Wi-Fi, or straight away through your Nextcloud, another WebDAV server or a Syncthing folder if you set one up. Or run your own [Restock server](https://github.com/d-plenty/restock-server): phones sync through it from anywhere, and you can use Restock in a browser.
+Yes, with **local sync**: up to 6 phones share one pantry and shopping list, straight from phone to phone on your home Wi-Fi. No account and no server. Start a household on one phone (Settings → Sync and backups → **Start a household**), pick what it shares (groceries, Keg, Pharmacy), and scan its one-time code with the others. Each phone can take all of it or just some, like groceries only. Changes made away from home catch up when you're both back on the Wi-Fi, or straight away through your Nextcloud, another WebDAV server or a Syncthing folder if you set one up. Or run your own [Restock server](https://github.com/d-plenty/restock-server): phones sync through it from anywhere, and you can use Restock in a browser.
 </details>
 
 <details>
@@ -211,8 +212,32 @@ Shops change their websites without warning, so connections break now and then. 
 <details>
 <summary><strong>How do I keep my data safe?</strong></summary>
 
-Everything lives on your phone, so back it up: Settings → Sync and backups → **Export a backup**, or turn on automatic backups into a folder you choose. Backups can include loyalty card numbers, so keep them private. Uninstalling Restock deletes its data.
+Everything lives on your phone, so keep a copy somewhere else. Any of these counts, and you can use one, two or all of them:
+
+1. **Phone-to-phone sync:** the other phones in your household hold a copy. Works offline, with no server.
+2. **Automatic backups into a folder:** a folder on the phone, or one that Nextcloud, Syncthing or a drive app keeps in the cloud.
+3. **Your own Restock server in Docker,** on a Raspberry Pi, mini PC or NAS: [step-by-step guides for each](https://github.com/d-plenty/restock-server#which-machine).
+4. **The same Restock server as a Home Assistant app,** if you run Home Assistant OS and don't have Docker: [how to install it](https://github.com/d-plenty/restock-server#as-a-home-assistant-app-no-docker-needed).
+
+Settings → **Sync and backups** shows at a glance whether everything is kept somewhere else, and names anything that needs you. With only sync or a server, Restock suggests a backup on the phone as well: sync copies mistakes to every phone, and a server can be down when you need it. Even weekly backups kept for 4 weeks (one tap: **Back up weekly, keep 4**) cover that. You can also **Export a backup** any time. Backups can include loyalty card numbers, so keep them private. Uninstalling Restock deletes its data.
 </details>
+
+## Home Assistant
+
+Your groceries list in [Home Assistant](https://www.home-assistant.io), both ways: add, tick or take something off in Restock and Home Assistant's list changes too, and the other way round. Say *"Okay Nabu, add milk to my shopping list"* and milk is on your Restock list.
+
+1. In Home Assistant, open your profile (your name, bottom left) → **Security** → **Long-lived access tokens** → **Create token**. Call it Restock and copy it.
+2. In Restock, go to **Settings → Home Assistant**. Type the address you open Home Assistant with (`http://homeassistant.local:8123`, its IP address like `http://192.168.1.50:8123`, your Nabu Casa `https://….ui.nabu.casa` address or a Tailscale one), paste the token and tap **Test connection**.
+3. Pick the list (`todo.shopping_list` unless you use another) and turn on **Sync with Home Assistant**.
+
+Good to know:
+
+- **One phone per household.** Only one phone in a household syncs with Home Assistant, so nothing gets added twice; your other phones get the changes through your household's sync. Turning it on on another phone asks *"Home Assistant syncs through Alex's phone. Move it to this phone?"*, and the old one stops by itself (it keeps its token, so you can move it back with **Move it here**). On the web, Settings → Phones shows which phone does it.
+- **Voice adds:** if what you said is clearly one of your pantry items, it's added as that item, with its price and cheapest shop. If not (or if it could be more than one), it's added as the words, with a **Pick my milk** button on every phone and on the web: pick the item, and tick *Always use this for "milk"* to have it match straight away next time, for the whole household. Or keep it as just "milk".
+- **If Home Assistant's list comes back empty** (while Home Assistant is starting up, say), Restock changes nothing and looks again. Only if it's still empty a couple of minutes later does it take those lines off your Restock list too.
+- **While Restock is open:** Restock syncs with Home Assistant when you open it, every minute while it's open, and just after the list changes. A voice add shows up the next time you open Restock.
+- **Needs Home Assistant 2024.8 or newer**, with a to-do list such as the Shopping list integration. Only the groceries list syncs, not Keg or Pharmacy.
+- **Private:** the phone talks straight to your Home Assistant, with no Restock server in between. Only the list's lines and ticks go there. The token stays on that phone, sealed, and is never shown again, synced or put in a backup. Plain `http://` only works for a Home Assistant at home or on Tailscale; anywhere else use `https://`.
 
 ## How you can help
 
@@ -246,38 +271,20 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is in its **release candidate** stage. Each new feature is followed by a release of fixes and polish, and there are no dates: each step is done when it's ready.
+Restock is in its **release candidate** stage. There are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
-**✅ 0.9.0: Release candidate**
-My catalogue, Shop around first, sync through a folder, a household recovery key, backup passwords, and a full security and privacy review.
+**✅ Out now**
+- **Your own Restock server:** a small server you run yourself with one `docker run` command, or as an app in Home Assistant ([Restock server](https://github.com/d-plenty/restock-server)). End-to-end encrypted, works at home and away, keeps your older prices and receipt photos, and lets you use Restock in your computer's browser.
+- **Simpler sync settings:** your household on top, a status strip, then how your phones sync and your backups. The Restock server has its own screen, and Connect starts your household for you.
+- **Household-wide settings:** shops, Shop around, alert levels and recall alerts are set once for the whole household, on any phone or the web, and every phone follows. Each phone keeps its own branch.
+- **Restock on a big screen:** the server's web app has a desktop layout, with Settings split into Household and Phones.
+- **Your cloud drive:** sync through Nextcloud, WebDAV for your own NAS, or a folder you choose. Receipts sync too.
+- **My catalogue, Shop around**, a household recovery key, backup passwords, 12 months of price history, and a full security and privacy review.
+- **Your shopping list in Home Assistant, both ways** (add by voice with Assist). See [Home Assistant](#home-assistant).
 
-**✅ 0.9.1: Your cloud drive**
-- Sign in to Nextcloud, or use WebDAV for your own NAS and other drives.
-- Receipts sync, and Sync and backups in one place in Settings.
-- Clearer pack sizes, and 12 months of price history.
-- Fixes and tighter security.
-
-**✅ 0.9.2: Your own Restock server (now)**
-- **A small server you run yourself** with one `docker run` command: [Restock server](https://github.com/d-plenty/restock-server).
-- **End-to-end encrypted:** the server only holds sealed files, never the key.
-- **Works anywhere:** your home address first, then Tailscale or your own domain when you're out.
-- **Older prices and receipt photos live on the server,** and leave the phone only once the server has them.
-- **Restock in your computer's browser,** signed in with your passphrase or by scanning a code with your phone.
-- **Restock never waits for it.** If the server is down, everything works as normal and catches up later.
-
-**🔧 0.9.3: Fixes**
-Fixes and polish for the server, drive sync, receipts and anything else testers find. Found something? [Report a problem](../../issues/new/choose).
-
-**🏡 0.9.4: Home Assistant**
-- **Your shopping list in Home Assistant, both ways:** add milk from a kitchen tablet or by voice and it's on everyone's list.
-- **Deals and recall alerts** can show up in Home Assistant too.
-
-**🔧 0.9.5: Fixes**
-Fixes and polish for Home Assistant.
-
-**✨ 0.9.6 and later: Final polish**
-- The last fixes and adjustments before 1.0.
-- Permission from the price-history sources, and a final read-through of the privacy policy.
+**🛠️ Still to come before 1.0** (in no particular order)
+- **Permission from the price-history sources,** and a final read-through of the privacy policy.
+- **Polish:** the last fixes and adjustments testers ask for.
 
 **🏁 1.0: The official release**
 
@@ -295,7 +302,7 @@ Restock stays focused on saving money on what you buy. Bigger ideas, like full b
 
 ## Coming soon
 
-These are planned (the [Roadmap](#roadmap) has the order), and each already has its own page in the app under **Settings → Coming soon**. None of them are switched on yet. Want one sooner, or have a better idea? Say so in [Discussions → Ideas](../../discussions/categories/ideas).
+These are planned, and each already has its own page in the app under **Settings → Coming soon**. None of them are switched on yet. Want one sooner, or have a better idea? Say so in [Discussions → Ideas](../../discussions/categories/ideas).
 
 ### What you have at home
 Tell Restock roughly how much of something you've got (a full bottle, two left, nearly out) and it keeps track as you buy and use things. It learns how fast you get through each one, so it can put things on your shopping list before you run out, and time it with a good price: *"You're nearly out of coffee, and it's half price at Coles this week."* Scanning a receipt or ticking things off in the shop tops your stock back up.
@@ -305,9 +312,6 @@ A simple month-by-month look at what you spent at each shop (from your kept rece
 
 ### iPhone version
 The same Restock on iOS, so a household with both kinds of phone can share a pantry and list. This needs a developer with an Apple developer account: see [Wanted: someone to bring Restock to iPhone](#wanted-someone-to-bring-restock-to-iphone).
-
-### Home Assistant
-Connect Restock to [Home Assistant](https://www.home-assistant.io) and your shopping list shows up there, with changes going both ways: add milk from a kitchen tablet or by voice and it's on your Restock list. Deals and recall alerts can show up in Home Assistant too. Planned for 0.9.4, using the Restock server (see the [Roadmap](#roadmap)).
 
 ### Shared prices, free for everyone
 Every price a phone sees can help everyone else. With shared prices, a new item arrives with months of history, so you know straight away whether its "special" is real. Restock will run a **free public price website** that anyone can browse and that every Restock phone can download history from, with no account and no ads.

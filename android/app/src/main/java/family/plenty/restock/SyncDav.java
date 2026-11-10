@@ -213,6 +213,8 @@ final class SyncDav {
                 throw new Problem("Couldn't reach the server. Check the address and your connection.", e);
             }
             String path = u.getRawPath() == null || u.getRawPath().isEmpty() ? "/" : u.getRawPath();
+            // 0.9.3: and its query, if it has one (Home Assistant's "?return_response").
+            if (u.getRawQuery() != null) path += "?" + u.getRawQuery();
             StringBuilder req = new StringBuilder();
             req.append(method).append(' ').append(path).append(" HTTP/1.1\r\n");
             boolean v6 = host.contains(":") && !host.startsWith("[");

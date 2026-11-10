@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { scanBarcode } from '../../lib/barcode';
 import { saveCopyInApp } from '../../lib/backup';
 import { confirmAction } from '../../lib/confirm';
-import { allGroups, allProducts, getSettings, updateSettings } from '../../lib/db';
+import { allGroups, allProducts, getSettings, reapplyHouseholdSettings, updateSettings } from '../../lib/db';
 import { CARRIED_TILES, householdSettingsFor } from '../../lib/household';
 import { SECTIONS, sectionOn, shopDef, type Section } from '../../shops';
 import type { Settings } from '../../types';
@@ -240,7 +240,7 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
           {!expired && <CodeText code={code} />}
           <ol className="small" style={{ margin: 0, paddingLeft: 18 }}>
             <li>Put both phones on the same Wi-Fi, and keep this screen open.</li>
-            <li>On the other phone (Restock 0.8.5 or newer), tap Join your household on the first screen, or Settings → Sync and backups → Local sync → Join a household.</li>
+            <li>On the other phone (Restock 0.8.5 or newer), tap Join your household on the first screen, or Settings → Sync and backups → Join a household.</li>
             <li>Scan this code.</li>
           </ol>
           <button className="btn block" onClick={close}>
@@ -310,7 +310,11 @@ export async function applyHouseholdSettings(json: string | undefined, opts: { t
       next.setup = { ...current.setup, done: [...done], skipped: current.setup.skipped.filter((t) => !done.has(t)) };
       for (const t of opts.tabs) if (t !== 'pantry') next.sections = { ...next.sections, [t]: true };
     }
-    const s = await updateSettings(next);
+    // 0.9.3: taken from the household, so this phone's only (never sent back as its own change),
+    // then the household's settings as they are now (they came with the first sync).
+    await updateSettings(next, { local: true });
+    await reapplyHouseholdSettings().catch(() => false);
+    const s = await getSettings();
     await syncBackgroundSchedule(s).catch(() => undefined);
     await scheduleReminders(s).catch(() => undefined);
     if (syncAvailable()) await RestockNative.scheduleRecalls({ enabled: s.recalls.enabled }).catch(() => undefined);
@@ -329,12 +333,17 @@ export async function shareTab(info: SyncInfo, tab: Section): Promise<SyncInfo |
   const next = await RestockNative.syncSet({ tabs: mine });
   const s = await getSettings();
   const used = [...new Set((await allProducts()).map((p) => p.chain))].filter((c) => (shopDef(c)?.section ?? customShopTab(s, c)) === tab);
-  await updateSettings({
-    sections: tab === 'pantry' ? s.sections : { ...s.sections, [tab]: true },
-    hiddenTabs: (s.hiddenTabs ?? []).filter((t) => t !== tab),
-    enabledChains: [...new Set([...s.enabledChains, ...(used as Settings['enabledChains'])])],
-    seenTabOffers: [...new Set([...(s.seenTabOffers ?? []), tab])],
-  });
+  // 0.9.3: fitted to what's there on this phone only; the household's own shops for the tab win after.
+  await updateSettings(
+    {
+      sections: tab === 'pantry' ? s.sections : { ...s.sections, [tab]: true },
+      hiddenTabs: (s.hiddenTabs ?? []).filter((t) => t !== tab),
+      enabledChains: [...new Set([...s.enabledChains, ...(used as Settings['enabledChains'])])],
+      seenTabOffers: [...new Set([...(s.seenTabOffers ?? []), tab])],
+    },
+    { local: true },
+  );
+  await reapplyHouseholdSettings().catch(() => false);
   return next;
 }
 
@@ -460,7 +469,7 @@ export function JoinSheet({
         <>
           <p className="small" style={{ margin: 0 }}>
             {where} shares {offered.map((t) => SHARE_TABS.find((x) => x.tab === t)!.title.toLowerCase()).join(', ')}. Pick what this phone shares; the
-            rest stays on this phone only. You can change it later in Settings → Sync and backups → Local sync.
+            rest stays on this phone only. You can change it later in Settings → Sync and backups → Phones and sharing.
           </p>
           <TabsPicker offered={keg ? offered : offered.filter((t) => t !== 'keg')} value={tabs} onChange={setTabs} />
           <button className="btn primary block" disabled={!tabs.length} onClick={() => setStep(!fresh && mineInTabs ? 'things' : 'cards')}>
@@ -518,7 +527,7 @@ export async function scanPairingCode(): Promise<string | undefined> {
   const out = await scanBarcode('Scan the code on the owner phone', {
     accept: pairingCode,
     qr: true,
-    wrong: "That isn't a Restock sync code. On the owner phone, open Settings → Sync and backups → Local sync → Add a phone.",
+    wrong: "That isn't a Restock sync code. On the owner phone, open Settings → Sync and backups → Add a phone.",
     typeHint: 'Or paste the code',
   });
   return out.ok ? out.code : undefined;
@@ -932,8 +941,12 @@ const addressText = (a?: string | null) => (a ?? '').replace(/^https?:\/\//i, ''
  * away-from-home choice. Join with the code on the server's Add a phone page; once joined, scan the
  * web page's code to let a browser see the household (or sign in there).
  */
-function ServerCard({ info, busy, onInfo }: { info: SyncInfo; busy: boolean; onInfo: (i: SyncInfo) => void }) {
+export function ServerCard({ info, busy, onInfo }: { info: SyncInfo; busy: boolean; onInfo: (i: SyncInfo) => void }) {
   const nav = useNav();
+  const settings = useLive(getSettings, []);
+  // 0.9.3: a phone that isn't in a household starts one first (it becomes the owner); the server
+  // seals everything with the household's key.
+  const householdName = info.household ?? settings?.household.name ?? 'Our house';
   const [working, setWorking] = useState<string>();
   const [error, setError] = useState<string>();
   const run = async (what: string, job: () => Promise<void>) => {
@@ -948,8 +961,29 @@ function ServerCard({ info, busy, onInfo }: { info: SyncInfo; busy: boolean; onI
     }
   };
 
+  const startHousehold = async (): Promise<boolean> => {
+    const sure = await confirmAction(`Start your household, "${householdName}"?`, {
+      detail:
+        "This phone isn't in a household yet, so it becomes the owner: it adds and removes the other phones. Your pantry, list and prices are shared; loyalty cards stay on each phone. Change the name or what's shared later in Sync and backups.",
+      action: 'Start it',
+      danger: false,
+    });
+    if (!sure) return false;
+    try {
+      const tabs = settings ? SECTIONS.filter((t) => t === 'pantry' || sectionOn(settings, t)) : (['pantry'] as Section[]);
+      const i = await RestockNative.syncStartHousehold({ household: householdName, shareCards: false, tabs });
+      if (settings && !settings.household.name) await updateSettings({ household: { name: householdName } });
+      onInfo(i);
+      return true;
+    } catch (e) {
+      setError(errText(e));
+      return false;
+    }
+  };
+
   const join = async () => {
     setError(undefined);
+    if (!info.paired && !(await startHousehold())) return;
     const out = await scanBarcode("Scan the code on your server's Add a phone page", {
       accept: serverCode,
       qr: true,
@@ -1096,14 +1130,38 @@ function ServerCard({ info, busy, onInfo }: { info: SyncInfo; busy: boolean; onI
             Restock server
           </span>
           <span className="small">
-            A small server you run yourself (a Docker container on a NAS, home server or Raspberry Pi). Phones sync through it at home and away,
+            A small server you run yourself (in Docker on a NAS or home server, or as an app in Home Assistant). Phones sync through it at home and away,
             prices included, and you can use Restock in a browser too. It only ever keeps sealed files: still no account, and the makers of
             Restock never see any of it. It works alongside Wi-Fi sync and sync away from home.
           </span>
+          {!info.paired && (
+            <ol className="small" style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <li>
+                <strong>Start your household.</strong> This phone isn't in one yet, so it becomes the owner of "{householdName}". The server uses the
+                household's key to seal everything.
+              </li>
+              <li>
+                <strong>Scan the server's code.</strong> On a computer, open your server's page, sign in and choose Add a phone.
+              </li>
+              <li>
+                <strong>Link the web page</strong> (optional): scan its second code, so the browser can show your household.
+              </li>
+            </ol>
+          )}
           <button className="btn primary" disabled={!syncAvailable() || busy || !!working} onClick={() => void join()}>
-            <Icon name="scan" size={18} /> Scan the code from your server's Add a phone page
+            <Icon name="scan" size={18} /> {info.paired ? "Scan the code from your server's Add a phone page" : 'Connect'}
           </button>
-          <span className="small">On a computer, open your server's page, sign in and choose Add a phone. Each code works once, for 10 minutes.</span>
+          <span className="small">
+            {info.paired
+              ? "On a computer, open your server's page, sign in and choose Add a phone. Each code works once, for 10 minutes."
+              : 'Connect does steps 1 and 2, asking first. Each code works once, for 10 minutes.'}
+          </span>
+          {!info.paired && (
+            <span className="small">
+              Adding more phones later: each one joins the household from this phone first (Sync and backups → Add a phone), then scans its own code
+              from the server's page.
+            </span>
+          )}
         </>
       )}
       {working && (
@@ -1128,10 +1186,19 @@ function awayTitle(info: SyncInfo): string {
   return `Syncing through ${info.folderName ?? 'a folder'}`;
 }
 
-export function SyncScreen() {
+/** 0.9.3: one line about the Restock server, for rows that lead to its screen. */
+export function serverSummary(info: SyncInfo | undefined): string {
+  if (!info?.server) return 'Sync at home and away through a small server you run yourself, and use Restock in a browser';
+  if (info.serverError) return info.serverError;
+  const where = addressText(info.serverReached ?? info.serverHome ?? info.serverAway);
+  return [where, info.serverAt ? `synced ${agoText(info.serverAt)}` : 'connected'].filter(Boolean).join(' · ');
+}
+
+export function SyncScreen({ invite }: { invite?: boolean } = {}) {
   const nav = useNav();
   const [info, setInfo] = useState<SyncInfo>();
-  const [inviting, setInviting] = useState(false);
+  // 0.9.3: Settings' Start a household and Add a phone open the code straight away.
+  const [inviting, setInviting] = useState(!!invite);
   const [joining, setJoining] = useState<string>();
   const [member, setMember] = useState<{ device: string; name: string }>();
   const [busy, setBusy] = useState(false);
@@ -1278,7 +1345,7 @@ export function SyncScreen() {
 
   return (
     <div className="screen">
-      <TopBar title="Local sync" />
+      <TopBar title="Phones and sharing" />
 
       {!syncAvailable() && (
         <div className="banner grey">
@@ -1356,6 +1423,14 @@ export function SyncScreen() {
             <span className="grow">
               <span className="title">Join a household</span>
               <span className="small">Scan the code on the owner phone.</span>
+            </span>
+            <Icon name="chevron" size={18} />
+          </button>
+          <button className="row" disabled={!syncAvailable()} onClick={() => nav.push({ name: 'restockServer' })}>
+            <Icon name="refresh" size={18} />
+            <span className="grow">
+              <span className="title">Use a Restock server</span>
+              <span className="small">Run your own? Connect starts the household for you.</span>
             </span>
             <Icon name="chevron" size={18} />
           </button>
@@ -1566,7 +1641,16 @@ export function SyncScreen() {
           {(!info.folder || choosing) && <AwayChoices disabled={!syncAvailable() || busy} onPick={pickAway} />}
 
           <div className="eyebrow">Restock server</div>
-          <ServerCard info={info} busy={busy} onInfo={setInfo} />
+          <div className="card flush">
+            <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
+              <Icon name="refresh" size={18} />
+              <span className="grow">
+                <span className="title">{info.server ? 'Syncing through your Restock server' : 'Restock server'}</span>
+                <span className="small">{serverSummary(info)}</span>
+              </span>
+              <Icon name="chevron" size={18} />
+            </button>
+          </div>
 
           <div className="eyebrow">What's shared</div>
           {info.isOwner && (

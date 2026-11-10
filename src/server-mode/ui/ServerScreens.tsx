@@ -4,6 +4,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { allCards, getSettings, updateSettings } from '../../lib/db';
 import { useLive } from '../../lib/useLive';
+import { haPhone } from '../../lib/listPicks';
 import { agoText } from '../../lib/sync';
 import { SECTION_NAMES, type Section } from '../../shops';
 import { Icon, ThemePicker, TopBar, timeAgo } from '../../ui/components';
@@ -16,10 +17,10 @@ import { PassphraseForm } from './Gate';
 import { AddOnServer, PhoneOnlyNote, PhoneOnlyScreen } from './PhoneOnly';
 import { Qr } from './Qr';
 
-const useStatus = () => useSyncExternalStore(onStatus, syncStatus);
+export const useStatus = () => useSyncExternalStore(onStatus, syncStatus);
 
 /** Ticks every 20 s, so "2 min ago" moves on by itself. */
-function useNow(ms = 20_000) {
+export function useNow(ms = 20_000) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), ms);
@@ -164,7 +165,7 @@ export function AddPhonePanel({ onAdded }: { onAdded?: () => void }) {
       ) : (
         <>
           <ol className="small steps">
-            <li>On the phone: Restock → Settings → Sync and backups → Local sync → Restock server → Connect.</li>
+            <li>On the phone: Restock → Settings → Sync and backups → Restock server → Connect.</li>
             <li>Scan this code. It works once, for {Math.ceil(left / 60)} more min.</li>
           </ol>
           <Qr text={invite.code} label="Code for a phone to scan" />
@@ -193,6 +194,8 @@ export function AddPhonePanel({ onAdded }: { onAdded?: () => void }) {
 
 function PhonesPage() {
   const [devices, setDevices] = useState<Device[]>();
+  // 0.9.3: the household's one Home Assistant phone (read only: it moves when it's turned on on a phone).
+  const ha = useLive(haPhone, []);
   const [error, setError] = useState<string>();
   const names = memberNames();
   const load = () =>
@@ -224,7 +227,10 @@ function PhonesPage() {
             <Icon name="phone" />
             <span className="grow">
               <span className="title">{d.name ?? names.get(d.device) ?? 'Phone'}</span>
-              <span className="small">{(d.lastSeen ?? d.seen) ? `Last seen ${timeAgo(d.lastSeen ?? d.seen)}` : 'Not seen yet'}</span>
+              <span className="small">
+                {(d.lastSeen ?? d.seen) ? `Last seen ${timeAgo(d.lastSeen ?? d.seen)}` : 'Not seen yet'}
+                {ha?.device === d.device && !ha.left ? ' · syncs the shopping list with Home Assistant' : ''}
+              </span>
             </span>
             <button className="btn small" onClick={() => void remove(d)}>
               Remove
@@ -240,7 +246,7 @@ function PhonesPage() {
 
 // ---------- Activity ----------
 
-const WHAT: Record<string, string> = {
+export const WHAT: Record<string, string> = {
   upload: 'sent its changes',
   write: 'sent its changes',
   fetch: 'fetched',
@@ -272,7 +278,16 @@ const WHAT: Record<string, string> = {
   'passphrase-change-refused': 'was refused a new passphrase (not the current one)',
 };
 
-function ActivityPage() {
+/** Who did something on the server: this browser, another browser, or a phone by its name. */
+export function activityWho(a: Activity, names: Map<string, string>, me: string | undefined): string {
+  const d = a.device ?? a.by ?? a.who;
+  if (!d) return a.ip ?? 'Someone';
+  if (d === 'web' || d === `web-${me}` || d === me) return 'This browser';
+  if (d.startsWith('web')) return 'A browser';
+  return names.get(d) ?? d;
+}
+
+export function ActivityPage() {
   const [rows, setRows] = useState<Activity[]>();
   const [error, setError] = useState<string>();
   const names = memberNames();
@@ -283,13 +298,7 @@ function ActivityPage() {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
   const me = session()?.webId;
-  const who = (a: Activity) => {
-    const d = a.device ?? a.by ?? a.who;
-    if (!d) return a.ip ?? 'Someone';
-    if (d === 'web' || d === `web-${me}` || d === me) return 'This browser';
-    if (d.startsWith('web')) return 'A browser';
-    return names.get(d) ?? d;
-  };
+  const who = (a: Activity) => activityWho(a, names, me);
   return (
     <div className="screen">
       <TopBar title="Activity" />
@@ -319,7 +328,7 @@ function ActivityPage() {
   );
 }
 
-function fileLabel(f: string, names: Map<string, string>): string {
+export function fileLabel(f: string, names: Map<string, string>): string {
   const m = /^restock-sync-(.+)\.bin$/.exec(f);
   if (m) return m[1].startsWith('web-') ? "the web's changes" : `${names.get(m[1]) ?? 'a phone'}'s changes`;
   if (f.startsWith('archive/')) return 'price history';
@@ -332,7 +341,7 @@ function fileLabel(f: string, names: Map<string, string>): string {
 // ---------- Account ----------
 
 /** Signs out, then takes this browser's copy away and starts again at the sign-in page. */
-async function leave(how: () => Promise<void>) {
+export async function leave(how: () => Promise<void>) {
   const id = session()?.webId;
   try {
     await how();
@@ -342,7 +351,7 @@ async function leave(how: () => Promise<void>) {
   }
 }
 
-function AccountPage({ onSession }: { onSession?: (s: Session) => void }) {
+export function AccountPage({ onSession }: { onSession?: (s: Session) => void }) {
   const s = session();
   const [changing, setChanging] = useState(false);
   const [msg, setMsg] = useState<string>();
@@ -476,7 +485,7 @@ function ServerSettings() {
 
 // ---------- loyalty cards ----------
 
-function ServerCards() {
+export function ServerCards() {
   const cards = useLive(allCards, []);
   return (
     <div className="screen">

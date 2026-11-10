@@ -195,7 +195,12 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     productOrder: maybeOneOf(s.productOrder, ['size', 'cheapest', 'name'] as const),
     otherContainerSizes: bool(s.otherContainerSizes, D.otherContainerSizes),
     updates: isObj(s.updates)
-      ? compact({ notify: bool(s.updates.notify, false), lastCheck: when(s.updates.lastCheck), told: text(s.updates.told, 40) })
+      ? compact({
+          notify: bool(s.updates.notify, false),
+          lastCheck: when(s.updates.lastCheck),
+          told: text(s.updates.told, 40),
+          everyDays: s.updates.everyDays === 7 ? 7 : undefined,
+        })
       : undefined,
     privacyAccepted: text(s.privacyAccepted, 60),
     seenHints: words(s.seenHints, [...D.seenHints]),

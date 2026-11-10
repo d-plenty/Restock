@@ -40,6 +40,17 @@ export interface RestockNativePlugin {
     timeoutMs?: number;
   }): Promise<{ status: number; body: string; headers?: Record<string, string> }>;
   /**
+   * 0.9.3: Home Assistant (HomeAssistant.java). The token is kept in Android, sealed with a key
+   * from its key store, and never comes back here: haRequest adds it. Plain http only to an
+   * address at home or on Tailscale, https everywhere else (the same rule as sync).
+   */
+  /** 0.9.3: the token is kept for this address only (Java refuses to send it anywhere else). */
+  haSaveToken(opts: { token: string; address: string }): Promise<void>;
+  haForgetToken(): Promise<void>;
+  haHasToken(): Promise<{ saved: boolean }>;
+  /** `path` is Home Assistant's API (/api/…). `token`: one typed in but not saved yet (Test connection). */
+  haRequest(opts: { address: string; method: 'GET' | 'POST'; path: string; body?: string; token?: string }): Promise<{ status: number; body: string }>;
+  /**
    * Open a page in the hidden browser, wait for its scripts to draw it, and return the finished
    * page (for shop websites that build their product lists with scripts, or block plain requests).
    */
@@ -99,6 +110,8 @@ export interface RestockNativePlugin {
   /** Starts (or reuses) the household; the code to show as a QR code. */
   /** tabs (0.8.5): what a new household shares (only used when starting one). */
   syncInvite(opts: { household: string; shareCards: boolean; tabs?: Section[] }): Promise<{ code: string; expiresInMs: number }>;
+  /** 0.9.3: start a household with this phone as the owner, without a code (the Restock server's Connect). */
+  syncStartHousehold(opts: { household: string; shareCards: boolean; tabs?: Section[] }): Promise<SyncInfo>;
   /** The sheet showing a code was closed: the code stops working. */
   syncCloseInvite(): Promise<void>;
   /** Owner: take a phone out of the household (the household's key changes). */
@@ -136,6 +149,12 @@ export interface RestockNativePlugin {
   syncWebApprove(opts: { code: string }): Promise<{ kind: 'link' | 'login'; host: string }>;
   /** 0.9.2: a receipt photo kept on the Restock server (base64 JPEG), fetched to show; not saved on the phone. */
   syncServerPhoto(opts: { path: string }): Promise<{ data: string }>;
+  /**
+   * 0.9.3: the quick check with the Restock server while Restock is open (sync.ts): one listing, and a
+   * round only when something changed there. Never overlaps a round (it doesn't look then).
+   * received: changes taken in, or -1 when it didn't look (no server, a round going, out of reach).
+   */
+  syncServerPoll(): Promise<{ received: number }>;
   /** The search test with the screen off (0.8.6): a notification with progress and a Stop button. */
   searchTestStart(opts: { total: number }): Promise<void>;
   searchTestProgress(opts: { done: number; total: number; text: string }): Promise<{ stop: boolean }>;

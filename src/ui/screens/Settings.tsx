@@ -6,9 +6,8 @@ import { readBackup, readCopyInApp, shareTextFile, type BackupSummary } from '..
 import { BEFORE_UPGRADE_FILE, beforeUpdateCopies } from '../../lib/boot';
 import { shareCsv } from '../../lib/csvExport';
 import { RestockNative } from '../../lib/sql/native';
-import { syncInfo } from '../../lib/sync';
+import { syncInfo, type SyncInfo } from '../../lib/sync';
 import { isNative } from '../../stores/http';
-import { syncSummary } from './Sync';
 import { allCards, eraseEverything, getSettings, priceHistorySpan, pruneHistory, serverKeepsHistory, updateSettings } from '../../lib/db';
 import { loadDemo, removeDemo } from '../../lib/demo';
 import { syncBackgroundSchedule } from '../../lib/check';
@@ -20,6 +19,7 @@ import { chainName, CHECK_INTERVALS, GOOD_SALE, GREAT_SALE, HISTORY_WEEKS, histo
 import { ChainDot, Explain, Icon, Logo, OpenStoreButton, Sheet, timeAgo, TopBar } from '../components';
 import { AccessibilitySettings, LookSettings } from './Look';
 import { AutoBackupSettings } from './Backups';
+import { SyncOverview } from './SyncOverview';
 import { ReceiptsSettings } from './Receipts';
 import { recallSummary } from './Recalls';
 import { ComingSoon } from './Soon';
@@ -35,6 +35,8 @@ import { shopSummary } from './Stores';
 import { ExportSheet, pricesIn } from './BackupParts';
 import { LegalSheet } from './Legal';
 import { readBackupFile, RestoreSheet } from './Restore';
+import { getHaConfig, haPhone, phoneLabel } from '../../lib/homeAssistant';
+import { serverMode } from '../../server-mode/flag';
 
 /** Settings → Shopping list: how much shopping around has to save (0.9.0). */
 const SHOP_AROUND_MINS = [0, 0.5, 1, 2, 5, 10];
@@ -107,7 +109,7 @@ async function eraseAll() {
     if (info?.paired && info.isOwner && (info.members ?? []).some((m) => !m.me)) {
       await confirmAction('Make another phone the owner first', {
         detail:
-          'This is the household\'s owner phone. In Settings → Sync and backups → Local sync, tap another phone and choose "Make this the owner phone", sync once, then erase this one. Or remove the other phones first.',
+          'This is the household\'s owner phone. In Settings → Sync and backups → Phones and sharing, tap another phone and choose "Make this the owner phone", sync once, then erase this one. Or remove the other phones first.',
         action: 'OK',
         danger: false,
       });
@@ -151,6 +153,11 @@ export function SettingsScreen() {
   const settings = useLive(getSettings, []);
   const cardCount = useLive(async () => (await allCards()).length, []);
   const sync = useLive(syncInfo, []);
+  // 0.9.3: Sync now in Sync and backups shows its result straight away.
+  const [syncNowInfo, setSyncShown] = useState<SyncInfo>();
+  const syncShown = syncNowInfo ?? sync;
+  // …until the next look: then what's live again (leaving the household, say, shows straight away).
+  useEffect(() => setSyncShown(undefined), [sync]);
   // 0.9.1: how much price history a backup holds.
   const span = useLive(priceHistorySpan, []);
   // 0.8.0: the copy saved just before the upgrade, if there is one.
@@ -165,6 +172,15 @@ export function SettingsScreen() {
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState<number>();
   const screen = useRef<HTMLDivElement>(null);
+  // 0.9.3: Home Assistant's row says whether it's on for this phone, or which phone does it.
+  const ha = useLive(getHaConfig, []);
+  const haWho = useLive(haPhone, []);
+  const haSummary =
+    haWho?.inHousehold && haWho.device && !haWho.mine
+      ? `Syncs through ${phoneLabel(haWho.name)}`
+      : ha?.enabled
+        ? `On for this phone · ${ha.entity}`
+        : 'Your shopping list in Home Assistant, both ways';
   useEffect(() => {
     if (!screen.current) return;
     // Searching looks inside the rows that fold away too.
@@ -211,6 +227,7 @@ export function SettingsScreen() {
         {[
           ['s-stores', 'Shops'],
           ['s-sync', 'Sync and backups'],
+          ...(serverMode ? [] : [['s-ha', 'Home Assistant']]),
           ['s-checks', 'Price checks'],
           ['s-list', 'Shopping list'],
           ['s-alerts', 'Alerts'],
@@ -235,7 +252,7 @@ export function SettingsScreen() {
         My shops
       </div>
       <div className="card flush">
-        {row('Setup', `${TILES.filter((t) => tileStatus(settings, t.id).ok).length} of ${TILES.length} done`, () => nav.push({ name: 'setup' }))}
+        {row('Setup', `${TILES.filter((t) => tileStatus(settings, t.id, syncShown).ok).length} of ${TILES.length} done`, () => nav.push({ name: 'setup' }))}
         {row('Supermarkets', shopSummary(settings, 'pantry'), () => nav.push({ name: 'stores', section: 'pantry' }))}
         {row('Shop accounts and stock', shopAccountsSummary(settings), () => nav.push({ name: 'stores', section: 'pantry' }))}
         {row('Bottle shops (Keg tab)', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
@@ -248,13 +265,9 @@ export function SettingsScreen() {
       <div className="eyebrow" id="s-sync">
         Sync and backups
       </div>
-      <h3 className="group-head">Sync with your household</h3>
-      <div className="card flush">
-        {row('Local sync', syncSummary(sync) || 'Phone to phone on your Wi-Fi · no account', () => nav.push({ name: 'sync' }))}
-        {row('Restock server', 'Sync at home and away through a small server you run yourself, and use Restock in a browser', () => nav.push({ name: 'sync' }))}
-        {row('Household name', (sync?.paired && sync.household) || settings.household.name, () => nav.push({ name: 'household' }))}
-      </div>
-      <p className="small group-note">Sync keeps your phones the same, mistakes included. Backups let you go back, so set up automatic backups too.</p>
+      {/* 0.9.3: the household on top, how the phones sync, then backups. Any of the three counts as kept elsewhere. */}
+      <SyncOverview settings={settings} info={syncShown} onInfo={setSyncShown} />
+      <p className="small group-note">Sync keeps your phones the same, mistakes included. Backups let you go back.</p>
 
       <h3 className="group-head" id="s-backups">
         Backups
@@ -347,6 +360,18 @@ export function SettingsScreen() {
           </span>
         </button>
       </div>
+
+      {/* 0.9.3: the shopping list with Home Assistant, from this phone. Phones only. */}
+      {!serverMode && (
+        <>
+          <div className="eyebrow" id="s-ha">
+            Home Assistant
+          </div>
+          <div className="card flush">
+            {row('Home Assistant', haSummary, () => nav.push({ name: 'homeAssistant' }))}
+          </div>
+        </>
+      )}
 
       <div className="eyebrow" id="s-checks">
         Price checks
@@ -1159,9 +1184,28 @@ function UpdateRowsOn({ settings }: { settings: Settings }) {
           <span className="title" style={{ fontSize: 15 }}>
             Tell me when there's an update
           </span>
-          <span className="small">Once a week, when you open Restock, it asks GitHub if there's a newer version.</span>
+          <span className="small">When you open Restock, it asks GitHub if there's a newer version, at most this often.</span>
         </span>
       </label>
+      {u?.notify && (
+        <label className="check">
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              How often
+            </span>
+          </span>
+          <select
+            className="input"
+            style={{ width: 'auto', height: 38, padding: '0 8px', fontSize: 15 }}
+            value={u.everyDays === 7 ? 7 : 1}
+            aria-label="How often to check for updates"
+            onChange={(e) => void updateSettings({ updates: { ...u, everyDays: e.target.value === '1' ? 1 : 7 } })}
+          >
+            <option value={1}>Every 24 hours (default)</option>
+            <option value={7}>Every 7 days</option>
+          </select>
+        </label>
+      )}
       {notes && found && (
         <Sheet title={`What's new in ${found.version}`} onClose={() => setNotes(false)}>
           <div className="small release-notes">{found.notes}</div>

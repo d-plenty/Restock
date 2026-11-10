@@ -45,7 +45,10 @@ import { PantryScreen } from './screens/Pantry';
 import { SettingsScreen } from './screens/Settings';
 import { StoresScreen } from './screens/Stores';
 import { SyncScreen } from './screens/Sync';
-import { serverMode, serverUi } from '../server-mode/flag';
+import { RestockServerScreen } from './screens/RestockServer';
+import { HomeAssistantScreen } from './screens/HomeAssistant';
+import { wireHomeAssistant } from '../lib/homeAssistant';
+import { serverMode, serverUi, useDesktopWidth } from '../server-mode/flag';
 
 const ALL_TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'home' },
@@ -75,6 +78,8 @@ function RestockApp() {
   const [toastUndo, setToastUndo] = useState<(() => void | Promise<void>) | undefined>(undefined);
   const toastTimer = useRef<number | undefined>(undefined);
   const settings = useLive(() => (ready ? getSettings() : Promise.resolve(undefined)), [ready]);
+  // 0.9.3: the web app on a Restock server, in a wide window: the desktop layout. Always false on a phone.
+  const desk = useDesktopWidth();
 
   useEffect(() => {
     void syncInsets();
@@ -88,7 +93,7 @@ function RestockApp() {
     };
   }, []);
 
-  // "Tell me when there's an update": once a week, when Restock opens (0.7.3).
+  // "Tell me when there's an update": when Restock opens, every 24 hours, or every 7 days if picked (0.9.3).
   useEffect(() => {
     if (!ready || serverMode) return;
     const t = window.setTimeout(() => {
@@ -224,6 +229,13 @@ function RestockApp() {
     void maybeAutoBackup().catch((e) => console.error('auto backup failed', e));
     void tidyReceipts().catch((e) => console.error('receipt tidy-up failed', e));
     const stopWidgets = watchWidgets();
+    // 0.9.3: the shopping list with Home Assistant, if it's on for this phone (homeAssistant.ts).
+    const stopHa = serverMode
+      ? () => undefined
+      : wireHomeAssistant((fn) => {
+          const h = CapApp.addListener('resume', fn);
+          return () => void h.then((x) => x.remove());
+        });
     const sub = CapApp.addListener('resume', () => {
       // The background worker may have saved new prices while the app was closed.
       refresh();
@@ -232,6 +244,7 @@ function RestockApp() {
     });
     return () => {
       stopWidgets();
+      stopHa();
       sub.then((s) => s.remove());
     };
   }, [onboarded, toast]);
@@ -261,7 +274,9 @@ function RestockApp() {
             <div className="overlay">
               {stack[stack.length - 1].name === 'stores' && <StoresScreen section={(stack[stack.length - 1] as { section?: Section }).section} />}
               {stack[stack.length - 1].name === 'cards' && <CardsScreen />}
-              {stack[stack.length - 1].name === 'sync' && <SyncScreen />}
+              {stack[stack.length - 1].name === 'sync' && <SyncScreen invite={(stack[stack.length - 1] as { invite?: boolean }).invite} />}
+              {stack[stack.length - 1].name === 'restockServer' && <RestockServerScreen />}
+              {stack[stack.length - 1].name === 'homeAssistant' && <HomeAssistantScreen />}
               {stack[stack.length - 1].name === 'household' && <HouseholdScreen />}
               {stack[stack.length - 1].name === 'diagnostics' && <DiagnosticsScreen />}
               {stack[stack.length - 1].name === 'soon' && <SoonScreen id={(stack[stack.length - 1] as { id: string }).id} />}
@@ -295,6 +310,94 @@ function RestockApp() {
   const tabs = ALL_TABS.filter((t) => (!isSectionTab(t.id) || inBar.includes(t.id)) && !(serverMode && t.id === 'add'));
   const shownTab: Tab = isSectionTab(tab) && !inBar.includes(tab) ? 'pantry' : tab;
   const addSection: Section = on.includes(section) ? section : 'pantry';
+
+  // The screen opened on top of the tab, if any (the server's own version where it has one).
+  const overlay = top ? (
+    (serverMode && serverUi.current?.screen(top)) || (
+      <>
+        {top.name === 'item' && <ItemScreen key={top.groupId} groupId={top.groupId} />}
+        {top.name === 'add' && (
+          <AddScreen
+            key={`add-${stack.length}`}
+            barcode={top.barcode}
+            attachTo={top.attachTo}
+            as={top.as}
+            another={top.another}
+            query={top.query}
+            onlyChain={top.chain}
+            section={top.section ?? addSection}
+            forList={top.forList}
+            replaceEntry={top.replaceEntry}
+            overlay
+          />
+        )}
+        {top.name === 'catalogues' && <CataloguesScreen />}
+        {top.name === 'mycatalogue' && <MyCatalogueScreen />}
+        {top.name === 'permissions' && <PermissionsScreen />}
+        {top.name === 'settings' && <SettingsScreen />}
+        {top.name === 'stores' && <StoresScreen section={top.section} />}
+        {top.name === 'cards' && <CardsScreen />}
+        {top.name === 'sync' && <SyncScreen invite={top.invite} />}
+        {top.name === 'restockServer' && <RestockServerScreen />}
+        {top.name === 'homeAssistant' && <HomeAssistantScreen />}
+        {top.name === 'household' && <HouseholdScreen />}
+        {top.name === 'setup' && <SetupScreen />}
+        {top.name === 'diagnostics' && <DiagnosticsScreen />}
+        {top.name === 'specials' && <SpecialsScreen />}
+        {top.name === 'receipts' && <ReceiptsScreen />}
+        {top.name === 'receipt' && <ReceiptScreen key={top.id ?? 'new'} id={top.id} />}
+        {top.name === 'recalls' && <RecallsScreen />}
+        {top.name === 'soon' && <SoonScreen id={top.id} />}
+      </>
+    )
+  ) : undefined;
+  // 0.9.1: in the layer on <body>, so the scanner, the toast and its Undo, and what screen readers
+  // hear still work while a sheet shuts the app off (components.tsx Sheet).
+  const layers = createPortal(
+    <>
+      <ScannerHost />
+      <Announcer text={toastMsg} />
+      {toastMsg && (
+        <div
+          className="toast"
+          // Tap it to make it go away, so it never sits over a button you need (0.7.3).
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest('.toast-undo')) return;
+            setToastMsg(undefined);
+            setToastUndo(undefined);
+          }}
+        >
+          <span style={{ flex: 1 }}>{toastMsg}</span>
+          {toastUndo && (
+            <button
+              className="toast-undo"
+              onClick={async () => {
+                const run = toastUndo;
+                setToastMsg(undefined);
+                setToastUndo(undefined);
+                await run();
+              }}
+            >
+              Undo
+            </button>
+          )}
+        </div>
+      )}
+    </>,
+    layerHost(),
+  );
+
+  // 0.9.3: a Restock server's web app in a wide window: a sidebar and wide pages (server-mode/ui/Desktop.tsx).
+  if (serverMode && desk && serverUi.current?.Desktop) {
+    const Desktop = serverUi.current.Desktop;
+    return (
+      <NavContext.Provider value={nav}>
+        <Desktop tabs={tabs.map((t) => t.id)} tab={shownTab} stack={stack} overlay={overlay} />
+        <ConfirmHost />
+        {layers}
+      </NavContext.Provider>
+    );
+  }
 
   return (
     <NavContext.Provider value={nav}>
@@ -330,83 +433,11 @@ function RestockApp() {
           )}
         </nav>
 
-        {top && (
-          <div className="overlay">
-            {(serverMode && serverUi.current?.screen(top)) || (
-              <>
-            {top.name === 'item' && <ItemScreen key={top.groupId} groupId={top.groupId} />}
-            {top.name === 'add' && (
-              <AddScreen
-                key={`add-${stack.length}`}
-                barcode={top.barcode}
-                attachTo={top.attachTo}
-                as={top.as}
-                another={top.another}
-                query={top.query}
-                onlyChain={top.chain}
-                section={top.section ?? addSection}
-                forList={top.forList}
-                replaceEntry={top.replaceEntry}
-                overlay
-              />
-            )}
-            {top.name === 'catalogues' && <CataloguesScreen />}
-            {top.name === 'mycatalogue' && <MyCatalogueScreen />}
-            {top.name === 'permissions' && <PermissionsScreen />}
-            {top.name === 'settings' && <SettingsScreen />}
-            {top.name === 'stores' && <StoresScreen section={top.section} />}
-            {top.name === 'cards' && <CardsScreen />}
-            {top.name === 'sync' && <SyncScreen />}
-            {top.name === 'household' && <HouseholdScreen />}
-            {top.name === 'setup' && <SetupScreen />}
-            {top.name === 'diagnostics' && <DiagnosticsScreen />}
-            {top.name === 'specials' && <SpecialsScreen />}
-            {top.name === 'receipts' && <ReceiptsScreen />}
-            {top.name === 'receipt' && <ReceiptScreen key={top.id ?? 'new'} id={top.id} />}
-            {top.name === 'recalls' && <RecallsScreen />}
-            {top.name === 'soon' && <SoonScreen id={top.id} />}
-              </>
-            )}
-          </div>
-        )}
+        {top && <div className="overlay">{overlay}</div>}
 
         <TourHost />
         <ConfirmHost />
-        {/* 0.9.1: in the layer on <body>, so the scanner, the toast and its Undo, and what screen readers
-            hear still work while a sheet shuts the app off (components.tsx Sheet). */}
-        {createPortal(
-          <>
-            <ScannerHost />
-            <Announcer text={toastMsg} />
-            {toastMsg && (
-              <div
-                className="toast"
-                // Tap it to make it go away, so it never sits over a button you need (0.7.3).
-                onClick={(e) => {
-                  if ((e.target as HTMLElement).closest('.toast-undo')) return;
-                  setToastMsg(undefined);
-                  setToastUndo(undefined);
-                }}
-              >
-                <span style={{ flex: 1 }}>{toastMsg}</span>
-                {toastUndo && (
-                  <button
-                    className="toast-undo"
-                    onClick={async () => {
-                      const run = toastUndo;
-                      setToastMsg(undefined);
-                      setToastUndo(undefined);
-                      await run();
-                    }}
-                  >
-                    Undo
-                  </button>
-                )}
-              </div>
-            )}
-          </>,
-          layerHost(),
-        )}
+        {layers}
       </div>
     </NavContext.Provider>
   );

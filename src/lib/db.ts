@@ -18,6 +18,8 @@ import { migrate } from './sql/schema';
 import { toPicks } from './picks';
 import { checkSettings } from './settingsCheck';
 import { isPhotoPath } from './receiptPaths';
+import { HA_CONFIG, HA_STATE, LOCAL_ONLY_KV, resetHaPairing } from './haKeys';
+import { applyRows, changedRows, syncedTabs } from './sharedSettings';
 
 // All reads and writes to the on-device SQLite database go through this file.
 
@@ -315,12 +317,74 @@ export async function getSettings(): Promise<Settings> {
   return s;
 }
 
-export async function updateSettings(patch: Partial<Settings>): Promise<Settings> {
-  const next = mergeSettings({ ...(await getSettings()), ...patch });
+/**
+ * Saves a change to the settings. 0.9.3: a household setting changed here (sharedSettings.ts: the
+ * shops of a tab this phone syncs, Shop around, alert level, recalls, the list's cheapest, the
+ * order of products) is also written to the synced household_settings table, so every phone in
+ * the household follows. `local`: this phone only (settings taken from the household, or fitted to
+ * it), never written there. What another phone changed arrives in the stored settings already
+ * (SyncEngine applies it), so it's never sent back out from here.
+ */
+export async function updateSettings(patch: Partial<Settings>, opts: { local?: boolean } = {}): Promise<Settings> {
+  const before = await getSettings();
+  const next = mergeSettings({ ...before, ...patch });
   setCustomShops(next.customShops);
-  await putKV('settings', next);
+  const ops: SqlOp[] = [{ sql: 'INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', params: ['settings', JSON.stringify(next)] }];
+  if (!opts.local) ops.push(...(await householdSettingOps(before, next)));
+  await write(ops);
   lastSettings = next;
   return next;
+}
+
+/** The household fields of the settings, to tell quickly whether any changed. */
+const sharedPart = (s: Settings) =>
+  JSON.stringify([s.shopAroundMin, s.defaultThresholdPct, s.listCompare, s.productOrder, s.recalls.enabled, s.enabledChains, s.sections, s.customShops]);
+
+/**
+ * 0.9.3: the household this phone (or the web app) is in, for household settings: the tabs it
+ * syncs and the rows there are. Null when it isn't in one (or the database is older).
+ */
+export async function householdContext(): Promise<{ tabs: Set<Section>; rows: Map<string, string> } | null> {
+  try {
+    const [owner] = await sql().query<{ v: string }>("SELECT v FROM household WHERE k = 'owner'");
+    if (!owner) return null;
+    const [mine] = await sql().query<{ value: string }>("SELECT value FROM sync_meta WHERE key = 'tabs'");
+    const [theirs] = await sql().query<{ v: string }>("SELECT v FROM household WHERE k = 'tabs'");
+    const rows = await sql().query<{ k: string; v: string }>('SELECT k, v FROM household_settings');
+    return { tabs: syncedTabs(mine?.value ?? null, theirs?.v ?? null), rows: new Map(rows.map((r) => [r.k, r.v])) };
+  } catch {
+    return null;
+  }
+}
+
+async function householdSettingOps(before: Settings, next: Settings): Promise<SqlOp[]> {
+  if (sharedPart(before) === sharedPart(next)) return [];
+  const ctx = await householdContext();
+  if (!ctx) return [];
+  return changedRows(before as unknown as Record<string, unknown>, next as unknown as Record<string, unknown>, ctx.tabs, ctx.rows).map(([k, v]) => ({
+    sql: 'INSERT OR REPLACE INTO household_settings (k, v) VALUES (?, ?)',
+    params: [k, v],
+  }));
+}
+
+/**
+ * 0.9.3: this device's settings brought in line with the household's rows (here only: nothing is
+ * written to the household). After joining, sharing another tab, a restore, a reset, at start-up,
+ * and on the web after fitting its shops. SyncEngine does the same as rows arrive; this covers
+ * settings saved here meanwhile. True when they changed.
+ */
+export async function reapplyHouseholdSettings(): Promise<boolean> {
+  const ctx = await householdContext();
+  if (!ctx || !ctx.rows.size) return false;
+  const s = structuredClone(await getSettings());
+  if (!applyRows(s as unknown as Record<string, unknown>, [...ctx.rows].map(([k, v]) => ({ k, v })), ctx.tabs)) return false;
+  await updateSettings(s, { local: true });
+  return true;
+}
+
+/** 0.9.3: a read-only query, for householdSettings.ts. */
+export async function queryRows<T>(text: string, params: SqlValue[] = []): Promise<T[]> {
+  return sql().query<T>(text, params);
 }
 
 /**
@@ -341,6 +405,8 @@ export async function resetSettings(): Promise<Settings> {
   setCustomShops(next.customShops);
   await putKV('settings', next);
   lastSettings = next;
+  // 0.9.3: the household's settings stay the household's.
+  if (await reapplyHouseholdSettings().catch(() => false)) return getSettings();
   return next;
 }
 
@@ -860,7 +926,14 @@ const lineTab = (e: ListEntry, itemTabs: Map<string, Section>): Section =>
 
 export async function restoreSnapshot(s: Snapshot): Promise<void> {
   // 0.9.0: this phone's automatic-backup password (never in a backup) and its app version stay.
-  const here = new Map((await sql().query<{ key: string; value: string }>("SELECT key, value FROM kv WHERE key IN ('settings', 'appVersion')")).map((r) => [r.key, r.value]));
+  // 0.9.3: and its Home Assistant settings; which line is which item there starts afresh (the
+  // next round pairs them by their words, so nothing is removed from either list).
+  const here = new Map(
+    (await sql().query<{ key: string; value: string }>('SELECT key, value FROM kv WHERE key IN (?, ?, ?)', ['settings', 'appVersion', HA_CONFIG])).map((r) => [
+      r.key,
+      r.value,
+    ]),
+  );
   const password = (() => {
     try {
       return (JSON.parse(here.get('settings') ?? '{}') as Partial<Settings>).autoBackup?.password;
@@ -869,7 +942,7 @@ export async function restoreSnapshot(s: Snapshot): Promise<void> {
     }
   })();
   const kv = s.kv
-    .filter((k) => k.key !== 'appVersion')
+    .filter((k) => k.key !== 'appVersion' && !LOCAL_ONLY_KV.includes(k.key))
     .map((k) => {
       if (k.key !== 'settings') return k;
       // 0.9.0: settings are checked on the way in (settingsCheck.ts).
@@ -877,6 +950,7 @@ export async function restoreSnapshot(s: Snapshot): Promise<void> {
       return { key: k.key, value: password ? { ...checked, autoBackup: { ...checked.autoBackup, password } } : checked };
     });
   if (here.has('appVersion')) kv.push({ key: 'appVersion', value: JSON.parse(here.get('appVersion')!) });
+  if (here.has(HA_CONFIG)) kv.push({ key: HA_CONFIG, value: JSON.parse(here.get(HA_CONFIG)!) });
   const ops: SqlOp[] = ['prices', 'products', 'items', 'list_entries', 'cards', 'categories', 'kv', 'receipts'].map((t) => ({
     sql: `DELETE FROM ${t}`,
   }));
@@ -888,6 +962,8 @@ export async function restoreSnapshot(s: Snapshot): Promise<void> {
   s.cards.forEach((c) => ops.push(insertCardOp(c)));
   s.categories.forEach((c) => ops.push(insertCategoryOp(c)));
   kv.forEach((k) => ops.push({ sql: 'INSERT INTO kv (key, value) VALUES (?, ?)', params: [k.key, JSON.stringify(k.value)] }));
+  // 0.9.3: Home Assistant's pairing starts afresh (it isn't kept), even for a round under way now.
+  resetHaPairing();
   await write(ops);
 }
 
@@ -1102,6 +1178,9 @@ export async function restoreParts(
       const section = e.section ?? (e.groupId ? backupTabs.get(e.groupId) : undefined);
       ops.push(insertEntryOp(keep ? e : { ...e, groupId: undefined, text: name, section }, true));
     });
+    // 0.9.3: Home Assistant pairs the list afresh by its words, so a restored list takes nothing off its list.
+    ops.push({ sql: 'DELETE FROM kv WHERE key = ?', params: [HA_STATE] });
+    resetHaPairing();
   }
   if (parts.cards) {
     if (!opts.household) ops.push({ sql: 'DELETE FROM cards' });
@@ -1129,6 +1208,8 @@ export async function restoreParts(
     }
   }
   if (ops.length) await write(ops);
+  // 0.9.3: restored shops and settings on a household's tabs give way to the household's.
+  if (parts.settings || parts.shops) await reapplyHouseholdSettings().catch(() => false);
 }
 
 /** Read the same tables the Android worker writes (used after a background check). */
@@ -1149,6 +1230,7 @@ export async function eraseEverything(): Promise<void> {
   for (const t of tables) ops.push({ sql: `DELETE FROM "${t.name}"` });
   ops.push({ sql: 'DELETE FROM sync_meta' });
   ops.push({ sql: "INSERT INTO sync_meta (key, value) VALUES ('device', lower(hex(randomblob(8))))" });
+  resetHaPairing();
   await sql().batch(ops);
   // 0.9.0: and what the app keeps outside the database: the settings it remembers, and the
   // browser storage it uses for small things (recent searches, the Pantry's sort, the deal shops

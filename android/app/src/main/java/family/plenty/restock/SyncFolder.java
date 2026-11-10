@@ -41,6 +41,9 @@ import org.json.JSONObject;
  *   serverKey (made from the household's key, so the web app can be given it without the household's
  *   key, which also opens Wi-Fi sync and picked folders), and carry prices changed in the last 60
  *   days and the photos the phone moved to the server (ServerOffload).
+ * - 0.9.3: a phone's file on a Restock server also carries "summary": its own settings in a few
+ *   words for the web app's Settings → Phones (PhoneSummary, from an allow-list). Not in a picked
+ *   folder's or WebDAV's files. Household settings travel as entries like everything else.
  *
  * No Android classes here (the folder is an interface), so it's tested on a computer too.
  */
@@ -264,6 +267,9 @@ final class SyncFolder {
             } catch (Exception notOurs) {
                 // Another household's, or sealed with a key this phone doesn't have (yet).
                 res.unread++;
+                // 0.9.3: which version couldn't be opened, so the quick look (ServerSync.anythingNew)
+                // doesn't take it for news every time. It's still tried every round.
+                if (ver != null) e.setMeta(p + "_bad:" + name, ver);
                 continue;
             }
             if (ver != null) e.setMeta(verKey, ver);
@@ -331,10 +337,36 @@ final class SyncFolder {
         e.setMeta("server_photorefs:" + device, b.length() == 0 ? null : b.toString());
     }
 
+    /** 0.9.3: this phone's settings summary, on a server only (null elsewhere, or if it can't be made). */
+    JSONObject summary() {
+        if (!server()) return null;
+        try {
+            return PhoneSummary.of(e);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    /**
+     * What this phone's own file was written from: its newest change, the key version, the tabs, cards
+     * and receipts, and (0.9.3, on a server) its settings summary. A different mark: write it again.
+     */
+    String ownMark(JSONObject summary) throws Exception {
+        List<JSONObject> top = e.db.query("SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log");
+        String mark = top.get(0).optLong("top", 0) + "/" + keyv() + "/" + String.join(",", e.tabs()) + "/" + e.shareCards() + "/" + e.shareReceipts();
+        return summary == null ? mark : mark + "/" + hash(summary.toString().getBytes(StandardCharsets.UTF_8)).substring(0, 12);
+    }
+
+    /** 0.9.3: whether this phone's own file is as it would write it now (so a quick look can skip a round). */
+    boolean ownUpToDate(List<String> names) throws Exception {
+        return names.contains(fileFor(e.device())) && ownMark(summary()).equals(e.meta(p + "_top"));
+    }
+
     /** This phone's own file, when something changed since it was last written. */
     private void writeOwn(Folder f, List<String> names, String me, String now, Result res) throws Exception {
         List<JSONObject> top = e.db.query("SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log");
-        String mark = top.get(0).optLong("top", 0) + "/" + keyv() + "/" + String.join(",", e.tabs()) + "/" + e.shareCards() + "/" + e.shareReceipts();
+        JSONObject summary = summary();
+        String mark = ownMark(summary);
         if (!mark.equals(e.meta(p + "_top")) || !names.contains(fileFor(me))) {
             // Everything but prices (0.9.2: a server takes recent prices too); deletes older than half
             // a year are left out to keep it small.
@@ -366,6 +398,8 @@ final class SyncFolder {
             out.put("entries", c.getJSONArray("entries"));
             // 0.9.2: on a server, the receipt photos this phone moved there ({ path: sha256 }).
             if (server()) out.put("photos", ServerOffload.photosMap(e));
+            // 0.9.3: on a server, this phone's own settings for the web app (PhoneSummary).
+            if (summary != null) out.put("summary", summary);
             f.write(fileFor(me), seal(fileKey(h.key()), out));
             e.setMeta(p + "_top", mark);
             res.wrote = true;

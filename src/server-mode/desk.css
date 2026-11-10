@@ -1,0 +1,1125 @@
+/* 0.9.3 server mode at desktop widths (ui/Desktop.tsx, from 1000 px): a navy sidebar and wide pages.
+   Only the web app on a Restock server ever loads this. Colours are the app's own tokens
+   (ui/styles.css), so light, dark and true black all work. */
+
+html.server-mode.server-desk body {
+  background: var(--bg);
+}
+html.server-mode .app.dk {
+  max-width: none;
+  margin: 0;
+  display: grid;
+  grid-template-columns: clamp(232px, 18vw, 264px) minmax(0, 1fr);
+  flex-direction: row;
+  box-shadow: none;
+  background: var(--bg);
+}
+
+.dk :focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.dk .dk-nav :focus-visible {
+  outline-color: var(--gold);
+}
+.dk-main:focus {
+  outline: none;
+}
+.dk-skip {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 50;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+}
+.dk-skip:focus {
+  left: 12px;
+}
+
+/* ---------- the sidebar ---------- */
+
+.dk-nav {
+  background: var(--navy);
+  color: #fff;
+  padding: 24px 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+  border-right: 3px solid var(--gold);
+}
+.dk-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px 20px;
+  min-width: 0;
+}
+.dk-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--gold);
+  color: #012169;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.dk-brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dk-brand-text strong {
+  font-size: 18px;
+}
+.dk-brand-text span {
+  font-size: 13px;
+  color: #c3cde8;
+}
+.dk-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 0;
+  background: transparent;
+  color: #e3e8f5;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  width: 100%;
+}
+.dk-nav-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.dk-nav-item[aria-current='page'] {
+  background: var(--navy-2);
+  color: var(--gold);
+  font-weight: 700;
+}
+.dk-nav-label {
+  flex: 1;
+  min-width: 0;
+}
+.dk-count {
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--gold);
+  color: #012169;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.dk-nav-rule {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 12px 8px;
+}
+.dk-nav-foot {
+  margin-top: auto;
+  padding-top: 12px;
+}
+.dk-sync {
+  width: 100%;
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 0;
+  background: var(--navy-2);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  font-size: 13px;
+}
+.dk-sync:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.dk-sync-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.dk-sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: #4fca8a;
+  flex-shrink: 0;
+}
+.dk-sync.trouble .dk-sync-dot {
+  background: var(--gold);
+}
+.dk-sync-dot.busy {
+  animation: strip-pulse 1s ease-in-out infinite alternate;
+}
+.dk-sync-sub {
+  color: #c3cde8;
+}
+
+/* ---------- pages ---------- */
+
+.dk-main {
+  min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+  position: relative;
+}
+.dk-page {
+  box-sizing: border-box;
+  max-width: 1440px;
+  padding: 28px clamp(16px, 3vw, 40px) 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.dk-page.dk-narrow {
+  max-width: 1080px;
+}
+.dk-page h2,
+.dk-page h3 {
+  margin: 0;
+}
+.dk-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.dk-head h1 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  flex-grow: 1;
+}
+.dk-head-sub,
+.dk-date {
+  font-size: 16px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.dk-tight {
+  margin-top: -8px;
+}
+.dk-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.dk-self-start {
+  align-self: flex-start;
+}
+.dk-sub {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.dk-sub-inline {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.dk-muted {
+  color: var(--muted);
+}
+.dk-good {
+  color: var(--green-ink);
+}
+.dk-warn {
+  color: var(--amber-ink);
+}
+.dk-down {
+  color: var(--green);
+}
+.dk-was {
+  font-size: 13px;
+  color: var(--muted);
+}
+.dk-gap {
+  margin-left: 6px;
+}
+.dk-linkish {
+  border: 0;
+  background: none;
+  padding: 4px 2px;
+  min-height: 32px;
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 600;
+}
+.dk-linkish:hover {
+  text-decoration: underline;
+}
+.dk-name {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dk-name:hover {
+  text-decoration: underline;
+}
+.dk-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.dk-section-head > h2,
+.dk-section-head > h3 {
+  flex-grow: 1;
+}
+.dk-page .card > h2,
+.dk-section-head > h2 {
+  font-size: 18px;
+}
+.dk-wide > .dk-section-head > h2 {
+  font-size: 20px;
+}
+.dk-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+}
+.dk-wide {
+  flex: 3 1 520px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dk-aside {
+  flex: 1 1 300px;
+  max-width: 420px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.dk-aside > h2 {
+  font-size: 18px;
+}
+.dk-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.dk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dk-actions,
+.dk-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+/* A switch of two or three, as on the concepts: a sand track, the one picked white and outlined. */
+.dk-seg {
+  display: inline-flex;
+  background: var(--seg);
+  border-radius: 22px;
+  padding: 4px;
+  gap: 2px;
+}
+.dk-seg button {
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dk-seg button[aria-pressed='true'],
+.dk-seg button[aria-selected='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow:
+    inset 0 0 0 1.5px var(--green),
+    0 1px 2px var(--shadow);
+}
+.dk-seg.big {
+  border-radius: 24px;
+}
+.dk-seg.big button {
+  min-height: 40px;
+  padding: 0 22px;
+  font-size: 15px;
+  border-radius: 20px;
+}
+.dk-pill {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--green-solid);
+  color: var(--on-accent);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------- Home ---------- */
+
+.dk-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.dk-tile {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  min-width: 0;
+}
+button.dk-tile:hover {
+  border-color: var(--line-2);
+  box-shadow: 0 2px 10px var(--shadow);
+}
+.dk-tile-lab,
+.dk-tile-sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+.dk-tile-big {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.dk-tile.navy {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+.dk-tile.navy .dk-tile-lab,
+.dk-tile.navy .dk-tile-sub {
+  color: #c3cde8;
+}
+.dk-tile.navy .dk-tile-big {
+  color: var(--gold);
+}
+.dk-tile.good {
+  background: var(--green-bg);
+  border-color: var(--green-bg);
+}
+.dk-tile.good,
+.dk-tile.good .dk-tile-lab,
+.dk-tile.good .dk-tile-sub {
+  color: var(--green-ink);
+}
+.dk-tile.bad {
+  background: var(--red-bg);
+  border-color: var(--red-bg);
+}
+.dk-tile.bad,
+.dk-tile.bad .dk-tile-lab,
+.dk-tile.bad .dk-tile-sub {
+  color: var(--red-ink);
+}
+.dk-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  font-size: 15px;
+}
+.dk-check input,
+.dk-line input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--green-solid);
+  flex-shrink: 0;
+}
+.dk-check .grow {
+  flex: 1;
+  min-width: 0;
+}
+.dk-check.done .grow {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.dk-drop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 15px;
+}
+.dk-drop .dk-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+
+/* ---------- tables ---------- */
+
+.dk-table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow-x: auto;
+}
+.dk-table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+.dk-table th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 14px 12px;
+}
+.dk-table td {
+  padding: 12px;
+  vertical-align: middle;
+  border-top: 1px solid var(--line-soft);
+}
+.dk-table th:first-child,
+.dk-table td:first-child {
+  padding-left: 20px;
+}
+.dk-table th:last-child,
+.dk-table td:last-child {
+  padding-right: 20px;
+}
+.dk-table td:first-child {
+  max-width: 320px;
+}
+.dk-table td .dk-sub {
+  max-width: 260px;
+}
+.dk-nowrap {
+  white-space: nowrap;
+}
+.dk-end {
+  text-align: right;
+  white-space: nowrap;
+}
+.dk-pick tbody tr {
+  cursor: pointer;
+}
+.dk-pick {
+  min-width: 560px;
+}
+.dk-tags {
+  min-width: 120px;
+}
+/* With an item open beside it, the table leaves out what the panel shows (its usual price and alert). */
+@media (max-width: 1699px) {
+  .dk-with-panel.has-panel .dk-extra {
+    display: none;
+  }
+  .dk-with-panel.has-panel .dk-pick {
+    min-width: 440px;
+  }
+}
+.dk-tags .tag {
+  margin: 2px 4px 2px 0;
+}
+.dk-pick tbody tr:hover {
+  background: var(--bg);
+}
+.dk-pick tbody tr.on {
+  background: var(--green-bg);
+  box-shadow: inset 4px 0 0 var(--green);
+}
+.dk-table .btn.small {
+  white-space: nowrap;
+}
+.btn.dk-add {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+/* ---------- the add box ---------- */
+
+.dk-addbox {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dk-addbox.compact {
+  flex: 0 1 460px;
+  min-width: 260px;
+}
+.dk-addform {
+  display: flex;
+  gap: 10px;
+}
+.dk-addform .input {
+  height: 48px;
+  border-radius: 24px;
+  padding: 0 20px;
+  font-size: 16px;
+}
+.dk-addform .btn {
+  height: 48px;
+  border-radius: 24px;
+  padding: 0 22px;
+}
+.dk-addbox.compact .dk-addform .input,
+.dk-addbox.compact .dk-addform .btn {
+  height: 44px;
+}
+.dk-addbox.compact .dk-matches {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  box-shadow: 0 8px 28px var(--shadow);
+}
+.dk-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 300px;
+  min-width: 200px;
+  color: var(--muted);
+}
+.dk-search svg {
+  position: absolute;
+  left: 14px;
+}
+.dk-search .input {
+  height: 44px;
+  border-radius: 22px;
+  padding-left: 40px;
+  font-size: 15px;
+  color: var(--ink);
+}
+.dk-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dk-sort .input {
+  width: auto;
+  height: 38px;
+  font-size: 14px;
+}
+
+/* ---------- Pantry's side panel ---------- */
+
+.dk-with-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+}
+.dk-panel {
+  flex: 0 1 420px;
+  min-width: 0;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.dk-panel-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.dk-panel-head .grow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dk-panel-head h2 {
+  font-size: 22px;
+}
+.dk-panel-head h2:focus {
+  outline: none;
+}
+.dk-panel-part {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dk-panel-part h3 {
+  font-size: 15px;
+}
+.dk-verdict {
+  padding: 12px 14px;
+  gap: 2px;
+}
+.small-ink {
+  font-size: 13px;
+}
+.dk-around {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dk-around-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+.dk-around-row.best {
+  background: var(--green-bg);
+}
+.dk-around-row .grow {
+  flex: 1;
+  min-width: 0;
+}
+.dk-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: 15px;
+}
+.dk-form-row select.input {
+  width: auto;
+  height: 40px;
+  font-size: 15px;
+}
+.dk-money {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.dk-money .input {
+  width: 110px;
+  height: 40px;
+  font-size: 15px;
+}
+.dk-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.dk-panel-actions .btn {
+  height: 44px;
+  border-radius: 22px;
+}
+
+/* ---------- the shopping list ---------- */
+
+.dk-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.dk-cols.one {
+  grid-template-columns: minmax(0, 760px);
+}
+.dk-col.any {
+  border-style: dashed;
+  border-color: var(--dash);
+}
+.dk-col-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.dk-col-head h2 {
+  flex-grow: 1;
+  font-size: 18px;
+}
+.dk-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+.dk-col-head + .dk-line {
+  border-top: 0;
+  padding-top: 0;
+}
+.dk-line input[type='checkbox'] {
+  margin: 1px 0 0;
+}
+.dk-line .grow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dk-line .stepper {
+  margin-top: 4px;
+  align-self: flex-start;
+}
+.dk-line-title {
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.dk-line.done .dk-line-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.dk-more {
+  width: 36px;
+  height: 36px;
+}
+.dk-done-lines {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  column-gap: 20px;
+  row-gap: 10px;
+}
+.dk-done-lines .dk-line {
+  border-top: 0;
+  padding-top: 0;
+}
+.dk-ha {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.dk-ha > span {
+  flex: 1 1 260px;
+}
+.btn.dk-ink {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+}
+.dk-compare {
+  max-width: 760px;
+}
+
+/* ---------- Household and phones ---------- */
+
+.dk-card-title {
+  padding: 18px 20px 8px;
+}
+.dk-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  margin: 0;
+  border-top: 1px solid var(--line-soft);
+}
+.dk-row .grow {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.dk-row-title {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dk-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+.dk-badge.blue {
+  background: var(--blue-bg);
+  color: var(--blue-ink);
+}
+.dk-badge.green {
+  background: var(--green-bg);
+  color: var(--green-ink);
+}
+.dk-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.dk-stats > div {
+  background: var(--bg);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.dk-stat {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+}
+.dk-activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+}
+.dk-activity li {
+  display: flex;
+  gap: 12px;
+}
+.dk-activity time {
+  width: 72px;
+  flex-shrink: 0;
+}
+.dk-locked {
+  background: var(--sunken);
+  border: 1px dashed var(--dash);
+  border-radius: 18px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--muted);
+}
+.dk-locked .small {
+  color: var(--muted);
+}
+.dk-locked-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-2);
+}
+.dk-cardrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.dk-minicard {
+  flex: 1 1 140px;
+  min-height: 64px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: var(--line);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* ---------- Settings ---------- */
+
+.dk-eyebrow {
+  margin: 8px 0 -8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dk-set-card {
+  gap: 0;
+}
+.dk-set {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  margin: 0;
+}
+.dk-set + .dk-set {
+  border-top: 1px solid var(--line-soft);
+}
+.dk-set > .grow {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dk-line-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.dk-set.greyed {
+  background: var(--sunken);
+}
+.dk-set.greyed .dk-line-name {
+  color: var(--ink-2);
+}
+.dk-where {
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  border: 1px dashed var(--dash);
+  background: var(--surface);
+  color: var(--muted);
+}
+select.input.dk-select {
+  width: auto;
+  min-width: 140px;
+  height: 40px;
+  font-size: 15px;
+}
+.dk-set-form {
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 480px;
+}
+.dk-phone-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.dk-phone-pick button {
+  min-height: 56px;
+  padding: 8px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dk-phone-pick button[aria-pressed='true'] {
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+.dk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+.dk-phone-card h3 {
+  font-size: 17px;
+}
+.dk-phone-card dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dk-dl-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+}
+.dk-dl-row dt {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.dk-dl-row dd {
+  margin: 0;
+  text-align: right;
+}
+.dk-phone-card .dk-where {
+  align-self: flex-start;
+  background: var(--bg);
+}
+.dk-lost {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.dk-lost .grow {
+  flex: 1 1 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ---------- a phone screen inside the desktop frame (Specials, Receipts, an item, …) ---------- */
+
+.dk-phone-page {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.dk-phone-page > .screen {
+  overflow: visible;
+  padding: 28px 24px 56px;
+}
+
+/* ---------- sheets and the toast: a dialog in the middle, not a sheet from the bottom ---------- */
+
+html.server-desk #layers {
+  max-width: none;
+}
+html.server-desk .sheet-back {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+html.server-desk .sheet {
+  width: min(560px, 100%);
+  max-height: 86vh;
+  border-radius: 20px;
+  padding-bottom: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+}
+html.server-desk .toast {
+  left: auto;
+  right: 24px;
+  bottom: 24px;
+  width: min(440px, calc(100% - 48px));
+}
+html.server-desk .toast:hover {
+  filter: brightness(1.08);
+}
+
+.dk-fieldset {
+  margin: 0;
+  min-width: 0;
+}
+.dk-fieldset:disabled {
+  opacity: 0.6;
+}

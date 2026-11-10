@@ -44,6 +44,13 @@ import org.json.JSONObject;
  * - Each phone notes how far the others have got through its own changes (sync_peers.seen), and
  *   compact() removes deletes older than 90 days that every phone in the household has seen.
  *
+ * 0.9.3:
+ * - Household-wide settings (household_settings, SharedSettings): which shops each shared tab uses,
+ *   Shop around, alert level, recalls and so on, one row per setting, the later change winning per
+ *   row, from any phone in the household or the web app. Applied to this phone's settings as they
+ *   arrive (only for the tabs it syncs); the owner phone seeds them once from its own settings.
+ *   A phone on 0.9.2 or older passes over the table (it isn't in its TABLES).
+ *
  * No Android classes here, so the same code is tested on a computer (tools/sync-test).
  */
 final class SyncEngine {
@@ -174,6 +181,8 @@ final class SyncEngine {
         { "household", "k" },
         // 0.9.1: receipts, when the household shares them.
         { "receipts", "id" },
+        // 0.9.3: household-wide settings (SharedSettings).
+        { "household_settings", "k" },
     };
 
     static final int PAGE = 400;
@@ -340,6 +349,12 @@ final class SyncEngine {
      * 0.9.1: true when it did that.
      */
     boolean noteTabs() throws Exception {
+        // 0.9.3: on the owner phone, the household settings that have no row yet (once each).
+        try {
+            SharedSettings.seed(this);
+        } catch (Exception ex) {
+            // next time
+        }
         Set<String> now = tabs();
         String was = meta("tabs_eff");
         Set<String> before = was == null ? null : parseTabs(was);
@@ -358,13 +373,22 @@ final class SyncEngine {
             });
         }
         String j = joinTabs(now);
-        if (!j.equals(was)) setMeta("tabs_eff", j);
+        if (!j.equals(was)) {
+            setMeta("tabs_eff", j);
+            // 0.9.3: syncing another tab (or one fewer): its household settings apply from now.
+            SharedSettings.applyTo(this);
+        }
         String r = receipts ? "1" : "0";
         if (!r.equals(rwas)) setMeta("receipts_eff", r);
         return again;
     }
 
     private Map<String, String> customTabs;
+
+    /** 0.9.3: the settings' own shops changed (household settings): look them up again. */
+    void forgetCustomTabs() {
+        customTabs = null;
+    }
 
     /** Which tab a shop is on: built-in shops from Shops, the ones people added from settings. */
     String chainTab(String chain) throws Exception {
@@ -421,6 +445,8 @@ final class SyncEngine {
                 List<JSONObject> r = db.query("SELECT chain FROM products WHERE id = ?", str(row, "product_id"));
                 return r.isEmpty() ? null : chainTab(str(r.get(0), "chain"));
             }
+            case "household_settings":
+                return SharedSettings.tabOf(str(row, "k"), str(row, "v"));
             default:
                 return null;
         }
@@ -526,7 +552,8 @@ final class SyncEngine {
                 String tab = tabOf(tbl, data);
                 if (tab != null && !allowed.contains(tab)) {
                     // A tab this pair doesn't share.
-                    if (!moves || "prices".equals(tbl)) continue;
+                    // 0.9.3: a household setting of a tab this pair doesn't share is left out, never sent as moved.
+                    if (!moves || "prices".equals(tbl) || SharedSettings.TABLE.equals(tbl)) continue;
                     e.put("deleted", true);
                     e.put("moved", true);
                     entries.put(e);
@@ -554,7 +581,7 @@ final class SyncEngine {
     }
 
     /** Notes a change in sync_log as taken in (or made) here: `seq` is this phone's next number. */
-    private void logEntry(String tbl, String pk, long stamp, String device, boolean deleted, String sig, long created) throws Exception {
+    void logEntry(String tbl, String pk, long stamp, String device, boolean deleted, String sig, long created) throws Exception {
         db.exec(
             "INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq, sig, created) VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log), ?, ?)",
             tbl, pk, stamp, device, deleted ? 1L : 0L, sig, created);
@@ -572,6 +599,11 @@ final class SyncEngine {
         final boolean receipts = shareReceipts();
         // 0.9.1: receipt photos on this phone that a change made unused (a receipt deleted on another phone).
         final List<String> unused = new ArrayList<>();
+        // 0.9.3: household settings came in (applied to the settings after), and whether this phone
+        // has their table yet (updated, not opened since: they come again once it has).
+        final boolean[] settings = { false };
+        final boolean hasSettings = SharedSettings.hasTable(this);
+        final SharedSettings.Room room = new SharedSettings.Room(this);
         db.transaction(() -> {
             // While this is set, the triggers don't note these as this phone's own changes.
             db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
@@ -588,6 +620,9 @@ final class SyncEngine {
                 boolean deleted = e.optBoolean("deleted", false);
                 if ("household".equals(tbl) && !householdChangeAllowed(pk, device, e)) continue;
                 if ("receipts".equals(tbl) && !receipts) continue;
+                if (SharedSettings.TABLE.equals(tbl) && !hasSettings) continue;
+                // 0.9.3: household settings only of a sensible size and shape, and not without end.
+                if (SharedSettings.TABLE.equals(tbl) && !SharedSettings.acceptable(room, pk, deleted ? null : e.optJSONObject("row"), deleted)) continue;
                 // A phone whose date is far ahead: take its change, but don't let it drag this
                 // phone's clock along (and say so on the Sync screen).
                 if (stamp > now + CLOCK_SLACK_MS) setMeta("clock_warn", device);
@@ -608,6 +643,7 @@ final class SyncEngine {
                 }
                 if (!wins) continue;
                 if (deleted && e.optBoolean("moved", false)) {
+                    if (SharedSettings.TABLE.equals(tbl)) continue;
                     // Moved to a tab the other phone doesn't share: goes only if it's on one this phone shares.
                     List<JSONObject> cur = db.query("SELECT * FROM " + tbl + " WHERE " + key + " = ?", pk);
                     if (cur.isEmpty()) continue;
@@ -633,6 +669,7 @@ final class SyncEngine {
                     writeRow(tbl, row, columnsOf(tbl, columns));
                 }
                 logEntry(tbl, pk, stamp, device, deleted, e.isNull("sig") ? null : e.optString("sig", null), created);
+                if (SharedSettings.TABLE.equals(tbl)) settings[0] = true;
                 changed[0]++;
             }
             // This phone's next changes are stamped after anything it has seen (clocks differ), but
@@ -642,6 +679,8 @@ final class SyncEngine {
             long cur = was == null ? 0 : Long.parseLong(was);
             if (cur > now + CLOCK_SLACK_MS) cur = 0;
             setMeta("clock", String.valueOf(Math.min(Math.max(clock, cur), now + CLOCK_SLACK_MS)));
+            // 0.9.3: household settings that came in change this phone's settings (the screens refresh).
+            if (settings[0]) SharedSettings.applyTo(this);
             db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
         });
         for (String p : unused) {
@@ -905,13 +944,15 @@ final class SyncEngine {
             for (String id : goneProducts) db.exec("DELETE FROM products WHERE id = ?", id);
             db.exec("DELETE FROM prices WHERE product_id NOT IN (SELECT id FROM products)");
             db.exec("DELETE FROM household");
+            // 0.9.3: and the household's settings (the new household's come with the first sync).
+            if (SharedSettings.hasTable(this)) db.exec("DELETE FROM " + SharedSettings.TABLE);
             db.exec("DELETE FROM sync_log");
             db.exec("DELETE FROM sync_peers");
             // What's left counts as this phone's own, changed now, so it can still be shared later.
             long now = System.currentTimeMillis();
             String me = device();
             for (String[] t : TABLES) {
-                if ("household".equals(t[0])) continue;
+                if ("household".equals(t[0]) || SharedSettings.TABLE.equals(t[0])) continue;
                 db.exec("INSERT OR IGNORE INTO sync_log (tbl, pk, stamp, device, deleted, seq) SELECT ?, " + t[1]
                     + ", ?, ?, 0, (SELECT COALESCE(MAX(seq), 0) FROM sync_log) + rowid FROM " + t[0], t[0], now, me);
             }

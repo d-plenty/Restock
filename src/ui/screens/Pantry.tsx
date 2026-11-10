@@ -22,7 +22,7 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'recent', label: 'Recently added' },
 ];
 // Deals first: the order Home uses, best saving at the top.
-const DEAL_RANK: Record<string, number> = { buy: 0, alt: 1, small: 2, wait: 3, skip: 4, none: 5 };
+export const DEAL_RANK: Record<string, number> = { buy: 0, alt: 1, small: 2, wait: 3, skip: 4, none: 5 };
 
 function loadSort(): Sort {
   try {
@@ -58,7 +58,7 @@ const EMPTY: Record<Section, string> = {
 const SEARCH_HINT: Record<Section, string> = { pantry: 'Search your pantry', keg: 'Search your keg', pharmacy: 'Search your pharmacy items' };
 
 /** At or under the item's "alert me under $X" price at its cheapest shop. */
-const underTarget = (r: Recommendation) =>
+export const underTarget = (r: Recommendation) =>
   r.group.targetPrice !== undefined && r.best?.price !== undefined && r.best.price <= r.group.targetPrice + 0.004 && !r.best.verdict.stale;
 
 /** The Pantry, Keg or Pharmacy tab: the things you buy from that kind of shop. */

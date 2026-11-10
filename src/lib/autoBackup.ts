@@ -10,7 +10,7 @@ import type { Settings } from '../types';
 // "every few days", so this keeps it simple and always makes exactly the same file as Export.
 
 export const BACKUP_EVERY = [1, 3, 7, 14, 30];
-export const BACKUP_KEEP = [3, 5, 10, 20];
+export const BACKUP_KEEP = [3, 4, 5, 10, 20]; // 0.9.3: 4, for "weekly, kept for 4 weeks"
 export const everyLabel = (d: number) =>
   d === 1 ? 'Every day' : d === 7 ? 'Every week' : d === 14 ? 'Every fortnight' : d === 30 ? 'Every month' : `Every ${d} days`;
 

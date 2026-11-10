@@ -179,6 +179,23 @@ const SYNC_091: string[] = [
   ),
 ];
 
+/**
+ * 0.9.3: household-wide settings (src/lib/sharedSettings.ts): one row per setting, key/value like
+ * the household table, but any phone in the household (or the web app) may change one, and the
+ * later change wins per row. SyncEngine (and the web's engine) apply them to the settings.
+ * A phone that was on 0.9.2 or older passed over other phones' household settings (an unknown
+ * table): it reads everything again once, so they come across.
+ */
+export const HOUSEHOLD_SETTINGS_SYNCED = { table: 'household_settings', key: 'k', deletes: true };
+/** Every synced table from 0.9.3 on. Mirrored in SyncEngine.java's TABLES. */
+export const SYNCED_093 = [...SYNCED_091, HOUSEHOLD_SETTINGS_SYNCED];
+const SYNC_093: string[] = [
+  `CREATE TABLE household_settings (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
+  ...syncTriggers090(HOUSEHOLD_SETTINGS_SYNCED),
+  'UPDATE sync_peers SET got = 0',
+  "DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%'",
+];
+
 /** 0.8.9: "Any size" and "Not at this shop" (picks.ts); the move to My picks is in DATA_STEPS. */
 const PICKS_089 = ['ALTER TABLE items ADD COLUMN any_size INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE items ADD COLUMN not_at TEXT'];
 
@@ -330,6 +347,8 @@ export const MIGRATIONS: string[][] = [
   SYNC_090,
   // 0.9.1: receipts sync (when the household shares them), and tidying old deletes.
   SYNC_091,
+  // 0.9.3: household-wide settings.
+  SYNC_093,
 ];
 
 /**
