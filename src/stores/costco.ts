@@ -40,7 +40,7 @@ const NAME = 'Costco';
 /** The cookie jar Costco's pages are asked with: its own, apart from the in-app browser's (no sign-in, no shared cookies). */
 const JAR = 'costco';
 /** At most this many results from a page. */
-const MAX_RESULTS = 40;
+const MAX_RESULTS = 48;
 /** The longest search words taken. */
 const MAX_TERM = 80;
 
@@ -49,8 +49,8 @@ export const costcoSearchUrl = (term: string) => `${SITE}/search?text=${encodeUR
  * 0.9.7: the product search Costco's own website uses (SAP Commerce, "australia" site). Not yet seen
  * from a real phone: if it isn't there, the search page above is read instead.
  */
-export const costcoApiUrl = (term: string) =>
-  `${SITE}/rest/v2/australia/products/search?query=${encodeURIComponent(term)}&fields=FULL&pageSize=24&lang=en_AU&curr=AUD`;
+export const costcoApiUrl = (term: string, page = 1) =>
+  `${SITE}/rest/v2/australia/products/search?query=${encodeURIComponent(term)}&fields=FULL&pageSize=48&currentPage=${Math.max(0, page - 1)}&lang=en_AU&curr=AUD`;
 
 // ---------- being gentle ----------
 
@@ -706,7 +706,8 @@ export function parseCostcoApi(text: string, state?: string): StoreProduct[] | u
 export function makeCostco(deps: Deps): StoreAdapter {
   return {
     chain: 'costco',
-    async search(term: string): Promise<StoreProduct[]> {
+    pages: true, // 0.9.8: "Get more from Costco"
+    async search(term: string, _storeId?: string, page = 1): Promise<StoreProduct[]> {
       // Only when someone presses Search (the caller makes sure). On a phone it asks from inside
       // Costco's own page (cookies, sign-in); on the server, a plain request.
       const q = term.trim().replace(/\s+/g, ' ').slice(0, MAX_TERM);
@@ -724,7 +725,7 @@ export function makeCostco(deps: Deps): StoreAdapter {
       };
       await deps.gate.turn();
       // 1. Costco's own product search (what its website asks for).
-      const api = await get(costcoApiUrl(q), 'application/json');
+      const api = await get(costcoApiUrl(q, page), 'application/json');
       if (api.status === 403 || api.status === 429) {
         deps.gate.block();
         throw new CostcoBlockedError(`HTTP ${api.status}`);
@@ -733,7 +734,8 @@ export function makeCostco(deps: Deps): StoreAdapter {
         const items = parseCostcoApi(api.text, state);
         if (items) return items;
       }
-      // 2. The search page itself.
+      // 2. The search page itself (first page only).
+      if (page > 1) return [];
       const res = await get(costcoSearchUrl(q), 'text/html,application/xhtml+xml');
       try {
         checkReply(res);

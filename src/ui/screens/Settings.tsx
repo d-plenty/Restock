@@ -253,12 +253,12 @@ export function SettingsScreen() {
       </div>
       <div className="card flush">
         {row('Setup', `${TILES.filter((t) => tileStatus(settings, t.id, syncShown).ok).length} of ${TILES.length} done`, () => nav.push({ name: 'setup' }))}
-        {row('Supermarkets', shopSummary(settings, 'pantry'), () => nav.push({ name: 'stores', section: 'pantry' }))}
-        {row('Shop accounts and stock', shopAccountsSummary(settings), () => nav.push({ name: 'stores', section: 'pantry' }))}
+        {/* 0.9.8: one row per tab of My shops; sign-ins and stock are on each shop's own row there. */}
+        {row('Supermarkets', `${shopSummary(settings, 'pantry')} · ${shopAccountsSummary(settings)}`, () => nav.push({ name: 'stores', section: 'pantry' }))}
         {row('Bottle shops (Keg tab)', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
         {row('Chemists (Health tab)', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
         {row('Cards', cardCount ? `${cardCount} added` : 'Loyalty and gift cards', () => nav.push({ name: 'cards' }))}
-        {row('Catalogues', 'This week at Coles, Woolworths and Aldi', () => nav.push({ name: 'catalogues' }))}
+        {row('Catalogues', 'This week at your supermarkets', () => nav.push({ name: 'catalogues' }))}
       </div>
 
       {/* 0.9.1: sync and backups in one place. Sync keeps phones the same; backups are how you go back. */}
@@ -321,6 +321,15 @@ export function SettingsScreen() {
             <span className="small">Your pantry, shopping list and price history, for Excel, Google Sheets, LibreOffice or Numbers.</span>
           </span>
         </button>
+        {/* 0.9.8: what only the server's web page does is shown here too, greyed, saying where. */}
+        {!serverMode && (
+          <div className="row" aria-disabled="true" style={{ opacity: 0.55 }}>
+            <span className="grow">
+              <span className="title">Import data</span>
+              <span className="small">On your Restock server's web page (Data tab): adds products and prices from a file.</span>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 0.9.3: the shopping list with Home Assistant, from this phone. Phones only. */}
@@ -879,7 +888,6 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
   );
 }
 
-/** A short line for "Shop accounts and stock": who you're signed in to and your Coles store. */
 /** Background price checks: on or off, how often, which day (Settings, and the setup tile, 0.8.0). */
 export function PriceCheckSettings({ settings }: { settings: Settings }) {
   const setChecks = async (patch: { hours?: number; on?: boolean; weekday?: number; time?: string }) => {
@@ -1072,13 +1080,9 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
 }
 
 function shopAccountsSummary(settings: Settings): string {
-  const w = settings.accounts?.woolworths;
-  const coles = settings.stores?.coles;
-  const parts = [
-    w?.signedIn ? `Woolworths: ${w.storeName ?? 'signed in'}` : 'Woolworths: online prices',
-    settings.localPrices && coles?.branchStoreNo ? `Coles: branch ${coles.branchStoreNo}` : 'Coles: online prices',
-  ];
-  return parts.join(' · ');
+  // 0.9.8: only the shops you're signed in to, so the line stays short.
+  const on = (['woolworths', 'coles', 'costco'] as const).filter((c) => settings.enabledChains.includes(c) && settings.accounts?.[c]?.signedIn);
+  return on.length ? `Signed in to ${on.map((c) => ({ woolworths: 'Woolworths', coles: 'Coles', costco: 'Costco' })[c]).join(', ')}` : 'Not signed in to any shop';
 }
 
 /** A settings card that folds away until you open it (0.7.3), so the page isn't a wall of options. */

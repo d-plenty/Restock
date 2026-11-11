@@ -786,14 +786,20 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
             const on = settings.enabledChains.includes(chain);
             const st = storeChoice(settings, chain);
             return (
-              <label key={chain} className="check">
-                <input type="checkbox" checked={on} onChange={(e) => void setShop(chain, e.target.checked)} aria-label={`Use ${chainName(chain)}`} />
-                <ChainDot chain={chain} />
-                <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <span>{chainName(chain)}</span>
-                  {on && <span className="small">{branchText(st)}</span>}
-                </span>
-              </label>
+              <div key={chain}>
+                <label className="check">
+                  <input type="checkbox" checked={on} onChange={(e) => void setShop(chain, e.target.checked)} aria-label={`Use ${chainName(chain)}`} />
+                  <ChainDot chain={chain} />
+                  <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <span>{chainName(chain)}</span>
+                    {on && <span className="small">{branchText(st)}</span>}
+                  </span>
+                </label>
+                {/* 0.9.8: each shop's sign-in, branch number and pros and cons, right under its tick. */}
+                {on && chain === 'woolworths' && <WoolworthsAccount settings={settings} inline />}
+                {on && chain === 'coles' && <ColesStore settings={settings} inline />}
+                {on && chain === 'aldi' && <AldiAbout />}
+              </div>
             );
           })}
           <CostcoRow settings={settings} />
@@ -803,8 +809,6 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
         {/* Keyed by tab only: picking a shop or a branch must not throw away the list you're looking at. */}
         <NearbyFinder key="pantry" settings={settings} section="pantry" />
         <ManualNames settings={settings} section="pantry" />
-        <div className="eyebrow">3 · Check your shops</div>
-        <LocalPrices settings={settings} />
       </>
     );
   }
@@ -966,7 +970,9 @@ function AccountCard({
   ok,
   info,
   children,
+  inlineShop,
 }: {
+  inlineShop?: boolean;
   chain: 'woolworths' | 'coles';
   beta?: boolean;
   status: string;
@@ -975,6 +981,24 @@ function AccountCard({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  // 0.9.8: under the shop's own tick in the supermarket list: its status, "About <shop>", then its buttons.
+  if (inlineShop)
+    return (
+      <div className="shop-extra">
+        <span className="small" style={{ color: ok ? 'var(--green-ink)' : 'var(--ink-2)' }}>
+          {status}
+          {beta && <span className="tag normal" style={{ marginLeft: 6 }}>BETA</span>}
+        </span>
+        <details className="explain">
+          <summary>
+            <Icon name="info" size={18} />
+            <span>About {chainName(chain)}: signed in or not</span>
+          </summary>
+          <div className="explain-body">{info.body}</div>
+        </details>
+        {children}
+      </div>
+    );
   return (
     <div className="woolies-account">
       <div className="row" style={{ padding: 0, minHeight: 0, gap: 10 }}>
@@ -1006,7 +1030,7 @@ function AccountCard({
  * don't (online prices, no stock). You sign in on Woolworths' own page inside Restock, so your
  * password goes to Woolworths, never to Restock.
  */
-function WoolworthsAccount({ settings }: { settings: Settings }) {
+function WoolworthsAccount({ settings, inline }: { settings: Settings; inline?: boolean }) {
   const acct = settings.accounts?.woolworths;
   const [busy, setBusy] = useState<string>();
   const [note, setNote] = useState<{ ok: boolean; text: string }>();
@@ -1032,6 +1056,7 @@ function WoolworthsAccount({ settings }: { settings: Settings }) {
   const on = !!acct?.signedIn;
   return (
     <AccountCard
+      inlineShop={inline}
       chain="woolworths"
       ok={on && !!acct?.storeId}
       status={
@@ -1102,7 +1127,7 @@ function WoolworthsAccount({ settings }: { settings: Settings }) {
  * map fills it in too when it knows it, and typing it is a fallback. Signing in is only for
  * filling your Coles trolley, which Restock hasn't learned yet.
  */
-function ColesStore({ settings }: { settings: Settings }) {
+function ColesStore({ settings, inline }: { settings: Settings; inline?: boolean }) {
   const nav = useNav();
   const st = storeChoice(settings, 'coles');
   const on = !!(settings.localPrices && st.branchStoreNo);
@@ -1187,6 +1212,7 @@ function ColesStore({ settings }: { settings: Settings }) {
   const where = (name: string | undefined, no: string) => `${name ? cleanStoreName(name) : 'your branch'} (branch ${no})`;
   return (
     <AccountCard
+      inlineShop={inline}
       chain="coles"
       beta
       ok={on}
@@ -1313,30 +1339,25 @@ function ColesStore({ settings }: { settings: Settings }) {
  * does that for a signed-in shopper, and Aldi doesn't share stock, so those stay as their websites
  * show them.
  */
-function LocalPrices({ settings }: { settings: Settings }) {
-  const coles = settings.enabledChains.includes('coles');
-  const woolies = settings.enabledChains.includes('woolworths');
-  if (!coles && !woolies && !settings.enabledChains.includes('aldi')) return null;
+/** 0.9.8: Aldi under its tick, like the other shops: what works and what doesn't. */
+function AldiAbout() {
   return (
-    <div className="card">
-      <p className="small" style={{ margin: 0 }}>
-        Your own branch's prices and stock, where the shop allows it:
-      </p>
-      {woolies && <WoolworthsAccount settings={settings} />}
-      {coles && <ColesStore settings={settings} />}
-      {settings.enabledChains.includes('aldi') && (
-        <div className="woolies-account">
-          <div className="row" style={{ padding: 0, minHeight: 0, gap: 10 }}>
-            <ChainDot chain="aldi" />
-            <span className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span className="title" style={{ fontSize: 15 }}>
-                Aldi
-              </span>
-              <span className="small">One price for everyone. Aldi doesn't say what's in stock, so Restock doesn't show any.</span>
-            </span>
-          </div>
+    <div className="shop-extra">
+      <span className="small">One price for everyone. No sign-in.</span>
+      <details className="explain">
+        <summary>
+          <Icon name="info" size={18} />
+          <span>About Aldi</span>
+        </summary>
+        <div className="explain-body">
+          <p className="small">
+            <strong>Works:</strong> Aldi's prices are the same at every branch, so what Restock finds is what you'll pay. Special Buys show when Aldi lists them.
+          </p>
+          <p className="small">
+            <strong>Doesn't:</strong> Aldi doesn't say what's in stock, so Restock doesn't show any. There's no Aldi account to sign in to and no trolley to send your list to.
+          </p>
         </div>
-      )}
+      </details>
     </div>
   );
 }
@@ -1381,32 +1402,41 @@ export function CostcoRow({ settings }: { settings: Settings }) {
         </span>
       </label>
       {on && (
-        <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="shop-extra">
+          <span className="small">{signedIn ? 'Signed in · member prices' : 'Not signed in · online prices'}</span>
           <details className="explain">
             <summary>
               <Icon name="info" size={18} />
-              <span>About Costco prices</span>
+              <span>About Costco: signed in or not</span>
             </summary>
-            <div className="explain-body">{notice}</div>
+            <div className="explain-body">
+              <p className="small">
+                <strong>Signed in:</strong> your member prices, and member-only items show their price.
+              </p>
+              <p className="small">
+                <strong>Not signed in:</strong> Costco's public online prices. Member-only items show without a price.
+              </p>
+              <p className="small">You sign in on Costco's own page, so your password goes to Costco, not Restock.</p>
+              {notice}
+            </div>
           </details>
-          {isNative() &&
-            (signedIn ? (
-              <div className="row" style={{ gap: 10 }}>
-                <span className="small grow">Signed in to Costco: searches show your member prices.</span>
-                <button className="btn small" onClick={() => void stopUsingCostco()}>
-                  Stop using my account
+          {(signedIn ? (
+              <div className="chips" style={{ flexWrap: 'wrap' }}>
+                <button className="btn small ghost" onClick={() => void stopUsingCostco()}>
+                  Sign out
                 </button>
               </div>
             ) : (
               <button
-                className="btn small"
+                className="btn primary"
+                disabled={!isNative()}
                 onClick={() =>
                   void signInCostco(() =>
                     confirmAction('Did you sign in to Costco?', { detail: "Costco doesn't tell Restock, so just say if you did.", action: 'Yes, signed in' }),
                   ).catch(() => undefined)
                 }
               >
-                Sign in to Costco (optional)
+                {isNative() ? 'Sign in to Costco' : 'Sign in works in the Android app'}
               </button>
             ))}
         </div>

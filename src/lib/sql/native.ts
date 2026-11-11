@@ -83,7 +83,7 @@ export interface RestockNativePlugin {
   /** Check the official recall lists now (the same check as the daily one). */
   checkRecalls(): Promise<{ checked: number; found: number; fresh: number; errors: Record<string, string> }>;
   /** Show a notification right away (recalls found by "Check now", the weekly summary). */
-  notify(opts: { id: number; title: string; body: string }): Promise<void>;
+  notify(opts: { id: number; title: string; body: string; action?: string }): Promise<void>;
   /**
    * 0.7.3: download an official release APK and open Android's installer. 0.9.1: `sha256` (lowercase
    * hex, as GitHub published it) is checked against the download first; without it, only the

@@ -59,12 +59,10 @@ describe('Costco 0.9.7: the search', () => {
     expect((await a.search('milk')).length).toBe(3);
   });
 
-  it('is still asked only when Search is pressed: never by Check now, a scan, a follow-up or a connection test', () => {
+  it('0.9.8: searched in every search, but never by Check now, the background or a connection test', () => {
     expect(isPressOnlyShop('costco')).toBe(true);
     expect(isPressOnlyShop('coles')).toBe(false);
     expect(readFileSync('src/lib/check.ts', 'utf8')).toMatch(/!isPressOnlyShop\(p\.chain\) && isPageless/);
-    expect(readFileSync('src/ui/screens/Add.tsx', 'utf8')).toMatch(/filter\(\(c\) => pressed \|\| !isPressOnlyShop\(c\)\)/);
-    expect(readFileSync('src/ui/screens/Add.tsx', 'utf8')).toMatch(/isPressOnlyShop\(chain\) \? undefined : adapterFor/);
     expect(readFileSync('android/app/src/main/java/family/plenty/restock/PriceChecker.java', 'utf8')).toMatch(/"costco"\.equals\(chain\)\) continue/);
   });
 });

@@ -616,7 +616,7 @@ public class RestockNativePlugin extends Plugin {
     public void notify(PluginCall call) {
         java.util.List<String> lines = new java.util.ArrayList<>();
         lines.add(call.getString("body", ""));
-        PriceChecker.notify(getContext(), call.getString("title", "Restock"), lines, call.getInt("id", 4300));
+        PriceChecker.notify(getContext(), call.getString("title", "Restock"), lines, call.getInt("id", 4300), call.getString("action"));
         call.resolve();
     }
 

@@ -70,7 +70,7 @@ import {
   activeSections,
   costcoIsOn,
   enabledIn,
-  isLocalOnlyShop, isPressOnlyShop,
+  isLocalOnlyShop,
   SECTION_NAMES,
   SECTION_PLACE,
   SECTION_SHOPS,
@@ -397,7 +397,7 @@ export function AddScreen({
    * then is Costco asked too. Every other search (a scan, opening from an item, changing the tab, a
    * quick pick or a recent search) leaves Costco out, and "Search Costco" below asks it on a press.
    */
-  const search = async (q: string, rq: RankQuery, sec: Section = section, pressed = false) => {
+  const search = async (q: string, rq: RankQuery, sec: Section = section, _pressed = false) => {
     const s = settings ?? (await getSettings());
     const text = q.trim();
     if (!text) return;
@@ -421,7 +421,8 @@ export function AddScreen({
     setRecs({});
     setRecBusy([]);
     recFor.current = undefined;
-    const chains = chainsToSearch(s.enabledChains, sec).filter((c) => pressed || !isPressOnlyShop(c));
+    // 0.9.8: Costco is searched like the other shops whenever you search (Declan, 11 Nov). Never in the background.
+    const chains = chainsToSearch(s.enabledChains, sec);
     setSearched(chains);
     setResults(Object.fromEntries(chains.map((c) => [c, { status: 'loading' }])));
     await Promise.all(chains.map((chain) => searchChain(chain, text, rq, searchStoreId(s, chain))));
@@ -599,8 +600,8 @@ export function AddScreen({
 
   // 0.9.6 (review L1): Costco is on and this search left it out (it was not a Search press): a
   // button to ask Costco too, one page, only when pressed.
-  const costcoLeftOut =
-    !!settings && !!lastText && costcoIsOn() && !searched.includes('costco') && chainsToSearch(settings.enabledChains).includes('costco');
+  // 0.9.8: Costco is in every search now, so this button never shows (kept for a search made before).
+  const costcoLeftOut = !!settings && !!lastText && costcoIsOn() && !searched.includes('costco') && false;
   const searchCostcoToo = () => {
     if (!settings || !lastText || searched.includes('costco')) return;
     setSearched((s) => (s.includes('costco') ? s : [...s, 'costco']));
@@ -2256,7 +2257,8 @@ function Stocktake({ section, onClose }: { section: Section; onClose: () => void
  * suggestions, recommendations). Never Costco: it is only ever asked when the person presses Search, one request.
  */
 function followAdapter(chain: string) {
-  return isPressOnlyShop(chain) ? undefined : adapterFor(chain as StoreChain);
+  // 0.9.8: Costco too: each of these is something the person did on the screen.
+  return adapterFor(chain as StoreChain);
 }
 
 function storePreview(sp: StoreProduct): PreviewProduct {

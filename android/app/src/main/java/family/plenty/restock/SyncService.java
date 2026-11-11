@@ -47,6 +47,7 @@ public class SyncService extends Service {
         NotificationManager nm = getSystemService(NotificationManager.class);
         if (nm != null) nm.createNotificationChannel(new NotificationChannel(CHANNEL_ID, "Sync with your household", NotificationManager.IMPORTANCE_MIN));
         Intent open = getPackageManager().getLaunchIntentForPackage(getPackageName());
+        if (open != null) open.putExtra("restockAction", "sync"); // 0.9.8: opens Sync and backups
         PendingIntent tap = open == null ? null : PendingIntent.getActivity(this, 1, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification.Builder b = new Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_restock)

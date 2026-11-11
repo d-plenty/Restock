@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.9.7" src="https://img.shields.io/badge/status-release%20candidate%200.9.7-ffcd00">
+  <img alt="Release candidate 0.9.8" src="https://img.shields.io/badge/status-release%20candidate%200.9.8-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-097">New in 0.9.7</a> ·
+  <a href="#new-in-098">New in 0.9.8</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -89,7 +89,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **General list**: a fourth shopping list, with no pantry of its own. A Home Assistant add that matches nothing in your Pantry, Keg or Health goes there. You can add to it yourself too. Adding by hand to Groceries, Keg or Health works as before, even for words that match nothing (like "chips", to buy whatever's on special). Nothing else moves to General by itself. It's shared with the groceries.
 - **Bottle shops**: Dan Murphy's, BWS, Liquorland, Liquorland Warehouse, Liquorland Cellars, The Bottle-O, Cellarbrations, Thirsty Camel and Porters Liquor. Beers say whether they're a single, a 6 pack or a case.
 - **Chemists**: Chemist Warehouse, My Chemist (with Chemist Warehouse's prices), Amcal, Discount Drug Stores, Guardian / PharmaSave, Priceline Pharmacy, Soul Pattinson, TerryWhite Chemmart, Blooms The Chemist, Good Price Pharmacy, Pharmacy 4 Less, Direct Chemist Outlet, Star Discount Chemist, Capital Chemist, National Pharmacies and Chempro.
-- **Costco** (off until you pick it with your supermarkets): everything Costco sells online, next to Woolworths, Coles and Aldi, shared with your household and server like any shop. Sign in to Costco in the app for member prices (optional). **Please read this first:** Costco's website terms say automated collection of product listings isn't allowed. Restock only looks when you press Search, one page at a time. It never runs in the background and never in bulk. Costco may block it or change its pages, so it may stop working. Treat it as a test feature. It's your choice to turn this on, and your responsibility. Prices are Costco's online prices, which include delivery. They can differ from warehouse to warehouse and from the shelf. The shelf price in the warehouse can be typed in by hand.
+- **Costco** (off until you pick it with your supermarkets): everything Costco sells online, next to Woolworths, Coles and Aldi, shared with your household and server like any shop. Sign in to Costco in the app for member prices (optional). **Please read this first:** Costco's website terms say automated collection of product listings isn't allowed. Restock only looks when you search, one page at a time. It never checks Costco in the background or with Check now, and never in bulk. Costco may block it or change its pages, so it may stop working. Treat it as a test feature. It's your choice to turn this on, and your responsibility. Prices are Costco's online prices, which include delivery. They can differ from warehouse to warehouse and from the shelf. The shelf price in the warehouse can be typed in by hand.
 - **Any other shop**: add its website and Restock finds its search page and reads the products and prices, with Save and test to check it works.
 - **Pantry**: each item has My picks (what you buy at each shop, which can differ shop to shop) and Would also take (others you'd buy when they're cheaper, for Swap & save), on This size or Any size, and shops marked Not at this shop. Listed by shop then size, cheapest first, or A to Z. Swipe to add to your list or delete.
 - **Add**: search all your shops at once. Tap a result to tick it into the bar at the bottom ("1 ticked · tap to add"); nothing jumps up in your way. The green arrow opens the details (name, and Picked for you at your other shops) when you're ready.
@@ -130,6 +130,14 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 </details>
 
+## New in 0.9.8
+
+- **My shops, tidied up:** every supermarket shows its sign-in (optional), its branch and an "About" with what works and what doesn't, right under its tick. Settings has one row per tab of shops.
+- **Costco is searched with your other shops** every time you search, with **Get more from Costco** for more results.
+- **Notifications open what they're about:** a deal opens that item, catalogue day opens your catalogue, a gift card reminder opens Cards.
+- **Back works better:** Settings keeps your place when you come back, and leaving the app from Home takes a second press of back.
+- **The server's web page has the same Settings groups as the phone,** in the same order. What only a phone can do is shown greyed, saying where to do it.
+
 ## New in 0.9.7
 
 - **Costco is one of the supermarkets.** Pick it next to Woolworths, Coles and Aldi, in setup or in Settings under shops (it's off until you do, and the notice shows first). It's shared with your household and server like any shop, and searches everything Costco sells online, not just food.
@@ -144,7 +152,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Last updated** on every product's Price history card, and **Enter a price** for any shop, saved as "entered by hand".
 - **Move to another list:** a button moves a line between Groceries, Keg, Health and General, with Undo. It never happens by itself.
 - **Cards:** Loyalty cards is now **Cards**, with **gift cards** next to them (barcode, PIN, balance, expiry reminder). They stay on your phone. On your server's web page and on iPhone, cards are kept only in that browser.
-- **Costco** (off until you pick it): see the notice under [Every feature](#highlights). Restock only looks when you press Search.
+- **Costco** (off until you pick it): see the notice under [Every feature](#highlights). Restock only looks when you search.
 - **Wi-Fi sync is its own option.** A phone on a Restock server no longer shows it, and the X on that card can't disconnect you from the server. **Leave this server** is a separate button on the server screen.
 - **Import data** on the server's Data tab: add products and prices from a file on top of what's there, with a preview first.
 - **A proper phone layout on iPhone**, with a bottom tab bar like the Android app, and the Pantry, all four lists and Cards open with no signal.
@@ -187,7 +195,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.9.7.apk` (on macOS, `shasum -a 256 restock-0.9.7.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.9.8.apk` (on macOS, `shasum -a 256 restock-0.9.8.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

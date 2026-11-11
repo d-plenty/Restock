@@ -1,4 +1,5 @@
 import { App as CapApp } from '@capacitor/app';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -120,7 +121,7 @@ function RestockApp() {
         if (!told) return;
         const msg = `Restock ${told} is out. Update it in Settings → About and updates.`;
         if (Capacitor.isNativePlatform())
-          await RestockNative.notify({ id: 4390, title: 'A Restock update is ready', body: msg }).catch(() => undefined);
+          await RestockNative.notify({ id: 4390, title: 'A Restock update is ready', body: msg, action: 'updates' }).catch(() => undefined);
         else setToastMsg(msg);
       })();
     }, 4000);
@@ -208,6 +209,46 @@ function RestockApp() {
     void canLeave(askLeave).then((ok) => ok && go());
   }, []);
 
+  // 0.9.8: each screen keeps its scroll place. Opening a screen on top notes where the one below was;
+  // coming back puts it there again (Settings, after Restore a backup or Recall alerts, say).
+  const scrolls = useRef<number[]>([]);
+  const topScroller = (): HTMLElement | null => {
+    const all = [...document.querySelectorAll<HTMLElement>('.screen')];
+    return all.length ? all[all.length - 1] : null;
+  };
+  const noteScroll = (depth: number) => {
+    scrolls.current[depth] = topScroller()?.scrollTop ?? 0;
+  };
+  const restoreScroll = (depth: number) => {
+    const y = scrolls.current[depth];
+    if (!y) return;
+    const leaving = topScroller(); // the screen being closed: never the one to scroll
+    const until = Date.now() + 1500; // the screen may still be loading what it shows
+    const tryIt = () => {
+      const el = topScroller();
+      if (el && el !== leaving) {
+        el.scrollTop = y;
+        if (Math.abs(el.scrollTop - y) < 2) return;
+      }
+      if (Date.now() < until) window.setTimeout(tryIt, 60);
+    };
+    window.requestAnimationFrame(tryIt);
+  };
+  const pushScreen = (s: Screen) =>
+    setStack((st) => {
+      noteScroll(st.length);
+      return [...st, s];
+    });
+  const popScreen = () =>
+    setStack((st) => {
+      const next = st.slice(0, -1);
+      restoreScroll(next.length);
+      return next;
+    });
+  const popRef = useRef(popScreen);
+  popRef.current = popScreen;
+  const exitArmed = useRef(0);
+
   const nav: Nav = useMemo(
     () => ({
       tab,
@@ -215,12 +256,13 @@ function RestockApp() {
       setTab: (t, sec) =>
         leave(() => {
           setStack([]);
+          scrolls.current.length = 0;
           setTab(t);
           if (isSectionTab(t)) setSection(t);
           else if (sec) setSection(sec);
         }),
-      push: (s) => leave(() => setStack((st) => [...st, s])),
-      pop: () => leave(() => setStack((st) => st.slice(0, -1))),
+      push: (s) => leave(() => pushScreen(s)),
+      pop: () => leave(() => popScreen()),
       toast,
     }),
     [tab, section, toast, leave],
@@ -228,6 +270,8 @@ function RestockApp() {
 
   // Android back button: one thing per press. The scanner, then the top sheet or shopping mode,
   // then the top screen, then setup's own steps (useBackHandler), then Home, then leave.
+  const sayRef = useRef(toast);
+  sayRef.current = toast;
   const stateRef = useRef({ stack, tab });
   stateRef.current = { stack, tab };
   useEffect(() => {
@@ -237,10 +281,15 @@ function RestockApp() {
       if (document.querySelector('.scanner')) {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
       } else if (closeTopLayer()) return;
-      else if (st.length) leave(() => setStack(st.slice(0, -1)));
+      else if (st.length) leave(() => popRef.current());
       else if (runBackHandlers()) return;
       else if (t !== 'home') leave(() => setTab('home'));
-      else CapApp.exitApp();
+      // 0.9.8: leaving the app takes a second press on Home, so a stray press never throws you out.
+      else if (Date.now() - exitArmed.current < 2500) CapApp.exitApp();
+      else {
+        exitArmed.current = Date.now();
+        sayRef.current("Press back again to leave Restock");
+      }
     });
     return () => {
       sub.then((s) => s.remove());
@@ -262,6 +311,18 @@ function RestockApp() {
       else if (a.action === 'receipt') setStack((st) => [...st, { name: 'receipt' }]);
       else if (a.action === 'recalls') setStack((st) => [...st, { name: 'recalls' }]);
       else if (a.action === 'deals') nav.setTab('home');
+      // 0.9.8: a notification opens what it's about (PriceChecker, notify.ts, cardReminders.ts).
+      else if (a.action?.startsWith('item:')) {
+        const groupId = a.action.slice(5);
+        nav.setTab('home');
+        if (groupId) setStack([{ name: 'item', groupId }]);
+      } else if (a.action === 'catalogue') {
+        nav.setTab('home');
+        setStack([{ name: 'mycatalogue' }]);
+      } else if (a.action === 'daily') nav.setTab('pantry');
+      else if (a.action === 'cards') setStack([{ name: 'cards' }]);
+      else if (a.action === 'sync') setStack([{ name: 'settings' }, { name: 'sync' }]);
+      else if (a.action === 'updates') setStack([{ name: 'settings' }]);
       else if (a.action === 'scan') {
         const out = await scanBarcode();
         if (out.ok) setStack((st) => [...st, { name: 'add', barcode: out.code }]);
@@ -271,8 +332,14 @@ function RestockApp() {
       .then(run)
       .catch(() => undefined);
     const sub = RestockNative.addListener('launchAction', (e) => void run(e));
+    // 0.9.8: reminders the app schedules itself (catalogue day, daily check, gift cards) say where to go too.
+    const local = LocalNotifications.addListener('localNotificationActionPerformed', (e) => {
+      const action = (e.notification.extra as { action?: unknown } | undefined)?.action;
+      if (typeof action === 'string') void run({ action });
+    });
     return () => {
       void sub.then((h) => h.remove());
+      void local.then((h) => h.remove());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onboarded]);

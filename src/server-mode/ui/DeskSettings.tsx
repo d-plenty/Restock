@@ -16,6 +16,7 @@ import { ADMIN_NOTE, canAdmin, house, saveHouseSettings, useHouseSettings } from
 import { HA_SHARED } from './ServerHomeAssistant';
 import { WebSearchSwitch } from './WebShopSearch'; // 0.9.5 (web search)
 import { COSTCO_WEB_NOTE } from '../../lib/costcoNotice';
+import { PhoneOnlyNote } from './PhoneOnly';
 import {
   categoriesData,
   downloadBrowserBackup,
@@ -306,32 +307,7 @@ function HouseholdPart() {
         </p>
       )}
 
-      {v3 ? (
-        <Group id="dk-s-household" title="Household">
-          <HouseName fallback={h.name} />
-          <Line title="What each phone shares" sub="Each phone chooses: Groceries (pantry and shopping list), Keg, Health, receipts, loyalty cards." greyed>
-            <WhereNote>Change this on each phone</WhereNote>
-          </Line>
-          <Line title="Adding and removing phones" sub="This server is the household's owner.">
-            <button className="btn small" onClick={() => nav.push({ name: 'server', page: 'phones' })}>
-              Server and phones
-            </button>
-          </Line>
-        </Group>
-      ) : (
-        <Group id="dk-s-household" title="Household">
-          <Line title="Household name" sub={h.name} greyed={h.nameOn !== 'web'}>
-            {where(h.nameOn)}
-          </Line>
-          <Line title="What the household shares" sub={h.shares} greyed>
-            {where('owner')}
-          </Line>
-          <Line title="Owner phone, adding and removing phones" sub={h.owner} greyed>
-            {where('owner')}
-          </Line>
-        </Group>
-      )}
-
+      {/* 0.9.8: the same groups, in the same order, as Settings on the phone. Phone-only ones are greyed, saying where. */}
       <Group id="dk-s-shops" title="Shops">
         {h.shops.map((t) => (
           <Line
@@ -362,57 +338,31 @@ function HouseholdPart() {
         )}
       </Group>
 
-      <Group id="dk-s-list" title="Shopping list and deals">
-        <Line title="Shop around" htmlFor="dk-shop-around" sub="Only send an item to another shop if it saves at least this much" greyed={!editable}>
-          <select
-            id="dk-shop-around"
-            className="input dk-select"
-            disabled={!editable}
-            value={String(hv.shopAroundMin)}
-            onChange={(e) => hold({ shopAroundMin: Number(e.target.value) })}
-          >
-            {SHOP_AROUND_MINS.map((v) => (
-              <option key={v} value={String(v)}>
-                {v === 0 ? 'Any saving' : money(v)}
-              </option>
-            ))}
-          </select>
-        </Line>
-        <Line title="The list's cheapest" htmlFor="dk-compare" sub="Best value compares per 100 g, litre or item; lowest price compares the shelf price" greyed={!editable}>
-          <select id="dk-compare" className="input dk-select" disabled={!editable} value={hv.listCompare} onChange={(e) => hold({ listCompare: e.target.value as 'unit' | 'price' })}>
-            <option value="unit">Best value</option>
-            <option value="price">Lowest price</option>
-          </select>
-        </Line>
-        <Line title="Price alerts start at" htmlFor="dk-new-alert" sub="For new items: tell us when it's this much under its usual price" greyed={!editable}>
-          <select id="dk-new-alert" className="input dk-select" disabled={!editable} value={String(hv.newItemPct)} onChange={(e) => hold({ newItemPct: Number(e.target.value) })}>
-            {[...new Set([...NEW_ITEM_PCTS, h.newItemPct])]
-              .sort((x, y) => x - y)
-              .map((p) => (
-                <option key={p} value={String(p)}>
-                  {p}% off
-                </option>
-              ))}
-          </select>
-        </Line>
-        <Line title="An item's products" htmlFor="dk-order" sub="The order they're listed in on an item's page" greyed={!editable}>
-          <select id="dk-order" className="input dk-select" disabled={!editable} value={hv.productOrder} onChange={(e) => hold({ productOrder: e.target.value as ProductOrder })}>
-            {PRODUCT_ORDERS.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </Line>
-        <Line title="Categories" sub={`${catCount} categor${catCount === 1 ? 'y' : 'ies'}, in aisle order`}>
-          <button className="btn small" onClick={() => setCats(true)}>
-            Edit categories
-          </button>
-        </Line>
-        <Line title="Recall alerts" htmlFor="dk-recalls" sub="Each phone checks daily against the official Australian recall lists" greyed={!editable}>
-          <input id="dk-recalls" type="checkbox" className="switch" disabled={!editable} checked={hv.recalls} onChange={(e) => hold({ recalls: e.target.checked })} />
-        </Line>
-      </Group>
+      {v3 ? (
+        <Group id="dk-s-household" title="Household">
+          <HouseName fallback={h.name} />
+          <Line title="What each phone shares" sub="Each phone chooses: Groceries (pantry and shopping list), Keg, Health, receipts, loyalty cards." greyed>
+            <WhereNote>Change this on each phone</WhereNote>
+          </Line>
+          <Line title="Adding and removing phones" sub="This server is the household's owner.">
+            <button className="btn small" onClick={() => nav.push({ name: 'server', page: 'phones' })}>
+              Server and phones
+            </button>
+          </Line>
+        </Group>
+      ) : (
+        <Group id="dk-s-household" title="Household">
+          <Line title="Household name" sub={h.name} greyed={h.nameOn !== 'web'}>
+            {where(h.nameOn)}
+          </Line>
+          <Line title="What the household shares" sub={h.shares} greyed>
+            {where('owner')}
+          </Line>
+          <Line title="Owner phone, adding and removing phones" sub={h.owner} greyed>
+            {where('owner')}
+          </Line>
+        </Group>
+      )}
 
       {v3 ? (
         <Group id="dk-s-server" title="Your Restock server">
@@ -514,7 +464,77 @@ function HouseholdPart() {
       </Group>
       )}
 
-      <Group id="dk-s-browser" title="This browser">
+      <Group id="dk-s-checks" title="Price checks">
+        <Line title={'Check prices in the background'} sub={'Each phone checks at its own time (5:00 am unless changed).'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+        <Line title={'Price check time'} sub={'Picked on each phone.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+      </Group>
+
+      <Group id="dk-s-list" title="Shopping list">
+        <Line title="Shop around" htmlFor="dk-shop-around" sub="Only send an item to another shop if it saves at least this much" greyed={!editable}>
+          <select
+            id="dk-shop-around"
+            className="input dk-select"
+            disabled={!editable}
+            value={String(hv.shopAroundMin)}
+            onChange={(e) => hold({ shopAroundMin: Number(e.target.value) })}
+          >
+            {SHOP_AROUND_MINS.map((v) => (
+              <option key={v} value={String(v)}>
+                {v === 0 ? 'Any saving' : money(v)}
+              </option>
+            ))}
+          </select>
+        </Line>
+        <Line title="The list's cheapest" htmlFor="dk-compare" sub="Best value compares per 100 g, litre or item; lowest price compares the shelf price" greyed={!editable}>
+          <select id="dk-compare" className="input dk-select" disabled={!editable} value={hv.listCompare} onChange={(e) => hold({ listCompare: e.target.value as 'unit' | 'price' })}>
+            <option value="unit">Best value</option>
+            <option value="price">Lowest price</option>
+          </select>
+        </Line>
+        <Line title="Price alerts start at" htmlFor="dk-new-alert" sub="For new items: tell us when it's this much under its usual price" greyed={!editable}>
+          <select id="dk-new-alert" className="input dk-select" disabled={!editable} value={String(hv.newItemPct)} onChange={(e) => hold({ newItemPct: Number(e.target.value) })}>
+            {[...new Set([...NEW_ITEM_PCTS, h.newItemPct])]
+              .sort((x, y) => x - y)
+              .map((p) => (
+                <option key={p} value={String(p)}>
+                  {p}% off
+                </option>
+              ))}
+          </select>
+        </Line>
+        <Line title="An item's products" htmlFor="dk-order" sub="The order they're listed in on an item's page" greyed={!editable}>
+          <select id="dk-order" className="input dk-select" disabled={!editable} value={hv.productOrder} onChange={(e) => hold({ productOrder: e.target.value as ProductOrder })}>
+            {PRODUCT_ORDERS.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </Line>
+        <Line title="Categories" sub={`${catCount} categor${catCount === 1 ? 'y' : 'ies'}, in aisle order`}>
+          <button className="btn small" onClick={() => setCats(true)}>
+            Edit categories
+          </button>
+        </Line>
+        <Line title="Recall alerts" htmlFor="dk-recalls" sub="Each phone checks daily against the official Australian recall lists" greyed={!editable}>
+          <input id="dk-recalls" type="checkbox" className="switch" disabled={!editable} checked={hv.recalls} onChange={(e) => hold({ recalls: e.target.checked })} />
+        </Line>
+      </Group>
+
+      <Group id="dk-s-alerts" title="Alerts">
+        <Line title={'Deals and catalogue day'} sub={'Notifications are on each phone.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+        <Line title={'Gift card reminders'} sub={'Cards stay on each phone.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+      </Group>
+
+      <Group id="dk-s-browser" title="Colours and this browser">
         <Line title="Look" sub="Just for this browser">
           <div className="dk-seg" role="group" aria-label="Look">
             {(
@@ -577,6 +597,33 @@ function HouseholdPart() {
           </span>
         </Line>
         )}
+      </Group>
+
+      <Group id="dk-s-a11y" title="Accessibility">
+        <Line title={'Text size and motion'} sub={"Set on each phone. This browser follows your computer's settings."} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+      </Group>
+
+      <Group id="dk-s-receipts" title="Receipts and widgets">
+        <Line title={'Receipts'} sub={'Added and read on a phone (camera).'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+        <Line title={'Widgets'} sub={'Home screen widgets are on Android phones.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+      </Group>
+
+      <Group id="dk-s-shared" title="Shared prices">
+        <Line title={'Judge new items from day one'} sub={'Downloaded by each phone.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+      </Group>
+
+      <Group id="dk-s-about" title="About and updates">
+        <Line title={'Check for updates'} sub={'Each phone checks GitHub. This server updates with Docker or Home Assistant.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
       </Group>
       {cats && <CategoriesSheet sections={h.categories} onClose={() => setCats(false)} />}
       {branches && <BranchSheet onClose={() => setBranches(false)} />}

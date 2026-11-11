@@ -430,6 +430,7 @@ final class PriceChecker {
         }
 
         List<String> lines = new ArrayList<>();
+        List<String> dealItems = new ArrayList<>(); // 0.9.8: which items the lines are about
         long nowMs = Instant.now().toEpochMilli();
         // Items on a tab that's switched off (Keg, Pharmacy) don't send alerts. (The section column
         // arrives with the app's 0.5.0 update, which may not have opened yet.)
@@ -472,6 +473,7 @@ final class PriceChecker {
                     if (!seen.contains(tkey)) {
                         seenList.add(tkey);
                         seen.add(tkey);
+                        dealItems.add(item.id);
                         lines.add(String.format(Locale.ROOT, "%s: $%.2f at %s, under your $%.2f target", item.name, rec.best.price,
                             Deals.chainName(rec.best.product.chain), target));
                     }
@@ -498,6 +500,7 @@ final class PriceChecker {
                     what += String.format(Locale.ROOT, " · usually on special every %d weeks, a good time to stock up", deal.stats.cycleWeeks);
                 }
                 lines.add(item.name + ": " + rec.headline + what);
+                dealItems.add(item.id);
             }
         }
         weeklySummary(context, db, settings, onSpecial, weekSaving);
@@ -509,7 +512,10 @@ final class PriceChecker {
 
         while (seenList.size() > 300) seenList.remove(0);
         writeKvRaw(db, "notified", new JSONArray(seenList).toString());
-        notify(context, lines.size() == 1 ? "Worth grabbing" : lines.size() + " deals worth grabbing", lines);
+        // 0.9.8: one deal opens that item; several open Home, where the deals are.
+        java.util.Set<String> one = new java.util.HashSet<>(dealItems);
+        notify(context, lines.size() == 1 ? "Worth grabbing" : lines.size() + " deals worth grabbing", lines, NOTIFICATION_ID,
+            one.size() == 1 ? "item:" + one.iterator().next() : "deals");
     }
 
     /**
@@ -524,13 +530,13 @@ final class PriceChecker {
             // With background activity on, the app doesn't schedule its plain catalogue-day reminder
             // (notify.ts), so this stands in for it.
             lines.add("Open Restock to see what's worth buying this week.");
-            notify(context, "New specials are out", lines, NOTIFICATION_ID + 1);
+            notify(context, "New specials are out", lines, NOTIFICATION_ID + 1, "catalogue");
             return;
         }
         String title = onSpecial == 1 ? "1 of your items is on special this week" : onSpecial + " of your items are on special this week";
         lines.add(saving >= 0.5 ? String.format(Locale.ROOT, "Saving about $%.0f against usual prices. Open Restock to see them.", saving)
             : "Open Restock to see what's worth buying.");
-        notify(context, title, lines, NOTIFICATION_ID + 1);
+        notify(context, title, lines, NOTIFICATION_ID + 1, "catalogue");
     }
 
     /** Is today catalogue day, with the summary switched on and not sent yet today? */
@@ -630,6 +636,11 @@ final class PriceChecker {
     }
 
     static void notify(Context context, String title, List<String> lines, int id) {
+        notify(context, title, lines, id, null);
+    }
+
+    /** 0.9.8: `action` says which screen a tap opens (App.tsx launch actions): "deals", "item:<id>", "catalogue", ... */
+    static void notify(Context context, String title, List<String> lines, int id, String action) {
         if (Build.VERSION.SDK_INT >= 33
             && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             return;
@@ -639,8 +650,9 @@ final class PriceChecker {
         nm.createNotificationChannel(new NotificationChannel(CHANNEL_ID, "Deals", NotificationManager.IMPORTANCE_DEFAULT));
 
         Intent open = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+        if (open != null && action != null) open.putExtra("restockAction", action);
         PendingIntent tap = open == null ? null
-            : PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+            : PendingIntent.getActivity(context, id, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
         StringBuilder body = new StringBuilder();
         for (int i = 0; i < Math.min(4, lines.size()); i++) body.append(i > 0 ? "\n" : "").append(lines.get(i));

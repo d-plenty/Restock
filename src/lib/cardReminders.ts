@@ -34,7 +34,7 @@ export async function scheduleCardReminders(cards: GiftCard[]): Promise<void> {
     const want = wantedReminders(cards);
     if (!want.length || !(await notificationsAllowed())) return;
     await ln.schedule({
-      notifications: want.map((w) => ({ id: w.id, title: w.title, body: w.body, schedule: { at: w.at, allowWhileIdle: true } })),
+      notifications: want.map((w) => ({ id: w.id, title: w.title, body: w.body, extra: { action: 'cards' }, schedule: { at: w.at, allowWhileIdle: true } })),
     });
   } catch {
     // A reminder that can't be set never stops the card being saved.

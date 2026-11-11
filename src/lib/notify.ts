@@ -69,6 +69,7 @@ export async function scheduleReminders(s: Settings): Promise<void> {
       id: ID.catalogue,
       title: 'New specials are out',
       body: 'Open Restock to see what’s worth buying this week.',
+      extra: { action: 'catalogue' },
       // Capacitor counts weekdays from 1 = Sunday.
       schedule: { on: { weekday: s.alerts.catalogueWeekday + 1, hour: 8, minute: 0 }, allowWhileIdle: true },
     });
@@ -79,6 +80,7 @@ export async function scheduleReminders(s: Settings): Promise<void> {
       id: ID.daily,
       title: 'Daily price check',
       body: 'Tap to check today’s prices on your pantry items.',
+      extra: { action: 'daily' },
       schedule: { on: { hour, minute }, allowWhileIdle: true },
     });
   }

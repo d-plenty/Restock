@@ -16,7 +16,7 @@ export const COSTCO_SWITCH_LABEL = 'Use Costco';
 
 /** What the switch does, in one line under it. */
 export const COSTCO_SWITCH_HELP = 'Off until you pick it. Online prices, include delivery.';
-export const COSTCO_SWITCH_HELP_ON = 'Costco is looked up only when you press Search. Prices are online prices.';
+export const COSTCO_SWITCH_HELP_ON = 'Searched with your other shops when you search. Prices are online prices.';
 
 /** The heading above the disclosure, in the sheet that asks first and in the setting itself. */
 export const COSTCO_NOTICE_HEADING = 'Before you pick Costco';
@@ -27,7 +27,7 @@ export const COSTCO_NOTICE_HEADING = 'Before you pick Costco';
  */
 export const COSTCO_NOTICE: readonly string[] = [
   "Costco's website terms say automated collection of product listings isn't allowed.",
-  'Restock only looks when you press Search, one page at a time. It never runs in the background and never in bulk.',
+  'Restock only looks when you search, one page at a time. It never checks Costco in the background or with Check now, and never in bulk.',
   'Costco may block it or change its pages, so it may stop working. Treat it as a test feature.',
   "It's your choice to turn this on, and your responsibility.",
   "Prices are Costco's online prices, which include delivery. They can differ from warehouse to warehouse and from the shelf.",
@@ -59,7 +59,7 @@ export const costcoSpecialUntil = (save: string, until?: string) => (until ? `On
 
 /** Shown for the shop in lists on the web page and the server's web UI, which never search Costco. */
 export const COSTCO_WEB_NAME = 'Costco';
-export const COSTCO_WEB_NOTE = "Costco's prices are online prices, which include delivery. Costco is looked up only when someone presses Search.";
+export const COSTCO_WEB_NOTE = "Costco's prices are online prices, which include delivery. Costco is looked up only when someone searches.";
 
 /** Errors and states in the app. */
 export const COSTCO_OFF_MESSAGE = 'Costco is not one of your shops. Pick it in Settings, under shops.';

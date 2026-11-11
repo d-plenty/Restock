@@ -64,10 +64,10 @@ const ALL_TILES: Tile[] = [
   {
     id: 'pantry',
     title: 'Supermarkets',
-    sub: 'Woolworths, Coles, Aldi',
+    sub: 'Woolworths, Coles, Aldi, Costco',
     icon: 'cart',
     heading: 'Where do you shop?',
-    intro: 'Pick your supermarkets and nearest branches.',
+    intro: 'Pick your supermarkets and nearest branches. Each shop has its sign-in (optional) and what works under its tick.',
   },
   {
     id: 'keg',
@@ -142,7 +142,7 @@ const ALL_TILES: Tile[] = [
     icon: 'card',
     heading: 'Cards and shop accounts',
     intro:
-      'Add your Flybuys and Everyday Rewards cards so member prices count. Sign in to Woolworths or pick your Coles branch, and prices and stock are for your local shop.',
+      'Add your Flybuys and Everyday Rewards cards so member prices count. Sign in to Woolworths or Costco, or pick your Coles branch, and prices and stock are for your local shop.',
   },
   {
     id: 'checks',
@@ -458,8 +458,8 @@ function AccountsTile() {
       <button className="row" onClick={() => nav.push({ name: 'stores', section: 'pantry' })}>
         <Icon name="cart" size={18} />
         <span className="grow">
-          <span className="title">Woolworths sign-in and your Coles branch</span>
-          <span className="small">Your local shop's prices and stock</span>
+          <span className="title">Shop sign-ins and your Coles branch</span>
+          <span className="small">Woolworths, Coles and Costco: your local prices, stock and member prices</span>
         </span>
         <Icon name="chevron" size={18} />
       </button>

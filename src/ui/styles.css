@@ -4358,3 +4358,27 @@ button.sync-choice:disabled {
 :root[data-text='1.5'] .shop-head > .price-col {
   margin-right: auto;
 }
+
+/* 0.9.8: a shop's status, "About" and sign-in, right under its tick in My shops. */
+.shop-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 14px 14px 14px;
+}
+
+/* 0.9.8: list line names and "Expand all" are small links: a 44 px tap area around them, same layout. */
+.checkline .linkish,
+.list-head .linkish {
+  position: relative;
+}
+.checkline .linkish::after,
+.list-head .linkish::after {
+  content: '';
+  position: absolute;
+  inset: -12px -6px;
+}
+/* 0.9.8: a dark card colour still shows on true black. */
+.swatch {
+  box-shadow: 0 0 0 1.5px var(--line, rgba(127, 127, 127, 0.5));
+}

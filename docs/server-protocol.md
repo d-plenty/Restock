@@ -857,3 +857,7 @@ plain JSON.
 - **Costco is an ordinary shop.** Picked with the household's shops (`enabledChains`, a household setting like the others), its products, prices, list lines and item picks sync like any shop's, and the server keeps, exports and imports them (`NEVER_SHOP` no longer matches any shop; `withheld.costco` is never sent). A 0.9.6 phone still keeps its own Costco records back; a 0.9.7 phone sends them. No new record kinds.
 - **The server's web search may ask Costco** when "Let the web page search the shops" is on, still only when Search is pressed.
 - **Phones ask Costco from inside Costco's own page** (`storeFetch`, chain `costco`), its product search first (`/rest/v2/australia/products/search`), then the search page. A sign-in there (`accounts.costco`) gives member prices.
+
+## 0.9.8: what changed on the wire
+
+- **Nothing.** No new record kinds, endpoints or settings keys. Costco's product search asks for 48 a page and pages with `currentPage` ("Get more from Costco"). Notifications carry a `restockAction` extra (`item:<id>`, `deals`, `catalogue`, `daily`, `cards`, `sync`, `updates`) that only the phone itself reads.
