@@ -1,0 +1,1 @@
+Costco is now one of the supermarkets: pick it in setup or Settings next to Woolworths, Coles and Aldi (off by default, notice first). It's shared with your household and server like any shop, searches everything Costco sells, and you can sign in for member prices. Searches now run inside Costco's own page in the app. Still only when you press Search.

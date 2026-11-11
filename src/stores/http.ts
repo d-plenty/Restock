@@ -48,7 +48,7 @@ export const connectionMode = () => mode;
 
 /** Make a request from inside the store's own website, the way the site itself does. */
 export async function viaBrowser(
-  chain: 'coles' | 'woolworths' | 'aldi' | 'danmurphys' | 'bws',
+  chain: 'coles' | 'woolworths' | 'aldi' | 'danmurphys' | 'bws' | 'costco',
   method: 'GET' | 'POST',
   url: string,
   body?: unknown,

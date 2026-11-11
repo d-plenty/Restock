@@ -97,6 +97,27 @@ export async function stopUsingColes(): Promise<void> {
   await updateSettings({ accounts: { ...(s.accounts ?? {}), coles: { signedIn: false, checkedAt: new Date().toISOString() } } });
 }
 
+// ---------- Costco (0.9.7) ----------
+
+/**
+ * Opens Costco in Restock's browser to sign in, so searches show your member prices. Costco
+ * doesn't say who's signed in, so you confirm it. Your password goes to Costco, not Restock.
+ */
+export async function signInCostco(confirmed: () => Promise<boolean>): Promise<ShopAccount | undefined> {
+  if (!isNative()) throw new Error('Signing in works in the Android app.');
+  await RestockNative.openStore({ chain: 'costco', path: '/login', message: 'Sign in to your Costco account. Then tap Done.' });
+  if (!(await confirmed())) return undefined;
+  const account: ShopAccount = { signedIn: true, checkedAt: new Date().toISOString() };
+  const s = await getSettings();
+  await updateSettings({ accounts: { ...(s.accounts ?? {}), costco: account } });
+  return account;
+}
+
+export async function stopUsingCostco(): Promise<void> {
+  const s = await getSettings();
+  await updateSettings({ accounts: { ...(s.accounts ?? {}), costco: { signedIn: false, checkedAt: new Date().toISOString() } } });
+}
+
 // ---------- recording a trolley ----------
 
 /**

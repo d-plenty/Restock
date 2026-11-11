@@ -154,12 +154,18 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
   const w = obj(s.widgets);
   const md = obj(s.marketData);
   const acc = obj(s.accounts);
-  const accounts = isObj(s.accounts) ? compact({ woolworths: accountOf(acc.woolworths), coles: accountOf(acc.coles) }) : undefined;
+  const accounts = isObj(s.accounts) ? compact({ woolworths: accountOf(acc.woolworths), coles: accountOf(acc.coles), costco: accountOf(acc.costco) }) : undefined;
 
   return compact<Settings>({
     onboarded: bool(s.onboarded, D.onboarded),
     stores,
-    enabledChains: Array.isArray(s.enabledChains) ? [...new Set(s.enabledChains.filter(isShop))] : [...D.enabledChains],
+    // 0.9.7: Costco switched on in 0.9.6's own setting becomes one of the picked shops.
+    enabledChains: (() => {
+      const picked = Array.isArray(s.enabledChains) ? [...new Set(s.enabledChains.filter(isShop))] : [...D.enabledChains];
+      const was = obj(s.costco);
+      if (bool(was.on, false) && !!when(was.acceptedAt) && !picked.includes('costco')) picked.push('costco');
+      return picked;
+    })(),
     sections: { keg: bool(sec.keg, D.sections.keg), pharmacy: bool(sec.pharmacy, D.sections.pharmacy) },
     hiddenTabs: tabs(s.hiddenTabs),
     customShops,

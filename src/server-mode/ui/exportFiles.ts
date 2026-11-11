@@ -306,7 +306,8 @@ export function exportTables(exp: { tables: Record<string, unknown> }): Table[] 
 }
 
 /** 0.9.6: the shop whose prices never go into an export (Declan, 11 Nov 2026). */
-export const NEVER_SHOP = 'costco';
+// 0.9.7: Costco's prices are imported and exported like any shop's: no shop is left out any more.
+export const NEVER_SHOP = '\u0000';
 
 /**
  * 0.9.6: the export without Costco's prices, whatever the server sent (a 0.9.5 server doesn't leave

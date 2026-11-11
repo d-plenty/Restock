@@ -351,7 +351,7 @@ export interface Settings {
    * Shop accounts you've signed in to inside Restock (0.6.12). Woolworths only shows your store's
    * prices and stock, and lets Restock fill your trolley, when you're signed in.
    */
-  accounts?: { woolworths?: ShopAccount; coles?: ShopAccount };
+  accounts?: { woolworths?: ShopAccount; coles?: ShopAccount; costco?: ShopAccount };
   /**
    * 0.9.6: Costco on this phone (src/stores/costco.ts). Off unless `on`, which needs `acceptedAt`: the day
    * the person read the notice (lib/costcoNotice.ts) and turned it on. `buyOnline` ("I buy from Costco online"):

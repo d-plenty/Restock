@@ -121,8 +121,8 @@ export const SHOPS: ShopDef[] = [
     catalogue: { url: 'https://www.aldi.com.au/special-buys', note: 'New Special Buys every Wednesday and Saturday.' },
   }),
 
-  // 0.9.6: Costco is switched on per phone in Settings (settings.costco), not by picking it with the shops,
-  // so it is never in enabledChains, never shared with the household and never read by the server.
+  // 0.9.7: Costco is a supermarket like the others: picked with the shops (enabledChains), off by
+  // default, shared with the household and the server. Searched only when Search is pressed.
   G({
     id: 'costco',
     name: 'Costco',
@@ -130,7 +130,7 @@ export const SHOPS: ShopDef[] = [
     color: '#5b6b7a',
     website: 'https://www.costco.com.au',
     map: /\bcostco\b/i,
-    note: 'Online prices, this phone only',
+    note: 'Online prices, include delivery',
   }),
 
   L({
@@ -313,25 +313,29 @@ export const GROCERY: GroceryChain[] = ['woolworths', 'coles', 'aldi'];
  * (settings.costco), so it is never in enabledChains and never picked for the household: not shared
  * with other phones or the server, and left out of backups, exports and the shared price pack.
  */
-export const LOCAL_ONLY_SHOPS: readonly string[] = ['costco'];
+// 0.9.7: none any more (Costco is an ordinary shop). Kept so older code paths stay simple.
+export const LOCAL_ONLY_SHOPS: readonly string[] = [];
+/** 0.9.7: Costco is asked only when someone presses Search (or Check at Costco): never by a scan, a follow-up, Check now, the background or a connection test. */
+export const isPressOnlyShop = (c: string | undefined): boolean => c === 'costco';
 export const isLocalOnlyShop = (c: string | undefined): boolean => !!c && LOCAL_ONLY_SHOPS.includes(c);
 
-// Costco on this phone (settings.costco), kept here like the person's own shops so any screen can ask.
-// `on`: Costco can be searched. `counts`: its prices also decide the cheapest shop ("I buy from Costco online").
+// Costco picked with the shops (costcoStateOf), kept here so any screen can ask.
 let costcoOn = false;
-let costcoCounts = false;
 let costcoNotAt = new Set<string>();
 export function setCostcoState(c: { on?: boolean; buyOnline?: boolean; notAt?: string[] } | undefined) {
   costcoOn = !!c?.on;
-  costcoCounts = costcoOn && !!c?.buyOnline;
   costcoNotAt = new Set(Array.isArray(c?.notAt) ? c.notAt : []);
 }
+/** 0.9.7: Costco is on when it's picked with the shops (enabledChains), like any other shop. */
+export const costcoStateOf = (s: { enabledChains?: readonly string[]; costco?: { notAt?: string[] } } | undefined) =>
+  s ? { on: !!s.enabledChains?.includes('costco'), notAt: s.costco?.notAt } : undefined;
 /** 0.9.6 (review L1): did this phone say "Not at Costco" for this item? Kept on the phone (settings.costco.notAt), never in the shared item. */
 export const costcoNotHere = (groupId: string | undefined): boolean => !!groupId && costcoNotAt.has(groupId);
 /** Is Costco switched on on this phone? Never true on the server or the web page. */
 export const costcoIsOn = () => costcoOn;
 /** Do Costco prices count when working out the cheapest shop? Only when switched on and "I buy from Costco online" is ticked. */
-export const costcoDecides = () => costcoCounts;
+// 0.9.7: always: Costco is only there when picked, and counts like any shop.
+export const costcoDecides = () => true;
 
 /** A shop the person added: a name, a website, and which tab it's for. */
 export interface CustomShop {

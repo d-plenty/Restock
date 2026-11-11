@@ -847,7 +847,13 @@ plain JSON.
 ## 0.9.6: what changed on the wire
 
 - **No new record kinds.** Move to another list is ordinary list changes: between Groceries and General the line is updated in place; across tabs it is a new line plus a delete of the old one. A 0.9.5 phone or server needs nothing.
-- **Costco** (phone only, opt-in): a phone never sends Costco products, prices, list-line details or item picks that point at Costco products; anything Costco-related that arrives is dropped. The server's search never contacts Costco.
+- **Costco** (0.9.6 only; see 0.9.7 below): a 0.9.6 phone never sends Costco products, prices, list-line details or item picks that point at Costco products.
 - **Gift cards and Cards in the web page:** never sent. Gift cards live in a phone-only table; the browser keeps cards in its own storage.
 - **Import:** see the "Data: Import" section above and [restock-import.md](restock-import.md).
 - **Price checks at a set time** are per phone (`checkTime`), not a shared setting.
+
+## 0.9.7: what changed on the wire
+
+- **Costco is an ordinary shop.** Picked with the household's shops (`enabledChains`, a household setting like the others), its products, prices, list lines and item picks sync like any shop's, and the server keeps, exports and imports them (`NEVER_SHOP` no longer matches any shop; `withheld.costco` is never sent). A 0.9.6 phone still keeps its own Costco records back; a 0.9.7 phone sends them. No new record kinds.
+- **The server's web search may ask Costco** when "Let the web page search the shops" is on, still only when Search is pressed.
+- **Phones ask Costco from inside Costco's own page** (`storeFetch`, chain `costco`), its product search first (`/rest/v2/australia/products/search`), then the search page. A sign-in there (`accounts.costco`) gives member prices.

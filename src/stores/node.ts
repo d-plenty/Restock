@@ -36,7 +36,7 @@ export const SHOP_HOSTS: ReadonlyMap<string, StoreChain> = (() => {
     }
   };
   for (const s of SHOPS) {
-    // 0.9.6: Costco is read on a phone only, never by the server: its host is not one the server may ask.
+    // 0.9.7: Costco may be asked by the server too (web search, when that setting is on), like any shop.
     if (isLocalOnlyShop(s.id)) continue;
     const owner = priceSource(s.id);
     add(s.website, owner);

@@ -14,7 +14,7 @@ import {
 } from '../types';
 import { changed } from './live';
 import { listLineWithoutCostco } from './costcoLocal';
-import { asListSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, setCostcoState, setCustomShops, shopDef, type ListSection, type Section } from '../shops';
+import { asListSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, shopDef, type ListSection, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
 import { GIFT_CARDS_TABLE, migrate } from './sql/schema';
 import { cleanGiftCard } from './giftCards'; // 0.9.6 (cards)
@@ -333,7 +333,7 @@ export const cachedSettings = () => lastSettings;
 export async function getSettings(): Promise<Settings> {
   const s = mergeSettings(await getKV<Partial<Settings>>('settings'));
   setCustomShops(s.customShops);
-  setCostcoState(s.costco);
+  setCostcoState(costcoStateOf(s));
   lastSettings = s;
   return s;
 }
@@ -350,7 +350,7 @@ export async function updateSettings(patch: Partial<Settings>, opts: { local?: b
   const before = await getSettings();
   const next = mergeSettings({ ...before, ...patch });
   setCustomShops(next.customShops);
-  setCostcoState(next.costco);
+  setCostcoState(costcoStateOf(next));
   const ops: SqlOp[] = [{ sql: 'INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', params: ['settings', JSON.stringify(next)] }];
   if (!opts.local) ops.push(...(await householdSettingOps(before, next)));
   await write(ops);
@@ -425,7 +425,7 @@ export async function resetSettings(): Promise<Settings> {
   }
   const next = checkSettings(kept);
   setCustomShops(next.customShops);
-  setCostcoState(next.costco);
+  setCostcoState(costcoStateOf(next));
   await putKV('settings', next);
   lastSettings = next;
   // 0.9.3: the household's settings stay the household's.

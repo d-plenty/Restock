@@ -408,7 +408,7 @@ function ExportCard() {
         </p>
       )}
       <span className="dk-sub">
-        Never in it: card numbers and PINs, receipt text and photos, Costco prices, your passphrase, keys or the Home Assistant token. The encrypted backup (Settings) is the copy to
+        Never in it: card numbers and PINs, receipt text and photos, your passphrase, keys or the Home Assistant token. The encrypted backup (Settings) is the copy to
         restore a server from.
       </span>
     </section>

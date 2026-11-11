@@ -15,8 +15,7 @@ import { BackupSheet, BranchSheet, KeepDataFor, PassphraseV3, RecoverySheet, Sig
 import { ADMIN_NOTE, canAdmin, house, saveHouseSettings, useHouseSettings } from './houseData';
 import { HA_SHARED } from './ServerHomeAssistant';
 import { WebSearchSwitch } from './WebShopSearch'; // 0.9.5 (web search)
-import { PhoneOnlyNote } from './PhoneOnly';
-import { COSTCO_WEB_NAME, COSTCO_WEB_NOTE } from '../../lib/costcoNotice';
+import { COSTCO_WEB_NOTE } from '../../lib/costcoNotice';
 import {
   categoriesData,
   downloadBrowserBackup,
@@ -201,12 +200,9 @@ function ShopsSheet({ tab, onClose }: { tab: ShopsForTab; onClose: () => void })
         ))}
       </fieldset>
       {tab.section === 'pantry' && (
-        <>
-          <p className="small" style={{ margin: 0 }}>
-            {COSTCO_WEB_NAME}
-          </p>
-          <PhoneOnlyNote compact text={COSTCO_WEB_NOTE} />
-        </>
+        <p className="small" style={{ margin: 0 }}>
+          {COSTCO_WEB_NOTE}
+        </p>
       )}
       <button className="btn primary" disabled={busy} onClick={() => void save()}>
         Save for every phone
@@ -353,10 +349,6 @@ function HouseholdPart() {
             )}
           </Line>
         ))}
-        {/* 0.9.6: Costco is looked up on a phone only (never here), turned on in a phone's own Settings. */}
-        <Line title={COSTCO_WEB_NAME} sub={COSTCO_WEB_NOTE} greyed>
-          <PhoneOnlyNote compact text="Turn Costco on in Settings on a phone." />
-        </Line>
         {v3 ? (
           <Line title="Which branch" sub="The household's usual branch of each shop, for phones that haven't picked their own. A phone's own pick always wins.">
             <button className="btn small" onClick={() => setBranches(true)}>

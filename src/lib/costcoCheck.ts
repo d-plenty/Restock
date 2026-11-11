@@ -1,4 +1,4 @@
-import { isLocalOnlyShop } from '../shops';
+import { isLocalOnlyShop, isPressOnlyShop } from '../shops';
 import { costco } from '../stores/costco';
 import type { StoreAdapter } from '../stores/types';
 import type { Product } from '../types';
@@ -19,7 +19,7 @@ export interface CostcoCheck {
 
 /** Products on an item that "Check at Costco" can check: Costco's, with an item number. */
 export const costcoCheckable = <P extends Pick<Product, 'chain' | 'storeProductId'>>(products: readonly P[]): P[] =>
-  products.filter((p) => isLocalOnlyShop(p.chain) && !!p.storeProductId);
+  products.filter((p) => isPressOnlyShop(p.chain) && !!p.storeProductId);
 
 /**
  * Check one Costco product's price now, because the person pressed "Check at Costco". `reader` is

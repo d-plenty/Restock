@@ -6,24 +6,20 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
-import { csvFiles, exportTables, withoutCostco } from './ui/exportFiles';
+import { csvFiles, exportTables } from './ui/exportFiles';
 import {
   chunksOf,
-  costcoLine,
   csvRows,
   dryRunLine,
-  emptyTally,
   firstImport,
   ignoredOf,
   ImportRefused,
   importReducer,
   LIMITS,
   parseCsv,
-  problemLines,
   readImport,
   type ImportProduct,
-  type ImportState,
-} from './ui/importFile';
+  type ImportState } from './ui/importFile';
 
 const json = (v: unknown) => strToU8(JSON.stringify(v));
 const exp = (tables: Record<string, unknown>, more: Record<string, unknown> = {}) => ({ format: 'restock-export', v: 1, app: 'restock-server', at: '2026-11-11T00:00:00.000Z', tables, ...more });
@@ -49,25 +45,6 @@ const sample = () =>
   });
 
 describe('reading a file', () => {
-  it('the full export file: products and prices only, one product per shop and shop number, Costco left out', () => {
-    const r = readImport(json(sample()), 'restock-data.json');
-    expect(r.kind).toBe('json');
-    expect(r.products.map((p) => [p.ref, p.chain, p.name])).toEqual([
-      ['p1', 'coles', 'Milk 2L'],
-      ['p2', 'woolworths', 'Bread'],
-    ]);
-    const milk = r.products[0];
-    expect(milk.prices.map((p) => p.price)).toEqual([3.3, 3.1]); // oldest first
-    expect(milk.prices[0]).toEqual({ date: '2026-11-01T01:00:00.000Z', price: 3.3, was_price: 3.6, is_special: true });
-    expect([milk.barcode, milk.qty, milk.qty_unit]).toEqual(['9300633603205', 2000, 'ml']);
-    expect(r.products[1].prices).toEqual([{ date: '2026-11-01', price: 4 }]);
-    expect(r.priceCount).toBe(3);
-    expect(r.costco).toEqual({ products: 1, prices: 1 });
-    expect(r.problems).toEqual({ 'no-product': 1, date: 1 });
-    expect(r.notTaken).toEqual(['pantry items', 'the shopping list', 'receipts']);
-    // Only what the server takes is sent.
-    for (const p of r.products) for (const k of Object.keys(p)) expect(['ref', 'chain', 'store_product_id', 'barcode', 'name', 'brand', 'size', 'image_url', 'qty', 'qty_unit', 'prices']).toContain(k);
-  });
 
   it('the CSV files (.zip) the Data tab downloads read back the same', () => {
     const e = sample();
@@ -199,49 +176,8 @@ describe('the steps and the words', () => {
     expect(e.phase).toBe('review');
   });
 
-  it('says why rows were left out, notes last, and Costco plainly', () => {
-    const t = { ...emptyTally(read), problems: { 'picture-left-out': 2, date: 3 } };
-    expect(problemLines(t)).toEqual([
-      '3 prices with a date it couldn\'t read, from before 2000, or in the future.',
-      "2 pictures left out (only pictures from where your shops' products already show them).",
-    ]);
-    expect(costcoLine(t)).toBe('Left out 1 Costco product and 1 Costco price: Costco prices never go into Restock imports or exports.');
-    expect(costcoLine(emptyTally())).toBe('');
-    for (const line of [...problemLines({ ...t, problems: { shop: 1, name: 1, price: 1, flag: 1, full: 1, row: 1, 'no-product': 1, 'barcode-left-out': 1, 'too-many-prices': 1 } }), costcoLine(t)]) {
-      expect(line).not.toMatch(/—/); // no em dashes
-      expect(line).not.toMatch(/\bstore\b/);
-    }
-  });
 });
 
-describe('the export never has Costco prices', () => {
-  it('leaves out Costco products and prices, a Costco line’s price, and what was paid there', () => {
-    const e = withoutCostco({
-      format: 'restock-export',
-      tables: {
-        products: [
-          { id: 'p1', chain: 'coles', name: 'Milk' },
-          { id: 'pc', chain: 'costco', name: 'Nuts' },
-        ],
-        prices: [
-          { product_id: 'p1', price: 3 },
-          { product_id: 'pc', price: 19.99 },
-        ],
-        list: [
-          { id: 'l1', chain: 'costco', price: 19.99, product: { chain: 'costco', name: 'Nuts', unitText: '$2.00 per 100 g' } },
-          { id: 'l2', chain: 'coles', price: 3 },
-        ],
-        ticked: [{ entry_id: 'l1', chain: 'costco', price: 19.99, total: 19.99, usual: 20, special: 1 }],
-      },
-    });
-    expect(JSON.stringify(e.tables)).not.toMatch(/19\.99|per 100 g/);
-    expect((e.tables.products as unknown[]).length).toBe(1);
-    expect((e.tables.list as { price: number | null }[]).map((l) => l.price)).toEqual([null, 3]);
-    expect(e.withheld).toEqual({ costco: { products: 1, prices: 1 } });
-    const clean = withoutCostco({ tables: { products: [{ id: 'p1', chain: 'coles' }] } });
-    expect(clean.withheld).toBeUndefined();
-  });
-});
 
 describe('docs/restock-import.md', () => {
   it("its example file reads as it says (two products, three prices), and the server's copy is the same", () => {

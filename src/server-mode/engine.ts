@@ -32,7 +32,7 @@
 // - card numbers are still blanked as they come in.
 // A phone's own choice of receipts (sync_meta share_receipts, "0" = off) now counts here too.
 
-import { isLocalOnlyShop, shopDef } from '../shops';
+import { isLocalOnlyShop, LOCAL_ONLY_SHOPS, shopDef } from '../shops';
 
 /** 0.9.6: the pseudo tab of records that never leave one phone (Costco's products and prices). Never in any shared set. SyncEngine.LOCAL_TAB. */
 const LOCAL_TAB = 'local';
@@ -666,6 +666,7 @@ export class WebSyncEngine {
   // ---------- 0.9.6: picks at Costco stay on their phone (SyncEngine.stripCostcoPicks) ----------
 
   private costcoIds(): Set<string> {
+    if (!LOCAL_ONLY_SHOPS.length) return new Set(); // 0.9.7: Costco is shared like any shop
     return new Set(this.db.query("SELECT id FROM products WHERE chain = 'costco'").map((r) => String(r.id)));
   }
 

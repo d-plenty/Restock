@@ -70,7 +70,7 @@ import {
   activeSections,
   costcoIsOn,
   enabledIn,
-  isLocalOnlyShop,
+  isLocalOnlyShop, isPressOnlyShop,
   SECTION_NAMES,
   SECTION_PLACE,
   SECTION_SHOPS,
@@ -421,7 +421,7 @@ export function AddScreen({
     setRecs({});
     setRecBusy([]);
     recFor.current = undefined;
-    const chains = chainsToSearch(s.enabledChains, sec).filter((c) => pressed || !isLocalOnlyShop(c));
+    const chains = chainsToSearch(s.enabledChains, sec).filter((c) => pressed || !isPressOnlyShop(c));
     setSearched(chains);
     setResults(Object.fromEntries(chains.map((c) => [c, { status: 'loading' }])));
     await Promise.all(chains.map((chain) => searchChain(chain, text, rq, searchStoreId(s, chain))));
@@ -2256,7 +2256,7 @@ function Stocktake({ section, onClose }: { section: Section; onClose: () => void
  * suggestions, recommendations). Never Costco: it is only ever asked when the person presses Search, one request.
  */
 function followAdapter(chain: string) {
-  return isLocalOnlyShop(chain) ? undefined : adapterFor(chain as StoreChain);
+  return isPressOnlyShop(chain) ? undefined : adapterFor(chain as StoreChain);
 }
 
 function storePreview(sp: StoreProduct): PreviewProduct {

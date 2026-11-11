@@ -32,6 +32,8 @@ import {
   openWoolworths,
   pickColesStore,
   signInColes,
+  signInCostco,
+  stopUsingCostco,
   signInWoolworths,
   stopUsingColes,
   stopUsingWoolworths,
@@ -41,16 +43,12 @@ import { ChainDot, Icon, LoadingBar, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
 import { money } from '../../lib/units';
 import {
-  COSTCO_BUY_ONLINE,
-  COSTCO_BUY_ONLINE_HELP,
   COSTCO_CANCEL,
   COSTCO_NOTICE,
   COSTCO_NOTICE_HEADING,
-  COSTCO_PHONE_ONLY_MESSAGE,
   COSTCO_SETTING_TITLE,
   COSTCO_SWITCH_HELP,
   COSTCO_SWITCH_HELP_ON,
-  COSTCO_SWITCH_LABEL,
   COSTCO_TURN_ON,
 } from '../../lib/costcoNotice';
 
@@ -798,6 +796,7 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
               </label>
             );
           })}
+          <CostcoRow settings={settings} />
           <ShopDropdownCustomOnly settings={settings} />
         </div>
         <div className="eyebrow">2 · Your branches</div>
@@ -806,7 +805,6 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
         <ManualNames settings={settings} section="pantry" />
         <div className="eyebrow">3 · Check your shops</div>
         <LocalPrices settings={settings} />
-        <CostcoSetting settings={settings} />
       </>
     );
   }
@@ -1344,18 +1342,13 @@ function LocalPrices({ settings }: { settings: Settings }) {
 }
 
 /**
- * 0.9.6: Costco on this phone. Off until the person reads the notice and turns it on; the notice stays
- * visible here afterwards. Not a household setting: it is this phone's own, so it is never in the list
- * of shops the household shares, and Costco is never searched by the server or the web page.
+ * 0.9.7: Costco, picked with the other supermarkets. Off by default; picking it shows the notice
+ * first. Once picked: the notice stays a tap away, and you can sign in for member prices.
  */
-export function CostcoSetting({ settings }: { settings: Settings }) {
+export function CostcoRow({ settings }: { settings: Settings }) {
   const [asking, setAsking] = useState(false);
-  const c = settings.costco;
-  const on = !!c?.on;
-  const turnOn = async () => {
-    setAsking(false);
-    await updateSettings({ costco: { on: true, buyOnline: c?.buyOnline, acceptedAt: nowIso() } });
-  };
+  const on = settings.enabledChains.includes('costco');
+  const signedIn = !!settings.accounts?.costco?.signedIn;
   const notice = (
     <div className="banner grey" role="note" style={{ fontSize: 13, flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
       <strong>{COSTCO_NOTICE_HEADING}</strong>
@@ -1366,47 +1359,62 @@ export function CostcoSetting({ settings }: { settings: Settings }) {
       </ul>
     </div>
   );
+  const pick = async () => {
+    setAsking(false);
+    const s = await getSettings();
+    await updateSettings({ costco: { ...s.costco, on: true, acceptedAt: nowIso() } });
+    await setShop('costco', true);
+  };
   return (
     <>
-      <div className="eyebrow">{COSTCO_SETTING_TITLE}</div>
-      <div className="card">
-        <label className="check" style={{ padding: 0 }}>
-          <span className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span className="title" style={{ fontSize: 15 }}>
-              {COSTCO_SWITCH_LABEL}
-            </span>
-            <span className="small">{on ? COSTCO_SWITCH_HELP_ON : COSTCO_SWITCH_HELP}</span>
-          </span>
-          <input
-            type="checkbox"
-            className="switch"
-            checked={on}
-            disabled={!isNative() && !on}
-            onChange={(e) => (e.target.checked ? setAsking(true) : void updateSettings({ costco: { on: false, buyOnline: c?.buyOnline, acceptedAt: c?.acceptedAt } }))}
-            aria-label={COSTCO_SWITCH_LABEL}
-          />
-        </label>
-        {!isNative() && <p className="small">{COSTCO_PHONE_ONLY_MESSAGE}</p>}
-        {notice}
-        {on && (
-          <label className="check" style={{ padding: 0 }}>
-            <input
-              type="checkbox"
-              checked={!!c?.buyOnline}
-              onChange={(e) => void updateSettings({ costco: { on: true, buyOnline: e.target.checked, acceptedAt: c?.acceptedAt } })}
-              aria-label={COSTCO_BUY_ONLINE}
-            />
-            <span className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span>{COSTCO_BUY_ONLINE}</span>
-              <span className="small">{COSTCO_BUY_ONLINE_HELP}</span>
-            </span>
-          </label>
-        )}
-      </div>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => (e.target.checked ? setAsking(true) : void setShop('costco', false))}
+          aria-label="Use Costco"
+        />
+        <ChainDot chain="costco" />
+        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <span>{COSTCO_SETTING_TITLE}</span>
+          <span className="small">{on ? COSTCO_SWITCH_HELP_ON : COSTCO_SWITCH_HELP}</span>
+        </span>
+      </label>
+      {on && (
+        <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <details className="explain">
+            <summary>
+              <Icon name="info" size={18} />
+              <span>About Costco prices</span>
+            </summary>
+            <div className="explain-body">{notice}</div>
+          </details>
+          {isNative() &&
+            (signedIn ? (
+              <div className="row" style={{ gap: 10 }}>
+                <span className="small grow">Signed in to Costco: searches show your member prices.</span>
+                <button className="btn small" onClick={() => void stopUsingCostco()}>
+                  Stop using my account
+                </button>
+              </div>
+            ) : (
+              <button
+                className="btn small"
+                onClick={() =>
+                  void signInCostco(() =>
+                    confirmAction('Did you sign in to Costco?', { detail: "Costco doesn't tell Restock, so just say if you did.", action: 'Yes, signed in' }),
+                  ).catch(() => undefined)
+                }
+              >
+                Sign in to Costco (optional)
+              </button>
+            ))}
+        </div>
+      )}
       {asking && (
         <Sheet title={COSTCO_SETTING_TITLE} onClose={() => setAsking(false)}>
           {notice}
-          <button className="btn primary" onClick={() => void turnOn()}>
+          <button className="btn primary" onClick={() => void pick()}>
             {COSTCO_TURN_ON}
           </button>
           <button className="btn" onClick={() => setAsking(false)}>

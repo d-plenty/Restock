@@ -21,7 +21,8 @@ export const LIMITS = {
 };
 
 /** The shop never imported or exported (Declan, 11 Nov 2026). */
-export const NEVER_SHOP = 'costco';
+// 0.9.7: Costco's prices are imported and exported like any shop's: no shop is left out any more.
+export const NEVER_SHOP = '\u0000';
 
 /** A price as sent. */
 export interface ImportPrice {

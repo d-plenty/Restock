@@ -49,8 +49,8 @@ final class SharedSettings {
 
     /** A built-in shop (not one people added). */
     static boolean builtIn(String id) {
-        // 0.9.6: Costco is one phone's own (shops.ts LOCAL_ONLY_SHOPS), never a household shop.
-        return id != null && !id.startsWith("custom-") && Shops.known(id) && !"costco".equals(id);
+        // 0.9.7: Costco is a household shop like the others.
+        return id != null && !id.startsWith("custom-") && Shops.known(id);
     }
 
     /** The built-in shops on a tab, sorted. */

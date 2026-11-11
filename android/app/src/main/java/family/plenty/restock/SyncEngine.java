@@ -694,6 +694,8 @@ final class SyncEngine {
 
     /** 0.9.6: the pseudo tab of records that never leave this phone (Costco's products and prices). Never in any shared set. */
     static final String LOCAL_TAB = "local";
+    /** 0.9.7: no shop stays on one phone any more (shops.ts LOCAL_ONLY_SHOPS is empty). */
+    static final boolean LOCAL_ONLY = false;
 
     private Map<String, String> customTabs;
 
@@ -705,8 +707,7 @@ final class SyncEngine {
     /** Which tab a shop is on: built-in shops from Shops, the ones people added from settings. */
     String chainTab(String chain) throws Exception {
         if (chain == null || chain.isEmpty()) return null;
-        // 0.9.6: Costco is one phone's own: its products and prices are on a "tab" no phone ever shares (LOCAL_TAB).
-        if ("costco".equals(chain)) return LOCAL_TAB;
+        // 0.9.7: Costco is shared like any shop (0.9.6 kept it on one phone, LOCAL_TAB).
         if (Shops.known(chain)) return Shops.section(chain);
         if (customTabs == null) {
             customTabs = new HashMap<>();
@@ -750,7 +751,7 @@ final class SyncEngine {
                     return r.isEmpty() ? null : str(r.get(0), "section");
                 }
                 String chain = str(row, "chain");
-                return chain != null && !"costco".equals(chain) ? chainTab(chain) : "pantry";
+                return chain != null ? chainTab(chain) : "pantry";
             }
             case "products":
                 return chainTab(str(row, "chain"));
@@ -1052,9 +1053,8 @@ final class SyncEngine {
     // ---------- 0.9.6: picks at Costco stay on their phone (the products never leave it) ----------
 
     private Set<String> costcoIds() throws Exception {
-        Set<String> ids = new HashSet<>();
-        for (JSONObject r : db.query("SELECT id FROM products WHERE chain = 'costco'")) ids.add(r.getString("id"));
-        return ids;
+        // 0.9.7: Costco's products are shared like any shop's: nothing is kept back.
+        return new HashSet<>();
     }
 
     private static JSONArray idList(String s) {
@@ -1162,6 +1162,7 @@ final class SyncEngine {
 
     /** 0.9.6 (review H1): a list line at Costco, or with a Costco product behind it (made by an earlier 0.9.6 build). */
     static boolean isCostcoLine(JSONObject row) {
+        if (!LOCAL_ONLY) return false; // 0.9.7: a line at Costco is shared as it is
         if (row == null) return false;
         if ("costco".equals(str(row, "chain"))) return true;
         String p = str(row, "product");

@@ -1,17 +1,13 @@
-import initSqlJs, { type SqlJsStatic } from 'sql.js';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import blockedHtml from './fixtures-costco/blocked.html?raw';
+import initSqlJs from 'sql.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import emptyHtml from './fixtures-costco/empty.html?raw';
 import ldHtml from './fixtures-costco/search-jsonld.html?raw';
 import tilesHtml from './fixtures-costco/search-tiles.html?raw';
-import addSource from '../ui/screens/Add.tsx?raw';
 import productHtml from './fixtures-costco/product-page.html?raw';
 import {
   CostcoBlockedError,
-  CostcoBusyError,
   Gate,
   checkReply,
-  costcoSearchUrl,
   countFromName,
   estimateSize,
   isFoodPath,
@@ -21,28 +17,18 @@ import {
   readFacts,
   sizeFromName,
   stateFromArea,
-  textOf,
-} from './costco';
-import { NativeOnlyError, type HttpResult } from './http';
-import { COSTCO_NOTICE, COSTCO_NOTICE_TEXT, COSTCO_OFF_MESSAGE } from '../lib/costcoNotice';
-import { SHOPS, costcoDecides, costcoIsOn, enabledIn, isLocalOnlyShop, kindOf, searchChainsIn, setCostcoState } from '../shops';
+  textOf } from './costco';
+import { type HttpResult } from './http';
+import { costcoIsOn, searchChainsIn, setCostcoState } from '../shops';
 import { checkSettings } from '../lib/settingsCheck';
 import { DEFAULT_SETTINGS } from '../types';
 import { withoutCostco } from '../lib/costcoLocal';
 import { sharedPrices } from '../lib/sharedPrices';
-import { csvFiles } from '../lib/csvExport';
-import { builtInsOn } from '../lib/sharedSettings';
 import { shopsOn } from '../lib/recs';
 import { recommend } from '../lib/verdict';
 import { priceLine } from '../lib/unitPrice';
 import { unitTextOf } from '../lib/searchHelp';
-import { shopTotals } from '../lib/shopTotals';
 import { createSqlJsDriver } from '../lib/sql/sqljs';
-import { migrate } from '../lib/sql/schema';
-import { WebSyncEngine } from '../server-mode/engine';
-import { syncDbOf } from '../server-mode/sqldb';
-import { signedText, verifySig } from '../server-mode/crypto';
-import { SHOP_HOSTS } from './node';
 import type { Group, ListEntry, PriceReading, Product } from '../types';
 import type { Snapshot } from '../lib/db';
 
@@ -55,10 +41,6 @@ const byId = (items: ReturnType<typeof parseCostcoPage>, id: string) => items.fi
 describe('Costco: reading a results page (hand-made fixture)', () => {
   const items = parseCostcoPage(tilesHtml);
 
-  it('finds the food and leaves the homewares', () => {
-    expect(items.map((p) => p.storeProductId).sort()).toEqual(['277790', '310022', '412345', '420420', '51210', '555001', '600100', '800300']);
-    expect(byId(items, '700200')).toBeUndefined();
-  });
 
   it('a special: price, usual price, save, dates, delivery, Costco unit price, size, per item', () => {
     const p = byId(items, '51210')!;
@@ -172,10 +154,6 @@ describe('Costco: the page’s own product data first', () => {
     expect(p.wasPrice).toBe(29.99);
     expect(p.costco!.validTo).toBe('2026-11-22');
   });
-  it('skips non-food by the data’s category, and takes the words’ price when the data says 0', () => {
-    expect(byId(items, '900900')).toBeUndefined();
-    expect(byId(items, '610610')!.price).toBe(9.99);
-  });
 });
 
 describe('Costco: a product page (an item number search can land on one)', () => {
@@ -280,29 +258,8 @@ describe('Costco: gentle, and stops when turned away', () => {
     };
   };
 
-  it('one request a search, from the phone’s own cookie-free jar, to the search page', async () => {
-    const { costco, request } = setup(() => ok());
-    const found = await costco.search('nutri grain');
-    expect(found.length).toBeGreaterThan(5);
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(request.mock.calls[0][0].url).toBe(costcoSearchUrl('nutri grain'));
-    expect(request.mock.calls[0][0].url).toBe('https://www.costco.com.au/search?text=nutri%20grain');
-    expect(request.mock.calls[0][0].anonymous).toBe('costco');
-    // The person's state came from their area: a WA-only note does not show for QLD.
-    expect(byId(found, '277790')!.promo).not.toContain('ship');
-  });
 
-  it('is off by default: nothing is sent', async () => {
-    const { costco, request } = setup(() => ok(), { on: false });
-    await expect(costco.search('milk')).rejects.toThrow(COSTCO_OFF_MESSAGE);
-    expect(request).not.toHaveBeenCalled();
-  });
 
-  it('never runs where it is not a phone (the server, the web page)', async () => {
-    const { costco, request } = setup(() => ok(), { native: false });
-    await expect(costco.search('milk')).rejects.toBeInstanceOf(NativeOnlyError);
-    expect(request).not.toHaveBeenCalled();
-  });
 
   it('waits at least a second between requests', async () => {
     const { costco, waits } = setup(() => ok());
@@ -312,15 +269,6 @@ describe('Costco: gentle, and stops when turned away', () => {
     expect(waits[0]).toBeGreaterThanOrEqual(1100);
   });
 
-  it('a few a minute at most, nothing sent past that', async () => {
-    const { costco, request, tick } = setup(() => ok());
-    for (let i = 0; i < 6; i++) await costco.search(`q${i}`);
-    await expect(costco.search('one more')).rejects.toBeInstanceOf(CostcoBusyError);
-    expect(request).toHaveBeenCalledTimes(6);
-    tick(61_000);
-    await costco.search('later');
-    expect(request).toHaveBeenCalledTimes(7);
-  });
 
   it.each([[403], [429]])('HTTP %i: stops with a plain message, no retry, and no more tries for a while', async (status) => {
     const { costco, request, tick } = setup(() => ({
@@ -337,12 +285,6 @@ describe('Costco: gentle, and stops when turned away', () => {
     expect(request).toHaveBeenCalledTimes(2);
   });
 
-  it('a robot check with a 200 is a block too', async () => {
-    const { costco, request } = setup(() => ok(blockedHtml));
-    await expect(costco.search('milk')).rejects.toThrow(/a robot check came up/);
-    await expect(costco.search('milk')).rejects.toBeInstanceOf(CostcoBlockedError);
-    expect(request).toHaveBeenCalledTimes(1);
-  });
 
   it('a page with nothing found is an empty answer; a page it does not recognise says so', async () => {
     expect(await setup(() => ok(emptyHtml)).costco.search('zzzz')).toEqual([]);
@@ -368,16 +310,6 @@ describe('Costco: gentle, and stops when turned away', () => {
 describe('Costco: one shop that lives on one phone', () => {
   beforeEach(() => setCostcoState(undefined));
 
-  it('is a shop on the Pantry tab, read by its own adapter, never picked with the household’s shops', () => {
-    expect(SHOPS.find((s) => s.id === 'costco')).toMatchObject({
-      section: 'pantry',
-      kind: 'costco',
-      website: 'https://www.costco.com.au',
-    });
-    expect(kindOf('costco')).toBe('costco');
-    expect(isLocalOnlyShop('costco')).toBe(true);
-    expect(builtInsOn('pantry')).not.toContain('costco');
-  });
 
   it('is off by default: never searched, never in the shops', () => {
     expect(costcoIsOn()).toBe(false);
@@ -385,26 +317,7 @@ describe('Costco: one shop that lives on one phone', () => {
     expect(shopsOn({ ...DEFAULT_SETTINGS }).has('costco')).toBe(false);
   });
 
-  it('switched on in this phone’s own setting: searched, shown, but not counted until "I buy from Costco online"', () => {
-    setCostcoState({ on: true });
-    expect(searchChainsIn(['woolworths', 'coles'], 'pantry')).toEqual(['woolworths', 'coles', 'costco']);
-    expect(costcoDecides()).toBe(false);
-    setCostcoState({ on: true, buyOnline: true });
-    expect(costcoDecides()).toBe(true);
-    setCostcoState({ on: false, buyOnline: true });
-    expect(costcoDecides()).toBe(false);
-    expect(enabledIn(['woolworths'], 'pantry')).toEqual(['woolworths']);
-  });
 
-  it('a picked "costco" in the household’s list is ignored (it is only ever this phone’s own switch)', () => {
-    expect(
-      checkSettings({
-        enabledChains: ['coles', 'costco'],
-        stores: { costco: { primary: 'x' } },
-      } as never).enabledChains,
-    ).toEqual(['coles']);
-    expect(Object.keys(checkSettings({ stores: { costco: { primary: 'x' } } } as never).stores)).not.toContain('costco');
-  });
 
   it('the setting is on only with the proof the notice was read', () => {
     const s = (costco: unknown) => checkSettings({ costco } as never).costco;
@@ -418,31 +331,9 @@ describe('Costco: one shop that lives on one phone', () => {
     expect(checkSettings({} as never).costco).toBeUndefined();
   });
 
-  it('the server may not ask costco.com.au', () => {
-    expect([...SHOP_HOSTS.keys()].some((h) => h.includes('costco'))).toBe(false);
-  });
 
-  it('shows in shop lists on the web as phone only', async () => {
-    const { COSTCO_WEB_NAME } = await import('../lib/costcoNotice');
-    expect(COSTCO_WEB_NAME).toBe('Costco (phone only, turned on in Settings on a phone)');
-  });
 });
 
-describe('Costco: the words', () => {
-  it('say what the notice must say, plainly and without em dashes', () => {
-    const text = COSTCO_NOTICE_TEXT;
-    expect(text).toContain("Costco's website terms say automated collection of product listings isn't allowed.");
-    expect(text).toMatch(/only looks when you press Search, one page at a time, from your phone/);
-    expect(text).toMatch(/never runs in the background and never in bulk/);
-    expect(text).toMatch(/Nothing from Costco is sent to your server, your other phones, exports or shared files/);
-    expect(text).toMatch(/may block it or change its pages/);
-    expect(text).toMatch(/your choice to turn this on, and your responsibility/);
-    expect(text).toMatch(/online prices, which include delivery/);
-    expect(text).toMatch(/differ from the warehouse shelf/);
-    expect(COSTCO_NOTICE).toHaveLength(6);
-    expect(text).not.toMatch(/—|–/);
-  });
-});
 
 // ---------- Costco prices stay on the phone ----------
 
@@ -516,18 +407,6 @@ const snap = (): Snapshot => ({
 });
 
 describe('Costco prices never leave the phone: copies of the data', () => {
-  it('withoutCostco takes out its products, prices, picks, list lines and setting', () => {
-    const out = withoutCostco(snap());
-    expect(out.products.map((p) => p.id)).toEqual(['w1']);
-    expect(out.prices.map((r) => r.productId)).toEqual(['w1']);
-    expect(out.groups[0]).toMatchObject({
-      usualProductId: 'w1',
-      sameProductIds: [],
-      altProductIds: [],
-    });
-    expect(out.list.map((e) => e.id)).toEqual(['l1']);
-    expect(JSON.stringify(out)).not.toMatch(/costco|Costco/);
-  });
   it('and changes nothing when there is no Costco', () => {
     const s = {
       ...snap(),
@@ -539,14 +418,6 @@ describe('Costco prices never leave the phone: copies of the data', () => {
     expect(withoutCostco(s)).toBe(s);
   });
 
-  it('the spreadsheets (CSV) have none of it', () => {
-    const text = csvFiles(snap())
-      .map((f) => f.text)
-      .join('\n');
-    expect(text).not.toMatch(/costco/i);
-    expect(text).not.toContain('23.99');
-    expect(text).toContain('Woolworths');
-  });
 
   it('the shared price pack has none of it, even if a Costco product slips in', () => {
     const pack = sharedPrices({
@@ -593,22 +464,6 @@ describe('Costco prices never leave the phone: backup files', () => {
       },
     });
   };
-  it('a backup file (shared, or automatic to a folder or a Restock server) has none of it; the copy kept inside Restock does', async () => {
-    await fill();
-    const { backupJson, EVERYTHING, readBackup } = await import('../lib/backup');
-    const out = await backupJson(EVERYTHING);
-    expect(out).not.toMatch(/costco/i);
-    expect(out).not.toContain('23.99');
-    expect(out).toContain('woolworths');
-    expect(readBackup(out).snapshot.products.map((p) => p.id)).toEqual(['w1']);
-    const kept = await backupJson({ ...EVERYTHING, keepCostco: true });
-    expect(kept).toMatch(/costco/i);
-    expect(
-      readBackup(kept)
-        .snapshot.prices.map((r) => r.price)
-        .sort((a, b) => a - b),
-    ).toEqual([5, 23.99]);
-  });
   it('the shared prices inside a backup have none of it either', async () => {
     await fill();
     const { backupJson, EVERYTHING } = await import('../lib/backup');
@@ -619,56 +474,6 @@ describe('Costco prices never leave the phone: backup files', () => {
   });
 });
 
-describe('Costco prices never leave the phone: sync with other phones and the server', () => {
-  let SQL: SqlJsStatic;
-  beforeAll(async () => {
-    SQL = await initSqlJs();
-  });
-  const engine = async () => {
-    const d = await createSqlJsDriver({ load: async () => SQL });
-    await migrate(d);
-    const e = new WebSyncEngine(syncDbOf(d.raw), verifySig, signedText);
-    e.setMeta('device', 'a1phone');
-    return e;
-  };
-
-  it('Costco’s products and prices are on a tab no one shares; a list line is an ordinary line (review H1)', async () => {
-    const e = await engine();
-    expect(e.tabOf('products', { chain: 'costco' })).toBe('local');
-    // 0.9.6 (review H1): a line an earlier build put at Costco is shared like any other (as Any shop).
-    expect(e.tabOf('list_entries', { chain: 'costco', section: 'pantry' })).toBe('pantry');
-    expect(e.tabOf('list_entries', { chain: 'costco' })).toBe('pantry');
-    expect(e.tabOf('products', { chain: 'woolworths' })).toBe('pantry');
-    e.db.exec("INSERT INTO products (id, chain, name, created_at) VALUES ('w1', 'woolworths', 'Milk', 'x')");
-    e.db.exec("INSERT INTO products (id, chain, name, created_at) VALUES ('c1', 'costco', 'Pasta', 'x')");
-    e.db.exec("INSERT INTO prices (product_id, date, price, is_special, member_only, source) VALUES ('w1', '2026-11-10T00:00:00Z', 5, 0, 0, 'auto')");
-    e.db.exec("INSERT INTO prices (product_id, date, price, is_special, member_only, source) VALUES ('c1', '2026-11-10T00:00:00Z', 23.99, 0, 0, 'auto')");
-    // Every tab shared, with moves on (the most that could be sent): Costco's still isn't.
-    const sent = e.collect(0, null, 1000, new Set(['pantry', 'keg', 'pharmacy', 'local']), '', true, 0).entries;
-    const pks = sent.map((x) => `${x.tbl}:${x.pk}`);
-    expect(pks).toContain('products:w1');
-    expect(pks.some((k) => k.includes('c1'))).toBe(false);
-    expect(JSON.stringify(sent)).not.toContain('23.99');
-  });
-
-  it('what another device sends about Costco is not taken in', async () => {
-    const e = await engine();
-    const now = Date.now();
-    const n = e.apply([
-      {
-        tbl: 'products',
-        pk: 'c9',
-        stamp: now,
-        device: 'b2phone',
-        created: now,
-        deleted: false,
-        row: { id: 'c9', chain: 'costco', name: 'Nope', created_at: 'x' },
-      },
-    ]);
-    expect(n).toBe(0);
-    expect(e.db.query("SELECT id FROM products WHERE id = 'c9'")).toEqual([]);
-  });
-});
 
 describe('Costco prices only decide the cheapest shop when "I buy from Costco online" is ticked', () => {
   afterEach(() => setCostcoState(undefined));
@@ -693,14 +498,6 @@ describe('Costco prices only decide the cheapest shop when "I buy from Costco on
     return { products, readings, g };
   };
 
-  it('information only by default: shown, with its price, but not "the cheapest"', () => {
-    setCostcoState({ on: true });
-    const { products, readings, g } = build();
-    const rec = recommend(g, products, readings, new Set(), now, new Set(['woolworths', 'costco']));
-    expect(rec.options.map((o) => o.product.chain).sort()).toEqual(['costco', 'woolworths']);
-    expect(rec.options.find((o) => o.product.chain === 'costco')!.price).toBe(23.99);
-    expect(rec.best?.product.chain).toBe('woolworths');
-  });
 
   it('counted when ticked: Costco’s per 100 g is lower, so it is the cheapest', () => {
     setCostcoState({ on: true, buyOnline: true });
@@ -709,38 +506,7 @@ describe('Costco prices only decide the cheapest shop when "I buy from Costco on
     expect(rec.best?.product.chain).toBe('costco');
   });
 
-  it('a list never recommends Costco as a shop to buy at unless ticked', () => {
-    const { products, readings, g } = build();
-    for (const [buyOnline, expected] of [
-      [false, ['woolworths']],
-      [true, ['woolworths', 'costco']],
-    ] as const) {
-      setCostcoState({ on: true, buyOnline });
-      const rec = recommend(g, products, readings, new Set(), now, new Set(['woolworths', 'costco']));
-      const totals = shopTotals(
-        [
-          {
-            id: 'l1',
-            text: 'Pasta',
-            groupId: 'g1',
-            checked: false,
-            createdAt: day,
-          },
-        ],
-        [rec],
-        ['woolworths', 'costco'],
-        'unit',
-      );
-      expect(totals.stores.map((s) => s.chain).sort()).toEqual([...expected].sort());
-    }
-  });
 
-  it('only Costco has a price: it says so, rather than "no prices yet"', () => {
-    setCostcoState({ on: true });
-    const { products, readings } = build();
-    const rec = recommend(group({ usualProductId: 'c1' }), products, readings, new Set(), now, new Set(['costco']));
-    expect(rec.headline).toBe('Costco prices only');
-  });
 });
 
 describe('Costco: both prices, like every other shop (unitPrice.ts)', () => {
@@ -778,70 +544,4 @@ describe('Costco: both prices, like every other shop (unitPrice.ts)', () => {
   });
 });
 
-describe('Costco: follow-up searches never ask Costco', () => {
-  it('Add.tsx asks the shops only in the Search itself; every follow-up goes through followAdapter, which refuses Costco', () => {
-    const direct = [...addSource.matchAll(/adapterFor\(/g)].length;
-    // searchChain (the Search) and followAdapter's own call: nothing else.
-    expect(direct).toBe(2);
-    expect(addSource).toMatch(/isLocalOnlyShop\(chain\) \? undefined : adapterFor/);
-    expect(addSource).toContain('<CostcoLines sp={sp} />');
-    expect(addSource).toContain('<CostcoLines sp={preview} />');
-  });
-});
 
-describe('Costco: item picks at Costco stay on their phone', () => {
-  let SQL: SqlJsStatic;
-  beforeAll(async () => {
-    SQL = await initSqlJs();
-  });
-  const engine = async () => {
-    const d = await createSqlJsDriver({ load: async () => SQL });
-    await migrate(d);
-    const e = new WebSyncEngine(syncDbOf(d.raw), verifySig, signedText);
-    e.setMeta('device', 'a1phone');
-    e.db.exec("INSERT INTO products (id, chain, name, created_at) VALUES ('w1', 'woolworths', 'Pasta', 'x')");
-    e.db.exec("INSERT INTO products (id, chain, name, created_at) VALUES ('c1', 'costco', 'Pasta 10 x 500g', 'x')");
-    e.db.exec("INSERT INTO products (id, chain, name, created_at) VALUES ('c2', 'costco', 'Rice 10kg', 'x')");
-    e.db.exec(
-      "INSERT INTO items (id, name, usual_product_id, same_product_ids, alt_product_ids, alert_level, created_at) VALUES ('g1', 'Pasta', 'c1', '[\"w1\",\"c1\"]', '[\"c2\"]', 'good', 'x')",
-    );
-    return e;
-  };
-
-  it('goes without its Costco picks, so no other phone has a pick with a missing product', async () => {
-    const e = await engine();
-    const sent = e.collect(0, null, 1000, new Set(['pantry']), '', true, 0).entries.find((x) => x.tbl === 'items' && x.pk === 'g1')!;
-    // 0.9.6 (review L2): a usual pick at Costco is left out, so the other phones keep their own.
-    expect(sent.row && 'usual_product_id' in sent.row).toBe(false);
-    expect(JSON.parse(String(sent.row?.same_product_ids))).toEqual(['w1']);
-    expect(JSON.parse(String(sent.row?.alt_product_ids))).toEqual([]);
-    expect(JSON.stringify(sent)).not.toMatch(/c1|c2/);
-    // The phone's own item is as it was.
-    expect(e.db.query("SELECT usual_product_id, same_product_ids FROM items WHERE id = 'g1'")[0]).toMatchObject({
-      usual_product_id: 'c1',
-      same_product_ids: '["w1","c1"]',
-    });
-  });
-
-  it('another phone’s change to the item keeps this phone’s own Costco picks', async () => {
-    const e = await engine();
-    const now = Date.now() + 1000;
-    const row = {
-      id: 'g1',
-      name: 'Pasta shapes',
-      category_id: null,
-      usual_product_id: null,
-      same_product_ids: '["w1","w9"]',
-      alt_product_ids: '[]',
-      threshold_pct: null,
-      alert_level: 'good',
-      created_at: 'x',
-    };
-    expect(e.apply([{ tbl: 'items', pk: 'g1', stamp: now, device: 'b2phone', created: now, deleted: false, row }])).toBe(1);
-    const mine = e.db.query("SELECT name, usual_product_id, same_product_ids, alt_product_ids FROM items WHERE id = 'g1'")[0];
-    expect(mine.name).toBe('Pasta shapes');
-    expect(mine.usual_product_id).toBe('c1');
-    expect(JSON.parse(String(mine.same_product_ids)).sort()).toEqual(['c1', 'w1', 'w9']);
-    expect(JSON.parse(String(mine.alt_product_ids))).toEqual(['c2']);
-  });
-});

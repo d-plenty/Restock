@@ -33,4 +33,4 @@
 
 <p><b>Private by design.</b> Everything stays in a database on your phone. No account, no ads, no analytics, no tracking, and no Google Play services. The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists), and to your own Home Assistant and Restock server if you connect them. Nothing goes to the people who make Restock.</p>
 
-<p>Restock isn't connected with any shop or government agency. Prices can be wrong or out of date. Costco is off until you turn it on: its website terms ask people not to collect its listings, so Restock shows a notice first and only looks when you press Search. It reads each shop's public website from your phone, so the shops' own terms and privacy policies apply to those visits.</p>
+<p>Restock isn't connected with any shop or government agency. Prices can be wrong or out of date. Costco is off until you pick it: its website terms ask people not to collect its listings, so Restock shows a notice first and only looks when you press Search. It reads each shop's public website from your phone, so the shops' own terms and privacy policies apply to those visits.</p>

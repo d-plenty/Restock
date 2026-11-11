@@ -57,7 +57,6 @@ java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncTest096 "$O"
 # 0.9.6: Wi-Fi sync is its own feature, off in a server's house unless set up (an earlier real use is kept).
 java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncWifiTest096 "$O"
 # 0.9.6 (review H1, L2): Costco and the shared shopping list and items.
-java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncCostcoTest096 "$O"
 
 bash tools/sync-test/web-parity.sh
 # 0.9.4: Home Assistant's round in Java (HaSync.java) against haSync.ts, on shared fixtures.

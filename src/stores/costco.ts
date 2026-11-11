@@ -3,7 +3,6 @@ import {
   COSTCO_CHANGED_MESSAGE,
   COSTCO_BUSY_MESSAGE,
   COSTCO_MEMBER_ONLY,
-  COSTCO_OFF_MESSAGE,
   COSTCO_OUT_OF_STOCK,
   COSTCO_PRICE_INCLUDES_DELIVERY,
   COSTCO_PRICE_SHIPPING_AT_CHECKOUT,
@@ -14,10 +13,11 @@ import {
   costcoSpecialUntil,
 } from '../lib/costcoNotice';
 import { formatUnitPrice, money, packSize } from '../lib/units';
-import { isNative, NativeOnlyError, request, sleep, type HttpResult } from './http';
+import { isNative, NativeOnlyError, request, sleep, viaBrowser, type HttpResult } from './http';
 import type { CostcoInfo, StoreAdapter, StoreProduct } from './types';
 
-// 0.9.6: Costco (costco.com.au), for food, read from its public pages on a phone.
+// 0.9.6: Costco (costco.com.au). 0.9.7: everything Costco sells (not just food), as an ordinary shop,
+// asked from inside Costco's own page on the phone (so a sign-in gives member prices).
 //
 // Costco's website terms ask people not to collect product listings by automated means. Declan
 // decided to build this anyway for family use, so it is kept as small and gentle as it can be:
@@ -45,6 +45,12 @@ const MAX_RESULTS = 40;
 const MAX_TERM = 80;
 
 export const costcoSearchUrl = (term: string) => `${SITE}/search?text=${encodeURIComponent(term)}`;
+/**
+ * 0.9.7: the product search Costco's own website uses (SAP Commerce, "australia" site). Not yet seen
+ * from a real phone: if it isn't there, the search page above is read instead.
+ */
+export const costcoApiUrl = (term: string) =>
+  `${SITE}/rest/v2/australia/products/search?query=${encodeURIComponent(term)}&fields=FULL&pageSize=24&lang=en_AU&curr=AUD`;
 
 // ---------- being gentle ----------
 
@@ -578,7 +584,7 @@ export function stateFromArea(label: string | undefined): string | undefined {
 
 /**
  * The products on a Costco search page (or a product page the search went straight to): JSON-LD first,
- * then the words in each result tile. Food only. Never throws on a page it can't read: returns what it
+ * then the words in each result tile. Never throws on a page it can't read: returns what it
  * could. `state` is the person's, so "Can't ship to WA" shows only for them.
  */
 export function parseCostcoPage(html: string, state?: string): StoreProduct[] {
@@ -635,7 +641,6 @@ export function parseCostcoPage(html: string, state?: string): StoreProduct[] {
     }
   }
   return raws
-    .filter((r) => isFoodPath(r.category))
     .map((r) => buildProduct(r, state))
     .filter((p) => p.price !== undefined || p.memberOnly || p.inStock === false)
     .slice(0, MAX_RESULTS);
@@ -645,8 +650,10 @@ export function parseCostcoPage(html: string, state?: string): StoreProduct[] {
 
 export interface Deps {
   isNative: () => boolean;
-  settings: () => { costco?: { on: boolean }; area?: { label: string } } | undefined;
+  settings: () => { area?: { label: string } } | undefined;
   request: (opts: Parameters<typeof request>[0]) => Promise<HttpResult>;
+  /** 0.9.7: a request from inside Costco's own page in the app (its cookies, so a sign-in counts). */
+  browser?: (url: string) => Promise<HttpResult>;
   gate: Gate;
 }
 
@@ -659,39 +666,82 @@ export function checkReply(res: HttpResult): void {
   if (why && !/\/p\/\d{3,10}/.test(res.text)) throw new CostcoBlockedError(why);
 }
 
+/** 0.9.7: products from Costco's product search answer (JSON). Undefined when it isn't that answer. */
+export function parseCostcoApi(text: string, state?: string): StoreProduct[] | undefined {
+  let j: unknown;
+  try {
+    j = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (!isObj(j) || !Array.isArray(j.products)) return undefined;
+  const raws: RawCostco[] = [];
+  for (const o of j.products as unknown[]) {
+    if (!isObj(o)) continue;
+    const id = str(o.code);
+    const name = str(o.name) ?? str(o.englishName);
+    if (!id || !name) continue;
+    const price = isObj(o.price) ? (typeof o.price.value === 'number' ? Math.round(o.price.value * 100) / 100 : cents(str(o.price.formattedValue))) : undefined;
+    const img = Array.isArray(o.images) ? (o.images as unknown[]).find((x) => isObj(x) && str(x.url)) : undefined;
+    const stock = isObj(o.stock) ? str(o.stock.stockLevelStatus) : undefined;
+    const url = str(o.url);
+    const words = [str(o.summary), str(o.description)].filter(Boolean).join(' ');
+    raws.push({
+      id,
+      name: decode(name.replace(/<[^>]+>/g, '')),
+      url: url ? abs(url) : `${SITE}/p/${id}`,
+      imageUrl: isObj(img) ? abs(String(img.url)) : undefined,
+      brand: str(o.manufacturer),
+      price,
+      inStock: stock ? !/outofstock|out_of_stock/i.test(stock) : undefined,
+      text: textOf(words).slice(0, 2000),
+    });
+  }
+  return raws
+    .map((r) => buildProduct(r, state))
+    .filter((p) => p.price !== undefined || p.memberOnly || p.inStock === false)
+    .slice(0, MAX_RESULTS);
+}
+
 export function makeCostco(deps: Deps): StoreAdapter {
   return {
     chain: 'costco',
     async search(term: string): Promise<StoreProduct[]> {
-      // Never from the server or the web page: only the phone's own HTTP, and only with Costco switched on.
-      if (!deps.isNative()) throw new NativeOnlyError();
-      const s = deps.settings();
-      if (!s?.costco?.on) throw new Error(COSTCO_OFF_MESSAGE);
+      // Only when someone presses Search (the caller makes sure). On a phone it asks from inside
+      // Costco's own page (cookies, sign-in); on the server, a plain request.
       const q = term.trim().replace(/\s+/g, ' ').slice(0, MAX_TERM);
       if (!q) return [];
+      const s = deps.settings();
+      const state = stateFromArea(s?.area?.label);
+      const get = async (url: string, accept: string): Promise<HttpResult> => {
+        try {
+          if (deps.isNative() && deps.browser) return await deps.browser(url);
+          return await deps.request({ url, headers: { Accept: accept, 'Accept-Language': 'en-AU,en;q=0.9' }, anonymous: JAR, timeoutMs: 20_000 });
+        } catch (e) {
+          if (e instanceof NativeOnlyError) throw e;
+          throw new Error(`Couldn't reach ${NAME} just now. Check your internet, then try again.`);
+        }
+      };
       await deps.gate.turn();
-      let res: HttpResult;
-      try {
-        res = await deps.request({
-          url: costcoSearchUrl(q),
-          headers: {
-            Accept: 'text/html,application/xhtml+xml',
-            'Accept-Language': 'en-AU,en;q=0.9',
-          },
-          anonymous: JAR,
-          timeoutMs: 20_000,
-        });
-      } catch (e) {
-        if (e instanceof NativeOnlyError) throw e;
-        throw new Error(`Couldn't reach ${NAME} just now. Check your internet, then try again.`);
+      // 1. Costco's own product search (what its website asks for).
+      const api = await get(costcoApiUrl(q), 'application/json');
+      if (api.status === 403 || api.status === 429) {
+        deps.gate.block();
+        throw new CostcoBlockedError(`HTTP ${api.status}`);
       }
+      if (api.status === 200) {
+        const items = parseCostcoApi(api.text, state);
+        if (items) return items;
+      }
+      // 2. The search page itself.
+      const res = await get(costcoSearchUrl(q), 'text/html,application/xhtml+xml');
       try {
         checkReply(res);
       } catch (e) {
         if (e instanceof CostcoBlockedError) deps.gate.block();
         throw e;
       }
-      const items = parseCostcoPage(res.text, stateFromArea(s.area?.label));
+      const items = parseCostcoPage(res.text, state);
       if (
         !items.length &&
         res.text.length > 2000 &&
@@ -710,5 +760,6 @@ export const costco: StoreAdapter = makeCostco({
   isNative,
   settings: () => cachedSettings(),
   request,
+  browser: (url) => viaBrowser('costco', 'GET', url),
   gate: costcoGate,
 });

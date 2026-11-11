@@ -1,6 +1,6 @@
 import { adapterFor } from '../stores';
 import type { Chain } from '../types';
-import { isLocalOnlyShop, kindOf, sectionOf } from '../shops';
+import { isPressOnlyShop, kindOf, sectionOf } from '../shops';
 import { getKV, putKV } from './db';
 
 // How each store's connection has been going: the last time it worked, and since when it's
@@ -64,7 +64,7 @@ export interface ConnectionTest {
 export async function testConnections(chains: StoreChain[], storeIds: Partial<Record<StoreChain, string | undefined>>): Promise<ConnectionTest[]> {
   const results = await Promise.all(
     // 0.9.6: never Costco: it is only searched one page at a time, when a person presses Search.
-    chains.filter((c) => !isLocalOnlyShop(c)).map(async (chain): Promise<ConnectionTest> => {
+    chains.filter((c) => !isPressOnlyShop(c)).map(async (chain): Promise<ConnectionTest> => {
       const t0 = Date.now();
       const word = { pantry: 'milk', keg: 'beer', pharmacy: 'paracetamol' }[sectionOf(chain)];
       try {

@@ -524,7 +524,7 @@ export function recommend(
   const base: Recommendation = { group, options, action: 'none', headline: 'Usual prices', detail: '', byUnit, sizeUnknown: unsized.length ? unsized : undefined };
   if (!priced.length)
     return options.some((o) => o.price !== undefined)
-      ? { ...base, headline: 'Costco prices only', detail: 'Costco prices show for information. Tick "I buy from Costco online" in Settings to count them.' }
+      ? { ...base, headline: 'Costco prices only', detail: "Costco's online prices, which include delivery." }
       : { ...base, headline: 'No prices yet', detail: 'Check prices or add one by hand.' };
 
   // Out-of-stock products only count when nothing else is available.

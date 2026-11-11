@@ -355,7 +355,7 @@ export function ImportCard({ onDone }: { onDone?: () => void }) {
           how to make a file
         </a>
         . Only import prices you're allowed to use: shops' websites have terms of use, and some don't allow collecting their prices with automated tools. Restock doesn't fetch shops
-        for you here. Card numbers, PINs, passwords, keys and receipts are never imported, and Costco prices never go in or out.
+        for you here. Card numbers, PINs, passwords, keys and receipts are never imported.
       </span>
       {open && (
         <ImportSheet

@@ -1,5 +1,5 @@
 import type { Snapshot } from './db';
-import { isLocalOnlyShop } from '../shops';
+import { isLocalOnlyShop, LOCAL_ONLY_SHOPS } from '../shops';
 import type { Group, ListEntry } from '../types';
 
 // 0.9.6: Costco's prices stay on the phone (lib/costcoNotice.ts says so in the app). This is the one
@@ -17,6 +17,7 @@ type Part = Pick<Snapshot, 'products' | 'prices'> & Partial<Pick<Snapshot, 'grou
  * list line for Costco, and this phone's Costco setting. Everything else is as it was.
  */
 export function withoutCostco<T extends Part>(s: T): T {
+  if (!LOCAL_ONLY_SHOPS.length) return s; // 0.9.7: Costco is an ordinary shop, in every copy like the rest
   const gone = new Set(s.products.filter((p) => isLocalOnlyShop(p.chain)).map((p) => p.id));
   const anyList = !!s.list?.some((e) => isLocalOnlyShop(e.chain) || isLocalOnlyShop(e.product?.chain));
   const settings = s.kv?.find((k) => k.key === 'settings');
@@ -107,6 +108,7 @@ export function costcoOf(s: Pick<Snapshot, 'products' | 'prices' | 'groups' | 'k
  * it still removes everything.
  */
 export function withCostcoKept<T extends Snapshot>(backup: T, here: CostcoHere): T {
+  if (!LOCAL_ONLY_SHOPS.length) return backup; // 0.9.7: backups have Costco's data like the rest
   if (backup.products.some((p) => isLocalOnlyShop(p.chain)) || settingOf(backup.kv) !== undefined) return backup;
   if (!here.products.length && here.setting === undefined) return backup;
   const mine = new Map(here.groups.map((g) => [g.id, g]));
