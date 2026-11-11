@@ -15,6 +15,8 @@ import { BackupSheet, BranchSheet, KeepDataFor, PassphraseV3, RecoverySheet, Sig
 import { ADMIN_NOTE, canAdmin, house, saveHouseSettings, useHouseSettings } from './houseData';
 import { HA_SHARED } from './ServerHomeAssistant';
 import { WebSearchSwitch } from './WebShopSearch'; // 0.9.5 (web search)
+import { PhoneOnlyNote } from './PhoneOnly';
+import { COSTCO_WEB_NAME, COSTCO_WEB_NOTE } from '../../lib/costcoNotice';
 import {
   categoriesData,
   downloadBrowserBackup,
@@ -198,6 +200,14 @@ function ShopsSheet({ tab, onClose }: { tab: ShopsForTab; onClose: () => void })
           </label>
         ))}
       </fieldset>
+      {tab.section === 'pantry' && (
+        <>
+          <p className="small" style={{ margin: 0 }}>
+            {COSTCO_WEB_NAME}
+          </p>
+          <PhoneOnlyNote compact text={COSTCO_WEB_NOTE} />
+        </>
+      )}
       <button className="btn primary" disabled={busy} onClick={() => void save()}>
         Save for every phone
       </button>
@@ -343,6 +353,10 @@ function HouseholdPart() {
             )}
           </Line>
         ))}
+        {/* 0.9.6: Costco is looked up on a phone only (never here), turned on in a phone's own Settings. */}
+        <Line title={COSTCO_WEB_NAME} sub={COSTCO_WEB_NOTE} greyed>
+          <PhoneOnlyNote compact text="Turn Costco on in Settings on a phone." />
+        </Line>
         {v3 ? (
           <Line title="Which branch" sub="The household's usual branch of each shop, for phones that haven't picked their own. A phone's own pick always wins.">
             <button className="btn small" onClick={() => setBranches(true)}>
@@ -528,8 +542,8 @@ function HouseholdPart() {
           title={v3 ? "Download this browser's copy" : 'Download a backup'}
           sub={
             v3
-              ? "What this browser has, as a Restock backup file a phone can restore. Not encrypted, and no loyalty card numbers. For everything the server keeps, use Encrypted backup above."
-              : "Everything this browser has, as a Restock backup file. Loyalty card numbers aren't in it: they never leave the phones."
+              ? "What this browser has, as a Restock backup file a phone can restore. Not encrypted, and no card numbers. For everything the server keeps, use Encrypted backup above."
+              : "Everything this browser has, as a Restock backup file. Card numbers aren't in it: cards never go to the server."
           }
         >
           <button

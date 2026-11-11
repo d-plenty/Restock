@@ -22,6 +22,7 @@ const KEYS: Record<string, string> = {
   products: 'id',
   list_entries: 'id',
   cards: 'id',
+  gift_cards: 'id', // 0.9.6 (cards)
   categories: 'id',
   receipts: 'id',
   prices: 'id',

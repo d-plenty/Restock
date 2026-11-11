@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { addListEntry, allGroups, nowIso, uid } from '../../lib/db';
+import { unitTextOf } from '../../lib/searchHelp';
 import { likeYourPantry, loadSpecials, type SpecialsList } from '../../lib/specials';
 import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
@@ -98,6 +99,8 @@ export function SpecialsScreen() {
                         <strong className="num">{money(p.price)}</strong>
                         {p.wasPrice ? ` · was ${money(p.wasPrice)}` : ''}
                       </span>
+                      {/* 0.9.6: both prices, per item then per litre or per 100 g. */}
+                      {unitTextOf(p) && <span className="small num">{unitTextOf(p)}</span>}
                     </span>
                     <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <button className="btn small primary" onClick={() => void addToList(p)} aria-label={`Add ${p.name} to your shopping list`}>

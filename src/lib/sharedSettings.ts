@@ -45,7 +45,7 @@
 //                                                  a phone that hasn't picked its own (StoreChoice
 //                                                  primary empty, or still the default it took)
 
-import { SHOPS, shopDef, type CustomShop, type Section } from '../shops';
+import { SHOPS, isLocalOnlyShop, shopDef, type CustomShop, type Section } from '../shops';
 import { siteOf } from './site';
 
 export const ALL_TABS: Section[] = ['pantry', 'keg', 'pharmacy'];
@@ -71,10 +71,11 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** A built-in shop's id (not one people added). */
-export const builtIn = (id: string): boolean => !id.startsWith('custom-') && !!shopDef(id);
+// 0.9.6: Costco is this phone's own (shops.ts LOCAL_ONLY_SHOPS), never a household shop.
+export const builtIn = (id: string): boolean => !id.startsWith('custom-') && !!shopDef(id) && !isLocalOnlyShop(id);
 
 /** The built-in shops on a tab, in shops.ts order. */
-export const builtInsOn = (tab: string): string[] => SHOPS.filter((s) => s.section === tab).map((s) => s.id);
+export const builtInsOn = (tab: string): string[] => SHOPS.filter((s) => s.section === tab && !isLocalOnlyShop(s.id)).map((s) => s.id);
 
 /** A row's value, decoded, or undefined when it isn't JSON. */
 export function decode(v: string | null | undefined): unknown {

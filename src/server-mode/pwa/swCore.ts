@@ -15,6 +15,8 @@ export const SW_FILE = 'sw.js';
 /** What the build hands the worker: its id and the files to keep, relative to the app's root. */
 export interface ShellManifest {
   build: string;
+  /** 0.9.6: the app's version (package.json), for the worker's answer to "shell". */
+  version?: string;
   files: string[];
 }
 

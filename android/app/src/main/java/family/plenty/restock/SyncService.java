@@ -30,7 +30,7 @@ public class SyncService extends Service {
     static void startIfWanted(Context context) {
         try {
             SyncHub hub = SyncHub.get(context);
-            if (!hub.paired() || !hub.keepReady()) return;
+            if (!hub.paired() || !hub.keepReady() || !hub.wifiOn()) return;
             Intent i = new Intent(context, SyncService.class);
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i);
             else context.startService(i);
@@ -63,7 +63,7 @@ public class SyncService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         final SyncHub hub = SyncHub.get(this);
         try {
-            if (!hub.paired() || !hub.keepReady()) {
+            if (!hub.paired() || !hub.keepReady() || !hub.wifiOn()) {
                 stopSelf();
                 return START_NOT_STICKY;
             }

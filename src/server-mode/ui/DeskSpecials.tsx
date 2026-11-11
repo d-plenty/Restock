@@ -8,6 +8,7 @@ import { addToList } from '../../lib/listActions'; // 0.9.5 (undo)
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { buildCatalogue } from '../../lib/myCatalogue';
 import { loadRecommendations } from '../../lib/recs';
+import { unitTextOf } from '../../lib/searchHelp';
 import { likeYourPantry } from '../../lib/specials';
 import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
@@ -121,6 +122,8 @@ function SpecialRow({ p, onAdd, onOpen, tracked, tracker }: { p: StoreProduct; o
             {p.promo ? ` · ${p.promo}` : ''}
             {tracked ? ' · in your pantry' : ''}
           </span>
+          {/* 0.9.6: both prices, as on the phone. */}
+          {unitTextOf(p) && <span className="small num">{unitTextOf(p)}</span>}
         </span>
       </button>
       {/* 0.9.5 (web search): Track it, as on the phone. */}
@@ -152,6 +155,7 @@ export function SpecialSheet({ p, onAdd, onClose, tracker }: { p: StoreProduct; 
         ) : null}
         {p.promo && <span className="tag good">{p.promo.toUpperCase()}</span>}
       </div>
+      {unitTextOf(p) && <span className="small num">{unitTextOf(p)}</span>}
       <p className="small">
         On special at {chainName(p.chain)} this week. It isn't in your pantry, so Restock doesn't watch its price.{' '}
         {tracker?.on ? 'Track it to put it in your pantry.' : 'Add it to your pantry on a phone to do that.'}

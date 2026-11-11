@@ -119,7 +119,7 @@ export function cleanSummary(raw: unknown): PhoneSummary | null {
  */
 export const PER_PHONE: readonly { field: keyof PhoneSummary; title: string; settings: string[] }[] = [
   { field: 'version', title: 'Restock version', settings: [] },
-  { field: 'checks', title: 'Price checks', settings: ['checkIntervalHours', 'checkWeekday', 'sync.backgroundActivity', 'lastCheck'] },
+  { field: 'checks', title: 'Price checks', settings: ['checkIntervalHours', 'checkTime', 'checkWeekday', 'sync.backgroundActivity', 'lastCheck'] },
   { field: 'notifications', title: 'Notifications', settings: ['alerts'] },
   { field: 'accounts', title: 'Shop accounts', settings: ['accounts'] },
   { field: 'cards', title: 'Loyalty cards', settings: [] },

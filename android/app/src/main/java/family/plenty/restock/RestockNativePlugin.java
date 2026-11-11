@@ -213,24 +213,12 @@ public class RestockNativePlugin extends Plugin {
     @PluginMethod
     public void scheduleChecks(PluginCall call) {
         boolean enabled = call.getBoolean("enabled", true);
-        int hours = call.getInt("intervalHours", 12);
-        // Weekly: wake once a day; PriceChecker only checks on the chosen weekday.
-        if (hours >= 168) hours = 24;
-        WorkManager wm = WorkManager.getInstance(getContext());
-        if (enabled) {
-            Constraints constraints = new Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .setRequiresBatteryNotLow(true)
-                .build();
-            PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(PriceCheckWorker.class, Math.max(1, hours), TimeUnit.HOURS)
-                .setConstraints(constraints)
-                .build();
-            wm.enqueueUniquePeriodicWork(PriceCheckWorker.UNIQUE_NAME, ExistingPeriodicWorkPolicy.UPDATE, req);
-        } else {
-            wm.cancelUniqueWork(PriceCheckWorker.UNIQUE_NAME);
-        }
+        // 0.9.6: the set time of day comes from the phone's own settings (checkTime, checkIntervalHours,
+        // checkWeekday); see PriceCheckWorker. `due`: a set time passed with no check (phone was off).
+        boolean due = PriceCheckWorker.schedule(getContext(), enabled);
         JSObject ret = new JSObject();
         ret.put("scheduled", enabled);
+        ret.put("due", due);
         call.resolve(ret);
     }
 
@@ -238,14 +226,19 @@ public class RestockNativePlugin extends Plugin {
 
     @PluginMethod
     public void checkNow(final PluginCall call) {
+        // 0.9.6: slot = this is the catch-up for a missed set time; it counts that time as done. A plain
+        // "Check now" never touches the schedule.
+        final boolean slot = Boolean.TRUE.equals(call.getBoolean("slot", false));
         checkThread.execute(() -> {
             try {
+                final java.time.Instant owed = slot ? PriceCheckWorker.owedSlot(getContext()) : null;
                 PriceChecker.Result r = PriceChecker.run(getContext(), (done, total) -> {
                     JSObject e = new JSObject();
                     e.put("done", done);
                     e.put("total", total);
                     notifyListeners("checkProgress", e);
                 }, false);
+                if (owed != null) PriceCheckWorker.markServedNow(getContext(), owed);
                 JSObject errors = new JSObject();
                 for (Map.Entry<String, String> e : r.errors.entrySet()) errors.put(e.getKey(), e.getValue());
                 JSObject ret = new JSObject();
@@ -1891,6 +1884,7 @@ public class RestockNativePlugin extends Plugin {
                 WorkManager wm = WorkManager.getInstance(getContext());
                 wm.cancelUniqueWork(SyncHub.WORK_NAME);
                 wm.cancelUniqueWork(PriceCheckWorker.UNIQUE_NAME);
+                wm.cancelUniqueWork(PriceCheckWorker.UNIQUE_NAME_B);
                 wm.cancelUniqueWork(RecallWorker.UNIQUE_NAME);
             } catch (Exception e) {
                 android.util.Log.w("Restock", "erase", e);

@@ -808,17 +808,23 @@ final class SyncHub {
 
     // ---------- 0.9.4: Wi-Fi sync on or off ----------
 
-    /** Phone-to-phone sync on the Wi-Fi: on unless turned off (a phone joining a server's house starts with it off). */
+    /**
+     * Phone-to-phone sync on the Wi-Fi. 0.9.6: in a server's house it is its own opt-in feature, off
+     * unless the person set it up ("1"); a household of phones without a server has it on unless
+     * turned off ("0"). A house phone from before 0.9.6 with nothing stored keeps what it really had:
+     * on if it has synced with another phone on the Wi-Fi, otherwise off (and the answer is stored).
+     */
+    /** 0.9.6 (review L4): when it can't be told, off: the phone never advertises on the Wi-Fi by mistake. */
     boolean wifiOn() {
         try {
-            return !"0".equals(engine.meta("wifi_sync"));
+            return household.wifiSyncOn();
         } catch (Exception e) {
-            return true;
+            return false;
         }
     }
 
     void setWifi(boolean on) throws Exception {
-        engine.setMeta("wifi_sync", on ? null : "0");
+        engine.setMeta("wifi_sync", on ? "1" : "0");
         if (on) start();
         else pause();
     }

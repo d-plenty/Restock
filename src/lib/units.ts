@@ -119,8 +119,9 @@ export function packSize(size: string | undefined | null, name: string | undefin
       return measureIsEach(n, s.qty) ? { qty: n.qty * s.qty, unit: n.unit, count: s.qty } : { qty: n.qty, unit: n.unit, count: s.qty };
     }
   }
-  // Size "375ml", name "… 10 x 375ml": the name has the whole pack.
-  if (s?.kind === 'single' && n?.kind === 'multi' && n.unit === s.unit && n.qty > s.qty) return { qty: n.qty, unit: n.unit, count: n.count };
+  // Size "375ml", name "… 10 x 375ml": the name has the whole pack. 0.9.6: also when the size is already the total
+  // (Coles: size "3.75L", name "… 10x375ml"), so it still knows it is 10 of them.
+  if (s?.kind === 'single' && n?.kind === 'multi' && n.unit === s.unit && n.qty >= s.qty * 0.99) return { qty: n.qty, unit: n.unit, count: n.count };
   // Size "375ml", name "… 24 Pack" (or "… Cans 24 Pack 375ml").
   const named = packCountIn(name);
   if (s?.kind === 'single' && s.unit === 'ml' && s.qty <= 600 && named && n?.kind !== 'multi') {
@@ -173,12 +174,22 @@ export function unitPrice(price: number, qty?: number, unit?: BaseUnit): number 
 }
 
 /** Human label for a unit price, scaled the way Australian shelf labels do. */
-export function formatUnitPrice(perBase: number | undefined, unit?: BaseUnit): string {
+export function formatUnitPrice(perBase: number | undefined, unit?: BaseUnit, style?: CompareStyle): string {
   if (perBase === undefined || !unit || !Number.isFinite(perBase)) return '';
-  if (unit === 'g') return `${money(perBase * 100)} / 100g`;
+  if (unit === 'g') return style?.kg ? `${money(perBase * 1000)} / kg` : `${money(perBase * 100)} / 100g`;
   // Always per litre (0.9.0), so a 1 L and a 2 L milk read the same way.
   if (unit === 'ml') return `${money(perBase * 1000)} / L`;
-  return perBase < 0.1 ? `${money(perBase * 100)} per 100` : `${money(perBase)} each`;
+  return (style?.per100 ?? perBase < 0.1) ? `${money(perBase * 100)} per 100` : `${money(perBase)} each`;
+}
+
+/**
+ * 0.9.6: the comparison unit to use on every line of one list or sheet, so the lines can be compared by eye.
+ * kg: grams are shown per kg, not per 100 g. per100: counted things are shown per 100, not each.
+ * Left out: each line picks its own (as before). Only how it is written: decisions use the same numbers.
+ */
+export interface CompareStyle {
+  kg?: boolean;
+  per100?: boolean;
 }
 
 /** Dollars, with commas in big amounts (0.9.0): $2,387.81. No number (or an endless one) is a dash, never "$Infinity". */

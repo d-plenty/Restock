@@ -1,0 +1,37 @@
+{
+ "note": "0.9.6 shared answers for Deals.java and verdict.ts: which product is the cheapest pick (and what to do) when a size is unknown. Checked by src/lib/dealsParity096.test.ts and DealsTest096 (tools/sync-test/deals-parity.sh).",
+ "now": "2026-11-12T09:00:00+10:00",
+ "cases": [
+  {"name": "unknown size sits out: sized 30 x 375ml at $20 beats an unsized 24 Pack at $14",
+   "products": [
+     {"id": "c", "chain": "coles", "name": "Sprite Lemonade 30 x 375mL", "price": 20},
+     {"id": "w", "chain": "woolworths", "name": "Sprite 24 Pack", "size": "24 Pack", "price": 14}],
+   "main": ["c", "w"], "alts": [], "best": "c", "action": "none"},
+  {"name": "both sized: the cheaper per litre wins",
+   "products": [
+     {"id": "c", "chain": "coles", "name": "Sprite Lemonade 24 x 375mL", "price": 20},
+     {"id": "w", "chain": "woolworths", "name": "Sprite Lemonade 24 x 375mL", "price": 14}],
+   "main": ["c", "w"], "alts": [], "best": "w", "action": "none"},
+  {"name": "none sized: shelf prices decide",
+   "products": [
+     {"id": "c", "chain": "coles", "name": "Sprite 24 Pack", "size": "24 Pack", "price": 20},
+     {"id": "w", "chain": "woolworths", "name": "Sprite 24 Pack", "size": "24 Pack", "price": 14}],
+   "main": ["c", "w"], "alts": [], "best": "w", "action": "none"},
+  {"name": "the only main is unsized (the sized one is an alternative): shelf prices decide for mains",
+   "products": [
+     {"id": "w", "chain": "woolworths", "name": "Sprite 24 Pack", "size": "24 Pack", "price": 14},
+     {"id": "c", "chain": "coles", "name": "Sprite Lemonade 30 x 375mL", "price": 20}],
+   "main": ["w"], "alts": ["c"], "best": "w", "action": "none"},
+  {"name": "sized in different units (litres and grams): shelf prices decide",
+   "products": [
+     {"id": "c", "chain": "coles", "name": "Thing 1L", "size": "1L", "price": 6},
+     {"id": "w", "chain": "woolworths", "name": "Thing 500g", "size": "500g", "price": 4}],
+   "main": ["c", "w"], "alts": [], "best": "w", "action": "none"},
+  {"name": "unsized and cheaper sits out, a third sized shop wins per litre",
+   "products": [
+     {"id": "a", "chain": "aldi", "name": "Cola 6 Pack", "size": "6 Pack", "price": 5},
+     {"id": "c", "chain": "coles", "name": "Cola 1.25L", "size": "1.25L", "price": 3},
+     {"id": "w", "chain": "woolworths", "name": "Cola 2L", "size": "2L", "price": 4}],
+   "main": ["a", "c", "w"], "alts": [], "best": "w", "action": "none"}
+ ]
+}

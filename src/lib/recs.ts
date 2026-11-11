@@ -1,6 +1,7 @@
 import { stockKnown, type Product, type Settings } from '../types';
 import { customShop, priceSource, sectionOf, sectionOn, shopDef } from '../shops';
-import { allGroups, cardChains, getProducts, getSettings, groupProductIds, readingsFor } from './db';
+import { allGroups, cardChains, getProducts, getProductsByBarcode, getSettings, groupProductIds, readingsFor } from './db';
+import { hasSize } from './unitPrice';
 import { recommend, type Recommendation } from './verdict';
 
 /**
@@ -9,8 +10,10 @@ import { recommend, type Recommendation } from './verdict';
  * same shops the price check checks (check.ts, PriceChecker.java). Hand-typed prices ('other')
  * always count; recommend() lets them through.
  */
-export function shopsOn(settings: Pick<Settings, 'enabledChains' | 'sections'>): Set<string> {
+export function shopsOn(settings: Pick<Settings, 'enabledChains' | 'sections'> & Partial<Pick<Settings, 'costco'>>): Set<string> {
   const on = new Set<string>();
+  // 0.9.6: Costco is this phone's own switch (settings.costco), not one of the household's shops.
+  if (settings.costco?.on) on.add('costco');
   for (const c of settings.enabledChains ?? []) {
     if (!shopDef(c) && !customShop(c)) continue;
     if (!sectionOn(settings, sectionOf(c))) continue;
@@ -33,5 +36,8 @@ export async function loadRecommendations(): Promise<Recommendation[]> {
   // Shops you've switched off don't count anywhere: Home, the tabs, item pages, the list, widgets (0.9.0).
   const on = shopsOn(settings);
   const now = Date.now();
-  return groups.map((g) => recommend(g, products, readings, cards, now, on));
+  // 0.9.6: a product with no size can copy it from the same barcode anywhere in the catalogue.
+  const codes = productRows.filter((p) => p.barcode && !hasSize(p)).map((p) => p.barcode!);
+  const same = codes.length ? (await getProductsByBarcode(codes)).filter((p) => !products.has(p.id)) : [];
+  return groups.map((g) => recommend(g, products, readings, cards, now, on, same));
 }

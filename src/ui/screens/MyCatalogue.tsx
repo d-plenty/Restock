@@ -6,6 +6,7 @@ import { loadRecommendations } from '../../lib/recs';
 import { nameHasSize } from '../../lib/naming';
 import { money, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
+import { bothPrices } from '../../lib/verdict';
 import { activeSections, chainName, searchChainsIn, shopColor } from '../../shops';
 import { Icon, TopBar } from '../components';
 import { useNav } from '../nav';
@@ -211,6 +212,8 @@ function DealTile({ d, listed, onAdd, onOpen }: { d: CatalogueDeal; listed: bool
         {d.was !== undefined && <s className="num">{money(d.was)}</s>}
       </span>
       <span className="cat-note">{d.note}</span>
+      {/* 0.9.6: both prices, per item then the comparison price. */}
+      {bothPrices(o) && <span className="cat-note num">{bothPrices(o)}</span>}
       <button
         className={`cat-add${listed ? ' on' : ''}`}
         aria-label={listed ? `${d.rec.group.name} is on your list` : `Add ${d.rec.group.name} to your list`}

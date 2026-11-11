@@ -89,6 +89,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **General list**: a fourth shopping list, with no pantry of its own. A Home Assistant add that matches nothing in your Pantry, Keg or Health goes there. You can add to it yourself too. Adding by hand to Groceries, Keg or Health works as before, even for words that match nothing (like "chips", to buy whatever's on special). Nothing else moves to General by itself. It's shared with the groceries.
 - **Bottle shops**: Dan Murphy's, BWS, Liquorland, Liquorland Warehouse, Liquorland Cellars, The Bottle-O, Cellarbrations, Thirsty Camel and Porters Liquor. Beers say whether they're a single, a 6 pack or a case.
 - **Chemists**: Chemist Warehouse, My Chemist (with Chemist Warehouse's prices), Amcal, Discount Drug Stores, Guardian / PharmaSave, Priceline Pharmacy, Soul Pattinson, TerryWhite Chemmart, Blooms The Chemist, Good Price Pharmacy, Pharmacy 4 Less, Direct Chemist Outlet, Star Discount Chemist, Capital Chemist, National Pharmacies and Chempro.
+- **Costco** (food only, off until you turn it on, on one phone at a time): shows Costco's online prices, which include delivery, next to the supermarkets. **Please read this first:** Costco's website terms say automated collection of product listings isn't allowed. Restock only looks when you press Search, one page at a time, from your phone. It never runs in the background and never in bulk. Nothing from Costco is sent to your server, your other phones, exports or shared files. Costco may block it or change its pages, so it may stop working. It's your choice to turn this on, and your responsibility. Prices are Costco's online prices, which include delivery. They can differ from the warehouse shelf. The shelf price in the warehouse can be typed in by hand. Costco prices only count towards the cheapest shop if you tick **I buy from Costco online**.
 - **Any other shop**: add its website and Restock finds its search page and reads the products and prices, with Save and test to check it works.
 - **Pantry**: each item has My picks (what you buy at each shop, which can differ shop to shop) and Would also take (others you'd buy when they're cheaper, for Swap & save), on This size or Any size, and shops marked Not at this shop. Listed by shop then size, cheapest first, or A to Z. Swipe to add to your list or delete.
 - **Add**: search all your shops at once. Tap a result to tick it into the bar at the bottom ("1 ticked · tap to add"); nothing jumps up in your way. The green arrow opens the details (name, and Picked for you at your other shops) when you're ready.
@@ -111,7 +112,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Diagnostics**: what went wrong lately, shop by shop, **Send search details** to capture exactly what a shop sent back, and a recording of what a shop's website does when you add something to its trolley yourself (sign-in and personal details left out), so connections can be fixed.
 - **Receipts** (optional): finds the receipt's edges, straightens it, makes it crisp black and white, and reads the shop, date and total with Tesseract on the phone. The reader is built in and works offline. Photos stay inside Restock, not in your gallery.
 - **Recall alerts**: on by default, checked every 24 hours separately from price checks, matched against your Pantry, Keg, Health, lists and kept receipts, with the official notice one tap away.
-- **Loyalty cards**: member prices only count if you've added the card.
+- **Cards**: loyalty cards (member prices only count if you've added the card) and gift cards, with the barcode, card number, a PIN that stays hidden until you tap it, the balance and what you spent, an expiry reminder and photos. Cards stay on your phone.
 - **My catalogue**: specials on the things you buy, a page per shop, Wednesday to Tuesday, with what you could save, half prices and multi-buys on the cover. **Add all to my list** says how many, and Undo takes them all back off.
 - **Catalogues**: a link to the catalogue of every shop you use.
 - **Home screen widgets**: Deals, Shopping list and Quick actions, with your choice of background, transparency and text colour.
@@ -128,6 +129,19 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Shared price history (Beta)**: optionally download months of Coles and Woolworths history from [hotprices.org](https://hotprices.org) ([source](https://github.com/Javex/hotprices-au), MIT) so new items get a fair verdict from day one. Off by default.
 
 </details>
+
+## New in 0.9.6
+
+- **Two prices on every product:** per item ("$0.98 each") so you can picture it, and a **comparison price** (per litre, per 100 g or per kg) that decides the cheapest shop. If a shop leaves the size out, Restock works it out from the same barcode or a matching pack elsewhere and says **estimated**, or says **size unknown** rather than guess.
+- **Price checks at a set time:** every day at **5:00 am** by default, at a time you choose in Settings. **Check now** is an extra check and never moves the schedule. Android may run it a few minutes late.
+- **Last updated** on every product's Price history card, and **Enter a price** for any shop, saved as "entered by hand".
+- **Move to another list:** a button moves a line between Groceries, Keg, Health and General, with Undo. It never happens by itself.
+- **Cards:** Loyalty cards is now **Cards**, with **gift cards** next to them (barcode, PIN, balance, expiry reminder). They stay on your phone. On your server's web page and on iPhone, cards are kept only in that browser.
+- **Costco** (food only, off until you turn it on): see the notice under [Every feature](#highlights). Restock only looks when you press Search.
+- **Wi-Fi sync is its own option.** A phone on a Restock server no longer shows it, and the X on that card can't disconnect you from the server. **Leave this server** is a separate button on the server screen.
+- **Import data** on the server's Data tab: add products and prices from a file on top of what's there, with a preview first.
+- **A proper phone layout on iPhone**, with a bottom tab bar like the Android app, and the Pantry, all four lists and Cards open with no signal.
+- The "Backup from before" list is gone from Settings. Use **Export a backup** or **Back up automatically**.
 
 ## New in 0.9.5
 
@@ -184,7 +198,7 @@ All three Android ways are the same APK, signed with the same key, so you can sw
 
 [Restock server](https://github.com/d-plenty/restock-server) is optional. It's a small server you run at home: on a NAS (TrueNAS, Synology, QNAP, Unraid), a Raspberry Pi 4 or 5, a mini PC, or as an app in Home Assistant. One `docker run` command, or a Compose file for Dockge, Portainer and TrueNAS. Then:
 
-- **It's the house.** You name it on its web page and add each phone with a one-time code. Each phone chooses what it shares: groceries always; Keg, Health, receipts and loyalty cards only if you turn them on.
+- **It's the house.** You name it on its web page and add each phone with a one-time code. Each phone chooses what it shares: groceries always; Keg, Health, receipts and loyalty cards only if you turn them on. Gift cards never leave the phone.
 - **It syncs around the clock,** at home and away, and keeps your household's history.
 - **It runs your Home Assistant shopping list** for everyone, even with every phone closed.
 - **Restock on your computer:** the Shopping list, pantry, specials and catalogues, laid out for a big screen.
@@ -216,8 +230,8 @@ The steps are also on the server's sign-in page, under **On iPhone?**. On Androi
 
 **Good to know:**
 
-- **Open it once with a connection** after you sign in, so it can keep a copy for offline.
-- **Sign out** takes the list off that iPhone. A sign-in made by scanning with a phone isn't kept for offline: sign in with your passphrase.
+- **Open it once with a connection** after you sign in (with **Keep me signed in** ticked), so it can keep a copy for offline. Offline, it opens what this phone last saved: the Pantry, Keg and Health tabs, all four lists (tick, add, edit, Move to and Undo), your cards with their barcodes, and specials, catalogues and price history as last saved. Changes sync when you're back online. Searching the shops, the Data tab (and Import), Server and phones, and Activity need signal.
+- **Sign out** takes the saved copy off that iPhone. If the iPhone runs low on space, iOS can clear what Restock saved: it loads again next time you're online, but changes not sent yet are lost. A sign-in made by scanning with a phone isn't kept for offline: sign in with your passphrase.
 - **No background price checks, alerts or widgets** on iPhone, and no Wi-Fi sync between phones. Those need a real iPhone app: see [Wanted](#wanted-someone-to-bring-restock-to-iphone).
 
 ## Home Assistant
@@ -336,7 +350,7 @@ Restock is built by one person in their spare time. Prices, shops and websites a
 | **Have an idea** | Starting a thread in [Discussions → Ideas](../../discussions/categories/ideas). |
 | **Like it** | Starring the repo and telling a mate. That's how a free app gets found. |
 
-Please don't post anything private (loyalty card numbers, backup files, export files, your address) in issues. Crop screenshots if you need to.
+Please don't post anything private (card numbers, PINs, backup files, export files, your address) in issues. Crop screenshots if you need to.
 
 ## Wanted: someone to bring Restock to iPhone
 
@@ -356,7 +370,7 @@ Restock is in its **release candidate** stage. There are no dates and no version
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.
-- **Restock on iPhone,** through your server: add its page to your home screen, and use your Shopping list offline in the shop too.
+- **Restock on iPhone,** through your server: add its page to your home screen, and use your lists, pantry and cards offline in the shop too.
 - **Data on the server:** spending from what you tick off, price charts, downloads, and Manage data with Auto delete.
 - **Let the web page search the shops** (opt-in), and a shop search when Pick my item finds nothing.
 - **General, Health, Undo and Save settings.**
@@ -392,7 +406,7 @@ Every price Restock sees can help everyone else. With shared prices, a new item 
 The plan is a **shared, decentralised network** of shop price data: Restock servers share prices with each other, instead of sending them to one central website or company. The prices will never be sold.
 
 - **Only prices and products:** each product's shop, name, brand, size and barcode, and its prices by day (the usual price, any special or multi-buy, the date).
-- **Never anything personal:** who you are, your loyalty cards, your branch or location, what you searched for, your pantry, your shopping list or what you ticked off, or your receipts. No account and no phone ID.
+- **Never anything personal:** who you are, your loyalty or gift cards, your branch or location, what you searched for, your pantry, your shopping list or what you ticked off, or your receipts. No account and no phone ID.
 - **Opt-in:** nothing is shared unless you turn it on.
 
 **The first step is here:** a Restock server can download a full export file in an open, documented format (`restock-export`, in [docs/server-protocol.md](docs/server-protocol.md)). On the phone, since 0.9.0, Restock keeps a "shared prices" part in your backups, ready for later. Nothing leaves your phone or your server for this yet. Restock will check the shops' terms and ask the data sources for permission before any prices are shared publicly.

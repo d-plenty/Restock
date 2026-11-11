@@ -5,7 +5,7 @@ import { captureWhile, clearProblems, problems, problemsText } from '../../lib/d
 import { recordTrolley } from '../../lib/accounts';
 import { getHealth } from '../../lib/health';
 import { useLive } from '../../lib/useLive';
-import { chainName, enabledIn, SECTION_NAMES, type Section, type StoreChain } from '../../shops';
+import { chainName, enabledIn, isLocalOnlyShop, SECTION_NAMES, type Section, type StoreChain } from '../../shops';
 import { adapterFor } from '../../stores';
 import { isNative } from '../../stores/http';
 import { localDay } from '../../lib/verdict';
@@ -37,7 +37,7 @@ export function DiagnosticsScreen() {
   if (!settings || !list || !health) return <div className="screen" />;
 
   const sections: Section[] = ['pantry', 'keg', 'pharmacy'];
-  const shops = sections.flatMap((sec) => enabledIn(settings.enabledChains, sec).map((c) => ({ c, sec })));
+  const shops = sections.flatMap((sec) => enabledIn(settings.enabledChains, sec).filter((c) => !isLocalOnlyShop(c)).map((c) => ({ c, sec })));
   const shop = chain ?? shops[0]?.c;
 
   const copy = async () => {

@@ -21,7 +21,8 @@
 // server (design D12). Its ha:phone row names the server when it runs it; a phone never claims the
 // row there, whether the server runs it or not (HaSync.java claimHaPhone does the same).
 
-import { allGroups, allListEntries, deleteListEntries, getKV, putKV, queryRows, runOps, updateListEntry } from './db';
+import { allGroups, allListEntries, deleteListEntries, getKV, insertEntryOp, putKV, queryRows, runOps, uid, updateListEntry } from './db';
+import { sectionOf } from '../shops';
 import { HA_STATE, LIST_ALIASES } from './haKeys';
 import { matchKey, parseLine } from './haMatch';
 import { ALIAS_PREFIX, checkListRow, decode, HA_PHONE, KEEP_PREFIX } from './sharedSettings';
@@ -160,8 +161,29 @@ export async function pickItemFor(entry: ListEntry, group: { id: string; name: s
     await deleteListEntries([now.id]);
   } else {
     // 0.9.5: a line from General moves to the item's own list.
-    const tab = now.section === 'general' ? ((await allGroups()).find((g) => g.id === group.id)?.section ?? 'pantry') : undefined;
-    await updateListEntry(now.id, { groupId: group.id, text: group.name, ...(tab ? { section: tab } : {}) });
+    const picked = now.section === 'general' ? (await allGroups()).find((g) => g.id === group.id) : undefined;
+    const tab = picked ? (picked.section ?? 'pantry') : undefined;
+    if (picked && tab && tab !== 'pantry') {
+      // 0.9.6: to Keg or Health the line is made again there and the old one taken off (as Move to does),
+      // so a phone that shares only Groceries and General sees it go instead of keeping a stale copy.
+      const fits = !now.chain || now.chain === 'other' || sectionOf(now.chain) === tab;
+      const line: ListEntry = {
+        id: uid(),
+        text: group.name,
+        groupId: group.id,
+        qty: Math.max(1, now.qty ?? 1),
+        checked: now.checked,
+        createdAt: now.createdAt,
+        section: tab,
+        ...(picked.categoryId ? { categoryId: picked.categoryId } : {}),
+        ...(fits && now.chain ? { chain: now.chain } : {}),
+        ...(fits && now.chain && now.product ? { product: now.product } : {}),
+        ...(fits && now.chain && now.price !== undefined ? { price: now.price } : {}),
+      };
+      await runOps([insertEntryOp(line), { sql: 'DELETE FROM list_entries WHERE id = ?', params: [now.id] }]);
+    } else {
+      await updateListEntry(now.id, { groupId: group.id, text: group.name, ...(tab ? { section: tab } : {}) });
+    }
   }
   return true;
 }

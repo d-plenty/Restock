@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BACKUP_EVERY, BACKUP_KEEP, everyLabel, maybeAutoBackup } from '../../lib/autoBackup';
+import { AUTO_GIFT_NOTE, BACKUP_EVERY, BACKUP_KEEP, everyLabel, maybeAutoBackup } from '../../lib/autoBackup';
 import { askPassword, confirmAction } from '../../lib/confirm';
 import { getSettings, priceHistorySpan, updateSettings } from '../../lib/db';
 // 0.9.5 (save): Settings → Automatic backups waits for Save settings (settingsDraft.ts).
@@ -98,7 +98,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
             Back up automatically
           </span>
           <span className="small">
-            Saves a whole backup into a folder you choose (Nextcloud, Syncthing or a folder on this phone). {pricesIn(settings, span)}
+            Saves a whole backup into a folder you choose (Nextcloud, Syncthing or a folder on this phone). {pricesIn(settings, span)} {AUTO_GIFT_NOTE}
             {inSetup ? ' Off unless you turn it on.' : ''}
           </span>
         </span>
@@ -177,7 +177,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
           <span className="small">
             {b.password
               ? 'On. Restoring one of these backups asks for the password. It’s kept on this phone only, never in a backup.'
-              : 'Off. Worth turning on if the folder is in the cloud: backups hold your loyalty card numbers.'}
+              : 'Off. Worth turning on if the folder is in the cloud: backups hold your loyalty card numbers. Gift cards are left out until you set one.'}
           </span>
         </span>
         <span style={{ display: 'flex', gap: 8 }}>

@@ -24,7 +24,7 @@ import {
 } from '../../lib/db';
 import { buzz, scannedLine } from '../../lib/listActions';
 import { loadRecommendations } from '../../lib/recs';
-import { lineCost, type Option } from '../../lib/verdict';
+import { bothPrices, lineCost, type Option } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
 import { aroundPlan, cheaperThan, recommendedStores, shopTotals, type ShopTotals } from '../../lib/shopTotals';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
@@ -50,9 +50,10 @@ import {
 import { MemberInfoTag, MultiInfoTag, StockInfoTag, SwapInfoTag, VerdictInfoTag } from '../tagInfo';
 import { SendToShopSheet } from './SendToShop';
 import { PickItemSheet } from './PickItem';
+import { MoveManySheet, MoveToSheet } from './MoveTo'; // 0.9.6 (Move to)
 import { linesToPick, pickWord } from '../../lib/homeAssistant';
 import { useNav } from '../nav';
-import { enabledIn, LIST_NAMES, LIST_PLACE, listSectionsOn, priceSource, searchChainsIn, SECTIONS, type ListSection, type Section, type StoreChain } from '../../shops';
+import { enabledIn, isLocalOnlyShop, LIST_NAMES, LIST_PLACE, listSectionsOn, priceSource, searchChainsIn, SECTIONS, type ListSection, type Section, type StoreChain } from '../../shops';
 import { CardBarcode, PROGRAMS } from './Cards';
 import { ShopTotalsCard } from '../shopTotalsCard';
 
@@ -293,6 +294,7 @@ export function ListScreen() {
   // 0.9.3: lines from Home Assistant to pick a pantry item for ("Pick my milk"), on every phone and the web (listPicks.ts).
   const toPick = useLive(linesToPick, []);
   const [picking, setPicking] = useState<ListEntry>();
+  const [movingMany, setMovingMany] = useState(false); // 0.9.6 (Move to)
 
   const full = useFullRefresh();
   // 0.9.0: the list's totals are worked out again only when the list, the prices or the settings
@@ -435,6 +437,8 @@ export function ListScreen() {
               )}
               {!deal && view !== 'shop' && shop !== 'any' && <span className="small">{chainName(shop)}</span>}
               {!deal && rec && <span className="small">No price yet</span>}
+              {/* 0.9.6: both prices: per item, then per litre or per 100 g. */}
+              {deal && bothPrices(deal) && <span className="small num">{bothPrices(deal)}</span>}
               {deal?.multi && !line?.packs && qtyOf(e) < deal.multi.n && !e.checked && (
                 <span className="small" style={{ color: 'var(--green)' }}>
                   Get {deal.multi.n} for {money(deal.multi.total)}: tap + to add {deal.multi.n - qtyOf(e)} more
@@ -796,6 +800,12 @@ export function ListScreen() {
           >
             <Icon name="check" size={18} /> Got them
           </button>
+          {/* 0.9.6 (Move to): the picked lines to another list, one Undo. */}
+          {sectionsOn.length > 1 && (
+            <button className="btn small" disabled={!picked.size} onClick={() => setMovingMany(true)}>
+              <Icon name="swap" size={18} /> Move to
+            </button>
+          )}
           <button
             className="btn small danger"
             disabled={!picked.size}
@@ -926,6 +936,18 @@ export function ListScreen() {
           onClose={() => setShopping(undefined)}
         />
       )}
+      {movingMany && (
+        <MoveManySheet
+          ids={[...picked]}
+          here={section}
+          lists={sectionsOn}
+          onClose={() => setMovingMany(false)}
+          onDone={() => {
+            setMovingMany(false);
+            stopSelecting();
+          }}
+        />
+      )}
       {editing && (
         <EditEntry
           entry={editing}
@@ -933,6 +955,7 @@ export function ListScreen() {
           shops={listShops(settings.enabledChains, section, sectionsOn)}
           deal={dealFor(c, editing) ?? recFor(c, editing)?.options[0]}
           name={recFor(c, editing)?.group.name}
+          lists={sectionsOn}
           onClose={() => setEditing(undefined)}
         />
       )}
@@ -1435,6 +1458,7 @@ export function EditEntry({
   onClose,
   deal,
   name,
+  lists,
 }: {
   entry: ListEntry;
   categories: { id: string; name: string }[];
@@ -1443,12 +1467,16 @@ export function EditEntry({
   deal?: Option;
   /** The pantry item's name, for a line linked to one. */
   name?: string;
+  /** 0.9.6 (Move to): the lists that are on, to move the line to another. */
+  lists?: readonly ListSection[];
 }) {
   const nav = useNav();
   const [looking, setLooking] = useState(false);
+  const [moving, setMoving] = useState(false); // 0.9.6 (Move to)
   // Only a hand-written line (not a pantry item) can be renamed: it has nothing else to go by.
   const [text, setText] = useState(entry.text);
-  const [chain, setChain] = useState<string>(entry.chain ?? '');
+  // 0.9.6 (review H1): a line an earlier build put at Costco shows (and saves) as Any shop.
+  const [chain, setChain] = useState<string>(isLocalOnlyShop(entry.chain) ? '' : (entry.chain ?? ''));
   const [categoryId, setCategoryId] = useState(entry.categoryId ?? '');
   const linked = !!entry.groupId;
   const save = async () => {
@@ -1465,6 +1493,7 @@ export function EditEntry({
   const oneOff = !deal && entry.product ? { ...entry.product, price: entry.price } : undefined;
   if (looking && deal) return <ProductPreview product={previewFromOption(deal)} onClose={() => setLooking(false)} />;
   if (looking && oneOff) return <ProductPreview product={oneOff} onClose={() => setLooking(false)} />;
+  if (moving && lists) return <MoveToSheet entry={entry} name={name ?? entry.text} lists={lists} onClose={onClose} />;
   return (
     <Sheet title={name ?? entry.text} onClose={onClose}>
       {deal ? (
@@ -1514,7 +1543,8 @@ export function EditEntry({
           <span>Shop</span>
           <select className="input" value={chain} onChange={(e) => setChain(e.target.value)}>
             <option value="">{linked ? 'Best price (auto)' : 'Any shop'}</option>
-            {shops.map((x) => (
+            {/* 0.9.6 (review H1): a list line is shared, so never Costco (its prices stay on this phone). */}
+            {shops.filter((x) => !isLocalOnlyShop(x)).map((x) => (
               <option key={x} value={x}>
                 {chainName(x)}
               </option>
@@ -1548,6 +1578,12 @@ export function EditEntry({
       <button className="btn primary" onClick={save}>
         Save
       </button>
+      {/* 0.9.6 (Move to): to Groceries, Keg, Health or General (MoveTo.tsx), with Undo. */}
+      {lists && lists.length > 1 && (
+        <button className="btn" onClick={() => setMoving(true)}>
+          <Icon name="swap" size={18} /> Move to another list
+        </button>
+      )}
       <button
         className="btn danger"
         onClick={async () => {

@@ -79,7 +79,7 @@ export function syncStatus(
   const cells: SyncStatus['cells'] = [];
   // 0.9.4: only what's in use: the server first, the Wi-Fi's phones only with Wi-Fi sync on, then the last backup.
   if (p.server) cells.push({ label: 'Server', when: info?.serverAt });
-  if (p.phones && info?.wifiSync !== false) cells.push({ label: 'Phones', when: info?.lastSyncAt });
+  if (p.phones && wifiSyncOn(info)) cells.push({ label: 'Phones', when: info?.lastSyncAt });
   if (info?.folder) cells.push({ label: 'Drive folder', when: info.folderAt });
   if (p.local) cells.push({ label: 'Last backup', when: auto.lastAt, day: true });
   const WEEK = 7 * 86_400_000;
@@ -90,10 +90,19 @@ export function syncStatus(
     (info?.folder && info.folderError && "Sync away from home isn't working") ||
     (p.phones &&
       !p.server &&
-      info?.wifiSync !== false &&
+      wifiSyncOn(info) &&
       !info?.folder &&
       (!info?.lastSyncAt || now - Date.parse(info.lastSyncAt) > WEEK) &&
       "Your phones haven't synced in a week") ||
     '';
   return { ok: !problem, title: problem || 'All up to date', cells };
+}
+
+/**
+ * 0.9.6 (review L4): is phone-to-phone Wi-Fi sync on? The phone says (`wifiSync`). When it doesn't,
+ * a server's house counts it as off (it's set up on purpose there), a household of phones as on.
+ */
+export function wifiSyncOn(info: { wifiSync?: boolean | null; house?: boolean | null; serverApi?: number | null } | null | undefined): boolean {
+  if (typeof info?.wifiSync === 'boolean') return info.wifiSync;
+  return !(info?.house || info?.serverApi === 3);
 }

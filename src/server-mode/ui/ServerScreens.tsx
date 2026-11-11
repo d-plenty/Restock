@@ -12,7 +12,9 @@ import { useNav, type Screen } from '../../ui/nav';
 import { PROGRAMS } from '../../ui/screens/Cards';
 import { api, isV3, serverInfo, type Activity, type Device } from '../api';
 import { deleteLocalCopy, downloadBackup, householdInfo, memberNames, onStatus, syncNow, syncStatus, unsentChanges } from '../live';
-import { askSignOutUnsent } from '../../lib/confirm';
+import { askChoice, askSignOutUnsent } from '../../lib/confirm';
+import { askKeepCards, thisBrowserCards } from '../cardStore'; // 0.9.6 (cards)
+import { DeskCards } from './DeskCards'; // 0.9.6 (cards)
 import { canChangeVault, inviteCode, session, signOut, signOutEverywhere, type Session } from '../session';
 import { PassphraseForm } from './Gate';
 import { ActivityLogs } from './DeskActivity';
@@ -26,6 +28,7 @@ import { ServerHomeAssistant } from './ServerHomeAssistant';
 import { peekStartOn } from './deskShared';
 import { AddOnServer, PhoneOnlyNote, PhoneOnlyScreen } from './PhoneOnly';
 import { Qr } from './Qr';
+import { MorePage, OnlineOnly } from './PhoneLayout'; // 0.9.6 (iPhone)
 
 export const useStatus = () => useSyncExternalStore(onStatus, syncStatus);
 
@@ -82,10 +85,33 @@ export function ServerTab() {
 export function serverScreen(top: Screen): ReactNode | undefined {
   switch (top.name) {
     case 'server':
-      if (isV3() && top.page === 'data') return <DeskData narrow />;
-      if (isV3() && top.page === 'data-manage') return <DeskDataManage narrow />;
-      if (isV3()) return top.page === 'phones' ? <ServerAndPhones narrow /> : top.page === 'activity' ? <ActivityLogs narrow /> : <AccountPage />;
-      return top.page === 'phones' ? <PhonesPage /> : top.page === 'activity' ? <ActivityPage /> : <AccountPage />;
+      // 0.9.6 (iPhone): More, the phone layout's last tab; the server's own pages need signal.
+      if (top.page === 'more') return <MorePage />;
+      if (isV3() && top.page === 'data')
+        return (
+          <OnlineOnly title="Your data" page="data">
+            <DeskData narrow />
+          </OnlineOnly>
+        );
+      if (isV3() && top.page === 'data-manage')
+        return (
+          <OnlineOnly title="Manage data" page="data-manage">
+            <DeskDataManage narrow />
+          </OnlineOnly>
+        );
+      if (top.page === 'phones')
+        return (
+          <OnlineOnly title={isV3() ? 'Server and phones' : 'Phones'} page="phones">
+            {isV3() ? <ServerAndPhones narrow /> : <PhonesPage />}
+          </OnlineOnly>
+        );
+      if (top.page === 'activity')
+        return (
+          <OnlineOnly title="Activity" page="activity">
+            {isV3() ? <ActivityLogs narrow /> : <ActivityPage />}
+          </OnlineOnly>
+        );
+      return <AccountPage />;
     case 'settings':
     case 'household':
       return isV3() ? <DeskSettings narrow /> : <ServerSettings />;
@@ -94,7 +120,8 @@ export function serverScreen(top: Screen): ReactNode | undefined {
     case 'specials':
       return <DeskSpecials narrow />;
     case 'cards':
-      return <ServerCards />;
+      // 0.9.6 (cards): the Cards tab, kept in this browser only (was the phones' loyalty cards, greyed).
+      return <DeskCards back />;
     case 'add':
       return <AddOnServer back />;
     case 'stores':
@@ -372,10 +399,16 @@ export async function leave(how: () => Promise<void>) {
   // One more try to send them first; still not sent, ask (Stay signed in · Sign out).
   if (unsentChanges() > 0) await syncNow().catch(() => undefined);
   if (unsentChanges() > 0 && !(await askSignOutUnsent())) return;
+  // 0.9.6 (cards): cards kept in this browser only: "Keep your cards on this phone/browser?"
+  // 0.9.6 (review M2): this server's and household's own cards (taken before the session goes).
+  const mine = thisBrowserCards();
+  const cards = await askKeepCards(askChoice, mine);
+  if (cards === 'stay') return;
   try {
     await how();
   } finally {
     if (id) await deleteLocalCopy(id);
+    if (cards === 'remove') await mine.removeAll().catch(() => undefined);
     location.reload();
   }
 }
@@ -511,7 +544,7 @@ function ServerSettings() {
         {row('Phones', 'The phones using this server', () => nav.push({ name: 'server', page: 'phones' }))}
         {row('Activity', "What's been sent and fetched", () => nav.push({ name: 'server', page: 'activity' }))}
         {row('Account', 'Passphrase, sign out', () => nav.push({ name: 'server', page: 'account' }))}
-        {row('Loyalty cards', 'Kept on your phones', () => nav.push({ name: 'cards' }))}
+        {row('Cards', 'Loyalty and gift cards, kept in this browser', () => nav.push({ name: 'cards' }))}
       </div>
       <div className="eyebrow">This browser</div>
       <div className="card">
@@ -520,7 +553,7 @@ function ServerSettings() {
       </div>
       <div className="card">
         <span className="title">Download a backup</span>
-        <span className="small">Everything this browser has, as a Restock backup file you can keep or restore on a phone. Loyalty card numbers aren't in it: they never leave the phones.</span>
+        <span className="small">Everything this browser has, as a Restock backup file you can keep or restore on a phone. Card numbers aren't in it: cards never go to the server.</span>
         <button
           className="btn"
           disabled={saving}

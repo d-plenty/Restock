@@ -7,10 +7,17 @@ export interface RestockNativePlugin {
   sqlQuery(opts: { sql: string; values: SqlValue[] }): Promise<{ rows: Record<string, unknown>[] }>;
   sqlRun(opts: { sql: string; values: SqlValue[] }): Promise<RunResult>;
   sqlBatch(opts: { ops: { sql: string; values: SqlValue[] }[] }): Promise<void>;
-  /** Turn the background price check on or off (Android WorkManager). */
-  scheduleChecks(opts: { enabled: boolean; intervalHours: number }): Promise<{ scheduled: boolean }>;
-  /** Run a price check now, in native code, and wait for it. */
-  checkNow(): Promise<{ checked: number; updated: number; errors: Record<string, string> }>;
+  /**
+   * Turn the background price check on or off (Android WorkManager). 0.9.6: it runs at the set time
+   * of day from the phone's settings (checkTime, checkIntervalHours, checkWeekday), so this only
+   * says on or off. `due`: a set time passed with no check (the phone was off), so run one now.
+   */
+  scheduleChecks(opts: { enabled: boolean; intervalHours?: number }): Promise<{ scheduled: boolean; due?: boolean }>;
+  /**
+   * Run a price check now, in native code, and wait for it. `slot`: this is the catch-up for a
+   * missed set time (counts that time as done). A plain check never moves the schedule.
+   */
+  checkNow(opts?: { slot?: boolean }): Promise<{ checked: number; updated: number; errors: Record<string, string> }>;
   addListener(event: 'checkProgress', fn: (e: { done: number; total: number }) => void): Promise<PluginListenerHandle>;
   /** Download shared price history (MarketData.java) and summarise it into the market table. */
   importMarket(opts?: {

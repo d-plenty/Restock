@@ -569,6 +569,7 @@ final class SyncEngine {
      * 0.9.1: true when it did that.
      */
     boolean noteTabs() throws Exception {
+        resendCostcoLines();
         // 0.9.3: on the owner phone, the household settings that have no row yet (once each).
         try {
             SharedSettings.seed(this);
@@ -691,6 +692,9 @@ final class SyncEngine {
         return n;
     }
 
+    /** 0.9.6: the pseudo tab of records that never leave this phone (Costco's products and prices). Never in any shared set. */
+    static final String LOCAL_TAB = "local";
+
     private Map<String, String> customTabs;
 
     /** 0.9.3: the settings' own shops changed (household settings): look them up again. */
@@ -701,6 +705,8 @@ final class SyncEngine {
     /** Which tab a shop is on: built-in shops from Shops, the ones people added from settings. */
     String chainTab(String chain) throws Exception {
         if (chain == null || chain.isEmpty()) return null;
+        // 0.9.6: Costco is one phone's own: its products and prices are on a "tab" no phone ever shares (LOCAL_TAB).
+        if ("costco".equals(chain)) return LOCAL_TAB;
         if (Shops.known(chain)) return Shops.section(chain);
         if (customTabs == null) {
             customTabs = new HashMap<>();
@@ -733,6 +739,8 @@ final class SyncEngine {
                 return s == null ? "pantry" : s;
             }
             case "list_entries": {
+                // 0.9.6 (review H1): a line an earlier build put at Costco is an ordinary line, shared as
+                // "Any shop" (stripCostcoLine), never on Costco's own tab: ticks and deletes still reach everyone.
                 // 0.9.5: a General line (section 'general') is shared with the groceries.
                 String s = str(row, "section");
                 if (s != null) return listTab(s);
@@ -742,7 +750,7 @@ final class SyncEngine {
                     return r.isEmpty() ? null : str(r.get(0), "section");
                 }
                 String chain = str(row, "chain");
-                return chain != null ? chainTab(chain) : "pantry";
+                return chain != null && !"costco".equals(chain) ? chainTab(chain) : "pantry";
             }
             case "products":
                 return chainTab(str(row, "chain"));
@@ -861,6 +869,7 @@ final class SyncEngine {
                 if (row.isEmpty()) continue; // tidied away since (old prices)
                 JSONObject data = row.get(0);
                 String tab = tabOf(tbl, data);
+                if (LOCAL_TAB.equals(tab)) continue; // 0.9.6: Costco stays on this phone, not even as a "moved" record
                 if (tab != null && !allowed.contains(tab)) {
                     // A tab this pair doesn't share.
                     // 0.9.3: a household setting of a tab this pair doesn't share is left out, never sent as moved.
@@ -872,6 +881,8 @@ final class SyncEngine {
                 }
                 if ("prices".equals(tbl)) data.remove("id");
                 if ("products".equals(tbl)) for (String c : LOCAL_PRODUCT_COLUMNS) data.remove(c);
+                if ("items".equals(tbl)) stripCostcoPicks(data);
+                if ("list_entries".equals(tbl)) stripCostcoLine(data);
                 e.put("row", data);
             }
             if ("household".equals(tbl)) {
@@ -985,6 +996,7 @@ final class SyncEngine {
                     // sharing that tab (and their own copies stay on the others).
                     List<JSONObject> cur = db.query("SELECT * FROM " + tbl + " WHERE " + key + " = ?", pk);
                     String tab = cur.isEmpty() ? null : tabOf(tbl, cur.get(0));
+                    if (LOCAL_TAB.equals(tab)) continue; // 0.9.6: nobody else has Costco's records to delete
                     if (tab != null && !mine.contains(tab)) {
                         // Held until this phone syncs that tab again (releaseHeld), so it still goes then,
                         // even if the others have tidied the delete away by then (review fix).
@@ -1008,6 +1020,7 @@ final class SyncEngine {
                 } else {
                     JSONObject row = e.optJSONObject("row");
                     if (row == null) continue;
+                    if ("items".equals(tbl)) keepLocalCostcoPicks(pk, row);
                     writeRow(tbl, row, columnsOf(tbl, columns));
                 }
                 logEntry(tbl, pk, stamp, device, deleted, e.isNull("sig") ? null : e.optString("sig", null), created, originOf(e, stamp, device, deleted, created, had));
@@ -1034,6 +1047,62 @@ final class SyncEngine {
             }
         }
         return changed[0];
+    }
+
+    // ---------- 0.9.6: picks at Costco stay on their phone (the products never leave it) ----------
+
+    private Set<String> costcoIds() throws Exception {
+        Set<String> ids = new HashSet<>();
+        for (JSONObject r : db.query("SELECT id FROM products WHERE chain = 'costco'")) ids.add(r.getString("id"));
+        return ids;
+    }
+
+    private static JSONArray idList(String s) {
+        try {
+            return new JSONArray(s == null ? "[]" : s);
+        } catch (Exception e) {
+            return new JSONArray();
+        }
+    }
+
+    /** An item sent to another phone goes without its Costco picks (server engine.ts stripCostcoPicks). */
+    void stripCostcoPicks(JSONObject data) throws Exception {
+        Set<String> gone = costcoIds();
+        if (gone.isEmpty()) return;
+        // 0.9.6 (review L2): only the Costco part goes. A usual pick at Costco is left out of the record
+        // altogether (items are updated in place), so every other phone keeps its own usual pick; lists
+        // without a Costco product in them go as they are (null stays null).
+        String usual = str(data, "usual_product_id");
+        if (usual != null && gone.contains(usual)) data.remove("usual_product_id");
+        for (String col : new String[] { "same_product_ids", "alt_product_ids" }) {
+            JSONArray a = idList(str(data, col));
+            JSONArray out = new JSONArray();
+            for (int i = 0; i < a.length(); i++) if (!gone.contains(a.optString(i))) out.put(a.optString(i));
+            if (out.length() != a.length()) data.put(col, out.toString());
+        }
+    }
+
+    /** An item that came in keeps this phone's own Costco picks (what the sender has never had). */
+    void keepLocalCostcoPicks(String pk, JSONObject row) throws Exception {
+        Set<String> mine = costcoIds();
+        if (mine.isEmpty()) return;
+        List<JSONObject> cur = db.query("SELECT usual_product_id, same_product_ids, alt_product_ids FROM items WHERE id = ?", pk);
+        if (cur.isEmpty()) return;
+        JSONObject c = cur.get(0);
+        String usual = str(c, "usual_product_id");
+        if (usual != null && mine.contains(usual) && str(row, "usual_product_id") == null) row.put("usual_product_id", usual);
+        for (String col : new String[] { "same_product_ids", "alt_product_ids" }) {
+            if (!row.has(col)) continue; // not sent: what is here stays (items are updated in place)
+            JSONArray theirs = idList(str(row, col));
+            Set<String> have = new HashSet<>();
+            for (int i = 0; i < theirs.length(); i++) have.add(theirs.optString(i));
+            JSONArray local = idList(str(c, col));
+            for (int i = 0; i < local.length(); i++) {
+                String id = local.optString(i);
+                if (mine.contains(id) && !have.contains(id)) theirs.put(id);
+            }
+            row.put(col, theirs.toString());
+        }
     }
 
     /** 0.9.1: a receipt row's photo paths (its photo, then its pages), only real receipt photo paths. */
@@ -1077,6 +1146,53 @@ final class SyncEngine {
      * (checked_at, qty_at). If this phone's side added something, the merged line is noted as a
      * new change from this phone, so it goes back to the others too.
      */
+    /**
+     * 0.9.6 (review H1), engine.ts resendCostcoLines: once, list lines an earlier 0.9.6 build kept back
+     * because they were at Costco go out again (as "Any shop", stripCostcoLine), with the change that
+     * was kept back, so the others catch up with ticks and edits made since.
+     */
+    void resendCostcoLines() throws Exception {
+        if (meta("costco_lines") != null) return;
+        db.transaction(() -> {
+            for (JSONObject r : db.query("SELECT id FROM list_entries WHERE chain = 'costco' OR product LIKE '%\"chain\":\"costco\"%'"))
+                db.exec("UPDATE sync_log SET seq = (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log) WHERE tbl = 'list_entries' AND pk = ? AND deleted = 0", r.getString("id"));
+            setMeta("costco_lines", "1");
+        });
+    }
+
+    /** 0.9.6 (review H1): a list line at Costco, or with a Costco product behind it (made by an earlier 0.9.6 build). */
+    static boolean isCostcoLine(JSONObject row) {
+        if (row == null) return false;
+        if ("costco".equals(str(row, "chain"))) return true;
+        String p = str(row, "product");
+        if (p == null) return false;
+        try {
+            return "costco".equals(new JSONObject(p).optString("chain", ""));
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    /** engine.ts stripCostcoLine: a Costco list line goes as "Any shop": no Costco shop, price or product leaves the phone. */
+    static void stripCostcoLine(JSONObject data) throws Exception {
+        if (!isCostcoLine(data)) return;
+        data.put("chain", JSONObject.NULL);
+        data.put("price", JSONObject.NULL);
+        data.put("product", JSONObject.NULL);
+    }
+
+    /**
+     * engine.ts keepLocalCostcoLine: a change from another phone to a line this phone has at Costco
+     * keeps this phone's own Costco shop, price and product when the other phone left the shop as
+     * "Any shop" (all it could see) and the words are the same. A shop they picked, or new words, win.
+     */
+    static void keepLocalCostcoLine(JSONObject cur, JSONObject merged) throws Exception {
+        if (!isCostcoLine(cur)) return;
+        if (str(merged, "chain") != null || str(merged, "product") != null || !merged.isNull("price")) return;
+        if (!merged.optString("text", "").equals(cur.optString("text", ""))) return;
+        for (String k : new String[] { "chain", "price", "product" }) merged.put(k, cur.isNull(k) ? JSONObject.NULL : cur.opt(k));
+    }
+
     private boolean mergeListLine(JSONObject e, boolean wins, JSONObject had, Set<String> mine, Map<String, Set<String>> columns) throws Exception {
         JSONObject in = e.optJSONObject("row");
         if (in == null) return false;
@@ -1091,6 +1207,7 @@ final class SyncEngine {
         boolean ours;
         if (wins) {
             merged = new JSONObject(in.toString());
+            keepLocalCostcoLine(cur, merged);
             ours = false;
             if (lc > ic) {
                 merged.put("checked", cur.opt("checked"));

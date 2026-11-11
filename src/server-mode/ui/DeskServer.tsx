@@ -283,7 +283,12 @@ function PhonesCard({ phones, error, reload }: { phones?: Phone[]; error?: strin
         </p>
       )}
       <p className="dk-row dk-sub">
-        Removing a phone stops it syncing. Nothing it shared is deleted.{canAdmin() ? '' : ' To remove one, sign in with the passphrase.'}
+        Removing a phone stops it syncing. Nothing it shared is deleted.{canAdmin() ? '' : ' To remove one, sign in with the passphrase.'} A phone
+        that chose Leave this server shows as Left.
+      </p>
+      <p className="dk-row dk-sub">
+        Wi-Fi sync is a separate, optional extra that a phone can set up for itself (phones swapping changes at home). It is off unless someone sets it up
+        on the phone, and this page never uses it: it only lists the phones the server knows.
       </p>
       {renaming && (
         <RenameSheet

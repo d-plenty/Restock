@@ -1,5 +1,6 @@
 import { CHECK_INTERVALS, DEFAULT_SETTINGS, HISTORY_WEEKS, type HomeArea, type Settings, type ShopAccount, type StoreChoice } from '../types';
-import { SECTIONS, shopDef, type CustomShop, type Section, type StoreChain } from '../shops';
+import { SECTIONS, isLocalOnlyShop, shopDef, type CustomShop, type Section, type StoreChain } from '../shops';
+import { isCheckTime } from './checkSchedule';
 import { ICON_COLOURS } from './looks';
 import { asHttps, searchOnSite } from './site';
 
@@ -134,7 +135,7 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
       if (c && !customShops.some((m) => m.id === c.id)) customShops.push(c);
     }
   const customIds = new Set<string>(customShops.map((c) => c.id));
-  const isShop = (c: unknown): c is StoreChain => typeof c === 'string' && (!!shopDef(c) || customIds.has(c));
+  const isShop = (c: unknown): c is StoreChain => typeof c === 'string' && ((!!shopDef(c) && !isLocalOnlyShop(c)) || customIds.has(c));
 
   const stores: Settings['stores'] = {};
   for (const c of Object.keys(D.stores) as StoreChain[]) stores[c] = {};
@@ -186,9 +187,24 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     checkIntervalHours: oneOf(s.checkIntervalHours, CHECK_INTERVALS, D.checkIntervalHours),
     historyWeeks: oneOf(s.historyWeeks, HISTORY_WEEKS, D.historyWeeks),
     checkWeekday: weekday(s.checkWeekday, D.checkWeekday),
+    // 0.9.6: HH:MM; anything else is 5:00 am. A 0.9.5 phone's file has none, which is the same.
+    checkTime: isCheckTime(s.checkTime) ? s.checkTime : D.checkTime,
     connection: oneOf(s.connection, ['auto', 'browser'] as const, D.connection),
     localPrices: maybeBool(s.localPrices),
     accounts: accounts && Object.keys(accounts).length ? accounts : undefined,
+    // 0.9.6: Costco is on only when the person read the notice and turned it on (acceptedAt is the proof): a
+    // file or phone that says "on" without it leaves it off.
+    costco: isObj(s.costco)
+      ? compact({
+          on: bool(obj(s.costco).on, false) && !!when(obj(s.costco).acceptedAt),
+          buyOnline: maybeBool(obj(s.costco).buyOnline),
+          acceptedAt: when(obj(s.costco).acceptedAt),
+          // 0.9.6 (review L1): item ids, at most 2,000 short ones.
+          notAt: Array.isArray(obj(s.costco).notAt)
+            ? [...new Set((obj(s.costco).notAt as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 100))].slice(0, 2000)
+            : undefined,
+        })
+      : undefined,
     theme: oneOf(s.theme, ['system', 'light', 'dark'] as const, D.theme),
     listCompare: oneOf(s.listCompare, ['unit', 'price'] as const, D.listCompare),
     shopAroundMin: number(s.shopAroundMin, D.shopAroundMin, 0, 1000),

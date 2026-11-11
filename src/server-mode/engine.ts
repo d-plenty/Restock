@@ -32,7 +32,48 @@
 // - card numbers are still blanked as they come in.
 // A phone's own choice of receipts (sync_meta share_receipts, "0" = off) now counts here too.
 
-import { shopDef } from '../shops';
+import { isLocalOnlyShop, shopDef } from '../shops';
+
+/** 0.9.6: the pseudo tab of records that never leave one phone (Costco's products and prices). Never in any shared set. SyncEngine.LOCAL_TAB. */
+const LOCAL_TAB = 'local';
+
+/** 0.9.6 (review H1): a list line at Costco, or with a Costco product behind it (made by an earlier 0.9.6 build). */
+export function isCostcoLine(row: Row | null | undefined): boolean {
+  if (!row) return false;
+  if (typeof row.chain === 'string' && isLocalOnlyShop(row.chain)) return true;
+  if (typeof row.product === 'string' && row.product) {
+    try {
+      const p = JSON.parse(row.product) as { chain?: unknown } | null;
+      return !!p && typeof p === 'object' && typeof p.chain === 'string' && isLocalOnlyShop(p.chain);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+/** SyncEngine.stripCostcoLine: a Costco list line goes as "Any shop": no Costco shop, price or product leaves the phone. */
+export function stripCostcoLine(data: Row): void {
+  if (!isCostcoLine(data)) return;
+  data.chain = null;
+  data.price = null;
+  data.product = null;
+}
+
+/**
+ * SyncEngine.keepLocalCostcoLine: a change from another device to a line this phone has at Costco
+ * keeps this phone's own Costco shop, price and product when the other device left the shop as
+ * "Any shop" (all it could see) and the words are the same. A shop they picked, or new words, win.
+ */
+export function keepLocalCostcoLine(cur: Row, merged: Row): void {
+  if (!isCostcoLine(cur)) return;
+  const none = (v: unknown) => v === null || v === undefined || v === '';
+  if (!none(merged.chain) || !none(merged.product) || !none(merged.price)) return;
+  if (String(merged.text ?? '') !== String(cur.text ?? '')) return;
+  merged.chain = cur.chain ?? null;
+  merged.price = cur.price ?? null;
+  merged.product = cur.product ?? null;
+}
 import { applyRows, settingChangeOk, settingTab, type SettingsRoom } from '../lib/sharedSettings';
 import { cleanSummary } from '../lib/phoneSummary';
 
@@ -343,6 +384,7 @@ export class WebSyncEngine {
 
   /** SyncEngine.noteTabs: sharing more now? Go through everything again. */
   noteTabs(): boolean {
+    this.resendCostcoLines();
     const caught = this.catchUpLists();
     const now = this.tabs();
     const was = this.meta('tabs_eff');
@@ -373,6 +415,8 @@ export class WebSyncEngine {
 
   chainTab(chain: string | null): string | null {
     if (!chain) return null;
+    // 0.9.6: Costco is one phone's own: a "tab" no device ever shares (SyncEngine.LOCAL_TAB).
+    if (isLocalOnlyShop(chain)) return LOCAL_TAB;
     const def = shopDef(chain);
     if (def) return def.section;
     if (!this.customTabs) {
@@ -394,6 +438,8 @@ export class WebSyncEngine {
       case 'items':
         return str(row, 'section') ?? 'pantry';
       case 'list_entries': {
+        // 0.9.6 (review H1): a line an earlier build put at Costco is an ordinary line, shared as
+        // "Any shop" (stripCostcoLine), never on Costco's own tab: ticks and deletes still reach everyone.
         // 0.9.5: a General line (section 'general') is shared with the groceries.
         const s = str(row, 'section');
         if (s !== null) return s === 'general' ? 'pantry' : s;
@@ -403,7 +449,7 @@ export class WebSyncEngine {
           return r.length ? str(r[0], 'section') : null;
         }
         const chain = str(row, 'chain');
-        return chain !== null ? this.chainTab(chain) : 'pantry';
+        return chain !== null && !isLocalOnlyShop(chain) ? this.chainTab(chain) : 'pantry';
       }
       case 'products':
         return this.chainTab(str(row, 'chain'));
@@ -471,6 +517,7 @@ export class WebSyncEngine {
         if (!row.length) continue;
         const data = { ...row[0] };
         const tab = this.tabOf(tbl, data);
+        if (tab === LOCAL_TAB) continue; // 0.9.6: Costco stays on its phone, not even as a "moved" record
         if (tab !== null && !allowed.has(tab)) {
           // 0.9.3: a household setting of a tab this pair doesn't share is left out, never sent as moved.
           if (!moves || tbl === 'prices' || tbl === 'household_settings') continue;
@@ -481,6 +528,8 @@ export class WebSyncEngine {
         }
         if (tbl === 'prices') delete data.id;
         if (tbl === 'products') for (const c of LOCAL_PRODUCT_COLUMNS) delete data[c];
+        if (tbl === 'items') this.stripCostcoPicks(data);
+        if (tbl === 'list_entries') stripCostcoLine(data);
         e.row = data;
       }
       if (tbl === 'household') {
@@ -579,6 +628,7 @@ export class WebSyncEngine {
           // devices sharing that tab.
           const cur = this.db.query(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]);
           const tab = cur.length ? this.tabOf(tbl, cur[0]) : null;
+          if (tab === LOCAL_TAB) continue; // 0.9.6: nobody else has Costco's records to delete
           if (tab !== null && !mine.has(tab)) {
             // Held until this device syncs that tab again (releaseHeld), so it still goes then, even
             // if the others have tidied the delete away by then (review fix).
@@ -595,6 +645,7 @@ export class WebSyncEngine {
           this.db.exec(`DELETE FROM ${tbl} WHERE ${key} = ?`, [pk]);
         } else {
           if (row === null) continue;
+          if (tbl === 'items') this.keepLocalCostcoPicks(pk, row);
           this.writeRow(tbl, tbl === 'cards' ? stripCard(row) : row, this.columnsOf(tbl, columns));
         }
         this.logEntry(tbl, pk, stamp, device, deleted, e.sig === null || e.sig === undefined ? null : String(e.sig), created, this.originOf(e, stamp, device, deleted, created, had, this.applyingFrom));
@@ -610,6 +661,50 @@ export class WebSyncEngine {
       this.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
     });
     return changed;
+  }
+
+  // ---------- 0.9.6: picks at Costco stay on their phone (SyncEngine.stripCostcoPicks) ----------
+
+  private costcoIds(): Set<string> {
+    return new Set(this.db.query("SELECT id FROM products WHERE chain = 'costco'").map((r) => String(r.id)));
+  }
+
+  private idList(v: unknown): string[] {
+    try {
+      const a: unknown = JSON.parse(typeof v === 'string' && v ? v : '[]');
+      return Array.isArray(a) ? a.map(String) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** An item sent to another device goes without its Costco picks (those products never leave this phone). */
+  stripCostcoPicks(data: Row): void {
+    const gone = this.costcoIds();
+    if (!gone.size) return;
+    // 0.9.6 (review L2): only the Costco part goes. A usual pick at Costco is left out of the record
+    // altogether (items are updated in place), so every other phone keeps its own usual pick; lists
+    // without a Costco product in them go as they are (null stays null).
+    if (typeof data.usual_product_id === 'string' && gone.has(data.usual_product_id)) delete data.usual_product_id;
+    for (const col of ['same_product_ids', 'alt_product_ids']) {
+      const ids = this.idList(data[col]);
+      if (ids.some((id) => gone.has(id))) data[col] = JSON.stringify(ids.filter((id) => !gone.has(id)));
+    }
+  }
+
+  /** An item that came in keeps this phone's own Costco picks (what the sender has never had). */
+  keepLocalCostcoPicks(pk: string, row: Row): void {
+    const mine = this.costcoIds();
+    if (!mine.size) return;
+    const cur = this.db.query('SELECT usual_product_id, same_product_ids, alt_product_ids FROM items WHERE id = ?', [pk])[0];
+    if (!cur) return;
+    if (typeof cur.usual_product_id === 'string' && mine.has(cur.usual_product_id) && (row.usual_product_id === null || row.usual_product_id === undefined)) row.usual_product_id = cur.usual_product_id;
+    for (const col of ['same_product_ids', 'alt_product_ids']) {
+      if (!(col in row)) continue; // not sent: what is here stays (items are updated in place)
+      const theirs = this.idList(row[col]);
+      for (const id of this.idList(cur[col])) if (mine.has(id) && !theirs.includes(id)) theirs.push(id);
+      row[col] = JSON.stringify(theirs);
+    }
   }
 
   /** 0.9.3: the household_settings table as it is, for settingChangeOk (counted once, when first asked). */
@@ -663,6 +758,21 @@ export class WebSyncEngine {
     return cols;
   }
 
+  /**
+   * 0.9.6 (review H1), SyncEngine.resendCostcoLines: once, list lines an earlier 0.9.6 build kept back
+   * because they were at Costco go out again (as "Any shop", stripCostcoLine), with the change that
+   * was kept back, so the others catch up with ticks and edits made since.
+   */
+  resendCostcoLines(): void {
+    if (this.meta('costco_lines') !== null) return;
+    this.db.transaction(() => {
+      const ids = this.db.query("SELECT id FROM list_entries WHERE chain = 'costco' OR product LIKE '%\"chain\":\"costco\"%'").map((r) => String(r.id));
+      for (const id of ids)
+        this.db.exec("UPDATE sync_log SET seq = (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log) WHERE tbl = 'list_entries' AND pk = ? AND deleted = 0", [id]);
+      this.setMeta('costco_lines', '1');
+    });
+  }
+
   /** SyncEngine.mergeListLine: the tick and the quantity each keep whichever changed last. */
   private mergeListLine(e: Entry, stamp: number, device: string, created: number, wins: boolean, had: Row, mine: Set<string>, columns: Map<string, Set<string>>): boolean {
     const inRow = e.row && typeof e.row === 'object' ? e.row : null;
@@ -681,6 +791,7 @@ export class WebSyncEngine {
     let ours: boolean;
     if (wins) {
       merged = { ...inRow };
+      keepLocalCostcoLine(cur, merged);
       ours = false;
       if (lc > ic) {
         merged.checked = cur.checked;

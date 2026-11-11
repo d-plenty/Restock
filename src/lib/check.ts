@@ -1,5 +1,5 @@
 import { logProblem } from './diagnostics';
-import { kindOf, priceSource, sectionOn, sectionOf, type StoreChain } from '../shops';
+import { isLocalOnlyShop, kindOf, priceSource, sectionOn, sectionOf, type StoreChain } from '../shops';
 import { adapterFor } from '../stores';
 import { isNative } from '../stores/http';
 import type { Chain, Settings } from '../types';
@@ -20,16 +20,16 @@ export interface CheckResult {
 
 let running: Promise<CheckResult> | undefined;
 
-export function checkPrices(onProgress?: (done: number, total: number) => void): Promise<CheckResult> {
-  if (!running) running = doCheck(onProgress).finally(() => (running = undefined));
+export function checkPrices(onProgress?: (done: number, total: number) => void, opts?: { slot?: boolean }): Promise<CheckResult> {
+  if (!running) running = doCheck(onProgress, opts).finally(() => (running = undefined));
   return running;
 }
 
-async function doCheck(onProgress?: (done: number, total: number) => void): Promise<CheckResult> {
+async function doCheck(onProgress?: (done: number, total: number) => void, opts?: { slot?: boolean }): Promise<CheckResult> {
   if (!isNative()) return { checked: 0, updated: 0, errors: {}, nativeOnly: true };
   const handle = await RestockNative.addListener('checkProgress', (e) => onProgress?.(e.done, e.total));
   try {
-    const r = await RestockNative.checkNow();
+    const r = await RestockNative.checkNow(opts?.slot ? { slot: true } : undefined);
     const extra = await refreshPagelessProducts().catch(() => ({ checked: 0, updated: 0 }));
     for (const [chain, msg] of Object.entries(r.errors ?? {})) if (msg) void logProblem(chain as StoreChain, 'price check', String(msg));
     return { checked: r.checked + extra.checked, updated: r.updated + extra.updated, errors: r.errors as CheckResult['errors'], nativeOnly: false };
@@ -39,10 +39,15 @@ async function doCheck(onProgress?: (done: number, total: number) => void): Prom
   }
 }
 
-/** Keep Android's background schedule in step with the "Allow background activity" setting. */
-export async function syncBackgroundSchedule(settings: Settings): Promise<void> {
-  if (!isNative()) return;
-  await RestockNative.scheduleChecks({ enabled: settings.sync.backgroundActivity, intervalHours: settings.checkIntervalHours });
+/**
+ * Keep Android's background schedule in step with the "Allow background activity" setting and the
+ * price check time (0.9.6: a set time of day, default 5:00 am). Says whether a set time passed with
+ * no check (the phone was off), so Restock can run one when it opens.
+ */
+export async function syncBackgroundSchedule(settings: Settings): Promise<{ due: boolean }> {
+  if (!isNative()) return { due: false };
+  const r = await RestockNative.scheduleChecks({ enabled: settings.sync.backgroundActivity, intervalHours: settings.checkIntervalHours });
+  return { due: !!r.due };
 }
 
 /** A shop product with no product page of its own to check (found in a page's data, not a link). */
@@ -61,7 +66,8 @@ async function refreshPagelessProducts(limit = 30): Promise<{ checked: number; u
     .filter(
       (p) =>
         // A product is saved under the shop whose website has its price (My Chemist's under Chemist Warehouse).
-        isPageless(p.chain, p.storeProductId) && sources.includes(p.chain as StoreChain) && sectionOn(settings, sectionOf(p.chain)),
+        // 0.9.6 (review L1): never Costco ("Check at Costco" on the item is the only way, costcoCheck.ts).
+        !isLocalOnlyShop(p.chain) && isPageless(p.chain, p.storeProductId) && sources.includes(p.chain as StoreChain) && sectionOn(settings, sectionOf(p.chain)),
     )
     .slice(0, limit);
   if (!todo.length) return { checked: 0, updated: 0 };

@@ -28,6 +28,23 @@ export interface Product {
   createdAt: string;
   /** Shared price history for this product (from a downloaded summary), when there is one. Not stored on the product. */
   market?: MarketSummary;
+  /** 0.9.6: the size worked out for it (from its words, a barcode match or a look-alike). Not stored on the product; see lib/unitPrice.ts. */
+  sizing?: Sizing;
+}
+
+/** How a size was found: the person typed it, the shop's words say it, the same barcode elsewhere, or worked out from a look-alike. */
+export type SizeBasis = 'confirmed' | 'shop' | 'barcode' | 'estimated';
+
+/** 0.9.6: what Restock knows about how much is in a product (lib/unitPrice.ts). */
+export interface Sizing {
+  /** The size used for comparing. Missing when it isn't known (a guess below is only a suggestion). */
+  size?: { qty: number; unit: BaseUnit; count?: number; basis: SizeBasis; from?: string };
+  /** A common-size guess (375 mL cans). Never used for comparing: it is only offered to the person to confirm. */
+  guess?: { qty: number; unit: BaseUnit; count?: number; why: string };
+  /** How many are in the pack, when the name or size says. */
+  packCount?: number;
+  /** No size to compare by. */
+  unknown: boolean;
 }
 
 /**
@@ -115,7 +132,7 @@ export interface PriceReading {
   isSpecial: boolean;
   memberOnly: boolean; // needs Flybuys / Everyday Rewards
   promo?: string;
-  source: 'auto' | 'manual' | 'demo';
+  source: 'auto' | 'manual' | 'demo' | 'imported';
 }
 
 /** A shop receipt kept in Restock (the Receipts add-on). The photo lives in Restock's private storage, not the phone's photos. */
@@ -183,6 +200,51 @@ export interface LoyaltyCard {
   label: string;
   number: string;
   createdAt: string;
+}
+
+// ---------- 0.9.6 (cards): gift cards, beside loyalty cards on the Cards screen ----------
+// Kept on this phone only (table gift_cards, never synced, never on a Restock server), or on the
+// web in this browser only (src/server-mode/cardStore.ts). In a backup for the person themself.
+
+/** How a gift card's barcode is drawn for the till. */
+export type GiftBarcodeType = 'CODE128' | 'QR' | 'EAN';
+
+/** One "update balance": what the balance was after it. */
+export interface GiftBalanceEntry {
+  /** When (ISO). */
+  at: string;
+  balance: number;
+}
+
+export interface GiftCard {
+  id: string;
+  /** The card or shop name ("Myer", "Bunnings"). */
+  name: string;
+  /** What the barcode holds (often the card number). Empty: no barcode drawn. */
+  barcode?: string;
+  barcodeType: GiftBarcodeType;
+  /** The card number, separate from the barcode. */
+  number?: string;
+  /** 4 to 8 digits, hidden until tapped. */
+  pin?: string;
+  /** Balance now, in dollars. */
+  balance?: number;
+  /** The last few balance updates, oldest first (at most GIFT_HISTORY_MAX). */
+  history?: GiftBalanceEntry[];
+  /** Expiry date, YYYY-MM-DD. */
+  expiry?: string;
+  /** Remind this many days before it expires (0 or missing: no reminder). Phone only. */
+  remindDays?: number;
+  notes?: string;
+  /** Photos of the front and back: paths in Restock's own storage (cardPhotos.ts), never the gallery. */
+  photoFront?: string;
+  photoBack?: string;
+  /** One of CARD_COLOURS (giftCards.ts). */
+  colour: string;
+  /** Used up: kept, out of the way, under "Used up". */
+  usedUp?: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Category {
@@ -273,6 +335,11 @@ export interface Settings {
   defaultThresholdPct: number;
   /** How often background price checks run. 168 = weekly, on checkWeekday. */
   checkIntervalHours: number;
+  /**
+   * 0.9.6: the time of day price checks run, "HH:MM" on the phone's own clock (5:00 am when not set).
+   * With every 12 hours, this and 12 hours later. This phone's own: never shared with the household.
+   */
+  checkTime?: string;
   /** How long price history is kept on the phone, in weeks. */
   historyWeeks: number;
   checkWeekday: number; // 0=Sun … 6=Sat, default 3 (Wed)
@@ -285,6 +352,15 @@ export interface Settings {
    * prices and stock, and lets Restock fill your trolley, when you're signed in.
    */
   accounts?: { woolworths?: ShopAccount; coles?: ShopAccount };
+  /**
+   * 0.9.6: Costco on this phone (src/stores/costco.ts). Off unless `on`, which needs `acceptedAt`: the day
+   * the person read the notice (lib/costcoNotice.ts) and turned it on. `buyOnline` ("I buy from Costco online"):
+   * only then do Costco's online prices count when working out the cheapest shop; otherwise they are shown for
+   * information. This phone's own: never shared with the household or the server, never in a backup file.
+   * 0.9.6 (review L1): `notAt`, the items this phone said "Not at Costco" for (item ids), kept here rather
+   * than in the shared item, so the household and the server are never told this phone uses Costco.
+   */
+  costco?: { on: boolean; buyOnline?: boolean; acceptedAt?: string; notAt?: string[] };
   theme: 'system' | 'light' | 'dark';
   /** Shopping list: cheapest by best value (per 100 g / litre / item) or by lowest shelf price. */
   listCompare: 'unit' | 'price';
@@ -367,7 +443,8 @@ export const DEFAULT_SETTINGS: Settings = {
   household: { name: 'Our house' },
   sharePrices: 'unasked',
   defaultThresholdPct: 10,
-  checkIntervalHours: 12,
+  checkIntervalHours: 24,
+  checkTime: '05:00',
   historyWeeks: 8,
   checkWeekday: 3,
   connection: 'auto',

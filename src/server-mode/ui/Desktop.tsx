@@ -20,6 +20,7 @@ import { DeskData } from './DeskData';
 import { DeskDataManage } from './DeskDataManage';
 import { HandoverCard, ServerAndPhones } from './DeskServer';
 import { DeskSpecials } from './DeskSpecials';
+import { DeskCards } from './DeskCards'; // 0.9.6 (cards)
 import { ServerHomeAssistant } from './ServerHomeAssistant';
 import { peekStartOn } from './deskShared';
 import { signOutHere } from './settingsData';
@@ -29,6 +30,7 @@ import { DeskList } from './DeskList';
 import { DeskPantry } from './DeskPantry';
 import { DeskSettings } from './DeskSettings';
 import { useNow, useStatus } from './ServerScreens';
+import { OnlineOnly } from './PhoneLayout'; // 0.9.6 (offline)
 import '../desk.css';
 // 0.9.5 (PWA)
 import { PwaBanners } from '../pwa/Banners';
@@ -38,7 +40,8 @@ import { UndoFoot } from './DeskUndo';
 import { askLeave } from '../../lib/confirm';
 import { canLeave, hasUnsaved } from '../../lib/settingsDraft';
 
-type Place = Tab | 'specials' | 'receipts' | 'household' | 'data' | 'settings';
+// 0.9.6 (cards): 'cards' is the Cards tab (kept in this browser only, DeskCards.tsx).
+type Place = Tab | 'specials' | 'receipts' | 'cards' | 'household' | 'data' | 'settings';
 
 /** Which sidebar entry a screen belongs to (by the first screen opened over the tab). */
 function placeOf(tab: Tab, stack: Screen[]): Place {
@@ -47,7 +50,8 @@ function placeOf(tab: Tab, stack: Screen[]): Place {
   if (s.name === 'specials' || s.name === 'catalogues' || s.name === 'mycatalogue') return 'specials';
   if (s.name === 'receipts' || s.name === 'receipt') return 'receipts';
   if (s.name === 'server' && (s.page === 'data' || s.page === 'data-manage')) return 'data';
-  if (s.name === 'server' || s.name === 'cards') return 'household';
+  if (s.name === 'cards') return 'cards'; // 0.9.6 (cards)
+  if (s.name === 'server') return 'household';
   if (s.name === 'settings' || s.name === 'household' || s.name === 'homeAssistant') return 'settings';
   return tab;
 }
@@ -62,11 +66,28 @@ function deskScreen(top: Screen): ReactNode | undefined {
     ) : (
       <DeskHousehold extra={serverInfo()?.api === 3 && serverInfo()?.mode === 'v2' ? <HandoverCard /> : undefined} />
     );
-  if (top.name === 'server' && top.page === 'activity' && house) return <ActivityLogs />;
-  if (top.name === 'server' && top.page === 'data' && house) return <DeskData />;
-  if (top.name === 'server' && top.page === 'data-manage' && house) return <DeskDataManage />;
+  // 0.9.6 (offline): pages that ask the server each time say Needs signal while offline.
+  if (top.name === 'server' && top.page === 'activity' && house)
+    return (
+      <OnlineOnly title="Activity" page="activity">
+        <ActivityLogs />
+      </OnlineOnly>
+    );
+  if (top.name === 'server' && top.page === 'data' && house)
+    return (
+      <OnlineOnly title="Your data" page="data">
+        <DeskData />
+      </OnlineOnly>
+    );
+  if (top.name === 'server' && top.page === 'data-manage' && house)
+    return (
+      <OnlineOnly title="Manage data" page="data-manage">
+        <DeskDataManage />
+      </OnlineOnly>
+    );
   if (top.name === 'homeAssistant' && house) return <ServerHomeAssistant />;
   if (top.name === 'specials' || top.name === 'catalogues') return <DeskSpecials />;
+  if (top.name === 'cards') return <DeskCards />; // 0.9.6 (cards)
   return undefined;
 }
 
@@ -150,6 +171,8 @@ function SideNav({ tabs, place, go }: { tabs: Tab[]; place: Place; go: (p: Place
       )}
       {item('specials', 'Specials and catalogues', 'flame')}
       {settings?.receipts.enabled && item('receipts', 'Receipts', 'receipt')}
+      {/* 0.9.6 (cards): Cards, kept in this browser only (DeskCards.tsx). */}
+      {item('cards', 'Cards', 'card')}
       <div className="dk-nav-rule" role="separator" />
       {item('household', 'Server and phones', 'phone')}
       {isV3() && item('data', 'Data', 'chart')}
@@ -202,6 +225,8 @@ export function Desktop({ tabs, tab, stack, overlay }: DesktopProps) {
           ? { name: 'specials' }
           : p === 'receipts'
             ? { name: 'receipts' }
+            : p === 'cards'
+            ? { name: 'cards' } // 0.9.6 (cards)
             : p === 'household'
               ? { name: 'server', page: 'phones' }
               : p === 'data'

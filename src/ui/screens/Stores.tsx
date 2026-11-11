@@ -40,6 +40,19 @@ import { confirmAction } from '../../lib/confirm';
 import { ChainDot, Icon, LoadingBar, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
 import { money } from '../../lib/units';
+import {
+  COSTCO_BUY_ONLINE,
+  COSTCO_BUY_ONLINE_HELP,
+  COSTCO_CANCEL,
+  COSTCO_NOTICE,
+  COSTCO_NOTICE_HEADING,
+  COSTCO_PHONE_ONLY_MESSAGE,
+  COSTCO_SETTING_TITLE,
+  COSTCO_SWITCH_HELP,
+  COSTCO_SWITCH_HELP_ON,
+  COSTCO_SWITCH_LABEL,
+  COSTCO_TURN_ON,
+} from '../../lib/costcoNotice';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -793,6 +806,7 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
         <ManualNames settings={settings} section="pantry" />
         <div className="eyebrow">3 · Check your shops</div>
         <LocalPrices settings={settings} />
+        <CostcoSetting settings={settings} />
       </>
     );
   }
@@ -807,7 +821,7 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
           <ShopDropdown settings={settings} section={section} startOpen={inSetup} />
           {!sectionOn(settings, section) && (
             <p className="small">
-              Pick at least one {section === 'keg' ? 'bottle shop' : 'pharmacy'} (here, or a branch below) to show the {SECTION_NAMES[section]} tab.
+              Pick at least one {section === 'keg' ? 'bottle shop' : 'chemist'} (here, or a branch below) to show the {SECTION_NAMES[section]} tab.
             </p>
           )}
           <div className="eyebrow">2 · Your branches</div>
@@ -1326,5 +1340,80 @@ function LocalPrices({ settings }: { settings: Settings }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * 0.9.6: Costco on this phone. Off until the person reads the notice and turns it on; the notice stays
+ * visible here afterwards. Not a household setting: it is this phone's own, so it is never in the list
+ * of shops the household shares, and Costco is never searched by the server or the web page.
+ */
+export function CostcoSetting({ settings }: { settings: Settings }) {
+  const [asking, setAsking] = useState(false);
+  const c = settings.costco;
+  const on = !!c?.on;
+  const turnOn = async () => {
+    setAsking(false);
+    await updateSettings({ costco: { on: true, buyOnline: c?.buyOnline, acceptedAt: nowIso() } });
+  };
+  const notice = (
+    <div className="banner grey" role="note" style={{ fontSize: 13, flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+      <strong>{COSTCO_NOTICE_HEADING}</strong>
+      <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {COSTCO_NOTICE.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </div>
+  );
+  return (
+    <>
+      <div className="eyebrow">{COSTCO_SETTING_TITLE}</div>
+      <div className="card">
+        <label className="check" style={{ padding: 0 }}>
+          <span className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              {COSTCO_SWITCH_LABEL}
+            </span>
+            <span className="small">{on ? COSTCO_SWITCH_HELP_ON : COSTCO_SWITCH_HELP}</span>
+          </span>
+          <input
+            type="checkbox"
+            className="switch"
+            checked={on}
+            disabled={!isNative() && !on}
+            onChange={(e) => (e.target.checked ? setAsking(true) : void updateSettings({ costco: { on: false, buyOnline: c?.buyOnline, acceptedAt: c?.acceptedAt } }))}
+            aria-label={COSTCO_SWITCH_LABEL}
+          />
+        </label>
+        {!isNative() && <p className="small">{COSTCO_PHONE_ONLY_MESSAGE}</p>}
+        {notice}
+        {on && (
+          <label className="check" style={{ padding: 0 }}>
+            <input
+              type="checkbox"
+              checked={!!c?.buyOnline}
+              onChange={(e) => void updateSettings({ costco: { on: true, buyOnline: e.target.checked, acceptedAt: c?.acceptedAt } })}
+              aria-label={COSTCO_BUY_ONLINE}
+            />
+            <span className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span>{COSTCO_BUY_ONLINE}</span>
+              <span className="small">{COSTCO_BUY_ONLINE_HELP}</span>
+            </span>
+          </label>
+        )}
+      </div>
+      {asking && (
+        <Sheet title={COSTCO_SETTING_TITLE} onClose={() => setAsking(false)}>
+          {notice}
+          <button className="btn primary" onClick={() => void turnOn()}>
+            {COSTCO_TURN_ON}
+          </button>
+          <button className="btn" onClick={() => setAsking(false)}>
+            {COSTCO_CANCEL}
+          </button>
+        </Sheet>
+      )}
+    </>
   );
 }

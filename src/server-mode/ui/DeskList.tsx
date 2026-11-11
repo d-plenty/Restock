@@ -5,6 +5,7 @@ import { allCategories, allListEntries, getSettings, updateSettings } from '../.
 import { linesToPick, pickWord } from '../../lib/homeAssistant';
 import { loadRecommendations } from '../../lib/recs';
 import { money } from '../../lib/units';
+import { bothPrices } from '../../lib/verdict';
 import { useLive } from '../../lib/useLive';
 import { LIST_NAMES, type ListSection } from '../../shops';
 import { chainName, type ListEntry } from '../../types';
@@ -240,6 +241,8 @@ export function DeskList() {
             {title}
           </button>
           {bits.length > 0 && <span className="dk-sub">{bits.join(' · ')}</span>}
+          {/* 0.9.6: both prices, as on the phone. */}
+          {deal && bothPrices(deal) && <span className="dk-sub num">{bothPrices(deal)}</span>}
           {(p !== undefined || onSale) && (
             <span className={`dk-sub num${onSale ? ' dk-good' : ''}`}>
               {p !== undefined ? money(p) : ''}
@@ -411,6 +414,7 @@ export function DeskList() {
           shops={listShops(settings.enabledChains, section, sectionsOn)}
           deal={dealFor(c, editing) ?? recFor(c, editing)?.options[0]}
           name={recFor(c, editing)?.group.name}
+          lists={sectionsOn /* 0.9.6 (Move to) */}
           onClose={() => setEditing(undefined)}
         />
       )}

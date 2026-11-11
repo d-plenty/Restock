@@ -1,5 +1,5 @@
 import { getSettings, updateSettings } from './db';
-import { backupJson, EVERYTHING } from './backup';
+import { backupJson, EVERYTHING, type ExportParts } from './backup';
 import { RestockNative } from './sql/native';
 import { isNative } from '../stores/http';
 import type { Settings } from '../types';
@@ -8,6 +8,18 @@ import type { Settings } from '../types';
 // opened (or comes back) and the last one is older than they asked for. Android's background
 // scheduler can't run the app's code, and opening Restock is frequent enough for a backup that's
 // "every few days", so this keeps it simple and always makes exactly the same file as Export.
+
+/** 0.9.6 (review M3): said in the Back up automatically setting. */
+export const AUTO_GIFT_NOTE = 'Gift cards are only included when the backup has a password.';
+
+/**
+ * 0.9.6 (review M3): what an automatic backup holds. Gift cards (numbers, PINs and photos) only
+ * when the backups are locked with a password: the folder is often a cloud drive.
+ */
+export function autoParts(b: Settings['autoBackup']): ExportParts {
+  const password = b.password || undefined;
+  return { ...EVERYTHING, receiptPhotos: b.receiptPhotos !== false, serverPhotos: false, password, giftCards: !!password };
+}
 
 export const BACKUP_EVERY = [1, 3, 7, 14, 30];
 export const BACKUP_KEEP = [3, 4, 5, 10, 20]; // 0.9.3: 4, for "weekly, kept for 4 weeks"
@@ -38,7 +50,8 @@ export async function maybeAutoBackup(force = false): Promise<string | undefined
   running = true;
   try {
     // 0.9.0: locked with the automatic backups' password, if one is set.
-    const json = await backupJson({ ...EVERYTHING, receiptPhotos: s.autoBackup.receiptPhotos !== false, serverPhotos: false, password: s.autoBackup.password || undefined });
+    // 0.9.6 (review M3): gift cards only in a locked backup (autoParts).
+    const json = await backupJson(autoParts(s.autoBackup));
     const name = autoName();
     await RestockNative.writeBackup({ uri: s.autoBackup.folder, name, json, keep: s.autoBackup.keep });
     const now = new Date().toISOString();

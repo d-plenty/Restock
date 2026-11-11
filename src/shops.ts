@@ -29,7 +29,7 @@ export const asListSection = (v: unknown): ListSection => (v === 'keg' || v === 
 /** The tab a list's lines are shared with (household sync, the server, What this phone shares): General goes with Groceries. */
 export const listShareTab = (s: ListSection | null | undefined): Section => (s === 'keg' || s === 'pharmacy' ? s : 'pantry');
 
-export type GroceryChain = 'woolworths' | 'coles' | 'aldi';
+export type GroceryChain = 'woolworths' | 'coles' | 'aldi' | 'costco';
 export type LiquorChain =
   'danmurphys' | 'bws' | 'liquorland' | 'liquorlandwarehouse' | 'liquorlandcellars' | 'bottleo' | 'cellarbrations' | 'thirstycamel' | 'porters';
 export type PharmacyChain =
@@ -59,6 +59,8 @@ export type StoreChain = Exclude<Chain, 'other'>;
 /**
  * How Restock talks to a shop:
  * - woolworths / coles / aldi: the supermarkets' own apps' data.
+ * - costco (0.9.6): costco.com.au's public pages, read on a phone only, only when Search is pressed
+ *   (src/stores/costco.ts). Off by default and per phone (settings.costco), never in enabledChains.
  * - endeavour: Dan Murphy's and BWS, which run on the same system as Woolworths.
  * - web: any shop website. Restock finds its search page and reads the products and prices
  *   the page already carries for search engines, using the hidden browser when it needs to.
@@ -117,6 +119,18 @@ export const SHOPS: ShopDef[] = [
     website: 'https://www.aldi.com.au',
     map: /\baldi\b/i,
     catalogue: { url: 'https://www.aldi.com.au/special-buys', note: 'New Special Buys every Wednesday and Saturday.' },
+  }),
+
+  // 0.9.6: Costco is switched on per phone in Settings (settings.costco), not by picking it with the shops,
+  // so it is never in enabledChains, never shared with the household and never read by the server.
+  G({
+    id: 'costco',
+    name: 'Costco',
+    kind: 'costco',
+    color: '#5b6b7a',
+    website: 'https://www.costco.com.au',
+    map: /\bcostco\b/i,
+    note: 'Online prices, this phone only',
   }),
 
   L({
@@ -294,6 +308,31 @@ export const SHOPS: ShopDef[] = [
 const BY_ID = new Map<string, ShopDef>(SHOPS.map((s) => [s.id, s]));
 export const GROCERY: GroceryChain[] = ['woolworths', 'coles', 'aldi'];
 
+/**
+ * 0.9.6: shops that live on one phone only. Costco is switched on in that phone's own Settings
+ * (settings.costco), so it is never in enabledChains and never picked for the household: not shared
+ * with other phones or the server, and left out of backups, exports and the shared price pack.
+ */
+export const LOCAL_ONLY_SHOPS: readonly string[] = ['costco'];
+export const isLocalOnlyShop = (c: string | undefined): boolean => !!c && LOCAL_ONLY_SHOPS.includes(c);
+
+// Costco on this phone (settings.costco), kept here like the person's own shops so any screen can ask.
+// `on`: Costco can be searched. `counts`: its prices also decide the cheapest shop ("I buy from Costco online").
+let costcoOn = false;
+let costcoCounts = false;
+let costcoNotAt = new Set<string>();
+export function setCostcoState(c: { on?: boolean; buyOnline?: boolean; notAt?: string[] } | undefined) {
+  costcoOn = !!c?.on;
+  costcoCounts = costcoOn && !!c?.buyOnline;
+  costcoNotAt = new Set(Array.isArray(c?.notAt) ? c.notAt : []);
+}
+/** 0.9.6 (review L1): did this phone say "Not at Costco" for this item? Kept on the phone (settings.costco.notAt), never in the shared item. */
+export const costcoNotHere = (groupId: string | undefined): boolean => !!groupId && costcoNotAt.has(groupId);
+/** Is Costco switched on on this phone? Never true on the server or the web page. */
+export const costcoIsOn = () => costcoOn;
+/** Do Costco prices count when working out the cheapest shop? Only when switched on and "I buy from Costco online" is ticked. */
+export const costcoDecides = () => costcoCounts;
+
 /** A shop the person added: a name, a website, and which tab it's for. */
 export interface CustomShop {
   id: CustomChain;
@@ -368,7 +407,9 @@ export function hostOf(url: string): string {
 
 /** The shops picked in this section. */
 export function enabledIn(enabled: readonly string[], section: Section): StoreChain[] {
-  return enabled.filter((c): c is StoreChain => c !== 'other' && sectionOf(c) === section && (!!shopDef(c) || !!customShop(c)));
+  const out = enabled.filter((c): c is StoreChain => c !== 'other' && !isLocalOnlyShop(c) && sectionOf(c) === section && (!!shopDef(c) || !!customShop(c)));
+  // 0.9.6: Costco, when this phone has it switched on, comes after the shops picked for the household.
+  return section === 'pantry' && costcoOn ? [...out, 'costco'] : out;
 }
 
 /**

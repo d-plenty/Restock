@@ -1,0 +1,206 @@
+/* 0.9.6 (cards): the Cards screen (loyalty and gift cards), phone and web alike. Gift card colours
+   are fixed (giftCards.ts CARD_COLOURS, each with text at 4.5:1 or better), like shop colours. */
+.giftcard {
+  border-radius: var(--r-lg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: stretch;
+}
+.cc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.cc-name {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.cc-reveal {
+  border: none;
+  background: none;
+  font-size: var(--fs-body);
+  letter-spacing: 2px;
+  color: var(--fixed-ink);
+  min-height: 44px;
+  padding: 0 12px;
+  overflow-wrap: anywhere;
+}
+.cc-qr {
+  display: block;
+  width: min(240px, 70vw);
+  aspect-ratio: 1;
+}
+.cc-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.cc-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cc-fact-label {
+  font-size: var(--fs-sm);
+  opacity: 0.9;
+}
+.cc-fact {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+}
+.cc-warn::before {
+  content: '! ';
+}
+.cc-pin {
+  min-height: 44px;
+  border-radius: var(--r-md);
+  border: 1.5px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.cc-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.card.cc-row {
+  flex-direction: row;
+  align-items: center;
+  text-align: left;
+  min-height: 56px;
+}
+.cc-row.on {
+  border-width: 2px;
+  border-color: var(--green);
+}
+.cc-row-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.cc-showing {
+  color: var(--green-ink);
+  font-weight: 700;
+}
+.btn.cc-used-toggle {
+  justify-content: space-between;
+}
+.cc-seg button {
+  min-height: 44px;
+  white-space: normal;
+  line-height: 1.2;
+}
+.cc-inline {
+  display: flex;
+  gap: 8px;
+}
+.cc-inline .btn {
+  flex-shrink: 0;
+}
+.cc-label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.cc-link {
+  align-self: flex-start;
+  min-height: 44px;
+}
+.cc-notes {
+  height: auto;
+  min-height: 88px;
+  padding: 10px 14px;
+  resize: vertical;
+}
+.cc-notes-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cc-photos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cc-photo-pick {
+  display: flex;
+  gap: 8px;
+}
+.cc-photo-pick .btn:first-of-type {
+  flex: 1;
+}
+.cc-colours {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 8px;
+}
+.cc-colour {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-full);
+  border: 2px solid var(--line-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cc-colour[aria-checked='true'] {
+  box-shadow: 0 0 0 3px var(--green);
+}
+.cc-thumbs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.cc-thumb {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--r-md);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+.cc-thumb img {
+  width: 100%;
+  max-height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.cc-big {
+  width: 100%;
+  height: auto;
+  border-radius: var(--r-md);
+}
+.cc-h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+.cc-pad {
+  padding: 12px 14px 4px;
+}
+.cc-hist {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+.cc-hist-bal {
+  font-weight: 700;
+}
+.cc-kept {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}

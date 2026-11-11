@@ -25,6 +25,7 @@ import { RecallBanner } from './Recalls';
 import { SetupNudges } from './SetupNudges';
 import { serverMode } from '../../server-mode/flag';
 import { ConnectionsSheet } from './Settings';
+import { nextCheckWords } from '../../lib/checkSchedule';
 
 export function HomeScreen() {
   const nav = useNav();
@@ -72,7 +73,7 @@ export function HomeScreen() {
   const oldest = recs.map((r) => r.group.createdAt).sort()[0];
   const backupNow = async () => {
     if (cards?.length) {
-      const ok = await confirmAction('Your backup includes your loyalty card numbers', {
+      const ok = await confirmAction('Your backup includes your card numbers', {
         detail: 'Keep the file somewhere private, and only share it with people you trust.',
         action: 'Make the backup',
       });
@@ -571,30 +572,11 @@ function DealCard({ rec, listed }: { rec: Recommendation; listed?: string }) {
   );
 }
 
-/** When the next background check should run, in words ("tonight 9:15 pm", "Wed 8 am"). */
+/** When the next background check should run, in words ("tonight 5:00 pm", "tomorrow 5:00 am"). 0.9.6: the set time of day. */
 export function nextCheck(
-  s: { lastCheck?: string; checkIntervalHours: number; checkWeekday?: number; sync: { backgroundActivity: boolean } },
+  s: { checkIntervalHours: number; checkTime?: string; checkWeekday?: number; sync: { backgroundActivity: boolean } },
   now = Date.now(),
 ): string | undefined {
-  if (!s.sync.backgroundActivity || !s.lastCheck) return undefined;
-  let at = Date.parse(s.lastCheck) + s.checkIntervalHours * 3_600_000;
-  if (s.checkIntervalHours >= 168 && s.checkWeekday !== undefined) {
-    // Weekly checks run some time on the chosen day, so just name the day.
-    const d = new Date(now);
-    const checkedToday = new Date(s.lastCheck).toDateString() === d.toDateString();
-    let add = (s.checkWeekday - d.getDay() + 7) % 7;
-    if (add === 0 && checkedToday) add = 7;
-    if (add === 0) return 'today';
-    if (add === 1) return 'tomorrow';
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + add).toLocaleDateString('en-AU', { weekday: 'long' });
-  }
-  if (at < now) return 'soon';
-  const d = new Date(at);
-  const time = d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
-  const today = new Date(now);
-  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-  if (sameDay(d, today)) return `${d.getHours() >= 18 ? 'tonight' : 'today'} ${time}`;
-  if (sameDay(d, tomorrow)) return `tomorrow ${time}`;
-  return `${d.toLocaleDateString('en-AU', { weekday: 'short' })} ${time}`;
+  if (!s.sync.backgroundActivity) return undefined;
+  return nextCheckWords({ intervalHours: s.checkIntervalHours, time: s.checkTime, weekday: s.checkWeekday }, now);
 }

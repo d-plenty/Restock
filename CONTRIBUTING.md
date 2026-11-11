@@ -33,7 +33,7 @@ Under any shop's results in Restock, tap **Wrong results? Save them for the deve
 
 ### Keep it private
 
-Issues are public. Leave out loyalty card numbers, backup files, export files, your address and anything else personal, and crop screenshots if needed. To report a security problem, see [SECURITY.md](SECURITY.md) instead.
+Issues are public. Leave out card numbers and PINs, backup files, export files, your address and anything else personal, and crop screenshots if needed. To report a security problem, see [SECURITY.md](SECURITY.md) instead.
 
 ## Ideas
 

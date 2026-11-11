@@ -2,6 +2,7 @@ import {
   HISTORY_WEEKS,
   type Category,
   type Chain,
+  type GiftCard,
   type Group,
   type ListEntry,
   type ListProduct,
@@ -12,9 +13,11 @@ import {
   type Settings,
 } from '../types';
 import { changed } from './live';
-import { asListSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, setCustomShops, shopDef, type ListSection, type Section } from '../shops';
+import { listLineWithoutCostco } from './costcoLocal';
+import { asListSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, setCostcoState, setCustomShops, shopDef, type ListSection, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
-import { migrate } from './sql/schema';
+import { GIFT_CARDS_TABLE, migrate } from './sql/schema';
+import { cleanGiftCard } from './giftCards'; // 0.9.6 (cards)
 import { toPicks } from './picks';
 import { checkSettings } from './settingsCheck';
 import { isPhotoPath } from './receiptPaths';
@@ -28,6 +31,8 @@ let driver: SqlDriver | undefined;
 export async function initDb(d: SqlDriver): Promise<void> {
   driver = d;
   await migrate(d);
+  // 0.9.6 (cards): gift cards, on this phone only (schema.ts GIFT_CARDS_TABLE says why it's not a migration).
+  await d.run(GIFT_CARDS_TABLE);
 }
 
 /** Use a database without upgrading it yet (to back it up first, 0.8.0). */
@@ -234,7 +239,9 @@ export const insertReadingOp = (r: Omit<PriceReading, 'id'>): SqlOp => ({
   params: [r.productId, r.date, r.price, n(r.wasPrice), b(r.isSpecial), b(r.memberOnly), n(r.promo), r.source],
 });
 
-export const insertEntryOp = (e: ListEntry, replace = false): SqlOp => ({
+// 0.9.6 (review H1): a line is shared, so never at Costco (costcoLocal.ts listLineWithoutCostco).
+export const insertEntryOp = (line: ListEntry, replace = false): SqlOp => entryOp(listLineWithoutCostco(line), replace);
+const entryOp = (e: ListEntry, replace: boolean): SqlOp => ({
   sql: `INSERT ${replace ? 'OR REPLACE ' : ''}INTO list_entries (id, text, item_id, chain, category_id, qty, price, section, product, checked, created_at, checked_at, qty_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   params: [
     e.id,
@@ -326,6 +333,7 @@ export const cachedSettings = () => lastSettings;
 export async function getSettings(): Promise<Settings> {
   const s = mergeSettings(await getKV<Partial<Settings>>('settings'));
   setCustomShops(s.customShops);
+  setCostcoState(s.costco);
   lastSettings = s;
   return s;
 }
@@ -342,6 +350,7 @@ export async function updateSettings(patch: Partial<Settings>, opts: { local?: b
   const before = await getSettings();
   const next = mergeSettings({ ...before, ...patch });
   setCustomShops(next.customShops);
+  setCostcoState(next.costco);
   const ops: SqlOp[] = [{ sql: 'INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', params: ['settings', JSON.stringify(next)] }];
   if (!opts.local) ops.push(...(await householdSettingOps(before, next)));
   await write(ops);
@@ -416,6 +425,7 @@ export async function resetSettings(): Promise<Settings> {
   }
   const next = checkSettings(kept);
   setCustomShops(next.customShops);
+  setCostcoState(next.costco);
   await putKV('settings', next);
   lastSettings = next;
   // 0.9.3: the household's settings stay the household's.
@@ -625,6 +635,22 @@ export async function addReading(r: Omit<PriceReading, 'id'>): Promise<void> {
   await write([insertReadingOp(r)]);
 }
 
+/** 0.9.6: takes one price out of the history (a price typed in by hand that was wrong). Used inside act() so it can be undone. */
+export async function deleteReading(id: number): Promise<void> {
+  await write([{ sql: 'DELETE FROM prices WHERE id = ?', params: [id] }]);
+}
+
+/** 0.9.6: saved products with any of these barcodes, to copy a missing size from the same product at another shop. */
+export async function getProductsByBarcode(codes: string[]): Promise<Product[]> {
+  const list = [...new Set(codes.filter(Boolean))];
+  const out: Product[] = [];
+  for (let i = 0; i < list.length; i += 400) {
+    const part = list.slice(i, i + 400);
+    out.push(...(await sql().query(`SELECT * FROM products WHERE barcode IN (${placeholders(part.length)})`, part)).map(toProduct));
+  }
+  return out;
+}
+
 export async function readingsFor(productIds: string[]): Promise<Map<string, PriceReading[]>> {
   const map = new Map<string, PriceReading[]>();
   if (!productIds.length) return map;
@@ -663,7 +689,8 @@ export async function addListEntry(e: ListEntry): Promise<void> {
  * 0.9.0: a tick or a new amount also records when it changed (checked_at, qty_at), so when two
  * phones change the same line, sync keeps the newer tick and the newer amount separately.
  */
-export function updateEntryOp(id: string, patch: Partial<ListEntry>, now = Date.now()): SqlOp | undefined {
+export function updateEntryOp(id: string, change: Partial<ListEntry>, now = Date.now()): SqlOp | undefined {
+  const patch = listLineWithoutCostco(change); // 0.9.6 (review H1)
   const op = updateOp('list_entries', id, patch, ENTRY_COLS);
   if (!op) return undefined;
   const extra: string[] = [];
@@ -737,6 +764,41 @@ export async function cardChains(): Promise<Set<Chain>> {
   return set;
 }
 
+// ---------- 0.9.6 (cards): gift cards (this phone only: never synced) ----------
+
+const giftCardOp = (g: GiftCard): SqlOp => ({
+  sql: 'INSERT OR REPLACE INTO gift_cards (id, data, used_up, created_at, updated_at) VALUES (?,?,?,?,?)',
+  params: [g.id, JSON.stringify(g), g.usedUp ? 1 : 0, g.createdAt, g.updatedAt],
+});
+
+/** Every gift card, oldest first (an older database without the table: none). */
+export async function allGiftCards(): Promise<GiftCard[]> {
+  let rows: { data: string }[];
+  try {
+    rows = await sql().query<{ data: string }>('SELECT data FROM gift_cards ORDER BY created_at');
+  } catch {
+    return [];
+  }
+  const out: GiftCard[] = [];
+  for (const r of rows) {
+    try {
+      const g = cleanGiftCard(JSON.parse(r.data));
+      if (g) out.push(g);
+    } catch {
+      // A damaged row is passed over, never shown half-read.
+    }
+  }
+  return out;
+}
+
+export async function saveGiftCard(g: GiftCard): Promise<void> {
+  await write([giftCardOp(g)]);
+}
+
+export async function deleteGiftCard(id: string): Promise<void> {
+  await write([{ sql: 'DELETE FROM gift_cards WHERE id = ?', params: [id] }]);
+}
+
 // ---------- categories ----------
 
 export async function allCategories(): Promise<Category[]> {
@@ -771,7 +833,7 @@ export async function deleteCategory(id: string): Promise<void> {
 
 /** A set of rows to remember before a change: `SELECT * FROM table WHERE where`. */
 export interface RowSet {
-  table: 'items' | 'products' | 'prices' | 'list_entries' | 'cards' | 'categories';
+  table: 'items' | 'products' | 'prices' | 'list_entries' | 'cards' | 'categories' | 'gift_cards';
   where: string;
   params: SqlValue[];
 }
@@ -892,6 +954,11 @@ export interface Snapshot {
   kv: { key: string; value: unknown }[];
   /** Kept receipts (not in backups made before 0.6.0). Their photos travel separately, in the backup file. */
   receipts?: Receipt[];
+  /**
+   * 0.9.6 (cards): gift cards, with the "Cards" part (not in older backups). Their own key, so a
+   * 0.9.5 phone restoring the file passes over them (it only reads the keys it knows).
+   */
+  giftCards?: GiftCard[];
 }
 
 export async function snapshot(): Promise<Snapshot> {
@@ -905,6 +972,7 @@ export async function snapshot(): Promise<Snapshot> {
     categories: await allCategories(),
     kv: kvRows.map((r) => ({ key: r.key, value: JSON.parse(r.value) })),
     receipts: await allReceipts(),
+    giftCards: await allGiftCards(),
   };
 }
 
@@ -965,9 +1033,13 @@ export async function restoreSnapshot(s: Snapshot): Promise<void> {
     });
   if (here.has('appVersion')) kv.push({ key: 'appVersion', value: JSON.parse(here.get('appVersion')!) });
   if (here.has(HA_CONFIG)) kv.push({ key: HA_CONFIG, value: JSON.parse(here.get(HA_CONFIG)!) });
-  const ops: SqlOp[] = ['prices', 'products', 'items', 'list_entries', 'cards', 'categories', 'kv', 'receipts'].map((t) => ({
+  // 0.9.6 (review L6): a backup with no gift cards in it (0.9.5 and older, or an automatic backup
+  // without a password) leaves this phone's gift cards alone, as restoreParts does.
+  const tables = ['prices', 'products', 'items', 'list_entries', 'cards', 'categories', 'kv', 'receipts', ...(Array.isArray(s.giftCards) ? ['gift_cards'] : [])];
+  const ops: SqlOp[] = tables.map((t) => ({
     sql: `DELETE FROM ${t}`,
   }));
+  (s.giftCards ?? []).map((g) => cleanGiftCard(g)).forEach((g) => g && ops.push(giftCardOp(g))); // 0.9.6 (cards)
   (s.receipts ?? []).forEach((r) => ops.push(insertReceiptOp(withSafePhotos(r))));
   s.products.forEach((p) => ops.push(insertProductOp(p)));
   s.groups.forEach((g) => ops.push(insertGroupOp(fromBackup(g, s))));
@@ -1117,6 +1189,8 @@ export function pickSnapshot(s: Snapshot, parts: RestoreParts, opts: { prices?: 
     cards: parts.cards ? s.cards : [],
     kv: parts.settings ? s.kv : [],
     receipts: parts.receipts ? (s.receipts ?? []) : [],
+    // 0.9.6 (cards): gift cards go with the Cards part.
+    giftCards: parts.cards ? (s.giftCards ?? []) : [],
   };
 }
 
@@ -1202,6 +1276,13 @@ export async function restoreParts(
   if (parts.cards) {
     if (!opts.household) ops.push({ sql: 'DELETE FROM cards' });
     s.cards.forEach((c) => ops.push(opts.household ? { ...insertCardOp(c), sql: insertCardOp(c).sql.replace('INSERT INTO', 'INSERT OR REPLACE INTO') } : insertCardOp(c)));
+    // 0.9.6 (cards): gift cards are this phone's own (never synced): replaced, or for the household
+    // (as with loyalty cards) added, one with the same id replaced, none removed. A backup from
+    // before 0.9.6 has no gift cards part at all: the ones here stay.
+    if (s.giftCards) {
+      if (!opts.household) ops.push({ sql: 'DELETE FROM gift_cards' });
+      s.giftCards.map((g) => cleanGiftCard(g)).forEach((g) => g && ops.push(giftCardOp(g)));
+    }
   }
   if (parts.receipts) {
     ops.push({ sql: 'DELETE FROM receipts' });
@@ -1255,6 +1336,7 @@ export async function eraseEverything(): Promise<void> {
   // on Home). Shop sign-ins, cookies and exported files are cleared on the Android side (eraseNative).
   lastSettings = undefined;
   setCustomShops([]);
+  setCostcoState(undefined);
   for (const store of ['localStorage', 'sessionStorage'] as const) {
     try {
       globalThis[store]?.clear();

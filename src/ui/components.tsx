@@ -5,7 +5,8 @@ import { RestockNative } from '../lib/sql/native';
 import { formatUnitPrice, money, tidySize, tidyUnitText } from '../lib/units';
 import { fetchDetails, type ProductDetails } from '../stores/details';
 import { isNative, promoLabel } from '../stores/http';
-import { describe, eachText, productQty, type Option } from '../lib/verdict';
+import { bothPrices, describe, productQty, type Option } from '../lib/verdict';
+import { sizeLabel } from '../lib/unitPrice';
 import { chainName, stockAtBranch, type Chain, type PriceReading } from '../types';
 import { cachedSettings } from '../lib/db';
 import { SECTION_NAMES, shopColor, websiteOf, type Section } from '../shops';
@@ -915,7 +916,7 @@ export function SwapBox({ label, option, hi }: { label: string; option?: Option;
       <span className="k two-lines">{option ? describe(option) : 'No price yet'}</span>
       {option && <span className="k">{chainName(option.product.chain)}</span>}
       <span className="v num">{money(option?.price)}</span>
-      <span className="k num">{[unitLabel(option), eachText(option)].filter(Boolean).join(' · ')}</span>
+      <span className="k num">{bothPrices(option)}</span>
     </div>
   );
 }
@@ -993,6 +994,8 @@ export interface PreviewProduct {
   memberOnly?: boolean;
   promo?: string;
   unitText?: string;
+  /** 0.9.6: the size as Restock reads it ("10 × 375 mL, 3.75 L in total"), when it has worked it out. */
+  sizeText?: string;
   inStock?: boolean;
   /** For a pantry item: which role this product plays. */
   role?: 'main' | 'alt';
@@ -1013,7 +1016,8 @@ export function previewFromOption(o: Option): PreviewProduct {
     isSpecial: cur?.isSpecial,
     memberOnly: cur?.memberOnly,
     promo: cur?.promo,
-    unitText: [unitLabel(o), eachText(o)].filter(Boolean).join(' · ') || undefined,
+    unitText: bothPrices(o) || undefined,
+    sizeText: o.product.sizing?.size ? sizeLabel(o.product) : undefined,
     inStock: o.product.inStock,
     role: o.role,
   };
@@ -1086,7 +1090,7 @@ export function ProductPreview({ product: p, onClose, action }: { product: Previ
           {p.name}
         </span>
         <span className="small" style={{ fontSize: 15 }}>
-          {[tidySize(p.size, p.name), tidyUnitText(p.unitText)].filter(Boolean).join(' · ')}
+          {[p.sizeText ?? tidySize(p.size, p.name), tidyUnitText(p.unitText)].filter(Boolean).join(' · ')}
         </span>
       </div>
       {p.price !== undefined && (
@@ -1234,7 +1238,7 @@ export function LoadingBar({ seconds }: { seconds: number }) {
 export function CheckedAgo({ date, source }: { date?: string; source?: string }) {
   if (!date) return null;
   const days = Math.floor((Date.now() - Date.parse(date)) / 86_400_000);
-  const word = source === 'manual' ? 'added by hand' : 'checked';
+  const word = source === 'manual' ? 'added by hand' : source === 'imported' ? 'imported' : 'checked';
   const when = days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
   const old = days >= 3;
   return (

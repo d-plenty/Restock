@@ -2,7 +2,8 @@ import { nameOnly, score, stem, tokens, typedSize, type RankQuery } from '../sto
 import { brandKind } from './brandKinds';
 import { kindOf } from './naming';
 import type { StoreProduct } from '../stores/types';
-import { formatUnitPrice, packSize, tidyUnitText, unitPrice } from './units';
+import { packSize, tidyUnitText, unitPrice } from './units';
+import { readSize, storePriceLine } from './unitPrice';
 
 // Small helpers that make searching friendlier: everyday Australian names for things,
 // common misspellings, matching the same product across stores, and unit prices.
@@ -130,7 +131,8 @@ export function queryChanged(input: string): boolean {
 /** Price per 100 g, per litre or per item, worked out from the size, for comparing and sorting. */
 export function unitOf(sp: StoreProduct): { per: number; unit: 'g' | 'ml' | 'ea' } | undefined {
   if (sp.price === undefined) return undefined;
-  const size = packSize(sp.size, sp.name);
+  // 0.9.6: from the words and the shop's own unit price; a pack of drinks with no size has none (never compared by the litre).
+  const size = readSize(sp).size;
   if (!size) return undefined;
   const per = unitPrice(sp.price, size.qty, size.unit);
   return per === undefined ? undefined : { per, unit: size.unit };
@@ -141,11 +143,15 @@ export function unitOf(sp: StoreProduct): { per: number; unit: 'g' | 'ml' | 'ea'
  * prices a pack per item ("$0.87 / 1EA" for a 30 pack of 375 ml cans) and Restock can work out
  * the litres or grams, show that instead so every store reads the same way.
  */
-export function unitTextOf(sp: StoreProduct): string {
-  const u = unitOf(sp);
-  const ours = u ? formatUnitPrice(u.per, u.unit) : '';
-  if (u && (!sp.unitPriceText || /ea\b|each/i.test(sp.unitPriceText))) return ours;
-  return tidyUnitText(sp.unitPriceText) || ours;
+export function unitTextOf(sp: StoreProduct, pool: StoreProduct[] = []): string {
+  // 0.9.6: both prices, per item then the comparison price, the same on every screen. Our own sum
+  // (size from the words, a barcode match or a look-alike) wins; failing that, the shop's own unit price
+  // label when it isn't just "each"; failing that, "size unknown" (never a silent guess).
+  const l = storePriceLine(sp, pool);
+  if (l.compare) return l.text;
+  const shop = tidyUnitText(sp.unitPriceText);
+  const own = shop && !/\b(ea|each)\b/i.test(shop) ? shop : undefined;
+  return [l.each, own ?? (l.unknown ? 'size unknown' : undefined)].filter(Boolean).join(' · ');
 }
 
 // Words that only say which store's version it is, so "Coles Diced Tomatoes" can match "Woolworths Diced Tomatoes".

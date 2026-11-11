@@ -125,7 +125,8 @@ export function buildCatalogue(recs: Recommendation[], chains: string[], now = n
       const cost = (o: Option) => (rec.byUnit && o.unitPrice !== undefined ? o.unitPrice : o.price!);
       const priced = (c: string) =>
         rec.options
-          .filter((o) => usable(rec, o) && o.product.chain === c && o.price !== undefined && o.product.inStock !== false)
+          // 0.9.6: a line with no size isn't compared when the item compares by the litre or 100 g.
+          .filter((o) => usable(rec, o) && o.product.chain === c && o.price !== undefined && o.product.inStock !== false && (!rec.byUnit || o.unitPrice !== undefined))
           .sort((a, b) => cost(a) - cost(b))[0];
       const mine = priced(page.chain);
       if (!mine) continue;

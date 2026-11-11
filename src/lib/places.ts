@@ -1,4 +1,4 @@
-import { SHOPS, shopDef, type Section, type StoreChain } from '../shops';
+import { SHOPS, isLocalOnlyShop, shopDef, type Section, type StoreChain } from '../shops';
 import { APP_UA, num, request, sleep } from '../stores/http';
 
 // Finding nearby stores, using OpenStreetMap's free public services from this phone:
@@ -152,7 +152,7 @@ export async function describePosition(lat: number, lon: number): Promise<string
 export function chainOf(tags: Record<string, string>, section?: Section): StoreChain | undefined {
   const s = `${tags.brand ?? ''} ${tags.name ?? ''} ${tags.operator ?? ''}`;
   // More specific names first, so "Liquorland Warehouse" isn't read as plain Liquorland.
-  const shops = SHOPS.filter((d) => !section || d.section === section).sort((a, b) => b.name.length - a.name.length);
+  const shops = SHOPS.filter((d) => !isLocalOnlyShop(d.id) && (!section || d.section === section)).sort((a, b) => b.name.length - a.name.length);
   for (const d of shops) if (d.map.test(s)) return d.id;
   return undefined;
 }
@@ -309,7 +309,7 @@ export async function nominatimStores(lat: number, lon: number, section: Section
   const [cLat, cLon] = [roundCoord(lat), roundCoord(lon)];
   const viewbox = [cLon - d, cLat + d, cLon + d, cLat - d].map((n) => n.toFixed(4)).join(',');
   const all: NearbyStore[] = [];
-  const brands = (chains ?? SHOPS.filter((x) => x.section === section).map((x) => x.id))
+  const brands = (chains ?? SHOPS.filter((x) => x.section === section && !isLocalOnlyShop(x.id)).map((x) => x.id))
     .map((c) => shopDef(c)?.name)
     .filter((x): x is string => !!x)
     .slice(0, 8);

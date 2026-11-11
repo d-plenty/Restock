@@ -1,6 +1,7 @@
 import type { Chain, ListEntry, Product } from '../types';
 import { inSheets, rollsIn } from './units';
-import { notAtChains } from './picks';
+import { notAtChains, notAtList } from './picks';
+import { costcoDecides } from '../shops';
 import { isBulk, lineCost, productQty, type Option, type Recommendation } from './verdict';
 
 // What to buy for each item on the shopping list, and "what would it cost if I only went to
@@ -341,12 +342,14 @@ export function withElsewhere(s: ShopTotal, by: CompareBy): number {
   return by === 'unit' ? s.fair + s.elsewhereFair : s.totalWithElsewhere;
 }
 
-export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains: Chain3[], by: CompareBy = 'unit'): ShopTotals {
+export function shopTotals(entries: ListEntry[], recs: Recommendation[], allChains: Chain3[], by: CompareBy = 'unit'): ShopTotals {
+  // 0.9.6: Costco counts as a shop to buy at only when "I buy from Costco online" is ticked.
+  const chains = allChains.filter((c) => c !== 'costco' || costcoDecides());
   const open = entries.filter((e) => !e.checked);
   // My picks only (0.8.9), at shops you buy it at. Would also take is for Swap & save.
   const usable = (rec: Recommendation) => {
     const notAt = new Set(notAtChains(rec.group, (id) => rec.options.find((o) => o.product.id === id)?.product.chain));
-    return rec.options.filter((o) => o.role === 'main' && !notAt.has(o.product.chain));
+    return rec.options.filter((o) => o.role === 'main' && !notAt.has(o.product.chain) && (o.product.chain !== 'costco' || costcoDecides()));
   };
   const byGroup = new Map(recs.map((r) => [r.group.id, { ...r, options: usable(r) }]));
   // One item's buy from these products: your pick for as many as are on the list, or with
@@ -411,7 +414,7 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], chains:
           qty,
         );
         const elsewhere = got.pick;
-        const notHere = (rec.group.notAt ?? []).includes(chain);
+        const notHere = notAtList(rec.group).includes(chain);
         t.missing.push({ item: rec.group.name, groupId: rec.group.id, elsewhere, qty: got.packs ?? qty, ...(notHere ? { notHere } : {}) });
         if (elsewhere) {
           const cost = lineCost(elsewhere, got.packs ?? qty);

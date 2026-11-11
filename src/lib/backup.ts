@@ -22,6 +22,8 @@ import { base64ToText, textToBase64 } from './base64';
 import { shareTextFile } from './shareFile';
 import { LIST_ALIASES, LOCAL_ONLY_KV } from './haKeys';
 import { aliasesForBackup } from './listPicks';
+import { isCardPhotoPath, readCardPhoto, writeCardPhoto } from './cardPhotos'; // 0.9.6 (cards)
+import { costcoOf, withCostcoKept, withoutCostco } from './costcoLocal';
 
 export { shareTextFile };
 
@@ -36,6 +38,11 @@ interface BackupFile {
   photos?: Record<string, string>;
   /** Shared prices (0.9.0): products and their prices only, nothing about you (sharedPrices.ts). Ignored when restoring. */
   sharedPrices?: SharedPrices;
+  /**
+   * 0.9.6 (cards): gift card photos (base64 JPEG) by their path (cards/<id>-front.jpg), with the
+   * Cards part. Apart from `photos`, so a 0.9.5 phone restoring the file never sees them.
+   */
+  cardPhotos?: Record<string, string>;
 }
 
 export interface ExportParts extends RestoreParts {
@@ -50,7 +57,24 @@ export interface ExportParts extends RestoreParts {
   serverPhotos?: boolean;
   /** 0.9.0: lock the file with this password (backupLock.ts). */
   password?: string;
+  /**
+   * 0.9.6: keep Costco's products, prices and setting in the file. Only for a copy that stays inside Restock
+   * on this phone (saveCopyInApp). Every file that leaves the phone goes without them (costcoLocal.ts).
+   */
+  keepCostco?: boolean;
+  /**
+   * 0.9.6 (review M3): false leaves gift cards (numbers, PINs and photos) out of the file while the
+   * loyalty cards still go with Cards: the automatic backups without a password. The file then has
+   * no giftCards at all, so restoring it leaves this phone's gift cards alone.
+   */
+  giftCards?: boolean;
 }
+
+/** 0.9.6 (review M3): Export a backup with Cards ticked and no password. */
+export const GIFT_NO_PASSWORD_WARNING = 'Gift card numbers and PINs will be in this file unlocked. Anyone who gets the file can use them. Set a password, or untick Cards.';
+/** Does this export need the warning? */
+export const giftCardsUnlocked = (parts: Pick<ExportParts, 'cards' | 'password' | 'giftCards'>, giftCount: number) =>
+  !!parts.cards && parts.giftCards !== false && !parts.password && giftCount > 0;
 
 export const EVERYTHING: ExportParts = {
   pantry: true,
@@ -74,7 +98,9 @@ export async function exportCounts() {
   return {
     bySection,
     list: s.list.length,
-    cards: s.cards.length,
+    // 0.9.6 (cards): loyalty and gift cards together, and how many are gift cards.
+    cards: s.cards.length + (s.giftCards?.length ?? 0),
+    giftCards: s.giftCards?.length ?? 0,
     prices: s.prices.length,
     receipts: receipts.length,
     photos: receipts.filter((r) => r.photo).length,
@@ -83,7 +109,8 @@ export async function exportCounts() {
 
 /** The backup file's text, for the parts picked (everything by default). */
 export async function backupJson(parts: ExportParts = EVERYTHING): Promise<string> {
-  const all = await snapshot();
+  const snap = await snapshot();
+  const all = parts.keepCostco ? snap : withoutCostco(snap);
   // 0.9.3: "Always use this for …" are the household's rows now (listPicks.ts); a backup still has
   // them where it always did (a restore moves them back into rows).
   const aliases = await aliasesForBackup().catch(() => undefined);
@@ -93,9 +120,10 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
     app: 'restock',
     version: 2,
     exportedAt: new Date().toISOString(),
-    parts: { ...picked, password: undefined, serverPhotos: undefined },
+    parts: { ...picked, password: undefined, serverPhotos: undefined, keepCostco: undefined },
     tables: withoutSecrets(pickSnapshot(all, picked, { prices: parts.prices })),
   };
+  if (parts.giftCards === false) delete file.tables.giftCards;
   file.tables.list = toBackupList(file.tables.list);
   // With "Share prices" on (the default) and price history in the file. 0.9.0: made from what's in
   // this file only (the tabs picked), not from everything on the phone.
@@ -120,6 +148,16 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
       }
     }
     if (Object.keys(photos).length) file.photos = photos;
+  }
+  // 0.9.6 (cards): the gift cards' photos go with the Cards part (a backup for the person themself).
+  if (parts.cards && parts.giftCards !== false) {
+    const cardPhotos: Record<string, string> = {};
+    for (const g of file.tables.giftCards ?? [])
+      for (const path of [g.photoFront, g.photoBack]) {
+        const data = isCardPhotoPath(path) ? await readCardPhoto(path) : undefined;
+        if (path && data) cardPhotos[path] = data;
+      }
+    if (Object.keys(cardPhotos).length) file.cardPhotos = cardPhotos;
   }
   const json = JSON.stringify(file);
   return parts.password ? lockBackup(json, parts.password) : json;
@@ -172,7 +210,7 @@ function withoutSecrets(t: Snapshot): Snapshot {
  * and before joining a household with "use the household's things". Returns the JSON too.
  */
 export async function saveCopyInApp(path: string): Promise<string> {
-  const json = await backupJson({ ...EVERYTHING, receiptPhotos: false });
+  const json = await backupJson({ ...EVERYTHING, receiptPhotos: false, keepCostco: true });
   await RestockNative.writeAppFile({ path, data: textToBase64(json) });
   return json;
 }
@@ -232,11 +270,16 @@ export interface BackupSummary {
   snapshot: Snapshot;
   /** Receipt photos in the file, by path. */
   photos: Record<string, string>;
+  /** 0.9.6 (cards): gift card photos in the file, by path. */
+  cardPhotos?: Record<string, string>;
   counts: {
     items: number;
     prices: number;
     list: number;
+    /** Loyalty and (0.9.6) gift cards together. */
     cards: number;
+    /** 0.9.6 (cards): how many of them are gift cards. */
+    giftCards?: number;
     categories: number;
     hasSettings: boolean;
     bySection: Record<Section, number>;
@@ -270,17 +313,21 @@ export function readBackup(text: string): BackupSummary {
     categories: t.categories ?? [],
     kv: t.kv ?? [],
     receipts: t.receipts ?? [],
+    // 0.9.6 (cards): only when the file has them (an older backup's restore leaves gift cards here alone).
+    giftCards: Array.isArray(t.giftCards) ? t.giftCards : undefined,
   };
   const photos = file.photos ?? {};
   return {
     exportedAt: file.exportedAt,
     snapshot: snap,
     photos,
+    cardPhotos: file.cardPhotos && typeof file.cardPhotos === 'object' ? file.cardPhotos : undefined,
     counts: {
       items: snap.groups.length,
       prices: snap.prices.length,
       list: snap.list.length,
-      cards: snap.cards.length,
+      cards: snap.cards.length + (snap.giftCards?.length ?? 0),
+      giftCards: snap.giftCards?.length ?? 0,
       categories: snap.categories.length,
       hasSettings: snap.kv.some((k) => k.key === 'settings'),
       receipts: snap.receipts?.length ?? 0,
@@ -349,9 +396,23 @@ export async function restoreBackup(
   opts: { stayInSetup?: string; renames?: Map<string, string>; household?: boolean } = {},
 ): Promise<void> {
   // 0.9.0: `household` ("Restore for the household") adds the backup's cards rather than replacing them all (db.ts restoreParts).
-  await restoreParts(summary.snapshot, parts, opts.renames, { household: opts.household });
+  // 0.9.6 (review L5): this phone's own Costco data stays (backup files never have it).
+  const kept = withCostcoKept(summary.snapshot, costcoOf(await snapshot()));
+  await restoreParts(kept, parts, opts.renames, { household: opts.household });
   if (parts.receipts) await restorePhotos(summary.photos);
+  if (parts.cards) await restoreCardPhotos(summary.cardPhotos, summary.snapshot);
   if (opts.stayInSetup) await updateSettings({ privacyAccepted: opts.stayInSetup });
+}
+
+/**
+ * 0.9.6 (cards): gift card photos from a backup, back into Restock's storage: only at a card photo's
+ * own path (cardPhotos.ts), and only the ones a gift card in the backup has.
+ */
+async function restoreCardPhotos(photos: Record<string, string> | undefined, snap: Pick<Snapshot, 'giftCards'>): Promise<void> {
+  const wanted = new Set((snap.giftCards ?? []).flatMap((g) => [g?.photoFront, g?.photoBack]).filter(isCardPhotoPath));
+  for (const [path, data] of Object.entries(photos ?? {})) {
+    if (wanted.has(path) && typeof data === 'string') await writeCardPhoto(path, data).catch(() => undefined);
+  }
 }
 
 /** Puts receipt photos from a backup back into Restock's storage (only at receipt photo paths, receiptPaths.ts). */
@@ -380,7 +441,9 @@ export async function importBackup(text: string, opts: { stayInSetup?: string } 
     kv = kv.map((r) => (r.key === 'settings' ? { ...r, value: { ...(r.value as object), onboarded: false, privacyAccepted: opts.stayInSetup } } : r));
     if (!has) kv.push({ key: 'settings', value: { onboarded: false, privacyAccepted: opts.stayInSetup } });
   }
-  await restoreSnapshot({
+  // 0.9.6 (review L5): this phone's own Costco data stays (backup files never have it).
+  const here = costcoOf(await snapshot());
+  await restoreSnapshot(withCostcoKept({
     products: t.products ?? [],
     groups: t.groups ?? [],
     prices: t.prices ?? [],
@@ -389,8 +452,11 @@ export async function importBackup(text: string, opts: { stayInSetup?: string } 
     categories: t.categories ?? [],
     kv,
     receipts: t.receipts ?? [],
-  });
+    // 0.9.6 (review L6): none in the file (0.9.5 and older): this phone's gift cards stay.
+    giftCards: Array.isArray(t.giftCards) ? t.giftCards : undefined,
+  }, here));
   await restorePhotos(file.photos);
+  await restoreCardPhotos(file.cardPhotos, t);
   // A restored phone is set up, even if the backup was made part-way through setup.
   if (!opts.stayInSetup && !(await getSettings()).onboarded) await updateSettings({ onboarded: true });
 }

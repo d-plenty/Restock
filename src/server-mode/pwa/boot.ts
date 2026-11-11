@@ -3,7 +3,7 @@
 import { ApiError, setServerInfo, type ServerInfo } from '../api';
 import { deleteLocalCopy, onStatus, syncStatus } from '../live';
 import { recall, type Session } from '../session';
-import { clearState, forgetKept, hasCopy, keepInfo, keptInfo, markBootOffline, offlineSession, openedCopy, roundDone, staleCopy, WEBID_KEY } from './offline';
+import { clearState, forgetKept, hasCopy, isOfflineError, keepInfo, keptInfo, markBootOffline, offlineSession, openedCopy, pwaState, roundDone, staleCopy, WEBID_KEY } from './offline';
 import { registerServiceWorker } from './register';
 
 const store = (): Storage | undefined => {
@@ -75,4 +75,11 @@ export function watchCopy(webId: string): () => void {
       roundDone(st.at);
     }
   });
+}
+
+/** 0.9.6 (offline): offline right now? (As the notice's useIsOffline, outside React.) */
+export function offlineNow(): boolean {
+  const p = pwaState();
+  const st = syncStatus();
+  return p.noNetwork || isOfflineError(st.error) || (p.bootOffline && !st.at);
 }

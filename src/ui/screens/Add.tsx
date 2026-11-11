@@ -61,12 +61,16 @@ import { useLive } from '../../lib/useLive';
 import { adapterFor, type StoreProduct } from '../../stores';
 import { shopDetails } from '../../stores/details';
 import { BlockedError, isNative, NativeOnlyError, promoLabel } from '../../stores/http';
+import { CostcoLines } from '../CostcoLines';
+import { COSTCO_LIST_NOTE } from '../../lib/costcoLocal';
 import { recordHealth } from '../../lib/health';
 import { isExactBarcode, rankAll, score, tokens, type RankQuery } from '../../stores/rank';
 import { chainName, mainProductIds, searchStoreId, stockKnown, type AlertLevel, type Chain, type Group, type ListEntry } from '../../types';
 import {
   activeSections,
+  costcoIsOn,
   enabledIn,
+  isLocalOnlyShop,
   SECTION_NAMES,
   SECTION_PLACE,
   SECTION_SHOPS,
@@ -388,7 +392,12 @@ export function AddScreen({
     };
   }, []);
   const [searched, setSearched] = useState<StoreChain[]>([]);
-  const search = async (q: string, rq: RankQuery, sec: Section = section) => {
+  /**
+   * `pressed`: the person pressed Search (the search box, or "What is it?"). 0.9.6 (review L1): only
+   * then is Costco asked too. Every other search (a scan, opening from an item, changing the tab, a
+   * quick pick or a recent search) leaves Costco out, and "Search Costco" below asks it on a press.
+   */
+  const search = async (q: string, rq: RankQuery, sec: Section = section, pressed = false) => {
     const s = settings ?? (await getSettings());
     const text = q.trim();
     if (!text) return;
@@ -412,7 +421,7 @@ export function AddScreen({
     setRecs({});
     setRecBusy([]);
     recFor.current = undefined;
-    const chains = chainsToSearch(s.enabledChains, sec);
+    const chains = chainsToSearch(s.enabledChains, sec).filter((c) => pressed || !isLocalOnlyShop(c));
     setSearched(chains);
     setResults(Object.fromEntries(chains.map((c) => [c, { status: 'loading' }])));
     await Promise.all(chains.map((chain) => searchChain(chain, text, rq, searchStoreId(s, chain))));
@@ -484,7 +493,7 @@ export function AddScreen({
       const s = settings ?? (await getSettings());
       await Promise.all(
         weak.map(async (chain) => {
-          const a = adapterFor(chain);
+          const a = followAdapter(chain);
           if (!a) return;
           const found = await a.search(kind, searchStoreId(s, chain)).catch(() => [] as StoreProduct[]);
           if (insteadFor.current !== tag) return;
@@ -537,7 +546,7 @@ export function AddScreen({
     if (lastText) void search(lastText, rankQ, sec);
   };
 
-  const handleBarcode = async (code: string, force = false) => {
+  const handleBarcode = async (code: string, force = false, pressed = false) => {
     setKnown(undefined);
     setSearchedFor(undefined);
     setWhatIsIt('');
@@ -564,7 +573,7 @@ export function AddScreen({
     setSearchedFor(generic ? q : undefined);
     // A name that's only the brand ("Earth Choice") waits for the product you tick to name it.
     if (info.name && !attachGroup && !weakName(info)) setName(genericName(info.name, info.brand));
-    await search(q, { text: displayName(info), brand: info.brand, size: info.size, barcode: code });
+    await search(q, { text: displayName(info), brand: info.brand, size: info.size, barcode: code }, section, pressed);
   };
 
   useEffect(() => {
@@ -579,13 +588,23 @@ export function AddScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, ready, !!settings]);
 
-  const runText = (t: string) => {
+  const runText = (t: string, pressed = false) => {
     if (!t.trim()) return;
     const fixed = normaliseQuery(t);
     setSearchedFor(queryChanged(t) ? fixed : undefined);
     rememberSearch(t);
     setRecent(recentSearches());
-    void search(fixed, { text: fixed });
+    void search(fixed, { text: fixed }, section, pressed);
+  };
+
+  // 0.9.6 (review L1): Costco is on and this search left it out (it was not a Search press): a
+  // button to ask Costco too, one page, only when pressed.
+  const costcoLeftOut =
+    !!settings && !!lastText && costcoIsOn() && !searched.includes('costco') && chainsToSearch(settings.enabledChains).includes('costco');
+  const searchCostcoToo = () => {
+    if (!settings || !lastText || searched.includes('costco')) return;
+    setSearched((s) => (s.includes('costco') ? s : [...s, 'costco']));
+    void searchChain('costco', lastText, rankQ, searchStoreId(settings, 'costco'));
   };
 
   const doScan = async () => {
@@ -610,7 +629,7 @@ export function AddScreen({
   const loadMore = async (chain: StoreChain) => {
     const cur = results[chain];
     if (cur?.status !== 'ok' || !cur.more || cur.loadingMore) return;
-    const a = adapterFor(chain);
+    const a = followAdapter(chain);
     if (!a?.pages) return;
     const page = (cur.page ?? 1) + 1;
     setResults((r) => ({ ...r, [chain]: { ...(r[chain] as typeof cur), loadingMore: true } }));
@@ -652,7 +671,7 @@ export function AddScreen({
     setSimilar({});
     await Promise.all(
       todo.map(async (chain) => {
-        const a = adapterFor(chain);
+        const a = followAdapter(chain);
         const storeId = searchStoreId(s, chain);
         try {
           if (!a) return;
@@ -719,7 +738,7 @@ export function AddScreen({
     await Promise.all(
       todo.map(async (chain) => {
         try {
-          const a = adapterFor(chain);
+          const a = followAdapter(chain);
           const cur = results[chain];
           const have = cur?.status === 'ok' ? cur.items : [];
           const extra: StoreProduct[] = [];
@@ -781,14 +800,14 @@ export function AddScreen({
     const kind = genericName(sizesFor.name, sizesFor.brand);
     const term = sizesFor.brand && kind ? `${sizesFor.brand} ${kind}`.toLowerCase().trim() : '';
     if (!term || term === lastText.toLowerCase().trim()) return;
-    const chains = (another ? searched : searched.filter((c) => c === sizesFor.chain)).filter((c) => adapterFor(c));
+    const chains = (another ? searched : searched.filter((c) => c === sizesFor.chain)).filter((c) => followAdapter(c));
     if (!chains.length) return;
     setSizesBusy(sizesKey);
     void (async () => {
       const s = settings ?? (await getSettings());
       await Promise.all(
         chains.map(async (c) => {
-          const found = await adapterFor(c)!
+          const found = await followAdapter(c)!
             .search(term, searchStoreId(s, c))
             .catch(() => [] as StoreProduct[]);
           if (sizesSearched.current === sizesKey && found.length) mergeInto(c as Chain, found);
@@ -895,22 +914,24 @@ export function AddScreen({
         return;
       }
       let groupId: string | undefined;
+      // 0.9.6 (review H1): a list line is shared, so the cheapest at Costco goes on as "Any shop", with its words only.
+      const costcoLine = target === 'list' && isLocalOnlyShop(cheapestChain());
       // 0.9.5 (undo): the new item, its products and prices, and its list line: one Undo.
       const said =
         target === 'list'
-          ? `${itemName} added to your shopping list`
+          ? `${itemName} added to your shopping list${costcoLine ? `. ${COSTCO_LIST_NOTE}` : ''}`
           : target === 'both'
             ? `${itemName} added to ${SECTION_PLACE[section]} and shopping list`
             : `${itemName} added to ${SECTION_PLACE[section]}`;
       await act(said, async () => {
       if (target !== 'list') groupId = (await addItemFromPicks(picks.values(), item, barcodeFor)).id;
       if (target !== 'pantry') {
-        const one = groupId ? undefined : cheapestPick();
+        const one = groupId || costcoLine ? undefined : cheapestPick();
         await addListEntry({
           id: uid(),
           text: itemName,
           groupId,
-          chain: groupId ? undefined : cheapestChain(),
+          chain: groupId || costcoLine ? undefined : cheapestChain(),
           price: one?.price,
           categoryId: categoryId || undefined,
           section,
@@ -1128,8 +1149,9 @@ export function AddScreen({
           setKnown(undefined);
           const t = term.trim();
           const code = productCode(t);
-          if (code) void handleBarcode(code);
-          else runText(t);
+          // The Search press: the only search that asks Costco too (0.9.6, review L1).
+          if (code) void handleBarcode(code, false, true);
+          else runText(t, true);
         }}
         style={{ display: 'flex', gap: 8 }}
       >
@@ -1246,7 +1268,7 @@ export function AddScreen({
             if (!attachGroup) setName(genericName(t));
             setTerm(t);
             const fixed = normaliseQuery(t);
-            void search(fixed, { text: fixed, barcode: scanned.barcode });
+            void search(fixed, { text: fixed, barcode: scanned.barcode }, section, true); // its Search button
           }}
         >
           <div className="title">What is it?</div>
@@ -1472,6 +1494,15 @@ export function AddScreen({
         </div>
       )}
 
+      {costcoLeftOut && isNative() && (
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span className="small">Costco is only searched when you press Search.</span>
+          <button className="btn" style={TAP} onClick={searchCostcoToo}>
+            <Icon name="search" size={18} /> Search Costco
+          </button>
+        </div>
+      )}
+
       {(() => {
         // Only hide a shop's results as "nothing like it" when another shop does have it.
         const likely = new Set(
@@ -1636,9 +1667,10 @@ export function AddScreen({
                                     {sp.wasPrice ? `SPECIAL · SAVE ${money(sp.wasPrice - (sp.price ?? sp.wasPrice))}` : 'SPECIAL'}
                                   </span>
                                 )}
-                                {sp.isSpecial && promoLabel(sp.promo) && <span className="tag normal">{promoLabel(sp.promo)}</span>}
-                                {sp.memberOnly && <MemberTag chain={sp.chain} />}
+                                {sp.isSpecial && sp.chain !== 'costco' && promoLabel(sp.promo) && <span className="tag normal">{promoLabel(sp.promo)}</span>}
+                                {sp.memberOnly && sp.chain !== 'costco' && <MemberTag chain={sp.chain} />}
                               </span>
+                              <CostcoLines sp={sp} />
                             </span>
                             <span style={{ textAlign: 'right' }}>
                               <span className="num" style={{ fontWeight: 600, display: 'block' }}>
@@ -1818,6 +1850,11 @@ export function AddScreen({
                 <p className="small" style={{ margin: 0 }}>
                   Just for this trip, at the cheapest of what you ticked. It doesn't go in your pantry, and Restock won't keep watching its price.
                 </p>
+                {isLocalOnlyShop(cheapestChain()) && (
+                  <p className="small" style={{ margin: 0 }}>
+                    {COSTCO_LIST_NOTE}
+                  </p>
+                )}
               </>
             ) : attachGroup ? (
               <button className="btn primary" onClick={saveAttach} disabled={saving}>
@@ -1910,15 +1947,18 @@ export function AddScreen({
           product={storePreview(preview)}
           onClose={() => setPreview(undefined)}
           action={
-            <button
-              className={`btn ${picks.has(keyOf(preview)) ? '' : 'primary'}`}
-              onClick={() => {
-                toggle(preview);
-                setPreview(undefined);
-              }}
-            >
-              <Icon name="check" size={18} /> {picks.has(keyOf(preview)) ? 'Untick this one' : 'Tick this one'}
-            </button>
+            <>
+              <CostcoLines sp={preview} />
+              <button
+                className={`btn ${picks.has(keyOf(preview)) ? '' : 'primary'}`}
+                onClick={() => {
+                  toggle(preview);
+                  setPreview(undefined);
+                }}
+              >
+                <Icon name="check" size={18} /> {picks.has(keyOf(preview)) ? 'Untick this one' : 'Tick this one'}
+              </button>
+            </>
           }
         />
       )}
@@ -2000,8 +2040,10 @@ export function ManualSheet({
       (r: { said?: string }) => r.said ?? null,
       async (): Promise<{ said?: string; after: () => void }> => {
         if (target === 'list') {
-          await addListEntry({ id: uid(), text: n, chain, categoryId: categoryId || undefined, section, checked: false, createdAt: nowIso() });
-          return { said: `${n} added to your shopping list`, after: () => onDone() };
+          // 0.9.6 (review H1): never a list line at Costco (it is shared): "Any shop", and it says so.
+          const atCostco = isLocalOnlyShop(chain);
+          await addListEntry({ id: uid(), text: n, chain: atCostco ? undefined : chain, categoryId: categoryId || undefined, section, checked: false, createdAt: nowIso() });
+          return { said: `${n} added to your shopping list${atCostco ? `. ${COSTCO_LIST_NOTE}` : ''}`, after: () => onDone() };
         }
         const id = uid();
         await addProduct({ id, chain, name: n, size: size || undefined, barcode: as === 'main' ? barcode : undefined, createdAt: nowIso() });
@@ -2207,6 +2249,14 @@ function Stocktake({ section, onClose }: { section: Section; onClose: () => void
       </button>
     </Sheet>
   );
+}
+
+/**
+ * 0.9.6: the shop to ask for a follow-up search (the same product at your other shops, other sizes, "instead of"
+ * suggestions, recommendations). Never Costco: it is only ever asked when the person presses Search, one request.
+ */
+function followAdapter(chain: string) {
+  return isLocalOnlyShop(chain) ? undefined : adapterFor(chain as StoreChain);
 }
 
 function storePreview(sp: StoreProduct): PreviewProduct {

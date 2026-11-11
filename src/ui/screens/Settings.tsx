@@ -2,15 +2,15 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { version } from '../../../package.json';
 import legal from '../../lib/legal.json';
 import { confirmAction } from '../../lib/confirm';
-import { readBackup, readCopyInApp, shareTextFile, type BackupSummary } from '../../lib/backup';
-import { BEFORE_UPGRADE_FILE, beforeUpdateCopies } from '../../lib/boot';
+import type { BackupSummary } from '../../lib/backup';
 import { shareCsv } from '../../lib/csvExport';
 import { RestockNative } from '../../lib/sql/native';
 import { syncInfo, type SyncInfo } from '../../lib/sync';
 import { isNative } from '../../stores/http';
-import { allCards, eraseEverything, getSettings as savedSettings, priceHistorySpan, pruneHistory, serverKeepsHistory, updateSettings as saveNow } from '../../lib/db';
+import { allCards, allGiftCards, eraseEverything, getSettings as savedSettings, priceHistorySpan, pruneHistory, serverKeepsHistory, updateSettings as saveNow } from '../../lib/db';
 // 0.9.5 (save): settings changed here wait for "Save settings" (settingsDraft.ts).
 import { afterSave, getSettings, updateSettings } from '../../lib/settingsDraft';
+import { dailyTimes, DEFAULT_CHECK_TIME, isCheckTime } from '../../lib/checkSchedule';
 import { SaveBar, useSettingsDraft } from '../SaveBar';
 import { loadDemo, removeDemo } from '../../lib/demo';
 import { syncBackgroundSchedule } from '../../lib/check';
@@ -121,7 +121,7 @@ async function eraseAll() {
   }
   const first = await confirmAction('Erase everything on this phone?', {
     detail:
-      "Every item, list, price, loyalty card, receipt and setting is deleted from this phone, you're signed out of the shops inside Restock, and it leaves your household if it's in one (and your Restock server, where what it moved stays). Other phones keep their things. Export a backup first if you might want any of it back.",
+      "Every item, list, price, card, receipt and setting is deleted from this phone, you're signed out of the shops inside Restock, and it leaves your household if it's in one (and your Restock server, where what it moved stays). Other phones keep their things. Export a backup first if you might want any of it back.",
     action: 'Continue',
   });
   if (!first) return;
@@ -138,7 +138,7 @@ async function eraseAll() {
     await RestockNative.eraseNative().catch(() => undefined);
     await RestockNative.scheduleChecks({ enabled: false, intervalHours: 12 }).catch(() => undefined);
     await RestockNative.scheduleRecalls({ enabled: false }).catch(() => undefined);
-    for (const dir of ['receipts', 'backups']) await RestockNative.deleteAppDir({ path: dir }).catch(() => undefined);
+    for (const dir of ['receipts', 'backups', 'cards']) await RestockNative.deleteAppDir({ path: dir }).catch(() => undefined);
   }
   await eraseEverything();
   try {
@@ -155,7 +155,7 @@ export function SettingsScreen() {
   useSettingsDraft(); // 0.9.5 (save)
   const nav = useNav();
   const settings = useLive(getSettings, []);
-  const cardCount = useLive(async () => (await allCards()).length, []);
+  const cardCount = useLive(async () => (await allCards()).length + (await allGiftCards()).length, []); // 0.9.6 (cards): loyalty and gift
   const sync = useLive(syncInfo, []);
   // 0.9.3: Sync now in Sync and backups shows its result straight away.
   const [syncNowInfo, setSyncShown] = useState<SyncInfo>();
@@ -164,10 +164,6 @@ export function SettingsScreen() {
   useEffect(() => setSyncShown(undefined), [sync]);
   // 0.9.1: how much price history a backup holds.
   const span = useLive(priceHistorySpan, []);
-  // 0.8.0: the copy saved just before the upgrade, if there is one.
-  const beforeUpgrade = useLive(async () => (isNative() ? (await RestockNative.appFileInfo({ path: BEFORE_UPGRADE_FILE })).exists : false), []);
-  // 0.9.0: the copies saved just before each update (the last two).
-  const beforeUpdate = useLive(async () => (isNative() ? beforeUpdateCopies() : []), []);
   const fileRef = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState<'privacy' | 'disclaimer'>();
   const [picking, setPicking] = useState<BackupSummary>();
@@ -261,7 +257,7 @@ export function SettingsScreen() {
         {row('Shop accounts and stock', shopAccountsSummary(settings), () => nav.push({ name: 'stores', section: 'pantry' }))}
         {row('Bottle shops (Keg tab)', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
         {row('Chemists (Health tab)', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
-        {row('Loyalty cards', cardCount ? `${cardCount} added` : 'Flybuys, Everyday Rewards', () => nav.push({ name: 'cards' }))}
+        {row('Cards', cardCount ? `${cardCount} added` : 'Loyalty and gift cards', () => nav.push({ name: 'cards' }))}
         {row('Catalogues', 'This week at Coles, Woolworths and Aldi', () => nav.push({ name: 'catalogues' }))}
       </div>
 
@@ -288,44 +284,6 @@ export function SettingsScreen() {
       </div>
       <AutoBackupSettings settings={settings} />
       <div className="card flush">
-        {beforeUpgrade && (
-          <button
-            className="row"
-            onClick={async () => {
-              const json = await readCopyInApp(BEFORE_UPGRADE_FILE);
-              if (json) await shareTextFile('restock-before-0.8.0.json', json);
-              else nav.toast("Couldn't read that copy");
-            }}
-          >
-            <span className="grow">
-              <span className="title">Backup from before 0.8.0</span>
-              <span className="small">Saved automatically just before the update. Share it to keep it somewhere safe, or restore it from there.</span>
-            </span>
-          </button>
-        )}
-        {(beforeUpdate ?? []).map((c) => (
-          <button
-            key={c.path}
-            className="row"
-            onClick={async () => {
-              const json = await readCopyInApp(c.path);
-              if (!json) return nav.toast("Couldn't read that copy");
-              try {
-                setPicking(readBackup(json));
-              } catch (e) {
-                nav.toast(e instanceof Error ? e.message : String(e));
-              }
-            }}
-          >
-            <span className="grow">
-              <span className="title">Backup from before {c.to}</span>
-              <span className="small">
-                Saved {new Date(c.at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                {c.from ? `, on ${c.from}` : ''}, just before the update. Tap to restore from it, if the update changed something it shouldn't have.
-              </span>
-            </span>
-          </button>
-        ))}
         <button className="row" onClick={() => fileRef.current?.click()}>
           <span className="grow">
             <span className="title">Restore a backup</span>
@@ -728,7 +686,7 @@ function SharePrices({ settings }: { settings: Settings }) {
         </p>
         <p className="small">
           <strong>What's in it:</strong> for each product Restock has checked, the shop, name, brand, size and barcode, and each price with the
-          usual price, any special or multi-buy, and the day. <strong>Never:</strong> who you are, your loyalty cards, your branch or location,
+          usual price, any special or multi-buy, and the day. <strong>Never:</strong> who you are, your cards, your branch or location,
           your shopping list or what you ticked off, receipts, or anything you type about yourself.
         </p>
       </div>
@@ -924,10 +882,11 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
 /** A short line for "Shop accounts and stock": who you're signed in to and your Coles store. */
 /** Background price checks: on or off, how often, which day (Settings, and the setup tile, 0.8.0). */
 export function PriceCheckSettings({ settings }: { settings: Settings }) {
-  const setChecks = async (patch: { hours?: number; on?: boolean; weekday?: number }) => {
+  const setChecks = async (patch: { hours?: number; on?: boolean; weekday?: number; time?: string }) => {
     const s = await updateSettings({
       ...(patch.hours !== undefined ? { checkIntervalHours: patch.hours } : {}),
       ...(patch.weekday !== undefined ? { checkWeekday: patch.weekday } : {}),
+      ...(patch.time !== undefined ? { checkTime: patch.time } : {}),
       ...(patch.on !== undefined ? { sync: { ...settings.sync, backgroundActivity: patch.on } } : {}),
     });
     // 0.9.5 (save): on a settings screen, once it's saved.
@@ -955,7 +914,7 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
             <span className="title" style={{ fontSize: 15 }}>
               How often
             </span>
-            <span className="small">Android may run it a little later to save battery.</span>
+            <span className="small">Android may run it a few minutes late to save battery.</span>
           </span>
           <select
             className="input"
@@ -968,10 +927,38 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
             {CHECK_INTERVALS.map((h) => (
               <option key={h} value={h}>
                 {intervalLabel(h)}
-                {h === 12 ? ' (default)' : ''}
+                {h === 24 ? ' (default)' : ''}
               </option>
             ))}
           </select>
+        </label>
+        <label
+          className="check"
+          style={settings.sync.backgroundActivity ? undefined : { opacity: 0.5 }}
+          aria-disabled={!settings.sync.backgroundActivity || undefined}
+        >
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              Price check time
+            </span>
+            <span className="small">
+              {settings.checkIntervalHours === 6 || settings.checkIntervalHours === 12
+                ? `Runs at ${dailyTimes({ intervalHours: settings.checkIntervalHours, time: settings.checkTime }).join(', ')}.`
+                : 'Your phone\'s own time. If the phone is off then, it checks soon after it is back.'}{' '}
+              Checking by hand doesn't change it.
+            </span>
+          </span>
+          <input
+            type="time"
+            className="input"
+            style={{ width: 'auto', height: 44, padding: '0 10px', fontSize: 15 }}
+            value={settings.checkTime ?? DEFAULT_CHECK_TIME}
+            disabled={!settings.sync.backgroundActivity}
+            onChange={(e) => {
+              if (isCheckTime(e.target.value)) void setChecks({ time: e.target.value });
+            }}
+            aria-label="Price check time"
+          />
         </label>
         {settings.checkIntervalHours >= 168 && (
           <label

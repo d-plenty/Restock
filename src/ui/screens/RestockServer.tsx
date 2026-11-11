@@ -4,7 +4,7 @@ import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar'; // 0.9.5 
 import { scanBarcode } from '../../lib/barcode';
 import { confirmAction } from '../../lib/confirm';
 import { getSettings, updateSettings } from '../../lib/db';
-import { protection, suggestLocalText } from '../../lib/protection';
+import { protection, suggestLocalText, wifiSyncOn } from '../../lib/protection';
 import { RestockNative, type ServerCodeCheck, type TakeBack } from '../../lib/sql/native';
 import {
   agoText,
@@ -405,14 +405,52 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
 
       {sharing && <SharesEditor info={info} onInfo={onInfo} />}
 
+      <div className="eyebrow">Phones on {label}</div>
+      <div className="card flush">
+        {(info.members ?? [])
+          .filter((m) => !m.device.startsWith('srv-'))
+          .map((m) => (
+            <div key={m.device} className="row">
+              <Icon name="phone" size={18} />
+              <span className="grow">
+                <span className="title" style={{ fontSize: 15 }}>
+                  {m.me ? (m.name === 'This phone' ? 'This phone' : `${m.name} (this phone)`) : m.name}
+                </span>
+                <span className="small">On the server</span>
+              </span>
+            </div>
+          ))}
+        <p className="small" style={{ padding: '4px 14px 12px', margin: 0 }}>
+          Phones are added and removed on the server's page.
+        </p>
+      </div>
+
+      <div className="card flush">
+        <button className="row" onClick={() => nav.push({ name: 'sync' })}>
+          <Icon name="wifi" size={18} />
+          <span className="grow">
+            <span className="title" style={{ fontSize: 15 }}>
+              Wi-Fi sync (optional)
+            </span>
+            <span className="small">
+              {!wifiSyncOn(info) ? 'Off. Phones swapping changes straight to each other on your Wi-Fi, if you set it up.' : 'On. This phone swaps changes with other phones on your Wi-Fi.'}
+            </span>
+          </span>
+          <Icon name="chevron" size={18} />
+        </button>
+      </div>
+
+      <div className="eyebrow">Leave this server</div>
       <div className="card flush">
         <button className="row" onClick={() => setLeaving(true)}>
           <Icon name="close" size={18} />
           <span className="grow">
             <span className="title" style={{ fontSize: 15, color: 'var(--red-ink)' }}>
-              Leave {label}
+              Leave this server
             </span>
-            <span className="small">This phone keeps everything. Nothing is deleted on the server.</span>
+            <span className="small">
+              This phone keeps everything it has now and stops syncing with {label}. Nothing is deleted on the server. You'll be asked to confirm.
+            </span>
           </span>
         </button>
       </div>

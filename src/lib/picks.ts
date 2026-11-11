@@ -1,5 +1,6 @@
 import type { Group, Product } from '../types';
 import { packSize } from './units';
+import { costcoNotHere } from '../shops';
 
 // My picks and Would also take (0.8.9).
 //
@@ -51,7 +52,13 @@ export function toPicks<G extends Pick<Group, 'usualProductId' | 'sameProductIds
  * The shops an item isn't bought at that still count: a shop marked "Not at this shop" that has
  * one of your picks again (ticked there later, maybe on another phone) is back in.
  */
-export function notAtChains(g: Pick<Group, 'notAt' | 'usualProductId' | 'sameProductIds'>, chainOf: (id: string) => string | undefined) {
+export function notAtChains(g: Pick<Group, 'notAt' | 'usualProductId' | 'sameProductIds'> & { id?: string }, chainOf: (id: string) => string | undefined) {
   const picked = new Set([g.usualProductId, ...(g.sameProductIds ?? [])].map((id) => id && chainOf(id)));
-  return (g.notAt ?? []).filter((c) => !picked.has(c));
+  return notAtList(g).filter((c) => !picked.has(c));
+}
+
+/** 0.9.6 (review L1): the shops an item is marked "Not at", with this phone's own "Not at Costco" (kept on the phone, shops.ts costcoNotHere). */
+export function notAtList(g: Pick<Group, 'notAt'> & { id?: string }): string[] {
+  const shared = g.notAt ?? [];
+  return costcoNotHere(g.id) && !shared.includes('costco') ? [...shared, 'costco'] : shared;
 }

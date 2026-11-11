@@ -38,6 +38,8 @@ final class Shops {
         add("woolworths", "pantry", "woolworths", "https://www.woolworths.com.au", null);
         add("coles", "pantry", "coles", "https://www.coles.com.au", null);
         add("aldi", "pantry", "aldi", "https://www.aldi.com.au", null);
+        // 0.9.6: Costco is read by the app on a phone, only when Search is pressed: never by a background check.
+        add("costco", "pantry", "costco", "https://www.costco.com.au", null);
         add("danmurphys", "keg", "endeavour", "https://www.danmurphys.com.au", null);
         add("bws", "keg", "endeavour", "https://bws.com.au", null);
         add("liquorland", "keg", "web", "https://www.liquorland.com.au", null);

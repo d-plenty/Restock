@@ -79,6 +79,7 @@ public class SyncServerV3Test {
         if (only.isEmpty() || only.contains("H")) {
             houseScenarios();
             generalScenarios();
+            moveScenarios(); // 0.9.6
         }
         if (only.isEmpty() || only.contains("O")) handoverScenarios();
         if (only.isEmpty() || only.contains("B")) bringScenarios();
@@ -418,6 +419,44 @@ public class SyncServerV3Test {
         rounds(g);
         report("GV5 and its ticks on General go through the house", !"1".equals(g.one("SELECT checked FROM list_entries WHERE id = 'gs-chop'")), "g gs-chop " + g.one("SELECT checked FROM list_entries WHERE id = 'gs-chop'"));
         b.db.close();
+    }
+
+    /**
+     * 0.9.6: "Move to" another list through the house (SyncTest096 has the same between phones): a
+     * phone sharing Keg gets the line on Keg, one sharing only groceries sees it go and never takes
+     * it off the others, and Undo puts the same line back everywhere.
+     */
+    static void moveScenarios() throws Exception {
+        SyncFamily.Phone m = phone("m5"), k = phone("k6"), r = phone("r4");
+        s(m).join3(web(house, "invite", "M's phone"), false);
+        s(k).join3(web(house, "invite", "K's phone"), false);
+        s(r).join3(web(house, "invite", "R4's phone"), false);
+        for (SyncFamily.Phone p : new SyncFamily.Phone[] { m, k }) {
+            p.e.setMeta("tabs", "pantry,keg");
+            p.e.noteTabs();
+        }
+        rounds(m, k, r);
+        SyncTest096.line(m, "mv-ice", "Ice", "pantry", 3);
+        rounds(m, k, r);
+        rounds(m, k, r);
+        boolean start = "pantry/3/0".equals(SyncTest096.state(r, "mv-ice")) && "pantry/3/0".equals(SyncTest096.state(k, "mv-ice"));
+        JSONObject was = m.db.query("SELECT * FROM list_entries WHERE id = 'mv-ice'").get(0);
+        String ice = SyncTest096.move(m, "mv-ice", "keg");
+        rounds(m, k, r);
+        rounds(m, k, r);
+        report("MV1 a line moved to Keg goes through the house to a phone sharing Keg, amount kept, nothing left on Groceries",
+            !start || !"keg/3/0".equals(SyncTest096.state(k, ice)) || !"gone".equals(SyncTest096.state(k, "mv-ice")),
+            "start " + start + " (tabs m " + m.e.tabs() + "), k " + SyncTest096.state(k, ice) + " old " + SyncTest096.state(k, "mv-ice"));
+        rounds(r, m, k);
+        report("MV2 a phone sharing only groceries sees it go off Groceries, and that never takes it off the others",
+            !"gone".equals(SyncTest096.state(r, "mv-ice")) || !"gone".equals(SyncTest096.state(r, ice)) || !"keg/3/0".equals(SyncTest096.state(m, ice)) || !"keg/3/0".equals(SyncTest096.state(k, ice)),
+            "r " + SyncTest096.state(r, "mv-ice") + " " + SyncTest096.state(r, ice) + ", m " + SyncTest096.state(m, ice) + ", k " + SyncTest096.state(k, ice));
+        SyncTest096.undoMove(m, was, ice);
+        rounds(m, k, r);
+        rounds(m, k, r);
+        report("MV3 Undo: the same line back on Groceries on every phone, with its amount; the Keg one gone",
+            !"pantry/3/0".equals(SyncTest096.state(r, "mv-ice")) || !"pantry/3/0".equals(SyncTest096.state(k, "mv-ice")) || !"gone".equals(SyncTest096.state(k, ice)),
+            "r " + SyncTest096.state(r, "mv-ice") + ", k " + SyncTest096.state(k, "mv-ice") + " " + SyncTest096.state(k, ice));
     }
 
     static ServerFolder listed(SyncFamily.Phone p) throws Exception {

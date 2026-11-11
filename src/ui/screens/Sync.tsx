@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { scanBarcode } from '../../lib/barcode';
 import { saveCopyInApp } from '../../lib/backup';
 import { confirmAction } from '../../lib/confirm';
+import { wifiSyncOn } from '../../lib/protection'; // 0.9.6 (review L4)
 import { allGroups, allProducts, getSettings, reapplyHouseholdSettings, updateSettings } from '../../lib/db';
 import { CARRIED_TILES, householdSettingsFor } from '../../lib/household';
 import { chainName, enabledIn, SECTIONS, sectionOn, shopDef, type Section } from '../../shops';
@@ -1277,7 +1278,7 @@ export function AddPhoneSheet({ info, onClose, onWifi }: { info: SyncInfo; onClo
       )}
       {house && (
         <p className="small" style={{ margin: 0 }}>
-          Once a phone has joined the server, phones on your Wi-Fi can also swap changes straight to each other at home (Phones on your Wi-Fi).
+          Wi-Fi sync (phones swapping changes straight to each other at home) is separate and off. You can set it up on the Wi-Fi sync screen.
         </p>
       )}
       <button className="btn block" onClick={onClose}>
@@ -1481,7 +1482,6 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
   const [, tick] = useState(0);
   // 0.9.4: Add a phone (server or Wi-Fi), and leaving the server's house.
   const [adding, setAdding] = useState(false);
-  const [leavingServer, setLeavingServer] = useState(false);
 
   const refresh = () => void syncInfo().then(setInfo);
   useEffect(() => {
@@ -1555,13 +1555,13 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
         setInfo(await RestockNative.syncSetWifi({ on }));
         setWifiPending(undefined);
       },
-      info?.wifiSync !== false,
+      wifiSyncOn(info),
     );
   };
 
   const leave = async () => {
-    // 0.9.4: in a server's house, leaving is leaving the server (nothing is deleted there).
-    if (info?.house || info?.serverApi === 3) return setLeavingServer(true);
+    // 0.9.6: this is only for a household of phones. Leaving a server is on the server's screen (Leave this server).
+    if (info?.house || info?.serverApi === 3) return;
     const others = (info?.members ?? []).filter((m) => !m.me);
     if (info?.isOwner && others.length) {
       await confirmAction('Make another phone the owner first', {
@@ -1642,10 +1642,61 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
 
   const synced = (device: string) => info?.peers?.find((p) => p.device === device)?.syncedAt;
   const owner = info?.members?.find((m) => m.owner);
+  // 0.9.6: in a server's house, Wi-Fi sync (phone to phone) is its own optional feature, off until set up.
+  const isHouse = !!(info?.house || info?.serverApi === 3);
+  const wifiOn = info ? wifiSyncOn(sh(info)) : true;
+  const batteryBlock = info ? (
+    <>
+  {!info.batteryExempt && (
+    <div className="banner amber" style={{ gap: 8 }}>
+      <strong>Let Restock sync in the background</strong>
+      <span style={{ fontSize: 13 }}>
+        Android saves battery by stopping apps in the background, which stops sync while Restock is closed. Tap Allow and choose "Allow" (or
+        "Don't optimise"). It hardly uses any battery: Restock just waits quietly for the other phones.
+      </span>
+      <button
+        className="btn small"
+        style={{ alignSelf: 'flex-start' }}
+        onClick={() => void RestockNative.requestBatteryExemption().then(() => setTimeout(refresh, 1500))}
+      >
+        Allow
+      </button>
+    </div>
+  )}
+  {strictBatteryMaker(info.maker) && (
+    <p className="small">
+      {info.maker} phones have their own battery saver too, which can still stop Restock.{' '}
+      <a href={`https://dontkillmyapp.com/${(info.maker ?? '').toLowerCase().split(/\s+/)[0]}`} target="_blank" rel="noreferrer">
+        How to keep Restock running on a {info.maker}
+      </a>
+    </p>
+  )}
+    </>
+  ) : null;
+  /** Sets Wi-Fi sync up, or stops it. Only ever Wi-Fi sync: the server is never touched. */
+  const wifiNow = async (on: boolean) => {
+    const ok = await confirmAction(on ? 'Set up Wi-Fi sync?' : 'Stop Wi-Fi sync?', {
+      detail: on
+        ? "This phone will announce itself on your Wi-Fi and swap changes straight with the house's other phones that have Wi-Fi sync on, even when the internet is down. Your server carries on as it is. Turn it on in each phone that should do it."
+        : `This phone stops looking for other phones on your Wi-Fi and stops announcing itself. It stays on ${serverName(info)}: nothing changes there, and this phone keeps everything.`,
+      action: on ? 'Set up Wi-Fi sync' : 'Stop Wi-Fi sync',
+      danger: false,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      setInfo(await RestockNative.syncSetWifi({ on }));
+      nav.toast(on ? 'Wi-Fi sync is on' : 'Wi-Fi sync is off');
+    } catch (e) {
+      nav.toast(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="screen">
-      <TopBar title="Phones and sharing" />
+      <TopBar title={isHouse ? 'Wi-Fi sync' : 'Phones and sharing'} />
 
       {!syncAvailable() && (
         <div className="banner grey">
@@ -1676,6 +1727,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
         </div>
       )}
 
+      {!isHouse && (
       <div className="card" style={{ gap: 8 }}>
         <strong>Phones on your Wi-Fi: one pantry and list for the whole house</strong>
         <span className="small">
@@ -1703,6 +1755,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
           </li>
         </ul>
       </div>
+      )}
 
       {info && !info.paired && (
         <div className="card flush">
@@ -1738,7 +1791,110 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
         <p className="small group-note">A cloud drive folder (for phones away from home without a server) is set up here once this phone is in a household.</p>
       )}
 
-      {info?.paired && (
+      {info?.paired && isHouse && (
+        <>
+          <div className="card flush">
+            <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
+              <Icon name="server" size={18} />
+              <span className="grow">
+                <span className="title">{serverName(info)}</span>
+                <span className="small">{serverSummary(info)}. Its status, its phones and leaving it are on the server's screen.</span>
+              </span>
+              <Icon name="chevron" size={18} />
+            </button>
+          </div>
+
+          <div className="eyebrow">Wi-Fi sync (optional)</div>
+          {!wifiOn ? (
+            <div className="card" style={{ gap: 8 }}>
+              <strong>Phone to phone on your Wi-Fi</strong>
+              <span className="small">
+                Your server already syncs this phone at home and away. Wi-Fi sync is a separate extra: phones swap changes straight to each other on the
+                same Wi-Fi, even when the internet or the server is down.
+              </span>
+              <span className="small">
+                It is off. This phone isn't announcing itself or looking for other phones on your network, and it won't until you set it up.
+              </span>
+              <button className="btn primary block" disabled={!syncAvailable() || busy} onClick={() => void wifiNow(true)}>
+                Set up Wi-Fi sync
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="card flush">
+                <div className="row">
+                  <span className="grow">
+                    <span className="title">{!info.onWifi ? "This phone isn't on Wi-Fi" : info.lastSyncAt ? `Wi-Fi sync is on · synced ${agoText(info.lastSyncAt)}` : 'Wi-Fi sync is on · not synced yet'}</span>
+                    <span className="small">
+                      {info.lastError ??
+                        (info.onWifi ? "Swaps changes with the house's other phones that have Wi-Fi sync on, on this Wi-Fi." : 'It waits until this phone is on Wi-Fi.')}
+                    </span>
+                  </span>
+                  <button className="btn small primary" disabled={busy} onClick={() => void syncNow()}>
+                    <Icon name="refresh" size={16} /> {busy ? 'Syncing…' : 'Sync now'}
+                  </button>
+                </div>
+                {busy && (
+                  <div style={{ padding: '0 14px 12px' }}>
+                    <LoadingBar seconds={8} />
+                  </div>
+                )}
+                <button className="row" disabled={busy} onClick={() => void wifiNow(false)}>
+                  <Icon name="close" size={18} />
+                  <span className="grow">
+                    <span className="title" style={{ fontSize: 15 }}>
+                      Stop Wi-Fi sync
+                    </span>
+                    <span className="small">Only stops phone to phone sync on the Wi-Fi. This phone stays on {serverName(info)}.</span>
+                  </span>
+                </button>
+              </div>
+
+              <div className="eyebrow">Phones found on this Wi-Fi</div>
+              <div className="card flush">
+                {(info.members ?? []).filter((m) => !m.me && !m.device.startsWith('srv-') && synced(m.device)).map((m) => (
+                  <div key={m.device} className="row">
+                    <Icon name="phone" size={18} />
+                    <span className="grow">
+                      <span className="title" style={{ fontSize: 15 }}>
+                        {m.name}
+                      </span>
+                      <span className="small">Last synced on the Wi-Fi {agoText(synced(m.device))}</span>
+                    </span>
+                  </div>
+                ))}
+                {!(info.members ?? []).some((m) => !m.me && !m.device.startsWith('srv-') && synced(m.device)) && (
+                  <p className="small" style={{ padding: '4px 14px 12px', margin: 0 }}>
+                    None yet. Set up Wi-Fi sync on the house's other phones too, and keep them on the same Wi-Fi.
+                  </p>
+                )}
+              </div>
+
+              <div className="card flush">
+                <label className="check">
+                  <input type="checkbox" className="switch" checked={sh(info).keepReady !== false} onChange={(e) => void set({ keepReady: e.target.checked })} />
+                  <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <span className="title" style={{ fontSize: 15 }}>
+                      Stay ready to sync
+                    </span>
+                    <span className="small">
+                      Lets the other phones sync with this one while Restock is closed. Android shows a quiet "Ready to sync" notification for it. Off:
+                      syncs only while Restock is open.
+                    </span>
+                  </span>
+                </label>
+              </div>
+              {batteryBlock}
+              <p className="small">
+                Some routers and guest networks keep devices from seeing each other ("client isolation" or "AP isolation"). If the phones never find
+                each other, that's the usual reason. Phones only look for each other on Wi-Fi, never over mobile data.
+              </p>
+            </>
+          )}
+        </>
+      )}
+
+      {info?.paired && !isHouse && (
         <>
           <div className="eyebrow">{info.household ?? 'Your household'}</div>
           <div className="card flush">
@@ -1775,13 +1931,13 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
           {/* 0.9.4: Wi-Fi sync can be off (a phone in a server's house starts with it off). */}
           <div className="card flush">
             <label className="check">
-              <input type="checkbox" className="switch" checked={sh(info).wifiSync !== false} onChange={(e) => void setWifi(e.target.checked)} />
+              <input type="checkbox" className="switch" checked={wifiSyncOn(sh(info))} onChange={(e) => void setWifi(e.target.checked)} />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <span className="title" style={{ fontSize: 15 }}>
                   Phones on your Wi-Fi
                 </span>
                 <span className="small">
-                  {sh(info).wifiSync !== false
+                  {wifiSyncOn(sh(info))
                     ? 'On: swaps changes straight with the household\'s phones on this Wi-Fi, even when the internet is down.'
                     : 'Off · turn on to also swap changes at home when the internet is down.'}
                 </span>
@@ -2093,33 +2249,11 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
             </label>
           </div>
 
-          {!info.batteryExempt && (
-            <div className="banner amber" style={{ gap: 8 }}>
-              <strong>Let Restock sync in the background</strong>
-              <span style={{ fontSize: 13 }}>
-                Android saves battery by stopping apps in the background, which stops sync while Restock is closed. Tap Allow and choose "Allow" (or
-                "Don't optimise"). It hardly uses any battery: Restock just waits quietly for the other phones.
-              </span>
-              <button
-                className="btn small"
-                style={{ alignSelf: 'flex-start' }}
-                onClick={() => void RestockNative.requestBatteryExemption().then(() => setTimeout(refresh, 1500))}
-              >
-                Allow
-              </button>
-            </div>
-          )}
-          {strictBatteryMaker(info.maker) && (
-            <p className="small">
-              {info.maker} phones have their own battery saver too, which can still stop Restock.{' '}
-              <a href={`https://dontkillmyapp.com/${(info.maker ?? '').toLowerCase().split(/\s+/)[0]}`} target="_blank" rel="noreferrer">
-                How to keep Restock running on a {info.maker}
-              </a>
-            </p>
-          )}
+          {batteryBlock}
         </>
       )}
 
+      {!isHouse && (
       <div className="card" style={{ gap: 6 }}>
         <strong>Good to know</strong>
         <span className="small">
@@ -2136,6 +2270,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
           match it.
         </span>
       </div>
+      )}
 
       {adding && info && (
         <AddPhoneSheet
@@ -2144,17 +2279,6 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
           onWifi={() => {
             setAdding(false);
             setInviting(true);
-          }}
-        />
-      )}
-      {leavingServer && info && (
-        <LeaveServerSheet
-          info={info}
-          onClose={() => setLeavingServer(false)}
-          onDone={(i) => {
-            setLeavingServer(false);
-            setInfo(i);
-            nav.toast('This phone has left the server');
           }}
         />
       )}

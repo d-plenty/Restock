@@ -5,6 +5,7 @@ import {
   allCategories,
   cardChains,
   deleteGroup,
+  deleteReading,
   getGroup,
   groupProductIds,
   nowIso,
@@ -24,14 +25,15 @@ import { serverMode, serverUi } from '../../server-mode/flag';
 import { firstPhoto, ItemPhoto } from '../../server-mode/ui/deskShared';
 import { getSettings, updateSettings } from '../../lib/db';
 import { loadRecommendations } from '../../lib/recs';
-import { formatUnitPrice, money, parseMoney, tidySize } from '../../lib/units';
+import { money, parseMoney, tidySize } from '../../lib/units';
+import { amountToConfirm, basisWord, lastUpdatedText, newestReading, priceLine, productLine, sizeLabel, type CompareStyle } from '../../lib/unitPrice';
 import { useLive } from '../../lib/useLive';
 import {
   ALERT_LEVELS,
   computeStats,
-  eachText,
   HISTORY_DAYS,
   multiBuy,
+  optionStyle,
   productQty,
   tiedWithBest,
   withMarket,
@@ -66,7 +68,8 @@ import {
 } from '../components';
 import { CheapestInfoTag, MemberInfoTag, MultiInfoTag, StockInfoTag, SwapInfoTag, VerdictInfoTag } from '../tagInfo';
 import { useNav } from '../nav';
-import { SECTION_PLACE, searchChainsIn, type StoreChain } from '../../shops';
+import { SECTION_PLACE, costcoIsOn, isLocalOnlyShop, searchChainsIn, type StoreChain } from '../../shops';
+import { checkAtCostco, costcoCheckable } from '../../lib/costcoCheck'; // 0.9.6 (review L1)
 import { notAtChains } from '../../lib/picks';
 
 const BANNER: Record<Recommendation['action'], string> = {
@@ -223,8 +226,9 @@ function amountFrom(rec: Recommendation): string {
 const usualOption = (rec: Recommendation) =>
   rec.options.find((o) => o.product.id === rec.group.usualProductId) ?? rec.options.find((o) => o.role === 'main');
 
-function unitText(o: Option) {
-  return [o.unitPrice !== undefined ? formatUnitPrice(o.unitPrice, productQty(o.product).unit) : '', eachText(o)].filter(Boolean).join(' · ');
+/** 0.9.6: both prices, per item then the comparison price: "$0.98 each · $2.61 / L (estimated)", or "$0.98 each · size unknown". */
+function unitText(o: Option, style?: CompareStyle) {
+  return priceLine(o.product, o.price, style).text;
 }
 
 export function ItemScreen({ groupId }: { groupId: string }) {
@@ -274,6 +278,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
     };
   }, [olderPrices, wantOlder, older]);
 
+  const [checkingCostco, setCheckingCostco] = useState(false); // 0.9.6 (review L1): "Check at Costco"
   if (data === undefined) return <div className="screen" />;
   if (data === null) {
     return (
@@ -287,6 +292,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   // Listed in the order picked on this page (0.7.6): by shop then size, cheapest first, or A to Z.
   const order = appSettings?.productOrder ?? 'size';
   const ordered = orderOptions(rec.options, order);
+  const cstyle = optionStyle(rec.options); // one comparison unit on every line of this item (0.9.6)
   const mains = ordered.filter((o) => o.role === 'main');
   const alts = ordered.filter((o) => o.role === 'alt');
   const chartId = selected ?? rec.best?.product.id ?? group.usualProductId;
@@ -326,11 +332,32 @@ export function ItemScreen({ groupId }: { groupId: string }) {
     const there = alts.filter((o) => o.product.chain === c);
     await act(`${group.name}: not at ${chainName(c)}`, async () => {
       for (const o of there) await removeProductFromGroup((await getGroup(group.id)) ?? group, o.product.id);
+      // 0.9.6 (review L1): "Not at Costco" stays on this phone; the shared item never says Costco.
+      if (isLocalOnlyShop(c)) return setCostcoNotAt(true);
       const now = (await getGroup(group.id)) ?? group;
       await updateGroup(group.id, { notAt: [...new Set([...(now.notAt ?? []), c])] });
     }); // 0.9.5 (undo)
   };
+  /** 0.9.6 (review L1): this phone's own "Not at Costco" for this item (settings.costco.notAt, never shared). */
+  const setCostcoNotAt = async (on: boolean) => {
+    const s = await getSettings();
+    const was = s.costco?.notAt ?? [];
+    const notAt = on ? [...new Set([...was, group.id])] : was.filter((id) => id !== group.id);
+    await updateSettings({ costco: { ...(s.costco ?? { on: false }), notAt } });
+  };
   const searchName = mains[0]?.product.name ?? group.name;
+  // 0.9.6 (review L1): a Costco product's price is checked again only when the person presses
+  // "Check at Costco" here: one page, never with "Check now" for everything or in the background.
+  const costcoHere = costcoIsOn() ? costcoCheckable([...mains, ...alts].map((o) => o.product)) : [];
+  const checkCostco = async (p: (typeof mains)[number]['product']) => {
+    if (checkingCostco) return;
+    setCheckingCostco(true);
+    try {
+      nav.toast((await checkAtCostco(p)).text);
+    } finally {
+      setCheckingCostco(false);
+    }
+  };
 
   // Checks the list itself, so a double tap adds it once (with its tab's list and a qty).
   const addToList = async () => {
@@ -356,8 +383,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             {/* The shop on the line under the name, as on Home and the Pantry (0.9.0). */}
             <span className="small">
               <ChainDot chain={o.product.chain} /> {chainName(o.product.chain)}
-              {o.product.size ? ` · ${tidySize(o.product.size, o.product.name)}` : ''}
-              {unitText(o) ? ` · ${unitText(o)}` : ''}
+              {productLine(o.product, o.price, cstyle) ? ` · ${productLine(o.product, o.price, cstyle)}` : ''}
               {o.stats.current && ' · '}
               <CheckedAgo date={o.stats.current?.date} source={o.stats.current?.source} />
             </span>
@@ -370,6 +396,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
                 />
               )}
               <VerdictInfoTag o={o} />
+              {o.price !== undefined && priceLine(o.product, o.price).unknown && <span className="tag normal">SIZE UNKNOWN</span>}
+              {o.product.sizing?.size?.basis === 'estimated' && <span className="tag normal">ESTIMATED SIZE</span>}
               {o.product.inStock === false && <StockInfoTag o={o} />}
               <MultiInfoTag o={o} />
               {o.stats.current?.memberOnly && <MemberInfoTag chain={o.product.chain} hasCard={!o.locked} />}
@@ -527,6 +555,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           allReadings={allReadings}
           chartReadings={chartReadings}
           allowMulti={group.allowMulti !== false}
+          onEnterPrice={() => setSheet('price')}
           range={
             allReadings.length >= 2 ? (
               <div className="seg range-seg" role="group" aria-label="How far back">
@@ -603,6 +632,13 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           </div>
         )}
         {mains.map((o) => row(o, mains.length > 1 && o === rec.best && !tiedWithBest(rec).length ? 'cheapest' : undefined))}
+        {costcoHere.map((p) => (
+          <div key={`costco-check-${p.id}`} style={{ padding: '0 14px 12px' }}>
+            <button className="btn small" style={{ minHeight: 44 }} disabled={checkingCostco} onClick={() => void checkCostco(p)}>
+              <Icon name="refresh" size={16} /> {checkingCostco ? 'Checking Costco…' : costcoHere.length > 1 ? `Check at Costco: ${p.name}` : 'Check at Costco'}
+            </button>
+          </div>
+        ))}
         {mains.length > 1 && tiedWithBest(rec).length > 0 && (
           <p className="small" style={{ padding: '0 14px 12px' }}>
             {sameAt(rec.best!, tiedWithBest(rec), mains)}, so buy it wherever suits you.
@@ -647,7 +683,10 @@ export function ItemScreen({ groupId }: { groupId: string }) {
               className="btn small"
               onClick={async () => {
                 const g = (await getGroup(group.id)) ?? group;
-                await act(`${group.name}: buying it at ${chainName(c)} again`, () => updateGroup(group.id, { notAt: (g.notAt ?? []).filter((x) => x !== c) }));
+                await act(`${group.name}: buying it at ${chainName(c)} again`, async () => {
+                  if (isLocalOnlyShop(c)) await setCostcoNotAt(false);
+                  if ((g.notAt ?? []).includes(c)) await updateGroup(group.id, { notAt: (g.notAt ?? []).filter((x) => x !== c) });
+                });
               }}
             >
               Buy it here again
@@ -745,7 +784,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           </div>
         </Sheet>
       )}
-      {sheet === 'price' && <PriceSheet options={rec.options} onClose={() => setSheet(undefined)} />}
+      {sheet === 'price' && <PriceSheet options={rec.options} productId={chartOption?.product.id} onClose={() => setSheet(undefined)} />}
       {typeof sheet === 'object' && <OptionSheet group={group} option={sheet.option} options={rec.options} onClose={() => setSheet(undefined)} />}
     </div>
   );
@@ -868,23 +907,51 @@ export function EditSheet({
   );
 }
 
-function PriceSheet({ options, onClose }: { options: Option[]; onClose: () => void }) {
-  const [productId, setProductId] = useState(options[0]?.product.id);
+/** "Last updated today, 6:32 am" for the product shown, top right of the Price history card (phone and web). */
+export function LastUpdated({ readings }: { readings: readonly PriceReading[] }) {
+  const last = newestReading(readings);
+  return (
+    <span className="small ph-updated" style={{ marginLeft: 'auto', textAlign: 'right' }}>
+      {lastUpdatedText(last?.date, last?.source)}
+    </span>
+  );
+}
+
+/** A local calendar day as "2026-11-12", for the date box. */
+const dayOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/**
+ * 0.9.6: Enter a price by hand, for any product at any shop (Coles, Woolworths, Aldi, chemists, bottle shops, Costco),
+ * even when a price was found. You set the price and the day. It goes in the price history as "entered by hand",
+ * counts in comparisons and the chart, and a later price check never overwrites it. The ones you've typed are
+ * listed to delete. Everything can be undone.
+ */
+export function PriceSheet({ options, productId: first, onClose }: { options: Option[]; productId?: string; onClose: () => void }) {
+  const [productId, setProductId] = useState(first ?? options[0]?.product.id);
   const [price, setPrice] = useState('');
   const [was, setWas] = useState('');
   const [special, setSpecial] = useState(false);
   const [member, setMember] = useState(false);
+  const today = dayOf(new Date());
+  const [day, setDay] = useState(today);
   // "$4.50" and "4.50" both work (0.9.0).
   const p = parseMoney(price);
+  const dayOk = /^\d{4}-\d{2}-\d{2}$/.test(day) && day <= today;
+  const typed = useLive(
+    async () => (productId ? ((await readingsFor([productId])).get(productId) ?? []).filter((r) => r.source === 'manual').reverse().slice(0, 8) : []),
+    [productId],
+  );
 
   const save = async () => {
-    if (!productId || !(p > 0)) return;
+    if (!productId || !(p > 0) || !dayOk) return;
     const w = parseMoney(was);
+    // Today: right now. Another day: midday that day, so it sorts where it belongs.
+    const date = day === today ? nowIso() : new Date(`${day}T12:00:00`).toISOString();
     // 0.9.5 (undo): a price typed in by mistake can be taken back.
     await act(`Price ${money(p)} added`, () =>
       addReading({
         productId,
-        date: nowIso(),
+        date,
         price: p,
         wasPrice: w > p ? w : undefined,
         // A member price is a special for card holders (0.9.0), so it never becomes the normal price.
@@ -898,7 +965,10 @@ function PriceSheet({ options, onClose }: { options: Option[]; onClose: () => vo
 
   return (
     <Sheet title="Enter a price" onClose={onClose}>
-      <p className="small">Seen a price in the shop or in the catalogue? Add it here. It counts towards the history like any other check.</p>
+      <p className="small">
+        Seen a price in the shop or in the catalogue? Type it here with the day you saw it. It's saved as entered by hand, counts in comparisons and the
+        chart, and later price checks don't overwrite it. You can undo it or delete it.
+      </p>
       {options.length > 1 && (
         <label className="field">
           <span>Product</span>
@@ -921,6 +991,10 @@ function PriceSheet({ options, onClose }: { options: Option[]; onClose: () => vo
           <input className="input num" inputMode="decimal" value={was} onChange={(e) => setWas(e.target.value)} />
         </label>
       </div>
+      <label className="field">
+        <span>Day you saw it</span>
+        <input className="input" type="date" value={day} max={today} onChange={(e) => setDay(e.target.value)} aria-label="Day you saw this price" />
+      </label>
       <div className="card flush">
         <label className="check">
           <input type="checkbox" checked={special} onChange={(e) => setSpecial(e.target.checked)} />
@@ -938,9 +1012,33 @@ function PriceSheet({ options, onClose }: { options: Option[]; onClose: () => vo
           <span>Needs a loyalty card (member price)</span>
         </label>
       </div>
-      <button className="btn primary" disabled={!(p > 0)} onClick={save}>
+      <button className="btn primary" disabled={!(p > 0) || !dayOk} onClick={save}>
         Save price
       </button>
+      {typed && typed.length > 0 && (
+        <div className="card flush" aria-label="Prices you entered by hand">
+          <div className="eyebrow" style={{ padding: '10px 14px 0' }}>
+            Entered by hand
+          </div>
+          {typed.map((r) => (
+            <div key={r.id ?? r.date} className="row">
+              <span className="grow">
+                <span className="title num" style={{ fontSize: 15 }}>
+                  {money(r.price)}
+                </span>
+                <span className="small">{lastUpdatedText(r.date).replace('Last updated ', '')}</span>
+              </span>
+              <button
+                className="btn small danger"
+                aria-label={`Delete the ${money(r.price)} price entered by hand`}
+                onClick={() => r.id !== undefined && void act(`Price ${money(r.price)} deleted`, () => deleteReading(r.id!))}
+              >
+                <Icon name="trash" size={16} /> Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </Sheet>
   );
 }
@@ -948,8 +1046,11 @@ function PriceSheet({ options, onClose }: { options: Option[]; onClose: () => vo
 function OptionSheet({ group, option, options, onClose }: { group: Group; option: Option; options: Option[]; onClose: () => void }) {
   const id = option.product.id;
   const [looking, setLooking] = useState(false);
-  const [qty, setQty] = useState(option.product.qty?.toString() ?? '');
-  const [unit, setUnit] = useState(option.product.qtyUnit ?? productQty(option.product).unit ?? 'ea');
+  // 0.9.6: nothing typed yet and Restock has a guess or an estimate: it fills the box, to check and save (confirmed).
+  const offer = option.product.qty ? undefined : amountToConfirm(option.product);
+  const [qty, setQty] = useState(option.product.qty?.toString() ?? (offer ? String(offer.qty) : ''));
+  const [unit, setUnit] = useState(option.product.qtyUnit ?? offer?.unit ?? productQty(option.product).unit ?? 'ea');
+  const line = priceLine(option.product, option.price, optionStyle(options));
   const isAlt = option.role === 'alt';
   const lastAtShop = !isAlt && options.filter((o) => o.role === 'main' && o.product.chain === option.product.chain).length === 1;
 
@@ -985,7 +1086,7 @@ function OptionSheet({ group, option, options, onClose }: { group: Group; option
       </button>
       <p className="small">
         {isAlt ? 'Would also take' : 'My pick'} at {chainName(option.product.chain)}
-        {option.product.size ? ` · ${tidySize(option.product.size, option.product.name)}` : ''}
+        {` · ${line.size}`}
         {option.product.barcode ? ` · barcode ${option.product.barcode}` : ''}
       </p>
       <p className="small">
@@ -996,6 +1097,16 @@ function OptionSheet({ group, option, options, onClose }: { group: Group; option
           Amount for unit pricing
         </div>
         <p className="small">Lets Restock compare different pack sizes fairly. For toilet paper, use total sheets (rolls × sheets per roll).</p>
+        {/* 0.9.6: always say how sure Restock is: confirmed by you, estimated, or unknown. */}
+        <p className="small" role="status">
+          {option.product.qty
+            ? `Confirmed by you: ${line.size}.`
+            : offer
+              ? `${line.suggestion ? `Size unknown. ${line.suggestion}` : `${line.size}. ${offer.note}`} It's filled in below: check it, then save to confirm.`
+              : line.unknown
+                ? 'Size unknown, so this one is left out of the cheapest comparison. Type the amount in the pack and save it.'
+                : `Size from ${basisWord(option.product.sizing?.size?.basis) ?? "the shop's own words"}.`}
+        </p>
         <div className="two">
           <input
             className="input num"
@@ -1191,13 +1302,14 @@ function HistoryPicker({ options, picked, onPick }: { options: Option[]; picked:
               <span className="ph-radio" aria-hidden />
               <span className="ph-row-text">
                 <span className="ph-size">
-                  {tidySize(x.product.size, x.product.name) || 'Size not given'}
+                  {priceLine(x.product, x.price).unknown ? 'Size unknown' : sizeLabel(x.product)}
                   {low !== undefined && x.unitPrice !== undefined && x.role !== 'alt' && Math.abs(x.unitPrice - low) < 1e-9 && (
                     <span className="tag great">Cheapest</span>
                   )}
                   {x.role === 'alt' && <span className="tag normal">Alternative</span>}
                 </span>
                 <span className="ph-name">{nameWithoutSize(x)}</span>
+                {unitText(x, optionStyle(options)) && <span className="ph-name num">{unitText(x, optionStyle(options))}</span>}
               </span>
               <span className="ph-row-price num">
                 {x.price !== undefined ? money(x.price) : '—'}
@@ -1233,6 +1345,7 @@ function PriceHistory({
   chartReadings,
   allowMulti,
   range,
+  onEnterPrice,
 }: {
   options: Option[];
   option: Option;
@@ -1242,6 +1355,7 @@ function PriceHistory({
   chartReadings: PriceReading[];
   allowMulti: boolean;
   range?: ReactNode;
+  onEnterPrice?: () => void;
 }) {
   const [why, setWhy] = useState(false);
   const market = stats.fromMarket ? o.product.market : undefined;
@@ -1362,10 +1476,12 @@ function PriceHistory({
 
   return (
     <div className="card ph">
-      <div className="ph-head">
+      <div className="ph-head" style={{ flexWrap: 'wrap' }}>
         <span className="title" style={{ fontSize: 17 }}>
           Price history
         </span>
+        {/* 0.9.6: when this product's price was last checked (follows the size and shop picked). */}
+        <LastUpdated readings={allReadings} />
       </div>
       {options.length > 1 && <HistoryPicker options={options} picked={o} onPick={onPick} />}
 
@@ -1382,7 +1498,7 @@ function PriceHistory({
       <div className="ph-sub">
         {o.multi
           ? `${o.multi.n} for ${money(o.multi.total)} · one on its own is ${money(o.shelfPrice)}`
-          : [tidySize(o.product.size, o.product.name), unitText(o)].filter(Boolean).join(' · ')}
+          : productLine(o.product, o.price, optionStyle(options))}
       </div>
       {tip && (
         <div className={`ph-tip ${tip.cls}`}>
@@ -1482,6 +1598,12 @@ function PriceHistory({
 
       {/* "Stock up" or "next sale due": not when the tip above already says to wait, or that it's not a real sale. */}
       {v.kind !== 'wait' && v.kind !== 'fake' && <StockUpTip stats={stats} readings={chartReadings} />}
+
+      {onEnterPrice && (
+        <button className="btn small" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={onEnterPrice}>
+          <Icon name="tag" size={16} /> Enter a price
+        </button>
+      )}
 
       <button className="ph-src" onClick={() => setWhy((x) => !x)} aria-expanded={why}>
         <span>{source}</span>

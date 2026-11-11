@@ -1,5 +1,5 @@
 import type { Snapshot } from './db';
-import { isCustom } from '../shops';
+import { isCustom, isLocalOnlyShop } from '../shops';
 import { localDay } from './verdict';
 
 // Shared prices (0.9.0). Restock's plan is an open price list anyone can search for free, shared
@@ -56,7 +56,7 @@ export function sharedPrices(s: Pick<Snapshot, 'products' | 'prices'>): SharedPr
     // A product without the shop's own product number was typed in by hand. Shops people add
     // themselves are left out too: their "product number" is the product's web address on a site
     // Restock doesn't know, which could carry anything.
-    if (!prices?.length || p.chain === 'other' || isCustom(p.chain) || p.id.startsWith('demo-') || !p.storeProductId) continue;
+    if (!prices?.length || p.chain === 'other' || isCustom(p.chain) || isLocalOnlyShop(p.chain) || p.id.startsWith('demo-') || !p.storeProductId) continue;
     products.push({
       n: products.length + 1,
       chain: p.chain,

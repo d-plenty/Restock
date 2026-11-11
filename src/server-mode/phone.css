@@ -1,0 +1,173 @@
+/* 0.9.6 (iPhone): the web app's phone layout (ui/PhoneLayout.tsx), under 1000 px wide. The phone
+   app's own screens and styles (src/ui/styles.css, tokens.css) do the look; this file only places
+   the tab bar and the notices, keeps clear of the notch and the home bar, and makes every touch
+   target at least 44 px. Nothing here applies to the desktop layout (html.server-desk). */
+
+/* The page itself never scrolls sideways or bounces; screens scroll inside, with momentum. */
+html.web-phone,
+html.web-phone body {
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+html.web-phone .app {
+  overflow: hidden;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  box-sizing: border-box;
+}
+html.web-phone .screen {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+/* The tab bar: the phone's (.tabs), at the bottom (it comes first in the page, App.tsx's own bar is
+   left out), with room for the home bar (--bottom is env(safe-area-inset-bottom)). */
+html.web-phone .app > nav.tabs:not(.pt-tabs) {
+  display: none;
+}
+.pt-tabs {
+  order: 99;
+  flex-shrink: 0;
+}
+.pt-tabs .tab {
+  min-height: 52px;
+  min-width: 44px;
+}
+
+/* The notices at the top, below the notch. Empty: nothing at all. */
+.pt-top {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 11;
+  background: var(--bg);
+}
+.pt-top:empty {
+  display: none;
+}
+.pt-top > .pwa-banner:first-child {
+  padding-top: calc(10px + var(--top));
+}
+/* Under a notice, a screen no longer needs to leave room for the status bar. */
+html.web-phone .pt-top:not(:empty) ~ .screen,
+html.web-phone.pt-has-top .overlay > .screen,
+html.web-phone.pt-has-top .overlay > * > .screen:first-child {
+  padding-top: 16px;
+}
+/* A screen opened over the tabs (an item, Settings, Specials) starts below the notices too, so
+   "Offline" is always in sight. --pt-top-h is measured (PhoneLayout.tsx). */
+html.web-phone.pt-has-top .overlay {
+  top: var(--pt-top-h, 0px);
+}
+/* More is a tab: its screen leaves the tab bar showing. */
+html.web-phone.pt-more-open .overlay {
+  bottom: var(--pt-bar-h, 0px);
+}
+
+/* Touch targets: chips, segments, small and round buttons and tags already take a 44 px tap while
+   keeping the Android app's look (styles.css "Tap areas"), so nothing is resized here. */
+
+/* ---------- More ---------- */
+.pt-sync {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.pt-sync-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pt-sync .small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pt-sync .btn {
+  flex-shrink: 0;
+  min-height: 44px;
+}
+.pt-row {
+  min-height: 56px;
+  color: var(--ink);
+}
+.pt-row-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-md);
+  background: var(--sunken);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pt-row svg:last-child {
+  color: var(--ink-2);
+  flex-shrink: 0;
+}
+.pt-warn {
+  color: var(--amber-ink);
+  font-weight: 600;
+}
+.pt-help {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.pt-help-link {
+  font-size: var(--fs-body);
+  gap: 6px;
+}
+.pt-version {
+  text-align: center;
+  margin: 0;
+}
+.pt-more .strip-dot {
+  background: var(--green);
+}
+
+/* ---------- the sign-in pages on a phone ---------- */
+html.server-mode .server-gate .screen {
+  padding-left: max(18px, env(safe-area-inset-left, 0px));
+  padding-right: max(18px, env(safe-area-inset-right, 0px));
+  padding-bottom: calc(24px + var(--bottom));
+  -webkit-overflow-scrolling: touch;
+}
+html.server-mode .server-gate .check {
+  min-height: 44px;
+}
+html.server-mode .server-gate .check input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+}
+
+/* The web's Cards page (DeskCards.tsx) is wrapped for the desktop's centred column: on a phone it
+   fills the screen and scrolls like the phone's other screens. */
+html.web-phone .dk-phone-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  margin: 0;
+}
+html.web-phone .dk-phone-page > .screen {
+  overflow-y: auto;
+  padding: calc(var(--top) + 20px) 18px calc(24px + var(--bottom));
+}
+html.server-mode .banner.cc-kept {
+  flex-direction: row;
+}
+html.server-mode .banner.cc-kept svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+/* More sits above the tab bar, which already keeps clear of the home bar. */
+html.web-phone .overlay .screen.pt-more {
+  padding-bottom: 24px;
+}

@@ -56,8 +56,25 @@ final class PriceChecker {
         return ISO.format(Instant.now());
     }
 
+    private static final java.util.concurrent.atomic.AtomicInteger ACTIVE = new java.util.concurrent.atomic.AtomicInteger();
+
+    /**
+     * 0.9.6: two runs never overlap. A background run that finds another run going stops at once (that
+     * run counts). A run that had to wait for another one (the app opening during the 5 am check)
+     * stops too when that run has just finished, instead of making a second full check.
+     */
+    static Result run(Context context, Progress progress, boolean fromBackground) throws Exception {
+        boolean busy = ACTIVE.getAndIncrement() > 0;
+        try {
+            if (busy && fromBackground) return new Result();
+            return runLocked(context, progress, fromBackground, busy);
+        } finally {
+            ACTIVE.decrementAndGet();
+        }
+    }
+
     /** Synchronized so "Check now" and the background worker never run at the same time. */
-    static synchronized Result run(Context context, Progress progress, boolean fromBackground) throws Exception {
+    private static synchronized Result runLocked(Context context, Progress progress, boolean fromBackground, boolean waited) throws Exception {
         Result result = new Result();
         SQLiteDatabase db = RestockDatabase.get(context);
         if (!RestockDatabase.ready(db)) return result;
@@ -67,30 +84,11 @@ final class PriceChecker {
         if (fromBackground) {
             JSONObject sync = settings.optJSONObject("sync");
             if (sync != null && !sync.optBoolean("backgroundActivity", true)) return result;
-            // Weekly checks: the worker wakes daily, but only checks on the chosen day.
-            // On the days it doesn't check, the catalogue-day summary still goes out (from the last prices).
-            if (settings.optInt("checkIntervalHours", 12) >= 168) {
-                int want = settings.optInt("checkWeekday", 3); // 0 = Sunday, as in the app
-                int today = java.time.LocalDate.now().getDayOfWeek().getValue() % 7;
-                if (today != want) return summaryOnly(context, db, settings, result);
-                String lastWeekly = settings.optString("lastCheck", "");
-                try {
-                    if (!lastWeekly.isEmpty() && Instant.now().toEpochMilli() - Instant.parse(lastWeekly).toEpochMilli() < 3 * 86_400_000L) {
-                        return summaryOnly(context, db, settings, result);
-                    }
-                } catch (Exception ignored) {
-                    // Unreadable date: just check.
-                }
-            }
-            // Skip if the app checked very recently.
-            String last = settings.optString("lastCheck", "");
-            if (!last.isEmpty() && !"null".equals(last)) {
-                try {
-                    if (Instant.now().toEpochMilli() - Instant.parse(last).toEpochMilli() < 30 * 60_000L) return summaryOnly(context, db, settings, result);
-                } catch (Exception ignored) {
-                    // Unreadable date: just check.
-                }
-            }
+            // 0.9.6: when to check is decided by the schedule (CheckSchedule, PriceCheckWorker): the set
+            // time of day. All that's left here is the guard against an accidental double run.
+            if (recentlyChecked(settings, Instant.now())) return summaryOnly(context, db, settings, result);
+        } else if (waited && recentlyChecked(settings, Instant.now())) {
+            return summaryOnly(context, db, settings, result);
         }
 
         Set<String> enabled = enabledShops(settings);
@@ -104,6 +102,9 @@ final class PriceChecker {
             null)) {
             while (c.moveToNext()) {
                 String chain = c.getString(1);
+                // 0.9.6 (review L1): never Costco, in the background or with "Check now" for everything:
+                // its prices are checked only by "Check at Costco" on the item (costcoCheck.ts).
+                if ("costco".equals(chain)) continue;
                 if (!enabled.contains(chain)) continue;
                 if (StoreClient.pageless(chain, c.getString(3))) continue;
                 List<String[]> list = byChain.get(chain);
@@ -271,6 +272,30 @@ final class PriceChecker {
         return enabled;
     }
 
+    /** Did a check run in the last 30 minutes? Only stops accidental double runs; it is not the schedule. */
+    static boolean recentlyChecked(JSONObject settings, Instant now) {
+        String last = settings.optString("lastCheck", "");
+        if (last.isEmpty() || "null".equals(last)) return false;
+        try {
+            return now.toEpochMilli() - Instant.parse(last).toEpochMilli() < 30 * 60_000L;
+        } catch (Exception ignored) {
+            return false; // Unreadable date: just check.
+        }
+    }
+
+    /** A wake with no check owed: the catalogue day summary can still go out (from the last prices). */
+    static synchronized void summaryOnly(Context context) {
+        try {
+            SQLiteDatabase db = RestockDatabase.get(context);
+            if (!RestockDatabase.ready(db)) return;
+            JSONObject settings = readKv(db, "settings");
+            if (settings == null) return;
+            summaryOnly(context, db, settings, new Result());
+        } catch (Exception e) {
+            Log.w(TAG, "summary failed", e);
+        }
+    }
+
     private static Result summaryOnly(Context context, SQLiteDatabase db, JSONObject settings, Result result) {
         try {
             if (summaryDue(db, settings)) alertDeals(context, db, settings, false);
@@ -380,7 +405,7 @@ final class PriceChecker {
         Map<String, List<Deals.Reading>> readings = new HashMap<>();
         String cutoff = ISO.format(Instant.now().minusSeconds((Deals.HISTORY_DAYS + 1L) * 86_400L));
         try (Cursor c = db.rawQuery(
-            "SELECT product_id, date, price, was_price, is_special, member_only, promo FROM prices WHERE date >= ? ORDER BY date",
+            "SELECT product_id, date, price, was_price, is_special, member_only, promo, source FROM prices WHERE date >= ? ORDER BY date",
             new String[] {cutoff})) {
             while (c.moveToNext()) {
                 List<Deals.Reading> list = readings.get(c.getString(0));
@@ -389,7 +414,7 @@ final class PriceChecker {
                     readings.put(c.getString(0), list);
                 }
                 list.add(new Deals.Reading(c.getString(1), c.getDouble(2), c.isNull(3) ? null : c.getDouble(3), c.getInt(4) == 1, c.getInt(5) == 1,
-                    c.isNull(6) ? null : c.getString(6)));
+                    c.isNull(6) ? null : c.getString(6), "manual".equals(c.getString(7))));
             }
         }
 

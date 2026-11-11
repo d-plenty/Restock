@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RestockNative } from '../../lib/sql/native';
-import { protection, suggestLocalText, syncStatus } from '../../lib/protection';
+import { protection, suggestLocalText, syncStatus, wifiSyncOn } from '../../lib/protection';
 import { agoText, dayAndTime, serverName, syncAvailable, syncNowMessage, type SyncInfo } from '../../lib/sync';
 import type { Settings } from '../../types';
 import { Icon } from '../components';
@@ -25,7 +25,7 @@ export function SyncOverview({ settings, info, onInfo }: { settings: Settings; i
   const phones = (info?.members ?? []).filter((m) => !m.device.startsWith('srv-'));
   const others = phones.filter((m) => !m.me);
   const setUp = paired || !!info?.server;
-  const wifi = info?.wifiSync !== false;
+  const wifi = wifiSyncOn(info);
 
   const syncNow = async () => {
     setBusy(true);
@@ -201,12 +201,16 @@ export function SyncOverview({ settings, info, onInfo }: { settings: Settings; i
             )}
             {way(
               paired && wifi,
-              'Phones on your Wi-Fi',
+              house ? 'Wi-Fi sync (phone to phone)' : 'Phones on your Wi-Fi',
               paired && wifi
                 ? others.length
                   ? `On · ${info?.lastSyncAt ? `synced ${agoText(info.lastSyncAt)}` : 'not synced yet'}`
-                  : 'On · add a phone to start'
-                : "Off · turn on to also swap changes at home when the internet's down",
+                  : house
+                    ? 'On · set up Wi-Fi sync on the other phones too'
+                    : 'On · add a phone to start'
+                : house
+                  ? 'Off · optional. Set up Wi-Fi sync to also swap changes at home when the server is down'
+                  : "Off · turn on to also swap changes at home when the internet's down",
               () => nav.push({ name: 'sync' }),
             )}
             {way(

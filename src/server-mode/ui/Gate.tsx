@@ -8,7 +8,10 @@ import { ApiError, isV3, serverInfo } from '../api';
 import { checkPassphrase } from '../passphrase';
 import { login, loginV3, setPassphrase, setUpHouse, startLink, startPhoneLogin, startPhoneLoginV3, signOut, type Session } from '../session';
 import { Qr } from './Qr';
-import { InstallHelpLink } from '../pwa/InstallHelp'; // 0.9.5 (PWA)
+import { InstallHelpLink, isInstalled } from '../pwa/InstallHelp'; // 0.9.5 (PWA)
+
+/** 0.9.6: a phone-sized window (under 600 px) (the words say "phone", not "computer"). */
+const phoneSized = () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(max-width: 599px)').matches;
 
 function Frame({ title, children, foot }: { title: string; children: ReactNode; foot?: ReactNode }) {
   return (
@@ -43,7 +46,10 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
   const [error, setError] = useState<string>();
   const [phone, setPhone] = useState(false);
   const house = isV3();
-  const [keep, setKeep] = useState(false);
+  // 0.9.6 (iPhone): from the home screen, Keep me signed in starts ticked: it's what lets the app
+  // open with no signal (a session kept for the tab only is gone when iOS closes the app).
+  const [keep, setKeep] = useState(() => isInstalled());
+  const onPhone = phoneSized();
   if (phone) return <PhoneLoginScreen onDone={onDone} onBack={() => setPhone(false)} />;
   const go = async () => {
     setError(undefined);
@@ -90,9 +96,11 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
           <label className="check gate-keep">
             <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} aria-describedby="gate-keep-help" />
             <span className="grow">
-              Keep me signed in on this computer
+              {onPhone ? 'Keep me signed in on this phone' : 'Keep me signed in on this computer'}
               <span id="gate-keep-help" className="small">
-                For 30 days of not using it. Leave it off on a shared computer: then closing the tab signs you out.
+                {onPhone
+                  ? 'For 30 days of not using it. Needed to open Restock with no signal. Leave it off on a shared phone.'
+                  : 'For 30 days of not using it. Leave it off on a shared computer: then closing the tab signs you out.'}
               </span>
             </span>
           </label>

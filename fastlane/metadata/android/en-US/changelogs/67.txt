@@ -1,0 +1,8 @@
+Two prices on every product: per item and per litre, 100 g or kg.
+Price checks at a set time, 5 am by default.
+Last updated on price history. Enter a price for any shop.
+Move a line to another list, with Undo.
+Cards: loyalty and gift cards.
+Costco (food only, off until you turn it on).
+Wi-Fi sync is its own option. Leave this server is a separate button.
+Server: Import data. iPhone: phone layout, more offline.

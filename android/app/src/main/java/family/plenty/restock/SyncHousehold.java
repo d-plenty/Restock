@@ -261,6 +261,51 @@ final class SyncHousehold implements SyncEngine.Household {
             || "server".equals(pk);
     }
 
+    /**
+     * 0.9.6: whether phone-to-phone Wi-Fi sync is on. Stored "1" (set up) or "0" (off) wins. Nothing stored:
+     * a household of phones without a server has it on (it is the household); a server's house has it off,
+     * unless this phone is really using it: a phone on the Wi-Fi (a sync_peers row with an address) swapped
+     * changes with it in the last 30 days (WIFI_RECENT_MS). 0.9.6 (review L4): an old row alone (two phones
+     * that once met on the LAN while 0.9.4/0.9.5 had it on by default) doesn't count. The answer is stored,
+     * so it is asked once and the person's choice is kept after that.
+     */
+    boolean wifiSyncOn() throws Exception {
+        return wifiSyncOn(System.currentTimeMillis());
+    }
+
+    static final long WIFI_RECENT_MS = 30L * 86_400_000L;
+
+    boolean wifiSyncOn(long now) throws Exception {
+        String v = e.meta("wifi_sync");
+        if ("0".equals(v)) return false;
+        if ("1".equals(v)) return true;
+        if (!paired() || !isHouse()) return true;
+        boolean used = false;
+        for (JSONObject r : e.db.query("SELECT synced_at FROM sync_peers WHERE host IS NOT NULL AND port > 0 AND synced_at IS NOT NULL")) {
+            long at = isoMillis(r.optString("synced_at", ""));
+            if (at > 0 && at <= now + 86_400_000L && now - at <= WIFI_RECENT_MS) {
+                used = true;
+                break;
+            }
+        }
+        e.setMeta("wifi_sync", used ? "1" : "0");
+        return used;
+    }
+
+    /** "2026-11-11T09:30:00.000Z" (or without the millis) as epoch ms; 0 when it isn't one. */
+    static long isoMillis(String s) {
+        if (s == null || s.length() < 19) return 0;
+        try {
+            java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.ROOT);
+            f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            f.setLenient(false);
+            java.util.Date d = f.parse(s.substring(0, 19));
+            return d == null ? 0 : d.getTime();
+        } catch (Exception ex) {
+            return 0;
+        }
+    }
+
     /** 0.9.4: whether the household is a house: its owner is a Restock server (srv-<sid>). */
     boolean isHouse() throws Exception {
         String o = owner();

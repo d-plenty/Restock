@@ -125,7 +125,7 @@ export const SOON: Soon[] = [
         </ul>
         <p>And never anything personal:</p>
         <ul>
-          <li>Who you are, your loyalty cards, your branch or where you live.</li>
+          <li>Who you are, your cards, your branch or where you live.</li>
           <li>What you searched for, your pantry, your shopping list or what you ticked off, or your receipts. No account, no phone ID.</li>
         </ul>
         <p>

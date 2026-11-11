@@ -12,16 +12,19 @@ import { deleteLocalCopy, openServerDatabase, serverHistory, start, stop, syncNo
 import { canChangeVault, forget, recall, session, type Session } from './session';
 import { startOn } from './ui/deskShared';
 import { Checking, LinkScreen, LoginScreen, ReleasedScreen, SetPassphraseScreen, SetUpServerScreen } from './ui/Gate';
-import { AddPhonePanel, ServerStrip, ServerTab, serverScreen } from './ui/ServerScreens';
+import { AddPhonePanel, ServerTab, serverScreen } from './ui/ServerScreens';
+import { PhoneChrome, SearchNeedsSignal } from './ui/PhoneLayout';
+import { copyKeyStore, keptHistory } from './pwa/offlineData';
 import { Desktop } from './ui/Desktop';
 import { serverUi } from './flag';
-import { atSignIn, noteServer, openOffline, signedOut, startPwa, watchCopy } from './pwa/boot';
-import { PwaBanners } from './pwa/Banners';
+import { atSignIn, noteServer, offlineNow, openOffline, signedOut, startPwa, watchCopy } from './pwa/boot';
 // 0.9.5 (web search): Let the web page search the shops; the Scan button sits by the add box now.
 import { setBarcodeSearch } from './pwa/scan';
 import { webSearchUi } from './ui/WebShopSearch';
 import { barcodeSearch } from './ui/webSearch';
 import { useNetworkWatch } from './pwa/offline';
+import { askAboutOtherCards } from './cardStore'; // 0.9.6 (review M2)
+import { askChoice } from '../lib/confirm';
 import './server.css';
 
 // 0.9.5: the home screen web app (service worker, offline list, notices). 0.9.5 (web search): the
@@ -29,25 +32,36 @@ import './server.css';
 startPwa();
 // 0.9.5 (web search): a scanned barcode no household product has searches the shops, when that's on.
 setBarcodeSearch((code, section) => barcodeSearch(code, section));
-function PhoneStrip() {
-  return (
-    <>
-      <ServerStrip />
-      <PwaBanners />
-    </>
-  );
-}
+// 0.9.6 (iPhone): the phone layout: the phone's tab bar (with More) and the notices, in place of
+// 0.9.5's navy strip (ui/PhoneLayout.tsx).
+// 0.9.6 (offline): shop search needs signal; an item's older prices are kept for offline.
+const searchOffline = () => offlineNow();
+const webSearch: typeof webSearchUi = {
+  ...webSearchUi,
+  PickButton: (p) => (searchOffline() ? <SearchNeedsSignal /> : <webSearchUi.PickButton {...p} />),
+  ListButton: (p) => (searchOffline() && p.text.trim() ? <SearchNeedsSignal /> : <webSearchUi.ListButton {...p} />),
+  ListPanel: (p) => (searchOffline() ? null : <webSearchUi.ListPanel {...p} />),
+};
+const olderPrices = keptHistory(
+  serverHistory,
+  () => {
+    const s = session();
+    // Not for a tab signed in with a phone: its copy is memory only.
+    return s && !s.viaPhone ? copyKeyStore(s.webId) : undefined;
+  },
+  offlineNow,
+);
 
 serverUi.current = {
-  Strip: PhoneStrip,
+  Strip: PhoneChrome,
   Tab: ServerTab,
   screen: serverScreen,
   // 0.9.3: the desktop layout, from 1000 px wide.
   Desktop,
   // 0.9.4: the full item page shows the server's older prices too (as the desktop side panel does).
-  olderPrices: serverHistory,
+  olderPrices,
   // 0.9.5 (web search): the Pick sheet's and the phone layout's list's shop search, and its Scan button.
-  webSearch: webSearchUi,
+  webSearch,
   refresh: async () => {
     const r = await syncNow();
     if (!r) return syncStatus().error ?? "Couldn't reach the server";
@@ -195,9 +209,13 @@ function Household({ s }: { s: Session }) {
       start();
     });
     setReady(true);
+    // 0.9.6 (review M2): cards this browser keeps from a sign-in to another household or server
+    // are never shown here; ask once per sign-in whether to keep them (after the page is up).
+    const asking = setTimeout(() => void askAboutOtherCards(askChoice, s).catch(() => undefined), 1500);
     // 0.9.5: when the list last came from the server (for the offline notice).
     const unwatch = s.viaPhone ? undefined : watchCopy(s.webId);
     return () => {
+      clearTimeout(asking);
       unwatch?.();
       stop();
     };

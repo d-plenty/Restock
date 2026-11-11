@@ -17,6 +17,40 @@ export interface StoreProduct {
   unitPriceText?: string;
   /** Online stock as the store reports it; undefined when the store doesn't say. */
   inStock?: boolean;
+  /** 0.9.6: what only Costco's pages say (src/stores/costco.ts). Kept on this phone, like everything from Costco. */
+  costco?: CostcoInfo;
+}
+
+/** What a Costco page says about a product, beyond price and size. */
+export interface CostcoInfo {
+  /** Costco's item number ("51210"). */
+  itemNumber?: string;
+  /** The product page. */
+  url?: string;
+  /** Where the page files it ("Online Grocery / Snacks"). */
+  category?: string;
+  /** 'included': the price includes delivery. 'checkout': Business Delivery, shipping added at checkout. */
+  delivery?: 'included' | 'checkout';
+  /** "Minimum purchase of 2": the least you can buy online. */
+  minQty?: number;
+  /** States Costco says it can't ship this to ("WA"). */
+  cantShipTo?: string[];
+  /** "Member Only Item": no price shown without a membership. */
+  memberOnlyItem?: boolean;
+  /** Costco's own unit price, in the unit it was given in. */
+  ownUnit?: { text: string; perBase: number; unit: 'g' | 'ml' | 'ea' };
+  /** What the page says is saved on a special, with the dates it's valid. */
+  save?: number;
+  validFrom?: string;
+  validTo?: string;
+  /** How many items are in the pack ("36 x 40g" is 36), when the name says. */
+  count?: number;
+  /** The price for one item in the pack, when there's a count. */
+  perItem?: number;
+  /** Where the size came from: the product's name, or worked out from Costco's unit price (estimated). */
+  sizeFrom?: 'name' | 'estimated';
+  /** The labelled lines to show on the product ("Online price, includes delivery", "Minimum 2 when buying online"). */
+  notes: string[];
 }
 
 export interface StoreAdapter {

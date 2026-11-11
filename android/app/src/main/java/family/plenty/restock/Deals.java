@@ -42,12 +42,19 @@ public final class Deals {
         public final boolean member;
         /** The store's promo text, e.g. "2 for $5". */
         public final String promo;
+        /** 0.9.6: typed in by hand (prices.source 'manual'): not overwritten by a price check the same day. */
+        public final boolean manual;
 
         public Reading(String date, double price, Double was, boolean special, boolean member) {
             this(date, price, was, special, member, null);
         }
 
         public Reading(String date, double price, Double was, boolean special, boolean member, String promo) {
+            this(date, price, was, special, member, promo, false);
+        }
+
+        public Reading(String date, double price, Double was, boolean special, boolean member, String promo, boolean manual) {
+            this.manual = manual;
             this.date = date;
             this.price = price;
             this.was = was;
@@ -312,9 +319,39 @@ public final class Deals {
         return new Size(p.qty, p.unit, "multi".equals(p.kind) && p.count != null && p.count > 1 ? p.count : null);
     }
 
+    /** unitPrice.ts DRINK: packs of these with no size for each one have no size at all. */
+    private static final Pattern DRINK = Pattern.compile(
+        "\\b(soft ?drinks?|cola|coke|lemonade|sprite|fanta|pepsi|solo|schweppes|mountain dew|ginger beer|creaming soda|tonic|soda|mineral water|spring water|sparkling|water|juice|cordial|energy drinks?|iced tea|beer|lager|ale|cider|stout|seltzer|premix|rtd|cans?|bottles?|stubbies|longnecks?)\\b",
+        Pattern.CASE_INSENSITIVE);
+    private static final Pattern PACK_COUNT_FULL = Pattern.compile("(\\d+)\\s*(?:packs?|pk|cans?|bottles?|stubbies)\\b");
+
+    /** unitPrice.ts packCountOf: "24 Pack", "30 cans" or "6pk": how many in the pack (more than one). */
+    private static boolean hasPackCount(String size, String name) {
+        for (String text : new String[] {size, name}) {
+            if (text == null) continue;
+            Matcher m = PACK_COUNT_FULL.matcher(text.toLowerCase(java.util.Locale.ROOT));
+            if (m.find()) {
+                try {
+                    if (Integer.parseInt(m.group(1)) > 1) return true;
+                } catch (NumberFormatException ignored) {
+                    // too long to be a count
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 0.9.6 (unitPrice.ts readSize): "Sprite 24 Pack" with nothing about how big each one is has no size
+     * (null), not "24 each": it sits out of the cheapest comparison. A size the person typed always counts.
+     * Java does not work sizes out from barcodes or look-alikes (the app does), so there it stays unknown.
+     */
     static Size productQty(Product p) {
         if (p.qty != null && p.qty > 0 && p.qtyUnit != null) return new Size(p.qty, p.qtyUnit);
-        return packSize(p.size, p.name);
+        Size z = packSize(p.size, p.name);
+        if (z != null && "ea".equals(z.unit) && hasPackCount(p.size, p.name)
+            && DRINK.matcher((p.name == null ? "" : p.name) + " " + (p.size == null ? "" : p.size)).find()) return null;
+        return z;
     }
 
     // ---------- stats & verdicts (verdict.ts) ----------
@@ -333,7 +370,11 @@ public final class Deals {
         Map<String, Reading> byDay = new LinkedHashMap<>();
         for (Reading r : sorted) {
             if (now - r.time() > HISTORY_DAYS * DAY) continue;
-            byDay.put(localDay(r.date), r);
+            String day = localDay(r.date);
+            // 0.9.6: a price typed in by hand isn't overwritten by a price check the same day (normaliseReadings in verdict.ts).
+            Reading had = byDay.get(day);
+            if (had != null && had.manual && !r.manual) continue;
+            byDay.put(day, r);
         }
         return new ArrayList<>(byDay.values());
     }
@@ -699,20 +740,23 @@ public final class Deals {
         if (priced.isEmpty()) return rec;
 
         Set<String> units = new HashSet<>();
-        boolean allUnitPrices = true;
+        boolean sizedMain = false;
         for (Option o : priced) {
+            if (o.unitPrice == null) continue;
             // Sheets and packs both count, but not the same thing (verdict.ts, 0.8.9).
             boolean sheets = o.product.qty == null && o.product.size != null && SHEETS.matcher(o.product.size).find();
             units.add(sheets ? "sheet" : o.unit);
-            if (o.unitPrice == null) allUnitPrices = false;
+            if ("main".equals(o.role)) sizedMain = true;
         }
-        final boolean byUnit = units.size() == 1 && !units.contains(null) && allUnitPrices;
+        // 0.9.6 (same rule as verdict.ts): a product with an unknown size is left out of the cheapest
+        // comparison while one of the picks has a size to compare by. With none, shelf prices decide.
+        final boolean byUnit = sizedMain && units.size() == 1 && !units.contains(null);
 
         // Out-of-stock products only count when nothing else is available.
         Option best = null;
         Option bestAny = null;
         for (Option o : priced) {
-            if (!"main".equals(o.role)) continue;
+            if (!"main".equals(o.role) || !comparable(o, byUnit)) continue;
             if (bestAny == null || cost(o, byUnit) < cost(bestAny, byUnit)) bestAny = o;
             if (!gone(o) && (best == null || cost(o, byUnit) < cost(best, byUnit))) best = o;
         }
@@ -721,7 +765,7 @@ public final class Deals {
         Option alt = null;
         Option stockAlt = null;
         for (Option o : priced) {
-            if (!"alt".equals(o.role) || gone(o)) continue;
+            if (!"alt".equals(o.role) || gone(o) || !comparable(o, byUnit)) continue;
             if (!item.allowBulk && isBulk(o, options, item)) continue;
             if (outOfStock && (stockAlt == null || cost(o, byUnit) < cost(stockAlt, byUnit))) stockAlt = o;
             if (!onSale(o)) continue;
@@ -768,6 +812,11 @@ public final class Deals {
                 rec.headline = "Cheapest at " + where;
         }
         return rec;
+    }
+
+    /** A product whose size is unknown has no unit price: it sits out of a by-unit comparison (verdict.ts). */
+    private static boolean comparable(Option o, boolean byUnit) {
+        return !byUnit || o.unitPrice != null;
     }
 
     private static double cost(Option o, boolean byUnit) {

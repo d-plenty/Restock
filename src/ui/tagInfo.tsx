@@ -278,7 +278,7 @@ export function MemberInfoTag({ chain, hasCard }: { chain: Chain; hasCard?: bool
       <p style={{ margin: 0 }}>This price is only for {program} members.</p>
       <p className="small" style={{ fontSize: 15 }}>
         {hasCard === false
-          ? `You haven't added a ${program} card, so Restock uses the usual price for you. Add your card under Loyalty cards on Home to count it.`
+          ? `You haven't added a ${program} card, so Restock uses the usual price for you. Add your card under Cards on Home to count it.`
           : `Restock counts it because you've added your ${program} card. Remember to scan it at the checkout.`}
       </p>
     </InfoTag>

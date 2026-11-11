@@ -6,7 +6,7 @@ import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { loadRecommendations } from '../../lib/recs';
 import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
-import { tiedWithBest, type Recommendation } from '../../lib/verdict';
+import { bothPrices, tiedWithBest, type Recommendation } from '../../lib/verdict';
 import { chainName, LEARNING_DAYS } from '../../types';
 import { Hold, Icon, MoreInfo, stockWhere, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, Thumb } from '../components';
 import { ActionInfoTag } from '../tagInfo';
@@ -319,6 +319,10 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                       <span className="grow">
                         <span className="title clip">{r.group.name}</span>
                         <span className="small clip">{detail}</span>
+                        {/* 0.9.6: both prices: per item, then the comparison price (per litre, per 100 g). */}
+                        {bothPrices(r.action === 'alt' ? r.alt : r.best) && (
+                          <span className="small clip num">{bothPrices(r.action === 'alt' ? r.alt : r.best)}</span>
+                        )}
                         {(r.action !== 'none' || underTarget(r)) && (
                           <span className="tags" style={{ marginTop: 3 }}>
                             {r.action !== 'none' && <ActionInfoTag rec={r} action={r.action} great={r.best?.verdict.kind === 'great'} />}

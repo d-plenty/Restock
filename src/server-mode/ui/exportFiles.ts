@@ -305,6 +305,43 @@ export function exportTables(exp: { tables: Record<string, unknown> }): Table[] 
   return out;
 }
 
+/** 0.9.6: the shop whose prices never go into an export (Declan, 11 Nov 2026). */
+export const NEVER_SHOP = 'costco';
+
+/**
+ * 0.9.6: the export without Costco's prices, whatever the server sent (a 0.9.5 server doesn't leave
+ * them out): its products and their prices go, a list line at Costco loses its price (and the shop's
+ * unit price text), and a ticked purchase there keeps what and when but not what it cost. Says how many
+ * went in `withheld.costco`.
+ */
+export function withoutCostco<T extends { tables: Record<string, unknown>; withheld?: unknown }>(exp: T): T & { withheld?: { costco?: { products: number; prices: number } } } {
+  const t = exp.tables;
+  const rows = (k: string) => (Array.isArray(t[k]) ? (t[k] as Record<string, unknown>[]) : null);
+  const products = rows('products');
+  const theirs = new Set((products ?? []).filter((p) => p?.chain === NEVER_SHOP).map((p) => String(p.id)));
+  const was = (exp.withheld as { costco?: { products?: number; prices?: number } } | undefined)?.costco;
+  let gone = 0;
+  const tables: Record<string, unknown> = { ...t };
+  if (products) tables.products = products.filter((p) => p?.chain !== NEVER_SHOP);
+  const prices = rows('prices');
+  if (prices) {
+    tables.prices = prices.filter((p) => !theirs.has(String(p?.product_id)));
+    gone = prices.length - (tables.prices as unknown[]).length;
+  }
+  const at = (r: Record<string, unknown>) => r?.chain === NEVER_SHOP || (r?.product as Record<string, unknown> | null | undefined)?.chain === NEVER_SHOP;
+  const list = rows('list');
+  if (list)
+    tables.list = list.map((r) => {
+      if (!at(r)) return r;
+      const p = r.product && typeof r.product === 'object' ? Object.fromEntries(Object.entries(r.product as Record<string, unknown>).filter(([k]) => !/price|unit/i.test(k))) : r.product;
+      return { ...r, price: null, product: p };
+    });
+  const ticked = rows('ticked');
+  if (ticked) tables.ticked = ticked.map((r) => (r?.chain === NEVER_SHOP ? { ...r, price: null, total: null, usual: null, special: 0 } : r));
+  const costco = { products: Math.max(was?.products ?? 0, theirs.size), prices: Math.max(was?.prices ?? 0, gone) };
+  return { ...exp, tables, ...(costco.products || costco.prices ? { withheld: { ...(exp.withheld as object), costco } } : {}) };
+}
+
 /** "restock-data-2026-11-10" (this computer's day). */
 export function fileBase(what = 'data', at = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0');

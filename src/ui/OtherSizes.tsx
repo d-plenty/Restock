@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { otherSizes, packLabel, vsLabel, type SizeOption } from '../lib/otherSizes';
+import { compareStyleOf } from '../lib/unitPrice';
 import { formatUnitPrice, money } from '../lib/units';
 import { chainName } from '../types';
 import type { StoreProduct } from '../stores/types';
@@ -54,6 +55,14 @@ export function OtherSizesCard({
   const shown = [...found.packs, ...(containersOn ? found.containers : [])];
   const pers = shown.map((x) => x.per).concat(mine.per !== undefined ? [mine.per] : []);
   const best = shown.length && pers.length ? Math.min(...pers) : undefined;
+  // 0.9.6: one comparison unit for every line (per kg when any pack is 5 kg or more; per 100 or each for all).
+  const cstyle = compareStyleOf(
+    [...shown.map((x) => ({ price: x.sp.price, per: x.per })), { price: anchor.price, per: mine.per }].map((x) => ({
+      unit,
+      perBase: x.per,
+      total: x.per && x.price !== undefined ? x.price / x.per : undefined,
+    })),
+  );
 
   const row = (o: SizeOption) => {
     const ticked = picks.has(keyOf(o.sp));
@@ -79,7 +88,9 @@ export function OtherSizesCard({
         </span>
         <span className="num size-price">
           <strong>{money(o.sp.price)}</strong>
-          <span className="small">{formatUnitPrice(o.per, unit)}</span>
+          {/* 0.9.6: both prices: per item (one can), then per litre or 100 g (what decides best value). */}
+          {o.pack.count > 1 && o.sp.price !== undefined && <span className="small">{money(o.sp.price / o.pack.count)} each</span>}
+          <span className="small">{formatUnitPrice(o.per, unit, cstyle)}</span>
         </span>
       </label>
     );
@@ -90,7 +101,8 @@ export function OtherSizesCard({
       <div className="eyebrow green">Other sizes of this</div>
       <span className="small">
         Yours: {packLabel(mine.pack)}
-        {mine.per !== undefined ? `, ${formatUnitPrice(mine.per, unit)}` : ''}. Tick any you'd also buy as this item.
+        {mine.pack.count > 1 && anchor.price !== undefined ? `, ${money(anchor.price / mine.pack.count)} each` : ''}
+        {mine.per !== undefined ? `, ${formatUnitPrice(mine.per, unit, cstyle)}` : ''}. Tick any you'd also buy as this item.
       </span>
       {searching && (
         <span className="small" role="status">

@@ -105,7 +105,7 @@ database in the browser, fills it by reading and merging every `restock-sync-*.b
 files with the same merge rules as `SyncEngine.apply`, and writes its own edits as
 `restock-sync-web-<webId>.bin`. Shop searches, price checks, shop sign-ins and anything that needs the
 phone's hardware are hidden with a plain note ("Do this on a phone: shops don't let a web page check
-prices"). Loyalty cards show greyed out with the shop's name and "Kept on your phones for privacy"; their
+prices"). Cards (loyalty and gift) show greyed out with the shop's name and "Kept on your phones for privacy"; their
 numbers are never shown (the web build strips them on read).
 
 ## Endpoints at a glance
@@ -540,7 +540,7 @@ All within the shapes above; the server (P2) already answers them.
   table at a time (joined with what their tab comes from), not a query a record. The phone keeps its own copy:
   it never takes in a delete by itself of a record it's taking back. Turning the kind on again clears it.
 - **Leaving with take-back**: `syncStopServer({ bringBack, takeBack })`. The Leave sheet offers a box for each
-  personal kind the phone shares (Keg, Pharmacy, receipts, loyalty cards; never groceries), all unticked. Ticked
+  personal kind the phone shares (Keg, Health, receipts, loyalty cards; never groceries; gift cards are never shared), all unticked. Ticked
   ones are turned off and taken back as above, then one round puts the phone's file with the deletes on the
   server, then it leaves; if that round can't reach the server it doesn't leave (the error starts "Couldn't take
   those things off the server"), and the sheet offers leaving without taking them back.
@@ -687,10 +687,18 @@ encrypted backup and goes with Delete everything), one row a tick: `entry_id, ch
   product_id, date, price, was_price, is_special, member_only, promo, source`; `ticked` rows: srv_spend's, with
   `id`. The full export file is the first answer with `tables.prices` and `tables.ticked` filled from the pages
   (and `paged` dropped).
-- Never in it: loyalty cards (no cards table at all; their numbers never reach household.db), receipt text, the
+- Never in it: loyalty cards and gift cards (no cards table at all; their numbers and PINs never reach household.db), Costco prices (a phone's Costco lines, products, prices and picks are never sent), receipt text, the
   passphrase or anything made from it, keys (household, server, owner, kex, phones'), sessions, the recovery
   key, the Home Assistant token or which phone runs it, `demo-` rows. A future import takes `format` and `v`
   first and refuses a higher `v`.
+- 0.9.6: **never Costco's prices** (Declan, 11 Nov 2026): products with `chain` `costco` and their prices are left
+  out (`paged.prices.count` too), a list line at Costco has `price` null and no price or unit price text in
+  `product`, and a ticked purchase there keeps what and when but has `price`, `total`, `usual` null (the monthly
+  `spending` totals still count it). When any were left out the answer says `withheld: { costco: { products,
+  prices } }`. The web page leaves them out again itself (`exportFiles.ts withoutCostco`), so a 0.9.5 server's
+  export saved from a 0.9.6 page has none either. (0.9.6 phones never send Costco's records at all.)
+- 0.9.6: `summary.kinds.prices.imported` and `stats.prices.imported` count prices with `source` `imported`;
+  a `series` week whose cheapest price was imported has `imported: true`.
 
 **Manage.** Every delete is two steps on the web; the server checks both: body `{ …, typed, confirm: { c, proof }
 }` (`confirm` as for Remove). Order: no `confirm` → 403 `confirm`; `typed` not exactly the word → 400 `typed`
@@ -750,3 +758,96 @@ unchanged copy doesn't bring it back). Logged in srv_log activity with who (`dat
   `retryAfter`); 500 rows at a time, the server answering other requests in between.
 - `POST /api/v3/prune` (0.9.4's Delete older data) stays as it was (passphrase, no typed word): prices, receipts
   (their photos and archive months) and logs, never the statistics; the Data tab uses `/api/v3/data/delete`.
+
+### v3, 0.9.6: Data: Import
+
+Server side in `server/src/v3/import.mjs`, the web in `src/server-mode/ui/DeskDataImport.tsx` and
+`importFile.ts`. The file format, with an example, is `docs/restock-import.md`. An import merges a file ON TOP
+of the server's data: it only adds **products** (the catalogue) and **prices** (price history). It never
+replaces or deletes anything, never touches the shopping list, the pantry (items), categories, receipts,
+settings or cards, and every price it adds has `source: "imported"` (apart from `auto`, prices a phone checked,
+and `manual`, typed in). Costco is never imported (as it is never exported).
+
+**The browser reads the file** (the Full export file `.json`, a restock-export v1; or the Data tab's CSV
+`.zip`, of which it reads `Products.csv` and `Prices.csv`; a spreadsheet `.xlsx` is refused with what to use
+instead), refuses one carrying anything secret (a table named like cards, keys, sessions, recovery; a field
+named like number, pin, password, passphrase, secret, token, key, recovery, or a receipt's `text`, `photo`,
+`pages`; a `data:` picture), and sends its products in chunks. Every chunk is checked again on the server.
+
+All four endpoints are a browser session's (RestockWeb3: none 401 `auth`, a bad MAC 401, a phone 403
+`forbidden`), POST, plain JSON bodies under the server's 256 KB request cap, every 2xx answer sealed, errors
+plain JSON.
+- A chunk's body: `{ products: [product…] }` (`import` and `n` too for `/chunk`), at most 2,000 products and
+  5,000 prices (400 `chunk`). A product: `{ ref?, chain, store_product_id?, barcode?, name, brand?, size?,
+  image_url?, qty?, qty_unit?, more?, prices?: [price…] }`; a price: `{ date, price, was_price?, is_special?,
+  member_only?, promo? }`. Any other field, or a product or price that isn't an object, refuses the whole
+  request (400 `fields` / `products` / `prices`) before anything is read or written. `more: true` is the rest
+  of a product an earlier chunk started (the web splits a product with many prices between days).
+- Each field (a product or price that fails is left out and counted in `problems`, the rest go on):
+  `chain` a shop the server knows (a built-in shop or one of the household's own; not `other`; lower case,
+  trimmed) else `shop`; `costco` (or any shop whose records stay on one phone) is counted in `costco`, never
+  kept. `name` 1–200 characters after tidying (NFC, control characters out, spaces collapsed) else `name`.
+  `store_product_id` text or a number (anything else: the product is left out, `shop-number`), ≤ 100, `brand`
+  ≤ 100, `size` ≤ 40 characters (longer: left out). A `ref` is per shop: the same ref at two shops is two products. `barcode` 8, 12, 13 or
+  14 digits (a GTIN-14 with leading zeros as its 13), else left out (`barcode-left-out`, a note). `image_url`
+  only https, no user, password or port, and only from a host the household's own products at that shop already
+  show pictures from, else left out (`picture-left-out`, a note). `qty` > 0 and ≤ 100,000 with `qty_unit` `g`,
+  `ml` or `ea`, else both left out. At most 5,000 prices a product (`too-many-prices`, its prices counted in
+  `product-ignored-prices`). A price's `date`: `yyyy-mm-dd` (noon that day in the server's zone), a date and
+  time with no zone (the server's zone) or an ISO time with `Z` or an offset; from 2000 to no later than a day
+  from now, a real day, else `date`. `price` a number from 0.01 to 10,000 (to the cent) else `price`;
+  `was_price` kept only when above the price and ≤ 10,000; `is_special`, `member_only` booleans or 0/1 (absent
+  false) else `flag`; `promo` ≤ 120 characters. The server's own `id`, `source` and `created_at` are never
+  taken from a file.
+- **Which product:** the one the server has with the file's `ref` as its id at the same shop, else the same
+  shop and `store_product_id`, else the same shop and `barcode`, else (only for a product with neither) the
+  same shop, name and size (ignoring case). An existing product is never changed. A new one gets `ref` as its
+  id when that's free (and doesn't start `demo-`), else a new UUID; `created_at` now. The server holds at most
+  50,000 products in all: past that an import adds no new ones (`full`, its prices `product-ignored-prices`).
+- **Which prices:** one a day per product (the day in the server's zone): the newest of each day in the file
+  (the others are counted in `skipped`). One the server already has that day at the same price is a duplicate
+  (`skipped`); when the server has that day at another price, the newest wins: the import's is added only
+  when it's later than the server's reading that day, else `skipped`. A day the product already has an
+  imported price for (an earlier chunk or import) is `skipped` too, so one a day holds across chunks: the
+  first one in wins. Nothing already there is changed.
+- `POST /api/v3/data/import/check { products }` (the dry run; any browser session) → `{ products: { add,
+  matched }, prices: { add, skipped }, costco: { products, prices }, problems: { "<code>": n } }`. Writes
+  nothing. A product with `more` the server doesn't have counts as one an earlier chunk counted.
+- `POST /api/v3/data/import/start { confirm }` (a passphrase session, 403 `passphrase`; the passphrase again
+  as for Remove: no `confirm` 403 `confirm`, a wrong one 403 `current`, counting towards the lockout) → `{
+  import: "<id>", until, idleMs, limits }`. One import at a time on the server: another going is 409 `busy`
+  (said before the passphrase is used). At most 10 starts an hour (429 `rate`); 507 `full` with under 200 MB
+  free on the server's disk.
+- `POST /api/v3/data/import/chunk { import, n, products }` (the same session) → `{ products: { added, matched
+  }, prices: { added, skipped, toPhones }, costco, problems, n, next }`. Chunks in order from 0 (409 `order`
+  with `next`). Each chunk is one transaction: all of it or none. At most 25,000 products and 500,000 prices an
+  import (413 `too-many`). An import is over after 10 minutes without a chunk, or 2 hours in all (410
+  `import-gone`, also for another session's id); what its chunks added stays.
+- `POST /api/v3/data/import/finish { import, cancelled? }` → `{ products, prices, costco, problems, chunks,
+  how: "finished" | "cancelled" }`. Cancel is `cancelled: true`. Logged in srv_log activity with who:
+  `data-imported` (or `data-import-stopped` for a cancelled or abandoned one) `{ how, products, prices,
+  skipped, ignored, costco }` (counts only).
+- `check` and `chunk` together: at most 300 a minute per browser session (429 `rate` with `retryAfter`; the
+  web waits and goes on).
+- **What the phones get:** products are written by the server (its sync triggers: device `srv-<sid>`, origin
+  the browser's `web-<id>`, as Track from a web search), so they go out in the server's file to every phone
+  sharing that shop's tab. Of a product's prices, only its newest imported one goes out with them, and only
+  when it is newer than any price the server had for it and from the last 60 days (as the server's file carries
+  recent prices). The older history is written quietly (no sync record, as the months phones offload are): it
+  stays on the server, in the Data tab's charts and counts, the export and the encrypted backup. This keeps the
+  server's file small for the phones. 0.9.5 phones and pages take these rows as any of the server's
+  products and prices (no new record kind; `source` is a plain text column they copy and show as checked).
+- The web: Import data on the Data tab, below Download your data: Choose a file → Checking the file (the dry
+  run, chunk by chunk, Cancel) → Step 1 ("Will add 12,000 products and 90,000 prices, skip 300 already there,
+  ignore 12 it couldn't read", why rows were left out, Costco left out, the tables not taken) → Step 2 (the
+  passphrase) → Importing (how far, Cancel stops after the chunk being sent, the page asks before it's closed)
+  → Imported / Import stopped. The web sends at most 500 products and 2,500 prices a request so the server
+  answers everyone else in between. Files up to 100 MB (300 MB unzipped).
+
+## 0.9.6: what changed on the wire
+
+- **No new record kinds.** Move to another list is ordinary list changes: between Groceries and General the line is updated in place; across tabs it is a new line plus a delete of the old one. A 0.9.5 phone or server needs nothing.
+- **Costco** (phone only, opt-in): a phone never sends Costco products, prices, list-line details or item picks that point at Costco products; anything Costco-related that arrives is dropped. The server's search never contacts Costco.
+- **Gift cards and Cards in the web page:** never sent. Gift cards live in a phone-only table; the browser keeps cards in its own storage.
+- **Import:** see the "Data: Import" section above and [restock-import.md](restock-import.md).
+- **Price checks at a set time** are per phone (`checkTime`), not a shared setting.

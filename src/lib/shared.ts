@@ -1,4 +1,5 @@
-import { chainName, sectionOf, SHOPS, type StoreChain } from '../shops';
+import { chainName, isLocalOnlyShop, sectionOf, SHOPS, type StoreChain } from '../shops';
+import { COSTCO_LIST_NOTE } from './costcoLocal';
 import { isNative } from '../stores/http';
 import { render } from '../stores/web';
 import { cleanName, extractProducts } from '../stores/webPage';
@@ -52,7 +53,11 @@ export function splitShared(text: string): { url?: string; words: string } {
 /** Add a shared link or text to the shopping list. Returns what to tell the person. */
 export async function addShared(text: string): Promise<string> {
   const { url, words } = splitShared(text);
-  const chain = url ? shopForUrl(url) : undefined;
+  const found = url ? shopForUrl(url) : undefined;
+  // 0.9.6 (review H1, L1): a Costco link is never opened (Costco is read only when Search is pressed)
+  // and the line is not at Costco (a list line is shared): its words go on as "Any shop".
+  const costcoLink = isLocalOnlyShop(found);
+  const chain = costcoLink ? undefined : found;
   let name = words || (url ? nameFromLink(url) : undefined);
   let price: number | undefined;
   if (url && chain && isNative()) {
@@ -71,5 +76,5 @@ export async function addShared(text: string): Promise<string> {
   if (!name) return "Couldn't tell what that was. Try sharing the product's page.";
   name = cleanName(name);
   await addListEntry({ id: uid(), text: name, chain, price, section: chain ? sectionOf(chain) : 'pantry', checked: false, createdAt: nowIso() });
-  return `${name}${chain ? ` (${chainName(chain)})` : ''} added to your shopping list`;
+  return `${name}${chain ? ` (${chainName(chain)})` : ''} added to your shopping list${costcoLink ? `. ${COSTCO_LIST_NOTE}` : ''}`;
 }

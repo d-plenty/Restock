@@ -56,7 +56,10 @@ function restockPwa(): Plugin {
       const chunk = (Array.isArray(out) ? out : [out]).flatMap((o) => ('output' in o ? o.output : [])).find((o) => o.type === 'chunk');
       if (!chunk || chunk.type !== 'chunk') throw new Error('restock-pwa: sw.js was not built');
       const files = shellFiles([...Object.keys(bundle), 'index.html']);
-      const manifest = { build: buildId(files, chunk.code), files };
+      // 0.9.6: the app's version is part of the id too, so a new release is always a new shell
+      // (restock-shell-<id>), and the old one goes when the new worker takes over.
+      const version = (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version?: string }).version ?? '';
+      const manifest = { build: buildId(files, `${version}\n${chunk.code}`), version, files };
       const marker = new RegExp(`(["'\`])${SHELL_MARKER}\\1`);
       if (!marker.test(chunk.code)) throw new Error('restock-pwa: the shell marker is missing from sw.js');
       this.emitFile({ type: 'asset', fileName: SW_FILE, source: chunk.code.replace(marker, () => JSON.stringify(JSON.stringify(manifest))) });

@@ -140,7 +140,7 @@ const ALL_TILES: Tile[] = [
     title: 'Cards and shop accounts',
     sub: 'Member prices, your own branch',
     icon: 'card',
-    heading: 'Loyalty cards and shop accounts',
+    heading: 'Cards and shop accounts',
     intro:
       'Add your Flybuys and Everyday Rewards cards so member prices count. Sign in to Woolworths or pick your Coles branch, and prices and stock are for your local shop.',
   },
@@ -450,7 +450,7 @@ function AccountsTile() {
       <button className="row" onClick={() => nav.push({ name: 'cards' })}>
         <Icon name="card" size={18} />
         <span className="grow">
-          <span className="title">Loyalty cards</span>
+          <span className="title">Cards</span>
           <span className="small">{cards ? `${cards} added` : 'Flybuys, Everyday Rewards'}</span>
         </span>
         <Icon name="chevron" size={18} />

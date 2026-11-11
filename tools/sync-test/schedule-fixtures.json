@@ -1,0 +1,434 @@
+{
+ "note": "0.9.6 shared answers for CheckSchedule.java and checkSchedule.ts. Regenerate with CheckScheduleTest096 gen.",
+ "cases": [
+  {
+   "next": "2026-11-10T18:00:00Z",
+   "wake": "2026-11-10T18:00:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-11-10T17:00:00Z",
+   "name": "daily before the time",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00",
+   "latest": "2026-11-09T18:00:00Z"
+  },
+  {
+   "next": "2026-11-11T18:00:00Z",
+   "wake": "2026-11-11T18:00:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-11-10T20:30:00Z",
+   "name": "daily after the time",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00",
+   "latest": "2026-11-10T18:00:00Z"
+  },
+  {
+   "next": "2026-11-11T18:00:00Z",
+   "wake": "2026-11-11T18:00:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-11-10T18:00:00Z",
+   "name": "daily exactly on the time",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00",
+   "latest": "2026-11-10T18:00:00Z"
+  },
+  {
+   "next": "2026-11-11T06:00:00Z",
+   "wake": "2026-11-11T06:00:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-11-10T20:00:00Z",
+   "name": "12 hours, morning",
+   "weekday": 3,
+   "interval": 12,
+   "time": "05:00",
+   "latest": "2026-11-10T18:00:00Z"
+  },
+  {
+   "next": "2026-11-11T18:00:00Z",
+   "wake": "2026-11-11T18:00:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-11-11T07:00:00Z",
+   "name": "12 hours, afternoon",
+   "weekday": 3,
+   "interval": 12,
+   "time": "05:00",
+   "latest": "2026-11-11T06:00:00Z"
+  },
+  {
+   "next": "2026-11-11T18:00:00Z",
+   "wake": "2026-11-11T18:00:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-11-11T08:00:00Z",
+   "name": "12 hours, night",
+   "weekday": 3,
+   "interval": 12,
+   "time": "05:00",
+   "latest": "2026-11-11T06:00:00Z"
+  },
+  {
+   "next": "2026-11-11T06:00:00Z",
+   "wake": "2026-11-11T06:00:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-11-11T01:00:00Z",
+   "name": "6 hours",
+   "weekday": 3,
+   "interval": 6,
+   "time": "05:00",
+   "latest": "2026-11-11T00:00:00Z"
+  },
+  {
+   "next": "2026-11-11T00:30:00Z",
+   "wake": "2026-11-11T00:30:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-11-10T20:00:00Z",
+   "name": "12 hours from 11:30 pm",
+   "weekday": 3,
+   "interval": 12,
+   "time": "23:30",
+   "latest": "2026-11-10T12:30:00Z"
+  },
+  {
+   "next": "2026-11-11T13:00:00Z",
+   "wake": "2026-11-11T13:00:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-11-10T20:00:00Z",
+   "name": "daily at midnight",
+   "weekday": 3,
+   "interval": 24,
+   "time": "00:00",
+   "latest": "2026-11-10T13:00:00Z"
+  },
+  {
+   "next": "2026-10-03T16:30:00Z",
+   "wake": "2026-10-03T16:30:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-10-03T10:00:00Z",
+   "name": "clocks forward, 2:30 am does not exist",
+   "weekday": 3,
+   "interval": 24,
+   "time": "02:30",
+   "latest": "2026-10-02T16:30:00Z"
+  },
+  {
+   "next": "2026-10-03T18:00:00Z",
+   "wake": "2026-10-03T18:00:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-10-03T10:00:00Z",
+   "name": "clocks forward, 5:00 am stays 5:00 am",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00",
+   "latest": "2026-10-02T19:00:00Z"
+  },
+  {
+   "next": "2026-10-04T15:30:00Z",
+   "wake": "2026-10-04T15:30:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-10-03T17:00:00Z",
+   "name": "clocks forward, the day after",
+   "weekday": 3,
+   "interval": 24,
+   "time": "02:30",
+   "latest": "2026-10-03T16:30:00Z"
+  },
+  {
+   "next": "2027-04-03T15:30:00Z",
+   "wake": "2027-04-03T15:30:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2027-04-03T10:00:00Z",
+   "name": "clocks back, 2:30 am happens twice",
+   "weekday": 3,
+   "interval": 24,
+   "time": "02:30",
+   "latest": "2027-04-02T15:30:00Z"
+  },
+  {
+   "next": "2027-04-03T19:00:00Z",
+   "wake": "2027-04-03T19:00:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2027-04-03T10:00:00Z",
+   "name": "clocks back, 5:00 am stays 5:00 am",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00",
+   "latest": "2027-04-02T18:00:00Z"
+  },
+  {
+   "next": "2026-10-04T06:00:00Z",
+   "wake": "2026-10-04T06:00:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-10-03T20:00:00Z",
+   "name": "12 hours across clocks forward",
+   "weekday": 3,
+   "interval": 12,
+   "time": "05:00",
+   "latest": "2026-10-03T18:00:00Z"
+  },
+  {
+   "next": "2026-10-03T19:00:00Z",
+   "wake": "2026-10-03T19:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-10-03T10:00:00Z",
+   "name": "Townsville has no daylight saving",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00",
+   "latest": "2026-10-02T19:00:00Z"
+  },
+  {
+   "next": "2026-11-10T21:00:00Z",
+   "wake": "2026-11-10T21:00:00Z",
+   "zone": "Australia/Perth",
+   "now": "2026-11-10T20:00:00Z",
+   "name": "same moment in Perth",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00",
+   "latest": "2026-11-09T21:00:00Z"
+  },
+  {
+   "next": "2027-03-14T10:30:00Z",
+   "wake": "2027-03-14T10:30:00Z",
+   "zone": "America/Los_Angeles",
+   "now": "2027-03-13T12:00:00Z",
+   "name": "Los Angeles clocks forward",
+   "weekday": 3,
+   "interval": 24,
+   "time": "02:30",
+   "latest": "2027-03-13T10:30:00Z"
+  },
+  {
+   "next": "2026-11-01T08:30:00Z",
+   "wake": "2026-11-01T08:30:00Z",
+   "zone": "America/Los_Angeles",
+   "now": "2026-11-01T05:00:00Z",
+   "name": "Los Angeles clocks back",
+   "weekday": 3,
+   "interval": 24,
+   "time": "01:30",
+   "latest": "2026-10-31T08:30:00Z"
+  },
+  {
+   "next": "2026-11-10T18:00:00Z",
+   "wake": "2026-11-10T18:00:00Z",
+   "zone": "Australia/Lord_Howe",
+   "now": "2026-11-10T12:00:00Z",
+   "name": "Lord Howe half hour offset",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00",
+   "latest": "2026-11-09T18:00:00Z"
+  },
+  {
+   "next": "2026-11-12T19:00:00Z",
+   "wake": "2026-11-12T19:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-11T00:00:00Z",
+   "name": "every 2 days",
+   "weekday": 3,
+   "interval": 48,
+   "time": "05:00",
+   "latest": "2026-11-10T19:00:00Z"
+  },
+  {
+   "next": "2026-11-12T19:00:00Z",
+   "wake": "2026-11-12T19:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-11T20:00:00Z",
+   "name": "every 2 days, the next day",
+   "weekday": 3,
+   "interval": 48,
+   "time": "05:00",
+   "latest": "2026-11-10T19:00:00Z"
+  },
+  {
+   "next": "2026-11-10T19:00:00Z",
+   "wake": "2026-11-10T19:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-10T12:00:00Z",
+   "name": "weekly on Wednesday (Tuesday now)",
+   "weekday": 3,
+   "interval": 168,
+   "time": "05:00",
+   "latest": "2026-11-03T19:00:00Z"
+  },
+  {
+   "next": "2026-11-17T19:00:00Z",
+   "wake": "2026-11-11T19:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-10T21:00:00Z",
+   "name": "weekly on Wednesday (Wednesday after the time)",
+   "weekday": 3,
+   "interval": 168,
+   "time": "05:00",
+   "latest": "2026-11-10T19:00:00Z"
+  },
+  {
+   "next": "2026-11-14T19:00:00Z",
+   "wake": "2026-11-11T19:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-11T12:00:00Z",
+   "name": "weekly on Sunday",
+   "weekday": 0,
+   "interval": 168,
+   "time": "05:00",
+   "latest": "2026-11-07T19:00:00Z"
+  },
+  {
+   "next": "2027-01-01T19:00:00Z",
+   "wake": "2027-01-01T19:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-12-31T20:00:00Z",
+   "name": "new year",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00",
+   "latest": "2026-12-31T19:00:00Z"
+  },
+  {
+   "next": "2028-02-29T19:00:00Z",
+   "wake": "2028-02-29T19:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2028-02-28T20:00:00Z",
+   "name": "leap day",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00",
+   "latest": "2028-02-28T19:00:00Z"
+  }
+ ],
+ "due": [
+  {
+   "zone": "Australia/Brisbane",
+   "due": true,
+   "now": "2026-11-10T22:00:00Z",
+   "served": null,
+   "name": "first run, nothing served",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": false,
+   "now": "2026-11-10T22:00:00Z",
+   "served": "2026-11-10T19:00:00Z",
+   "name": "served today",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": true,
+   "now": "2026-11-10T22:00:00Z",
+   "served": "2026-11-09T19:00:00Z",
+   "name": "missed yesterday, phone was off",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": true,
+   "now": "2026-11-10T22:00:00Z",
+   "served": "2026-11-03T19:00:00Z",
+   "name": "off for a week: one check, not seven",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": false,
+   "now": "2026-11-10T18:00:00Z",
+   "served": "2026-11-09T19:00:00Z",
+   "name": "before the time today, served yesterday",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": true,
+   "now": "2026-11-10T18:00:00Z",
+   "served": "2026-11-08T19:00:00Z",
+   "name": "before the time today, missed yesterday",
+   "weekday": 3,
+   "interval": 24,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": false,
+   "now": "2026-11-10T22:00:00Z",
+   "served": "2026-11-10T19:00:00Z",
+   "name": "12 hours: morning served, evening not yet",
+   "weekday": 3,
+   "interval": 12,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": true,
+   "now": "2026-11-11T08:00:00Z",
+   "served": "2026-11-10T19:00:00Z",
+   "name": "12 hours: evening time passed, only morning served",
+   "weekday": 3,
+   "interval": 12,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": false,
+   "now": "2026-11-11T08:00:00Z",
+   "served": "2026-11-11T07:00:00Z",
+   "name": "12 hours: both served",
+   "weekday": 3,
+   "interval": 12,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": true,
+   "now": "2026-11-10T22:00:00Z",
+   "served": "2026-11-04T19:00:00Z",
+   "name": "weekly: not the day",
+   "weekday": 3,
+   "interval": 168,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": true,
+   "now": "2026-11-11T22:00:00Z",
+   "served": "2026-11-04T19:00:00Z",
+   "name": "weekly: the day, not served",
+   "weekday": 3,
+   "interval": 168,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": true,
+   "now": "2026-11-12T22:00:00Z",
+   "served": "2026-11-04T19:00:00Z",
+   "name": "weekly: missed Wednesday, now Friday",
+   "weekday": 3,
+   "interval": 168,
+   "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": false,
+   "now": "2026-11-12T22:00:00Z",
+   "served": "2026-11-10T19:00:00Z",
+   "name": "weekly: served this Wednesday",
+   "weekday": 3,
+   "interval": 168,
+   "time": "05:00"
+  }
+ ]
+}

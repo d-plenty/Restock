@@ -1,6 +1,6 @@
 # Fine print
 
-_Last updated 10 November 2026_
+_Last updated 11 November 2026_
 
 ## In short
 
@@ -10,7 +10,7 @@ _Last updated 10 November 2026_
 
 ## Not affiliated with any shop
 
-Restock is an independent project. It isn't made, endorsed or supported by Coles, Woolworths, Aldi, Dan Murphy's, BWS, Liquorland, Chemist Warehouse, Priceline or any other retailer. Their names belong to them and are used only to say which shop a price came from.
+Restock is an independent project. It isn't made, endorsed or supported by Coles, Woolworths, Aldi, Costco, Dan Murphy's, BWS, Liquorland, Chemist Warehouse, Priceline or any other retailer. Their names belong to them and are used only to say which shop a price came from.
 
 ## Prices and stock can be wrong
 
@@ -33,6 +33,8 @@ The Keg tab is for adults 18 and over. Restock only compares prices; please drin
 Restock only checks the items you track, one at a time with pauses in between, like a person browsing. Please use it for your own household shopping. A shop may change its website or block requests at any time, and some features may stop working until the app is updated.
 
 If you turn on "Let the web page search the shops" on your own Restock server, it searches only when someone presses Search on its web page, one search at a time, and never in the background. A shop may block searches from a server; then search on a phone.
+
+Costco is the one shop whose website terms say automated collection of product listings isn't allowed, so it's off until you turn it on in Settings. Costco's website terms say automated collection of product listings isn't allowed. Restock only looks when you press Search, one page at a time, from your phone. It never runs in the background and never in bulk. Nothing from Costco is sent to your server, your other phones, exports or shared files. Costco may block it or change its pages, so it may stop working. It's your choice to turn this on, and your responsibility. Prices are Costco's online prices, which include delivery. They can differ from the warehouse shelf. Turning it on is your choice and your responsibility.
 
 ## Data and battery
 

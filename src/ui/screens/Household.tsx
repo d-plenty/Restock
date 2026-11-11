@@ -107,9 +107,19 @@ export function HouseholdScreen() {
           <Icon name="swap" size={18} />
           <span className="grow">
             <span className="title" style={{ fontSize: 15 }}>
-              {sync?.paired && !sync.house ? (sync.isOwner ? 'Add or remove phones' : 'Phones on your Wi-Fi') : 'Phones on your Wi-Fi'}
+              {sync?.house || sync?.serverApi === 3
+                ? 'Wi-Fi sync (optional)'
+                : sync?.paired
+                  ? sync.isOwner
+                    ? 'Add or remove phones'
+                    : 'Phones on your Wi-Fi'
+                  : 'Phones on your Wi-Fi'}
             </span>
-            <span className="small">Phone to phone on your Wi-Fi. No account, and nothing leaves your home. Up to {MAX_SYNC_PHONES} phones.</span>
+            <span className="small">
+              {sync?.house || sync?.serverApi === 3
+                ? `Phone to phone on your Wi-Fi, separate from your server. ${sync.wifiSync === true ? 'On.' : 'Off until you set it up.'}`
+                : `Phone to phone on your Wi-Fi. No account, and nothing leaves your home. Up to ${MAX_SYNC_PHONES} phones.`}
+            </span>
           </span>
           <Icon name="chevron" size={18} />
         </button>

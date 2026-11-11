@@ -15,13 +15,14 @@ import { addToList, takeOffList } from '../../lib/listActions'; // 0.9.5 (undo)
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { loadRecommendations } from '../../lib/recs';
 import { money, parseMoney, tidySize } from '../../lib/units';
+import { productLine, sizeLabel, type CompareStyle } from '../../lib/unitPrice';
 import { useLive } from '../../lib/useLive';
-import { ALERT_LEVELS, computeStats, HISTORY_DAYS, multiBuy, tiedWithBest, withMarket, type Option, type Recommendation } from '../../lib/verdict';
+import { ALERT_LEVELS, bothPrices, computeStats, HISTORY_DAYS, multiBuy, optionStyle, tiedWithBest, withMarket, type Option, type Recommendation } from '../../lib/verdict';
 import { SECTION_NAMES, type Section } from '../../shops';
 import { chainName, type AlertLevel } from '../../types';
 import { ChainName, Icon, PriceChart, Thumb } from '../../ui/components';
 import { useNav } from '../../ui/nav';
-import { EditSheet } from '../../ui/screens/Item';
+import { EditSheet, LastUpdated, PriceSheet } from '../../ui/screens/Item';
 import { DEAL_RANK, underTarget } from '../../ui/screens/Pantry';
 import { ActionInfoTag } from '../../ui/tagInfo';
 import { PhoneOnlyNote } from './PhoneOnly';
@@ -156,7 +157,7 @@ export function DeskPantry({ section }: { section: Section }) {
                   {shown.map((r) => {
                     const deal = r.action === 'alt' ? r.alt : r.best;
                     const mains = r.options.filter((o) => o.role === 'main');
-                    const size = deal?.product.size ? tidySize(deal.product.size, deal.product.name) : undefined;
+                    const size = deal?.product.sizing?.size ? sizeLabel(deal.product) : deal?.product.size ? tidySize(deal.product.size, deal.product.name) : undefined;
                     const isOpen = open === r.group.id;
                     return (
                       <tr key={r.group.id} className={isOpen ? 'on' : undefined} onClick={() => setOpen(r.group.id)}>
@@ -185,6 +186,8 @@ export function DeskPantry({ section }: { section: Section }) {
                           {deal?.price !== undefined ? (
                             <>
                               <strong>{money(deal.price)}</strong>
+                              {/* 0.9.6: both prices, as on the phone: per item, then per litre or per 100 g. */}
+                              {bothPrices(deal) && <span className="dk-sub">{bothPrices(deal)}</span>}
                               <span className="dk-sub">
                                 {mains.length > 1 && r.action !== 'alt' && tiedWithBest(r).length + 1 >= mains.length ? 'same everywhere' : chainName(deal.product.chain)}
                               </span>
@@ -230,6 +233,7 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
   // 0.9.4, a house: the server keeps the older prices (phones and this browser only keep weeks).
   const [older, setOlder] = useState<Map<string, PriceReading[]>>(new Map());
   const [editing, setEditing] = useState(false);
+  const [pricing, setPricing] = useState(false);
   const [target, setTarget] = useState<string>();
   const adding = useRef(false);
   const head = useRef<HTMLHeadingElement>(null);
@@ -283,7 +287,7 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
     : undefined;
   // Shop around: your picks at each shop, cheapest first (the ones with no price last).
   const around = [...mains].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
-  const size = chartOpt?.product.size ? tidySize(chartOpt.product.size, chartOpt.product.name) : undefined;
+  const size = chartOpt?.product.sizing?.size ? sizeLabel(chartOpt.product) : chartOpt?.product.size ? tidySize(chartOpt.product.size, chartOpt.product.name) : undefined;
   const usual = rec.options.find((o) => o.product.id === group.usualProductId);
   const alts = rec.options.filter((o) => o.role === 'alt');
   const sub = [size, usual ? `My pick: ${usual.product.name}` : undefined, alts.length ? `Would also take ${alts.length} other${alts.length === 1 ? '' : 's'}` : undefined]
@@ -358,8 +362,10 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
       <section className="dk-panel-part" aria-labelledby="dk-ph">
         <div className="dk-section-head">
           <h3 id="dk-ph">Price, last 3 months</h3>
-          <span className="dk-sub">{fromServer.length ? 'older weeks from your server' : 'from your phones'}</span>
+          {/* 0.9.6: when this product's price was last checked, top right (follows the shop picked). */}
+          <LastUpdated readings={all} />
         </div>
+        <span className="dk-sub">{fromServer.length ? 'older weeks from your server' : 'from your phones'}</span>
         {mains.length > 1 && (
           <div className="dk-chips" role="group" aria-label="Which shop's price">
             {mains.map((o) => (
@@ -370,6 +376,10 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
           </div>
         )}
         {chartOpt && stats ? <PriceChart readings={shownReadings.slice(-400)} typical={stats.typical} /> : <p className="small">No prices yet.</p>}
+        {/* 0.9.6: a price seen on the shelf, for any shop, with its day. Entered by hand; undo or delete it. */}
+        <button className="btn small" disabled={!rec.options.length} onClick={() => setPricing(true)}>
+          <Icon name="tag" size={16} /> Enter a price
+        </button>
       </section>
 
       <section className="dk-panel-part" aria-labelledby="dk-sa">
@@ -377,7 +387,7 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
         {around.length === 0 && <p className="small">Not linked to a shop's product yet. Do that on a phone.</p>}
         <div className="dk-around">
           {around.map((o) => (
-            <AroundRow key={o.product.id} o={o} best={o === rec.best && o.price !== undefined} />
+            <AroundRow key={o.product.id} o={o} best={o === rec.best && o.price !== undefined} style={optionStyle(rec.options)} />
           ))}
         </div>
       </section>
@@ -422,12 +432,13 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
       </section>
 
       <PhoneOnlyNote compact text="Checking prices now happens on your phones." />
+      {pricing && <PriceSheet options={rec.options} productId={chartOpt?.product.id} onClose={() => setPricing(false)} />}
       {editing && <EditSheet group={group} categories={categories} onClose={() => setEditing(false)} />}
     </aside>
   );
 }
 
-function AroundRow({ o, best }: { o: Option; best: boolean }) {
+function AroundRow({ o, best, style }: { o: Option; best: boolean; style?: CompareStyle }) {
   const cur = o.stats.current;
   const special = cur?.isSpecial && o.verdict.stale !== 'ended';
   const note = o.product.inStock === false ? 'out of stock' : special ? 'special' : o.verdict.stale === 'ended' ? 'special, may have ended' : undefined;
@@ -437,6 +448,8 @@ function AroundRow({ o, best }: { o: Option; best: boolean }) {
         <ChainName chain={o.product.chain} />
         {note && <span className="dk-sub-inline"> · {note}</span>}
         {best && <span className="sr-only"> (cheapest)</span>}
+        {/* 0.9.6: both prices; a line with no size is left out of "cheapest". */}
+        {productLine(o.product, o.price, style) && <span className="dk-sub num" style={{ display: 'block' }}>{productLine(o.product, o.price, style)}</span>}
       </span>
       <strong className="num">{money(o.multi ? o.shelfPrice : o.price)}</strong>
     </div>

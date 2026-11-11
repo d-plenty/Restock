@@ -13,7 +13,7 @@
 // - an answer of at most maxBytes (3 MB), and each shop's whole search within timeoutMs (10 s);
 // - cookies only for the length of one search (a new jar each time, dropped when it ends), so no shop
 //   session, and never any shop sign-in, is kept on the server.
-import { SHOPS, priceSource, shopDef, type StoreChain } from '../shops';
+import { SHOPS, isLocalOnlyShop, priceSource, shopDef, type StoreChain } from '../shops';
 import { setTransport, type HttpResult, type RequestOptions } from './http';
 
 /** The shops' API hosts, besides their websites (aldi.ts API, endeavour.ts ENDEAVOUR.api). */
@@ -36,6 +36,8 @@ export const SHOP_HOSTS: ReadonlyMap<string, StoreChain> = (() => {
     }
   };
   for (const s of SHOPS) {
+    // 0.9.6: Costco is read on a phone only, never by the server: its host is not one the server may ask.
+    if (isLocalOnlyShop(s.id)) continue;
     const owner = priceSource(s.id);
     add(s.website, owner);
     add(s.search, owner);

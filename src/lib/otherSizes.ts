@@ -11,7 +11,7 @@ import { packSize } from './units';
 // Coke, or Nutella with breadsticks for Nutella.
 
 /** Words that only say how it's packed or what kind of drink it is, never which product it is. Stemmed, as tokens() does. */
-const PACKING = new Set(
+export const PACKING = new Set(
   [
     'soft',
     'drink',

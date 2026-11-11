@@ -3,10 +3,11 @@
 // screen. Under the top strip on a phone, at the top of the page on a wide screen.
 import { useEffect, useState } from 'react';
 import { Icon } from '../../ui/components';
-import { syncNow } from '../live';
+import { syncNow, unsentChanges } from '../live';
 import { useStatus } from '../ui/ServerScreens';
 import { InstallSheet, isInstalled, isIos } from './InstallHelp';
 import { isOfflineError, usePwaState, whenText } from './offline';
+import { offlineText, waitingText } from './offlineData'; // 0.9.6 (iPhone offline)
 import { applyUpdate, useUpdateWaiting } from './register';
 import './pwa.css';
 
@@ -19,6 +20,9 @@ function hintClosed(): boolean {
     return false;
   }
 }
+
+/** 0.9.6: a phone-sized window (the phone layout), where "this phone" is the right word. */
+const phoneWide = () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(max-width: 599px)').matches;
 
 /** Is the app offline right now (no network, or the server can't be reached)? */
 export function useIsOffline(): boolean {
@@ -55,9 +59,10 @@ export function PwaBanners() {
       {offline ? (
         <div className="pwa-banner offline" role="status">
           <Icon name="wifi" size={18} />
+          {/* 0.9.6 (iPhone offline): everything this phone last saved opens; edits wait here. */}
           <span className="grow">
-            <strong>Offline.</strong> Changes will sync when you're back online.
-            {last && <span className="pwa-banner-sub">Shopping list last updated {last}.</span>}
+            <strong>{offlineText(last, phoneWide() ? 'phone' : 'browser')}</strong>
+            <span className="pwa-banner-sub">{waitingText(unsentChanges())}</span>
           </span>
         </div>
       ) : refused ? (

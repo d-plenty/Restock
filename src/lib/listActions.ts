@@ -61,3 +61,6 @@ export function scannedLine(name: string | undefined, code: string): { text: str
 
 /** "Milk taken off your shopping list · Undo". */
 export const takeOffList = (ids: string[], name: string) => act(`${name} taken off your shopping list`, () => deleteListEntries(ids));
+
+// 0.9.6: "Move to" another list (Groceries, Keg, Health, General), with Undo: moveLine.ts.
+export { moveAll, moveTo } from './moveLine';

@@ -3,6 +3,7 @@
 // spending from what was ticked off the shopping list (not receipts), where you shop, one item's
 // price over time, what you buy most (with a spreadsheet), storage on the server and disk free, and
 // the downloads (spreadsheet, CSV, the full export file). Manage data (DeskDataManage.tsx) deletes.
+// 0.9.6: Import beside the downloads (DeskDataImport.tsx); imported prices counted and tagged.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { allGroups } from '../../lib/db';
 import { useLive } from '../../lib/useLive';
@@ -15,7 +16,8 @@ import { householdInfo } from '../live';
 import { HousePage } from './DeskServer';
 import { PriceChart, PriceKey, ShopBars, SpendingChart, StorageBar } from './DeskDataCharts';
 import { bytesText, dayMonthYear, monthYear, moneyShort, perMonth, periodWords, readPeriod, specialEvery, cheapestByWeek } from './dataCharts';
-import { csvFiles, exportTables, fileBase, saveFile, xlsxOf, XLSX_TYPE, type Table } from './exportFiles';
+import { csvFiles, exportTables, fileBase, saveFile, withoutCostco, xlsxOf, XLSX_TYPE, type Table } from './exportFiles';
+import { ImportCard } from './DeskDataImport';
 import { allTop, canAdmin, data, errText, fullExport, KIND_NAME, PERIODS, useServer, type DataSummary, type Period, type TopItem } from './houseData';
 
 const PERIOD_KEY = 'restock-data-period';
@@ -54,6 +56,14 @@ function Tile({ label, big, sub }: { label: string; big: string; sub: string }) 
 
 const EMPTY_SPEND = 'Tick things off your shopping list and your spending shows up here.';
 
+/** "since March 2025", and 0.9.6's "90,000 imported" (a 0.9.5 server doesn't say). */
+function pricesSub(s: { prices: { first: string | null; imported?: number } } | undefined): string {
+  if (!s) return '';
+  const since = s.prices.first ? `since ${monthYear(s.prices.first)}` : 'none yet';
+  const imported = Number(s.prices.imported) || 0;
+  return imported > 0 ? `${since}, ${imported.toLocaleString('en-AU')} imported` : since;
+}
+
 // ---------- price over time ----------
 
 function PriceOverTime({ period, pick, onPick, top }: { period: Period; pick?: string; onPick: (id: string) => void; top?: TopItem[] }) {
@@ -77,10 +87,19 @@ function PriceOverTime({ period, pick, onPick, top }: { period: Period; pick?: s
   const points = series ? cheapestByWeek(series.weeks) : [];
   const every = specialEvery(points);
   const current = series && series.item.id === id ? series : undefined;
+  // 0.9.6: a week whose price came from an import (the server marks it).
+  const imported = !!current?.weeks.some((w) => (w as { imported?: boolean }).imported);
   return (
     <section className="card dd-card" aria-labelledby="dd-price">
       <div className="dd-card-head">
-        <h2 id="dd-price">Price over time</h2>
+        <h2 id="dd-price">
+          Price over time{' '}
+          {current && points.length > 0 && imported && (
+            <span className="tag small normal dd-imported" title="Some of these prices came from a file you imported, not from a phone">
+              imported
+            </span>
+          )}
+        </h2>
         <div className="dd-picker">
           <label htmlFor="dd-pick" className="small">
             Item
@@ -329,7 +348,8 @@ function ExportCard() {
     setMsg(undefined);
     setStep('Asking the server…');
     try {
-      const full = await fullExport(setStep);
+      // 0.9.6: never Costco's prices, whatever the server sent.
+      const full = withoutCostco(await fullExport(setStep));
       setStep('Making the file…');
       const base = fileBase();
       let name: string;
@@ -388,8 +408,8 @@ function ExportCard() {
         </p>
       )}
       <span className="dk-sub">
-        Never in it: loyalty card numbers, receipt text and photos, your passphrase, keys or the Home Assistant token. The encrypted backup (Settings) is the copy to restore a
-        server from.
+        Never in it: card numbers and PINs, receipt text and photos, Costco prices, your passphrase, keys or the Home Assistant token. The encrypted backup (Settings) is the copy to
+        restore a server from.
       </span>
     </section>
   );
@@ -470,7 +490,7 @@ export function DeskData({ narrow }: { narrow?: boolean }) {
           />
           <Tile label="Saved on specials" big={s ? moneyShort(s.saved.total) : '…'} sub="against usual prices" />
           <Tile label="Items tracked" big={s ? s.itemsTracked.toLocaleString('en-AU') : '…'} sub={tabWords(tabs)} />
-          <Tile label="Prices recorded" big={s ? s.prices.count.toLocaleString('en-AU') : '…'} sub={s?.prices.first ? `since ${monthYear(s.prices.first)}` : s ? 'none yet' : ''} />
+          <Tile label="Prices recorded" big={s ? s.prices.count.toLocaleString('en-AU') : '…'} sub={pricesSub(s)} />
         </div>
         <div className="dd-row">
           <section className="card dd-card dd-wide-card" aria-labelledby="dd-spend">
@@ -501,6 +521,12 @@ export function DeskData({ narrow }: { narrow?: boolean }) {
           <StorageCard summary={summary.data} error={summary.error} />
         </div>
         <ExportCard />
+        <ImportCard
+          onDone={() => {
+            stats.reload();
+            summary.reload();
+          }}
+        />
       </div>
     </HousePage>
   );

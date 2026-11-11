@@ -2,6 +2,7 @@ import { chainName } from '../shops';
 import { SECTION_NAMES } from '../shops';
 import type { Snapshot } from './db';
 import { localDay } from './verdict';
+import { withoutCostco } from './costcoLocal';
 
 // Spreadsheet export (0.9.0): the pantry, the shopping list and the price history as CSV files
 // that Excel, LibreOffice, Google Sheets or Numbers open as they are. Your data, in a format
@@ -18,7 +19,9 @@ export const csv = (rows: unknown[][]): string => '﻿' + rows.map((r) => r.map(
 const day = (iso: string | undefined) => (iso ? localDay(iso) : '');
 const money = (n: number | undefined) => (n === undefined || n === null || Number.isNaN(n) ? '' : n.toFixed(2));
 
-export function csvFiles(s: Snapshot): { name: string; text: string }[] {
+export function csvFiles(all: Snapshot): { name: string; text: string }[] {
+  // 0.9.6: Costco's prices stay on the phone (costcoLocal.ts).
+  const s = withoutCostco(all);
   const products = new Map(s.products.map((p) => [p.id, p]));
   const cats = new Map(s.categories.map((c) => [c.id, c.name]));
   const groups = new Map(s.groups.map((g) => [g.id, g]));

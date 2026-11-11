@@ -99,3 +99,25 @@ export function askSignOutUnsent(): Promise<boolean> {
     });
   });
 }
+
+/**
+ * 0.9.6 (cards): a question with a few answers (the first is the one picked by default). Resolves
+ * to the id picked, or undefined when the sheet is closed. Without the in-app sheet, the browser's
+ * own confirm: OK is the first answer.
+ */
+export function askChoice(title: string, detail: string, choices: NonNullable<ConfirmRequest['choices']>): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    if (!listener)
+      return resolve(typeof window !== 'undefined' && typeof window.confirm === 'function' && window.confirm(`${title}\n\n${detail}\n\nOK: ${choices[0]?.label}`) ? choices[0]?.id : undefined);
+    listener({
+      title,
+      detail,
+      action: choices[0]?.label ?? 'OK',
+      choices,
+      resolve: (ok, text) => {
+        listener?.(undefined);
+        resolve(ok ? text : undefined);
+      },
+    });
+  });
+}

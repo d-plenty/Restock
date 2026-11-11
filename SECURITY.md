@@ -1,6 +1,6 @@
 # Security
 
-Restock keeps everything on your phone, but it still handles things worth protecting: loyalty card numbers, receipts, backups, a Woolworths sign-in if you use one, the encrypted link between your household's phones if you use local sync, and, if you run one, your own Restock server with your household's data on it.
+Restock keeps everything on your phone, but it still handles things worth protecting: loyalty and gift card numbers and PINs, receipts, backups, a Woolworths sign-in if you use one, the encrypted link between your household's phones if you use local sync, and, if you run one, your own Restock server with your household's data on it.
 
 ## Reporting a problem
 

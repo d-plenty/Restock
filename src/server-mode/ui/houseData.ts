@@ -165,6 +165,8 @@ const ACT: Record<string, (d: Detail, name: (device: unknown) => string | undefi
   'phones-asked-to-resend': () => 'asked every phone to send all it has again',
   recounted: () => 'recounted the charts and sizes',
   'data-exported': () => 'downloaded an export of the data',
+  'data-imported': () => 'imported products and prices from a file',
+  'data-import-stopped': () => 'stopped an import (what went in stays)',
   'recovery-key-shown': () => 'looked at the recovery key',
   'backup-downloaded': () => 'downloaded an encrypted backup',
   'home-assistant-changed': (d) => (d.enabled === true ? 'turned Home Assistant on' : d.enabled === false ? 'turned Home Assistant off' : 'changed Home Assistant'),

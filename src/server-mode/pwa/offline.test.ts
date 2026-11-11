@@ -186,9 +186,9 @@ describe('which session may open the copy offline', () => {
   it('keeps only what the server is (no household data), and not for a 0.9.3-style or released server', () => {
     const m = new Map<string, string>();
     const st = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) };
-    keepInfo(st, { api: 3, mode: 'v3', version: '0.9.5', house: 'Declan and Sarah' });
-    expect(JSON.parse(m.get(INFO_KEY)!)).toEqual({ api: 3, mode: 'v3', version: '0.9.5' });
-    expect(keptInfo(st)).toEqual({ api: 3, mode: 'v3', version: '0.9.5' });
+    keepInfo(st, { api: 3, mode: 'v3', version: '0.9.6', house: 'Declan and Sarah' });
+    expect(JSON.parse(m.get(INFO_KEY)!)).toEqual({ api: 3, mode: 'v3', version: '0.9.6' });
+    expect(keptInfo(st)).toEqual({ api: 3, mode: 'v3', version: '0.9.6' });
     keepInfo(st, { api: 2 });
     expect(keptInfo(st)).toBeUndefined();
     keepInfo(st, { api: 3, mode: 'released' });

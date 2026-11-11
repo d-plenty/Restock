@@ -60,7 +60,7 @@ sw.addEventListener('activate', (e) => {
 sw.addEventListener('message', (e) => {
   const d = e.data as { type?: string } | null;
   if (d?.type === 'skip-waiting') void sw.skipWaiting();
-  if (d?.type === 'shell') e.source?.postMessage({ type: 'shell', build: SHELL.build, files: SHELL.files });
+  if (d?.type === 'shell') e.source?.postMessage({ type: 'shell', build: SHELL.build, version: SHELL.version, files: SHELL.files });
 });
 
 async function page(req: Request): Promise<Response> {
@@ -82,7 +82,16 @@ async function page(req: Request): Promise<Response> {
 
 async function shellFile(req: Request): Promise<Response> {
   const hit = await caches.open(CACHE).then((c) => c.match(req));
-  return hit ?? fetch(req);
+  if (hit) return hit;
+  try {
+    return await fetch(req);
+  } catch (e) {
+    // 0.9.6: offline, and this build's shell doesn't have it (a page still running the build before
+    // an update asking for one of its own files): any kept shell that still has it.
+    const any = await caches.match(req);
+    if (any) return any;
+    throw e;
+  }
 }
 
 sw.addEventListener('fetch', (e) => {

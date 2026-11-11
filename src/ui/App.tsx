@@ -288,15 +288,21 @@ function RestockApp() {
     if (!onboarded || !Capacitor.isNativePlatform()) return;
     const maybeCheck = async () => {
       const s = await getSettings();
-      if (!s.lastCheck || Date.now() - Date.parse(s.lastCheck) > s.checkIntervalHours * 3_600_000) {
-        const r = await checkPrices();
+      // 0.9.6: checks run at a set time of day (default 5:00 am). If that time passed while the phone
+      // was off, check now, once. A check made by hand in between never moves the schedule.
+      const { due } = await syncBackgroundSchedule(s).catch((e) => {
+        console.error('background schedule failed', e);
+        return { due: false };
+      });
+      const recent = !!s.lastCheck && Date.now() - Date.parse(s.lastCheck) < 30 * 60_000;
+      if (!s.lastCheck || (due && !recent)) {
+        const r = await checkPrices(undefined, { slot: due });
         if (r.updated) toast(`Updated ${r.updated} price${r.updated === 1 ? '' : 's'}`);
       }
     };
     void maybeCheck().catch((e) => console.error('price check failed', e));
     // Kept separate so a problem with reminders can't stop background price checks, or the reverse.
     void getSettings().then((s) => {
-      syncBackgroundSchedule(s).catch((e) => console.error('background schedule failed', e));
       scheduleReminders(s).catch((e) => console.error('reminders failed', e));
       RestockNative.scheduleRecalls({ enabled: s.recalls.enabled }).catch((e) => console.error('recall schedule failed', e));
     });

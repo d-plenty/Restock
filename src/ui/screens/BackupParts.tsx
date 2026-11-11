@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
-import { EVERYTHING, exportBackup, exportCounts, type ExportParts } from '../../lib/backup';
+import { EVERYTHING, exportBackup, exportCounts, GIFT_NO_PASSWORD_WARNING, giftCardsUnlocked, type ExportParts } from '../../lib/backup';
 import { confirmAction } from '../../lib/confirm';
 import { getSettings, priceHistorySpan } from '../../lib/db';
 import { SECTION_NAMES, SECTIONS, type Section } from '../../shops';
 import { historyLabel, type Settings } from '../../types';
+import { cardsCount } from '../../lib/giftCards';
 import { Icon, Sheet } from '../components';
 
 /** What can be picked in a backup, and how many of each there are. */
 export interface PartCounts {
   bySection: Record<Section, number>;
   list: number;
+  /** Loyalty cards and (0.9.6) gift cards together. */
   cards: number;
+  /** 0.9.6 (cards): how many of `cards` are gift cards. */
+  giftCards?: number;
   /** Saved prices; only offered when exporting. */
   prices?: number;
   /** Exporting (0.9.1): "Includes all the prices on this phone, back to …", for the price history tick. */
@@ -124,8 +128,14 @@ export function PartsPicker({
           true,
         )}
       {row('list', 'Shopping lists', plural(counts.list, 'line'), counts.list > 0, parts.list, (v) => set({ list: v }))}
-      {row('cards', 'Loyalty cards', `${plural(counts.cards, 'card')}, including card numbers`, counts.cards > 0, parts.cards, (v) =>
-        set({ cards: v }),
+      {/* 0.9.6 (cards): "Cards" (was Loyalty cards): loyalty and gift cards, for the person themself. */}
+      {row(
+        'cards',
+        'Cards',
+        `${cardsCount(counts.cards - (counts.giftCards ?? 0), counts.giftCards ?? 0)}, including card numbers${counts.giftCards ? ', PINs and photos' : ''}`,
+        counts.cards > 0,
+        parts.cards,
+        (v) => set({ cards: v }),
       )}
       {(counts.receipts ?? 0) > 0 &&
         row(
@@ -211,7 +221,7 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
   const any = parts.pantry || parts.list || parts.cards || parts.settings || parts.receipts;
   const go = async () => {
     if (parts.cards && counts?.cards && !lock) {
-      const ok = await confirmAction('Your backup includes your loyalty card numbers', {
+      const ok = await confirmAction(counts.giftCards ? 'Your backup includes your card numbers and gift card PINs' : 'Your backup includes your card numbers', {
         detail: 'Keep the file somewhere private, and only share it with people you trust. Or go back and turn on "Lock it with a password".',
         action: 'Make the backup',
       });
@@ -267,6 +277,12 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
           </div>
         )}
       </div>
+      {/* 0.9.6 (review M3): gift cards ticked, no password: say so plainly. */}
+      {giftCardsUnlocked({ ...parts, password: lock ? pw : undefined }, counts?.giftCards ?? 0) && (
+        <p className="banner red small" role="alert">
+          <Icon name="alert" size={16} /> {GIFT_NO_PASSWORD_WARNING}
+        </p>
+      )}
       <button className="btn primary block" disabled={!any || busy || !counts || !!pwProblem} onClick={go}>
         <Icon name="external" size={18} /> {busy ? 'Making the backup…' : 'Export'}
       </button>

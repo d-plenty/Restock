@@ -10,8 +10,10 @@ import {
   type Product,
 } from '../types';
 import { nameHasSize } from './naming';
-import { formatUnitPrice, inSheets, money, packSize, unitPrice } from './units';
-import { chainName } from '../shops';
+import { formatUnitPrice, inSheets, money, unitPrice } from './units';
+import { compareStyleOfProducts, priceLine, sizingOf, withSizes } from './unitPrice';
+import type { CompareStyle } from './units';
+import { chainName, costcoDecides } from '../shops';
 
 export type VerdictKind = 'great' | 'good' | 'small' | 'wait' | 'fake' | 'normal' | 'nodata';
 
@@ -103,7 +105,7 @@ export function localDay(iso: string): string {
 }
 
 /**
- * Keep the last reading per calendar day, oldest first, within the history window. `days`: a longer
+ * Keep the last reading per calendar day (a hand-typed one wins over a check that day), oldest first, within the history window. `days`: a longer
  * window, only for an item page's chart showing 12 months (0.9.1); verdicts and alerts always use HISTORY_DAYS.
  */
 export function normaliseReadings(readings: PriceReading[], now = Date.now(), days = HISTORY_DAYS): PriceReading[] {
@@ -111,7 +113,10 @@ export function normaliseReadings(readings: PriceReading[], now = Date.now(), da
   const sorted = [...readings].sort((a, b) => a.date.localeCompare(b.date));
   for (const r of sorted) {
     if (now - Date.parse(r.date) > days * DAY) continue;
-    byDay.set(localDay(r.date), r);
+    const day = localDay(r.date);
+    // 0.9.6: a price typed in by hand isn't overwritten by a price check the same day.
+    if (byDay.get(day)?.source === 'manual' && r.source !== 'manual') continue;
+    byDay.set(day, r);
   }
   return [...byDay.values()];
 }
@@ -417,6 +422,8 @@ export interface Recommendation {
   saving?: number;
   /** Prices are compared per 100 g / per litre / per item. */
   byUnit: boolean;
+  /** 0.9.6: priced lines left out of the comparison because their size is unknown. */
+  sizeUnknown?: Option[];
 }
 
 /**
@@ -425,9 +432,10 @@ export interface Recommendation {
  * count is how many are in the pack, when the size says.
  */
 export function productQty(p: Product): { qty?: number; unit?: Product['qtyUnit']; count?: number } {
-  if (p.qty && p.qtyUnit) return { qty: p.qty, unit: p.qtyUnit };
-  const parsed = packSize(p.size, p.name);
-  return { qty: parsed?.qty, unit: parsed?.unit, count: parsed?.count };
+  // 0.9.6: a size the person typed, then the shop's words, then one worked out (barcode, look-alike). A pack of
+  // drinks with no size at all has none: it isn't compared by the litre until the person says (or Restock can tell).
+  const s = sizingOf(p).size;
+  return { qty: s?.qty, unit: s?.unit, count: s?.count };
 }
 
 const ON_SALE: VerdictKind[] = ['great', 'good', 'small'];
@@ -444,18 +452,26 @@ export function recommend(
    * verdict, "cheapest at" or total. Hand-typed prices ('other') always count. Left out: every shop.
    */
   shopsOn?: ReadonlySet<string>,
+  /** 0.9.6: other products to match barcodes against when a size is missing (the rest of the catalogue). */
+  catalogue?: Product[],
 ): Recommendation {
   const ids: [string, Role][] = [
     ...mainProductIds(group).map((id): [string, Role] => [id, 'main']),
     ...group.altProductIds.map((id): [string, Role] => [id, 'alt']),
   ];
 
+  // 0.9.6: sizes worked out for products that have none (a barcode match, a look-alike at another shop).
+  const present = [...new Set(ids.map(([id]) => id))]
+    .map((id) => products.get(id))
+    .filter((p): p is Product => !!p && !(shopsOn && p.chain !== 'other' && !shopsOn.has(p.chain)));
+  const latest = (id: string) => readingsByProduct.get(id)?.at(-1)?.price;
+  const sized = new Map(withSizes(present, latest, catalogue).map((p) => [p.id, p]));
+
   const options: Option[] = [];
   const seen = new Set<string>();
   for (const [id, role] of ids) {
-    const product = products.get(id);
+    const product = sized.get(id);
     if (!product || seen.has(id)) continue;
-    if (shopsOn && product.chain !== 'other' && !shopsOn.has(product.chain)) continue;
     seen.add(id);
     const hasCard = cards.has(product.chain);
     const stats = withMarket(computeStats(readingsByProduct.get(id) ?? [], now, hasCard), product.market);
@@ -488,16 +504,28 @@ export function recommend(
     });
   }
 
-  const priced = options.filter((o) => o.price !== undefined);
-  // Compare by unit price when every priced option shares a unit, otherwise by shelf price.
+  // 0.9.6: Costco's online prices are information only (shown, with their comparison price) unless "I buy from
+  // Costco online" is ticked: they never decide the cheapest, a deal or a swap otherwise.
+  const decides = (o: Option) => o.product.chain !== 'costco' || costcoDecides();
+  const priced = options.filter((o) => o.price !== undefined && decides(o));
+  // Compare by the comparison price (per litre, per 100 g, per item) when the priced options share a unit.
   // Sheets ("4,320 sheets") and packs ("48 pack") both count, but not the same thing (0.8.9).
-  const units = new Set(priced.map((o) => (!o.product.qty && inSheets(o.product.size) ? 'sheet' : productQty(o.product).unit)));
-  const byUnit = priced.length > 0 && units.size === 1 && !units.has(undefined) && priced.every((o) => o.unitPrice !== undefined);
+  // 0.9.6: a line whose size is unknown is left out of the cheapest comparison (it still shows, as "size unknown"),
+  // as long as one of your picks has a size to compare by. With none, shelf prices decide, as before.
+  const unitOf = (o: Option) => (!o.product.qty && inSheets(o.product.size) ? 'sheet' : productQty(o.product).unit);
+  const sizedMains = priced.filter((o) => o.role === 'main' && o.unitPrice !== undefined);
+  const units = new Set(priced.filter((o) => o.unitPrice !== undefined).map(unitOf));
+  const byUnit = sizedMains.length > 0 && units.size === 1 && !units.has(undefined);
+  const comparable = (o: Option) => !byUnit || o.unitPrice !== undefined;
   const cost = (o: Option) => (byUnit ? o.unitPrice! : o.price!);
-  const cheapest = (list: Option[]) => list.reduce<Option | undefined>((b, o) => (!b || cost(o) < cost(b) ? o : b), undefined);
+  const cheapest = (list: Option[]) => list.filter(comparable).reduce<Option | undefined>((b, o) => (!b || cost(o) < cost(b) ? o : b), undefined);
 
-  const base: Recommendation = { group, options, action: 'none', headline: 'Usual prices', detail: '', byUnit };
-  if (!priced.length) return { ...base, headline: 'No prices yet', detail: 'Check prices or add one by hand.' };
+  const unsized = byUnit ? priced.filter((o) => !comparable(o)) : [];
+  const base: Recommendation = { group, options, action: 'none', headline: 'Usual prices', detail: '', byUnit, sizeUnknown: unsized.length ? unsized : undefined };
+  if (!priced.length)
+    return options.some((o) => o.price !== undefined)
+      ? { ...base, headline: 'Costco prices only', detail: 'Costco prices show for information. Tick "I buy from Costco online" in Settings to count them.' }
+      : { ...base, headline: 'No prices yet', detail: 'Check prices or add one by hand.' };
 
   // Out-of-stock products only count when nothing else is available.
   const gone = (o: Option) => o.product.inStock === false;
@@ -573,16 +601,24 @@ export function describe(o: Option): string {
   return `${name} ${size}`;
 }
 
-/** "$0.87 each" for a pack priced by the litre or kilo, so you can still see the price a can. */
+/** "$0.87 each" for a pack priced by the litre or kilo, so you can still see the price a can. Per item: for understanding, never for deciding. */
 export function eachText(o?: Option): string {
   if (!o || o.price === undefined) return '';
-  const { count, unit } = productQty(o.product);
-  return count && count > 1 && unit !== 'ea' ? `${money(o.price / count)} each` : '';
+  return priceLine(o.product, o.price).each ?? '';
 }
 
+/** The comparison price, "$2.61 / L" (only this decides the cheapest). */
 function unitText(o: Option): string {
-  return formatUnitPrice(o.unitPrice, productQty(o.product).unit);
+  return o.unitPrice !== undefined ? formatUnitPrice(o.unitPrice, productQty(o.product).unit) : '';
 }
+
+/** Both prices on one line: "$0.98 each · $2.61 / L (estimated)", or "$0.98 each · size unknown". */
+export function bothPrices(o?: Option, style?: CompareStyle): string {
+  return o ? priceLine(o.product, o.price, style).text : '';
+}
+
+/** 0.9.6: the one comparison unit for the lines of one item (its shops and packs), so they read the same way. */
+export const optionStyle = (options: Option[]): CompareStyle => compareStyleOfProducts(options);
 
 /**
  * Is this a bigger pack than your own product (more than 1.5 times the grams, millilitres or

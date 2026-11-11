@@ -71,17 +71,19 @@ export function RestoreSheet({
       if (sync?.paired) {
         const send = await confirmAction(`This phone syncs with ${sync.household ?? 'your household'}`, {
           detail: `If you restore while it's syncing, the household's other phones get the restored things too: everyone's pantry and list will match this backup.${
-            parts.cards ? " Loyalty cards from the backup are added, and no one's cards are removed." : ''
+            parts.cards ? " Cards from the backup are added, and no one's cards are removed." : ''
           } To restore on this phone only, choose Stop syncing first.`,
           action: 'Restore for the household',
           danger: false,
         });
         household = send;
         if (!send) {
-          const leave = await confirmAction('Stop syncing this phone, then restore?', {
-            detail:
-              'This phone leaves the household (it keeps everything), and the backup is restored here only. To sync again later, join with a new code.',
-            action: 'Stop syncing and restore',
+          const onServer = !!(sync.house || sync.serverApi === 3);
+          const leave = await confirmAction(onServer ? 'Leave the server, then restore?' : 'Stop syncing this phone, then restore?', {
+            detail: onServer
+              ? "This phone leaves your Restock server (it keeps everything, and nothing is deleted there), and the backup is restored here only. To join again later, scan a new code from the server's page."
+              : 'This phone leaves the household (it keeps everything), and the backup is restored here only. To sync again later, join with a new code.',
+            action: onServer ? 'Leave and restore' : 'Stop syncing and restore',
           });
           if (!leave) return stop();
           const r = await RestockNative.syncLeave();
@@ -121,6 +123,7 @@ export function RestoreSheet({
           bySection: c.bySection,
           list: c.list,
           cards: c.cards,
+          giftCards: c.giftCards, // 0.9.6 (cards)
           hasSettings: c.hasSettings,
           receipts: c.receipts,
           photos: c.photos,

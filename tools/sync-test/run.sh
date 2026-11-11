@@ -52,6 +52,12 @@ if git rev-parse -q --verify "refs/tags/v094" >/dev/null 2>&1; then
   OLD094="$OS/classes:$ORGJSON;$(cd $OS && pwd)"
 fi
 RESTOCK_OLD094="$OLD094" java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncTest095 "$O"
+# 0.9.6: "Move to" another list (moveLine.ts), on the Wi-Fi and through a shared folder.
+java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncTest096 "$O"
+# 0.9.6: Wi-Fi sync is its own feature, off in a server's house unless set up (an earlier real use is kept).
+java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncWifiTest096 "$O"
+# 0.9.6 (review H1, L2): Costco and the shared shopping list and items.
+java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncCostcoTest096 "$O"
 
 bash tools/sync-test/web-parity.sh
 # 0.9.4: Home Assistant's round in Java (HaSync.java) against haSync.ts, on shared fixtures.

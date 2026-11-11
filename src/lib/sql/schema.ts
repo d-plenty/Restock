@@ -241,6 +241,26 @@ const SYNC_094: string[] = [
   ...SYNCED_093.flatMap(syncTriggers094),
 ];
 
+/**
+ * 0.9.6 (cards): gift cards, beside loyalty cards on the Cards screen. Kept on this phone only: not
+ * in SYNCED (no sync triggers, so no sync_log rows), so they never go to the household's other
+ * phones, a sync folder or a Restock server, and an older phone never sees one. `data` is the card
+ * as JSON (types.ts GiftCard, checked by giftCards.ts cleanGiftCard when read). The Java side never
+ * reads it.
+ *
+ * Not a MIGRATIONS entry on purpose: a Restock server builds its household.db from MIGRATIONS
+ * (server-core), and it should have no gift card table at all. db.ts initDb makes it on phones (and
+ * in the web page's own copy, where it stays empty: the web keeps cards in this browser's own
+ * storage, server-mode/cardStore.ts). IF NOT EXISTS, so it's safe to run every time.
+ */
+export const GIFT_CARDS_TABLE = `CREATE TABLE IF NOT EXISTS gift_cards (
+  id TEXT PRIMARY KEY,
+  data TEXT NOT NULL,
+  used_up INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)`;
+
 /** 0.8.9: "Any size" and "Not at this shop" (picks.ts); the move to My picks is in DATA_STEPS. */
 const PICKS_089 = ['ALTER TABLE items ADD COLUMN any_size INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE items ADD COLUMN not_at TEXT'];
 

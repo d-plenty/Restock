@@ -1,4 +1,7 @@
-import { chainName, enabledIn, type Section, type StoreChain } from '../shops';
+import { chainName, enabledIn, isLocalOnlyShop, type Section, type StoreChain } from '../shops';
+
+/** 0.9.6: the shops a test searches: never Costco, which is only ever searched one page at a time by a person pressing Search. */
+const testShops = (chains: readonly string[], sec: Section) => enabledIn(chains, sec).filter((c) => !isLocalOnlyShop(c));
 import { adapterFor } from '../stores';
 import type { StoreProduct } from '../stores/types';
 import { searchStoreId } from '../types';
@@ -45,7 +48,7 @@ export const slim = (p: StoreProduct) => ({
 /** How many searches a test would make (before any shop is searched again for the kind). */
 export async function searchTestSize(sections: Section[], every = false): Promise<number> {
   const s = await getSettings();
-  return sections.reduce((n, sec) => n + enabledIn(s.enabledChains, sec).length * (every ? SEARCH_WORDS : PHONE_WORDS)[sec].length, 0);
+  return sections.reduce((n, sec) => n + testShops(s.enabledChains, sec).length * (every ? SEARCH_WORDS : PHONE_WORDS)[sec].length, 0);
 }
 
 export async function runSearchTest(
@@ -58,7 +61,7 @@ export async function runSearchTest(
   const raw: Record<string, StoreProduct[]> = {};
   const errors: Record<string, string> = {};
   const plan = sections.flatMap((sec) =>
-    enabledIn(s.enabledChains, sec).flatMap((shop) =>
+    testShops(s.enabledChains, sec).flatMap((shop) =>
       (every ? SEARCH_WORDS : PHONE_WORDS)[sec].map((word) => ({
         sec,
         shop,
@@ -102,7 +105,7 @@ export async function runSearchTest(
     for (const word of (every ? SEARCH_WORDS : PHONE_WORDS)[sec]) {
       if (stopNow()) break;
       const text = normaliseQuery(word);
-      const shops = enabledIn(s.enabledChains, sec).filter((c) => raw[`${c}|${word}`]);
+      const shops = testShops(s.enabledChains, sec).filter((c) => raw[`${c}|${word}`]);
       const scored = Object.fromEntries(shops.map((c) => [c, scoreAll({ text }, raw[`${c}|${word}`])]));
       const kind = intendedKind({ text }, scored);
       if (!kind) continue;

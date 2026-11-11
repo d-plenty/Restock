@@ -53,7 +53,7 @@ export function InstallSheet({ onClose }: { onClose: () => void }) {
   const installed = isInstalled();
   return (
     <Sheet title="Restock on iPhone" onClose={onClose}>
-      <p style={{ margin: 0 }}>Put Restock on your home screen. It opens like an app, and your Shopping list works with no signal.</p>
+      <p style={{ margin: 0 }}>Put Restock on your home screen. It opens like an app, and your lists, pantry and cards work with no signal.</p>
       {installed ? (
         <p className="pwa-note good">
           <Icon name="check" size={18} /> Restock is on this phone's home screen.
@@ -94,15 +94,20 @@ export function InstallSheet({ onClose }: { onClose: () => void }) {
         </button>
       )}
       <h3 className="pwa-h">With no signal</h3>
+      {/* 0.9.6 (iPhone offline): everything this phone last saved, and edits wait for signal. */}
       <ul className="pwa-steps">
-        <li>Your Shopping list opens, and you can tick things off, add and remove them.</li>
+        <li>Open Restock once with signal first, and sign in with Keep me signed in ticked.</li>
+        <li>Your Pantry, Keg and Health tabs open, and all four lists (Groceries, Keg, Health, General). Tick, add, edit, Move to and Undo all work.</li>
+        <li>Your cards open, with their barcodes.</li>
+        <li>Specials, catalogues and price history show as this phone last saved them.</li>
         <li>Scanning a barcode adds things you already have in your pantry.</li>
-        <li>Your changes go to the server when you're back online. The list shows when it was last updated.</li>
-        <li>Prices, specials and settings need the server.</li>
+        <li>Your changes go to the server when you're back online. A notice says when this phone last saved.</li>
+        <li>Searching the shops, the Data tab (and Import), Server and phones, and Activity need signal.</li>
       </ul>
       <p className="small" style={{ margin: 0 }}>
-        It needs the https address: iPhones only keep a web app for offline, and only let it use the camera, on https. Sign out and the list is taken off this
-        phone.
+        It needs the https address: iPhones only keep a web app for offline, and only let it use the camera, on https. If the iPhone runs low on space, iOS
+        can clear what Restock saved: it loads again next time you're online, but changes not sent yet are lost. Sign out and the household's copy is taken off
+        this phone.
       </p>
       <button className="btn" onClick={onClose}>
         Done

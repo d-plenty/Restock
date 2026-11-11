@@ -3,6 +3,7 @@ import { wooliesAccount } from '../types';
 import { kindOf, type StoreChain } from '../shops';
 import { aldi } from './aldi';
 import { coles } from './coles';
+import { costco } from './costco';
 import { endeavourAdapter } from './endeavour';
 import { connectionMode, NativeOnlyError } from './http';
 import type { StoreAdapter } from './types';
@@ -23,6 +24,9 @@ export function adapterFor(chain: StoreChain | 'other'): StoreAdapter | undefine
     case 'coles':
     case 'aldi':
       return withBackup(ADAPTERS[chain as keyof typeof ADAPTERS]);
+    case 'costco':
+      // 0.9.6: no hidden-browser backup and no retries: Costco is read once, on a phone, when Search is pressed.
+      return costco;
     case 'endeavour':
       return endeavourAdapter(chain as 'danmurphys' | 'bws');
     case 'web':
@@ -66,7 +70,7 @@ function fakeAdapter(chain: StoreChain): StoreAdapter {
   const section =
     kindOf(chain) === 'endeavour' || /liquor|bottle|cellar|camel|porters/.test(chain)
       ? 'keg'
-      : ['woolworths', 'coles', 'aldi'].includes(chain)
+      : ['woolworths', 'coles', 'aldi', 'costco'].includes(chain)
         ? 'pantry'
         : 'pharmacy';
   const names = FAKE[section];
