@@ -4,7 +4,7 @@
 // item, and "Always use this for chopsticks" saved for it.
 
 import { addGroup, addProduct, addReading, findProductByStore, nowIso, uid, updateProduct } from '../../lib/db';
-import { pickItemFor } from '../../lib/listPicks';
+import { pickItemFor, pickItemOffList } from '../../lib/listPicks';
 import { act } from '../../lib/undo';
 import type { StoreProduct } from '../../stores';
 import type { AlertLevel, Group, ListEntry, Product } from '../../types';
@@ -96,9 +96,11 @@ export async function addItemForLine(
   item: NewItem,
   always: boolean,
   barcodeFor?: (sp: StoreProduct) => string | undefined,
+  /** 0.9.11: "both" (the line becomes the item) or "pantry" (the line comes off the list). */
+  target: 'both' | 'pantry' = 'both',
 ): Promise<{ group: Group; linked: boolean }> {
   const group = await addItemFromPicks(picks, item, barcodeFor);
-  const linked = await pickItemFor(entry, group, always);
+  const linked = await (target === 'pantry' ? pickItemOffList : pickItemFor)(entry, group, always);
   return { group, linked };
 }
 
@@ -114,11 +116,12 @@ export const addItemForLineUndoable = (
   always: boolean,
   said: (r: { group: Group; linked: boolean }) => string,
   barcodeFor?: (sp: StoreProduct) => string | undefined,
-): Promise<{ group: Group; linked: boolean }> => act(said, () => addItemForLine(entry, picks, item, always, barcodeFor));
+  target: 'both' | 'pantry' = 'both',
+): Promise<{ group: Group; linked: boolean }> => act(said, () => addItemForLine(entry, picks, item, always, barcodeFor, target));
 
 /** What the Pick sheet says once a line has its item ("Chopsticks added to your pantry. "chopsticks" is Chopsticks from now on"). */
-export function pickedWords(name: string, opts: { made: boolean; linked: boolean; always: boolean; word: string; place?: string }): string {
-  const what = opts.made ? `${name} added to ${opts.place ?? 'your pantry'}` : `${name} it is`;
+export function pickedWords(name: string, opts: { made: boolean; linked: boolean; always: boolean; word: string; place?: string; off?: boolean }): string {
+  const what = opts.made ? `${name} added to ${opts.place ?? 'your pantry'}${opts.off ? ' and off your list' : ''}` : `${name} it is`;
   if (!opts.linked) return `${what}. That line isn't on the list any more`;
   return opts.always ? `${what}. "${opts.word}" is ${name} from now on` : what;
 }

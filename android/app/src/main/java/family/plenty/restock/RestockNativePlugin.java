@@ -222,6 +222,42 @@ public class RestockNativePlugin extends Plugin {
         call.resolve(ret);
     }
 
+    // ---------- price helper (0.9.11) ----------
+
+    /** Turns the price helper's half-hourly job on or off to match the saved settings. */
+    @PluginMethod
+    public void priceHelperSchedule(PluginCall call) {
+        try {
+            SQLiteDatabase db = RestockDatabase.get(getContext());
+            PriceHelper.schedule(getContext(), RestockDatabase.ready(db) ? PriceChecker.readKv(db, "settings") : null);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(String.valueOf(e.getMessage()));
+        }
+    }
+
+    /** "Run a few now": the next few searches straight away. */
+    @PluginMethod
+    public void priceHelperRunNow(PluginCall call) {
+        PriceHelper.runNow(getContext());
+        call.resolve();
+    }
+
+    /** "Test": does the collector at this address take this key? {ok, status?, error?} */
+    @PluginMethod
+    public void priceHelperTest(final PluginCall call) {
+        final String url = call.getString("url", "");
+        final String key = call.getString("key", "");
+        checkThread.execute(() -> {
+            org.json.JSONObject r = PriceHelper.test(url, key);
+            JSObject ret = new JSObject();
+            ret.put("ok", r.optBoolean("ok", false));
+            if (r.has("status")) ret.put("status", r.optInt("status"));
+            if (r.has("error")) ret.put("error", r.optString("error"));
+            call.resolve(ret);
+        });
+    }
+
     // ---------- check now ----------
 
     @PluginMethod
@@ -908,6 +944,16 @@ public class RestockNativePlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /** 0.9.11: can backups go in Documents/Restock backups without picking a folder (Android 10+)? */
+    @PluginMethod
+    public void backupDocuments(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("available", Backups.documentsAvailable());
+        ret.put("uri", Backups.DOCUMENTS);
+        ret.put("name", "Documents/Restock backups");
+        call.resolve(ret);
+    }
+
     @PluginMethod
     public void writeBackup(final PluginCall call) {
         final String uri = call.getString("uri");
@@ -916,7 +962,9 @@ public class RestockNativePlugin extends Plugin {
         final int keep = call.getInt("keep", 5);
         dbThread.execute(() -> {
             try {
-                int removed = Backups.write(getContext(), Uri.parse(uri), name, json, keep);
+                int removed = Backups.DOCUMENTS.equals(uri)
+                    ? Backups.writeDocuments(getContext(), name, json, keep)
+                    : Backups.write(getContext(), Uri.parse(uri), name, json, keep);
                 JSObject ret = new JSObject();
                 ret.put("written", name);
                 ret.put("removed", removed);

@@ -112,8 +112,8 @@ export function HouseholdScreen() {
                 : sync?.paired
                   ? sync.isOwner
                     ? 'Add or remove phones'
-                    : 'Phones on your Wi-Fi'
-                  : 'Phones on your Wi-Fi'}
+                    : 'Phone sharing (local Wi-Fi)'
+                  : 'Phone sharing (local Wi-Fi)'}
             </span>
             <span className="small">
               {sync?.house || sync?.serverApi === 3

@@ -489,6 +489,76 @@ final class StoreClient {
         return q;
     }
 
+    // ---------- Price helper (0.9.11) ----------
+
+    /** The first page of a Coles search, the products as Coles sends them (PriceHelper). */
+    JSONArray colesSearch(String term) throws Exception {
+        Resp resp;
+        if (web != null) {
+            resp = viaWeb("coles", "GET", colesSearchPath(term, null), null);
+            if (resp.status <= 0) throw new BlockedException("Coles", COLES_UNBLOCK);
+        } else {
+            if (colesKey == null) {
+                Resp home = request("GET", COLES + "/", html(), null);
+                colesKey = extractColesKey(home.body);
+                if (colesKey == null) throw new BlockedException("Coles", "bot protection");
+            }
+            resp = request("GET", COLES + colesSearchPath(term, null) + "&subscription-key=" + enc(colesKey), json(COLES + "/search/products?q=" + enc(term)), null);
+        }
+        JSONArray results = parse("Coles", resp).optJSONArray("results");
+        JSONArray out = new JSONArray();
+        if (results == null) return out;
+        for (int i = 0; i < results.length(); i++) {
+            JSONObject p = results.optJSONObject(i);
+            if (p != null && "PRODUCT".equals(p.optString("_type", "PRODUCT"))) out.put(p);
+        }
+        return out;
+    }
+
+    /** The first page of a Woolworths search (36 products), flattened out of its bundles (PriceHelper). */
+    JSONArray woolworthsSearch(String term) throws Exception {
+        String location = "/shop/search/products?searchTerm=" + enc(term);
+        JSONObject body = new JSONObject();
+        body.put("SearchTerm", term);
+        body.put("PageNumber", 1);
+        body.put("PageSize", 36);
+        body.put("SortType", "TraderRelevance");
+        body.put("Location", location);
+        body.put("IsSpecial", false);
+        body.put("IsBundle", false);
+        body.put("IsMobile", true);
+        body.put("Filters", new JSONArray());
+        body.put("GroupEdmVariants", false);
+        body.put("EnableAdReRanking", false);
+        Resp resp;
+        if (web != null) resp = viaWeb("woolworths", "POST", "/apis/ui/Search/products", body.toString());
+        else {
+            Map<String, String> h = json(WOOLIES + location);
+            h.put("Origin", WOOLIES);
+            h.put("Content-Type", "application/json");
+            resp = request("POST", WOOLIES + "/apis/ui/Search/products", h, body.toString());
+        }
+        JSONObject data = parse("Woolworths", resp);
+        JSONArray outer = data.optJSONArray("Products");
+        if (outer == null) outer = data.optJSONArray("Bundles");
+        JSONArray out = new JSONArray();
+        if (outer == null) return out;
+        for (int i = 0; i < outer.length(); i++) {
+            JSONObject e = outer.optJSONObject(i);
+            if (e == null) continue;
+            JSONArray inner = e.optJSONArray("Products");
+            if (inner == null) {
+                inner = new JSONArray();
+                inner.put(e);
+            }
+            for (int j = 0; j < inner.length(); j++) {
+                JSONObject p = inner.optJSONObject(j);
+                if (p != null && !p.optBoolean("IsMarketProduct", false)) out.put(p);
+            }
+        }
+        return out;
+    }
+
     // ---------- Aldi ----------
 
     /** Which request style Aldi last accepted: 0 = app identity, 1 = browser style. Same as aldi.ts. */

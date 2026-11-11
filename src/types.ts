@@ -48,7 +48,7 @@ export interface Sizing {
 }
 
 /**
- * A summary of a product's recent price history from a shared source (hotprices.org, for testing),
+ * A summary of a product's recent price history from a shared source (restock-prices, or hotprices.org),
  * so new items can be judged from day one. Worked out on the phone from the downloaded file.
  */
 export interface MarketSummary {
@@ -387,6 +387,8 @@ export interface Settings {
   backupNudgeAt?: string;
   /** Shared price history download (testing): off until turned on. */
   marketData: { enabled: boolean; wifiOnly: boolean };
+  /** 0.9.11: price helper phone mode (priceHelper.ts). This phone only, never shared. */
+  priceHelper?: import('./lib/priceHelper').PriceHelperSettings;
   area?: HomeArea;
   lastCheck?: string;
   demoLoaded?: boolean;
@@ -463,6 +465,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autoBackup: { enabled: false, everyDays: 7, keep: 5 },
   cartPush: { experimental: false },
   widgets: { background: 'solid', colour: '#012169', transparency: 0, text: 'auto' },
+  // 0.9.11: on by default, every 24 hours (no longer asked in setup).
+  updates: { notify: true },
 };
 
 export const CHECK_INTERVALS = [6, 12, 24, 48, 168];

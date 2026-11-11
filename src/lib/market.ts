@@ -2,11 +2,16 @@ import { isNative } from '../stores/http';
 import { clearMarket, getKV, marketStatus, refresh } from './db';
 import { RestockNative } from './sql/native';
 
-// Shared price history, for testing: the phone downloads hotprices.org's public Coles and
-// Woolworths files and keeps a short summary per product (MarketData.java). The files are the
-// same for everyone, so nothing about what you track leaves the phone.
+// Shared price history: the phone downloads public price files and keeps a short summary per
+// product (MarketData.java). 0.9.11: restock-prices, Restock's own weekly collection on GitHub
+// (Coles, Woolworths, Aldi and Costco), and hotprices.org for Coles and Woolworths until
+// restock-prices has their files. The files are the same for everyone, so nothing about what you
+// track leaves the phone.
 
-export const MARKET_SOURCE = 'hotprices.org';
+export const MARKET_SOURCE = 'restock-prices';
+/** Where the files are, for the words in Setup and Settings. */
+export const MARKET_SOURCE_TEXT = "restock-prices (Restock's own weekly price collection, public on GitHub)";
+export const MARKET_FALLBACK = 'hotprices.org';
 /**
  * Rough size of one full download (both files). Not measured yet: the files hold every price
  * change since 2023 for about 60,000 products. Update this once a real download reports its size.

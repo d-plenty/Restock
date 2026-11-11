@@ -192,15 +192,24 @@ export function fromBackupList(list: BackupLine[]): ListEntry[] {
 /**
  * The automatic backups' password never goes into a backup (it would be in the file it locks).
  * 0.9.3: nor this phone's Home Assistant settings (haKeys.ts; its token isn't in the database at all).
+ * 0.9.11: nor the price helper's key.
  */
 function withoutSecrets(t: Snapshot): Snapshot {
   return {
     ...t,
     kv: t.kv.filter((k) => !LOCAL_ONLY_KV.includes(k.key)).map((k) => {
       if (k.key !== 'settings' || !k.value || typeof k.value !== 'object') return k;
-      const v = k.value as { autoBackup?: { password?: string } };
-      if (!v.autoBackup?.password) return k;
-      return { key: k.key, value: { ...v, autoBackup: { ...v.autoBackup, password: undefined } } };
+      const v = k.value as { autoBackup?: { password?: string }; priceHelper?: { key?: string } };
+      // 0.9.11: nor the price helper's collector key.
+      if (!v.autoBackup?.password && !v.priceHelper?.key) return k;
+      return {
+        key: k.key,
+        value: {
+          ...v,
+          ...(v.autoBackup ? { autoBackup: { ...v.autoBackup, password: undefined } } : {}),
+          ...(v.priceHelper ? { priceHelper: { ...v.priceHelper, key: undefined } } : {}),
+        },
+      };
     }),
   };
 }

@@ -480,8 +480,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             Judged with shared price history <span className="tag normal beta">Beta</span>
           </strong>
           <span>
-            Restock has only {learning} day{learning === 1 ? '' : 's'} of its own prices for this, so the verdict uses months of history from
-            {MARKET_SOURCE}. After about 4 weeks it switches to the prices this phone has seen.
+            Restock has only {learning} day{learning === 1 ? '' : 's'} of its own prices for this, so the verdict uses months of shared price
+            history. After about 4 weeks it switches to the prices this phone has seen.
           </span>
         </div>
       )}
@@ -1612,7 +1612,7 @@ function PriceHistory({
       {why &&
         (market ? (
           <p className="small" style={{ margin: 0 }}>
-            Usual, usual sale and lowest come from shared price history ({MARKET_SOURCE}): {market.days} days at {chainName(o.product.chain)}, on
+            Usual, usual sale and lowest come from shared price history ({market.source || MARKET_SOURCE}): {market.days} days at {chainName(o.product.chain)}, on
             sale {Math.round(market.saleShare * 100)}% of the time{stats.cycleWeeks ? `, about every ${stats.cycleWeeks} weeks` : ''}.
             {stats.marketScale && stats.marketScale !== 1
               ? ` Adjusted ${Math.round(Math.abs(stats.marketScale - 1) * 100)}% ${stats.marketScale > 1 ? 'up' : 'down'} to match your shop's prices.`

@@ -66,6 +66,11 @@ export const SCAN_FORMATS = [
   'DataMatrix',
   'DataBar',
   'DataBarExpanded',
+  // 0.9.11: what loyalty and gift cards use as well.
+  'Code93',
+  'Codabar',
+  'PDF417',
+  'Aztec',
 ] as const;
 
 /**
@@ -154,6 +159,19 @@ export interface ScanKind {
   /** A QR code rather than a barcode: square box, sharper look at the middle of the picture. */
   qr?: boolean;
 }
+
+/**
+ * 0.9.11: a loyalty or gift card: any code at all, read as it is (numbers, letters, a QR code).
+ * Never "not a product barcode": a card isn't a product. A website link in a QR code is kept too.
+ */
+export const CARD_SCAN: ScanKind = {
+  accept: (text) => {
+    const t = text.trim();
+    return t ? t.slice(0, 120) : undefined;
+  },
+  wrong: "Couldn't read that code. Hold the card flat and closer, or type the number in.",
+  typeHint: 'Card number',
+};
 
 export type ScanRequest = { title: string; kind?: ScanKind; resolve: (o: ScanOutcome) => void };
 type Listener = (req: ScanRequest | undefined) => void;

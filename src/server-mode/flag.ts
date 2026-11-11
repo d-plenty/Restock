@@ -43,7 +43,7 @@ export interface ServerUi {
    */
   webSearch?: {
     PickButton: ComponentType<{ typed: string; pantryShown: boolean; busy: boolean; onSearch: (q: string) => void }>;
-    PickResults: ComponentType<{ query: string; entry: ListEntry; word: string; always: boolean; onAlways: (on: boolean) => void; onDone: (said: string | undefined) => void }>;
+    PickResults: ComponentType<{ query: string; section?: Section; entry: ListEntry; word: string; always: boolean; onAlways: (on: boolean) => void; onDone: (said: string | undefined) => void }>;
     ListButton: ComponentType<{ text: string; list: ListSection }>;
     ListPanel: ComponentType<{ list: ListSection; onAdded?: () => void }>;
     Scan: ComponentType<{ section: Section }>;

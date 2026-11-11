@@ -119,6 +119,17 @@ describe('Pick sheet: search the shops for a line that matches nothing', () => {
     expect(groups.find((g) => g.id === group.id)!.usualProductId).toBe(groups.find((g) => g.name === 'Old chopsticks')!.usualProductId);
   });
 
+  // 0.9.11: "Add to pantry" from Pick my: the item is made and the line comes off the list.
+  it('Add to pantry: the item, the "next time" words, and the line off the list', async () => {
+    await addListEntry({ id: 'ha-7', text: 'coconut cream', qty: 1, section: 'pantry', checked: false, createdAt: nowIso() });
+    const [line] = (await allListEntries()).filter((e) => e.id === 'ha-7');
+    const { group, linked } = await addItemForLine(line, [sticks], { name: 'Coconut cream', section: 'pantry' }, true, undefined, 'pantry');
+    expect(linked).toBe(true);
+    expect((await allGroups()).some((g) => g.id === group.id)).toBe(true);
+    expect((await allListEntries()).some((e) => e.id === 'ha-7')).toBe(false);
+    expect(Object.values(await getAliases())).toEqual([group.id]);
+  });
+
   it('a line deleted meanwhile: the item is still made, and nothing else on the list changes', async () => {
     await addListEntry({ id: 'ha-3', text: 'chopsticks', qty: 1, section: 'pantry', checked: false, createdAt: nowIso() });
     const [line] = await allListEntries();

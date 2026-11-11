@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AUTO_GIFT_NOTE, BACKUP_EVERY, BACKUP_KEEP, everyLabel, maybeAutoBackup } from '../../lib/autoBackup';
+import { AUTO_GIFT_NOTE, BACKUP_EVERY, BACKUP_KEEP, everyLabel, defaultBackupFolder, maybeAutoBackup } from '../../lib/autoBackup';
 import { askPassword, confirmAction } from '../../lib/confirm';
 import { getSettings, priceHistorySpan, updateSettings } from '../../lib/db';
 // 0.9.5 (save): Settings → Automatic backups waits for Save settings (settingsDraft.ts).
@@ -44,7 +44,12 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
   };
 
   const toggle = async (on: boolean) => {
-    if (on && !b.folder && !(await pick())) return;
+    // 0.9.11: no folder yet? Documents/Restock backups, made for you. "Change folder" picks another.
+    if (on && !b.folder) {
+      const d = await defaultBackupFolder();
+      if (d) await set({ folder: d.uri, folderName: d.name, lastError: undefined });
+      else if (!(await pick())) return;
+    }
     await set({ enabled: on });
     // 0.9.5 (save): the first one once it's saved.
     await draft.afterSave('first-backup', async (s) => {
@@ -109,7 +114,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
           <span className="title" style={{ fontSize: 15 }}>
             Folder
           </span>
-          <span className="small">{b.folderName ?? 'Not picked yet'}</span>
+          <span className="small">{b.folderName ?? 'Documents/Restock backups, made for you when you turn this on'}</span>
         </span>
         <span className="small" style={{ fontWeight: 700 }}>
           {b.folder ? 'Change' : 'Pick'}
@@ -221,12 +226,13 @@ export function SuggestLocalBackup({ text }: { text: string }) {
     if (!isNative()) return nav.toast('Picking a folder works in the Android app.');
     setBusy(true);
     try {
-      let f: { uri: string; name: string };
-      try {
-        f = await RestockNative.pickFolder();
-      } catch {
-        return;
-      }
+      let f: { uri: string; name: string } | undefined = await defaultBackupFolder();
+      if (!f)
+        try {
+          f = await RestockNative.pickFolder();
+        } catch {
+          return;
+        }
       const latest = await getSettings();
       await updateSettings({
         autoBackup: { ...latest.autoBackup, folder: f.uri, folderName: f.name, lastError: undefined, enabled: true, ...LOCAL_SUGGESTED },

@@ -6,8 +6,8 @@
 // other shops, category), then Track, Add to list, or both. The server saves it all (the price the
 // shop gave it), and this browser's copy gets it at the sync that follows.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { allCategories } from '../../lib/db';
-import { pickItemFor } from '../../lib/listPicks';
+import { allCategories, deleteListEntries } from '../../lib/db';
+import { pickItemFor, pickItemOffList } from '../../lib/listPicks';
 import { nameHasSize } from '../../lib/naming';
 import { money, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
@@ -16,6 +16,7 @@ import type { StoreProduct } from '../../stores/types';
 import { chainName, type ListEntry } from '../../types';
 import { ChainDot, ChainName, Icon, LoadingBar, MemberTag, Sheet, Thumb } from '../../ui/components';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from '../../ui/screens/addPicks';
+import { AlwaysTick, pickButtonsNote } from '../../ui/screens/addPickWords';
 import { useNav } from '../../ui/nav';
 import { ScanButton } from '../pwa/WebScanner';
 import { syncNow } from '../live';
@@ -196,15 +197,20 @@ export function WebShopSearch({
     setSaveError(undefined);
     try {
       const itemName = name.trim() || suggestedName(picks.values(), forLine?.word);
-      const body = addBody(answer.search, picks.values(), { target, tab, list: forLine || target === 'pantry' ? tab : listPick, name: itemName, categoryId });
+      // 0.9.11: from the Pick sheet "both" makes the item and the line becomes it, so the server only makes the item.
+      const sent: Target = forLine && target === 'both' ? 'pantry' : target;
+      const body = addBody(answer.search, picks.values(), { target: sent, tab, list: forLine || target === 'pantry' ? tab : listPick, name: itemName, categoryId });
       const had = await productIdsHere();
       const a = await addFromSearch(body);
       await fetchIt();
       // 0.9.5 (final review): with an Undo (searchUndo.ts), whose toast says what happened.
       await offerUndo(a, had, async () => {
+        // 0.9.11: "Add to list" from the Pick sheet: the new line takes the old one's place.
+        if (forLine && target === 'list') await deleteListEntries([forLine.entry.id]);
         if (forLine && a.item) {
-          const linked = await pickItemFor(forLine.entry, a.item, forLine.always);
-          const what = `${a.item.name} added to your pantry`;
+          const off = target === 'pantry';
+          const linked = await (off ? pickItemOffList : pickItemFor)(forLine.entry, a.item, forLine.always);
+          const what = `${a.item.name} added to ${SECTION_PLACE[tab]}${off ? ' and off your list' : ''}`;
           return !linked ? `${what}. That line isn't on the list any more` : forLine.always ? `${what}. "${forLine.word}" is ${a.item.name} from now on` : what;
         }
         return addedText(a, a.item?.name ?? itemName, tab);
@@ -487,15 +493,21 @@ export function WebShopSearch({
               </label>
               {picksForYouBlock}
               {categorySelect}
-              <label className="check" style={{ padding: '4px 2px', minHeight: 44 }}>
-                <input type="checkbox" checked={forLine.always} onChange={(e) => forLine.onAlways(e.target.checked)} />
-                <span>Always use this for "{forLine.word}"</span>
-              </label>
-              <button className="btn primary" onClick={() => void save('pantry')} disabled={saving || picks.size > 6}>
-                <Icon name="pantry" size={18} /> Add to pantry
+              {/* 0.9.11: the same three buttons and tick as the phone's Pick sheet. */}
+              <AlwaysTick forLine={forLine} />
+              <button className="btn primary" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
+                <Icon name="cart" size={18} /> Add to both
               </button>
+              <div className="two">
+                <button className="btn" onClick={() => void save('list')} disabled={saving || picks.size > 6}>
+                  <Icon name="cart" size={18} /> Add to list
+                </button>
+                <button className="btn" onClick={() => void save('pantry')} disabled={saving || picks.size > 6}>
+                  <Icon name={tab} size={18} /> Add to {SECTION_NAMES[tab].toLowerCase()}
+                </button>
+              </div>
               <p className="small" style={{ margin: 0 }}>
-                The "{forLine.entry.text}" line on your Shopping list becomes this item, with its price and cheapest shop.
+                {pickButtonsNote(SECTION_PLACE[tab])}
               </p>
             </>
           ) : (
@@ -712,15 +724,17 @@ export function PickSearchResults({
   always,
   onAlways,
   onDone,
+  section = 'pantry',
 }: {
   query: string;
+  section?: Section;
   entry: ListEntry;
   word: string;
   always: boolean;
   onAlways: (on: boolean) => void;
   onDone: (said: string | undefined) => void;
 }) {
-  return <WebShopSearch query={query} tab="pantry" forLine={{ entry, word, always, onAlways }} onDone={(said) => onDone(said)} />;
+  return <WebShopSearch query={query} tab={section} forLine={{ entry, word, always, onAlways }} onDone={(said) => onDone(said)} />;
 }
 
 /** The phone layout's Shopping list on the web: Scan, as on the desktop list's add box. */

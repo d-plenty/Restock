@@ -21,20 +21,33 @@ import java.util.zip.GZIPInputStream;
 import org.json.JSONObject;
 
 /**
- * Shared price history, for testing: downloads hotprices.org's public Coles and Woolworths
- * files (an open-source project that records both stores' prices daily) and keeps a short
- * summary per product in the market table. The files are the same for everyone, so nothing
- * about what you track is sent anywhere. The full history isn't kept, only the summary.
+ * Shared price history: downloads public price files and keeps a short summary per product in the
+ * market table. 0.9.11: first from restock-prices (Restock's own weekly collection, published on
+ * GitHub, for Coles, Woolworths, Aldi and Costco), and for Coles and Woolworths from hotprices.org
+ * (an open-source project that records both stores' prices daily) when restock-prices has no file
+ * yet. The files are the same for everyone, so nothing about what you track is sent anywhere. The
+ * full history isn't kept, only the summary.
  */
 final class MarketData {
     private static final String TAG = "RestockMarket";
-    static final String SOURCE = "hotprices.org";
-    /** Restock chain → the file name hotprices.org uses. */
+    static final String SOURCE = "restock-prices";
+    static final String HOTPRICES = "hotprices.org";
+    /** 0.9.11: restock-prices' latest files (Restock's own export format), one per shop. */
+    static final String RESTOCK_PRICES = "https://raw.githubusercontent.com/d-plenty/restock-prices/main/latest/";
+    static final String[] CHAINS = {"woolworths", "coles", "aldi", "costco"};
+    /** Restock chain → the file hotprices.org publishes, used when restock-prices has none yet. */
     static final Map<String, String> FILES = new LinkedHashMap<>();
 
     static {
         FILES.put("woolworths", "https://hotprices.org/data/latest-canonical.woolies.compressed.json.gz");
         FILES.put("coles", "https://hotprices.org/data/latest-canonical.coles.compressed.json.gz");
+    }
+
+    /** Not published (yet): HTTP 404 from restock-prices, so a shop with no file is skipped quietly. */
+    static final class NotThere extends Exception {
+        NotThere(String why) {
+            super(why);
+        }
     }
 
     /** Summaries cover the last 26 weeks, however much history the phone keeps itself. */
@@ -96,10 +109,20 @@ final class MarketData {
         if (!tableReady(db)) throw new Exception("Open Restock once to finish updating, then try again.");
         long now = System.currentTimeMillis();
         String stamp = PriceChecker.now();
-        for (Map.Entry<String, String> f : FILES.entrySet()) {
-            String chain = f.getKey();
+        for (String chain : CHAINS) {
             try {
-                int n = importFile(db, chain, f.getValue(), now, stamp, result, progress);
+                int n;
+                try {
+                    n = importFile(db, chain, RESTOCK_PRICES + chain + ".json.gz", SOURCE, now, stamp, result, progress);
+                } catch (Exception first) {
+                    String fallback = FILES.get(chain);
+                    if (fallback == null) {
+                        if (first instanceof NotThere) continue; // Aldi or Costco not published yet: nothing to say
+                        throw first;
+                    }
+                    Log.i(TAG, chain + ": restock-prices had nothing (" + first.getMessage() + "), using " + HOTPRICES);
+                    n = importFile(db, chain, fallback, HOTPRICES, now, stamp, result, progress);
+                }
                 result.byChain.put(chain, n);
                 result.products += n;
             } catch (Exception e) {
@@ -123,7 +146,7 @@ final class MarketData {
         return result;
     }
 
-    private static int importFile(SQLiteDatabase db, String chain, String url, long now, String stamp, Result result, Progress progress)
+    private static int importFile(SQLiteDatabase db, String chain, String url, String source, long now, String stamp, Result result, Progress progress)
         throws Exception {
         HttpURLConnection c = (HttpURLConnection) Net.url(url).openConnection();
         c.setConnectTimeout(20_000);
@@ -131,7 +154,11 @@ final class MarketData {
         c.setRequestProperty("User-Agent", StoreClient.APP_UA + " shared-history-test");
         c.setRequestProperty("Accept-Encoding", "gzip");
         int status = c.getResponseCode();
-        if (status != 200) throw new Exception(SOURCE + " returned HTTP " + status);
+        if (status == 404) {
+            c.disconnect();
+            throw new NotThere(source + " has no " + chain + " file yet");
+        }
+        if (status != 200) throw new Exception(source + " returned HTTP " + status);
 
         final long[] count = {0};
         InputStream raw = new FilterInputStream(c.getInputStream()) {
@@ -166,16 +193,19 @@ final class MarketData {
         final List<String> ids = new ArrayList<>();
         final List<Deals.Market> rows = new ArrayList<>();
         try {
-            MarketParser.parse(in, now, WINDOW_DAYS, (id, m) -> {
+            MarketParser.Sink sink = (id, m) -> {
                 ids.add(id);
                 rows.add(m);
-            }, (seen, kept) -> {
+            };
+            MarketParser.Progress tick = (seen, kept) -> {
                 if (progress != null) progress.onProgress(chain, count[0], kept);
-            });
+            };
+            if (SOURCE.equals(source)) MarketParser.parseExport(in, now, WINDOW_DAYS, sink, tick);
+            else MarketParser.parse(in, now, WINDOW_DAYS, sink, tick);
         } finally {
             c.disconnect();
         }
-        if (rows.isEmpty()) throw new Exception(SOURCE + " sent no usable prices for " + chain);
+        if (rows.isEmpty()) throw new Exception(source + " sent no usable prices for " + chain);
 
         db.beginTransaction();
         try {
@@ -196,7 +226,7 @@ final class MarketData {
                 if (m.cycleWeeks != null) ins.bindLong(7, m.cycleWeeks);
                 else ins.bindNull(7);
                 ins.bindLong(8, m.days);
-                ins.bindString(9, SOURCE);
+                ins.bindString(9, source);
                 ins.bindString(10, stamp);
                 if (m.latest != null) ins.bindDouble(11, m.latest);
                 else ins.bindNull(11);

@@ -477,7 +477,7 @@ export function ListScreen() {
             <button
               className="icon-btn"
               aria-label={`Pick my ${pickWord(e.text)}`}
-              onClick={() => nav.push({ name: 'add', query: e.text, forList: true, replaceEntry: e.id, section: searchTabOf(e.section) })}
+              onClick={() => setPicking(e)}
               style={{ width: 36, height: 36 }}
             >
               <Icon name="search" size={18} />
@@ -860,7 +860,7 @@ export function ListScreen() {
         </Sheet>
       )}
 
-      {picking && <PickItemSheet entry={picking} onClose={() => setPicking(undefined)} />}
+      {picking && <PickItemSheet entry={picking} fromHa={!!toPick?.has(picking.id)} onClose={() => setPicking(undefined)} />}
 
       {sending && (
         <SendToShopSheet
@@ -958,6 +958,7 @@ export function ListScreen() {
           deal={dealFor(c, editing) ?? recFor(c, editing)?.options[0]}
           name={recFor(c, editing)?.group.name}
           lists={sectionsOn}
+          onPick={setPicking}
           onClose={() => setEditing(undefined)}
         />
       )}
@@ -1481,7 +1482,10 @@ export function EditEntry({
   deal,
   name,
   lists,
+  onPick,
 }: {
+  /** 0.9.11: "Pick my cordial" opens the Pick sheet, as the line's search button does. */
+  onPick?: (e: ListEntry) => void;
   entry: ListEntry;
   categories: { id: string; name: string }[];
   shops: StoreChain[];
@@ -1554,7 +1558,8 @@ export function EditEntry({
           className="btn"
           onClick={() => {
             onClose();
-            nav.push({ name: 'add', query: entry.text, forList: true, replaceEntry: entry.id, section: searchTabOf(entry.section) });
+            if (onPick && !oneOff) onPick(entry);
+            else nav.push({ name: 'add', query: entry.text, forList: true, replaceEntry: entry.id, section: searchTabOf(entry.section) });
           }}
         >
           <Icon name="search" size={18} /> {oneOff ? 'Find a cheaper one' : `Pick my ${pickWord(entry.text)}`}

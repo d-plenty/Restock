@@ -14,7 +14,7 @@ import { AddPhoneSheet, serverSummary } from './Sync';
  * on your Wi-Fi, then a cloud drive folder. Set up: a strip with only what's in use (and the last
  * backup's day and time), the house, then how the household syncs. Backups follow in Settings.
  */
-export function SyncOverview({ settings, info, onInfo }: { settings: Settings; info: SyncInfo | undefined; onInfo: (i: SyncInfo) => void }) {
+export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: Settings; info: SyncInfo | undefined; onInfo: (i: SyncInfo) => void; haSummary?: string }) {
   const nav = useNav();
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -109,6 +109,15 @@ export function SyncOverview({ settings, info, onInfo }: { settings: Settings; i
 
       {!setUp ? (
         <>
+          {/* 0.9.11: the household's name lives here now (setup no longer asks for it). */}
+          <div className="card flush">
+            <button className="row" onClick={() => nav.push({ name: 'household' })}>
+              <span className="grow">
+                <span className="title">Household name</span>
+                <span className="small">{settings.household.name || 'Our house'} · what your phones and the server call your household</span>
+              </span>
+            </button>
+          </div>
           <h3 className="group-head">Sync with your household</h3>
           <button className="sync-choice recommended" disabled={!syncAvailable()} onClick={() => nav.push({ name: 'restockServer' })}>
             <span className="sync-choice-head">
@@ -133,7 +142,12 @@ export function SyncOverview({ settings, info, onInfo }: { settings: Settings; i
               <span className="sync-choice-ic wifi" aria-hidden="true">
                 <Icon name="wifi" size={22} />
               </span>
-              <strong style={{ fontSize: 17 }}>Phones on your Wi-Fi (no server)</strong>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <strong style={{ fontSize: 17 }}>Phone sharing</strong>
+                <span className="eyebrow" style={{ margin: 0 }}>
+                  No server · local Wi-Fi
+                </span>
+              </span>
             </span>
             <span className="small">
               No server and no account. Phones swap changes straight to each other when they're on the same Wi-Fi. Nothing leaves your home.
@@ -151,6 +165,21 @@ export function SyncOverview({ settings, info, onInfo }: { settings: Settings; i
               writes there and reads the others. Slower, and depends on the drive app.
             </span>
           </button>
+          {/* 0.9.11: Home Assistant sits with the other ways of sharing. */}
+          {haSummary !== undefined && (
+            <button className="sync-choice" onClick={() => nav.push({ name: 'homeAssistant' })}>
+              <span className="sync-choice-head">
+                <span className="sync-choice-ic folder" aria-hidden="true">
+                  <Icon name="home" size={22} />
+                </span>
+                <strong style={{ fontSize: 17 }}>Home Assistant</strong>
+              </span>
+              <span className="small">
+                Your shopping list in Home Assistant, both ways: tick things off on a dashboard, or say "add milk to the shopping list" to a voice
+                assistant and it shows up here. {haSummary}.
+              </span>
+            </button>
+          )}
         </>
       ) : (
         <>
@@ -201,7 +230,7 @@ export function SyncOverview({ settings, info, onInfo }: { settings: Settings; i
             )}
             {way(
               paired && wifi,
-              house ? 'Wi-Fi sync (phone to phone)' : 'Phones on your Wi-Fi',
+              house ? 'Phone sharing (Wi-Fi, optional)' : 'Phone sharing (no server, local Wi-Fi)',
               paired && wifi
                 ? others.length
                   ? `On · ${info?.lastSyncAt ? `synced ${agoText(info.lastSyncAt)}` : 'not synced yet'}`
@@ -223,6 +252,7 @@ export function SyncOverview({ settings, info, onInfo }: { settings: Settings; i
                   : 'Off · Google Drive, Dropbox, OneDrive, Syncthing, Nextcloud or WebDAV',
               () => nav.push({ name: 'sync' }),
             )}
+            {haSummary !== undefined && way(!!haSummary && !haSummary.startsWith('Your shopping list'), 'Home Assistant', haSummary, () => nav.push({ name: 'homeAssistant' }))}
           </div>
         </>
       )}

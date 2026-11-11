@@ -57,6 +57,72 @@ final class MarketParser {
         return kept;
     }
 
+    /**
+     * 0.9.11: a restock-prices file, Restock's own export format: {"format": "restock-export",
+     * "tables": {"products": [{"store_product_id": "…", "prices": [{"date": "…", "price": 3.1}, …]}, …]}}.
+     * Read a product at a time, as above. Returns how many products had enough history to summarise.
+     */
+    static int parseExport(InputStream in, long now, int windowDays, Sink sink, Progress progress) throws IOException {
+        int[] counts = {0, 0};
+        JsonReader r = new JsonReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+        try {
+            r.beginObject();
+            while (r.hasNext()) {
+                if (!"tables".equals(r.nextName()) || r.peek() != JsonToken.BEGIN_OBJECT) {
+                    r.skipValue();
+                    continue;
+                }
+                r.beginObject();
+                while (r.hasNext()) {
+                    if (!"products".equals(r.nextName()) || r.peek() != JsonToken.BEGIN_ARRAY) {
+                        r.skipValue();
+                        continue;
+                    }
+                    r.beginArray();
+                    while (r.hasNext()) {
+                        Item item = readExportItem(r);
+                        counts[0]++;
+                        if (item.id != null && !item.dates.isEmpty()) {
+                            Deals.Market m = Deals.summarise(item.dates, item.prices, now, windowDays);
+                            if (m != null) {
+                                sink.accept(item.id, m);
+                                counts[1]++;
+                            }
+                        }
+                        if (progress != null && counts[0] % 2000 == 0) progress.onProgress(counts[0], counts[1]);
+                    }
+                    r.endArray();
+                }
+                r.endObject();
+            }
+            r.endObject();
+        } finally {
+            r.close();
+        }
+        if (progress != null) progress.onProgress(counts[0], counts[1]);
+        return counts[1];
+    }
+
+    /** One product of a restock-prices file: its id and its prices (oldest first, as the file has them). */
+    static Item readExportItem(JsonReader r) throws IOException {
+        Item item = new Item();
+        r.beginObject();
+        while (r.hasNext()) {
+            String key = r.nextName();
+            if (r.peek() == JsonToken.NULL) {
+                r.nextNull();
+            } else if ("store_product_id".equals(key)) {
+                item.id = r.nextString();
+            } else if ("prices".equals(key) && r.peek() == JsonToken.BEGIN_ARRAY) {
+                readPrices(r, item);
+            } else {
+                r.skipValue();
+            }
+        }
+        r.endObject();
+        return item;
+    }
+
     static final class Item {
         String id;
         boolean weighted;
@@ -84,6 +150,18 @@ final class MarketParser {
                     item.weighted = r.peek() == JsonToken.BOOLEAN ? r.nextBoolean() : "true".equals(r.nextString());
                     break;
                 case "priceHistory":
+                    readPrices(r, item);
+                    break;
+                default:
+                    r.skipValue();
+            }
+        }
+        r.endObject();
+        return item;
+    }
+
+    /** [{"date": "2026-11-10", "price": 3.1}, …], keeping the newest MAX_HISTORY. */
+    static void readPrices(JsonReader r, Item item) throws IOException {
                     r.beginArray();
                     while (r.hasNext()) {
                         String date = null;
@@ -111,13 +189,6 @@ final class MarketParser {
                     }
                     r.endArray();
                     keepNewest(item, MAX_HISTORY);
-                    break;
-                default:
-                    r.skipValue();
-            }
-        }
-        r.endObject();
-        return item;
     }
 
     /** 0.9.0: keeps a product's newest `keep` price changes (the dates are ISO, so they sort as text). */

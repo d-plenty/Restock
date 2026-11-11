@@ -21,6 +21,20 @@ export function autoParts(b: Settings['autoBackup']): ExportParts {
   return { ...EVERYTHING, receiptPhotos: b.receiptPhotos !== false, serverPhotos: false, password, giftCards: !!password };
 }
 
+/**
+ * 0.9.11: the folder for automatic backups without asking: Documents/Restock backups, which Restock
+ * makes itself (Android 10 and later). Undefined on older Android, where a folder is picked instead.
+ */
+export async function defaultBackupFolder(): Promise<{ uri: string; name: string } | undefined> {
+  if (!isNative()) return undefined;
+  try {
+    const d = await RestockNative.backupDocuments();
+    return d.available ? { uri: d.uri, name: d.name } : undefined;
+  } catch {
+    return undefined; // an older app build
+  }
+}
+
 export const BACKUP_EVERY = [1, 3, 7, 14, 30];
 export const BACKUP_KEEP = [3, 4, 5, 10, 20]; // 0.9.3: 4, for "weekly, kept for 4 weeks"
 export const everyLabel = (d: number) =>

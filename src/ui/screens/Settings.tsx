@@ -10,6 +10,7 @@ import { isNative } from '../../stores/http';
 import { allCards, allGiftCards, eraseEverything, getSettings as savedSettings, priceHistorySpan, pruneHistory, serverKeepsHistory, updateSettings as saveNow } from '../../lib/db';
 // 0.9.5 (save): settings changed here wait for "Save settings" (settingsDraft.ts).
 import { afterSave, getSettings, updateSettings } from '../../lib/settingsDraft';
+import { PriceHelperSettings } from './PriceHelperSettings';
 import { dailyTimes, DEFAULT_CHECK_TIME, isCheckTime } from '../../lib/checkSchedule';
 import { SaveBar, useSettingsDraft } from '../SaveBar';
 import { loadDemo, removeDemo } from '../../lib/demo';
@@ -29,7 +30,7 @@ import { ComingSoon } from './Soon';
 import { WidgetSettings } from './WidgetSettings';
 import { TILES, tileStatus } from './Setup';
 import { startTour } from '../Tour';
-import { downloadMarket, MARKET_SIZE_TEXT, MARKET_SOURCE, marketInfo, megabytes, removeMarket } from '../../lib/market';
+import { downloadMarket, MARKET_FALLBACK, MARKET_SIZE_TEXT, MARKET_SOURCE_TEXT, marketInfo, megabytes, removeMarket } from '../../lib/market';
 import { getHealth, testConnections, type ConnectionTest, type StoreChain } from '../../lib/health';
 import { useNav } from '../nav';
 import { checkForUpdate, installUpdate, RELEASES, SELF_UPDATE, type UpdateInfo } from '../../lib/updates';
@@ -227,7 +228,6 @@ export function SettingsScreen() {
         {[
           ['s-stores', 'Shops'],
           ['s-sync', 'Sync and backups'],
-          ...(serverMode ? [] : [['s-ha', 'Home Assistant']]),
           ['s-checks', 'Price checks'],
           ['s-list', 'Shopping list'],
           ['s-alerts', 'Alerts'],
@@ -266,7 +266,7 @@ export function SettingsScreen() {
         Sync and backups
       </div>
       {/* 0.9.3: the household on top, how the phones sync, then backups. Any of the three counts as kept elsewhere. */}
-      <SyncOverview settings={settings} info={syncShown} onInfo={setSyncShown} />
+      <SyncOverview settings={settings} info={syncShown} onInfo={setSyncShown} haSummary={serverMode ? undefined : haSummary} />
       <p className="small group-note">Sync keeps your phones the same, mistakes included. Backups let you go back.</p>
 
       <h3 className="group-head" id="s-backups">
@@ -332,17 +332,7 @@ export function SettingsScreen() {
         )}
       </div>
 
-      {/* 0.9.3: the shopping list with Home Assistant, from this phone. Phones only. */}
-      {!serverMode && (
-        <>
-          <div className="eyebrow" id="s-ha">
-            Home Assistant
-          </div>
-          <div className="card flush">
-            {row('Home Assistant', haSummary, () => nav.push({ name: 'homeAssistant' }))}
-          </div>
-        </>
-      )}
+      {/* 0.9.11: Home Assistant is in Sync and backups now (it's sharing your list too). */}
 
       <div className="eyebrow" id="s-checks">
         Price checks
@@ -484,6 +474,10 @@ export function SettingsScreen() {
       <SharePrices settings={settings} />
       <Fold title="Judge new items from day one" sub={settings.marketData.enabled ? 'On' : 'Off'}>
         <SharedHistory settings={settings} />
+      </Fold>
+      {/* 0.9.11: a spare phone that collects Coles and Woolworths prices for the shared history. */}
+      <Fold title="Price helper phone" sub={settings.priceHelper?.enabled ? 'On' : 'Off'}>
+        <PriceHelperSettings settings={settings} />
       </Fold>
 
       <div className="eyebrow" id="s-help">
@@ -660,8 +654,8 @@ export function SettingsScreen() {
 }
 
 /**
- * Beta: price history from hotprices.org, an open-source project that records Coles and
- * Woolworths prices daily, so new items can be judged from day one.
+ * Beta: shared price history (restock-prices, and hotprices.org for Coles and Woolworths while it
+ * gets going), so new items can be judged from day one.
  */
 /**
  * Share prices about products (0.9.0). On unless turned off. For now it only adds a "shared prices"
@@ -753,9 +747,9 @@ function SharedHistory({ settings }: { settings: Settings }) {
             Judge new items from day one
           </span>
           <span className="small">
-            Downloads months of Coles and Woolworths price history from {MARKET_SOURCE}, an open-source price tracker, and keeps a short summary per
-            product. It's {MARKET_SIZE_TEXT} each time, about once a week. Everyone downloads the same file, so it can't tell what you track. Aldi
-            isn't covered.
+            Downloads months of Coles, Woolworths, Aldi and Costco price history from {MARKET_SOURCE_TEXT} ({MARKET_FALLBACK} fills in Coles and
+            Woolworths while it gets going), and keeps a short summary per product. It's {MARKET_SIZE_TEXT} each time, about once a week. Everyone
+            downloads the same files, so they can't tell what you track.
           </span>
         </span>
       </label>

@@ -25,7 +25,7 @@ import {
   updateGroup,
   updateSettings,
 } from '../../lib/db';
-import { pickItemFor } from '../../lib/listPicks';
+import { pickItemFor, pickItemOffList } from '../../lib/listPicks';
 import { addToList } from '../../lib/listActions'; // 0.9.5 (undo)
 import { genericName, nameHasSize } from '../../lib/naming';
 import { shareTextFile } from '../../lib/backup';
@@ -109,6 +109,7 @@ import { OtherSizesCard } from '../OtherSizes';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from './addPicks';
 import { addItemForLineUndoable, addItemFromPicks, pickedWords, saveStoreProducts } from './addSave';
 import { AlertPicker } from './Item';
+import { AlwaysTick, pickButtonsNote } from './addPickWords';
 
 /**
  * 0.9.5: "Search the shops" from the Pick sheet, for a list line that matches nothing in the pantry
@@ -124,6 +125,8 @@ export interface ForLine {
   onAlways: (on: boolean) => void;
   /** The line now is this item (`made`: a new one). `linked` false: the line had gone meanwhile. */
   onDone: (group: { id: string; name: string }, made: boolean, linked: boolean) => void;
+  /** 0.9.11: "Add to list" (no pantry item): the line was replaced, so the sheet just closes. */
+  onListed: () => void;
 }
 
 type ChainResult =
@@ -899,16 +902,18 @@ export function AddScreen({
       const first = [...picks.values()][0];
       const itemName = name.trim() || genericName(first.name, first.brand);
       const item = { name: itemName, section, categoryId, alertLevel, alertPct, allowBulk, allowMulti };
-      if (forLine) {
-        // From the Pick sheet: the new item, and the list line becomes it.
-        // 0.9.5 (final review): with an Undo, as every other add.
+      if (forLine && target !== 'list') {
+        // From the Pick sheet: the new item, and the list line becomes it ("both"), or comes off the
+        // list ("pantry", 0.9.11). 0.9.5 (final review): with an Undo, as every other add.
+        const off = target === 'pantry';
         const { group, linked } = await addItemForLineUndoable(
           forLine.entry,
           picks.values(),
           item,
           forLine.always,
-          (r) => pickedWords(r.group.name, { made: true, linked: r.linked, always: forLine.always, word: forLine.word, place: SECTION_PLACE[section] }),
+          (r) => pickedWords(r.group.name, { made: true, linked: r.linked, always: forLine.always, word: forLine.word, place: SECTION_PLACE[section], off }),
           barcodeFor,
+          off ? 'pantry' : 'both',
         );
         reset();
         forLine.onDone(group, true, linked);
@@ -951,10 +956,13 @@ export function AddScreen({
           checked: false,
           createdAt: nowIso(),
         });
-        if (replaceEntry) await deleteListEntries([replaceEntry]);
+        const old = replaceEntry ?? forLine?.entry.id;
+        if (old) await deleteListEntries([old]);
       }
       });
       reset();
+      // 0.9.11: "Add to list" from the Pick sheet: the line is now this product, and the sheet closes.
+      if (forLine) return forLine.onListed();
       if (overlay) nav.pop();
       if (groupId) nav.push({ name: 'item', groupId });
     } finally {
@@ -1826,16 +1834,7 @@ export function AddScreen({
                   <AlertPicker level={alertLevel} pct={alertPct} onChange={(l, p) => (setAlertLevel(l), setAlertPct(p))} />
                 </div>
               </details>
-              <label className="check" style={{ padding: '4px 2px', minHeight: 44 }}>
-                <input type="checkbox" checked={forLine.always} onChange={(e) => forLine.onAlways(e.target.checked)} />
-                <span>Always use this for "{forLine.word}"</span>
-              </label>
-              <button className="btn primary" onClick={() => save('pantry')} disabled={saving}>
-                <Icon name="pantry" size={18} /> Add to pantry
-              </button>
-              <p className="small" style={{ margin: 0 }}>
-                The "{forLine.entry.text}" line on your Shopping list becomes this item, with its price and cheapest shop.
-              </p>
+              <PickButtons forLine={forLine} section={section} saving={saving} onSave={(t) => void save(t)} />
             </>
           ) : (
             forList && !attachGroup ? (
@@ -2044,7 +2043,9 @@ export function ManualSheet({
           // 0.9.6 (review H1): never a list line at Costco (it is shared): "Any shop", and it says so.
           const atCostco = isLocalOnlyShop(chain);
           await addListEntry({ id: uid(), text: n, chain: atCostco ? undefined : chain, categoryId: categoryId || undefined, section, checked: false, createdAt: nowIso() });
-          return { said: `${n} added to your shopping list${atCostco ? `. ${COSTCO_LIST_NOTE}` : ''}`, after: () => onDone() };
+          // 0.9.11: from the Pick sheet, this replaces the line.
+          if (forLine) await deleteListEntries([forLine.entry.id]);
+          return { said: `${n} added to your shopping list${atCostco ? `. ${COSTCO_LIST_NOTE}` : ''}`, after: () => (forLine ? forLine.onListed() : onDone()) };
         }
         const id = uid();
         await addProduct({ id, chain, name: n, size: size || undefined, barcode: as === 'main' ? barcode : undefined, createdAt: nowIso() });
@@ -2073,8 +2074,13 @@ export function ManualSheet({
           createdAt: nowIso(),
         });
         if (forLine) {
-          const linked = await pickItemFor(forLine.entry, { id: groupId, name: n }, forLine.always);
-          return { after: () => forLine.onDone({ id: groupId, name: n }, true, linked) };
+          // 0.9.11: "Add to both" (the line becomes it) or "Add to pantry" (the line comes off the list).
+          const off = target === 'pantry';
+          const linked = await (off ? pickItemOffList : pickItemFor)(forLine.entry, { id: groupId, name: n }, forLine.always);
+          return {
+            said: pickedWords(n, { made: true, linked, always: forLine.always, word: forLine.word, place: SECTION_PLACE[section], off }),
+            after: () => forLine.onDone({ id: groupId, name: n }, true, linked),
+          };
         }
         if (target === 'both') {
           await addListEntry({ id: uid(), text: n, groupId, categoryId: categoryId || undefined, section, checked: false, createdAt: nowIso() });
@@ -2137,16 +2143,7 @@ export function ManualSheet({
       )}
       {forLine ? (
         <>
-          <label className="check" style={{ padding: '4px 2px', minHeight: 44 }}>
-            <input type="checkbox" checked={forLine.always} onChange={(e) => forLine.onAlways(e.target.checked)} />
-            <span>Always use this for "{forLine.word}"</span>
-          </label>
-          <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
-            Add to pantry
-          </button>
-          <p className="small" style={{ margin: 0 }}>
-            The "{forLine.entry.text}" line on your Shopping list becomes this item.
-          </p>
+          <PickButtons forLine={forLine} section={section} saving={saving || !name.trim()} onSave={(t) => void save(t)} />
         </>
       ) : attachTo ? (
         <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
@@ -2287,3 +2284,28 @@ export function tickedShops(picks: StoreProduct[]): string {
   for (const p of picks) counts.set(p.chain as StoreChain, (counts.get(p.chain as StoreChain) ?? 0) + 1);
   return [...counts].map(([c, n]) => (n > 1 ? `${chainName(c)} (${n})` : chainName(c))).join(', ');
 }
+
+/**
+ * 0.9.11: the end of "Pick my coconut cream", on the phone (shop search and Add by hand): the same
+ * three buttons as any add, and the "next time" tick (ticked to start with).
+ */
+export function PickButtons({ forLine, section, saving, onSave }: { forLine: ForLine; section: Section; saving: boolean; onSave: (t: 'both' | 'list' | 'pantry') => void }) {
+  return (
+    <>
+      <AlwaysTick forLine={forLine} />
+      <button className="btn primary" onClick={() => onSave('both')} disabled={saving}>
+        <Icon name="cart" size={18} /> Add to both
+      </button>
+      <div className="two">
+        <button className="btn" onClick={() => onSave('list')} disabled={saving}>
+          <Icon name="cart" size={18} /> Add to list
+        </button>
+        <button className="btn" onClick={() => onSave('pantry')} disabled={saving}>
+          <Icon name={section} size={18} /> Add to {SECTION_NAMES[section].toLowerCase()}
+        </button>
+      </div>
+      <p className="small" style={{ margin: 0 }}>{pickButtonsNote(SECTION_PLACE[section])}</p>
+    </>
+  );
+}
+

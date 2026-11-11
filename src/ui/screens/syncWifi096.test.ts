@@ -24,7 +24,7 @@ const house = (more: Partial<SyncInfo> = {}) =>
 describe('Wi-Fi sync in a server house (0.9.6)', () => {
   it('shows as an optional Wi-Fi sync that is off, never "Phones on your Wi-Fi: On"', () => {
     const off = html(house({ wifiSync: false }));
-    expect(off).toContain('Wi-Fi sync (phone to phone)');
+    expect(off).toContain('Phone sharing (Wi-Fi, optional)');
     expect(off).toContain('Off · optional');
     expect(off).not.toContain('Phones on your Wi-Fi');
   });

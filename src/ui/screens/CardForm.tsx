@@ -3,7 +3,7 @@
 // number, PIN, balance, expiry, reminder, notes, photos and colour. Update balance keeps a short
 // spend history.
 import { useRef, useState } from 'react';
-import { scanBarcode } from '../../lib/barcode';
+import { CARD_SCAN, scanBarcode } from '../../lib/barcode';
 import type { CardStore } from '../../lib/cardStore';
 import { nowIso, uid } from '../../lib/db';
 import {
@@ -99,7 +99,7 @@ function LoyaltyFields({ store, onAdded }: { store: CardStore; onAdded: (id: str
   const [error, setError] = useState<string>();
 
   const scan = async () => {
-    const out = await scanBarcode('Scan your card');
+    const out = await scanBarcode('Scan your card', CARD_SCAN);
     if (out.ok) setNumber(out.code);
   };
 
@@ -204,7 +204,7 @@ function GiftFields({ store, card, onSaved }: { store: CardStore; card?: GiftCar
   const inputs = { front: useRef<HTMLInputElement>(null), back: useRef<HTMLInputElement>(null) };
 
   const scan = async () => {
-    const out = await scanBarcode('Scan the gift card');
+    const out = await scanBarcode('Scan the gift card', CARD_SCAN);
     if (!out.ok) return;
     setBarcode(out.code);
     setType(guessBarcodeType(out.code));

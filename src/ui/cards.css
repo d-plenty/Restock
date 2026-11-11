@@ -94,10 +94,14 @@
 .btn.cc-used-toggle {
   justify-content: space-between;
 }
-.cc-seg button {
+.seg.cc-seg button {
+  /* 0.9.11: the highlight grows with the words ("Everyday Rewards"), instead of a fixed 38 px pill. */
+  height: auto;
   min-height: 44px;
+  padding: 8px 6px;
   white-space: normal;
   line-height: 1.2;
+  text-align: center;
 }
 .cc-inline {
   display: flex;

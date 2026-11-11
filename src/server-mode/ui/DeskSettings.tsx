@@ -349,6 +349,13 @@ function HouseholdPart() {
               Server and phones
             </button>
           </Line>
+          {/* 0.9.11: the same ways as the phone's Sync and backups, in its order. */}
+          <Line title="Phone sharing" sub="No server · local Wi-Fi. Phones that use this server sync through it instead." greyed>
+            <WhereNote>Set on each phone</WhereNote>
+          </Line>
+          <Line title="A drive folder" sub="Backups to a folder on a phone (Documents/Restock backups, or one you choose)." greyed>
+            <WhereNote>Set on each phone</WhereNote>
+          </Line>
         </Group>
       ) : (
         <Group id="dk-s-household" title="Household">
@@ -617,6 +624,10 @@ function HouseholdPart() {
       <Group id="dk-s-shared" title="Shared prices">
         <Line title={'Judge new items from day one'} sub={'Downloaded by each phone.'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+        {/* 0.9.11 */}
+        <Line title={'Price helper phone'} sub={'A spare Android phone on its charger searches Coles and Woolworths for the shared price history.'} greyed>
+          <PhoneOnlyNote compact text="Set on that phone (Settings on the phone)." />
         </Line>
       </Group>
 

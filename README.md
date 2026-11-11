@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.9.10" src="https://img.shields.io/badge/status-release%20candidate%200.9.10-ffcd00">
+  <img alt="Release candidate 0.9.11" src="https://img.shields.io/badge/status-release%20candidate%200.9.11-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0910">New in 0.9.10</a> ·
+  <a href="#new-in-0911">New in 0.9.11</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -126,9 +126,19 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Accessibility**: bigger text, high contrast, less motion and bigger buttons, checked with an automatic accessibility audit.
 - **Updates**: Settings → About and updates → Check for updates, or turn on **Tell me when there's an update** to check every 24 hours (or every 7 days) when you open Restock. Or install through [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium and let them handle updates.
 - **Sharing prices**: product prices (shop, name, size, barcode and the prices on each day) are kept ready in your backups for a future shared price network. Nothing is sent anywhere yet, nothing about you is ever included, and the data will never be sold. Turn it off in Settings → Shared prices. See [Shared prices](#shared-prices).
-- **Shared price history (Beta)**: optionally download months of Coles and Woolworths history from [hotprices.org](https://hotprices.org) ([source](https://github.com/Javex/hotprices-au), MIT) so new items get a fair verdict from day one. Off by default.
+- **Shared price history (Beta)**: optionally download months of Coles, Woolworths, Aldi and Costco history from [restock-prices](https://github.com/d-plenty/restock-prices) (Restock's own weekly collection), with [hotprices.org](https://hotprices.org) ([source](https://github.com/Javex/hotprices-au), MIT) filling in Coles and Woolworths while it gets going, so new items get a fair verdict from day one. Off by default.
 
 </details>
+
+## New in 0.9.11
+
+- **Setup is shorter:** the welcome screen fits small phones, and setup no longer asks about price check times, widgets, updates, colours or the household's name. Price checks run once a day at 5:00 am, Restock tells you about updates, and the household starts as "Our house". Change any of them in Settings.
+- **Sync and backups:** the household's name is here now, then **Join your Restock server** (recommended), **Phone sharing** (no server, local Wi-Fi), a drive folder, and **Home Assistant**.
+- **Local backups** make a **Documents/Restock backups** folder for you. Change folder picks another.
+- **Cards:** the card scanner reads any barcode or QR code on a loyalty or gift card and fills in the number. The highlighted choices sit properly in their boxes.
+- **Pick my coconut cream:** the line's search button and "Pick my …" open the same search, which ends with **Add to both**, **Add to list** or **Add to pantry** (the line then comes off your list). "Next time "coconut cream" is added to your list, use this item" is ticked to start with. The same on the web page.
+- **Judge deals from day one** now reads [restock-prices](https://github.com/d-plenty/restock-prices), Restock's own weekly collection of Coles, Woolworths, Aldi and Costco prices, with hotprices.org filling in Coles and Woolworths while it gets going.
+- **Price helper phone:** Settings → Shared prices → Price helper phone. A spare Android phone left on its charger searches Coles and Woolworths for about 500 everyday things through the week (the first page of results each time, about one search every 10 minutes) and sends the products and prices to your restock-prices collector, for everyone's shared price history.
 
 ## New in 0.9.10
 
@@ -207,7 +217,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.9.10.apk` (on macOS, `shasum -a 256 restock-0.9.10.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.9.11.apk` (on macOS, `shasum -a 256 restock-0.9.11.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

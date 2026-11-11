@@ -47,6 +47,8 @@ async function doCheck(onProgress?: (done: number, total: number) => void, opts?
 export async function syncBackgroundSchedule(settings: Settings): Promise<{ due: boolean }> {
   if (!isNative()) return { due: false };
   const r = await RestockNative.scheduleChecks({ enabled: settings.sync.backgroundActivity, intervalHours: settings.checkIntervalHours });
+  // 0.9.11: and the price helper's half-hourly job (on only on a phone set up as one).
+  await RestockNative.priceHelperSchedule?.().catch(() => undefined);
   return { due: !!r.due };
 }
 

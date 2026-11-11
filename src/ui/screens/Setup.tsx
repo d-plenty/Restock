@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
+import { applyTheme } from '../../lib/theme';
 import type { BackupSummary } from '../../lib/backup';
 import { allCards, getSettings, updateSettings } from '../../lib/db';
 import { syncInfo } from '../../lib/sync';
 import legal from '../../lib/legal.json';
-import { downloadMarket, MARKET_SIZE_TEXT, MARKET_SOURCE } from '../../lib/market';
+import { downloadMarket, MARKET_FALLBACK, MARKET_SIZE_TEXT, MARKET_SOURCE_TEXT } from '../../lib/market';
 import { useLive } from '../../lib/useLive';
 import { enabledIn, sectionOn } from '../../shops';
 import { checkAll } from '../../lib/permissions';
@@ -208,25 +210,10 @@ const ALL_TILES: Tile[] = [
  * The order setup goes through them: how Restock looks and works for you first (text size,
  * permissions, colours, backups, price history), then your shops, then the add-ons.
  */
-const TILE_ORDER: TileId[] = [
-  'a11y',
-  'permissions',
-  'look',
-  'backups',
-  'history',
-  'pantry',
-  'keg',
-  'pharmacy',
-  'accounts',
-  'checks',
-  'alerts',
-  'receipts',
-  'recalls',
-  'household',
-  'sync',
-  'widgets',
-  'updates',
-];
+// 0.9.11: price checks, look and colours, household name, widgets and updates aren't asked in setup
+// any more: they start on their defaults (checks once a day at 5:00 am, updates every 24 hours,
+// "Our house") and are all in Settings. The household's name is set in Sync and backups.
+const TILE_ORDER: TileId[] = ['a11y', 'permissions', 'backups', 'history', 'pantry', 'keg', 'pharmacy', 'accounts', 'alerts', 'receipts', 'recalls', 'sync'];
 // The Updates tile only where Restock updates itself from GitHub (not F-Droid builds).
 export const TILES: Tile[] = TILE_ORDER.filter((id) => SELF_UPDATE || id !== 'updates').map((id) => ALL_TILES.find((t) => t.id === id)!);
 
@@ -350,6 +337,15 @@ function FlagBackground() {
 }
 
 function Welcome({ onSetUp, onRestore, onJoin }: { onSetUp: () => void; onRestore: () => void; onJoin: () => void }) {
+  // 0.9.10: navy behind the clock and the gesture bar, with light icons, while the welcome shows.
+  useEffect(() => {
+    document.documentElement.classList.add('on-welcome');
+    if (Capacitor.isNativePlatform()) SystemBars.setStyle({ style: SystemBarsStyle.Dark }).catch(() => undefined);
+    return () => {
+      document.documentElement.classList.remove('on-welcome');
+      void getSettings().then((s) => applyTheme(s)).catch(() => undefined);
+    };
+  }, []);
   return (
     <div className="welcome">
       <FlagBackground />
@@ -394,9 +390,9 @@ function MarketSetup({ settings }: { settings: Settings }) {
     <div className="card">
       <div className="title">Download shared price history</div>
       <p className="small">
-        Restock can download months of real Coles and Woolworths prices collected by public price trackers (for now, {MARKET_SOURCE}, an open-source
-        project that records both shops every day). From that it works out each product's usual price, usual sale price and how often it goes on
-        sale, so new items get a proper verdict straight away. Aldi isn't covered yet.
+        Restock can download months of real Coles, Woolworths, Aldi and Costco prices from {MARKET_SOURCE_TEXT}, with {MARKET_FALLBACK} (an
+        open-source tracker) filling in Coles and Woolworths while it gets going. From that it works out each product's usual price, usual sale
+        price and how often it goes on sale, so new items get a proper verdict straight away.
       </p>
       <ul className="ticks">
         <li>
@@ -490,7 +486,7 @@ function BackupsTile({ settings }: { settings: Settings }) {
         <button className="row" onClick={() => nav.push({ name: 'sync' })}>
           <Icon name="swap" size={18} />
           <span className="grow">
-            <span className="title">{p.phones ? 'Phones on your Wi-Fi are on' : 'Phones on your Wi-Fi'}</span>
+            <span className="title">{p.phones ? 'Phone sharing is on' : 'Phone sharing (no server, local Wi-Fi)'}</span>
             <span className="small">Your other phones keep a copy. Works with no internet and no server.</span>
           </span>
           <Icon name="chevron" size={18} />
@@ -523,7 +519,7 @@ function SyncTile() {
       <button className="row" onClick={() => nav.push({ name: 'sync' })}>
         <Icon name="refresh" size={18} />
         <span className="grow">
-          <span className="title">{info?.paired && !info.house ? 'Phones on your Wi-Fi are on' : 'Phones on your Wi-Fi (no server)'}</span>
+          <span className="title">{info?.paired && !info.house ? 'Phone sharing is on' : 'Phone sharing (no server, local Wi-Fi)'}</span>
           <span className="small">{info?.paired && !info.house ? syncSummary(info) : 'Phones swap changes straight to each other on the same Wi-Fi. Nothing leaves your home.'}</span>
         </span>
         <Icon name="chevron" size={18} />

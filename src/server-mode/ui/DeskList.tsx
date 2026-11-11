@@ -406,7 +406,7 @@ export function DeskList() {
         </div>
       )}
 
-      {picking && <PickItemSheet entry={picking} onClose={() => setPicking(undefined)} />}
+      {picking && <PickItemSheet entry={picking} fromHa={!!toPick?.has(picking.id)} onClose={() => setPicking(undefined)} />}
       {editing && (
         <EditEntry
           entry={editing}
@@ -415,6 +415,7 @@ export function DeskList() {
           deal={dealFor(c, editing) ?? recFor(c, editing)?.options[0]}
           name={recFor(c, editing)?.group.name}
           lists={sectionsOn /* 0.9.6 (Move to) */}
+          onPick={setPicking /* 0.9.11: the same Pick sheet as the phone */}
           onClose={() => setEditing(undefined)}
         />
       )}

@@ -1729,7 +1729,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
 
       {!isHouse && (
       <div className="card" style={{ gap: 8 }}>
-        <strong>Phones on your Wi-Fi: one pantry and list for the whole house</strong>
+        <strong>Phone sharing (no server, local Wi-Fi): one pantry and list for the whole house</strong>
         <span className="small">
           Phones in your household swap changes <strong>straight from one phone to another</strong> on your own Wi-Fi: pantry, shopping list (ticks
           too), prices, categories and alerts. With your own Restock server they also sync anywhere, around the clock; without one, a cloud drive
@@ -1934,7 +1934,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
               <input type="checkbox" className="switch" checked={wifiSyncOn(sh(info))} onChange={(e) => void setWifi(e.target.checked)} />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <span className="title" style={{ fontSize: 15 }}>
-                  Phones on your Wi-Fi
+                  Phone sharing (no server, local Wi-Fi)
                 </span>
                 <span className="small">
                   {wifiSyncOn(sh(info))

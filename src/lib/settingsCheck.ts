@@ -223,13 +223,26 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
           told: text(s.updates.told, 40),
           everyDays: s.updates.everyDays === 7 ? 7 : undefined,
         })
-      : undefined,
+      : D.updates,
     privacyAccepted: text(s.privacyAccepted, 60),
     seenHints: words(s.seenHints, [...D.seenHints]),
     seenTabOffers: tabs(s.seenTabOffers),
     lastBackupAt: when(s.lastBackupAt),
     backupNudgeAt: when(s.backupNudgeAt),
     marketData: { enabled: bool(md.enabled, D.marketData.enabled), wifiOnly: bool(md.wifiOnly, D.marketData.wifiOnly) },
+    // 0.9.11: price helper phone mode.
+    ...(isObj(s.priceHelper)
+      ? {
+          priceHelper: {
+            enabled: bool(s.priceHelper.enabled, false),
+            url: text(s.priceHelper.url, 200),
+            key: text(s.priceHelper.key, 200),
+            searches: Array.isArray(s.priceHelper.searches)
+              ? (s.priceHelper.searches as unknown[]).filter((x): x is string => typeof x === 'string' && !!x.trim() && x.length <= 60).slice(0, 1000)
+              : undefined,
+          },
+        }
+      : {}),
     area: areaOf(s.area),
     lastCheck: when(s.lastCheck),
     demoLoaded: maybeBool(s.demoLoaded),

@@ -1760,20 +1760,24 @@ table.nutrition td.num {
 
 /* ---------- welcome ---------- */
 .welcome {
-  position: relative;
-  min-height: 100%;
-  overflow: hidden;
+  /* 0.9.10: the whole screen, behind the clock and the gesture bar too, and it scrolls on short phones. */
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--brand-navy);
   color: var(--on-navy);
 }
 .welcome-flag {
-  position: absolute;
+  position: fixed;
   inset: 0;
   width: 100%;
   height: 100%;
 }
 .welcome-shade {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background:
     linear-gradient(to bottom, transparent 0, transparent 58%, rgba(1, 24, 80, 0.55) 66%, rgba(1, 24, 80, 0.55) 88%, transparent 100%),
@@ -1782,12 +1786,15 @@ table.nutrition td.num {
 .welcome-body {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  min-height: 100%;
+  box-sizing: border-box;
+  max-width: 560px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: calc(var(--top) + 56px) 26px calc(var(--bottom) + 26px);
+  padding: calc(var(--top) + clamp(16px, 5vh, 56px)) 22px calc(var(--bottom) + 20px);
 }
 .welcome-body svg {
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
@@ -4381,4 +4388,27 @@ button.sync-choice:disabled {
 /* 0.9.8: a dark card colour still shows on true black. */
 .swatch {
   box-shadow: 0 0 0 1.5px var(--line, rgba(127, 127, 127, 0.5));
+}
+
+/* 0.9.10: shorter phones (and bigger text): everything still fits, smaller gaps first. */
+@media (max-height: 820px) {
+  .welcome-body svg { width: 84px; height: 84px; }
+  .welcome-hello { margin-top: 14px; font-size: var(--fs-body); }
+  .welcome-brand { font-size: calc(var(--fs-display) * 0.85); }
+  .welcome-tag { margin-top: 10px; font-size: var(--fs-2xl); }
+  .welcome-desc { margin-top: 10px; font-size: var(--fs-body); }
+  .welcome-tag2 { margin-top: 10px; font-size: var(--fs-lg); }
+  .welcome-made { margin-top: 14px; font-size: var(--fs-md); }
+  .welcome-free { font-size: var(--fs-md); }
+  .welcome-actions { padding-top: 18px; gap: 8px; }
+  .welcome-go { padding: 15px; }
+}
+@media (max-height: 680px) {
+  .welcome-body svg { width: 64px; height: 64px; }
+  .welcome-tag2 { display: none; }
+}
+html.on-welcome,
+html.on-welcome body,
+html.on-welcome #root {
+  background: var(--brand-navy);
 }

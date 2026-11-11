@@ -100,7 +100,7 @@ const LEGEND = (
 );
 
 function basisText(o: Option): string {
-  if (o.stats.fromMarket) return 'shared price history (hotprices.org), matched to your shop';
+  if (o.stats.fromMarket) return 'shared price history, matched to your shop';
   if (o.verdict.basis === 'history') return `the ${o.stats.spanDays} days of prices Restock has seen`;
   if (o.verdict.basis === 'was-price') return 'the shop\'s own "was" price (Restock is still learning this one)';
   return 'nothing yet';

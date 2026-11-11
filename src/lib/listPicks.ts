@@ -188,6 +188,19 @@ export async function pickItemFor(entry: ListEntry, group: { id: string; name: s
   return true;
 }
 
+/**
+ * 0.9.11: "Add to pantry" from the Pick sheet: the item is in the pantry now, so the line comes off
+ * the list ("Next time … use this item" still saved). False when the line had gone meanwhile.
+ */
+export async function pickItemOffList(entry: ListEntry, group: { id: string; name: string }, always: boolean): Promise<boolean> {
+  if (always) await saveAlias(pickWord(entry.text), group.id);
+  const now = (await allListEntries()).find((e) => e.id === entry.id);
+  await dropLegacy(entry.id);
+  if (!now) return false;
+  await deleteListEntries([now.id]);
+  return true;
+}
+
 /** "Keep it as just milk": the button goes on every phone and the web, and the line stays as it is. */
 export async function keepAsWords(entryId: string): Promise<void> {
   const k = KEEP_PREFIX + entryId;

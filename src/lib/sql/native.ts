@@ -13,6 +13,10 @@ export interface RestockNativePlugin {
    * says on or off. `due`: a set time passed with no check (the phone was off), so run one now.
    */
   scheduleChecks(opts: { enabled: boolean; intervalHours?: number }): Promise<{ scheduled: boolean; due?: boolean }>;
+  /** 0.9.11: price helper phone mode (PriceHelper.java). */
+  priceHelperSchedule(): Promise<void>;
+  priceHelperRunNow(): Promise<void>;
+  priceHelperTest(opts: { url: string; key: string }): Promise<{ ok: boolean; status?: number; error?: string }>;
   /**
    * Run a price check now, in native code, and wait for it. `slot`: this is the catch-up for a
    * missed set time (counts that time as done). A plain check never moves the schedule.
@@ -95,6 +99,8 @@ export interface RestockNativePlugin {
   }): Promise<{ started?: boolean; needsPermission?: boolean; notified?: boolean; sha256Checked?: boolean }>;
   /** Pick a folder for automatic backups (Android's folder picker). Rejects if cancelled. */
   pickFolder(): Promise<{ uri: string; name: string }>;
+  /** 0.9.11: Documents/Restock backups, made by Restock itself (Android 10+). */
+  backupDocuments(): Promise<{ available: boolean; uri: string; name: string }>;
   /** Write a backup file into the picked folder, keeping the newest `keep` Restock backups there. */
   writeBackup(opts: { uri: string; name: string; json: string; keep: number }): Promise<{ written: string; removed: number }>;
   /** Save, read or delete a file in Restock's private storage (receipt photos). Data is base64. */

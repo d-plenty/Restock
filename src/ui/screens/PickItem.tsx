@@ -4,13 +4,14 @@ import { searchItems } from '../../lib/haMatch';
 import { keepAsWords, pickItemFor, pickWord } from '../../lib/homeAssistant';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { useLive } from '../../lib/useLive';
-import { enabledIn } from '../../shops';
+import { enabledIn, SECTION_PLACE, type Section } from '../../shops';
 import { isNative } from '../../stores/http';
 import { serverMode, serverUi } from '../../server-mode/flag'; // 0.9.5 (web search)
 import type { ListEntry } from '../../types';
 import { Icon, Sheet, useBackLayer } from '../components';
 import { useNav } from '../nav';
 import type { ForLine } from './Add';
+import { alwaysWords } from './addPickWords';
 import { pickedWords } from './addSave';
 
 // Loaded when first needed: the web app on a Restock server uses this sheet too, and never searches
@@ -44,11 +45,18 @@ function useOnline(): boolean {
  * its picks, and the line becomes it ("Always use this for chopsticks" saved for the new item). Or
  * add it by hand, which works offline.
  */
-export function PickItemSheet({ entry, onClose }: { entry: ListEntry; onClose: () => void }) {
+/**
+ * 0.9.11: every "Pick my coconut cream" opens this sheet: the line's search button, the button under
+ * a Home Assistant line, and the one in the line's ⋯ sheet. Its own list's items (a Keg or Health
+ * line looks in those), and the "next time" tick starts ticked.
+ */
+export function PickItemSheet({ entry, onClose, fromHa = true }: { entry: ListEntry; onClose: () => void; fromHa?: boolean }) {
   const nav = useNav();
   const word = pickWord(entry.text);
+  const section: Section = !entry.section || entry.section === 'general' ? 'pantry' : entry.section;
+  const place = SECTION_PLACE[section];
   const [query, setQuery] = useState(word);
-  const [always, setAlways] = useState(false);
+  const [always, setAlways] = useState(true);
   const [busy, setBusy] = useState(false);
   /** The words searched at the shops, while that search is showing. */
   const [shopsFor, setShopsFor] = useState<string>();
@@ -57,11 +65,11 @@ export function PickItemSheet({ entry, onClose }: { entry: ListEntry; onClose: (
   const native = isNative();
   // 0.9.5 (web search): on a Restock server's web page, its shop search (when the household turned it on).
   const web = !native && serverMode ? serverUi.current?.webSearch : undefined;
-  const pantry = useLive(async () => (await allGroups()).filter((g) => (g.section ?? 'pantry') === 'pantry'), []);
+  const pantry = useLive(async () => (await allGroups()).filter((g) => (g.section ?? 'pantry') === section), [section]);
   const extras = useLive(async () => {
     const [cats, s] = await Promise.all([allCategories(), getSettings()]);
-    return { categories: cats.filter((c) => c.section === 'pantry'), shops: enabledIn(s.enabledChains, 'pantry') };
-  }, []);
+    return { categories: cats.filter((c) => c.section === section), shops: enabledIn(s.enabledChains, section) };
+  }, [section]);
   const shown = pantry ? searchItems(query, pantry).slice(0, 40) : [];
   const typed = query.trim() || word;
   const top = useRef<HTMLDivElement>(null);
@@ -94,7 +102,7 @@ export function PickItemSheet({ entry, onClose }: { entry: ListEntry; onClose: (
     }
   };
 
-  const forLine: ForLine = { entry, word, always, onAlways: setAlways, onDone: (g, made, linked) => done(g, linked, made) };
+  const forLine: ForLine = { entry, word, always, onAlways: setAlways, onDone: (g, made, linked) => done(g, linked, made), onListed: onClose };
 
   if (shopsFor !== undefined)
     return (
@@ -104,11 +112,12 @@ export function PickItemSheet({ entry, onClose }: { entry: ListEntry; onClose: (
           <span style={{ display: 'inline-flex', transform: 'rotate(180deg)' }}>
             <Icon name="chevron" size={16} />
           </span>{' '}
-          Back to your pantry
+          Back to {place}
         </button>
         {web ? (
           // 0.9.5 (web search): the server searches the shops; the same ticks, bar and sheet.
           <web.PickResults
+            section={section}
             key={shopsFor}
             query={shopsFor}
             entry={entry}
@@ -122,7 +131,7 @@ export function PickItemSheet({ entry, onClose }: { entry: ListEntry; onClose: (
           />
         ) : (
           <Suspense fallback={<p className="small">Getting the shop search ready…</p>}>
-            <AddScreen key={shopsFor} query={shopsFor} section="pantry" forLine={forLine} />
+            <AddScreen key={shopsFor} query={shopsFor} section={section} forLine={forLine} />
           </Suspense>
         )}
       </Sheet>
@@ -135,12 +144,12 @@ export function PickItemSheet({ entry, onClose }: { entry: ListEntry; onClose: (
   ) : !native ? (
     <div className="banner grey">
       <strong>Shop search works in the Android app</strong>
-      <span style={{ fontSize: 13 }}>Here you can still pick a pantry item, or keep it as just the words.</span>
+      <span style={{ fontSize: 13 }}>Here you can still pick one of your items, or keep it as just the words.</span>
     </div>
   ) : !online ? (
     <>
       <div className="banner grey" role="status">
-        <span style={{ fontSize: 14 }}>Searching the shops needs the internet. You can still pick a pantry item or add it by hand.</span>
+        <span style={{ fontSize: 14 }}>Searching the shops needs the internet. You can still pick one of your items or add it by hand.</span>
       </div>
       <button className="btn" disabled={busy} onClick={() => setByHand(true)}>
         Add "{word}" by hand
@@ -161,8 +170,8 @@ export function PickItemSheet({ entry, onClose }: { entry: ListEntry; onClose: (
     <Sheet title={`Pick my ${word}`} onClose={onClose}>
       <div ref={top} style={{ display: 'contents' }} />
       <p className="small" style={{ margin: 0 }}>
-        "{entry.text}" came from Home Assistant. Which of your pantry items is it? Restock then shows its price and cheapest shop, and Home Assistant
-        gets its name.
+        {fromHa ? `"${entry.text}" came from Home Assistant. ` : ''}Which of the items in {place} is it? Or search the shops for it. Restock then shows its
+        price and cheapest shop{fromHa ? ', and Home Assistant gets its name.' : '.'}
       </p>
       <div className="settings-search">
         <Icon name="search" size={18} />
@@ -170,14 +179,14 @@ export function PickItemSheet({ entry, onClose }: { entry: ListEntry; onClose: (
           className="input"
           type="search"
           value={query}
-          placeholder="Search your pantry"
-          aria-label="Search your pantry"
+          placeholder={`Search ${place}`}
+          aria-label={`Search ${place}`}
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
       <label className="check" style={{ padding: '4px 2px', minHeight: 44 }}>
         <input type="checkbox" checked={always} onChange={(e) => setAlways(e.target.checked)} />
-        <span>Always use this for "{word}"</span>
+        <span>{alwaysWords(word)}</span>
       </label>
       <div className="card flush">
         {shown.map((g) => (
@@ -191,7 +200,7 @@ export function PickItemSheet({ entry, onClose }: { entry: ListEntry; onClose: (
         {pantry && !shown.length && (
           <div className="row" role="status">
             <span className="small">
-              Nothing in your pantry matches "{query.trim()}". {native && online ? 'Try another word, or search the shops.' : 'Try another word.'}
+              Nothing in {place} matches "{query.trim()}". {native && online ? 'Try another word, or search the shops.' : 'Try another word.'}
             </span>
           </div>
         )}
@@ -213,7 +222,7 @@ export function PickItemSheet({ entry, onClose }: { entry: ListEntry; onClose: (
             as="main"
             defaultName={typed.charAt(0).toUpperCase() + typed.slice(1)}
             categories={extras?.categories ?? []}
-            section="pantry"
+            section={section}
             shops={extras?.shops ?? []}
             forLine={forLine}
             onClose={() => setByHand(false)}

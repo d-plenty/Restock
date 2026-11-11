@@ -81,7 +81,9 @@ No service, for receipts: the receipt reader (Tesseract, open-source text recogn
 
 Store catalogue links open in your phone's web browser, under that website's own policy.
 
-hotprices.org, only if you choose shared price history during setup or turn it on in Settings. It's an open-source project that records Coles and Woolworths prices every day. Restock downloads its public price files, the same for everyone, and keeps a short summary per product. Nothing about you or what you track is sent. Restock is testing this and plans to ask the project for permission before any public release.
+GitHub (raw.githubusercontent.com, the restock-prices project) and hotprices.org, only if you choose shared price history during setup or turn it on in Settings. restock-prices is Restock's own weekly collection of Coles, Woolworths, Aldi and Costco shelf prices, published openly on GitHub; hotprices.org is an open-source project that records Coles and Woolworths prices every day, used for those two shops while restock-prices has no file for them yet. Restock downloads the public price files, the same for everyone, and keeps a short summary per product. Nothing about you or what you track is sent.
+
+Your own restock-prices collector, only on a phone you set up as a price helper (Settings → Shared prices → Price helper phone). That phone searches Coles and Woolworths for everyday things while it charges, and sends the products and shelf prices it found, plus the newest prices of your household's own Coles and Woolworths products, to the collector address you type in, with the key you type in. Nothing about you, your list, cards or receipts is sent. The collector publishes them in restock-prices, without saying where they came from.
 
 GitHub (github.com), only when you tap Check for updates in Settings, or once a week if you turn on "Tell me when there's an update". Restock asks for the latest release's version number and notes, and if you tap Update, downloads the new APK from there. Nothing about you or what you track is sent.
 
