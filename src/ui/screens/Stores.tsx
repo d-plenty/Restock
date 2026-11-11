@@ -15,6 +15,7 @@ import {
   hostOf,
   SECTION_NAMES,
   SECTION_SHOPS,
+  sectionOf,
   sectionOn,
   shopDef,
   shopsIn,
@@ -98,7 +99,7 @@ export function cleanStoreName(name: string | undefined): string | undefined {
   );
 }
 
-function NearbyFinder({ settings, section }: { settings: Settings; section: Section }) {
+function NearbyFinder({ settings, section, only }: { settings: Settings; section: Section; only?: StoreChain }) {
   const [q, setQ] = useState('');
   const [areas, setAreas] = useState<Area[]>();
   const [stores, setStores] = useState<NearbyStore[]>();
@@ -112,7 +113,8 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
   const [deep, setDeep] = useState(false);
   const [expanded, setExpanded] = useState<Set<StoreChain>>(new Set());
   const what = SECTION_SHOPS[section];
-  const picked: StoreChain[] = enabledIn(settings.enabledChains, section);
+  // 0.9.9 (0.9.10): in a shop's Edit sheet, only that shop's branches.
+  const picked: StoreChain[] = only ? [only] : enabledIn(settings.enabledChains, section);
 
   const loadStores = async (area: Area, harder = false) => {
     setAreas(undefined);
@@ -136,7 +138,14 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
         setDeep(true);
         setOnlyMine(true);
       } else {
-        setStores(await nearbyStores(area.lat, area.lon, section));
+        const found = await nearbyStores(area.lat, area.lon, section);
+        // One shop: its branches the map knows, and the same shop looked up by name as well.
+        if (only) {
+          const mine = found.filter((x) => x.chain === only);
+          const more = mine.length >= 2 ? [] : await findPickedShops(area.lat, area.lon, section, [only]).catch(() => [] as NearbyStore[]);
+          const have = new Set(mine.map((x) => x.id ?? `${x.chain}:${x.lat},${x.lon}`));
+          setStores([...mine, ...more.filter((x) => x.chain === only && !have.has(x.id ?? `${x.chain}:${x.lat},${x.lon}`))]);
+        } else setStores(found);
       }
     } catch (e) {
       setError(errText(e));
@@ -228,12 +237,12 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
     }
   };
 
-  const list = (stores ?? []).filter((s) => !onlyMine || !picked.length || picked.includes(s.chain));
-  const label = SECTION_NAMES[section] === 'Pantry' ? 'supermarkets' : what;
+  const list = (stores ?? []).filter((s) => (only ? s.chain === only : !onlyMine || !picked.length || picked.includes(s.chain)));
+  const label = only ? chainName(only) : SECTION_NAMES[section] === 'Pantry' ? 'supermarkets' : what;
 
   return (
     <div className="card">
-      <div className="title">Your nearest {label}</div>
+      <div className="title">{only ? `${label} near you` : `Your nearest ${label}`}</div>
       <p className="small" style={{ marginTop: -4 }}>
         Tap <strong>Primary</strong> on the branch you usually go to, and <strong>2nd</strong> on another if you have one. Picking a branch also picks
         its shop.
@@ -301,7 +310,7 @@ function NearbyFinder({ settings, section }: { settings: Settings; section: Sect
               ? `${list.length} ${onlyMine && picked.length ? `of your ${label}` : label} near ${(settings.area?.label ?? 'you').replace(/\s+[A-Z]{2,3}\s+\d{4}$/, '')}, closest first.`
               : `No ${label} Restock knows within 25 km of ${settings.area?.label ?? 'there'}.`}
           </span>
-          {picked.length > 0 && stores.length > 0 && (
+          {!only && picked.length > 0 && stores.length > 0 && (
             <div className="seg" role="radiogroup" aria-label="Which branches">
               <button role="radio" aria-checked={onlyMine} className={onlyMine ? 'on' : ''} onClick={() => setOnlyMine(true)}>
                 My shops
@@ -1381,6 +1390,35 @@ function ShopEdit({ settings, chain }: { settings: Settings; chain: StoreChain }
   );
 }
 
+/** 0.9.10: the branch names typed by hand, behind a button: the map is the first way. */
+function BranchByHand({ chain, choice, onSet }: { chain: StoreChain; choice: StoreChoice; onSet: (key: 'primary' | 'secondary', value: string) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  if (!open)
+    return (
+      <button className="btn small ghost" onClick={() => setOpen(true)}>
+        <Icon name="pencil" size={16} /> Enter a branch yourself
+      </button>
+    );
+  return (
+    <div className="two">
+      <input
+        className="input"
+        placeholder={`${chainName(chain)} branch name`}
+        aria-label={`${chainName(chain)} main branch`}
+        defaultValue={choice.primary ?? ''}
+        onBlur={(e) => void onSet('primary', e.target.value.trim())}
+      />
+      <input
+        className="input"
+        placeholder="Second (optional)"
+        aria-label={`${chainName(chain)} second branch`}
+        defaultValue={choice.secondary ?? ''}
+        onBlur={(e) => void onSet('secondary', e.target.value.trim())}
+      />
+    </div>
+  );
+}
+
 function ShopEditSheet({ settings, chain, onClose }: { settings: Settings; chain: StoreChain; onClose: () => void }) {
   const s = storeChoice(settings, chain);
   const setStore = async (key: 'primary' | 'secondary', value: string) => {
@@ -1391,25 +1429,12 @@ function ShopEditSheet({ settings, chain, onClose }: { settings: Settings; chain
   return (
     <Sheet title={chainName(chain)} onClose={onClose}>
       <div className="eyebrow">Branches</div>
-      <div className="two">
-        <input
-          className="input"
-          placeholder="Main branch"
-          aria-label={`${chainName(chain)} main branch`}
-          defaultValue={s.primary ?? ''}
-          onBlur={(e) => void setStore('primary', e.target.value.trim())}
-        />
-        <input
-          className="input"
-          placeholder="Second (optional)"
-          aria-label={`${chainName(chain)} second branch`}
-          defaultValue={s.secondary ?? ''}
-          onBlur={(e) => void setStore('secondary', e.target.value.trim())}
-        />
-      </div>
       <p className="small" style={{ margin: 0 }}>
-        Or close this and use <strong>Your branches</strong> on this screen to find them on the map.
+        {[s.primary && `Main: ${s.primary}`, s.secondary && `2nd: ${s.secondary}`].filter(Boolean).join(' · ') || 'No branch picked yet.'}
       </p>
+      {/* 0.9.10: find this shop's own branches nearby, then tap Primary or 2nd. Typing is the fallback. */}
+      <NearbyFinder settings={settings} section={sectionOf(chain)} only={chain} />
+      <BranchByHand chain={chain} choice={s} onSet={setStore} />
 
       <div className="eyebrow">Sign in and your store</div>
       {chain === 'woolworths' && <WoolworthsAccount settings={settings} inline />}

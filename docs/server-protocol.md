@@ -865,3 +865,7 @@ plain JSON.
 ## 0.9.9: what changed on the wire
 
 - **Nothing.** Stock tags, the shop Edit sheet and branch advice use what phones already sync (`products.in_stock`, `in_stock2`, `stock_at`, the shop picks).
+
+## 0.9.10: what changed on the wire
+
+- **Nothing.**

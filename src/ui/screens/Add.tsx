@@ -999,7 +999,7 @@ export function AddScreen({
           ? `Find it at ${chainName(onlyChain)}`
           : 'Find at another shop'
     : forList
-      ? 'Find the cheapest'
+      ? 'Pick the one you buy'
       : 'Add an item';
   const hint = attachGroup
     ? as === 'alt'

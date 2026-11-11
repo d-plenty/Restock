@@ -1,0 +1,1 @@
+Each shop's Edit sheet now finds that shop's own branches near you (Woolworths only shows Woolworths, and so on), with Enter a branch yourself as a fallback. Lines that aren't one of your items yet say Pick my cordial on the phone and the web page alike.

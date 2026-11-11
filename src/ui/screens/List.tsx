@@ -476,7 +476,7 @@ export function ListScreen() {
           {!selecting && !e.groupId && (
             <button
               className="icon-btn"
-              aria-label={`Find the cheapest ${title}`}
+              aria-label={`Pick my ${pickWord(e.text)}`}
               onClick={() => nav.push({ name: 'add', query: e.text, forList: true, replaceEntry: e.id, section: searchTabOf(e.section) })}
               style={{ width: 36, height: 36 }}
             >
@@ -1557,8 +1557,14 @@ export function EditEntry({
             nav.push({ name: 'add', query: entry.text, forList: true, replaceEntry: entry.id, section: searchTabOf(entry.section) });
           }}
         >
-          <Icon name="search" size={18} /> {oneOff ? 'Find a cheaper one' : 'Find the cheapest'}
+          <Icon name="search" size={18} /> {oneOff ? 'Find a cheaper one' : `Pick my ${pickWord(entry.text)}`}
         </button>
+      )}
+      {/* 0.9.10: the same words on the phone and the web page: "Pick my cordial", then what it does. */}
+      {!linked && !oneOff && (
+        <p className="small" style={{ margin: '-4px 0 0' }}>
+          Search your shops and pick the one you buy. Restock then tracks where it's cheapest.
+        </p>
       )}
       <div className="two">
         <label className="field">
