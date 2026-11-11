@@ -861,3 +861,7 @@ plain JSON.
 ## 0.9.8: what changed on the wire
 
 - **Nothing.** No new record kinds, endpoints or settings keys. Costco's product search asks for 48 a page and pages with `currentPage` ("Get more from Costco"). Notifications carry a `restockAction` extra (`item:<id>`, `deals`, `catalogue`, `daily`, `cards`, `sync`, `updates`) that only the phone itself reads.
+
+## 0.9.9: what changed on the wire
+
+- **Nothing.** Stock tags, the shop Edit sheet and branch advice use what phones already sync (`products.in_stock`, `in_stock2`, `stock_at`, the shop picks).

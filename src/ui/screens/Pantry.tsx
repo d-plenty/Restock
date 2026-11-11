@@ -1,3 +1,4 @@
+import { StockTag } from '../StockTag';
 import { useFullRefresh } from '../refresh';
 import { useRef, useState } from 'react';
 import { allCategories, allListEntries, deleteGroup, updateGroup } from '../../lib/db';
@@ -323,12 +324,12 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                         {bothPrices(r.action === 'alt' ? r.alt : r.best) && (
                           <span className="small clip num">{bothPrices(r.action === 'alt' ? r.alt : r.best)}</span>
                         )}
-                        {(r.action !== 'none' || underTarget(r)) && (
-                          <span className="tags" style={{ marginTop: 3 }}>
-                            {r.action !== 'none' && <ActionInfoTag rec={r} action={r.action} great={r.best?.verdict.kind === 'great'} />}
-                            {underTarget(r) && <span className="tag good">UNDER {money(r.group.targetPrice)}</span>}
-                          </span>
-                        )}
+                        <span className="tags" style={{ marginTop: 3 }}>
+                          {r.action !== 'none' && <ActionInfoTag rec={r} action={r.action} great={r.best?.verdict.kind === 'great'} />}
+                          {underTarget(r) && <span className="tag good">UNDER {money(r.group.targetPrice)}</span>}
+                          {/* 0.9.9: stock at each shop, a tap away. */}
+                          {!editing && <StockTag products={mains.map((o) => o.product)} name={r.group.name} />}
+                        </span>
                       </span>
                       <span className="num small" style={{ fontWeight: 600 }}>
                         {money((r.action === 'alt' ? r.alt : r.best)?.price)}

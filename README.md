@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.9.8" src="https://img.shields.io/badge/status-release%20candidate%200.9.8-ffcd00">
+  <img alt="Release candidate 0.9.9" src="https://img.shields.io/badge/status-release%20candidate%200.9.9-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-098">New in 0.9.8</a> ·
+  <a href="#new-in-099">New in 0.9.9</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -130,6 +130,13 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 </details>
 
+## New in 0.9.9
+
+- **Every shop works the same:** on every tab, each shop has one line about how it works and an **Edit** button. Edit opens the same sheet for every shop, inside the app: branches, sign-in (or why there isn't one), stock and about.
+- **Stock on every item:** pantry items and shopping list lines say In stock, Out at a branch, or Stock unknown. Tap it to see each shop and branch, and when it was checked.
+- **Start shopping names the branch** ("Coles Thuringowa"), and suggests your other branch when your usual one is out of things.
+- The BETA tag is gone from Coles.
+
 ## New in 0.9.8
 
 - **My shops, tidied up:** every supermarket shows its sign-in (optional), its branch and an "About" with what works and what doesn't, right under its tick. Settings has one row per tab of shops.
@@ -195,7 +202,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.9.8.apk` (on macOS, `shasum -a 256 restock-0.9.8.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.9.9.apk` (on macOS, `shasum -a 256 restock-0.9.9.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

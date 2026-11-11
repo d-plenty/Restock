@@ -796,9 +796,7 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
                   </span>
                 </label>
                 {/* 0.9.8: each shop's sign-in, branch number and pros and cons, right under its tick. */}
-                {on && chain === 'woolworths' && <WoolworthsAccount settings={settings} inline />}
-                {on && chain === 'coles' && <ColesStore settings={settings} inline />}
-                {on && chain === 'aldi' && <AldiAbout />}
+                {on && <ShopEdit settings={settings} chain={chain} />}
               </div>
             );
           })}
@@ -897,7 +895,8 @@ function SelectedSummary({ settings, section }: { settings: Settings; section: S
       {chains.map((c) => {
         const st = storeChoice(settings, c);
         return (
-          <div key={c} className="row">
+          <div key={c}>
+          <div className="row">
             <ChainDot chain={c} />
             <span className="grow">
               <span className="title" style={{ fontSize: 15 }}>
@@ -905,6 +904,8 @@ function SelectedSummary({ settings, section }: { settings: Settings; section: S
               </span>
               <span className="small">{branchText(st)}</span>
             </span>
+          </div>
+          <ShopEdit settings={settings} chain={c} />
           </div>
         );
       })}
@@ -1214,7 +1215,6 @@ function ColesStore({ settings, inline }: { settings: Settings; inline?: boolean
     <AccountCard
       inlineShop={inline}
       chain="coles"
-      beta
       ok={on}
       status={
         on
@@ -1339,6 +1339,117 @@ function ColesStore({ settings, inline }: { settings: Settings; inline?: boolean
  * does that for a signed-in shopper, and Aldi doesn't share stock, so those stay as their websites
  * show them.
  */
+/** 0.9.9: what a shop tells Restock about stock at your branch, in one line. */
+function stockLine(settings: Settings, chain: string): string {
+  if (chain === 'woolworths')
+    return settings.accounts?.woolworths?.signedIn ? 'Stock at your signed-in Woolworths, at each price check.' : 'Sign in to see stock at your Woolworths. Woolworths only says it for the store on your account, so there\'s no second Woolworths for stock.';
+  if (chain === 'coles') return settings.localPrices && storeChoice(settings, 'coles').branchStoreNo ? 'Stock at your Coles, and at a second Coles if you add one.' : 'Pick your Coles branch (above) to see its stock.';
+  if (chain === 'aldi') return 'Aldi doesn\'t say what\'s in stock.';
+  if (chain === 'costco') return 'Costco doesn\'t say what\'s in stock at a warehouse.';
+  return 'This shop doesn\'t tell Restock about stock at your branch.';
+}
+
+/** 0.9.9: the short line under a shop's name: signed in or not, or how its prices work. */
+function shopStatus(settings: Settings, chain: string): string {
+  if (chain === 'woolworths') {
+    const a = settings.accounts?.woolworths;
+    return a?.signedIn ? `Signed in · prices and stock at ${a.storeName ?? 'your store'}` : 'Not signed in · online prices, no stock';
+  }
+  if (chain === 'coles') {
+    const no = settings.localPrices ? storeChoice(settings, 'coles').branchStoreNo : undefined;
+    return no ? `Prices and stock at your Coles (branch ${no})` : 'Online prices, no stock';
+  }
+  if (chain === 'aldi') return 'One price for everyone. No sign-in.';
+  if (chain === 'costco') return settings.accounts?.costco?.signedIn ? 'Signed in · member prices' : 'Not signed in · online prices';
+  return "Prices from the shop's website. No sign-in.";
+}
+
+/**
+ * 0.9.9: every shop, on every tab, has the same thing under its name: one status line and an Edit
+ * button. Edit opens the same sheet for every shop (never the website): Branches, Sign in, Stock, About.
+ */
+function ShopEdit({ settings, chain }: { settings: Settings; chain: StoreChain }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="shop-extra">
+      <span className="small">{shopStatus(settings, chain)}</span>
+      <button className="btn small" onClick={() => setOpen(true)} aria-label={`Edit ${chainName(chain)}`}>
+        <Icon name="pencil" size={16} /> Edit {chainName(chain)}
+      </button>
+      {open && <ShopEditSheet settings={settings} chain={chain} onClose={() => setOpen(false)} />}
+    </div>
+  );
+}
+
+function ShopEditSheet({ settings, chain, onClose }: { settings: Settings; chain: StoreChain; onClose: () => void }) {
+  const s = storeChoice(settings, chain);
+  const setStore = async (key: 'primary' | 'secondary', value: string) => {
+    const latest = await getSettings();
+    await updateSettings({ stores: { ...latest.stores, [chain]: { ...storeChoice(latest, chain), [key]: value || undefined } } });
+  };
+  const signIn = chain === 'woolworths' || chain === 'coles' || chain === 'costco';
+  return (
+    <Sheet title={chainName(chain)} onClose={onClose}>
+      <div className="eyebrow">Branches</div>
+      <div className="two">
+        <input
+          className="input"
+          placeholder="Main branch"
+          aria-label={`${chainName(chain)} main branch`}
+          defaultValue={s.primary ?? ''}
+          onBlur={(e) => void setStore('primary', e.target.value.trim())}
+        />
+        <input
+          className="input"
+          placeholder="Second (optional)"
+          aria-label={`${chainName(chain)} second branch`}
+          defaultValue={s.secondary ?? ''}
+          onBlur={(e) => void setStore('secondary', e.target.value.trim())}
+        />
+      </div>
+      <p className="small" style={{ margin: 0 }}>
+        Or close this and use <strong>Your branches</strong> on this screen to find them on the map.
+      </p>
+
+      <div className="eyebrow">Sign in and your store</div>
+      {chain === 'woolworths' && <WoolworthsAccount settings={settings} inline />}
+      {chain === 'coles' && <ColesStore settings={settings} inline />}
+      {chain === 'costco' && <CostcoAccount settings={settings} />}
+      {!signIn && (
+        <div className="row" aria-disabled="true" style={{ opacity: 0.55, padding: 0 }}>
+          <span className="grow small">{chain === 'aldi' ? 'Aldi has no account to sign in to.' : "Restock doesn't sign in to this shop. Its website's prices are the same for everyone."}</span>
+        </div>
+      )}
+
+      <div className="eyebrow">Stock</div>
+      <p className="small" style={{ margin: 0 }}>
+        {stockLine(settings, chain)}
+      </p>
+
+      {chain === 'aldi' && <AldiAbout />}
+      {!signIn && chain !== 'aldi' && (
+        <details className="explain">
+          <summary>
+            <Icon name="info" size={18} />
+            <span>About {chainName(chain)}</span>
+          </summary>
+          <div className="explain-body">
+            <p className="small">
+              <strong>Works:</strong> Restock searches {chainName(chain)}'s website when you search, and checks the prices of what you track.
+            </p>
+            <p className="small">
+              <strong>Doesn't:</strong> no sign-in, no stock, and some shops set prices per branch, so your local one can differ from the website.
+            </p>
+          </div>
+        </details>
+      )}
+      <button className="btn primary" onClick={onClose}>
+        Done
+      </button>
+    </Sheet>
+  );
+}
+
 /** 0.9.8: Aldi under its tick, like the other shops: what works and what doesn't. */
 function AldiAbout() {
   return (
@@ -1369,7 +1480,6 @@ function AldiAbout() {
 export function CostcoRow({ settings }: { settings: Settings }) {
   const [asking, setAsking] = useState(false);
   const on = settings.enabledChains.includes('costco');
-  const signedIn = !!settings.accounts?.costco?.signedIn;
   const notice = (
     <div className="banner grey" role="note" style={{ fontSize: 13, flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
       <strong>{COSTCO_NOTICE_HEADING}</strong>
@@ -1401,7 +1511,36 @@ export function CostcoRow({ settings }: { settings: Settings }) {
           <span className="small">{on ? COSTCO_SWITCH_HELP_ON : COSTCO_SWITCH_HELP}</span>
         </span>
       </label>
-      {on && (
+      {on && <ShopEdit settings={settings} chain="costco" />}
+      {asking && (
+        <Sheet title={COSTCO_SETTING_TITLE} onClose={() => setAsking(false)}>
+          {notice}
+          <button className="btn primary" onClick={() => void pick()}>
+            {COSTCO_TURN_ON}
+          </button>
+          <button className="btn" onClick={() => setAsking(false)}>
+            {COSTCO_CANCEL}
+          </button>
+        </Sheet>
+      )}
+    </>
+  );
+}
+
+/** 0.9.9: Costco's sign-in and its notice, in Costco's Edit sheet. */
+function CostcoAccount({ settings }: { settings: Settings }) {
+  const signedIn = !!settings.accounts?.costco?.signedIn;
+  const notice = (
+    <div className="banner grey" role="note" style={{ fontSize: 13, flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+      <strong>{COSTCO_NOTICE_HEADING}</strong>
+      <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {COSTCO_NOTICE.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </div>
+  );
+  return (
         <div className="shop-extra">
           <span className="small">{signedIn ? 'Signed in · member prices' : 'Not signed in · online prices'}</span>
           <details className="explain">
@@ -1440,18 +1579,5 @@ export function CostcoRow({ settings }: { settings: Settings }) {
               </button>
             ))}
         </div>
-      )}
-      {asking && (
-        <Sheet title={COSTCO_SETTING_TITLE} onClose={() => setAsking(false)}>
-          {notice}
-          <button className="btn primary" onClick={() => void pick()}>
-            {COSTCO_TURN_ON}
-          </button>
-          <button className="btn" onClick={() => setAsking(false)}>
-            {COSTCO_CANCEL}
-          </button>
-        </Sheet>
-      )}
-    </>
   );
 }

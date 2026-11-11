@@ -1,0 +1,1 @@
+Every shop now works the same: an Edit button opens its branches, sign-in, stock and about, inside the app. Pantry items and shopping list lines show stock; tap for each shop and branch. Start shopping names the branch and suggests your other one when your usual branch is out of things. No more BETA tag on Coles.

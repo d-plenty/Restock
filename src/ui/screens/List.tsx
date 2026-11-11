@@ -1,3 +1,5 @@
+import { StockTag } from '../StockTag';
+import { branchAdvice, branchName, stockRows } from '../../lib/stock';
 import { useFullRefresh } from '../refresh';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { nameHasSize } from '../../lib/naming';
@@ -1117,7 +1119,7 @@ function PickShops({
               <ChainDot chain={x} />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <span className="title" style={{ fontSize: 15 }}>
-                  {chainName(x)}{' '}
+                  {branchName(cachedSettings(), x)}{' '}
                   {x === oneWins ? (
                     <span className="badge">RECOMMENDED</span>
                   ) : (
@@ -1151,6 +1153,20 @@ function PickShops({
           <span>None of your picks are there. They'll be listed separately while you shop, so you don't forget them.</span>
         </div>
       )}
+      {/* 0.9.9: which branch to go to, by stock (Coles' two branches, Woolworths signed in). */}
+      {(() => {
+        const advice = branchAdvice(
+          entries.filter((e) => !e.checked).map((e) => {
+            const r = e.groupId ? recs.find((x) => x.group.id === e.groupId) : undefined;
+            return r ? stockRows(r.options.filter((o) => o.role === 'main').map((o) => o.product), cachedSettings()) : [];
+          }),
+        );
+        return advice ? (
+          <div className="banner green" role="note" style={{ fontSize: 13 }}>
+            {advice}
+          </div>
+        ) : null;
+      })()}
       {plan && <StockCheck entries={entries} recs={recs} plan={plan} skip={skip} onSkip={setSkip} />}
       <button className="btn primary block" disabled={!chosen.length} onClick={() => onStart(chosen, skip)}>
         <Icon name="cart" size={18} />{' '}
@@ -1331,7 +1347,7 @@ function ShoppingMode({
                   padding: '12px 16px 4px',
                 }}
               >
-                {shop !== 'any' && <ChainDot chain={shop} />} {shop === 'any' ? 'Any shop' : chainName(shop)}
+                {shop !== 'any' && <ChainDot chain={shop} />} {shop === 'any' ? 'Any shop' : branchName(cachedSettings(), shop)}
               </div>
               {items.map((e) => {
                 const d = dealFor(c, e);
@@ -1389,6 +1405,12 @@ function ShoppingMode({
                           style={{ color: stockNote(c, e)!.kind === 'second' ? 'var(--green-ink)' : 'var(--amber-ink)', fontWeight: 600 }}
                         >
                           {stockNote(c, e)!.text}
+                        </span>
+                      )}
+                      {/* 0.9.9: stock at each shop the item is bought at, a tap away. */}
+                      {!e.checked && recFor(c, e) && (
+                        <span className="tags" style={{ marginTop: 3 }}>
+                          <StockTag products={recFor(c, e)!.options.filter((o) => o.role === 'main').map((o) => o.product)} name={name} />
                         </span>
                       )}
                     </span>
