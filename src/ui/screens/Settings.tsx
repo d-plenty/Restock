@@ -722,9 +722,9 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             <Logo size={40} />
           </div>
           <p className="small" style={{ textAlign: 'center' }}>
-            Restock {version} beta · free and open source
+            Restock {version} release candidate · free and open source
             <br />
-            Your data stays on this phone, and your household's phones only if you share
+            Your data stays on this phone, and your household's phones and server only if you share
             <br />
             <a href="https://github.com/d-plenty/Restock" target="_blank" rel="noreferrer">
               Source code and bug reports on GitHub

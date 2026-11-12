@@ -13,7 +13,7 @@
 
 <p><b>Features</b></p>
 <ul>
-<li>Coles, Woolworths and Aldi, plus bottle shops (Keg tab, 18+) and chemists (Health tab) if you want them, and any other shop's website</li>
+<li>Coles, Woolworths and Aldi, plus bottle shops (Keg tab, 18+) and chemists (Health tab), both in beta, if you want them, and any other shop's website</li>
 <li>Four shopping lists: Groceries, Keg, Health and General</li>
 <li>Built-in open-source barcode scanner; Restock finds the same product at each of your shops</li>
 <li>Undo after most changes, and settings that wait for Save settings</li>
@@ -26,11 +26,13 @@
 <li>My catalogue: specials on the things you buy, a page for each shop</li>
 <li>A Shopping list that suggests shopping around, or the one shop with everything when shopping around saves less than your minimum</li>
 <li>Background price checks and alerts, and a weekly deals summary</li>
+<li>Shared prices: new items judged from day one, and your phone shares the shelf prices it reads in return</li>
+<li>Your data: what you spent, where, and what specials saved</li>
 <li>Recall alerts from the official Australian recall lists (FSANZ, Product Safety Australia, TGA)</li>
 <li>Optional receipt scanning, read on the phone by a built-in open-source reader that works offline</li>
 <li>Shopping mode, widgets, shortcuts, backups, themes and accessibility settings</li>
 </ul>
 
-<p><b>Private by design.</b> Everything stays in a database on your phone. No account, no ads, no analytics, no tracking, and no Google Play services. The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists), and to your own Home Assistant and Restock server if you connect them. Nothing goes to the people who make Restock.</p>
+<p><b>Private by design.</b> Everything stays in a database on your phone. No account, no ads, no analytics, no tracking, and no Google Play services. The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists), and to your own Home Assistant and Restock server if you connect them. Nothing about you goes to the people who make Restock: only feedback you send and, with Shared prices on, the shelf prices your phone reads, published for everyone.</p>
 
 <p>Restock isn't connected with any shop or government agency. Prices can be wrong or out of date. Costco is off until you pick it: its website terms ask people not to collect its listings, so Restock shows a notice first and only looks when you search. It reads each shop's public website from your phone, so the shops' own terms and privacy policies apply to those visits.</p>
