@@ -247,7 +247,7 @@ export function DeskSpecials({ narrow }: { narrow?: boolean }) {
           <h2 id="sp-week">This week's specials</h2>
           <div className="dk-seg" role="group" aria-label="Which specials">
             <button aria-pressed={filter} disabled={!pantry.length} onClick={() => setMine(true)}>
-              Things I buy
+              Suggested
             </button>
             <button aria-pressed={!filter} onClick={() => setMine(false)}>
               All specials
@@ -280,7 +280,7 @@ export function DeskSpecials({ narrow }: { narrow?: boolean }) {
                   {l.device.startsWith('srv-') ? 'Shared by your phones' : `From ${names.get(l.device) ?? 'a phone'}`}
                   {l.at ? `, ${timeAgo(l.at)}` : ''}
                 </span>
-                {items.length === 0 && <p className="small house-pad">{filter ? 'Nothing like the things you buy this week.' : 'None this week.'}</p>}
+                {items.length === 0 && <p className="small house-pad">{filter ? 'Nothing suggested this week: nothing like what you buy is on special.' : 'None this week.'}</p>}
                 {items.slice(0, 40).map((p) => (
                   <SpecialRow key={p.storeProductId} p={p} onAdd={(x) => void add(x)} onOpen={opener.open} tracked={!!trackedGroup(opener.index, p)} tracker={tracker} />
                 ))}

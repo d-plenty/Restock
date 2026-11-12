@@ -6,13 +6,31 @@ import { coles } from './coles';
 import { costco } from './costco';
 import { endeavourAdapter } from './endeavour';
 import { connectionMode, NativeOnlyError } from './http';
-import type { StoreAdapter } from './types';
+import type { StoreAdapter, StoreProduct } from './types';
+import { noteSearch, SHARE_SHOPS } from '../lib/priceShare';
 import { webAdapter } from './web';
 import { woolworths } from './woolworths';
 
 export const ADAPTERS = { woolworths, coles, aldi };
 
 export function adapterFor(chain: StoreChain | 'other'): StoreAdapter | undefined {
+  const a = pickAdapter(chain);
+  // 0.9.14: Send prices back: what Coles, Woolworths, Aldi and Costco searches show (lib/priceShare.ts).
+  return a && (SHARE_SHOPS as readonly string[]).includes(a.chain) ? noting(a) : a;
+}
+
+function noting(a: StoreAdapter): StoreAdapter {
+  const seen = <T extends unknown[]>(fn: ((...args: T) => Promise<StoreProduct[]>) | undefined) =>
+    fn &&
+    (async (...args: T) => {
+      const out = await fn(...args);
+      noteSearch(out);
+      return out;
+    });
+  return { ...a, search: seen(a.search.bind(a))!, searchBrowser: seen(a.searchBrowser?.bind(a)), searchAnonymous: seen(a.searchAnonymous?.bind(a)) };
+}
+
+function pickAdapter(chain: StoreChain | 'other'): StoreAdapter | undefined {
   if (chain === 'other') return undefined;
   // Test builds only (VITE_FAKE_STORES=1): canned results so the Add screen can be clicked through off-phone.
   if (import.meta.env.VITE_FAKE_STORES === '1') {

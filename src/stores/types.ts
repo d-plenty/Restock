@@ -17,7 +17,7 @@ export interface StoreProduct {
   unitPriceText?: string;
   /** Online stock as the store reports it; undefined when the store doesn't say. */
   inStock?: boolean;
-  /** 0.9.6: what only Costco's pages say (src/stores/costco.ts). Kept on this phone, like everything from Costco. */
+  /** 0.9.6: what only Costco's pages say (src/stores/costco.ts). Kept on this phone (Send prices back sends only the price and product facts). */
   costco?: CostcoInfo;
 }
 

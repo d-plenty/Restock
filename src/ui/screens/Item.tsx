@@ -502,8 +502,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
                 className="linkish small"
                 style={{ alignSelf: 'flex-start' }}
                 onClick={() => {
-                  // 0.9.13: Settings → Shopping, at Judge new items from day one, once it has drawn.
-                  nav.push({ name: 'settings', page: 'shopping' });
+                  // 0.9.14: Settings → Prices and deals, at Judge new items from day one, once it has drawn.
+                  nav.push({ name: 'settings', page: 'prices' });
                   let tries = 0;
                   const t = window.setInterval(() => {
                     const el = document.getElementById('s-dayone');
@@ -568,7 +568,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
                     className={w > keepWeeks ? 'dim' : undefined}
                     onClick={() =>
                       w > keepWeeks
-                        ? nav.toast(`You keep ${historyLabel(keepWeeks)} of prices. Keep more in Settings → Price checks.`)
+                        ? nav.toast(`You keep ${historyLabel(keepWeeks)} of prices. Keep more in Settings → Prices and deals.`)
                         : setRangeWeeks(w)
                     }
                   >

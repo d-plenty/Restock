@@ -291,6 +291,43 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
+    // ---------- 0.9.14: Your data from the Restock server ----------
+
+    /** GET /api/v3/data/{summary,stats,top,series}: the server's statistics, read as this phone. */
+    @PluginMethod
+    public void serverData(final PluginCall call) {
+        final String path = call.getString("path", "");
+        if (!path.matches("/data/(summary|stats|top|series)(\\?[A-Za-z0-9=&%._~-]{0,300})?")) {
+            call.reject("Not something Your data reads.");
+            return;
+        }
+        syncThread.execute(() -> {
+            try {
+                org.json.JSONObject o = SyncHub.get(getContext()).serverRead(path);
+                call.resolve(new JSObject(o.toString()));
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Couldn't reach your Restock server.", e);
+            }
+        });
+    }
+
+    // ---------- 0.9.14: Send prices back (PriceShare.java) ----------
+
+    @PluginMethod
+    public void sharePrices(final PluginCall call) {
+        marketThread.execute(() -> {
+            try {
+                SQLiteDatabase mdb = RestockDatabase.get(getContext());
+                int sent = PriceShare.sendNow(mdb, PriceChecker.readKv(mdb, "settings"));
+                JSObject ret = new JSObject();
+                ret.put("sent", sent);
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject("Couldn't send prices: " + e.getMessage(), e);
+            }
+        });
+    }
+
     // ---------- shared price history (testing) ----------
 
     @PluginMethod

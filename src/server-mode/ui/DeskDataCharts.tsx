@@ -3,6 +3,7 @@
 // marked with a diamond), and the storage bar. Each one is an image with a summary in words, its
 // numbers written on it or in a table beside it, and one accent colour (the theme's own tokens, so
 // light, dark and true black all work).
+import '../dataCharts.css';
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { chainName } from '../../shops';
 import { money } from '../../lib/units';

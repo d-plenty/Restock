@@ -16,7 +16,7 @@ import { changed } from './live';
 import { listLineWithoutCostco } from './costcoLocal';
 import { asListSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, shopDef, type ListSection, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
-import { GIFT_CARDS_TABLE, migrate } from './sql/schema';
+import { GIFT_CARDS_TABLE, migrate, SPEND_TABLE } from './sql/schema';
 import { cleanGiftCard } from './giftCards'; // 0.9.6 (cards)
 import { toPicks } from './picks';
 import { checkSettings } from './settingsCheck';
@@ -33,6 +33,8 @@ export async function initDb(d: SqlDriver): Promise<void> {
   await migrate(d);
   // 0.9.6 (cards): gift cards, on this phone only (schema.ts GIFT_CARDS_TABLE says why it's not a migration).
   await d.run(GIFT_CARDS_TABLE);
+  // 0.9.14: spending from ticks, this phone's own (schema.ts SPEND_TABLE).
+  await d.run(SPEND_TABLE);
 }
 
 /** Use a database without upgrading it yet (to back it up first, 0.8.0). */
@@ -404,6 +406,15 @@ export async function reapplyHouseholdSettings(): Promise<boolean> {
   return true;
 }
 
+/**
+ * 0.9.14: a write to a table that's this phone's own record (spending.ts spend_log): not synced,
+ * not undoable, and it doesn't make the screens look again (so a screen that notes ticks as it
+ * draws doesn't go round in circles).
+ */
+export async function runSql(text: string, params: SqlValue[] = []): Promise<void> {
+  await sql().run(text, params);
+}
+
 /** 0.9.3: a read-only query, for householdSettings.ts. */
 export async function queryRows<T>(text: string, params: SqlValue[] = []): Promise<T[]> {
   return sql().query<T>(text, params);
@@ -711,8 +722,15 @@ export const checkEntriesOp = (ids: string[], now = Date.now()): SqlOp => ({
   params: [now, ...ids],
 });
 
+/** 0.9.14: spending.ts notes the ticks before ticked lines come off the list (so they still count). */
+let beforeListDelete: (() => Promise<void>) | undefined;
+export function onBeforeListDelete(fn: typeof beforeListDelete): void {
+  beforeListDelete = fn;
+}
+
 export async function deleteListEntries(ids: string[]): Promise<void> {
   if (!ids.length) return;
+  await beforeListDelete?.().catch(() => undefined);
   await write([{ sql: `DELETE FROM list_entries WHERE id IN (${placeholders(ids.length)})`, params: ids }]);
 }
 

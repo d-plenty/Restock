@@ -31,6 +31,8 @@ export const COSTCO_NOTICE: readonly string[] = [
   'Costco may block it or change its pages, so it may stop working. Treat it as a test feature.',
   "It's your choice to turn this on, and your responsibility.",
   "Prices are Costco's online prices, which include delivery. They can differ from warehouse to warehouse and from the shelf.",
+  // 0.9.14: Send prices back.
+  "With Send prices back on (Settings → Privacy and sharing), the Costco prices your searches show go to Restock's shared price service too, like the other supermarkets'.",
 ];
 
 /** The disclosure as one paragraph (README, release notes). */

@@ -6,7 +6,7 @@ import { allCards, getSettings, updateSettings } from '../../lib/db';
 import { syncInfo } from '../../lib/sync';
 import legal from '../../lib/legal.json';
 import { downloadMarket, MARKET_SOURCE_TEXT } from '../../lib/market';
-import { DayOneLengths } from './DayOne';
+import { HistoryLengths } from './DayOne';
 import { useLive } from '../../lib/useLive';
 import { enabledIn, sectionOn } from '../../shops';
 import { checkAll } from '../../lib/permissions';
@@ -401,7 +401,7 @@ function MarketSetup({ settings }: { settings: Settings }) {
         <li>
           <Icon name="check" size={16} />
           <span>
-            <strong>Small:</strong> about once a week, and only a short summary per product is kept on your phone.
+            <strong>Small:</strong> once a week, after the Thursday collection, and only a short summary per product is kept on your phone.
           </span>
         </li>
         <li>
@@ -413,7 +413,7 @@ function MarketSetup({ settings }: { settings: Settings }) {
         <li>
           <Icon name="check" size={16} />
           <span>
-            <strong>Off unless you turn it on.</strong> Change it any time in Settings → Shopping.
+            <strong>Off unless you turn it on.</strong> Change it any time in Settings → Prices and deals.
           </span>
         </li>
       </ul>
@@ -428,7 +428,11 @@ function MarketSetup({ settings }: { settings: Settings }) {
           Judge new items from day one
         </span>
       </label>
-      {settings.marketData.enabled && <DayOneLengths settings={settings} />}
+      {/* 0.9.14: one setting, how far back Restock looks (its own prices and the shared ones). */}
+      <span className="title" style={{ fontSize: 15 }}>
+        How far back Restock looks
+      </span>
+      <HistoryLengths settings={settings} />
       <label className="check" style={{ padding: 0 }}>
         <input
           type="checkbox" className="switch"
@@ -554,8 +558,8 @@ function TileBody({ id, settings }: { id: TileId; settings: Settings }): ReactNo
           <PermissionList hideNote />
           <p className="small">
             Each one is only used for what it says. For location, "While using the app" is plenty. Allow all asks for alarms last: Android opens its
-            settings page, so turn on "Allow setting alarms and reminders" and come back. Change these later in Settings → Troubleshooting →
-            Permissions.
+            settings page, so turn on "Allow setting alarms and reminders" and come back. Change these later in Settings → Privacy and
+            sharing → Permissions.
           </p>
         </>
       );

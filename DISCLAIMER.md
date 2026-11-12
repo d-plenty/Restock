@@ -1,6 +1,6 @@
 # Fine print
 
-_Last updated 12 November 2026_
+_Last updated 13 November 2026_
 
 ## In short
 
@@ -40,7 +40,7 @@ Costco is the one shop whose website terms say automated collection of product l
 
 Price checks use a small amount of internet data and battery. Background checks only run on a network connection and when the battery isn't low, and you can turn them off in Settings.
 
-Judge new items from day one, if you turn it on, downloads the shared price history for your shops about once a week (on Wi-Fi only, unless you change that): roughly 1 MB for 8 weeks to 3 MB for 12 months with all four shops collected, and less for fewer. Settings → Shopping shows the size for yours.
+Judge new items from day one, if you turn it on, downloads the shared price history for your shops once a week after the Thursday collection, or every day if you choose (on Wi-Fi only, unless you change that): roughly 1 MB for 8 weeks to 3 MB for 12 months with all four shops collected, and less for fewer. Settings → Prices and deals shows the size for yours. Send prices back uses a few kilobytes after each search or price check.
 
 ## No warranty
 
@@ -48,7 +48,7 @@ Restock is free, open-source software provided "as is", without warranty of any 
 
 ## Beta software
 
-Restock is beta software: it's still being built and tested, so things can change or break between versions. Features under Settings → Beta and development are for testing and can change or disappear. If something goes wrong, Settings → Feedback tells us. Keep a backup of anything you'd hate to lose.
+Restock is beta software: it's still being built and tested, so things can change or break between versions. Features under Settings → Advanced are for testing and can change or disappear. If something goes wrong, Settings → Feedback tells us. Keep a backup of anything you'd hate to lose.
 
 ---
 

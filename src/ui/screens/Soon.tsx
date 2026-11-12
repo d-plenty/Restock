@@ -107,7 +107,7 @@ export const SOON: Soon[] = [
     id: 'sharedprices',
     icon: 'tag',
     title: 'Shared prices',
-    short: 'Shop prices shared between Restock servers, so new items are judged from day one',
+    short: 'Phones share shop prices now; Restock servers sharing with each other is next',
     body: (
       <>
         <p>
@@ -126,12 +126,12 @@ export const SOON: Soon[] = [
         <p>And never anything personal:</p>
         <ul>
           <li>Who you are, your cards, your branch or where you live.</li>
-          <li>What you searched for, your pantry, your shopping list or what you ticked off, your receipts, or prices you typed in. No account, no phone ID.</li>
+          <li>The words you searched, your pantry, your shopping list or what you ticked off, your receipts, or prices you typed in. No account (a random number per install tells phones apart).</li>
         </ul>
         <p>
-          It's "Send prices back" in Settings → Privacy and sharing: on unless you turn it off, and nothing is sent yet. Prices you type in yourself
-          are never shared. What's here so far: Judge new items from day one downloads restock-prices' shared history, and a Restock server can
-          download a full export file in an open, documented format. Restock will check the shops' terms before any prices are shared publicly.
+          It's "Send prices back" in Settings → Privacy and sharing: on unless you turn it off. Phones send the shop prices they read to
+          restock-prices, and Judge new items from day one downloads the shared history back. Prices you type in yourself are never shared. Still to
+          come: Restock servers sharing with each other. Restock will check the shops' terms before any prices are shared publicly.
         </p>
       </>
     ),

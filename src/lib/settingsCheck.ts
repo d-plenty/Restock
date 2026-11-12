@@ -1,4 +1,4 @@
-import { CHECK_INTERVALS, DEFAULT_SETTINGS, HISTORY_WEEKS, type HomeArea, type Settings, type ShopAccount, type StoreChoice } from '../types';
+import { CHECK_INTERVALS, DEFAULT_SETTINGS, HISTORY_WEEKS, keepDays, keepWeeks, type HomeArea, type Settings, type ShopAccount, type StoreChoice } from '../types';
 import { SECTIONS, isLocalOnlyShop, shopDef, type CustomShop, type Section, type StoreChain } from '../shops';
 import { isCheckTime } from './checkSchedule';
 import { ICON_COLOURS } from './looks';
@@ -153,6 +153,7 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
   const ab = obj(s.autoBackup);
   const w = obj(s.widgets);
   const md = obj(s.marketData);
+  const weeks = keepWeeks(typeof s.historyWeeks === 'number' && HISTORY_WEEKS.includes(s.historyWeeks) ? s.historyWeeks : D.historyWeeks);
   const acc = obj(s.accounts);
   const accounts = isObj(s.accounts) ? compact({ woolworths: accountOf(acc.woolworths), coles: accountOf(acc.coles), costco: accountOf(acc.costco) }) : undefined;
 
@@ -192,7 +193,8 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     ...(isObj(s.beta) ? { beta: { enabled: bool(s.beta.enabled, false) } } : {}),
     defaultThresholdPct: number(s.defaultThresholdPct, D.defaultThresholdPct, 1, 90),
     checkIntervalHours: oneOf(s.checkIntervalHours, CHECK_INTERVALS, D.checkIntervalHours),
-    historyWeeks: oneOf(s.historyWeeks, HISTORY_WEEKS, D.historyWeeks),
+    // 0.9.14: 8 weeks, 6 months or 12 months (1 and 3 months become the next one up).
+    historyWeeks: weeks,
     checkWeekday: weekday(s.checkWeekday, D.checkWeekday),
     // 0.9.6: HH:MM; anything else is 5:00 am. A 0.9.5 phone's file has none, which is the same.
     checkTime: isCheckTime(s.checkTime) ? s.checkTime : D.checkTime,
@@ -233,7 +235,9 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     marketData: {
       enabled: bool(md.enabled, D.marketData.enabled),
       wifiOnly: bool(md.wifiOnly, D.marketData.wifiOnly),
-      days: md.days === 182 || md.days === 365 ? md.days : 56,
+      // 0.9.14: follows how far back Restock looks (historyWeeks).
+      days: keepDays(weeks),
+      every: md.every === 'daily' ? 'daily' : 'weekly',
     },
     // 0.9.11: price helper phone mode.
     ...(isObj(s.priceHelper)

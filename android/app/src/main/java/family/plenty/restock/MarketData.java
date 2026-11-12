@@ -43,12 +43,77 @@ final class MarketData {
         }
     }
 
-    /** The window chosen in settings (marketData.days), or 8 weeks. */
+    /**
+     * How far back: 0.9.14, one setting for both (Settings → Prices and deals → Price history), the
+     * weeks of prices this phone keeps (historyWeeks: 8, 26 or 52) and so the day-one file it gets.
+     */
     static int windowDays(JSONObject settings) {
+        int weeks = settings != null ? settings.optInt("historyWeeks", 0) : 0;
+        if (weeks >= 52) return 365;
+        if (weeks >= 26) return 182;
+        if (weeks > 0) return 56;
         JSONObject md = settings != null ? settings.optJSONObject("marketData") : null;
         int d = md != null ? md.optInt("days", 56) : 56;
         for (int w : WINDOWS) if (w == d) return d;
         return 56;
+    }
+
+    /** "weekly" (after Thursday's collection, the default) or "daily" (marketData.every, 0.9.14). */
+    static boolean daily(JSONObject settings) {
+        JSONObject md = settings != null ? settings.optJSONObject("marketData") : null;
+        return md != null && "daily".equals(md.optString("every", "weekly"));
+    }
+
+    /** window/index.json: when each shop was last published ("to") and last fully collected ("full"). */
+    static JSONObject readIndex() {
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) Net.url(RESTOCK_PRICES + "index.json").openConnection();
+            c.setConnectTimeout(15_000);
+            c.setReadTimeout(20_000);
+            c.setRequestProperty("User-Agent", StoreClient.APP_UA + " shared-history");
+            c.setRequestProperty("Cache-Control", "no-cache");
+            if (c.getResponseCode() != 200) return null;
+            byte[] body = readAtMost(c.getInputStream(), 256 * 1024);
+            JSONObject o = new JSONObject(new String(body, java.nio.charset.StandardCharsets.UTF_8));
+            return "restock-window-index".equals(o.optString("format")) ? o : null;
+        } catch (Exception e) {
+            Log.w(TAG, "index", e);
+            return null;
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
+    private static byte[] readAtMost(InputStream in, int max) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] b = new byte[8192];
+        int n;
+        while ((n = in.read(b)) > 0) {
+            out.write(b, 0, n);
+            if (out.size() > max) throw new IOException("too big");
+        }
+        return out.toByteArray();
+    }
+
+    /**
+     * Whether there's something new for this phone's shops since the last download: weekly, a newer
+     * full collection; daily, anything newer (the collector adds phones' prices every night).
+     */
+    static boolean newer(JSONObject index, JSONObject last, List<String> chains, boolean daily) {
+        JSONObject shops = index != null ? index.optJSONObject("shops") : null;
+        if (shops == null) return false;
+        JSONObject had = last != null ? last.optJSONObject("index") : null;
+        for (String c : chains) {
+            JSONObject now = shops.optJSONObject(c);
+            if (now == null) continue;
+            JSONObject was = had != null ? had.optJSONObject(c) : null;
+            String key = daily ? "to" : "full";
+            String a = now.optString(key, now.optString("to", ""));
+            String b = was != null ? was.optString(key, was.optString("to", "")) : "";
+            if (a.compareTo(b) > 0) return true;
+        }
+        return false;
     }
 
     /** The shops this phone uses (enabledChains), each once. */
@@ -95,7 +160,10 @@ final class MarketData {
         }
     }
 
-    /** Called after background price checks: refresh if it's switched on and a week old. */
+    /**
+     * Called after background price checks: downloads when there's something new (0.9.14: weekly, once
+     * Thursday's collection is published; daily, whenever the collector has published since).
+     */
     static void maybeRefresh(Context context, SQLiteDatabase db, JSONObject settings) {
         try {
             JSONObject md = settings.optJSONObject("marketData");
@@ -103,7 +171,17 @@ final class MarketData {
             if (md.optBoolean("wifiOnly", true) && onMobileData(context)) return;
             JSONObject last = PriceChecker.readKv(db, "marketImport");
             String at = last != null ? last.optString("at", "") : "";
-            if (!at.isEmpty() && System.currentTimeMillis() - Instant.parse(at).toEpochMilli() < REFRESH_MS) return;
+            long since = at.isEmpty() ? Long.MAX_VALUE : System.currentTimeMillis() - Instant.parse(at).toEpochMilli();
+            boolean daily = daily(settings);
+            // A day at least between downloads, even on "every day" (prices are checked once a day).
+            if (since < 20L * 3_600_000L) return;
+            boolean changedLength = last != null && last.optInt("days", windowDays(settings)) != windowDays(settings);
+            if (!at.isEmpty() && !changedLength) {
+                JSONObject index = readIndex();
+                if (index == null) {
+                    if (since < REFRESH_MS) return; // can't tell: the old weekly rule
+                } else if (!newer(index, last, chainsOf(settings), daily)) return;
+            }
             importAll(db, settings, null);
         } catch (Exception e) {
             Log.w(TAG, "background refresh failed", e);
@@ -123,6 +201,8 @@ final class MarketData {
         String stamp = PriceChecker.now();
         int days = windowDays(settings);
         List<String> chains = chainsOf(settings);
+        JSONObject index = readIndex();
+        JSONObject listed = index != null ? index.optJSONObject("shops") : null;
         // 0.9.13: a shop this phone stopped using, and anything from before (hotprices.org), goes.
         StringBuilder keep = new StringBuilder();
         List<String> args = new ArrayList<>();
@@ -133,6 +213,12 @@ final class MarketData {
         db.delete("market", chains.isEmpty() ? null : "chain NOT IN (" + keep + ")", chains.isEmpty() ? null : args.toArray(new String[0]));
         db.delete("market", "source != ?", new String[] {SOURCE});
         for (String chain : chains) {
+            // 0.9.14: a shop the collector doesn't publish (bottle shops, chemists, or nothing yet).
+            if (index != null && (listed == null || !listed.has(chain))) {
+                result.missing.add(chain);
+                db.delete("market", "chain = ?", new String[] {chain});
+                continue;
+            }
             try {
                 int n = importFile(db, chain, RESTOCK_PRICES + chain + "-" + days + "d.json.gz", days, now, stamp, result, progress);
                 result.byChain.put(chain, n);
@@ -162,6 +248,14 @@ final class MarketData {
         org.json.JSONArray missing = new org.json.JSONArray();
         for (String c : result.missing) missing.put(c);
         status.put("missing", missing);
+        // 0.9.14: what was published then, so the next check knows whether there's anything newer.
+        JSONObject seen = new JSONObject();
+        if (listed != null) for (String c : chains) {
+            JSONObject x = listed.optJSONObject(c);
+            if (x != null && !result.errors.containsKey(c)) seen.put(c, new JSONObject().put("to", x.optString("to", "")).put("full", x.optString("full", x.optString("to", ""))));
+        }
+        status.put("index", seen);
+        status.put("published", index != null);
         PriceChecker.writeKv(db, "marketImport", status);
         return result;
     }
@@ -172,7 +266,7 @@ final class MarketData {
         HttpURLConnection c = (HttpURLConnection) Net.url(url).openConnection();
         c.setConnectTimeout(20_000);
         c.setReadTimeout(60_000);
-        c.setRequestProperty("User-Agent", StoreClient.APP_UA + " shared-history-test");
+        c.setRequestProperty("User-Agent", StoreClient.APP_UA + " shared-history");
         c.setRequestProperty("Accept-Encoding", "gzip");
         int status = c.getResponseCode();
         if (status == 404) {

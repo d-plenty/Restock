@@ -1616,7 +1616,7 @@ export function AddScreen({
                     No matches at {chainName(chain)}.
                     {/* A shop read off its website that found nothing may just not be readable yet (0.8.6). */}
                     {shopKindOf(chain) === 'web' &&
-                      ' If it sells this, its website may not work with Restock yet: Settings → Troubleshooting → Diagnostics → Send search details helps get it fixed.'}
+                      ' If it sells this, its website may not work with Restock yet: Settings → Advanced → Diagnostics → Send search details helps get it fixed.'}
                   </p>
                 )}
                 {r.status === 'ok' && r.items.length > 0 && !pool.length && <p className="small">Nothing on special at {chainName(chain)}.</p>}

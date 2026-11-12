@@ -390,7 +390,11 @@ export interface Settings {
   backupNudgeAt?: string;
   /** Shared price history download (testing): off until turned on. */
   /** 0.9.13: `days`, how much shared history: 56 (8 weeks, the default), 182 (6 months) or 365 (12 months). */
-  marketData: { enabled: boolean; wifiOnly: boolean; days?: 56 | 182 | 365 };
+  /**
+   * Judge new items from day one. 0.9.14: `days` follows historyWeeks (one setting, keepDays);
+   * `every`: get new shared prices weekly (after Thursday's collection, the default) or daily.
+   */
+  marketData: { enabled: boolean; wifiOnly: boolean; days?: 56 | 182 | 365; every?: 'weekly' | 'daily' };
   /** 0.9.11: price helper phone mode (priceHelper.ts). This phone only, never shared. */
   priceHelper?: import('./lib/priceHelper').PriceHelperSettings;
   area?: HomeArea;
@@ -459,7 +463,7 @@ export const DEFAULT_SETTINGS: Settings = {
   shopAroundMin: 1,
   otherContainerSizes: false,
   seenHints: [],
-  marketData: { enabled: false, wifiOnly: true, days: 56 },
+  marketData: { enabled: false, wifiOnly: true, days: 56, every: 'weekly' },
   look: { style: 'australia', icon: 'green' },
   a11y: { text: 1, contrast: false, motion: false, big: false },
   setup: { done: [], skipped: [] },
@@ -476,6 +480,14 @@ export const DEFAULT_SETTINGS: Settings = {
 export const CHECK_INTERVALS = [6, 12, 24, 48, 168];
 /** Price history to keep: 1 month, 8 weeks (default), 3 months, 6 months, 12 months (0.9.1). */
 export const HISTORY_WEEKS = [4, 8, 13, 26, 52];
+/**
+ * 0.9.14: how far back Restock looks, one setting (Settings → Prices and deals → Price history):
+ * the prices this phone keeps, and the shared price history it gets for day one.
+ */
+export const KEEP_WEEKS = [8, 26, 52] as const;
+/** An older choice (1 or 3 months) becomes the next one up, so no prices are lost. */
+export const keepWeeks = (w: unknown): (typeof KEEP_WEEKS)[number] => KEEP_WEEKS.find((k) => typeof w === 'number' && w <= k) ?? (typeof w === 'number' && w > 52 ? 52 : 8);
+export const keepDays = (w: number): 56 | 182 | 365 => (w >= 52 ? 365 : w >= 26 ? 182 : 56);
 export const historyLabel = (w: number) =>
   w === 4 ? '1 month' : w === 13 ? '3 months' : w === 26 ? '6 months' : w === 52 ? '12 months' : `${w} weeks`;
 /**

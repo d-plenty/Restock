@@ -336,7 +336,7 @@ function RestockApp() {
       } else if (a.action === 'daily') nav.setTab('pantry');
       else if (a.action === 'cards') setStack([{ name: 'cards' }]);
       else if (a.action === 'sync') setStack([{ name: 'settings' }, { name: 'settings', page: 'sync' }, { name: 'sync' }]);
-      else if (a.action === 'updates') setStack([{ name: 'settings' }, { name: 'settings', page: 'help' }]);
+      else if (a.action === 'updates') setStack([{ name: 'settings' }, { name: 'settings', page: 'about' }]);
       else if (a.action === 'scan') {
         const out = await scanBarcode();
         if (out.ok) setStack((st) => [...st, { name: 'add', barcode: out.code }]);
@@ -391,6 +391,10 @@ function RestockApp() {
     void tidyReceipts().catch((e) => console.error('receipt tidy-up failed', e));
     // 0.9.13: feedback that couldn't go when it was sent (no connection) goes now.
     void import('../lib/feedback').then((f) => f.sendWaiting()).catch(() => undefined);
+    // 0.9.14: Your data: ticks made on other phones or in Home Assistant since Restock last looked.
+    if (!serverMode) void import('../lib/spending').then((f) => f.noteTicks()).catch(() => undefined);
+    // 0.9.14: Send prices back: what earlier searches and price checks read, if it didn't go yet.
+    if (!serverMode) void import('../lib/priceShare').then((f) => f.sendPricesNow()).catch(() => undefined);
     const stopWidgets = watchWidgets();
     // 0.9.3: the shopping list with Home Assistant, if it's on for this phone (homeAssistant.ts).
     const stopHa = serverMode

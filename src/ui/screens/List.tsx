@@ -1,4 +1,5 @@
 import { StockTag } from '../StockTag';
+import { noteTicksSoon } from '../../lib/spending';
 import { branchAdvice, branchName, stockRows } from '../../lib/stock';
 import { useFullRefresh } from '../refresh';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -137,7 +138,10 @@ export async function shareText(text: string): Promise<'shared' | 'copied'> {
 
 /** 0.9.5 (undo): a list line's tick, as an undoable action ("Ticked Milk · Undo"). */
 export const tickEntry = (e: { id: string; text: string }, checked: boolean, name = e.text) =>
-  act(`${checked ? 'Ticked' : 'Unticked'} ${name}`, () => updateListEntry(e.id, { checked }));
+  act(`${checked ? 'Ticked' : 'Unticked'} ${name}`, async () => {
+    await updateListEntry(e.id, { checked });
+    noteTicksSoon(); // 0.9.14: Your data's spending (spending.ts)
+  });
 /** 0.9.5 (undo): a new amount; pressing + a few times is one Undo. */
 export const setQty = (e: { id: string; text: string }, qty: number, name = e.text) =>
   act(`${name}: ${qty} on your list`, () => updateListEntry(e.id, { qty }), { merge: `qty:${e.id}` });

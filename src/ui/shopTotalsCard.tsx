@@ -292,7 +292,7 @@ function HowPicked({ totals, min, onClose }: { totals: Totals; min: number; onCl
       <p className="small">
         <strong>Shop around</strong> is recommended: every item from the shop that has it cheapest. If one shop has everything on your list and
         shopping around wouldn't save {min < 0.005 ? 'anything' : `at least ${money(min)}`} over it, that shop is recommended instead. Change{' '}
-        {min < 0.005 ? 'this' : `the ${money(min)}`} in Settings → Shopping list.
+        {min < 0.005 ? 'this' : `the ${money(min)}`} in Settings → Shopping list and receipts.
       </p>
       <p className="small">
         <strong>If you only go to one shop</strong>, the best one is the cheapest, unless it only just wins (by under $2, or 3%) or one item alone makes the difference. Then the shop that's

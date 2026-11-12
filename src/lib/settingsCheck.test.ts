@@ -25,6 +25,7 @@ describe('checking settings', () => {
       ],
       sections: { keg: true, pharmacy: false },
       historyWeeks: 26,
+      marketData: { enabled: true, wifiOnly: false, days: 182, every: 'daily' },
       checkIntervalHours: 168,
       shopAroundMin: 0.5,
       look: { style: 'plain', accent: '#ffcd00', icon: 'match', black: false },
@@ -160,5 +161,16 @@ describe('colours from settings', () => {
     expect(() => accentVars(5 as never, false)).not.toThrow();
     expect(accentVars(undefined as never, true)).toEqual(accentVars('#00843d', true));
     expect(luminance(null as never)).toBe(luminance('#00843d'));
+  });
+});
+
+describe('0.9.14: one price history setting', () => {
+  it('turns 1 and 3 months into the next choice up, and the day-one length follows', async () => {
+    const { checkSettings } = await import('./settingsCheck');
+    expect(checkSettings({ historyWeeks: 4 }).historyWeeks).toBe(8);
+    expect(checkSettings({ historyWeeks: 13 }).historyWeeks).toBe(26);
+    expect(checkSettings({ historyWeeks: 13 }).marketData.days).toBe(182);
+    expect(checkSettings({ historyWeeks: 52, marketData: { days: 56 } }).marketData.days).toBe(365);
+    expect(checkSettings({}).marketData).toEqual({ enabled: false, wifiOnly: true, days: 56, every: 'weekly' });
   });
 });

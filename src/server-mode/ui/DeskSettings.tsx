@@ -18,6 +18,7 @@ import { WebSearchSwitch } from './WebShopSearch'; // 0.9.5 (web search)
 import { COSTCO_WEB_NOTE } from '../../lib/costcoNotice';
 import { PhoneOnlyNote } from './PhoneOnly';
 import { LegalSheet } from '../../ui/screens/Legal';
+import { Credits } from '../../ui/screens/Credits';
 import {
   categoriesData,
   downloadBrowserBackup,
@@ -264,6 +265,7 @@ function HouseholdPart() {
   const [cats, setCats] = useState(false);
   const [shopsFor, setShopsFor] = useState<ShopsForTab>();
   const [reading, setReading] = useState<'privacy' | 'disclaimer'>(); // 0.9.13
+  const [credits, setCredits] = useState(false); // 0.9.14
   const [changing, setChanging] = useState(false);
   const [msg, setMsg] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -310,7 +312,7 @@ function HouseholdPart() {
       )}
 
       {/* 0.9.8, 0.9.13: the same groups, in the same order, as the pages of Settings on the phone. Phone-only ones are greyed, saying where. */}
-      <Group id="dk-s-shops" title="Shops">
+      <Group id="dk-s-shops" title="Your shops">
         {h.shops.map((t) => (
           <Line
             key={t.section}
@@ -473,7 +475,7 @@ function HouseholdPart() {
       </Group>
       )}
 
-      <Group id="dk-s-list" title="Shopping">
+      <Group id="dk-s-list" title="Shopping list and receipts">
         <Line title="Shop around" htmlFor="dk-shop-around" sub="Only send an item to another shop if it saves at least this much" greyed={!editable}>
           <select
             id="dk-shop-around"
@@ -523,16 +525,20 @@ function HouseholdPart() {
         <Line title={'Receipts'} sub={'Added and read on a phone (camera).'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
-        <Line title={'Judge new items from day one'} sub={'Shared price history, downloaded by each phone for its shops (8 weeks, 6 or 12 months).'} greyed>
-          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
-        </Line>
       </Group>
 
-      <Group id="dk-s-checks" title="Price checks">
+      <Group id="dk-s-checks" title="Prices and deals">
         <Line title={'Check prices in the background'} sub={'Each phone checks at its own time (5:00 am unless changed).'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
         <Line title={'Price check time'} sub={'Picked on each phone.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+        {/* 0.9.14: one setting on the phone for both. */}
+        <Line title={'How far back Restock looks'} sub={'8 weeks, 6 months or 12 months of prices on each phone. This server keeps everything its phones send.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+        <Line title={'Judge new items from day one'} sub={'Shared price history for each phone\'s shops, weekly or every day.'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
       </Group>
@@ -546,6 +552,62 @@ function HouseholdPart() {
         </Line>
         <Line title="Recall alerts" htmlFor="dk-recalls" sub="Each phone checks daily against the official Australian recall lists" greyed={!editable}>
           <input id="dk-recalls" type="checkbox" className="switch" disabled={!editable} checked={hv.recalls} onChange={(e) => hold({ recalls: e.target.checked })} />
+        </Line>
+      </Group>
+
+      {/* 0.9.13: as on the phone. */}
+      <Group id="dk-s-cards" title="Cards">
+        <Line title="Loyalty and gift cards" sub="On the web page they're kept in this browser only">
+          <button className="btn small" onClick={() => nav.push({ name: 'cards' })}>
+            Open Cards
+          </button>
+        </Line>
+      </Group>
+
+      {/* 0.9.14: as on the phone (Settings → Your data). */}
+      <Group id="dk-s-data" title="Your data">
+        {v3 ? (
+          <Line title="Spending, prices over time, what's stored" sub="Everything your phones have shared with this server">
+            <button className="btn small" onClick={() => nav.push({ name: 'server', page: 'data' })}>
+              Open Data
+            </button>
+          </Line>
+        ) : (
+          <Line title="Spending, prices over time, what's stored" sub="Once this server keeps your household (Server and phones)." greyed />
+        )}
+      </Group>
+
+      <Group id="dk-s-sync" title="Sync and backups">
+        <Line title="Your household and Restock server" sub="Household and Your Restock server, above, and Server and phones">
+          <button className="btn small" onClick={() => nav.push({ name: 'server', page: 'phones' })}>
+            Server and phones
+          </button>
+        </Line>
+        {v3 && (
+          <Line title="Home Assistant" sub="Your shopping list in Home Assistant, both ways">
+            <button className="btn small" onClick={() => nav.push({ name: 'homeAssistant' })}>
+              Home Assistant
+            </button>
+          </Line>
+        )}
+        <Line title={'Phone sharing and backups on the phone'} sub={'Phones swap changes over Wi-Fi, and each makes its own backups.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+      </Group>
+
+      <Group id="dk-s-privacy" title="Privacy and sharing">
+        <Line title={'Send prices back'} sub={'Each phone can share the shelf prices it reads from shops (price, barcode, shop). Never anything typed in, and nothing from this server.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+        <Line title="Privacy policy and fine print" sub="What Restock keeps, where, and what it shares">
+          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn small" onClick={() => setReading('privacy')}>
+              Privacy policy
+            </button>
+            <button className="btn small" onClick={() => setReading('disclaimer')}>
+              Fine print
+            </button>
+          </span>
         </Line>
       </Group>
 
@@ -620,43 +682,39 @@ function HouseholdPart() {
         </Line>
       </Group>
 
-      {/* 0.9.13: as on the phone. */}
-      <Group id="dk-s-privacy" title="Privacy and sharing">
-        <Line title={'Send prices back'} sub={'Each phone can share the shelf prices it reads from shops (price, barcode, shop). Never anything typed in, and nothing from this server.'} greyed>
-          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
-        </Line>
-        <Line title="Privacy policy and fine print" sub="What Restock keeps, where, and what it shares">
-          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn small" onClick={() => setReading('privacy')}>
-              Privacy policy
-            </button>
-            <button className="btn small" onClick={() => setReading('disclaimer')}>
-              Fine print
-            </button>
-          </span>
-        </Line>
-      </Group>
-
-      <Group id="dk-s-feedback" title="Feedback">
+      <Group id="dk-s-help" title="Help">
         <Line title="Send feedback" sub="Good or bad, it helps make Restock better. Screenshots welcome.">
           <button className="btn small" onClick={() => nav.push({ name: 'feedback' })}>
             Send feedback
           </button>
         </Line>
+        <Line title="Restock on GitHub" sub="Known problems, and reporting one if you have a GitHub account">
+          <a className="btn small" href="https://github.com/d-plenty/Restock/issues" target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+        </Line>
+        <Line title={'Tour, sample items, check my shops are working'} sub={'On each phone.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
       </Group>
 
-      <Group id="dk-s-about" title="Help and about">
+      <Group id="dk-s-about" title="About">
         <Line title={'Check for updates'} sub={'Each phone checks GitHub. This server updates with Docker or Home Assistant.'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
+        <Line title="Credits" sub="The open data and open-source code Restock is built with">
+          <button className="btn small" onClick={() => setCredits(true)}>
+            Credits
+          </button>
+        </Line>
       </Group>
 
-      <Group id="dk-s-beta" title="Beta and development">
-        <Line title={'Diagnostics and connection tests'} sub={'On each phone, once beta and development features are turned on there.'} greyed>
+      <Group id="dk-s-advanced" title="Advanced">
+        <Line title={'Diagnostics, shop connections, price helper phone'} sub={'On each phone, once its testing features are turned on (Settings → Advanced).'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
-        <Line title={'Price helper phone'} sub={'A spare Android phone on its charger searches Coles and Woolworths for the shared price history.'} greyed>
-          <PhoneOnlyNote compact text="Set on that phone (Settings on the phone)." />
+        <Line title={'Erase everything'} sub={'Each phone erases its own. To clear this server, use Data → Manage data.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
       </Group>
       {cats && <CategoriesSheet sections={h.categories} onClose={() => setCats(false)} />}
@@ -665,6 +723,11 @@ function HouseholdPart() {
       {recovery && <RecoverySheet onClose={() => setRecovery(false)} />}
       {shopsFor && <ShopsSheet tab={shopsFor} onClose={() => setShopsFor(undefined)} />}
       {reading && <LegalSheet doc={reading} onClose={() => setReading(undefined)} />}
+      {credits && (
+        <Sheet title="Credits" onClose={() => setCredits(false)}>
+          <Credits />
+        </Sheet>
+      )}
     </>
   );
 }

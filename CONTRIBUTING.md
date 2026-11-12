@@ -23,7 +23,7 @@ Please include the app version (Settings, at the very bottom), your phone and An
 
 This is the single most useful thing you can attach:
 
-1. In Restock, open **Settings → Beta and development**, tap **Turn this on**, then **Diagnostics**.
+1. In Restock, open **Settings → Advanced**, tap **Turn on testing features**, then **Diagnostics**.
 2. Under **Send search details**, pick the shop, type something it sells, and tap **Search and save the details**.
 3. Share the file it makes, and attach it to your **Shop stopped working** issue.
 

@@ -1,7 +1,7 @@
 import type { Section } from '../shops';
 
 // The words the search tests use (0.8.6): the big search test on a computer, and the search test
-// in Settings → Troubleshooting → Diagnostics on the phone. What's right for each is in searchExpect.ts.
+// in Settings → Advanced → Diagnostics on the phone. What's right for each is in searchExpect.ts.
 
 // Everyday words people type: plain, with a brand, with a size, Aussie names, and a few typos.
 export const SEARCH_WORDS: Record<Section, string[]> = {

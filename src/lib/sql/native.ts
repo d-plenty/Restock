@@ -23,6 +23,10 @@ export interface RestockNativePlugin {
    */
   checkNow(opts?: { slot?: boolean }): Promise<{ checked: number; updated: number; errors: Record<string, string> }>;
   addListener(event: 'checkProgress', fn: (e: { done: number; total: number }) => void): Promise<PluginListenerHandle>;
+  /** 0.9.14: the Restock server's statistics, read as this phone (Your data): "/data/stats?period=3" and the like. */
+  serverData(opts: { path: string }): Promise<Record<string, unknown>>;
+  /** 0.9.14: Send prices back now (PriceShare.java): what this phone read from the shops since the last send. */
+  sharePrices(): Promise<{ sent: number }>;
   /** Download shared price history (MarketData.java) and summarise it into the market table. */
   importMarket(opts?: {
     /** Skip (and say so) when on mobile data; the weekly background refresh picks it up on Wi-Fi. */

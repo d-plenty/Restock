@@ -14,7 +14,7 @@ import { mark, scorecard } from './searchScore';
 import { PHONE_WORDS, SEARCH_WORDS } from './searchWords';
 import { localDay } from './verdict';
 
-// The search test on the phone (0.8.6): Settings → Troubleshooting → Diagnostics. Searches a list
+// The search test on the phone (0.8.6): Settings → Advanced → Diagnostics. Searches a list
 // of everyday words at your shops the way the app does (including the shops that only answer the
 // phone), marks the results, and saves one file to send to the developer. Gentle on the shops:
 // one search at a time, with a pause between. The file has the shops' answers and the test words,
@@ -208,7 +208,7 @@ export async function startSearchTest(sections: Section[], every: boolean): Prom
           ? {}
           : {
               title: file.stoppedEarly ? 'Search test stopped' : 'Search test finished',
-              text: `${firstPct ? `The right thing came first ${firstPct} of the time. ` : ''}Send it from Settings → Troubleshooting → Diagnostics.`,
+              text: `${firstPct ? `The right thing came first ${firstPct} of the time. ` : ''}Send it from Settings → Advanced → Diagnostics.`,
             },
       ).catch(() => undefined);
     if (!onScreen) return 'saved';

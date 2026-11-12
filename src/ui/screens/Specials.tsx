@@ -48,7 +48,7 @@ export function SpecialsScreen() {
       <p className="sub">This week's half-price specials at Woolworths and Coles. They change on Wednesdays.</p>
       <div className="chips" role="group" aria-label="Which specials">
         <button className="chip" aria-pressed={filterMine} disabled={!pantryNames.length} onClick={() => setMine(true)}>
-          Things I buy
+          Suggested
         </button>
         <button className="chip" aria-pressed={!filterMine} onClick={() => setMine(false)}>
           All specials
@@ -84,7 +84,7 @@ export function SpecialsScreen() {
               </div>
             )}
             {!l.error && !items.length && (
-              <p className="small">{filterMine ? 'Nothing like the things you buy this week.' : 'No half-price specials found.'}</p>
+              <p className="small">{filterMine ? 'Nothing suggested this week: nothing like what you buy is on special.' : 'No half-price specials found.'}</p>
             )}
             {items.length > 0 && (
               <div className="card flush">

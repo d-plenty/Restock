@@ -304,6 +304,28 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         }
     }
 
+    /**
+     * 0.9.14: a signed GET of the server's statistics (Settings → Your data), trying each address
+     * (home, then away) as names() does. Returns the answer's JSON; throws with the server's words.
+     */
+    JSONObject readJson(String pathAndQuery) throws Exception {
+        Exception last = null;
+        for (String b : bases) {
+            if (b == null) continue;
+            try {
+                SyncDav.Response r = send(b, "GET", api + pathAndQuery, null, SyncDav.MAX_LIST);
+                if (r.status == 200) return new JSONObject(r.text());
+                String said = messageOf(r);
+                throw new Refused(errorOf(r), said.isEmpty() ? "The server answered " + r.status + "." : said);
+            } catch (AccessException | Refused e) {
+                throw e;
+            } catch (Exception e) {
+                last = e;
+            }
+        }
+        throw last != null ? last : new Exception("no server address");
+    }
+
     /** The status of a signed request (after names()), for things that answer 404 or 410 when a code ran out. */
     int status(String method, String path, JSONObject body) throws Exception {
         return send(base(), method, api + path, body == null ? null : body.toString().getBytes(StandardCharsets.UTF_8), SyncDav.MAX_SMALL).status;

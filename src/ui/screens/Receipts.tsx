@@ -199,7 +199,7 @@ export function ReceiptsScreen() {
       </button>
       <p className="small">
         Kept {keep ? `for ${keepLabel(keep).toLowerCase()} from scanning` : 'until you delete them'}. Pinned ones stay.{' '}
-        <button className="linkish" onClick={() => nav.push({ name: 'settings', page: 'shopping' })}>
+        <button className="linkish" onClick={() => nav.push({ name: 'settings', page: 'list' })}>
           Change
         </button>
       </p>

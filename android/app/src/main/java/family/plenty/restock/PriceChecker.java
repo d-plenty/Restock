@@ -240,6 +240,8 @@ final class PriceChecker {
             alertDeals(context, db, settings, alerts == null || alerts.optBoolean("greatDeals", true));
         } finally {
             // Shared price history (testing): refresh weekly from the background, if it's switched on.
+            // 0.9.14: Send prices back (on unless turned off): what this check read from the shops. It's quick, so first.
+            if (fromBackground) PriceShare.sendNow(db, settings);
             if (fromBackground) MarketData.maybeRefresh(context, db, settings);
         }
         return result;

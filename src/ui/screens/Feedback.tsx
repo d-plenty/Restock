@@ -217,7 +217,11 @@ export function FeedbackScreen() {
       </button>
       {!message.trim() && <p className="small">Write a message to send it.</p>}
       <p className="small">
-        Prefer GitHub? You can also open an issue on Restock's GitHub page (Settings → Help and about). See the privacy policy for how feedback is kept.
+        Prefer GitHub? You can also{' '}
+        <a href="https://github.com/d-plenty/Restock/issues" target="_blank" rel="noreferrer">
+          open an issue on Restock's GitHub page
+        </a>
+        . The privacy policy (Settings → About) says how feedback is kept.
       </p>
 
       {showing && (

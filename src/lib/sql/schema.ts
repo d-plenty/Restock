@@ -261,6 +261,28 @@ export const GIFT_CARDS_TABLE = `CREATE TABLE IF NOT EXISTS gift_cards (
   updated_at TEXT NOT NULL
 )`;
 
+/**
+ * 0.9.14: Settings → Your data without a Restock server: each tick of a list line, priced, as the
+ * server's srv_spend (spending.ts). This phone's own record: not in SYNCED, not in backups, not a
+ * MIGRATIONS entry (a Restock server keeps its own, srv_spend). Erase everything empties it.
+ */
+export const SPEND_TABLE = `CREATE TABLE IF NOT EXISTS spend_log (
+  entry_id TEXT NOT NULL,
+  checked_at INTEGER NOT NULL,
+  at TEXT NOT NULL,
+  chain TEXT,
+  section TEXT,
+  item_id TEXT,
+  product_id TEXT,
+  text TEXT NOT NULL,
+  qty REAL NOT NULL,
+  price REAL,
+  total REAL,
+  usual REAL,
+  special INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (entry_id, checked_at)
+)`;
+
 /** 0.8.9: "Any size" and "Not at this shop" (picks.ts); the move to My picks is in DATA_STEPS. */
 const PICKS_089 = ['ALTER TABLE items ADD COLUMN any_size INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE items ADD COLUMN not_at TEXT'];
 
