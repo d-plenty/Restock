@@ -78,7 +78,10 @@ export function SetupNudges({ settings }: { settings: Settings }) {
               <span className="title" style={{ fontSize: 15 }}>
                 Finish setting up · {left.length} left
               </span>
-              <span className="small">{left.map((t) => t.title).join(', ')}</span>
+              {/* 0.9.12: the next three, not all eleven ("Supermarkets, Backups, Sync and 8 more"). */}
+              <span className="small">
+                {left.length > 4 ? `${left.slice(0, 3).map((t) => t.title).join(', ')} and ${left.length - 3} more` : left.map((t) => t.title).join(', ')}
+              </span>
             </span>
             <button className="icon-btn" aria-label="Hide this" onClick={() => updateSettings({ setup: { ...settings.setup, dismissed: true } })}>
               <Icon name="close" size={16} />

@@ -150,6 +150,15 @@ export function staged<T>(key: string): T | undefined {
 }
 
 /** "Save settings": the changes, then what goes with them. False if something couldn't be saved (the draft stays). */
+/**
+ * 0.9.12: for a button that acts straight away on what's saved (Check now, Sync now): saves what's
+ * waiting for Save first, so it acts on what the screen shows. False if that save failed.
+ */
+export async function saveFirst(): Promise<boolean> {
+  if (!draft || !hasUnsaved()) return true;
+  return saveDraft();
+}
+
 export async function saveDraft(): Promise<boolean> {
   const d = draft;
   if (!d || saving) return false;

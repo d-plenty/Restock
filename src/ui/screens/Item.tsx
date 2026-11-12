@@ -256,7 +256,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
     };
   }, [groupId]);
   const [selected, setSelected] = useState<string>();
-  const [sheet, setSheet] = useState<'edit' | 'price' | 'menu' | { option: Option }>();
+  const [sheet, setSheet] = useState<'edit' | 'alerts' | 'price' | 'menu' | { option: Option }>();
   const appSettings = useLive(getSettings, []);
   const [preview, setPreview] = useState<Option>();
   const [rangeWeeks, setRangeWeeks] = useState<number>();
@@ -519,11 +519,12 @@ export function ItemScreen({ groupId }: { groupId: string }) {
         </div>
       )}
       <div className="chips" style={{ marginTop: -4 }}>
-        <button className="chip" onClick={() => setSheet('edit')} aria-label="Change price alerts">
+        {/* 0.9.12: these open the alerts on their own ("Price alerts"), not the whole Edit item sheet. */}
+        <button className="chip" onClick={() => setSheet('alerts')} aria-label="Change price alerts">
           <Icon name="bell" size={14} /> Alert: {ALERT_LEVELS.find((a) => a.id === group.alertLevel)?.label}
           {group.alertLevel === 'custom' ? ` (${group.alertPct ?? 30}%+)` : ''}
         </button>
-        <button className="chip" onClick={() => setSheet('edit')} aria-label="Set a target price">
+        <button className="chip" onClick={() => setSheet('alerts')} aria-label="Set a target price">
           <Icon name="tag" size={14} /> {group.targetPrice !== undefined ? `Under ${money(group.targetPrice)}` : 'Set a price alert'}
         </button>
       </div>
@@ -739,8 +740,9 @@ export function ItemScreen({ groupId }: { groupId: string }) {
         Changes are saved as you make them.
       </p>
 
-      {sheet === 'edit' && (
+      {(sheet === 'edit' || sheet === 'alerts') && (
         <EditSheet
+          alertsOnly={sheet === 'alerts'}
           group={group}
           categories={categories}
           suggested={genericName(mains[0]?.product.name, mains[0]?.product.brand)}
@@ -795,11 +797,14 @@ export function EditSheet({
   categories,
   suggested,
   onClose,
+  alertsOnly = false,
 }: {
   group: Group;
   categories: { id: string; name: string }[];
   suggested?: string;
   onClose: () => void;
+  /** 0.9.12: just the price alerts (from the Alert chips), titled "Price alerts". */
+  alertsOnly?: boolean;
 }) {
   const nav = useNav();
   const [name, setName] = useState(group.name);
@@ -826,27 +831,31 @@ export function EditSheet({
   };
 
   return (
-    <Sheet title="Edit item" onClose={onClose}>
-      <label className="field">
-        <span>Name</span>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
-      </label>
-      {suggested && suggested.toLowerCase() !== name.trim().toLowerCase() && (
-        <button className="chip wrap" style={{ alignSelf: 'flex-start' }} onClick={() => setName(suggested)}>
-          Use a short name: {suggested}
-        </button>
+    <Sheet title={alertsOnly ? 'Price alerts' : 'Edit item'} onClose={onClose}>
+      {!alertsOnly && (
+        <>
+          <label className="field">
+            <span>Name</span>
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          {suggested && suggested.toLowerCase() !== name.trim().toLowerCase() && (
+            <button className="chip wrap" style={{ alignSelf: 'flex-start' }} onClick={() => setName(suggested)}>
+              Use a short name: {suggested}
+            </button>
+          )}
+          <label className="field">
+            <span>Category</span>
+            <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+              <option value="">None</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
       )}
-      <label className="field">
-        <span>Category</span>
-        <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="">None</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
       <AlertPicker level={alertLevel} pct={alertPct} onChange={(l, p) => (setAlertLevel(l), setAlertPct(p))} />
       <label className="field">
         <span>Alert me under</span>
@@ -869,40 +878,46 @@ export function EditSheet({
         </div>
         <span className="small">Tells you when any of your shops has it at or below this price, special or not.</span>
       </label>
-      <label className="check" style={{ padding: '4px 0' }}>
-        <input type="checkbox" className="switch" checked={allowBulk} onChange={(e) => setAllowBulk(e.target.checked)} />
-        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title" style={{ fontSize: 15 }}>
-            Swap for bulk packs to save money
+      {!alertsOnly && (
+        <>
+        <label className="check" style={{ padding: '4px 0' }}>
+          <input type="checkbox" className="switch" checked={allowBulk} onChange={(e) => setAllowBulk(e.target.checked)} />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              Swap for bulk packs to save money
+            </span>
+            <span className="small">Off: a bigger pack you'd also take is never suggested as a swap. Your own picks always count.</span>
           </span>
-          <span className="small">Off: a bigger pack you'd also take is never suggested as a swap. Your own picks always count.</span>
-        </span>
-      </label>
-      <label className="check" style={{ padding: '4px 0' }}>
-        <input type="checkbox" className="switch" checked={allowMulti} onChange={(e) => setAllowMulti(e.target.checked)} />
-        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title" style={{ fontSize: 15 }}>
-            Multi-buy to save money
+        </label>
+        <label className="check" style={{ padding: '4px 0' }}>
+          <input type="checkbox" className="switch" checked={allowMulti} onChange={(e) => setAllowMulti(e.target.checked)} />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              Multi-buy to save money
+            </span>
+            <span className="small">
+              Off: deals like "2 for $12" aren't counted. You see the price for one, and a multi-buy alone isn't treated as a sale.
+            </span>
           </span>
-          <span className="small">
-            Off: deals like "2 for $12" aren't counted. You see the price for one, and a multi-buy alone isn't treated as a sale.
-          </span>
-        </span>
-      </label>
+        </label>
+        </>
+      )}
       <button className="btn primary" onClick={save}>
         Save
       </button>
-      <button
-        className="btn danger"
-        onClick={async () => {
-          const name = group.name;
-          await act(`${name} deleted`, () => deleteGroup(group.id)); // 0.9.5 (undo)
-          onClose();
-          nav.pop();
-        }}
-      >
-        <Icon name="trash" size={18} /> Delete item
-      </button>
+      {!alertsOnly && (
+        <button
+          className="btn danger"
+          onClick={async () => {
+            const name = group.name;
+            await act(`${name} deleted`, () => deleteGroup(group.id)); // 0.9.5 (undo)
+            onClose();
+            nav.pop();
+          }}
+        >
+          <Icon name="trash" size={18} /> Delete item
+        </button>
+      )}
     </Sheet>
   );
 }

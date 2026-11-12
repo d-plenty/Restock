@@ -430,7 +430,7 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
           <Icon name="wifi" size={18} />
           <span className="grow">
             <span className="title" style={{ fontSize: 15 }}>
-              Wi-Fi sync (optional)
+              Phone sharing (optional)
             </span>
             <span className="small">
               {!wifiSyncOn(info) ? 'Off. Phones swapping changes straight to each other on your Wi-Fi, if you set it up.' : 'On. This phone swaps changes with other phones on your Wi-Fi.'}

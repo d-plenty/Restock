@@ -528,33 +528,34 @@ export function WebShopSearch({
               </label>
               {picksForYouBlock}
               {categorySelect}
+              {/* 0.9.12: the phone's words and layout: Add to both first, then list or pantry on their own. */}
               {listPick === 'general' ? (
                 <div className="two">
                   <button className="btn primary" onClick={() => void save('list')} disabled={saving || picks.size > 6}>
                     <Icon name="cart" size={18} /> Add to list
                   </button>
-                  <button className="btn" onClick={() => void save('pantry')} disabled={saving || picks.size > 6}>
-                    <Icon name={tab} size={18} /> Track it
+                  <button className="btn" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
+                    <Icon name={tab} size={18} /> Add to both
                   </button>
                 </div>
               ) : (
                 <>
+                  <button className="btn primary" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
+                    <Icon name="cart" size={18} /> Add to both
+                  </button>
                   <div className="two">
-                    <button className="btn primary" onClick={() => void save('pantry')} disabled={saving || picks.size > 6}>
-                      <Icon name={tab} size={18} /> Track it
-                    </button>
-                    <button className="btn primary" onClick={() => void save('list')} disabled={saving || picks.size > 6}>
+                    <button className="btn" onClick={() => void save('list')} disabled={saving || picks.size > 6}>
                       <Icon name="cart" size={18} /> Add to list
                     </button>
+                    <button className="btn" onClick={() => void save('pantry')} disabled={saving || picks.size > 6}>
+                      <Icon name={tab} size={18} /> Add to {SECTION_NAMES[tab].toLowerCase()}
+                    </button>
                   </div>
-                  <button className="btn" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
-                    Track it and add to list
-                  </button>
                 </>
               )}
               <p className="small" style={{ margin: 0 }}>
-                Track puts it in {SECTION_PLACE[tab]} ({SECTION_NAMES[tab]}), so Restock watches its price. Add to list puts it on the list for this trip only, at the
-                price shown.{listPick === 'general' ? ' General is a list only: tracking puts it in ' + SECTION_PLACE[tab] + '.' : ''}
+                Add to {SECTION_NAMES[tab].toLowerCase()} puts it in {SECTION_PLACE[tab]}, so Restock watches its price. Add to list puts it on the list for this trip only, at the
+                price shown.{listPick === 'general' ? ' General is a list only: Add to both also puts it in ' + SECTION_PLACE[tab] + '.' : ''}
               </p>
             </>
           )}

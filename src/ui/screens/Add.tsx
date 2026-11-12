@@ -1908,28 +1908,29 @@ export function AddScreen({
                     </span>
                   </span>
                 </label>
+                {/* 0.9.12: one layout everywhere: Add to both first, then list or pantry on their own. */}
                 {tabHidden ? (
                   <div className="two">
                     <button className="btn primary" onClick={() => save('list')} disabled={saving}>
                       <Icon name="cart" size={18} /> Add to list
                     </button>
                     <button className="btn" onClick={() => save('both')} disabled={saving}>
-                      <Icon name={section} size={18} /> Track it too
+                      <Icon name={section} size={18} /> Add to both
                     </button>
                   </div>
                 ) : (
                   <>
+                    <button className="btn primary" onClick={() => save('both')} disabled={saving}>
+                      <Icon name="cart" size={18} /> Add to both
+                    </button>
                     <div className="two">
-                      <button className="btn primary" onClick={() => save('pantry')} disabled={saving}>
-                        <Icon name={section} size={18} /> Add to {SECTION_NAMES[section].toLowerCase()}
-                      </button>
-                      <button className="btn primary" onClick={() => save('list')} disabled={saving}>
+                      <button className="btn" onClick={() => save('list')} disabled={saving}>
                         <Icon name="cart" size={18} /> Add to list
                       </button>
+                      <button className="btn" onClick={() => save('pantry')} disabled={saving}>
+                        <Icon name={section} size={18} /> Add to {SECTION_NAMES[section].toLowerCase()}
+                      </button>
                     </div>
-                    <button className="btn" onClick={() => save('both')} disabled={saving}>
-                      Add to both
-                    </button>
                   </>
                 )}
                 <p className="small" style={{ margin: 0 }}>
@@ -2151,17 +2152,18 @@ export function ManualSheet({
         </button>
       ) : (
         <>
-          <div className="two">
-            <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
-              Add to {SECTION_NAMES[section].toLowerCase()}
-            </button>
-            <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('list')}>
-              Add to list
-            </button>
-          </div>
-          <button className="btn" disabled={!name.trim() || saving} onClick={() => save('both')}>
+          {/* 0.9.12: the same layout as the search results and Pick my…. */}
+          <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('both')}>
             Add to both
           </button>
+          <div className="two">
+            <button className="btn" disabled={!name.trim() || saving} onClick={() => save('list')}>
+              Add to list
+            </button>
+            <button className="btn" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
+              Add to {SECTION_NAMES[section].toLowerCase()}
+            </button>
+          </div>
         </>
       )}
     </Sheet>

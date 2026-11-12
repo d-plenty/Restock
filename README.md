@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.9.11" src="https://img.shields.io/badge/status-release%20candidate%200.9.11-ffcd00">
+  <img alt="Release candidate 0.9.12" src="https://img.shields.io/badge/status-release%20candidate%200.9.12-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0911">New in 0.9.11</a> ·
+  <a href="#new-in-0912">New in 0.9.12</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -130,6 +130,20 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 </details>
 
+## New in 0.9.12
+
+Fixes and tidy-ups, mostly for the price helper phone.
+
+- **Price helper phone:** its settings save straight away, it runs one search job at a time, and its status updates while you watch ("Running now: search 4 of 500", what it sent, when a shop is resting).
+- **Adding things looks the same everywhere:** **Add to both** first, then **Add to list** or **Add to pantry**, on the phone, the web page and Pick my ….
+- **Type a count on the list:** "2 coconut cream", "3x eggs" or "bread x2". "2 minute noodles" stays as it is.
+- **Setup starts with your shops**, then price history, alerts and cards, then backups and sync, then the extras.
+- **One name, Phone sharing,** for phones swapping changes over Wi-Fi (some screens still said Wi-Fi sync).
+- **Item screen:** the Alert chips open just **Price alerts**. **Receipts** is always on Home. Aldi's branch is optional (its prices are the same everywhere).
+- **Check now** (recall alerts) and **Sync now** (Home Assistant) save waiting changes first. When something fails, Restock says so.
+- **Easier to tap and read:** bigger colour swatches, finger-sized links, and two- and three-way switches that wrap on small phones.
+- **Web page:** the sidebar lights up the page you're on, every list line has Pick my …, and sample items say they stay in that browser.
+
 ## New in 0.9.11
 
 - **Setup is shorter:** the welcome screen fits small phones, and setup no longer asks about price check times, widgets, updates, colours or the household's name. Price checks run once a day at 5:00 am, Restock tells you about updates, and the household starts as "Our house". Change any of them in Settings.
@@ -217,7 +231,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.9.11.apk` (on macOS, `shasum -a 256 restock-0.9.11.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.9.12.apk` (on macOS, `shasum -a 256 restock-0.9.12.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

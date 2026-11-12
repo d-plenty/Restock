@@ -27,7 +27,7 @@ import { useLive } from '../../lib/useLive';
 import { LoadingBar, TopBar } from '../components';
 import { useNav } from '../nav';
 // 0.9.5 (save): the switch, the list and the address wait for Save settings; Test connection and Sync now run straight away.
-import { stage, staged } from '../../lib/settingsDraft';
+import { saveFirst, stage, staged } from '../../lib/settingsDraft';
 import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar';
 
 /**
@@ -230,6 +230,8 @@ export function HomeAssistantScreen() {
   const syncNow = async () => {
     setBusy('sync');
     try {
+      // 0.9.12: what's waiting for Save counts too.
+      if (!(await saveFirst())) return nav.toast("Couldn't save your changes, so it didn't sync");
       const s = await runHaSync({ manual: true });
       if (s.held) nav.toast("Home Assistant's list came back empty. Restock will look again in a minute");
       else if (!s.error) nav.toast('Your list is the same in Home Assistant');

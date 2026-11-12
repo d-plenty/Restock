@@ -51,6 +51,9 @@ public class PriceHelper extends Worker {
     /** Most products kept waiting per shop when the collector can't be reached. */
     static final int OUTBOX_MAX = 20_000;
 
+    /** 0.9.12: the half-hourly run and "Run a few now" never overlap. */
+    private static final java.util.concurrent.locks.ReentrantLock LOCK = new java.util.concurrent.locks.ReentrantLock();
+
     public PriceHelper(Context context, WorkerParameters params) {
         super(context, params);
     }
@@ -86,9 +89,22 @@ public class PriceHelper extends Worker {
 
     @Override
     public Result doWork() {
-        Context ctx = getApplicationContext();
+        // 0.9.12: one run at a time. "Run a few now" tapped twice, or tapped while the half-hourly
+        // run is going, used to search the same things twice.
+        if (!LOCK.tryLock()) return Result.success();
         try {
-            SQLiteDatabase db = RestockDatabase.get(ctx);
+            return run();
+        } finally {
+            LOCK.unlock();
+        }
+    }
+
+    private Result run() {
+        Context ctx = getApplicationContext();
+        SQLiteDatabase db = null;
+        JSONObject state = null;
+        try {
+            db = RestockDatabase.get(ctx);
             if (!RestockDatabase.ready(db)) return Result.success();
             JSONObject settings = PriceChecker.readKv(db, "settings");
             JSONObject ph = settings != null ? settings.optJSONObject("priceHelper") : null;
@@ -98,7 +114,7 @@ public class PriceHelper extends Worker {
             String url = ph.optString("url").replaceAll("/+$", "");
             String key = ph.optString("key");
 
-            JSONObject state = PriceChecker.readKv(db, STATE);
+            state = PriceChecker.readKv(db, STATE);
             if (state == null) state = new JSONObject();
             LocalDate today = LocalDate.now(ZoneId.systemDefault());
             String week = weekOf(today);
@@ -114,6 +130,10 @@ public class PriceHelper extends Worker {
                 tracked(db, outbox);
             }
             state.put("of", terms.length());
+            // 0.9.12: the Settings screen shows "Running now" (and each search as it's done).
+            state.put("runningSince", PriceChecker.now());
+            state.remove("lastError");
+            PriceChecker.writeKv(db, STATE, state);
 
             StoreClient client = new StoreClient();
             client.setWebFetcher(StoreWeb.forAll(ctx), true);
@@ -148,6 +168,10 @@ public class PriceHelper extends Worker {
                     }
                 }
                 done++;
+                state.put("done", done);
+                state.put("paused", paused);
+                PriceChecker.writeKv(db, OUTBOX, outbox);
+                PriceChecker.writeKv(db, STATE, state);
             }
             state.put("done", done);
             state.put("paused", paused);
@@ -160,9 +184,19 @@ public class PriceHelper extends Worker {
             for (String chain : CHAINS) waiting += outbox.optJSONArray(chain) != null ? outbox.optJSONArray(chain).length() : 0;
             state.put("waiting", waiting);
             state.put("lastAt", PriceChecker.now());
+            state.remove("runningSince");
             PriceChecker.writeKv(db, STATE, state);
         } catch (Exception e) {
             Log.w(TAG, "price helper run failed", e);
+            if (db != null && state != null) {
+                try {
+                    state.remove("runningSince");
+                    state.put("lastError", "The run stopped: " + e.getMessage());
+                    PriceChecker.writeKv(db, STATE, state);
+                } catch (Exception ignored) {
+                    // nothing more to do
+                }
+            }
         }
         return Result.success();
     }

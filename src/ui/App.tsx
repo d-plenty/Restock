@@ -158,6 +158,19 @@ function RestockApp() {
     },
     [startToastTimer],
   );
+  // 0.9.12: a button whose work fails without saying so (an error nobody caught) says something
+  // went wrong, instead of seeming to do nothing. Network hiccups that the code already expects are
+  // caught where they happen; this is the safety net for the rest.
+  useEffect(() => {
+    const onReject = (e: PromiseRejectionEvent) => {
+      const why = e.reason instanceof Error ? e.reason.message : String(e.reason ?? '');
+      console.error('unhandled', e.reason);
+      if (!why || /abort/i.test(why)) return;
+      toast(`That didn't work: ${why.length > 120 ? `${why.slice(0, 117)}…` : why}`);
+    };
+    window.addEventListener('unhandledrejection', onReject);
+    return () => window.removeEventListener('unhandledrejection', onReject);
+  }, [toast]);
   const holdToast = useCallback(
     (hold: boolean) => {
       toastHeld.current = hold;

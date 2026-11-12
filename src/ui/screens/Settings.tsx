@@ -558,7 +558,7 @@ export function SettingsScreen() {
             className="row"
             onClick={async () => {
               await loadDemo();
-              nav.toast('Sample items added');
+              nav.toast(serverMode ? 'Sample items added, in this browser only: they never go to your phones' : 'Sample items added');
             }}
           >
             <span className="grow">

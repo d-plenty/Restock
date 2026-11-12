@@ -966,7 +966,7 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
 const addressText = (a?: string | null) => (a ?? '').replace(/^https?:\/\//i, '');
 
 /**
- * The Restock server: a card of its own, so a phone can use it alongside Wi-Fi sync and the
+ * The Restock server: a card of its own, so a phone can use it alongside Phone sharing and the
  * away-from-home choice. Join with the code on the server's Add a phone page; once joined, scan the
  * web page's code to let a browser see the household (or sign in there).
  */
@@ -1074,7 +1074,7 @@ export function ServerCard({ info, busy, onInfo }: { info: SyncInfo; busy: boole
     const ok = await confirmAction('Stop syncing through the Restock server?', {
       detail:
         (photos ? `${plural(photos, 'receipt photo')} kept on the server come back onto this phone first. ` : '') +
-        "Older prices this phone moved there stay on the server. This phone comes off the server's list; Wi-Fi sync and sync away from home carry on.",
+        "Older prices this phone moved there stay on the server. This phone comes off the server's list; Phone sharing and sync away from home carry on.",
       action: 'Stop',
     });
     if (!ok) return;
@@ -1161,7 +1161,7 @@ export function ServerCard({ info, busy, onInfo }: { info: SyncInfo; busy: boole
           <span className="small">
             A small server you run yourself (in Docker on a NAS or home server, or as an app in Home Assistant). Phones sync through it at home and away,
             prices included, and you can use Restock in a browser too. It only ever keeps sealed files: still no account, and the makers of
-            Restock never see any of it. It works alongside Wi-Fi sync and sync away from home.
+            Restock never see any of it. It works alongside Phone sharing and sync away from home.
           </span>
           {!info.paired && (
             <ol className="small" style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1278,7 +1278,7 @@ export function AddPhoneSheet({ info, onClose, onWifi }: { info: SyncInfo; onClo
       )}
       {house && (
         <p className="small" style={{ margin: 0 }}>
-          Wi-Fi sync (phones swapping changes straight to each other at home) is separate and off. You can set it up on the Wi-Fi sync screen.
+          Phone sharing (phones swapping changes straight to each other at home) is separate and off. You can set it up on the Phone sharing screen.
         </p>
       )}
       <button className="btn block" onClick={onClose}>
@@ -1507,7 +1507,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
     try {
       const r = await RestockNative.syncNow();
       setInfo(r);
-      // 0.9.4: what it did, and never about the Wi-Fi's phones unless Wi-Fi sync is on.
+      // 0.9.4: what it did, and never about the Wi-Fi's phones unless Phone sharing is on.
       nav.toast(syncNowMessage(r));
     } finally {
       setBusy(false);
@@ -1630,8 +1630,8 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
     const server = info?.folderKind === 'nextcloud' || info?.folderKind === 'webdav';
     const ok = await confirmAction(server ? 'Stop syncing through the server?' : 'Stop syncing through the folder?', {
       detail: server
-        ? "This phone stops using the server and forgets its sign-in. Its file stays there; delete it yourself if you like. Wi-Fi sync carries on."
-        : "This phone stops reading and writing the folder. Its file stays there; delete it yourself if you like. Wi-Fi sync carries on.",
+        ? "This phone stops using the server and forgets its sign-in. Its file stays there; delete it yourself if you like. Phone sharing carries on."
+        : "This phone stops reading and writing the folder. Its file stays there; delete it yourself if you like. Phone sharing carries on.",
       action: 'Stop',
     });
     if (ok) {
@@ -1675,18 +1675,18 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
   ) : null;
   /** Sets Wi-Fi sync up, or stops it. Only ever Wi-Fi sync: the server is never touched. */
   const wifiNow = async (on: boolean) => {
-    const ok = await confirmAction(on ? 'Set up Wi-Fi sync?' : 'Stop Wi-Fi sync?', {
+    const ok = await confirmAction(on ? 'Set up Phone sharing?' : 'Stop Phone sharing?', {
       detail: on
-        ? "This phone will announce itself on your Wi-Fi and swap changes straight with the house's other phones that have Wi-Fi sync on, even when the internet is down. Your server carries on as it is. Turn it on in each phone that should do it."
+        ? "This phone will announce itself on your Wi-Fi and swap changes straight with the house's other phones that have Phone sharing on, even when the internet is down. Your server carries on as it is. Turn it on in each phone that should do it."
         : `This phone stops looking for other phones on your Wi-Fi and stops announcing itself. It stays on ${serverName(info)}: nothing changes there, and this phone keeps everything.`,
-      action: on ? 'Set up Wi-Fi sync' : 'Stop Wi-Fi sync',
+      action: on ? 'Set up Phone sharing' : 'Stop Phone sharing',
       danger: false,
     });
     if (!ok) return;
     setBusy(true);
     try {
       setInfo(await RestockNative.syncSetWifi({ on }));
-      nav.toast(on ? 'Wi-Fi sync is on' : 'Wi-Fi sync is off');
+      nav.toast(on ? 'Phone sharing is on' : 'Phone sharing is off');
     } catch (e) {
       nav.toast(errText(e));
     } finally {
@@ -1696,7 +1696,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
 
   return (
     <div className="screen">
-      <TopBar title={isHouse ? 'Wi-Fi sync' : 'Phones and sharing'} />
+      <TopBar title={isHouse ? 'Phone sharing' : 'Phones and sharing'} />
 
       {!syncAvailable() && (
         <div className="banner grey">
@@ -1804,19 +1804,19 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
             </button>
           </div>
 
-          <div className="eyebrow">Wi-Fi sync (optional)</div>
+          <div className="eyebrow">Phone sharing (optional)</div>
           {!wifiOn ? (
             <div className="card" style={{ gap: 8 }}>
               <strong>Phone to phone on your Wi-Fi</strong>
               <span className="small">
-                Your server already syncs this phone at home and away. Wi-Fi sync is a separate extra: phones swap changes straight to each other on the
+                Your server already syncs this phone at home and away. Phone sharing is a separate extra: phones swap changes straight to each other on the
                 same Wi-Fi, even when the internet or the server is down.
               </span>
               <span className="small">
                 It is off. This phone isn't announcing itself or looking for other phones on your network, and it won't until you set it up.
               </span>
               <button className="btn primary block" disabled={!syncAvailable() || busy} onClick={() => void wifiNow(true)}>
-                Set up Wi-Fi sync
+                Set up Phone sharing
               </button>
             </div>
           ) : (
@@ -1824,10 +1824,10 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
               <div className="card flush">
                 <div className="row">
                   <span className="grow">
-                    <span className="title">{!info.onWifi ? "This phone isn't on Wi-Fi" : info.lastSyncAt ? `Wi-Fi sync is on · synced ${agoText(info.lastSyncAt)}` : 'Wi-Fi sync is on · not synced yet'}</span>
+                    <span className="title">{!info.onWifi ? "This phone isn't on Wi-Fi" : info.lastSyncAt ? `Phone sharing is on · synced ${agoText(info.lastSyncAt)}` : 'Phone sharing is on · not synced yet'}</span>
                     <span className="small">
                       {info.lastError ??
-                        (info.onWifi ? "Swaps changes with the house's other phones that have Wi-Fi sync on, on this Wi-Fi." : 'It waits until this phone is on Wi-Fi.')}
+                        (info.onWifi ? "Swaps changes with the house's other phones that have Phone sharing on, on this Wi-Fi." : 'It waits until this phone is on Wi-Fi.')}
                     </span>
                   </span>
                   <button className="btn small primary" disabled={busy} onClick={() => void syncNow()}>
@@ -1843,7 +1843,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                   <Icon name="close" size={18} />
                   <span className="grow">
                     <span className="title" style={{ fontSize: 15 }}>
-                      Stop Wi-Fi sync
+                      Stop Phone sharing
                     </span>
                     <span className="small">Only stops phone to phone sync on the Wi-Fi. This phone stays on {serverName(info)}.</span>
                   </span>
@@ -1865,7 +1865,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                 ))}
                 {!(info.members ?? []).some((m) => !m.me && !m.device.startsWith('srv-') && synced(m.device)) && (
                   <p className="small" style={{ padding: '4px 14px 12px', margin: 0 }}>
-                    None yet. Set up Wi-Fi sync on the house's other phones too, and keep them on the same Wi-Fi.
+                    None yet. Set up Phone sharing on the house's other phones too, and keep them on the same Wi-Fi.
                   </p>
                 )}
               </div>

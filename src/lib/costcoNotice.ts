@@ -15,7 +15,7 @@ export const COSTCO_SETTING_TITLE = 'Costco';
 export const COSTCO_SWITCH_LABEL = 'Use Costco';
 
 /** What the switch does, in one line under it. */
-export const COSTCO_SWITCH_HELP = 'Off until you pick it. Online prices, include delivery.';
+export const COSTCO_SWITCH_HELP = 'Off until you pick it. Online prices, delivery included.';
 export const COSTCO_SWITCH_HELP_ON = 'Searched with your other shops when you search. Prices are online prices.';
 
 /** The heading above the disclosure, in the sheet that asks first and in the setting itself. */

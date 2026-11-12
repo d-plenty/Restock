@@ -53,6 +53,36 @@ export interface PriceHelperState {
   lastAt?: string;
   lastError?: string;
   paused?: Record<string, string>;
+  /** 0.9.12: set while a run is going. */
+  runningSince?: string;
+}
+
+/**
+ * 0.9.12: the status lines under the buttons. `asked`: when "Run a few now" was tapped (the run can
+ * take a few seconds to start). A run "going" for over 15 minutes stopped without saying (the phone
+ * was restarted, say), so it isn't shown as going.
+ */
+export function helperStatus(o: { state?: PriceHelperState; enabled: boolean; of: number; asked?: number; now: number }): string[] {
+  const s = o.state;
+  const running = !!s?.runningSince && o.now - Date.parse(s.runningSince) < 15 * 60_000;
+  const lines: string[] = [];
+  if (running) lines.push(`Running now: search ${Math.min((s?.done ?? 0) + 1, s?.of ?? o.of)} of ${s?.of ?? o.of}. Each one takes about a minute.`);
+  else if (o.asked && o.now - o.asked < 60_000 && (!s?.lastAt || Date.parse(s.lastAt) < o.asked)) lines.push('Starting…');
+  if (s?.week) {
+    const parts = [`This week: ${Math.min(s.done ?? 0, s.of ?? o.of)} of ${s.of ?? o.of} searches done`, `${(s.sent ?? 0).toLocaleString()} prices sent`];
+    if (s.waiting) parts.push(`${s.waiting.toLocaleString()} waiting to send`);
+    if (s.lastAt) parts.push(`last ran ${new Date(s.lastAt).toLocaleString()}`);
+    lines.push(parts.join(' · '));
+    if (s.paused) for (const [shop, until] of Object.entries(s.paused)) if (Date.parse(until) > o.now) lines.push(`${shop === 'coles' ? 'Coles' : 'Woolworths'} turned it away, so it's resting until ${new Date(until).toLocaleTimeString()}.`);
+    if (s.lastError && !running) lines.push(`Last problem: ${s.lastError}`);
+  } else if (!running && !lines.length) {
+    lines.push(
+      o.enabled
+        ? 'Not run yet. It runs by itself about every half hour while this phone is charging on Wi-Fi (Android picks the moment), or tap Run a few now.'
+        : 'Off.',
+    );
+  }
+  return lines;
 }
 
 /** The built-in list: 500 everyday things people buy at the supermarket. */

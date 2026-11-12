@@ -130,7 +130,7 @@ export const SHOPS: ShopDef[] = [
     color: '#5b6b7a',
     website: 'https://www.costco.com.au',
     map: /\bcostco\b/i,
-    note: 'Online prices, include delivery',
+    note: 'Online prices, delivery included',
     catalogue: { url: 'https://www.costco.com.au/warehouse-savings', note: "Costco's warehouse savings for members." },
   }),
 

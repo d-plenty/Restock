@@ -108,7 +108,7 @@ export function HouseholdScreen() {
           <span className="grow">
             <span className="title" style={{ fontSize: 15 }}>
               {sync?.house || sync?.serverApi === 3
-                ? 'Wi-Fi sync (optional)'
+                ? 'Phone sharing (optional)'
                 : sync?.paired
                   ? sync.isOwner
                     ? 'Add or remove phones'

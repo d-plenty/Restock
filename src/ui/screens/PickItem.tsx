@@ -206,16 +206,19 @@ export function PickItemSheet({ entry, onClose, fromHa = true }: { entry: ListEn
         )}
       </div>
       {pantry && shopAction}
-      <button
-        className="btn"
-        disabled={busy}
-        onClick={async () => {
-          await keepAsWords(entry.id);
-          onClose();
-        }}
-      >
-        Keep it as just "{word}"
-      </button>
+      {/* 0.9.12: only for a Home Assistant line (it stops asking). A line you typed is already just words. */}
+      {fromHa && (
+        <button
+          className="btn"
+          disabled={busy}
+          onClick={async () => {
+            await keepAsWords(entry.id);
+            onClose();
+          }}
+        >
+          Keep it as just "{word}"
+        </button>
+      )}
       {byHand && (
         <Suspense fallback={null}>
           <ManualSheet

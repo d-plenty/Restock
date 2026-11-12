@@ -61,8 +61,8 @@ describe('screens (0.9.6)', () => {
   it('Stop syncing on the Wi-Fi screen never leaves the server; the server screen has Leave this server', () => {
     const sync = read('./Sync.tsx');
     expect(sync).not.toContain('setLeavingServer');
-    expect(sync).toContain('Stop Wi-Fi sync');
-    expect(sync).toContain('Set up Wi-Fi sync');
+    expect(sync).toContain('Stop Phone sharing');
+    expect(sync).toContain('Set up Phone sharing');
     const server = read('./RestockServer.tsx');
     expect(server).toContain('Leave this server');
   });

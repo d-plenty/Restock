@@ -103,8 +103,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
             Back up automatically
           </span>
           <span className="small">
-            Saves a whole backup into a folder you choose (Nextcloud, Syncthing or a folder on this phone). {pricesIn(settings, span)} {AUTO_GIFT_NOTE}
-            {inSetup ? ' Off unless you turn it on.' : ''}
+            Saves a whole backup into Documents/Restock backups on this phone, or a folder you pick (Nextcloud, Syncthing). {pricesIn(settings, span)} {AUTO_GIFT_NOTE}
           </span>
         </span>
         <input type="checkbox" className="switch" checked={b.enabled} onChange={(e) => void toggle(e.target.checked)} aria-label="Back up automatically" />

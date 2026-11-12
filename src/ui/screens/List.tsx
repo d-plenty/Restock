@@ -24,7 +24,7 @@ import {
   updateSettings,
   cachedSettings,
 } from '../../lib/db';
-import { buzz, scannedLine } from '../../lib/listActions';
+import { buzz, scannedLine, splitCount } from '../../lib/listActions';
 import { loadRecommendations } from '../../lib/recs';
 import { bothPrices, lineCost, type Option } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
@@ -221,21 +221,23 @@ export function useListAdd(entries: ListEntry[], recs: Recommendation[], section
   const [text, setText] = useState('');
   /** `said`: the Undo toast's words, when not the usual "Milk added to your shopping list". */
   const add = async (value: string, groupId?: string, said?: string) => {
-    const t = value.trim();
+    // 0.9.12: "2 coconut cream" is two of them.
+    const { text: t, qty: n } = splitCount(value);
     if (!t) return;
     // 0.9.5: a pantry item added on General (a scan) goes on its own tab's list, as it would anywhere.
     const item = groupId && section === 'general' ? (await allGroups()).find((g) => g.id === groupId) : undefined;
     const all = item ? await allListEntries() : entries;
     const existing = groupId ? all.find((e) => !e.checked && e.groupId === groupId) : undefined;
     // 0.9.5 (undo): "Milk added to your shopping list · Undo".
-    await act(said ?? (existing ? `One more ${t} on your shopping list` : `${t} added to your shopping list`), async () => {
-      if (existing) await updateListEntry(existing.id, { qty: qtyOf(existing) + 1 });
+    const words = existing ? (n > 1 ? `${n} more ${t} on your shopping list` : `One more ${t} on your shopping list`) : `${n > 1 ? `${n} × ` : ''}${t} added to your shopping list`;
+    await act(said ?? words, async () => {
+      if (existing) await updateListEntry(existing.id, { qty: qtyOf(existing) + n });
       else
         await addListEntry({
           id: uid(),
           text: t,
           groupId,
-          qty: 1,
+          qty: n,
           section: item ? (item.section ?? 'pantry') : section,
           checked: false,
           createdAt: nowIso(),
@@ -473,7 +475,8 @@ export function ListScreen() {
             </span>
           )}
           {/* Not a pantry item: search the shops for it in one tap (also in the ⋯ menu). 0.7.4 */}
-          {!selecting && !e.groupId && (
+          {/* 0.9.12: not on a line already ticked off. */}
+          {!selecting && !e.groupId && !e.checked && (
             <button
               className="icon-btn"
               aria-label={`Pick my ${pickWord(e.text)}`}

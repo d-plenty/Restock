@@ -170,6 +170,8 @@ export function RecallsScreen() {
   const check = async () => {
     setBusy(true);
     try {
+      // 0.9.12: the check reads the saved settings, so a change waiting for Save counts too.
+      if (!(await draft.saveFirst())) return nav.toast("Couldn't save your changes, so it didn't check");
       const r = await RestockNative.checkRecalls();
       refresh();
       const failed = Object.keys(r.errors);

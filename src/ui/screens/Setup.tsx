@@ -207,13 +207,15 @@ const ALL_TILES: Tile[] = [
 ];
 
 /**
- * The order setup goes through them: how Restock looks and works for you first (text size,
- * permissions, colours, backups, price history), then your shops, then the add-ons.
+ * The order setup goes through them: text size first, then your shops, how deals are judged and
+ * told, keeping it safe and shared, then the add-ons.
  */
 // 0.9.11: price checks, look and colours, household name, widgets and updates aren't asked in setup
 // any more: they start on their defaults (checks once a day at 5:00 am, updates every 24 hours,
 // "Our house") and are all in Settings. The household's name is set in Sync and backups.
-const TILE_ORDER: TileId[] = ['a11y', 'permissions', 'backups', 'history', 'pantry', 'keg', 'pharmacy', 'accounts', 'alerts', 'receipts', 'recalls', 'sync'];
+// 0.9.12: what a new person cares about first: their shops, then how deals are judged and told,
+// then keeping it safe and shared, then the extras.
+const TILE_ORDER: TileId[] = ['a11y', 'pantry', 'history', 'alerts', 'accounts', 'permissions', 'backups', 'sync', 'keg', 'pharmacy', 'receipts', 'recalls'];
 // The Updates tile only where Restock updates itself from GitHub (not F-Droid builds).
 export const TILES: Tile[] = TILE_ORDER.filter((id) => SELF_UPDATE || id !== 'updates').map((id) => ALL_TILES.find((t) => t.id === id)!);
 

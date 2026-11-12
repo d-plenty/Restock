@@ -44,15 +44,25 @@ import { canLeave, hasUnsaved } from '../../lib/settingsDraft';
 type Place = Tab | 'specials' | 'receipts' | 'cards' | 'household' | 'data' | 'settings';
 
 /** Which sidebar entry a screen belongs to (by the first screen opened over the tab). */
-function placeOf(tab: Tab, stack: Screen[]): Place {
-  const s = stack[0];
-  if (!s) return tab;
+function placeOfScreen(s: Screen): Place | undefined {
   if (s.name === 'specials' || s.name === 'catalogues' || s.name === 'mycatalogue') return 'specials';
   if (s.name === 'receipts' || s.name === 'receipt') return 'receipts';
   if (s.name === 'server' && (s.page === 'data' || s.page === 'data-manage')) return 'data';
   if (s.name === 'cards') return 'cards'; // 0.9.6 (cards)
   if (s.name === 'server') return 'household';
   if (s.name === 'settings' || s.name === 'household' || s.name === 'homeAssistant') return 'settings';
+  return undefined;
+}
+
+/**
+ * The sidebar's lit place. 0.9.12: the page on top decides (it was the first page opened, so
+ * Settings opened from Receipts still lit Receipts).
+ */
+function placeOf(tab: Tab, stack: Screen[]): Place {
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const p = placeOfScreen(stack[i]);
+    if (p) return p;
+  }
   return tab;
 }
 

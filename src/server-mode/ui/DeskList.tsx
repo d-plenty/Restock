@@ -259,6 +259,12 @@ export function DeskList() {
           )}
           {!e.checked && <Stepper e={e} />}
         </span>
+        {/* 0.9.12: a line that isn't one of your items yet: search the shops for it, as on the phone. */}
+        {!e.groupId && !e.checked && (
+          <button className="icon-btn" aria-label={`Pick my ${pickWord(e.text)}`} title={`Pick my ${pickWord(e.text)}`} onClick={() => setPicking(e)}>
+            <Icon name="search" size={18} />
+          </button>
+        )}
         <button className="icon-btn dk-more" aria-label={`Details and options for ${title}`} onClick={() => setEditing(e)}>
           <Icon name="more" size={18} />
         </button>

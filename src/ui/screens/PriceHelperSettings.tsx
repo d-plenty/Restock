@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
-import { getKV } from '../../lib/db';
-import { DEFAULT_PRICE_HELPER, HELPER_SEARCHES, helperSearches, tidyHelperUrl, tidySearches, type PriceHelperSettings, type PriceHelperState } from '../../lib/priceHelper';
-import { afterSave, updateSettings } from '../../lib/settingsDraft';
+import { getKV, updateSettings } from '../../lib/db';
+import {
+  DEFAULT_PRICE_HELPER,
+  HELPER_SEARCHES,
+  helperSearches,
+  helperStatus,
+  tidyHelperUrl,
+  tidySearches,
+  type PriceHelperSettings,
+  type PriceHelperState,
+} from '../../lib/priceHelper';
 import { RestockNative } from '../../lib/sql/native';
-import { useLive } from '../../lib/useLive';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
 import { useNav } from '../nav';
@@ -21,7 +28,23 @@ export function PriceHelperSettings({ settings }: { settings: Settings }) {
   const [editing, setEditing] = useState(false);
   const [list, setList] = useState('');
   const [testing, setTesting] = useState(false);
-  const state = useLive(() => getKV<PriceHelperState>('priceHelper'), []);
+  // 0.9.12: what the background run writes, read again every few seconds while this is open (the
+  // phone's own runs don't tell the screen when they write).
+  const [state, setState] = useState<PriceHelperState | undefined>();
+  const [asked, setAsked] = useState<number | undefined>();
+  useEffect(() => {
+    let alive = true;
+    const read = () =>
+      void getKV<PriceHelperState>('priceHelper')
+        .then((v) => alive && setState(v))
+        .catch(() => undefined);
+    read();
+    const t = setInterval(read, 4000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
   useEffect(() => setUrl(ph.url ?? ''), [ph.url]);
   useEffect(() => setKey(ph.key ?? ''), [ph.key]);
 
@@ -35,12 +58,15 @@ export function PriceHelperSettings({ settings }: { settings: Settings }) {
       </div>
     );
 
+  // 0.9.12: saved straight away, not held for Settings' Save button: the background run reads the
+  // saved settings, so a change waiting for Save did nothing ("Run a few now" ran with it off).
+  // It's this phone's own setting, so it never goes to the household.
   const save = async (patch: Partial<PriceHelperSettings>) => {
     const next: PriceHelperSettings = { ...ph, ...patch };
     // Turned on: the list the phone runs is written out, so the background job has it.
     if (next.enabled && !next.searches?.length) next.searches = HELPER_SEARCHES;
-    await updateSettings({ priceHelper: next });
-    await afterSave('priceHelper', () => RestockNative.priceHelperSchedule().catch(() => undefined));
+    await updateSettings({ priceHelper: next }, { local: true });
+    await RestockNative.priceHelperSchedule().catch(() => undefined);
   };
 
   const searches = helperSearches(ph);
@@ -136,27 +162,22 @@ export function PriceHelperSettings({ settings }: { settings: Settings }) {
           className="btn"
           disabled={!ph.enabled || !ph.url || !ph.key}
           onClick={async () => {
+            // Whatever is typed in the boxes counts, even if they haven't been left yet.
+            const u = tidyHelperUrl(url);
+            if (u && (u !== ph.url || key.trim() !== ph.key)) await save({ url: u, key: key.trim() || undefined });
             await RestockNative.priceHelperRunNow();
-            nav.toast('Running the next few searches now. It takes a couple of minutes.');
+            setAsked(Date.now());
           }}
         >
           Run a few now
         </button>
       </div>
-      <div className="small" role="status">
-        {state?.week ? (
-          <>
-            This week: {Math.min(state.done ?? 0, state.of ?? searches.length)} of {state.of ?? searches.length} searches done · {(state.sent ?? 0).toLocaleString()}{' '}
-            prices sent
-            {state.waiting ? ` · ${state.waiting.toLocaleString()} waiting to send` : ''}
-            {state.lastAt ? ` · last ran ${new Date(state.lastAt).toLocaleString()}` : ''}
-            {state.lastError ? <span style={{ display: 'block' }}>Last problem: {state.lastError}</span> : null}
-          </>
-        ) : ph.enabled ? (
-          'Not run yet. It starts the next time this phone is charging on Wi-Fi.'
-        ) : (
-          'Off.'
-        )}
+      <div className="small" role="status" aria-live="polite">
+        {helperStatus({ state, enabled: ph.enabled, of: searches.length, asked, now: Date.now() }).map((line) => (
+          <span key={line} style={{ display: 'block' }}>
+            {line}
+          </span>
+        ))}
       </div>
       {!editing ? (
         <button

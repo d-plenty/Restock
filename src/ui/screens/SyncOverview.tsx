@@ -235,10 +235,10 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
                 ? others.length
                   ? `On · ${info?.lastSyncAt ? `synced ${agoText(info.lastSyncAt)}` : 'not synced yet'}`
                   : house
-                    ? 'On · set up Wi-Fi sync on the other phones too'
+                    ? 'On · set up Phone sharing on the other phones too'
                     : 'On · add a phone to start'
                 : house
-                  ? 'Off · optional. Set up Wi-Fi sync to also swap changes at home when the server is down'
+                  ? 'Off · optional. Set up Phone sharing to also swap changes at home when the server is down'
                   : "Off · turn on to also swap changes at home when the internet's down",
               () => nav.push({ name: 'sync' }),
             )}

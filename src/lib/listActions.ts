@@ -64,3 +64,22 @@ export const takeOffList = (ids: string[], name: string) => act(`${name} taken o
 
 // 0.9.6: "Move to" another list (Groceries, Keg, Health, General), with Undo: moveLine.ts.
 export { moveAll, moveTo } from './moveLine';
+
+/**
+ * 0.9.12: "2 coconut cream", "coconut cream x2" or "3x milk" typed on a list is that many: the
+ * count comes off the words. "2 minute noodles", "3 in 1 coffee", "7up" and "2L milk" stay as typed.
+ */
+export function splitCount(typed: string): { text: string; qty: number } {
+  const t = typed.trim().replace(/\s+/g, ' ');
+  const lead = /^(\d{1,2})\s*[x×]?\s+(.+)$/i.exec(t);
+  if (lead && !/^(in|of|for|pack|packs|minute|minutes|ply|way|by|to|and|x)\b/i.test(lead[2])) {
+    const n = Number(lead[1]);
+    if (n >= 1 && n <= 50) return { text: lead[2], qty: n };
+  }
+  const tail = /^(.+?)\s+[x×]\s*(\d{1,2})$/i.exec(t) ?? /^(.+?)\s+(\d{1,2})\s*[x×]$/i.exec(t);
+  if (tail) {
+    const n = Number(tail[2]);
+    if (n >= 1 && n <= 50) return { text: tail[1], qty: n };
+  }
+  return { text: t, qty: 1 };
+}

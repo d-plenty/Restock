@@ -737,7 +737,7 @@ function ManualNames({ settings, section }: { settings: Settings; section: Secti
     <details className="explain">
       <summary>
         <Icon name="pencil" size={18} />
-        <span>Type branch names yourself</span>
+        <span>Enter a branch yourself</span>
       </summary>
       <div className="explain-body">
         {chains.map((chain) => {
@@ -801,7 +801,7 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
                   <ChainDot chain={chain} />
                   <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <span>{chainName(chain)}</span>
-                    {on && <span className="small">{branchText(st)}</span>}
+                    {on && <span className="small">{branchText(st, chain)}</span>}
                   </span>
                 </label>
                 {/* 0.9.8: each shop's sign-in, branch number and pros and cons, right under its tick. */}
@@ -887,11 +887,17 @@ function ShopDropdownCustomOnly({ settings }: { settings: Settings }) {
   );
 }
 
+/**
+ * 0.9.12: Aldi's price is the same at every branch, so its branch only names where you go in Start
+ * shopping: it's optional, not something missing.
+ */
+const NO_BRANCH_YET = (chain: StoreChain) => (chain === 'aldi' ? 'Branch optional: it only names where you go in Start shopping' : 'No branch picked yet');
+
 /** "Your store: Kirwan · 2nd: Upper Ross", or that no branch is picked yet. */
-function branchText(st: StoreChoice): string {
+function branchText(st: StoreChoice, chain: StoreChain): string {
   const primary = cleanStoreName(st.primary);
   const second = cleanStoreName(st.secondary);
-  if (!primary && !second) return 'No branch picked yet (pick one below)';
+  if (!primary && !second) return NO_BRANCH_YET(chain);
   return [primary && `Your branch: ${primary}`, second && `2nd: ${second}`].filter(Boolean).join(' · ');
 }
 
@@ -911,7 +917,7 @@ function SelectedSummary({ settings, section }: { settings: Settings; section: S
               <span className="title" style={{ fontSize: 15 }}>
                 {chainName(c)}
               </span>
-              <span className="small">{branchText(st)}</span>
+              <span className="small">{branchText(st, c)}</span>
             </span>
           </div>
           <ShopEdit settings={settings} chain={c} />
@@ -1430,7 +1436,7 @@ function ShopEditSheet({ settings, chain, onClose }: { settings: Settings; chain
     <Sheet title={chainName(chain)} onClose={onClose}>
       <div className="eyebrow">Branches</div>
       <p className="small" style={{ margin: 0 }}>
-        {[s.primary && `Main: ${s.primary}`, s.secondary && `2nd: ${s.secondary}`].filter(Boolean).join(' · ') || 'No branch picked yet.'}
+        {[s.primary && `Main: ${s.primary}`, s.secondary && `2nd: ${s.secondary}`].filter(Boolean).join(' · ') || `${NO_BRANCH_YET(chain)}.`}
       </p>
       {/* 0.9.10: find this shop's own branches nearby, then tap Primary or 2nd. Typing is the fallback. */}
       <NearbyFinder settings={settings} section={sectionOf(chain)} only={chain} />

@@ -236,7 +236,7 @@ export function DeskHousehold({ extra }: { extra?: ReactNode } = {}) {
               </button>
             </div>
             <p className="dk-row dk-sub">
-              This is the server's list of phones. Wi-Fi sync between phones is a separate, optional extra set up on a phone; this page never uses it.
+              This is the server's list of phones. Phone sharing (phones swapping changes over Wi-Fi) is a separate, optional extra set up on a phone; this page never uses it.
             </p>
             {error && <p className="dk-row banner red small">{error}</p>}
             {msg && (

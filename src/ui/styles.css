@@ -648,7 +648,8 @@ details.dropdown[open] > summary {
 .seg button {
   flex: 1;
   min-width: 0;
-  height: 38px;
+  /* 0.9.12: two lines when the words need it ("Recently added" on a small phone), never spilling out. */
+  min-height: 44px;
   border: none;
   background: transparent;
   color: var(--ink-2);
@@ -661,7 +662,10 @@ details.dropdown[open] > summary {
   gap: 6px;
   justify-content: center;
   align-items: center;
-  white-space: nowrap;
+  text-align: center;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .seg button[aria-pressed='true'],
@@ -1726,8 +1730,15 @@ table.nutrition td.num {
 /* ---------- colour pickers ---------- */
 .swatches {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
   gap: 8px;
+}
+/* 0.9.12: the colour picker's own size. It shared the name with the 30 px card dot above, so it was
+   30 px wide: too small to tap. */
+.swatches .swatch {
+  width: 44px;
+  height: 44px;
+  justify-self: center;
 }
 .swatch {
   aspect-ratio: 1;
@@ -3066,7 +3077,8 @@ h2,
   border-radius: var(--r-full);
 }
 .seg button {
-  height: 36px;
+  /* 0.9.12: grows to two lines when it must (was a fixed 36 px). */
+  height: auto;
 }
 /* Tags: one pill shape and size, never on two lines. */
 .tag {
@@ -4123,10 +4135,11 @@ button.sync-choice:disabled {
 /* Tap areas: anything small (chips, small buttons, segments, round icon buttons, tags you tap)
    keeps its look but takes a 44 px tap. :where() keeps this from beating a rule that places
    the control itself. */
-:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .ph-src, .dk-name, .dk-line-open, .dk-linkish, .cat-name-open, .cat-add, .shoprow-open) {
+:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .ph-src, .dk-name, .dk-line-open, .dk-linkish, .linkish, .cat-name-open, .cat-add, .shoprow-open) {
   position: relative;
 }
-:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .dk-name, .dk-line-open, .dk-linkish, .cat-name-open, .cat-add)::after {
+:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .dk-name, .dk-line-open, .dk-linkish, .linkish, .cat-name-open, .cat-add)::after {
+  /* 0.9.12: .linkish too ("Expand all", "Change" in a sentence). */
   content: '';
   position: absolute;
   left: 50%;

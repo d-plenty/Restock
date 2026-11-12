@@ -162,33 +162,33 @@ final class MarketParser {
 
     /** [{"date": "2026-11-10", "price": 3.1}, …], keeping the newest MAX_HISTORY. */
     static void readPrices(JsonReader r, Item item) throws IOException {
-                    r.beginArray();
-                    while (r.hasNext()) {
-                        String date = null;
-                        Double price = null;
-                        r.beginObject();
-                        while (r.hasNext()) {
-                            String k = r.nextName();
-                            if (r.peek() == JsonToken.NULL) {
-                                r.nextNull();
-                            } else if ("date".equals(k)) {
-                                date = r.nextString();
-                            } else if ("price".equals(k)) {
-                                price = r.nextDouble();
-                            } else {
-                                r.skipValue();
-                            }
-                        }
-                        r.endObject();
-                        if (date != null && price != null && date.length() >= 10) {
-                            item.dates.add(date);
-                            item.prices.add(price);
-                            // 0.9.0: trim now and then while reading (not every time), and at the end.
-                            if (item.dates.size() >= 2 * MAX_HISTORY) keepNewest(item, MAX_HISTORY);
-                        }
-                    }
-                    r.endArray();
-                    keepNewest(item, MAX_HISTORY);
+        r.beginArray();
+        while (r.hasNext()) {
+            String date = null;
+            Double price = null;
+            r.beginObject();
+            while (r.hasNext()) {
+                String k = r.nextName();
+                if (r.peek() == JsonToken.NULL) {
+                    r.nextNull();
+                } else if ("date".equals(k)) {
+                    date = r.nextString();
+                } else if ("price".equals(k)) {
+                    price = r.nextDouble();
+                } else {
+                    r.skipValue();
+                }
+            }
+            r.endObject();
+            if (date != null && price != null && date.length() >= 10) {
+                item.dates.add(date);
+                item.prices.add(price);
+                // 0.9.0: trim now and then while reading (not every time), and at the end.
+                if (item.dates.size() >= 2 * MAX_HISTORY) keepNewest(item, MAX_HISTORY);
+            }
+        }
+        r.endArray();
+        keepNewest(item, MAX_HISTORY);
     }
 
     /** 0.9.0: keeps a product's newest `keep` price changes (the dates are ISO, so they sort as text). */

@@ -107,7 +107,8 @@ export function HomeScreen() {
           </button>
         </div>
         {/* Fixed tiles, not a row that scrolls sideways (0.8.8): easier to hit, nothing to swipe. */}
-        <div className="home-links" style={{ gridTemplateColumns: `repeat(${settings.receipts.enabled ? 4 : 3}, 1fr)` }}>
+        {/* 0.9.12: all four, as on the web page; Receipts shows how to turn them on until they are. */}
+        <div className="home-links" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <button onClick={() => nav.push({ name: 'cards' })}>
             <Icon name="card" size={22} />
             <span>Cards</span>
@@ -120,12 +121,10 @@ export function HomeScreen() {
             <Icon name="flame" size={22} />
             <span>Specials</span>
           </button>
-          {settings.receipts.enabled && (
-            <button onClick={() => nav.push({ name: 'receipts' })}>
-              <Icon name="receipt" size={22} />
-              <span>Receipts</span>
-            </button>
-          )}
+          <button onClick={() => nav.push({ name: 'receipts' })}>
+            <Icon name="receipt" size={22} />
+            <span>Receipts</span>
+          </button>
         </div>
         <div className="checkline">
           {refresh.stage && !progress ? (
@@ -307,7 +306,12 @@ export function HomeScreen() {
             className="btn ghost"
             onClick={async () => {
               await loadDemo();
-              nav.toast('Sample items added. Remove them any time in Settings.');
+              // 0.9.12: on the web page they stay in this browser (they never sync), so it says so.
+              nav.toast(
+                serverMode
+                  ? "Sample items added, in this browser only: they never go to your phones. Remove them any time in Settings."
+                  : 'Sample items added. Remove them any time in Settings.',
+              );
             }}
           >
             Or look around with sample items

@@ -72,7 +72,7 @@ export const SOON: Soon[] = [
           . It needs an https address, such as a Cloudflare tunnel or Tailscale's https.
         </p>
         <p>
-          Still to come: a real iPhone app, with background price checks, alerts, widgets and Wi-Fi sync between phones. That needs a developer
+          Still to come: a real iPhone app, with background price checks, alerts, widgets and Phone sharing. That needs a developer
           with an Apple developer account.
         </p>
       </>

@@ -287,7 +287,7 @@ function PhonesCard({ phones, error, reload }: { phones?: Phone[]; error?: strin
         that chose Leave this server shows as Left.
       </p>
       <p className="dk-row dk-sub">
-        Wi-Fi sync is a separate, optional extra that a phone can set up for itself (phones swapping changes at home). It is off unless someone sets it up
+        Phone sharing is a separate, optional extra that a phone can set up for itself (phones swapping changes at home). It is off unless someone sets it up
         on the phone, and this page never uses it: it only lists the phones the server knows.
       </p>
       {renaming && (
@@ -332,8 +332,9 @@ function KeptCard() {
       <h2 id="house-kept">Kept on this server</h2>
       <div className="dk-stats two">
         <div>
-          <span className="dk-stat num">{span(oldest) ?? (stats ? 'None yet' : '…')}</span>
-          <span className="dk-sub">of prices</span>
+          {/* 0.9.12: "None yet / of prices" read oddly; "No prices yet" when there are none. */}
+          <span className="dk-stat num">{span(oldest) ?? (stats ? '0' : '…')}</span>
+          <span className="dk-sub">{span(oldest) || !stats ? 'of prices' : 'prices yet'}</span>
         </div>
         <div>
           <span className="dk-stat num">{stats ? receipts : '…'}</span>

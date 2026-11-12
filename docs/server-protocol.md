@@ -873,3 +873,7 @@ plain JSON.
 ## 0.9.11: what changed on the wire
 
 - **Nothing between phones and the Restock server.** The settings key `priceHelper` (`{ enabled, url, key, searches }`) and the `priceHelper` / `priceHelperOutbox` store entries stay on the phone that has them: they're never synced, and the key is left out of backups. A price helper phone posts `{ format: "restock-helper", version: 1, chain, products }` to the restock-prices collector's `POST /helper/prices` (with `Authorization: Bearer <HELPER_KEY>`), never to the Restock server. "Pick my …" with **Add to list** replaces the line (a new list line, the old one deleted), as Search the shops already did.
+
+## 0.9.12: what changed on the wire
+
+- **Nothing.** The price helper's `priceHelper` store entry gains `runningSince` (this phone only, never synced). The restock-prices collector's STATUS.md gains a "From the price helper phone" column.
