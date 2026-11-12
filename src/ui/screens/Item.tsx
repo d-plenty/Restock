@@ -16,7 +16,7 @@ import {
   updateProduct,
 } from '../../lib/db';
 import { addToList as addToListUndoable } from '../../lib/listActions'; // 0.9.5 (undo)
-import { MARKET_SOURCE } from '../../lib/market';
+import { MARKET_SHOPS, MARKET_SOURCE } from '../../lib/market';
 import { genericName, nameHasSize } from '../../lib/naming';
 import { orderOptions, PRODUCT_ORDERS, shopRank } from '../../lib/productOrder';
 import { ensureNotificationPermission, notificationsAllowed, scheduleReminders } from '../../lib/notify';
@@ -497,23 +497,23 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           </span>
           {appSettings &&
             !appSettings.marketData.enabled &&
-            rec.options.some((o) => o.product.chain === 'coles' || o.product.chain === 'woolworths') && (
+            rec.options.some((o) => (MARKET_SHOPS as readonly string[]).includes(o.product.chain)) && (
               <button
                 className="linkish small"
                 style={{ alignSelf: 'flex-start' }}
                 onClick={() => {
-                  nav.push({ name: 'settings' });
-                  // Open Settings at Shared price history, once that section has drawn.
+                  // 0.9.13: Settings → Shopping, at Judge new items from day one, once it has drawn.
+                  nav.push({ name: 'settings', page: 'shopping' });
                   let tries = 0;
                   const t = window.setInterval(() => {
-                    const el = document.getElementById('s-shared');
+                    const el = document.getElementById('s-dayone');
                     if (!el && ++tries < 30) return;
                     window.clearInterval(t);
                     el?.scrollIntoView({ block: 'start' });
                   }, 50);
                 }}
               >
-                Judge it from day one with shared price history (Beta)
+                Judge it from day one with shared price history
               </button>
             )}
         </div>

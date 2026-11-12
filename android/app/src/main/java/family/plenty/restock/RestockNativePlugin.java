@@ -308,7 +308,8 @@ public class RestockNativePlugin extends Plugin {
                     call.resolve(wait);
                     return;
                 }
-                MarketData.Result r = MarketData.importAll(RestockDatabase.get(getContext()), (chain, bytes, products) -> {
+                SQLiteDatabase mdb = RestockDatabase.get(getContext());
+                MarketData.Result r = MarketData.importAll(mdb, PriceChecker.readKv(mdb, "settings"), (chain, bytes, products) -> {
                     JSObject e = new JSObject();
                     e.put("chain", chain);
                     e.put("bytes", bytes);
@@ -324,6 +325,9 @@ public class RestockNativePlugin extends Plugin {
                 ret.put("bytes", r.bytes);
                 ret.put("byChain", byChain);
                 ret.put("errors", errors);
+                com.getcapacitor.JSArray missing = new com.getcapacitor.JSArray();
+                for (String m : r.missing) missing.put(m);
+                ret.put("missing", missing);
                 call.resolve(ret);
             } catch (Exception e) {
                 call.reject("Couldn't download shared price history: " + e.getMessage(), e);

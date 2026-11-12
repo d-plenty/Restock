@@ -16,7 +16,7 @@ import type { Settings } from '../../types';
 import { useNav } from '../nav';
 
 /**
- * 0.9.11: Settings → Shared prices → Price helper phone. A spare Android phone, left on its charger,
+ * 0.9.11: Settings → Beta and development → Price helper phone (0.9.13; was under Shared prices). A spare Android phone, left on its charger,
  * searches Coles and Woolworths through the week and sends what it finds to the restock-prices
  * collector on your own network (PriceHelper.java). Phone only: the web page shows why not.
  */

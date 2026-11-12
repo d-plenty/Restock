@@ -877,3 +877,9 @@ plain JSON.
 ## 0.9.12: what changed on the wire
 
 - **Nothing.** The price helper's `priceHelper` store entry gains `runningSince` (this phone only, never synced). The restock-prices collector's STATUS.md gains a "From the price helper phone" column.
+
+## 0.9.13: what changed on the wire
+
+- **Nothing between phones and the Restock server.** The settings gain `marketData.days` (56, 182 or 365; 56 when missing) and `beta: { enabled }`; `sharePrices` is unchanged (on unless `"no"`). The store entries `installId` and `feedbackOutbox` stay on the phone (never synced or backed up).
+- **Day-one downloads** read only the restock-prices collector's `window/<shop>-<days>d.json.gz` files (`{ format: "restock-window", v: 1, chain, days, from, to, products: { <shop product id>: [[day, cents, flags?], …] } }`, with `day` counted from `from`; flags 1 = special, 2 = member price), and `window/index.json` for their sizes. Phones no longer read hotprices.org or the collector's `latest/` files.
+- **Feedback** goes from the app (phone or web page) to the collector's `POST /feedback`: `{ format: "restock-feedback", v: 1, install, kind: "wrong" | "idea" | "like" | "other", message, email?, app, platform: "android" | "web" | "iphone", device?, screen?, diagnostics?, screenshots?: [{ type, data (base64) }] }`, at most 3 screenshots and 8 MB. It answers `200 { ok, id }`, `400`, `413` or `429 { error }`. The web app's Content-Security-Policy allows `connect-src` to `https://restock-prices.plenty.family` for this, and nothing else new.

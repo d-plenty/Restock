@@ -5,7 +5,8 @@ import type { BackupSummary } from '../../lib/backup';
 import { allCards, getSettings, updateSettings } from '../../lib/db';
 import { syncInfo } from '../../lib/sync';
 import legal from '../../lib/legal.json';
-import { downloadMarket, MARKET_FALLBACK, MARKET_SIZE_TEXT, MARKET_SOURCE_TEXT } from '../../lib/market';
+import { downloadMarket, MARKET_SOURCE_TEXT } from '../../lib/market';
+import { DayOneLengths } from './DayOne';
 import { useLive } from '../../lib/useLive';
 import { enabledIn, sectionOn } from '../../shops';
 import { checkAll } from '../../lib/permissions';
@@ -123,9 +124,9 @@ const ALL_TILES: Tile[] = [
   {
     id: 'history',
     title: 'Price history',
-    sub: 'Judge deals from day one',
+    sub: 'Judge new items from day one',
     icon: 'chart',
-    heading: 'Judge deals from day one?',
+    heading: 'Judge new items from day one?',
     intro:
       "On its own, Restock needs about 4 to 8 weeks of watching an item before it knows its usual price. It still tells you about specials straight away, but can't say how good they are.",
   },
@@ -390,17 +391,17 @@ function Welcome({ onSetUp, onRestore, onJoin }: { onSetUp: () => void; onRestor
 function MarketSetup({ settings }: { settings: Settings }) {
   return (
     <div className="card">
-      <div className="title">Download shared price history</div>
+      <div className="title">Judge new items from day one</div>
       <p className="small">
-        Restock can download months of real Coles, Woolworths, Aldi and Costco prices from {MARKET_SOURCE_TEXT}, with {MARKET_FALLBACK} (an
-        open-source tracker) filling in Coles and Woolworths while it gets going. From that it works out each product's usual price, usual sale
-        price and how often it goes on sale, so new items get a proper verdict straight away.
+        Restock can download real Coles, Woolworths, Aldi and Costco prices from {MARKET_SOURCE_TEXT}, for just the shops you use. From that it works
+        out each product's usual price, usual sale price and how often it goes on sale, so new items get a proper verdict straight away, instead of
+        after 4 to 8 weeks of watching.
       </p>
       <ul className="ticks">
         <li>
           <Icon name="check" size={16} />
           <span>
-            <strong>Size:</strong> {MARKET_SIZE_TEXT} the first time, then about once a week. Only a small summary is kept on your phone.
+            <strong>Small:</strong> about once a week, and only a short summary per product is kept on your phone.
           </span>
         </li>
         <li>
@@ -412,7 +413,7 @@ function MarketSetup({ settings }: { settings: Settings }) {
         <li>
           <Icon name="check" size={16} />
           <span>
-            <strong>Beta:</strong> this is new. Turn it on or off any time in Settings → Shared price history.
+            <strong>Off unless you turn it on.</strong> Change it any time in Settings → Shopping.
           </span>
         </li>
       </ul>
@@ -421,12 +422,13 @@ function MarketSetup({ settings }: { settings: Settings }) {
           type="checkbox" className="switch"
           checked={settings.marketData.enabled}
           onChange={(e) => updateSettings({ marketData: { ...settings.marketData, enabled: e.target.checked } })}
-          aria-label="Download shared price history"
+          aria-label="Judge new items from day one"
         />
         <span className="title" style={{ fontSize: 15 }}>
-          Download shared price history
+          Judge new items from day one
         </span>
       </label>
+      {settings.marketData.enabled && <DayOneLengths settings={settings} />}
       <label className="check" style={{ padding: 0 }}>
         <input
           type="checkbox" className="switch"

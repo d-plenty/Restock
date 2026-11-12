@@ -11,6 +11,7 @@ import { allCards, allGiftCards, eraseEverything, getSettings as savedSettings, 
 // 0.9.5 (save): settings changed here wait for "Save settings" (settingsDraft.ts).
 import { afterSave, getSettings, updateSettings } from '../../lib/settingsDraft';
 import { PriceHelperSettings } from './PriceHelperSettings';
+import { DayOneLengths } from './DayOne';
 import { dailyTimes, DEFAULT_CHECK_TIME, isCheckTime } from '../../lib/checkSchedule';
 import { SaveBar, useSettingsDraft } from '../SaveBar';
 import { loadDemo, removeDemo } from '../../lib/demo';
@@ -30,7 +31,7 @@ import { ComingSoon } from './Soon';
 import { WidgetSettings } from './WidgetSettings';
 import { TILES, tileStatus } from './Setup';
 import { startTour } from '../Tour';
-import { downloadMarket, MARKET_FALLBACK, MARKET_SIZE_TEXT, MARKET_SOURCE_TEXT, marketInfo, megabytes, removeMarket } from '../../lib/market';
+import { downloadMarket, MARKET_SOURCE_TEXT, marketInfo, megabytes, removeMarket } from '../../lib/market';
 import { getHealth, testConnections, type ConnectionTest, type StoreChain } from '../../lib/health';
 import { useNav } from '../nav';
 import { checkForUpdate, installUpdate, RELEASES, SELF_UPDATE, type UpdateInfo } from '../../lib/updates';
@@ -152,7 +153,22 @@ async function eraseAll() {
   window.location.reload();
 }
 
-export function SettingsScreen() {
+/** 0.9.13: Settings' own pages, each opened from a row on the main list. */
+export type SettingsPage = 'shopping' | 'checks' | 'alerts' | 'sync' | 'look' | 'privacy' | 'help' | 'beta';
+export const SETTINGS_PAGES: Record<SettingsPage, { title: string }> = {
+  shopping: { title: 'Shopping' },
+  checks: { title: 'Price checks' },
+  alerts: { title: 'Notifications' },
+  sync: { title: 'Sync and backups' },
+  look: { title: 'Look and accessibility' },
+  privacy: { title: 'Privacy and sharing' },
+  help: { title: 'Help and about' },
+  beta: { title: 'Beta and development' },
+};
+/** The rows on the main list, in order (Feedback and Beta and development follow). */
+const PAGE_ORDER: SettingsPage[] = ['shopping', 'checks', 'alerts', 'sync', 'look', 'privacy', 'help'];
+
+export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
   useSettingsDraft(); // 0.9.5 (save)
   const nav = useNav();
   const settings = useLive(getSettings, []);
@@ -189,6 +205,29 @@ export function SettingsScreen() {
     setMatches(filterSettings(screen.current, query));
   }, [query, settings, cardCount]);
   if (!settings) return <div className="screen" />;
+  // 0.9.13: searching the main list looks through every page (Beta and development only once it's on).
+  const all = !page && !!query.trim();
+  const on = (p: SettingsPage | 'hub') => (p === 'hub' ? !page : page === p || all);
+  const pageSub = (p: SettingsPage): string => {
+    switch (p) {
+      case 'shopping':
+        return `Shopping list, receipts${settings.marketData.enabled ? ', day-one prices on' : ''}`;
+      case 'checks':
+        return 'When prices are checked, how a sale is judged';
+      case 'alerts':
+        return `Deals and price drops, recalls${settings.recalls?.enabled ? ' (on)' : ''}`;
+      case 'sync':
+        return 'Household, Restock server, Phone sharing, Home Assistant, backups';
+      case 'look':
+        return 'Colours, app icon, text size, widgets';
+      case 'privacy':
+        return settings.sharePrices === 'no' ? 'What stays here and what\'s shared' : 'What stays here and what\'s shared · sending shop prices back';
+      case 'help':
+        return `Tour, sample items, updates · Restock ${version}`;
+      default:
+        return '';
+    }
+  };
 
   const row = (title: string, sub: string, onClick: () => void) => (
     <button className="row" onClick={onClick}>
@@ -202,428 +241,449 @@ export function SettingsScreen() {
 
   return (
     <div className="screen" ref={screen}>
-      <TopBar title="Settings" />
-      <div className="settings-search" data-keep="1">
-        <Icon name="search" size={18} />
-        <input
-          className="input"
-          type="search"
-          placeholder="Search settings"
-          aria-label="Search settings"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {query && (
-          <button className="icon-btn" aria-label="Clear search" onClick={() => setQuery('')}>
-            <Icon name="close" size={16} />
-          </button>
-        )}
-      </div>
-      {query.trim() && matches === 0 && (
-        <p className="small" data-keep="1">
-          No settings match "{query.trim()}". Try another word, like "alerts", "colour" or "backup".
-        </p>
+      <TopBar title={page ? SETTINGS_PAGES[page].title : 'Settings'} />
+      {!page && (
+        <>
+          <div className="settings-search" data-keep="1">
+            <Icon name="search" size={18} />
+            <input
+              className="input"
+              type="search"
+              placeholder="Search settings"
+              aria-label="Search settings"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {query && (
+              <button className="icon-btn" aria-label="Clear search" onClick={() => setQuery('')}>
+                <Icon name="close" size={16} />
+              </button>
+            )}
+          </div>
+          {query.trim() && matches === 0 && (
+            <p className="small" data-keep="1">
+              No settings match "{query.trim()}". Try another word, like "alerts", "colour" or "backup".
+            </p>
+          )}
+        </>
       )}
-      <nav className="chips jump" aria-label="Jump to" data-search-hide="1">
-        {[
-          ['s-stores', 'Shops'],
-          ['s-sync', 'Sync and backups'],
-          ['s-checks', 'Price checks'],
-          ['s-list', 'Shopping list'],
-          ['s-alerts', 'Alerts'],
-          ['s-look', 'Colours'],
-          ['s-a11y', 'Accessibility'],
-          ['s-recalls', 'Recalls'],
-          ['s-receipts', 'Receipts'],
-          ['s-widgets', 'Widgets'],
-          ['s-shared', 'Shared prices'],
-          ['s-help', 'Help'],
-          ['s-about', 'About and updates'],
-          ['s-soon', 'Coming soon'],
-          ['s-erase', 'Start fresh'],
-        ].map(([id, label]) => (
-          <button key={id} className="chip" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      <div className="eyebrow" id="s-stores">
-        My shops
-      </div>
-      <div className="card flush">
-        {row('Setup', `${TILES.filter((t) => tileStatus(settings, t.id, syncShown).ok).length} of ${TILES.length} done`, () => nav.push({ name: 'setup' }))}
-        {/* 0.9.8: one row per tab of My shops; sign-ins and stock are on each shop's own row there. */}
-        {row('Supermarkets', `${shopSummary(settings, 'pantry')} · ${shopAccountsSummary(settings)}`, () => nav.push({ name: 'stores', section: 'pantry' }))}
-        {row('Bottle shops (Keg tab)', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
-        {row('Chemists (Health tab)', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
-        {row('Cards', cardCount ? `${cardCount} added` : 'Loyalty and gift cards', () => nav.push({ name: 'cards' }))}
-        {row('Catalogues', 'This week at your supermarkets', () => nav.push({ name: 'catalogues' }))}
-      </div>
-
-      {/* 0.9.1: sync and backups in one place. Sync keeps phones the same; backups are how you go back. */}
-      <div className="eyebrow" id="s-sync">
-        Sync and backups
-      </div>
-      {/* 0.9.3: the household on top, how the phones sync, then backups. Any of the three counts as kept elsewhere. */}
-      <SyncOverview settings={settings} info={syncShown} onInfo={setSyncShown} haSummary={serverMode ? undefined : haSummary} />
-      <p className="small group-note">Sync keeps your phones the same, mistakes included. Backups let you go back.</p>
-
-      <h3 className="group-head" id="s-backups">
-        Backups
-      </h3>
-      <div className="card flush">
-        <button className="row" onClick={() => setExporting(true)}>
-          <span className="grow">
-            <span className="title">Export a backup</span>
-            <span className="small">
-              Pick what goes in: everything, or just some tabs, lists, cards or settings. {pricesIn(settings, span)} Keep it private.
-            </span>
-          </span>
-        </button>
-      </div>
-      <AutoBackupSettings settings={settings} />
-      <div className="card flush">
-        <button className="row" onClick={() => fileRef.current?.click()}>
-          <span className="grow">
-            <span className="title">Restore a backup</span>
-            <span className="small">Pick what to bring back: pantry, shopping list, cards or settings</span>
-          </span>
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          hidden
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            e.target.value = '';
-            if (!file) return;
-            try {
-              setPicking(await readBackupFile(file));
-            } catch (err) {
-              nav.toast(err instanceof Error ? err.message : 'Could not read that file');
-            }
-          }}
-        />
-        <button
-          className="row"
-          onClick={async () => {
-            try {
-              await shareCsv();
-            } catch (e) {
-              nav.toast(`Couldn't make the spreadsheets: ${e instanceof Error ? e.message : e}`);
-            }
-          }}
-        >
-          <span className="grow">
-            <span className="title">Export as spreadsheets (CSV)</span>
-            <span className="small">Your pantry, shopping list and price history, for Excel, Google Sheets, LibreOffice or Numbers.</span>
-          </span>
-        </button>
-        {/* 0.9.8: what only the server's web page does is shown here too, greyed, saying where. */}
-        {!serverMode && (
-          <div className="row" aria-disabled="true" style={{ opacity: 0.55 }}>
-            <span className="grow">
-              <span className="title">Import data</span>
-              <span className="small">On your Restock server's web page (Data tab): adds products and prices from a file.</span>
-            </span>
+      {on('hub') && (
+        <>
+          <div className="eyebrow" id="s-stores">
+            My shops
           </div>
-        )}
-      </div>
-
-      {/* 0.9.11: Home Assistant is in Sync and backups now (it's sharing your list too). */}
-
-      <div className="eyebrow" id="s-checks">
-        Price checks
-      </div>
-      <PriceCheckSettings settings={settings} />
-      <div className="card flush">
-        <label className="check">
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 15 }}>
-              Keep price history for
-            </span>
-            <span className="small">
-              Longer means Restock knows each item's usual price and sale pattern better. It only takes a few megabytes on your phone either way,
-              and backups include all of it.
-            </span>
-          </span>
-          <select
-            className="input"
-            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
-            value={settings.historyWeeks}
-            aria-label="Keep price history for"
-            onChange={async (e) => {
-              const weeks = parseInt(e.target.value, 10);
-              if (weeks < settings.historyWeeks) {
-                // 0.9.2: with a Restock server, older prices move there instead of being deleted.
-                const onServer = await serverKeepsHistory();
-                const ok = await confirmAction(`Keep only ${historyLabel(weeks)} of prices on this phone?`, {
-                  detail: onServer
-                    ? `Prices older than ${historyLabel(weeks)} move to your Restock server, and come off this phone once it has them. Each item keeps its latest price. Prices from shops on tabs this phone doesn't sync are deleted, as without a server.`
-                    : `Prices older than ${historyLabel(weeks)} are deleted now. Each item keeps its latest price, and sample items aren't touched.`,
-                  action: onServer ? 'Move older prices' : 'Delete older prices',
-                  danger: !onServer,
-                });
-                if (!ok) return;
-              }
-              await updateSettings({ historyWeeks: weeks });
-              // 0.9.5 (save): older prices go once it's saved.
-              await afterSave('history', async (s) => {
-                const removed = await pruneHistory(s.historyWeeks);
-                if (removed) nav.toast(`Removed ${removed} older price${removed === 1 ? '' : 's'}`);
-              });
-            }}
-          >
-            {HISTORY_WEEKS.map((w) => (
-              <option key={w} value={w}>
-                {historyLabel(w)}
-                {w === 8 ? ' (default)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className="eyebrow" id="s-list">
-        Shopping list
-      </div>
-      <div className="card flush">
-        <label className="row field-row">
-          <span className="grow">
-            <span className="title">Shop around if it saves at least</span>
-            <span className="small">
-              Below this, a shop that has everything on your list is recommended instead, so you're not making extra stops for a few cents.
-            </span>
-            <select
-              className="input"
-              value={String(settings.shopAroundMin ?? 1)}
-              onChange={(e) => void updateSettings({ shopAroundMin: Number(e.target.value) })}
-              aria-label="Shop around if it saves at least"
-            >
-              {SHOP_AROUND_MINS.map((v) => (
-                <option key={v} value={String(v)}>
-                  {v === 0 ? 'Any saving' : money(v)}
-                  {v === 1 ? ' (default)' : ''}
-                </option>
-              ))}
-            </select>
-          </span>
-        </label>
-      </div>
-
-      <div className="eyebrow" id="s-alerts">
-        Notifications
-      </div>
-      <NotificationSettings settings={settings} />
-
-      <Explain title="How Restock judges a sale">
-        {/* 0.9.0: says what the code does (verdict.ts computeStats and judge). */}
-        <p>
-          Each product's <strong>usual price</strong> is the middle of the regular prices Restock has seen for it over the history you keep (
-          {historyLabel(settings.historyWeeks)}
-          {settings.historyWeeks === 8 ? ' unless you change it' : ''}). Until it has seen one at a regular price, it goes by the shop's "was" price.
-          {settings.marketData.enabled ? ' For its first 4 weeks or so, shared price history fills in.' : ''} Member prices only count if you've added that
-          shop's card.
-        </p>
-        <p>
-          Only this week's specials (Wednesday to Tuesday) count as on special. An older special, or a lower price last checked over {STALE_DAYS} days
-          ago, isn't called a deal until prices are checked again.
-        </p>
-        <p>
-          Small saving: any drop under {GOOD_SALE * 100}% · On special: {GOOD_SALE * 100}%+ · Great deal: {GREAT_SALE * 100}%+. "Wait" means it's been at
-          least 5% cheaper recently (never at half price or better). Each pantry item picks which of these send an alert.
-        </p>
-        <p>
-          Multi-buys like "2 for $5" count at their price each ($2.50), and your shopping list only uses that price when you're buying the full set.
-          Swaps to bigger packs only happen for items you've said yes to bulk packs.
-        </p>
-      </Explain>
-
-      <div className="eyebrow" id="s-look">
-        Look and colours
-      </div>
-      <LookSettings settings={settings} />
-
-      <div className="eyebrow" id="s-a11y">
-        Accessibility
-      </div>
-      <AccessibilitySettings settings={settings} />
-
-      <div className="eyebrow" id="s-recalls">
-        Recall alerts
-      </div>
-      <div className="card flush">{row('Recall alerts', recallSummary(settings), () => nav.push({ name: 'recalls' }))}</div>
-
-      <div className="eyebrow" id="s-receipts">
-        Receipts
-      </div>
-      <ReceiptsSettings settings={settings} />
-
-      <div className="eyebrow" id="s-widgets">
-        Home screen widgets
-      </div>
-      <Fold title="Home screen widgets" sub="Deals, shopping list and quick actions">
-        <WidgetSettings settings={settings} />
-      </Fold>
-
-      <div className="eyebrow" id="s-shared">
-        Shared prices <span className="tag normal beta">Beta</span>
-      </div>
-      <SharePrices settings={settings} />
-      <Fold title="Judge new items from day one" sub={settings.marketData.enabled ? 'On' : 'Off'}>
-        <SharedHistory settings={settings} />
-      </Fold>
-      {/* 0.9.11: a spare phone that collects Coles and Woolworths prices for the shared history. */}
-      <Fold title="Price helper phone" sub={settings.priceHelper?.enabled ? 'On' : 'Off'}>
-        <PriceHelperSettings settings={settings} />
-      </Fold>
-
-      <div className="eyebrow" id="s-help">
-        Troubleshooting
-      </div>
-      <div className="card flush">
-        {row('Test connections', 'Try a search at each shop and see what happens', () => setTesting(true))}
-        {row('Diagnostics', 'What went wrong lately, the search test and search details', () => nav.push({ name: 'diagnostics' }))}
-        {row('Permissions', 'Notifications, alarms, camera, location', () => nav.push({ name: 'permissions' }))}
-        <details className="pick-more fold-inline">
-          <summary>
-            <span className="grow">Advanced: shop connections</span>
-            <Icon name="chevron" size={18} />
-          </summary>
-          <label className="check">
-            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <span className="title" style={{ fontSize: 15 }}>
-                Shop connections
-              </span>
-              <span className="small">
-                Automatic asks shops directly and switches to a hidden in-app browser if that fails. Coles always uses the browser.
-              </span>
-            </span>
-            <select
-              className="input"
-              style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
-              value={settings.connection}
-              onChange={(e) => updateSettings({ connection: e.target.value as Settings['connection'] })}
-              aria-label="Shop connections"
-            >
-              <option value="auto">Automatic</option>
-              <option value="browser">Always browser</option>
-            </select>
-          </label>
-          <div className="row" style={{ flexWrap: 'wrap' }}>
-            <span className="grow" style={{ minWidth: 200 }}>
-              <span className="title">Shop keeps saying it's blocked?</span>
-              <span className="small">Open its website here once and tick its "I'm a person" box.</span>
-            </span>
+          <div className="card flush">
+            {row('Setup', `${TILES.filter((t) => tileStatus(settings, t.id, syncShown).ok).length} of ${TILES.length} done`, () => nav.push({ name: 'setup' }))}
+            {/* 0.9.8: one row per tab of My shops; sign-ins and stock are on each shop's own row there. */}
+            {row('Supermarkets', `${shopSummary(settings, 'pantry')} · ${shopAccountsSummary(settings)}`, () => nav.push({ name: 'stores', section: 'pantry' }))}
+            {row('Bottle shops (Keg tab)', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
+            {row('Chemists (Health tab)', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
+            {row('Cards', cardCount ? `${cardCount} added` : 'Loyalty and gift cards', () => nav.push({ name: 'cards' }))}
+            {row('Catalogues', 'This week at your supermarkets', () => nav.push({ name: 'catalogues' }))}
           </div>
-          {shopGroups(settings).map(({ section, chains }) => (
-            <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 14px 12px' }}>
-              <span className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Icon name={section} size={15} /> {GROUP_LABEL[section]}
+        </>
+      )}
+      {/* 0.9.13: everything else is a row that opens its own page, like My shops. */}
+      {!page && !query.trim() && (
+        <div className="card flush" data-search-hide="1">
+          {PAGE_ORDER.map((p) => row(SETTINGS_PAGES[p].title, pageSub(p), () => nav.push({ name: 'settings', page: p })))}
+          {row('Feedback', 'Tell us what works and what doesn\'t: it really helps', () => nav.push({ name: 'feedback' }))}
+          {row(SETTINGS_PAGES.beta.title, settings.beta?.enabled ? 'On: diagnostics, connections, price helper' : 'Testing features, off until you turn them on', () =>
+            nav.push({ name: 'settings', page: 'beta' }),
+          )}
+        </div>
+      )}
+      {on('shopping') && (
+        <>
+          <div className="eyebrow" id="s-list">
+            Shopping list
+          </div>
+          <div className="card flush">
+            <label className="row field-row">
+              <span className="grow">
+                <span className="title">Shop around if it saves at least</span>
+                <span className="small">
+                  Below this, a shop that has everything on your list is recommended instead, so you're not making extra stops for a few cents.
+                </span>
+                <select
+                  className="input"
+                  value={String(settings.shopAroundMin ?? 1)}
+                  onChange={(e) => void updateSettings({ shopAroundMin: Number(e.target.value) })}
+                  aria-label="Shop around if it saves at least"
+                >
+                  {SHOP_AROUND_MINS.map((v) => (
+                    <option key={v} value={String(v)}>
+                      {v === 0 ? 'Any saving' : money(v)}
+                      {v === 1 ? ' (default)' : ''}
+                    </option>
+                  ))}
+                </select>
               </span>
-              <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {chains.map((c) => (
-                  <OpenStoreButton
-                    key={c}
-                    chain={c}
-                    label={chainName(c)}
-                    onDone={() => nav.toast(`Thanks. ${chainName(c)} should work again now.`)}
-                  />
+            </label>
+          </div>
+          <div className="eyebrow" id="s-dayone">
+            Judge new items from day one
+          </div>
+          <SharedHistory settings={settings} />
+          <div className="eyebrow" id="s-receipts">
+            Receipts
+          </div>
+          <ReceiptsSettings settings={settings} />
+        </>
+      )}
+      {on('checks') && (
+        <>
+          <div className="eyebrow" id="s-checks">
+            Price checks
+          </div>
+          <PriceCheckSettings settings={settings} />
+          <div className="card flush">
+            <label className="check">
+              <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <span className="title" style={{ fontSize: 15 }}>
+                  Keep price history for
+                </span>
+                <span className="small">
+                  Longer means Restock knows each item's usual price and sale pattern better. It only takes a few megabytes on your phone either way,
+                  and backups include all of it.
+                </span>
+              </span>
+              <select
+                className="input"
+                style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
+                value={settings.historyWeeks}
+                aria-label="Keep price history for"
+                onChange={async (e) => {
+                  const weeks = parseInt(e.target.value, 10);
+                  if (weeks < settings.historyWeeks) {
+                    // 0.9.2: with a Restock server, older prices move there instead of being deleted.
+                    const onServer = await serverKeepsHistory();
+                    const ok = await confirmAction(`Keep only ${historyLabel(weeks)} of prices on this phone?`, {
+                      detail: onServer
+                        ? `Prices older than ${historyLabel(weeks)} move to your Restock server, and come off this phone once it has them. Each item keeps its latest price. Prices from shops on tabs this phone doesn't sync are deleted, as without a server.`
+                        : `Prices older than ${historyLabel(weeks)} are deleted now. Each item keeps its latest price, and sample items aren't touched.`,
+                      action: onServer ? 'Move older prices' : 'Delete older prices',
+                      danger: !onServer,
+                    });
+                    if (!ok) return;
+                  }
+                  await updateSettings({ historyWeeks: weeks });
+                  // 0.9.5 (save): older prices go once it's saved.
+                  await afterSave('history', async (s) => {
+                    const removed = await pruneHistory(s.historyWeeks);
+                    if (removed) nav.toast(`Removed ${removed} older price${removed === 1 ? '' : 's'}`);
+                  });
+                }}
+              >
+                {HISTORY_WEEKS.map((w) => (
+                  <option key={w} value={w}>
+                    {historyLabel(w)}
+                    {w === 8 ? ' (default)' : ''}
+                  </option>
                 ))}
+              </select>
+            </label>
+          </div>
+          <Explain title="How Restock judges a sale">
+            {/* 0.9.0: says what the code does (verdict.ts computeStats and judge). */}
+            <p>
+              Each product's <strong>usual price</strong> is the middle of the regular prices Restock has seen for it over the history you keep (
+              {historyLabel(settings.historyWeeks)}
+              {settings.historyWeeks === 8 ? ' unless you change it' : ''}). Until it has seen one at a regular price, it goes by the shop's "was" price.
+              {settings.marketData.enabled ? ' For its first 4 weeks or so, shared price history fills in.' : ''} Member prices only count if you've added that
+              shop's card.
+            </p>
+            <p>
+              Only this week's specials (Wednesday to Tuesday) count as on special. An older special, or a lower price last checked over {STALE_DAYS} days
+              ago, isn't called a deal until prices are checked again.
+            </p>
+            <p>
+              Small saving: any drop under {GOOD_SALE * 100}% · On special: {GOOD_SALE * 100}%+ · Great deal: {GREAT_SALE * 100}%+. "Wait" means it's been at
+              least 5% cheaper recently (never at half price or better). Each pantry item picks which of these send an alert.
+            </p>
+            <p>
+              Multi-buys like "2 for $5" count at their price each ($2.50), and your shopping list only uses that price when you're buying the full set.
+              Swaps to bigger packs only happen for items you've said yes to bulk packs.
+            </p>
+          </Explain>
+        </>
+      )}
+      {on('alerts') && (
+        <>
+          <div className="eyebrow" id="s-alerts">
+            Notifications
+          </div>
+          <NotificationSettings settings={settings} />
+          <div className="eyebrow" id="s-recalls">
+            Recall alerts
+          </div>
+          <div className="card flush">{row('Recall alerts', recallSummary(settings), () => nav.push({ name: 'recalls' }))}</div>
+        </>
+      )}
+      {on('sync') && (
+        <>
+          {/* 0.9.1: sync and backups in one place. Sync keeps phones the same; backups are how you go back. */}
+          <div className="eyebrow" id="s-sync">
+            Sync and backups
+          </div>
+          {/* 0.9.3: the household on top, how the phones sync, then backups. Any of the three counts as kept elsewhere. */}
+          <SyncOverview settings={settings} info={syncShown} onInfo={setSyncShown} haSummary={serverMode ? undefined : haSummary} />
+          <p className="small group-note">Sync keeps your phones the same, mistakes included. Backups let you go back.</p>
+
+          <h3 className="group-head" id="s-backups">
+            Backups
+          </h3>
+          <div className="card flush">
+            <button className="row" onClick={() => setExporting(true)}>
+              <span className="grow">
+                <span className="title">Export a backup</span>
+                <span className="small">
+                  Pick what goes in: everything, or just some tabs, lists, cards or settings. {pricesIn(settings, span)} Keep it private.
+                </span>
               </span>
-            </div>
-          ))}
-        </details>
-      </div>
-      <div className="card flush">
-        {settings.demoLoaded ? (
-          <button
-            className="row"
-            onClick={async () => {
-              await removeDemo();
-              nav.toast('Sample items removed');
-            }}
-          >
-            <span className="grow">
-              <span className="title" style={{ color: 'var(--red-ink)' }}>
-                Remove sample items
+            </button>
+          </div>
+          <AutoBackupSettings settings={settings} />
+          <div className="card flush">
+            <button className="row" onClick={() => fileRef.current?.click()}>
+              <span className="grow">
+                <span className="title">Restore a backup</span>
+                <span className="small">Pick what to bring back: pantry, shopping list, cards or settings</span>
               </span>
-              <span className="small">Your own items stay</span>
-            </span>
-          </button>
-        ) : (
-          <button
-            className="row"
-            onClick={async () => {
-              await loadDemo();
-              nav.toast(serverMode ? 'Sample items added, in this browser only: they never go to your phones' : 'Sample items added');
-            }}
-          >
-            <span className="grow">
-              <span className="title">Add sample items</span>
-              <span className="small">Seven made-up items with price history, to see how verdicts work</span>
-            </span>
-          </button>
-        )}
-        <button
-          className="row"
-          onClick={async () => {
-            nav.pop();
-            await startTour();
-          }}
-        >
-          <span className="grow">
-            <span className="title">Take the tour again</span>
-            <span className="small">A look round with sample items, removed when it ends</span>
-          </span>
-        </button>
-      </div>
-
-      <div className="eyebrow" id="s-about">
-        About and updates
-      </div>
-      <div className="card flush">
-        <UpdateRows settings={settings} />
-        {row('Privacy policy', `Updated ${legal.updated}`, () => setReading('privacy'))}
-        {row('Fine print', 'Not affiliated with the shops, no warranty', () => setReading('disclaimer'))}
-      </div>
-
-      <div className="eyebrow" id="s-soon">
-        Coming soon
-      </div>
-      <Fold title="What's planned" sub="Stock at home, spending, hosted sync, iPhone and more">
-        <ComingSoon />
-      </Fold>
-
-      <div className="eyebrow" id="s-erase">
-        Start fresh
-      </div>
-      <div className="card flush">
-        <button className="row" onClick={() => void eraseAll()}>
-          <Icon name="trash" size={18} />
-          <span className="grow">
-            <span className="title" style={{ color: 'var(--red-ink)' }}>
-              Erase everything and start fresh
-            </span>
-            <span className="small">Deletes all your items, lists, prices, cards, receipts and settings from this phone. It can't be undone.</span>
-          </span>
-        </button>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
-        <Logo size={40} />
-      </div>
-      <p className="small" style={{ textAlign: 'center' }}>
-        Restock {version} release candidate · free and open source
-        <br />
-        Your data stays on this phone, and your household's phones only if you share
-        <br />
-        <a href="https://github.com/d-plenty/Restock" target="_blank" rel="noreferrer">
-          Source code and bug reports on GitHub
-        </a>
-      </p>
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (!file) return;
+                try {
+                  setPicking(await readBackupFile(file));
+                } catch (err) {
+                  nav.toast(err instanceof Error ? err.message : 'Could not read that file');
+                }
+              }}
+            />
+            <button
+              className="row"
+              onClick={async () => {
+                try {
+                  await shareCsv();
+                } catch (e) {
+                  nav.toast(`Couldn't make the spreadsheets: ${e instanceof Error ? e.message : e}`);
+                }
+              }}
+            >
+              <span className="grow">
+                <span className="title">Export as spreadsheets (CSV)</span>
+                <span className="small">Your pantry, shopping list and price history, for Excel, Google Sheets, LibreOffice or Numbers.</span>
+              </span>
+            </button>
+            {/* 0.9.8: what only the server's web page does is shown here too, greyed, saying where. */}
+            {!serverMode && (
+              <div className="row" aria-disabled="true" style={{ opacity: 0.55 }}>
+                <span className="grow">
+                  <span className="title">Import data</span>
+                  <span className="small">On your Restock server's web page (Data tab): adds products and prices from a file.</span>
+                </span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+      {on('look') && (
+        <>
+          <div className="eyebrow" id="s-look">
+            Look and colours
+          </div>
+          <LookSettings settings={settings} />
+          <div className="eyebrow" id="s-a11y">
+            Accessibility
+          </div>
+          <AccessibilitySettings settings={settings} />
+          <div className="eyebrow" id="s-widgets">
+            Home screen widgets
+          </div>
+          <Fold title="Home screen widgets" sub="Deals, shopping list and quick actions">
+            <WidgetSettings settings={settings} />
+          </Fold>
+        </>
+      )}
+      {on('privacy') && (
+        <>
+          <PrivacySharing settings={settings} />
+          <div className="card flush">
+            {row('Permissions', 'Notifications, alarms, camera, location', () => nav.push({ name: 'permissions' }))}
+            {row('Privacy policy', `Updated ${legal.updated}`, () => setReading('privacy'))}
+            {row('Fine print', 'Not affiliated with the shops, no warranty', () => setReading('disclaimer'))}
+          </div>
+        </>
+      )}
+      {on('help') && (
+        <>
+          <div className="eyebrow" id="s-tour">
+            Try it out
+          </div>
+          <div className="card flush">
+            {settings.demoLoaded ? (
+              <button
+                className="row"
+                onClick={async () => {
+                  await removeDemo();
+                  nav.toast('Sample items removed');
+                }}
+              >
+                <span className="grow">
+                  <span className="title" style={{ color: 'var(--red-ink)' }}>
+                    Remove sample items
+                  </span>
+                  <span className="small">Your own items stay</span>
+                </span>
+              </button>
+            ) : (
+              <button
+                className="row"
+                onClick={async () => {
+                  await loadDemo();
+                  nav.toast(serverMode ? 'Sample items added, in this browser only: they never go to your phones' : 'Sample items added');
+                }}
+              >
+                <span className="grow">
+                  <span className="title">Add sample items</span>
+                  <span className="small">Seven made-up items with price history, to see how verdicts work</span>
+                </span>
+              </button>
+            )}
+            <button
+              className="row"
+              onClick={async () => {
+                nav.pop();
+                await startTour();
+              }}
+            >
+              <span className="grow">
+                <span className="title">Take the tour again</span>
+                <span className="small">A look round with sample items, removed when it ends</span>
+              </span>
+            </button>
+          </div>
+          <div className="eyebrow" id="s-about">
+            About and updates
+          </div>
+          <div className="card flush">
+            <UpdateRows settings={settings} />
+            {row('Privacy policy', `Updated ${legal.updated}`, () => setReading('privacy'))}
+            {row('Fine print', 'Not affiliated with the shops, no warranty', () => setReading('disclaimer'))}
+          </div>
+          <div className="eyebrow" id="s-soon">
+            Coming soon
+          </div>
+          <Fold title="What's planned" sub="Stock at home, spending, hosted sync, iPhone and more">
+            <ComingSoon />
+          </Fold>
+        </>
+      )}
+      {(page === 'beta' || (all && settings.beta?.enabled)) && (
+        <BetaGate settings={settings} searching={all}>
+          <div className="eyebrow" id="s-help">
+            Troubleshooting
+          </div>
+          <div className="card flush">
+            {row('Test connections', 'Try a search at each shop and see what happens', () => setTesting(true))}
+            {row('Diagnostics', 'What went wrong lately, the search test and search details', () => nav.push({ name: 'diagnostics' }))}
+            <details className="pick-more fold-inline">
+              <summary>
+                <span className="grow">Advanced: shop connections</span>
+                <Icon name="chevron" size={18} />
+              </summary>
+              <label className="check">
+                <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <span className="title" style={{ fontSize: 15 }}>
+                    Shop connections
+                  </span>
+                  <span className="small">
+                    Automatic asks shops directly and switches to a hidden in-app browser if that fails. Coles always uses the browser.
+                  </span>
+                </span>
+                <select
+                  className="input"
+                  style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
+                  value={settings.connection}
+                  onChange={(e) => updateSettings({ connection: e.target.value as Settings['connection'] })}
+                  aria-label="Shop connections"
+                >
+                  <option value="auto">Automatic</option>
+                  <option value="browser">Always browser</option>
+                </select>
+              </label>
+              <div className="row" style={{ flexWrap: 'wrap' }}>
+                <span className="grow" style={{ minWidth: 200 }}>
+                  <span className="title">Shop keeps saying it's blocked?</span>
+                  <span className="small">Open its website here once and tick its "I'm a person" box.</span>
+                </span>
+              </div>
+              {shopGroups(settings).map(({ section, chains }) => (
+                <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 14px 12px' }}>
+                  <span className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Icon name={section} size={15} /> {GROUP_LABEL[section]}
+                  </span>
+                  <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {chains.map((c) => (
+                      <OpenStoreButton
+                        key={c}
+                        chain={c}
+                        label={chainName(c)}
+                        onDone={() => nav.toast(`Thanks. ${chainName(c)} should work again now.`)}
+                      />
+                    ))}
+                  </span>
+                </div>
+              ))}
+            </details>
+          </div>
+          {/* 0.9.11: a spare phone that collects Coles and Woolworths prices for the shared history. */}
+          <Fold title="Price helper phone" sub={settings.priceHelper?.enabled ? 'On' : 'Off'}>
+            <PriceHelperSettings settings={settings} />
+          </Fold>
+        </BetaGate>
+      )}
+      {on('hub') && (
+        <>
+          <div className="eyebrow" id="s-erase">
+            Start fresh
+          </div>
+          <div className="card flush">
+            <button className="row" onClick={() => void eraseAll()}>
+              <Icon name="trash" size={18} />
+              <span className="grow">
+                <span className="title" style={{ color: 'var(--red-ink)' }}>
+                  Erase everything and start fresh
+                </span>
+                <span className="small">Deletes all your items, lists, prices, cards, receipts and settings from this phone. It can't be undone.</span>
+              </span>
+            </button>
+          </div>
+        </>
+      )}
+      {(!page || page === 'help') && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
+            <Logo size={40} />
+          </div>
+          <p className="small" style={{ textAlign: 'center' }}>
+            Restock {version} beta · free and open source
+            <br />
+            Your data stays on this phone, and your household's phones only if you share
+            <br />
+            <a href="https://github.com/d-plenty/Restock" target="_blank" rel="noreferrer">
+              Source code and bug reports on GitHub
+            </a>
+          </p>
+        </>
+      )}
       {/* 0.9.5 (save): "Unsaved changes · Save settings", above the tabs. */}
       <SaveBar />
       {reading && <LegalSheet doc={reading} onClose={() => setReading(undefined)} />}
@@ -654,46 +714,115 @@ export function SettingsScreen() {
 }
 
 /**
- * Beta: shared price history (restock-prices, and hotprices.org for Coles and Woolworths while it
- * gets going), so new items can be judged from day one.
+ * Judge new items from day one: shared price history from restock-prices (0.9.13: only from there,
+ * and only for this phone's shops, for 8 weeks, 6 months or 12 months).
  */
 /**
- * Share prices about products (0.9.0). On unless turned off. For now it only adds a "shared prices"
- * section to your own backups (sharedPrices.ts); nothing is sent anywhere yet.
+ * 0.9.13: Settings → Privacy and sharing. What stays on this phone, what goes where, and "Send
+ * prices back" (it was "Share prices about products", 0.9.0): on unless turned off. When it's live,
+ * prices this phone reads from the shops go to the shared price history (restock-prices). For now
+ * they're only saved, ready, in your own backups (sharedPrices.ts), and nothing is sent anywhere.
  */
-function SharePrices({ settings }: { settings: Settings }) {
-  const on = settings.sharePrices !== 'no';
+function PrivacySharing({ settings }: { settings: Settings }) {
+  const nav = useNav();
+  const sending = settings.sharePrices !== 'no';
   return (
-    <div className="card flush">
-      <label className="check">
-        <input
-          type="checkbox"
-          className="switch"
-          checked={on}
-          onChange={(e) => void updateSettings({ sharePrices: e.target.checked ? 'yes' : 'no' })}
-        />
-        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title">Share prices about products</span>
-          <span className="small">{on ? 'On' : 'Off'} · for now, only saved in your own backups</span>
-        </span>
-      </label>
-      <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <p className="small">
-          The plan is a free, open price list anyone can search: what things cost at each shop, and when. It's meant to be decentralised. The
-          phones and computers running Restock share prices with each other, instead of one central server collecting them. The prices will
-          never be sold.
-        </p>
-        <p className="small">
-          <strong>For now nothing leaves your phone.</strong> Restock adds a "shared prices" part to the backups you make, ready for when sharing
-          starts. Before any version sends prices anywhere, it will ask you first, and nothing is sent unless you say yes.
-        </p>
-        <p className="small">
-          <strong>What's in it:</strong> for each product Restock has checked, the shop, name, brand, size and barcode, and each price with the
-          usual price, any special or multi-buy, and the day. <strong>Never:</strong> who you are, your cards, your branch or location,
-          your shopping list or what you ticked off, receipts, or anything you type about yourself.
+    <>
+      <div className="eyebrow" id="s-privacy">
+        What stays on this phone
+      </div>
+      <div className="card">
+        <p className="small" style={{ margin: 0 }}>
+          Your pantry, shopping lists, cards, receipts, the prices you type in and the items you track stay on this phone. They only go to your own
+          household's phones, your own Restock server or Home Assistant if you set those up (Sync and backups), and into backups you make.
         </p>
       </div>
-    </div>
+      <div className="eyebrow" id="s-share">
+        What's shared
+      </div>
+      <div className="card flush">
+        <label className="check">
+          <input
+            type="checkbox"
+            className="switch"
+            checked={sending}
+            onChange={(e) => void updateSettings({ sharePrices: e.target.checked ? 'yes' : 'no' })}
+          />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              Send prices back
+            </span>
+            <span className="small">
+              {sending ? 'On' : 'Off'} · prices your phone reads from the shops go to the shared price history, so everyone's day-one prices get
+              better. The more phones that share, the better it is for everyone. (Starts when the shared price service is ready.)
+            </span>
+          </span>
+        </label>
+        <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p className="small" style={{ margin: 0 }}>
+            <strong>What goes:</strong> what a search or price check reads straight from Coles, Woolworths, Aldi and the other built-in shops: each
+            product's shop, name, brand, size, barcode and price, any special, member price or multi-buy, and the day. Not Costco's (its terms), and
+            not shops you added yourself.
+          </p>
+          <p className="small" style={{ margin: 0 }}>
+            <strong>Never:</strong> anything you type in or change yourself, who you are, your cards, branch or location, your lists or what you tick
+            off, receipts, or which items you track. Prices you enter by hand stay on this phone and your own household.
+          </p>
+          <p className="small" style={{ margin: 0 }}>
+            Until the service is ready, these prices are only kept, ready, in the backups you make.
+          </p>
+        </div>
+        <button className="row" onClick={() => nav.push({ name: 'settings', page: 'shopping' })}>
+          <span className="grow">
+            <span className="title">Judge new items from day one</span>
+            <span className="small">
+              {settings.marketData.enabled ? 'On' : 'Off'} · downloads shared prices from restock-prices on GitHub. Everyone downloads the same files.
+            </span>
+          </span>
+          <Icon name="chevron" size={18} />
+        </button>
+        <button className="row" onClick={() => nav.push({ name: 'feedback' })}>
+          <span className="grow">
+            <span className="title">Feedback</span>
+            <span className="small">Only what you send, when you send it, to Restock's own server (restock-prices.plenty.family)</span>
+          </span>
+          <Icon name="chevron" size={18} />
+        </button>
+      </div>
+    </>
+  );
+}
+
+/**
+ * 0.9.13: Settings → Beta and development. A note, and Turn this on (this phone only); then
+ * diagnostics, test connections, shop connections and the price helper phone.
+ */
+function BetaGate({ settings, searching, children }: { settings: Settings; searching: boolean; children: ReactNode }) {
+  const on = !!settings.beta?.enabled;
+  const set = (enabled: boolean) => void updateSettings({ beta: { enabled } }, { local: true });
+  if (searching) return <>{on ? children : null}</>;
+  return (
+    <>
+      <div className="card">
+        <p className="small" style={{ margin: 0 }}>
+          These are new or testing features. They may not always work right, and some are for people comfortable with the technical side:
+          diagnostics, shop connections and the price helper phone. You can turn them off again any time.
+        </p>
+        {!on && (
+          <button className="btn primary" style={{ marginTop: 12 }} onClick={() => set(true)}>
+            Turn this on
+          </button>
+        )}
+      </div>
+      {on && (
+        <>
+          {children}
+          <button className="btn ghost" style={{ alignSelf: 'center' }} onClick={() => set(false)}>
+            Turn beta and development features off
+          </button>
+        </>
+      )}
+    </>
   );
 }
 
@@ -718,7 +847,9 @@ function SharedHistory({ settings }: { settings: Settings }) {
       nav.toast(
         failed.length
           ? `Got ${r.products.toLocaleString()} products. ${failed.map(([c, e]) => `${chainName(c)}: ${e}`).join('. ')}`
-          : `Shared price history for ${r.products.toLocaleString()} products (${megabytes(r.bytes)})`,
+          : r.products
+            ? `Shared price history for ${r.products.toLocaleString()} products (${megabytes(r.bytes)})`
+            : 'restock-prices has no shared history for your shops yet. It tries again next week.',
       );
     } catch (e) {
       nav.toast(e instanceof Error ? e.message : String(e));
@@ -747,14 +878,25 @@ function SharedHistory({ settings }: { settings: Settings }) {
             Judge new items from day one
           </span>
           <span className="small">
-            Downloads months of Coles, Woolworths, Aldi and Costco price history from {MARKET_SOURCE_TEXT} ({MARKET_FALLBACK} fills in Coles and
-            Woolworths while it gets going), and keeps a short summary per product. It's {MARKET_SIZE_TEXT} each time, about once a week. Everyone
-            downloads the same files, so they can't tell what you track.
+            Downloads Coles, Woolworths, Aldi and Costco price history from {MARKET_SOURCE_TEXT}, for just the shops you use, about once a week, and
+            keeps a short summary per product, so a new item gets a proper verdict straight away. Everyone downloads the same files, so they can't
+            tell what you track.
           </span>
         </span>
       </label>
       {md.enabled && (
         <>
+          <div style={{ padding: '4px 14px 10px' }}>
+            {/* 0.9.13: 8 weeks, 6 months or 12 months; a change downloads again once it's saved. */}
+            <DayOneLengths
+              settings={settings}
+              onPick={() =>
+                void afterSave('market-days', (s) => {
+                  if (s.marketData.enabled) void download(s.marketData.wifiOnly);
+                })
+              }
+            />
+          </div>
           <label className="check">
             <input type="checkbox" className="switch" checked={md.wifiOnly} onChange={(e) => updateSettings({ marketData: { ...md, wifiOnly: e.target.checked } })} />
             <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>

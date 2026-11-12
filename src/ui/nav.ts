@@ -26,7 +26,8 @@ export type Screen =
       /** With forList: the plain list line this replaces ("Nescafe" becomes the product found). */
       replaceEntry?: string;
     }
-  | { name: 'settings' }
+  | { name: 'settings'; page?: import('./screens/Settings').SettingsPage }
+  | { name: 'feedback' }
   | { name: 'catalogues' }
   | { name: 'mycatalogue' }
   | { name: 'permissions' }

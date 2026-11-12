@@ -331,7 +331,10 @@ export interface Settings {
   };
   household: { name: string };
   /** Share prices about products (0.9.0): on unless 'no'. For now only saved in your own backups (sharedPrices.ts). */
+  /** 0.9.13 "Send prices back" (Privacy and sharing): on unless 'no'. */
   sharePrices: 'unasked' | 'yes' | 'no';
+  /** 0.9.13: Beta and development features shown (this phone only). */
+  beta?: { enabled: boolean };
   defaultThresholdPct: number;
   /** How often background price checks run. 168 = weekly, on checkWeekday. */
   checkIntervalHours: number;
@@ -386,7 +389,8 @@ export interface Settings {
   lastBackupAt?: string;
   backupNudgeAt?: string;
   /** Shared price history download (testing): off until turned on. */
-  marketData: { enabled: boolean; wifiOnly: boolean };
+  /** 0.9.13: `days`, how much shared history: 56 (8 weeks, the default), 182 (6 months) or 365 (12 months). */
+  marketData: { enabled: boolean; wifiOnly: boolean; days?: 56 | 182 | 365 };
   /** 0.9.11: price helper phone mode (priceHelper.ts). This phone only, never shared. */
   priceHelper?: import('./lib/priceHelper').PriceHelperSettings;
   area?: HomeArea;
@@ -455,7 +459,7 @@ export const DEFAULT_SETTINGS: Settings = {
   shopAroundMin: 1,
   otherContainerSizes: false,
   seenHints: [],
-  marketData: { enabled: false, wifiOnly: true },
+  marketData: { enabled: false, wifiOnly: true, days: 56 },
   look: { style: 'australia', icon: 'green' },
   a11y: { text: 1, contrast: false, motion: false, big: false },
   setup: { done: [], skipped: [] },

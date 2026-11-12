@@ -126,11 +126,12 @@ export const SOON: Soon[] = [
         <p>And never anything personal:</p>
         <ul>
           <li>Who you are, your cards, your branch or where you live.</li>
-          <li>What you searched for, your pantry, your shopping list or what you ticked off, or your receipts. No account, no phone ID.</li>
+          <li>What you searched for, your pantry, your shopping list or what you ticked off, your receipts, or prices you typed in. No account, no phone ID.</li>
         </ul>
         <p>
-          It will be opt-in: nothing is shared unless you turn it on. The first step is here: a Restock server can download a full export file in
-          an open, documented format. Restock will check the shops' terms before any prices are shared publicly.
+          It's "Send prices back" in Settings → Privacy and sharing: on unless you turn it off, and nothing is sent yet. Prices you type in yourself
+          are never shared. What's here so far: Judge new items from day one downloads restock-prices' shared history, and a Restock server can
+          download a full export file in an open, documented format. Restock will check the shops' terms before any prices are shared publicly.
         </p>
       </>
     ),

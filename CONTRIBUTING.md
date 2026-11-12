@@ -6,7 +6,9 @@ You don't have to write code to help. Most of the time, the most useful thing is
 
 ## Reporting a problem
 
-Use the [issue forms](../../issues/new/choose):
+No GitHub account? Use **Settings → Feedback** in the app (or on your Restock server's web page): it goes straight to the people who make Restock, with screenshots and diagnostics if you like.
+
+On GitHub, use the [issue forms](../../issues/new/choose):
 
 - **Bug**: something in the app doesn't work or looks wrong.
 - **Shop stopped working**: searching or price checks fail for a supermarket, bottle shop or chemist.
@@ -21,7 +23,7 @@ Please include the app version (Settings, at the very bottom), your phone and An
 
 This is the single most useful thing you can attach:
 
-1. In Restock, open **Settings → Troubleshooting → Diagnostics**.
+1. In Restock, open **Settings → Beta and development**, tap **Turn this on**, then **Diagnostics**.
 2. Under **Send search details**, pick the shop, type something it sells, and tap **Search and save the details**.
 3. Share the file it makes, and attach it to your **Shop stopped working** issue.
 

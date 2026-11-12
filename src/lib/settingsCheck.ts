@@ -189,6 +189,7 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     }),
     household: { name: name(obj(s.household).name, 80) ?? D.household.name },
     sharePrices: oneOf(s.sharePrices, ['unasked', 'yes', 'no'] as const, D.sharePrices),
+    ...(isObj(s.beta) ? { beta: { enabled: bool(s.beta.enabled, false) } } : {}),
     defaultThresholdPct: number(s.defaultThresholdPct, D.defaultThresholdPct, 1, 90),
     checkIntervalHours: oneOf(s.checkIntervalHours, CHECK_INTERVALS, D.checkIntervalHours),
     historyWeeks: oneOf(s.historyWeeks, HISTORY_WEEKS, D.historyWeeks),
@@ -229,7 +230,11 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     seenTabOffers: tabs(s.seenTabOffers),
     lastBackupAt: when(s.lastBackupAt),
     backupNudgeAt: when(s.backupNudgeAt),
-    marketData: { enabled: bool(md.enabled, D.marketData.enabled), wifiOnly: bool(md.wifiOnly, D.marketData.wifiOnly) },
+    marketData: {
+      enabled: bool(md.enabled, D.marketData.enabled),
+      wifiOnly: bool(md.wifiOnly, D.marketData.wifiOnly),
+      days: md.days === 182 || md.days === 365 ? md.days : 56,
+    },
     // 0.9.11: price helper phone mode.
     ...(isObj(s.priceHelper)
       ? {

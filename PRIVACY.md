@@ -1,10 +1,10 @@
 # Privacy policy
 
-_Last updated 11 November 2026_
+_Last updated 12 November 2026_
 
-**Privacy policy? There's nothing to collect, so there's nothing to hide from you. But here's the long version anyway.**
+**Privacy policy? We collect almost nothing, and we tell you exactly what. Here's the long version.**
 
-Restock is a free, open-source app that helps you spend less on groceries. It isn't here to take advantage of you. There's no account, no advertising, no analytics and no tracking, and the people who make Restock never receive your data. All the code is public, so anyone can check that this is true.
+Restock is a free, open-source app that helps you spend less on groceries. It isn't here to take advantage of you. There's no account, no advertising, no analytics and no tracking, and the people who make Restock never receive your data, except feedback you choose to send them and, once sharing starts, prices read from the shops (both below). All the code is public, so anyone can check that this is true.
 
 ## In short
 
@@ -12,10 +12,11 @@ Restock is a free, open-source app that helps you spend less on groceries. It is
 - No account, no ads, no analytics, no tracking.
 - Permissions are only used for the feature that asks for them, and only when you use it.
 - Costco is off until you pick it with your shops. Its website terms ask people not to collect its listings, so Restock shows you a notice first and only looks when you search.
-- The app talks directly to the shops and a few open services, never to us.
+- The app talks directly to the shops and a few open services. It only sends anything to us when you send feedback, and the shared price history comes from GitHub, only if you turn it on.
 - If you turn on sync, your household's phones share your Restock data straight with each other over your Wi-Fi, encrypted, or through a folder you pick, sealed so only your phones can read it. It never goes through us.
 - If you run your own Restock server, it keeps what your phones share with it, at your home. It only contacts the shops if you turn on "Let the web page search the shops", and only when someone presses Search.
-- Sharing prices about products is on by default, but for now they're only saved in your own backups. Nothing is sent anywhere, and nothing about you is in them.
+- "Send prices back" is on unless you turn it off: the shelf prices Restock reads from the shops (price, barcode, shop), never anything you type in and nothing about you. Sending starts once the shared price service is ready; until then they're only kept in your own backups.
+- Feedback reaches us only when you press Send, with diagnostics unless you turn them off, and your email only if you type it.
 
 ## What stays on your phone
 
@@ -35,7 +36,7 @@ If you turn on the Keg tab, Restock asks you to confirm you're 18 or over. That 
 
 ## What we collect
 
-Nothing. Restock has no server run by its makers, no sign-in, no crash reporting, no analytics and no advertising. We can't see what you buy, where you shop or what you search for. Shared prices (below) are, for now, only saved in your own backups.
+Only feedback you send. Restock has no sign-in, no crash reporting, no analytics and no advertising. We can't see what you buy, where you shop or what you search for. Feedback you send from Settings → Feedback comes to us (see Feedback). Prices sent back (see Sharing prices) will be shop prices only, with nothing about you, and for now none are sent.
 
 ## Permissions and what they're for
 
@@ -81,9 +82,11 @@ No service, for receipts: the receipt reader (Tesseract, open-source text recogn
 
 Store catalogue links open in your phone's web browser, under that website's own policy.
 
-GitHub (raw.githubusercontent.com, the restock-prices project) and hotprices.org, only if you choose shared price history during setup or turn it on in Settings. restock-prices is Restock's own weekly collection of Coles, Woolworths, Aldi and Costco shelf prices, published openly on GitHub; hotprices.org is an open-source project that records Coles and Woolworths prices every day, used for those two shops while restock-prices has no file for them yet. Restock downloads the public price files, the same for everyone, and keeps a short summary per product. Nothing about you or what you track is sent.
+GitHub (raw.githubusercontent.com, the restock-prices project), only if you turn on Judge new items from day one (in setup, or Settings → Shopping). restock-prices is Restock's own weekly collection of Coles, Woolworths, Aldi and Costco shelf prices, published openly on GitHub. Restock downloads only the files for the shops you picked, for the length you choose (8 weeks, 6 months or 12 months), the same files for everyone, and keeps a short summary per product. Nothing about you or what you track is sent. From 0.9.13 phones no longer download from hotprices.org; the restock-prices collector uses it instead.
 
-Your own restock-prices collector, only on a phone you set up as a price helper (Settings → Shared prices → Price helper phone). That phone searches Coles and Woolworths for everyday things while it charges, and sends the products and shelf prices it found, plus the newest prices of your household's own Coles and Woolworths products, to the collector address you type in, with the key you type in. Nothing about you, your list, cards or receipts is sent. The collector publishes them in restock-prices, without saying where they came from.
+Your own restock-prices collector, only on a phone you set up as a price helper (Settings → Beta and development → Price helper phone). That phone searches Coles and Woolworths for everyday things while it charges, and sends the products and shelf prices it found, plus the newest prices of your household's own Coles and Woolworths products, to the collector address you type in, with the key you type in. Nothing about you, your list, cards or receipts is sent. The collector publishes them in restock-prices, without saying where they came from.
+
+Restock's feedback inbox (restock-prices.plenty.family, run by the people who make Restock), only when you press Send in Settings → Feedback, on the phone or your Restock server's web page. It gets what kind of feedback it is and your message, any screenshots you attach, your email only if you type one, Restock's version and the kind of device. Unless you turn Attach diagnostics off, it also gets diagnostics: your settings with passwords, keys, tokens, addresses, branches and names taken out, recent problems with shops, and how sync and shared prices are doing ("See what's included" shows exactly what). It also gets a random number made for this install, only to limit how much one phone can send in a day, and, like any website, your internet address, used for the same limit and not kept with your message. Your pantry, lists, cards, receipts and prices are never in it. With no connection it waits on your phone and goes the next time Restock opens. Feedback is read only by the people who make Restock, kept on their server for as long as it's useful, and never sold or shared. Ask, from the email you used, and we'll delete yours.
 
 GitHub (github.com), only when you tap Check for updates in Settings, or once a week if you turn on "Tell me when there's an update". Restock asks for the latest release's version number and notes, and if you tap Update, downloads the new APK from there. Nothing about you or what you track is sent.
 
@@ -101,7 +104,7 @@ Just before a new version of Restock first opens, it saves a backup (without rec
 
 "Export as spreadsheets" makes CSV files of your pantry, shopping list and price history, and hands them to Android's share menu. Where they go is up to you.
 
-With "Share prices about products" on (the default), a backup that includes price history also has a "shared prices" part: products and their prices only, for the items in that backup, nothing about you (see Sharing prices).
+With "Send prices back" on (the default), a backup that includes price history also has a "shared prices" part: products and their prices only, for the items in that backup, nothing about you (see Sharing prices).
 
 ## Sync between your phones
 
@@ -129,13 +132,13 @@ From 0.9.3, some settings are the household's: which shops each shared tab uses,
 
 ## Sharing prices
 
-Restock's plan is a free, open price list anyone can search: what things cost at each shop, and when. It's meant to be a shared, decentralised network: Restock servers share shop price data with each other, instead of one central website or company collecting it. It will only ever carry prices and products, never anything personal, and it will be opt-in: nothing is shared unless you turn it on. The prices will never be sold.
+Restock's plan is a free, open price list anyone can search: what things cost at each shop, and when. It's meant to be a shared, decentralised network: Restock servers share shop price data with each other, instead of one central website or company collecting it. It will only ever carry prices and products read from the shops, never anything personal and never anything you typed in. The prices will never be sold.
 
-"Share prices about products" is on unless you turn it off (Settings → Shared prices). For now nothing is sent anywhere, from your phone or your server. Restock only adds a "shared prices" part to the backups you export or save, ready for when sharing starts. Before any version sends prices off your phone, it will ask you first, and nothing is sent unless you say yes.
+"Send prices back" is on unless you turn it off (Settings → Privacy and sharing). With it on, Restock will send the shelf prices it reads from the shops to restock-prices, Restock's own shared price service, to make the shared price history better for everyone: for each product, the shop, its name, brand, size, barcode and the shop's product number, the price with any special or member price, and the day. That starts with a coming version, once the service is ready. For now nothing is sent anywhere, from your phone or your server: the prices are only kept in a "shared prices" part of your own backups. Turning it off stops it, now and later. Prices you type in or change yourself are never sent: they stay on your phone, your household's phones and your own server.
 
 The first step is the full export file a Restock server can download, in an open, documented format. That file is for you: it also holds your list, pantry and spending, and it stays wherever you save it. A shared network would only ever take the prices and products part. Restock will check the shops' terms before any prices are shared publicly.
 
-What's in it: for each product Restock has checked at a shop, the shop, its name, brand, size, barcode and the shop's product number, and each price Restock read from the shop with the usual ("was") price, any special or multi-buy, and the day. Only the tabs in that backup are included. The products are the ones you track, but nothing in it links them to you. It never includes who you are, your loyalty or gift cards, your branch or location, your shopping list or what you ticked off, your receipts, or anything you type about yourself. Products and prices you typed in yourself aren't included, and nor are products from shops you added yourself or sample items. Costco prices aren't included either. Turning it off leaves it out of your future backups.
+What's in it: for each product Restock has checked at a shop, the shop, its name, brand, size, barcode and the shop's product number, and each price Restock read from the shop with the usual ("was") price, any special or multi-buy, and the day. Only the tabs in that backup are included. The products are the ones you track, but nothing in it links them to you. It never includes who you are, your loyalty or gift cards, your branch or location, your shopping list or what you ticked off, your receipts, or anything you type about yourself. Products and prices you typed in yourself aren't included, and nor are products from shops you added yourself or sample items. Costco prices aren't included either. Turning it off leaves it out of your future backups, and nothing will be sent.
 
 ## Children
 
@@ -143,7 +146,7 @@ Restock isn't made for children and doesn't knowingly collect anything from anyo
 
 ## Changes and contact
 
-If this policy changes, the new version will be in the app and in the project's source code, with a new date. Questions or concerns? Open an issue on the project's GitHub page: https://github.com/d-plenty/Restock/issues
+If this policy changes, the new version will be in the app and in the project's source code, with a new date. Questions or concerns? Use Settings → Feedback, or open an issue on the project's GitHub page: https://github.com/d-plenty/Restock/issues
 
 _If you've read all the way to the bottom: thank you, and also, you might be a tiny bit boring. We say that with love. Go and find something on special._
 

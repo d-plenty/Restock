@@ -96,7 +96,7 @@ describe('the privacy policy', () => {
 
   it('names every service the app talks to for barcodes and near me', () => {
     const text = render();
-    expect(legal.updated).toBe('11 November 2026');
+    expect(legal.updated).toBe('12 November 2026');
     for (const name of ['Open Food Facts', 'Open Beauty Facts', 'Open Products Facts', 'nominatim.openstreetmap.org', 'overpass-api.de', 'overpass.private.coffee'])
       expect(text).toContain(name);
     expect(text).not.toContain('mail.ru');
@@ -104,5 +104,18 @@ describe('the privacy policy', () => {
     expect(text).toContain('one at a time');
     expect(text).toContain("only the ones you've switched on");
     expect(text).toMatch(/Erase everything[^\n]*signs you out[^\n]*exported/);
+  });
+
+  it('0.9.13: says what feedback sends, and that Send prices back sends nothing yet', () => {
+    const text = render();
+    expect(text).toContain('restock-prices.plenty.family');
+    expect(text).toContain('Attach diagnostics');
+    expect(text).toMatch(/Send prices back[^\n]*on unless you turn it off/);
+    expect(text).toMatch(/For now nothing is sent anywhere/);
+    expect(text).toMatch(/Prices you type in or change yourself are never sent/);
+    // Phones no longer download from hotprices.org, and the old "it will ask you first" promise is gone.
+    expect(text).toContain('no longer download from hotprices.org');
+    expect(text).not.toContain('it will ask you first');
+    expect(text).not.toContain('Restock has no server run by its makers');
   });
 });

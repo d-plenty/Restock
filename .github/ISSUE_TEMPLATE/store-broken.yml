@@ -29,7 +29,7 @@ body:
     id: details
     attributes:
       label: Search details file
-      description: In Restock, Settings → Troubleshooting → Diagnostics → Send search details. Pick this shop, search for something it sells, and drag the saved file in here. It only contains the shop's answer, nothing about you.
+      description: In Restock, Settings → Beta and development (Turn this on) → Diagnostics → Send search details. Pick this shop, search for something it sells, and drag the saved file in here. It only contains the shop's answer, nothing about you.
   - type: input
     id: error
     attributes:
@@ -38,7 +38,7 @@ body:
   - type: dropdown
     id: open
     attributes:
-      label: Did "Open <shop>" in Settings → Troubleshooting help?
+      label: Did "Open <shop>" in Settings → Beta and development help?
       options: [Didn't try, "Yes, it works again", "No, still failing"]
   - type: input
     id: version

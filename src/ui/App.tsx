@@ -45,6 +45,7 @@ import { watchWidgets } from '../lib/widgets';
 import { tidyReceipts } from '../lib/receipts';
 import { PantryScreen } from './screens/Pantry';
 import { SettingsScreen } from './screens/Settings';
+import { FeedbackScreen } from './screens/Feedback';
 import { StoresScreen } from './screens/Stores';
 import { SyncScreen } from './screens/Sync';
 import { RestockServerScreen } from './screens/RestockServer';
@@ -334,8 +335,8 @@ function RestockApp() {
         setStack([{ name: 'mycatalogue' }]);
       } else if (a.action === 'daily') nav.setTab('pantry');
       else if (a.action === 'cards') setStack([{ name: 'cards' }]);
-      else if (a.action === 'sync') setStack([{ name: 'settings' }, { name: 'sync' }]);
-      else if (a.action === 'updates') setStack([{ name: 'settings' }]);
+      else if (a.action === 'sync') setStack([{ name: 'settings' }, { name: 'settings', page: 'sync' }, { name: 'sync' }]);
+      else if (a.action === 'updates') setStack([{ name: 'settings' }, { name: 'settings', page: 'help' }]);
       else if (a.action === 'scan') {
         const out = await scanBarcode();
         if (out.ok) setStack((st) => [...st, { name: 'add', barcode: out.code }]);
@@ -388,6 +389,8 @@ function RestockApp() {
     });
     void maybeAutoBackup().catch((e) => console.error('auto backup failed', e));
     void tidyReceipts().catch((e) => console.error('receipt tidy-up failed', e));
+    // 0.9.13: feedback that couldn't go when it was sent (no connection) goes now.
+    void import('../lib/feedback').then((f) => f.sendWaiting()).catch(() => undefined);
     const stopWidgets = watchWidgets();
     // 0.9.3: the shopping list with Home Assistant, if it's on for this phone (homeAssistant.ts).
     const stopHa = serverMode
@@ -494,7 +497,8 @@ function RestockApp() {
         {top.name === 'catalogues' && <CataloguesScreen />}
         {top.name === 'mycatalogue' && <MyCatalogueScreen />}
         {top.name === 'permissions' && <PermissionsScreen />}
-        {top.name === 'settings' && <SettingsScreen />}
+        {top.name === 'settings' && <SettingsScreen key={top.page ?? 'main'} page={top.page} />}
+        {top.name === 'feedback' && <FeedbackScreen />}
         {top.name === 'stores' && <StoresScreen section={top.section} />}
         {top.name === 'cards' && <CardsScreen />}
         {top.name === 'sync' && <SyncScreen invite={top.invite} />}

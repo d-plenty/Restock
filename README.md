@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.9.12" src="https://img.shields.io/badge/status-release%20candidate%200.9.12-ffcd00">
+  <img alt="Beta 0.9.13" src="https://img.shields.io/badge/status-beta%200.9.13-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0912">New in 0.9.12</a> ·
+  <a href="#new-in-0913">New in 0.9.13</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -108,7 +108,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Specials**: this week's specials at your shops (Woolworths and Coles half price, Aldi Special Buys), filtered to **Things I buy** or **All specials**.
 - **Alert me under $X** per item, and **stock-up tips** for things that rarely go on special.
 - **Near me**: find every supermarket, bottle shop or chemist nearby from OpenStreetMap and pick your branch.
-- **Shop health**: Home tells you if a shop hasn't worked for a day, and Settings → Troubleshooting → Test connections shows what went wrong.
+- **Shop health**: Home tells you if a shop hasn't worked for a day, and Settings → Beta and development → Test connections shows what went wrong.
 - **Diagnostics**: what went wrong lately, shop by shop, **Send search details** to capture exactly what a shop sent back, and a recording of what a shop's website does when you add something to its trolley yourself (sign-in and personal details left out), so connections can be fixed.
 - **Receipts** (optional): finds the receipt's edges, straightens it, makes it crisp black and white, and reads the shop, date and total with Tesseract on the phone. The reader is built in and works offline. Photos stay inside Restock, not in your gallery.
 - **Recall alerts**: on by default, checked every 24 hours separately from price checks, matched against your Pantry, Keg, Health, lists and kept receipts, with the official notice one tap away.
@@ -124,11 +124,24 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Spreadsheets**: export your pantry, shopping list and price history as CSV files for Excel, Google Sheets, LibreOffice or Numbers.
 - **Look and colours**: Light, Dark or System, with true black for OLED screens; Australian or Plain; 24 accent colours; 16 app icon colours.
 - **Accessibility**: bigger text, high contrast, less motion and bigger buttons, checked with an automatic accessibility audit.
-- **Updates**: Settings → About and updates → Check for updates, or turn on **Tell me when there's an update** to check every 24 hours (or every 7 days) when you open Restock. Or install through [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium and let them handle updates.
-- **Sharing prices**: product prices (shop, name, size, barcode and the prices on each day) are kept ready in your backups for a future shared price network. Nothing is sent anywhere yet, nothing about you is ever included, and the data will never be sold. Turn it off in Settings → Shared prices. See [Shared prices](#shared-prices).
-- **Shared price history (Beta)**: optionally download months of Coles, Woolworths, Aldi and Costco history from [restock-prices](https://github.com/d-plenty/restock-prices) (Restock's own weekly collection), with [hotprices.org](https://hotprices.org) ([source](https://github.com/Javex/hotprices-au), MIT) filling in Coles and Woolworths while it gets going, so new items get a fair verdict from day one. Off by default.
+- **Updates**: Settings → Help and about → Check for updates, or turn on **Tell me when there's an update** to check every 24 hours (or every 7 days) when you open Restock. Or install through [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium and let them handle updates.
+- **Send prices back**: the shelf prices Restock reads from the shops (shop, name, size, barcode and the price on each day) are kept ready in your backups for the shared price history. It's on unless you turn it off (Settings → Privacy and sharing). Nothing is sent yet, prices you type in yourself never are, nothing about you is ever included, and the data will never be sold. See [Shared prices](#shared-prices).
+- **Judge new items from day one**: optionally download 8 weeks, 6 months or 12 months of shared history for your shops from [restock-prices](https://github.com/d-plenty/restock-prices) (Restock's own weekly collection of Coles, Woolworths, Aldi and Costco prices), so new items get a fair verdict straight away. Off by default; turn it on in setup or Settings → Shopping.
+- **Feedback**: Settings → Feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.9.13
+
+A tidier Settings, day-one prices you choose the length of, and a way to send feedback from the app.
+
+- **Settings is a list of pages:** Shopping, Price checks, Notifications, Sync and backups, Look and accessibility, Privacy and sharing, Feedback, Help and about, and Beta and development. Tap one to open it. Search still finds any setting.
+- **Judge new items from day one** is in Settings → Shopping (and offered in setup). Pick **8 weeks** (the default), **6 months** or **12 months**: each shows roughly what it downloads each week and keeps on your phone. It only downloads the shops you use, and only from [restock-prices](https://github.com/d-plenty/restock-prices). Phones no longer download from hotprices.org.
+- **Privacy and sharing:** what stays on your phone, what goes where, and **Send prices back** (on unless you turn it off). Nothing is sent yet.
+- **Feedback:** Settings → Feedback, on the phone, the web page and the iPhone web app. Say what's wrong or what you like, attach up to 3 screenshots, and diagnostics if you like (see exactly what's included). Leave an email only if you'd like a reply.
+- **Beta and development:** diagnostics, connection tests and the price helper phone are together on one page, behind **Turn this on**.
+- **The web page's Settings** has the same groups in the same order.
+- **The privacy policy and fine print** are updated for all of this.
 
 ## New in 0.9.12
 
@@ -214,7 +227,7 @@ Fixes and tidy-ups, mostly for the price helper phone.
 - If you run your own Restock server, it holds your household's data (what each phone chooses to share) so it can work around the clock. It's yours, at home; keep its data folder private. Card numbers and shop sign-ins stay on your phones unless you choose to share cards.
 - No Google Play services, Firebase or ML Kit, so it runs on de-Googled phones (GrapheneOS, CalyxOS, /e/OS).
 - Every permission is optional and explained, and asked for only when a feature needs it.
-- The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists, and GitHub if you check for updates), and to your own Home Assistant and Restock server if you connect them. **Nothing goes to the people who make Restock.**
+- The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists, and GitHub if you check for updates or use day-one prices), and to your own Home Assistant and Restock server if you connect them. **Nothing goes to the people who make Restock unless you send feedback.**
 - **Your server only contacts the shops if you turn on Let the web page search the shops**, and then only when someone presses Search on its web page. Nothing runs in the background, and no shop sign-ins are kept.
 - **Erase everything** (at the bottom of Settings) deletes your data, signs you out of the shops inside Restock and clears what the app saved, files it shared included. Backups can be locked with a password.
 
@@ -231,7 +244,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.9.12.apk` (on macOS, `shasum -a 256 restock-0.9.12.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.9.13.apk` (on macOS, `shasum -a 256 restock-0.9.13.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -290,7 +303,7 @@ The steps are also on the server's sign-in page, under **On iPhone?**. On Androi
 Your shopping list in [Home Assistant](https://www.home-assistant.io), both ways: add, tick or take something off in Restock and Home Assistant's list changes too, and the other way round. Say *"Okay Nabu, add milk to my shopping list"* and milk is on your Restock list.
 
 1. In Home Assistant, open your profile (your name, bottom left) → **Security** → **Long-lived access tokens** → **Create token**. Call it Restock and copy it.
-2. In Restock, go to **Settings → Home Assistant**. Type the address you open Home Assistant with (`http://homeassistant.local:8123`, its IP address like `http://192.168.1.50:8123`, your Nabu Casa `https://….ui.nabu.casa` address or a Tailscale one), paste the token and tap **Test connection**.
+2. In Restock, go to **Settings → Sync and backups → Home Assistant**. Type the address you open Home Assistant with (`http://homeassistant.local:8123`, its IP address like `http://192.168.1.50:8123`, your Nabu Casa `https://….ui.nabu.casa` address or a Tailscale one), paste the token and tap **Test connection**.
 3. Pick the list (`todo.shopping_list` unless you use another), turn on **Sync with Home Assistant**, and tap **Save settings**.
 
 Good to know:
@@ -390,8 +403,8 @@ Restock is built by one person in their spare time. Prices, shops and websites a
 
 | If you... | You can help by... |
 |---|---|
-| **Shop anywhere in Australia** | Using it for a couple of weeks and [reporting anything wrong](../../issues/new/choose). We especially want people in every state and territory, and in regional towns. |
-| **Notice a shop isn't working** | Opening a [**Shop stopped working**](../../issues/new?template=store-broken.yml) issue. In the app, Settings → Troubleshooting → Diagnostics → **Send search details** saves exactly what the shop sent back. Attach that file and it can usually be fixed fast. |
+| **Shop anywhere in Australia** | Using it for a couple of weeks and telling us what you find: **Settings → Feedback** in the app, or [an issue here](../../issues/new/choose). We especially want people in every state and territory, and in regional towns. |
+| **Notice a shop isn't working** | Opening a [**Shop stopped working**](../../issues/new?template=store-broken.yml) issue. In the app, Settings → Beta and development → Diagnostics → **Send search details** saves exactly what the shop sent back. Attach that file and it can usually be fixed fast. |
 | **See the wrong product or price** | Opening a [**Wrong product or price**](../../issues/new?template=product-mismatch.yml) issue with the barcode and what the shelf says. |
 | **Use a bottle shop or chemist** | Testing it! These connections are the newest and least tested. |
 | **Run a Restock server** | Running `docker compose exec restock-server node scripts/try-search.mjs` and telling us which shops answer your server. Problems with the server itself go in [its own issues](https://github.com/d-plenty/restock-server/issues). |
@@ -417,7 +430,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is in its **release candidate** stage. There are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is in **beta**. There are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.
@@ -440,7 +453,7 @@ Restock stays focused on saving money on what you buy. Bigger ideas, like full b
 
 ## Coming soon
 
-These are planned, and each has its own page in the app under **Settings → Coming soon**. Want one sooner, or have a better idea? Say so in [Discussions → Ideas](../../discussions/categories/ideas).
+These are planned, and each has its own page in the app under **Settings → Help and about → Coming soon**. Want one sooner, or have a better idea? Say so in [Discussions → Ideas](../../discussions/categories/ideas).
 
 ### What you have at home
 Tell Restock roughly how much of something you've got (a full bottle, two left, nearly out) and it keeps track as you buy and use things. It learns how fast you get through each one, so it can put things on your shopping list before you run out, and time it with a good price: *"You're nearly out of coffee, and it's half price at Coles this week."* Ticking things off in the shop or scanning a receipt tops your stock back up.
@@ -458,9 +471,9 @@ The plan is a **shared, decentralised network** of shop price data: Restock serv
 
 - **Only prices and products:** each product's shop, name, brand, size and barcode, and its prices by day (the usual price, any special or multi-buy, the date).
 - **Never anything personal:** who you are, your loyalty or gift cards, your branch or location, what you searched for, your pantry, your shopping list or what you ticked off, or your receipts. No account and no phone ID.
-- **Opt-in:** nothing is shared unless you turn it on.
+- **Send prices back** is on unless you turn it off (Settings → Privacy and sharing). Prices you type in or change yourself are never shared.
 
-**The first step is here:** a Restock server can download a full export file in an open, documented format (`restock-export`, in [docs/server-protocol.md](docs/server-protocol.md)). On the phone, since 0.9.0, Restock keeps a "shared prices" part in your backups, ready for later. Nothing leaves your phone or your server for this yet. Restock will check the shops' terms and ask the data sources for permission before any prices are shared publicly.
+**The first step is here:** a Restock server can download a full export file in an open, documented format (`restock-export`, in [docs/server-protocol.md](docs/server-protocol.md)). On the phone, since 0.9.0, Restock keeps a "shared prices" part in your backups, ready for later, and since 0.9.11 Judge new items from day one downloads restock-prices' shared history. Nothing leaves your phone or your server for sharing yet. Restock will check the shops' terms and ask the data sources for permission before any prices are shared publicly.
 
 ### The main F-Droid repository
 Restock in the main [F-Droid](https://f-droid.org) repository, built by F-Droid from the source. Until then, [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) has every release.
@@ -527,7 +540,7 @@ Restock isn't connected with, endorsed by or paid by any supermarket, bottle sho
 [Tesseract](https://github.com/tesseract-ocr/tesseract) and [tesseract.js](https://github.com/naptha/tesseract.js) (receipt reading) ·
 [sql.js](https://github.com/sql-js/sql.js) ·
 [Capacitor](https://capacitorjs.com) ·
-[hotprices-au](https://github.com/Javex/hotprices-au) ·
+[hotprices-au](https://github.com/Javex/hotprices-au) (used by the restock-prices collector) ·
 Food Standards Australia New Zealand, Product Safety Australia and the TGA for publishing recalls openly.
 
 <p align="center"><sub>Made in Australia, for Australian shoppers. A <strong>Plenty Technologies</strong> project.</sub></p>
