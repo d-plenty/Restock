@@ -1,7 +1,7 @@
 import { StockTag } from '../StockTag';
 import { useFullRefresh } from '../refresh';
 import { useRef, useState } from 'react';
-import { allCategories, allListEntries, deleteGroup, updateGroup } from '../../lib/db';
+import { allCategories, allListEntries, deleteGroup, getSettings, updateGroup, updateSettings } from '../../lib/db';
 import { addAllToList, addToList, buzz, takeOffList } from '../../lib/listActions';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { loadRecommendations } from '../../lib/recs';
@@ -9,7 +9,7 @@ import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import { bothPrices, tiedWithBest, type Recommendation } from '../../lib/verdict';
 import { chainName, LEARNING_DAYS } from '../../types';
-import { Hold, Icon, MoreInfo, stockWhere, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, Thumb } from '../components';
+import { BETA_NOTE, BETA_SECTIONS, betaFor, Hold, Icon, MoreInfo, stockWhere, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, Thumb } from '../components';
 import { ActionInfoTag } from '../tagInfo';
 import { useNav } from '../nav';
 import { SECTION_NAMES, type Section } from '../../shops';
@@ -195,7 +195,10 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       {full.indicator}
       {full.status}
       <div className="topbar">
-        <h1>{SECTION_NAMES[section]}</h1>
+        <h1>
+          {SECTION_NAMES[section]}
+          {betaFor(section)}
+        </h1>
         {recs.length > 0 && (
           editing ? (
             <button className="btn small primary" onClick={stopEditing}>
@@ -213,6 +216,8 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           </button>
         )}
       </div>
+      {/* 0.10.0: what Beta means, until it's been read once on this tab. */}
+      <BetaHint section={section} />
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
         <span style={{ position: 'absolute', left: 14, color: 'var(--muted)', display: 'flex' }}>
           <Icon name="search" size={18} />
@@ -439,6 +444,29 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           </div>
         </Sheet>
       )}
+    </div>
+  );
+}
+
+/** 0.10.0: Keg and Health are beta: a line saying what that means, with Got it (seenHints). */
+function BetaHint({ section }: { section: Section }) {
+  const settings = useLive(getSettings, []);
+  const key = `beta-${section}`;
+  if (!settings || !BETA_SECTIONS.includes(section) || settings.seenHints.includes(key)) return null;
+  return (
+    <div className="card" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <span className="small" style={{ flex: 1 }}>
+        {BETA_NOTE}
+      </span>
+      <button
+        className="btn small"
+        onClick={async () => {
+          const s = await getSettings();
+          await updateSettings({ seenHints: [...s.seenHints, key] }, { local: true });
+        }}
+      >
+        Got it
+      </button>
     </div>
   );
 }

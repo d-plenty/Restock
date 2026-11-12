@@ -311,6 +311,21 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
+    /** 0.10.0: POST /api/v3/data/spend: this phone's earlier spending, so the server's figures have it too. */
+    @PluginMethod
+    public void serverSpend(final PluginCall call) {
+        final JSObject data = call.getData();
+        syncThread.execute(() -> {
+            try {
+                org.json.JSONObject body = new org.json.JSONObject();
+                body.put("rows", data.optJSONArray("rows") != null ? data.optJSONArray("rows") : new org.json.JSONArray());
+                call.resolve(new JSObject(SyncHub.get(getContext()).serverSpend(body).toString()));
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Couldn't reach your Restock server.", e);
+            }
+        });
+    }
+
     // ---------- 0.9.14: Send prices back (PriceShare.java) ----------
 
     @PluginMethod

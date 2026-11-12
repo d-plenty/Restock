@@ -167,7 +167,8 @@ final class MarketData {
     static void maybeRefresh(Context context, SQLiteDatabase db, JSONObject settings) {
         try {
             JSONObject md = settings.optJSONObject("marketData");
-            if (md == null || !md.optBoolean("enabled", false)) return;
+            // 0.10.0: one switch, Shared prices (sharePrices and marketData.enabled together).
+            if (md == null || !md.optBoolean("enabled", false) || !PriceShare.on(settings)) return;
             if (md.optBoolean("wifiOnly", true) && onMobileData(context)) return;
             JSONObject last = PriceChecker.readKv(db, "marketImport");
             String at = last != null ? last.optString("at", "") : "";

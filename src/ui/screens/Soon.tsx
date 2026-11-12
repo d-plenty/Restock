@@ -36,19 +36,22 @@ export const SOON: Soon[] = [
   {
     id: 'spending',
     icon: 'chart',
-    title: 'Spending on your phone',
-    short: 'On a Restock server now, in its Data tab. On the phone later',
+    title: 'Spending',
+    short: 'Here now in Your data. Receipts for spending later',
     body: (
       <>
         <p>
-          With a Restock server, it's here now: the server's <strong>Data</strong> tab shows what you spent each month, where you shop and what you
-          saved on specials. It's worked out from what you tick off your shopping list (the price at the shop you ticked it at, times how many), not
-          from receipts.
+          It's here now: <strong>Settings → Your data</strong> on the phone (and the <strong>Data</strong> tab on a Restock server) shows what you
+          spent each month, where you shop and what you saved on specials. It's worked out from what you tick off your shopping list (the price at
+          the shop you ticked it at, times how many), not from receipts.
         </p>
-        <p>Still to come: the same simple summary on the phone itself, with no server.</p>
         <p>
-          Later, when reading receipts is better, a switch to use your receipts for spending instead. Restock isn't a budgeting app, so this stays
-          light.
+          With a Restock server, your phones share their spending with it unless you turn that off (Settings → Sync and backups), so every phone
+          shows the household's figures.
+        </p>
+        <p>
+          Still to come, when reading receipts is better: a switch to use your receipts for spending instead. Restock isn't a budgeting app, so this
+          stays light.
         </p>
       </>
     ),
@@ -107,21 +110,18 @@ export const SOON: Soon[] = [
     id: 'sharedprices',
     icon: 'tag',
     title: 'Shared prices',
-    short: 'Phones share shop prices now; Restock servers sharing with each other is next',
+    short: 'Here now. Restock servers sharing with each other is an idea for later',
     body: (
       <>
         <p>
-          Every price Restock sees could help everyone else: a new item would arrive with months of history, so you'd know straight away whether its
-          "special" is real.
-        </p>
-        <p>
-          The plan is a shared, decentralised network: Restock servers share shop price data with each other, instead of sending it to one
-          central website or company. The prices will never be sold.
+          It's here now: <strong>Shared prices</strong> in Settings → Privacy and sharing, on unless you turn it off. New items get a fair verdict
+          from day one, from prices everyone's phones and Restock's own collection have seen, and in return your phone shares the shelf prices it
+          reads from Coles, Woolworths, Aldi and Costco.
         </p>
         <p>It only ever shares prices and products:</p>
         <ul>
           <li>Each product's shop, name, brand, size and barcode.</li>
-          <li>Its prices by day: the usual price, any special or multi-buy, and the date.</li>
+          <li>Its prices by day: the shelf price, any special or multi-buy, and the date.</li>
         </ul>
         <p>And never anything personal:</p>
         <ul>
@@ -129,9 +129,8 @@ export const SOON: Soon[] = [
           <li>The words you searched, your pantry, your shopping list or what you ticked off, your receipts, or prices you typed in. No account (a random number per install tells phones apart).</li>
         </ul>
         <p>
-          It's "Send prices back" in Settings → Privacy and sharing: on unless you turn it off. Phones send the shop prices they read to
-          restock-prices, and Judge new items from day one downloads the shared history back. Prices you type in yourself are never shared. Still to
-          come: Restock servers sharing with each other. Restock will check the shops' terms before any prices are shared publicly.
+          The shared history is public on GitHub (d-plenty/restock-prices), free for anyone to use, and never sold. An idea for later: Restock servers
+          sharing prices with each other directly.
         </p>
       </>
     ),

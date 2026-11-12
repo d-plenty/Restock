@@ -17,6 +17,7 @@ import {
 } from '../../lib/db';
 import { addToList as addToListUndoable } from '../../lib/listActions'; // 0.9.5 (undo)
 import { MARKET_SHOPS, MARKET_SOURCE } from '../../lib/market';
+import { sharedOn } from '../../lib/priceShare';
 import { genericName, nameHasSize } from '../../lib/naming';
 import { orderOptions, PRODUCT_ORDERS, shopRank } from '../../lib/productOrder';
 import { ensureNotificationPermission, notificationsAllowed, scheduleReminders } from '../../lib/notify';
@@ -477,11 +478,11 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       {learning !== undefined && usingShared && (
         <div className="card hint" style={{ flexDirection: 'column', gap: 4 }}>
           <strong>
-            Judged with shared price history <span className="tag normal beta">Beta</span>
+            Judged with shared prices
           </strong>
           <span>
-            Restock has only {learning} day{learning === 1 ? '' : 's'} of its own prices for this, so the verdict uses months of shared price
-            history. After about 4 weeks it switches to the prices this phone has seen.
+            Restock has only {learning} day{learning === 1 ? '' : 's'} of its own prices for this, so the verdict uses months of shared
+            prices. After about 4 weeks it switches to the prices this phone has seen.
           </span>
         </div>
       )}
@@ -496,24 +497,24 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             sale. It takes about 4 to 8 weeks.
           </span>
           {appSettings &&
-            !appSettings.marketData.enabled &&
+            !sharedOn(appSettings) &&
             rec.options.some((o) => (MARKET_SHOPS as readonly string[]).includes(o.product.chain)) && (
               <button
                 className="linkish small"
                 style={{ alignSelf: 'flex-start' }}
                 onClick={() => {
-                  // 0.9.14: Settings → Prices and deals, at Judge new items from day one, once it has drawn.
-                  nav.push({ name: 'settings', page: 'prices' });
+                  // 0.10.0: Settings → Privacy and sharing, at Shared prices, once it has drawn.
+                  nav.push({ name: 'settings', page: 'privacy' });
                   let tries = 0;
                   const t = window.setInterval(() => {
-                    const el = document.getElementById('s-dayone');
+                    const el = document.getElementById('s-shared');
                     if (!el && ++tries < 30) return;
                     window.clearInterval(t);
                     el?.scrollIntoView({ block: 'start' });
                   }, 50);
                 }}
               >
-                Judge it from day one with shared price history
+                Judge it from day one: turn on Shared prices
               </button>
             )}
         </div>
@@ -1484,7 +1485,7 @@ function PriceHistory({
 
   const ownWeeks = allReadings.length ? Math.max(1, Math.round((now - Date.parse(allReadings[0].date)) / WEEK)) : 0;
   const source = market
-    ? `From shared price history · ${market.days} days`
+    ? `From shared prices · ${market.days} days`
     : allReadings.length
       ? `Your prices · ${ownWeeks >= 9 ? `${Math.round(ownWeeks / 4.3)} months` : `${ownWeeks} week${ownWeeks === 1 ? '' : 's'}`}`
       : 'No prices yet';
@@ -1627,7 +1628,7 @@ function PriceHistory({
       {why &&
         (market ? (
           <p className="small" style={{ margin: 0 }}>
-            Usual, usual sale and lowest come from shared price history ({market.source || MARKET_SOURCE}): {market.days} days at {chainName(o.product.chain)}, on
+            Usual, usual sale and lowest come from shared prices ({market.source || MARKET_SOURCE}): {market.days} days at {chainName(o.product.chain)}, on
             sale {Math.round(market.saleShare * 100)}% of the time{stats.cycleWeeks ? `, about every ${stats.cycleWeeks} weeks` : ''}.
             {stats.marketScale && stats.marketScale !== 1
               ? ` Adjusted ${Math.round(Math.abs(stats.marketScale - 1) * 100)}% ${stats.marketScale > 1 ? 'up' : 'down'} to match your shop's prices.`

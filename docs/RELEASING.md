@@ -54,7 +54,7 @@ tar czf ~/restock-signing-key-backup.tar.gz -C ~ .restock
    git push
    git push --tags
    ```
-6. **Publish on GitHub:** Releases → **Draft a new release** → choose the tag → title `Restock 0.x.y`, or `Restock 0.x.y (beta)` before 1.0 → write what's new in plain words → drag in the APK, plus a copy of it named `restock.apk` (the README's download link always points at that name in the latest release) → **Publish release**.
+6. **Publish on GitHub:** Releases → **Draft a new release** → choose the tag → title `Restock 0.x.y`, or `Restock 0.x.y (beta)` before 1.0, or `Restock 0.x.y (release candidate N)` for a release candidate → write what's new in plain words → drag in the APK, plus a copy of it named `restock.apk` (the README's download link always points at that name in the latest release) → **Publish release**.
 7. **Add the checksum** to the release notes so people can check their download:
    ```bash
    sha256sum ~/restock-$VERSION.apk

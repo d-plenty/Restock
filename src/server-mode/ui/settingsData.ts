@@ -87,6 +87,8 @@ export const NEW_ITEM_PCTS = [10, 15, 20, 30, 40, 50];
 export { PRODUCT_ORDERS };
 
 const TAB_TITLE: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg (bottle shops)', pharmacy: 'Health' };
+/** 0.10.0: the shop rows, named as on the phone's Settings → Your shops (Keg and Health are beta). */
+const SHOPS_TITLE: Record<Section, string> = { pantry: 'Supermarkets (Pantry tab)', keg: 'Bottle shops (Keg tab) · Beta', pharmacy: 'Chemists (Health tab) · Beta' };
 
 function sharesText(tabs: string[], receipts: boolean): string {
   const names = tabs.map((t) => (t === 'pantry' ? 'Groceries' : (SECTION_NAMES[t as Section] ?? t)));
@@ -109,7 +111,7 @@ async function readHousehold(): Promise<HouseholdSettings> {
           const ids = [...builtInsOn(t), ...tab.customShops.map((c) => c.id)] as StoreChain[];
           return {
             section: t,
-            title: TAB_TITLE[t],
+            title: SHOPS_TITLE[t],
             on: tab.on,
             shops: tab.chains.map((id) => ({ id, name: nameOf(id) })),
             choices: ids.map((id) => ({ id, name: nameOf(id), picked: tab.chains.includes(id) })),
@@ -117,7 +119,7 @@ async function readHousehold(): Promise<HouseholdSettings> {
         })
     : activeSections(s).map((t) => ({
         section: t,
-        title: TAB_TITLE[t],
+        title: SHOPS_TITLE[t],
         on: true,
         shops: searchChainsIn(s.enabledChains, t).map((id) => ({ id, name: nameOf(id) })),
         choices: [],
@@ -313,7 +315,7 @@ export function phoneGroups(name: string, s: SentSummary | undefined, haPhone = 
       title: 'Receipts and shared prices',
       rows: [
         { label: 'Receipts', value: onOff(s?.receipts) },
-        { label: 'Shared price history', value: onOff(s?.sharedPrices) },
+        { label: 'Shared prices', value: onOff(s?.sharedPrices) },
       ],
       note: on,
     },

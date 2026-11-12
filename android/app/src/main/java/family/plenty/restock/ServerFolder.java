@@ -326,6 +326,26 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         throw last != null ? last : new Exception("no server address");
     }
 
+    /** 0.10.0: a signed POST of JSON to the server (Your data's earlier spending), trying each address like readJson. */
+    JSONObject postJson(String path, JSONObject body) throws Exception {
+        Exception last = null;
+        byte[] data = body.toString().getBytes(StandardCharsets.UTF_8);
+        for (String b : bases) {
+            if (b == null) continue;
+            try {
+                SyncDav.Response r = send(b, "POST", api + path, data, SyncDav.MAX_SMALL);
+                if (r.status == 200) return new JSONObject(r.text());
+                String said = messageOf(r);
+                throw new Refused(errorOf(r), said.isEmpty() ? "The server answered " + r.status + "." : said);
+            } catch (AccessException | Refused e) {
+                throw e;
+            } catch (Exception e) {
+                last = e;
+            }
+        }
+        throw last != null ? last : new Exception("no server address");
+    }
+
     /** The status of a signed request (after names()), for things that answer 404 or 410 when a code ran out. */
     int status(String method, String path, JSONObject body) throws Exception {
         return send(base(), method, api + path, body == null ? null : body.toString().getBytes(StandardCharsets.UTF_8), SyncDav.MAX_SMALL).status;

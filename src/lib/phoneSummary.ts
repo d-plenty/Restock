@@ -130,6 +130,6 @@ export const PER_PHONE: readonly { field: keyof PhoneSummary; title: string; set
   { field: 'homeAssistant', title: 'Home Assistant', settings: [] },
   { field: 'look', title: 'Look and text size', settings: ['theme', 'look', 'a11y'] },
   { field: 'receipts', title: 'Receipts', settings: ['receipts'] },
-  { field: 'sharedPrices', title: 'Shared price history', settings: ['marketData'] },
+  { field: 'sharedPrices', title: 'Shared prices', settings: ['marketData', 'sharePrices'] },
   { field: 'updates', title: 'Update checks', settings: ['updates'] },
 ];

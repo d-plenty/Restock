@@ -228,6 +228,23 @@ export function TopBar({ title, right, back = true }: { title: string; right?: R
   );
 }
 
+/**
+ * 0.10.0: "Beta" beside the Keg and Health tabs and their shops, everywhere they're named (phone,
+ * web page, iPhone web app): still being worked on. Nothing else about them changes.
+ */
+export const BETA_SECTIONS: readonly string[] = ['keg', 'pharmacy'];
+/** What the Beta means, wherever it's explained (setup, Settings, the tab itself, the web page). */
+export const BETA_NOTE =
+  "Beta: it works the same way as Groceries, it just hasn't been tested as thoroughly yet. It'll keep being tested before it comes out of beta.";
+export function BetaTag({ compact }: { compact?: boolean }) {
+  return (
+    <span className={compact ? 'beta-mark' : 'tag beta'} aria-label="(beta)">
+      Beta
+    </span>
+  );
+}
+export const betaFor = (section: string | undefined, compact?: boolean) => (section && BETA_SECTIONS.includes(section) ? <BetaTag compact={compact} /> : null);
+
 export function ChainDot({ chain }: { chain: Chain }) {
   return <span className={`dot chain-dot ${chain}`} style={{ background: shopColor(chain) }} aria-hidden="true" />;
 }

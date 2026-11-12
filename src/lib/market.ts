@@ -92,7 +92,7 @@ export function downloadMarket(onProgress?: (chain: string, bytes: number, produ
 }
 
 async function doDownload(onProgress: ((chain: string, bytes: number, products: number) => void) | undefined, opts: { onlyUnmetered?: boolean }) {
-  if (!isNative()) throw new Error('Downloading shared price history works in the Android app.');
+  if (!isNative()) throw new Error('Shared prices download in the Android app.');
   const handle = await RestockNative.addListener('marketProgress', (e) => onProgress?.(e.chain, e.bytes, e.products));
   try {
     return await RestockNative.importMarket({ onlyUnmetered: !!opts.onlyUnmetered });

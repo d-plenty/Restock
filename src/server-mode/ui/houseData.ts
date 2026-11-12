@@ -160,6 +160,7 @@ const ACT: Record<string, (d: Detail, name: (device: unknown) => string | undefi
   pruned: () => 'deleted data older than Auto delete keeps',
   // 0.9.5: the Data tab.
   'auto-delete-changed': (d) => (d.months === null ? 'turned Auto delete off' : typeof d.months === 'number' ? `set Auto delete to after ${d.months} month${d.months === 1 ? '' : 's'}` : 'changed Auto delete'),
+  'spending-added': (d) => `sent its earlier spending (${Number(d.added) || 0} purchase${Number(d.added) === 1 ? '' : 's'})`, // 0.10.0
   'data-deleted': (d) => `deleted ${Array.isArray(d.kinds) ? kindWords(d.kinds) : 'data'}${typeof d.before === 'string' ? ` from before ${dayText(d.before)}` : ''}`,
   'deleted-everything': () => 'deleted everything on this server',
   'phones-asked-to-resend': () => 'asked every phone to send all it has again',

@@ -353,7 +353,7 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
   // Half price is about as good as supermarket specials get, so it's never "wait".
   if (enoughHistory && stats.low !== undefined && stats.low < p * 0.95 && discount < HALF_PRICE) {
     const cycle = stats.cycleWeeks ? ` It goes on special about every ${stats.cycleWeeks} weeks.` : '';
-    const when = stats.lowDate ? ` on ${shortDate(stats.lowDate)}` : stats.fromMarket ? ' in the shared price history' : '';
+    const when = stats.lowDate ? ` on ${shortDate(stats.lowDate)}` : stats.fromMarket ? ' in shared prices' : '';
     return {
       kind: 'wait',
       headline: 'Wait for a better sale',
@@ -367,7 +367,7 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
   // "the store's was-price" only when it is the store's was-price (0.9.0). From the prices Restock
   // has seen, it's "its usual" until there's enough history to call it normal.
   const vs = stats.fromMarket
-    ? `its usual ${money(ref)} (from shared price history)`
+    ? `its usual ${money(ref)} (from shared prices)`
     : basis === 'was-price'
       ? `the shop's "was" price of ${money(ref)}`
       : enoughHistory

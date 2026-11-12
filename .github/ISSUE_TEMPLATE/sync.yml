@@ -32,8 +32,8 @@ body:
       label: The phones
       description: For each phone, the Restock version (Settings, at the very bottom), the phone and Android version, and whether it's the owner.
       placeholder: |
-        Owner: Restock 0.9.14, Pixel 8, Android 16
-        Member: Restock 0.9.14, Galaxy S23, Android 15
+        Owner: Restock 0.10.0, Pixel 8, Android 16
+        Member: Restock 0.10.0, Galaxy S23, Android 15
     validations:
       required: true
   - type: input

@@ -40,7 +40,7 @@ import {
   stopUsingWoolworths,
 } from '../../lib/accounts';
 import { confirmAction } from '../../lib/confirm';
-import { ChainDot, Icon, LoadingBar, Sheet, TopBar } from '../components';
+import { BETA_NOTE, BETA_SECTIONS, ChainDot, Icon, LoadingBar, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
 import { money } from '../../lib/units';
 import {
@@ -943,6 +943,7 @@ export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
           </button>
         ))}
       </div>
+      {BETA_SECTIONS.includes(tab) && <p className="small" style={{ margin: 0 }}>{BETA_NOTE}</p>}
       {settings && <StoreFields key={tab} settings={settings} section={tab} />}
       {settings && (
         <button

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { allGroups } from '../../lib/db';
-import { phoneSpending, noteTicks } from '../../lib/spending';
+import { phoneSpending, noteTicks, spendingOnServer } from '../../lib/spending';
+import { getSettings } from '../../lib/db';
 import { RestockNative } from '../../lib/sql/native';
 import { syncInfo } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
@@ -51,11 +52,10 @@ function Tile({ label, big, sub }: { label: string; big: string; sub?: string })
 export function YourData() {
   const nav = useNav();
   const info = useLive(syncInfo, []);
+  const settings = useLive(getSettings, []);
   const onServer = isNative() && !!info?.server && info.serverApi === 3;
-  const [source, setSource] = useState<Source>('phone');
-  useEffect(() => {
-    if (onServer) setSource('server');
-  }, [onServer]);
+  // 0.10.0: with a server, its figures unless Share my spending with the server is off (Sync and backups).
+  const source: Source = onServer && settings && spendingOnServer(settings) ? 'server' : 'phone';
   const [period, setPeriod] = useState<Period>(3);
   const [stats, setStats] = useState<DataStats>();
   const [err, setErr] = useState<string>();
@@ -91,7 +91,7 @@ export function YourData() {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, period]);
+  }, [source, period, settings === undefined]);
 
   // The item chart: the most bought one to start with, else the first item.
   useEffect(() => {
@@ -117,20 +117,18 @@ export function YourData() {
 
   return (
     <>
-      {onServer && (
-        <div className="seg" role="group" aria-label="Whose figures">
-          <button type="button" aria-pressed={source === 'server'} onClick={() => setSource('server')}>
-            Your Restock server
-          </button>
-          <button type="button" aria-pressed={source === 'phone'} onClick={() => setSource('phone')}>
-            This phone
-          </button>
-        </div>
-      )}
       <p className="small" style={{ margin: 0 }}>
         {source === 'server'
-          ? "Everything your household's phones have shared with your Restock server, as its web page's Data tab shows it."
+          ? "Your household's figures from your Restock server, the same on every phone and on its web page."
           : 'Worked out on this phone from what you tick off on your shopping list. It stays on this phone.'}
+        {onServer && (
+          <>
+            {' '}
+            <button className="linkish" onClick={() => nav.push({ name: 'settings', page: 'sync' })}>
+              {source === 'server' ? 'Keep it on this phone instead' : 'Share it with your server'}
+            </button>
+          </>
+        )}
       </p>
       <div className="seg" role="group" aria-label="Time period">
         {PERIODS.map((p) => (
@@ -161,7 +159,6 @@ export function YourData() {
             <div className="card">
               <p className="small" style={{ margin: 0 }}>
                 Tick things off your shopping list and your spending shows up here.
-                {source === 'phone' ? ' This phone started counting with Restock 0.9.14.' : ''}
               </p>
             </div>
           ) : (

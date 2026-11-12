@@ -1169,6 +1169,13 @@ final class SyncHub {
         return server().addresses();
     }
 
+    /** 0.10.0: this phone's earlier spending, to the server (Share my spending with the server). */
+    org.json.JSONObject serverSpend(org.json.JSONObject body) throws Exception {
+        ServerSync s = server();
+        if (!s.on() || !s.v3()) throw new IllegalStateException("This phone isn't in a household on a Restock server.");
+        return s.open().postJson("/data/spend", body);
+    }
+
     /** 0.9.14: the server's statistics for Your data (only a v3 household's server has them). */
     org.json.JSONObject serverRead(String pathAndQuery) throws Exception {
         ServerSync s = server();

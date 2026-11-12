@@ -6,14 +6,14 @@ import { createPortal } from 'react-dom';
 import { openDatabase } from '../lib/boot';
 import { wireSync } from '../lib/sync';
 import { checkPrices, syncBackgroundSchedule } from '../lib/check';
-import { getSettings, pruneHistory, refresh, updateSettings } from '../lib/db';
+import { getKV, getSettings, pruneHistory, putKV, refresh, updateSettings } from '../lib/db';
 import { checkForUpdate, SELF_UPDATE, weeklyCheckDue } from '../lib/updates';
 import { version as appVersion } from '../../package.json';
 import { setConnectionMode } from '../stores/http';
 import { applyTheme, syncInsets } from '../lib/theme';
 import { scheduleReminders } from '../lib/notify';
 import { useLive } from '../lib/useLive';
-import { Announcer, closeTopLayer, Icon, layerHost, runBackHandlers } from './components';
+import { Announcer, betaFor, closeTopLayer, Icon, layerHost, runBackHandlers } from './components';
 import { isSectionTab, NavContext, type Nav, type Screen, type Tab } from './nav';
 import { activeSections, type Section } from '../shops';
 import { ConfirmHost } from './ConfirmHost';
@@ -54,7 +54,7 @@ import { wireHomeAssistant } from '../lib/homeAssistant';
 import { serverMode, serverUi, useDesktopWidth } from '../server-mode/flag';
 import { onUndo, undo as undoStep, undoneText } from '../lib/undo'; // 0.9.5 (undo)
 import { canLeave, getSettings as shownSettings, hasUnsaved } from '../lib/settingsDraft'; // 0.9.5 (save)
-import { askLeave } from '../lib/confirm'; // 0.9.5 (save)
+import { askChoice, askLeave } from '../lib/confirm'; // 0.9.5 (save), 0.10.0
 
 const ALL_TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'home' },
@@ -391,8 +391,40 @@ function RestockApp() {
     void tidyReceipts().catch((e) => console.error('receipt tidy-up failed', e));
     // 0.9.13: feedback that couldn't go when it was sent (no connection) goes now.
     void import('../lib/feedback').then((f) => f.sendWaiting()).catch(() => undefined);
+    // 0.10.0: Shared prices is one switch, on for every phone. A phone that had sharing off stays off
+    // until it's asked, once (the privacy policy says off stays off): Keep sharing turns it on from
+    // now, nothing read while it was off goes. Closing the question asks again next time.
+    if (!serverMode)
+      void (async () => {
+        if (await getKV<boolean>('sharedPrices010')) return;
+        const s = await getSettings();
+        if (s.sharePrices !== 'no' || !s.onboarded) {
+          // On (or still in setup, which asks itself): the one switch is simply on.
+          await putKV('sharedPrices010', true);
+          if (s.sharePrices === 'unasked') await updateSettings({ sharePrices: 'yes', marketData: { ...s.marketData, enabled: true } }, { local: true });
+          return;
+        }
+        const pick = await askChoice(
+          'Shared prices',
+          "Restock 0.10.0 joins Judge new items from day one and Send prices back into one switch, Shared prices: new items get a fair verdict from day one, and in return your phone shares the shelf prices it reads from the shops. Nothing about you goes. You had sharing off, so it's still off. Turn it on?",
+          [
+            { id: 'keep', label: 'Turn on shared prices', kind: 'primary' },
+            { id: 'off', label: 'Keep it off' },
+          ],
+        );
+        if (!pick) return;
+        await putKV('sharedPrices010', true);
+        if (pick === 'keep') {
+          const { shareFromNow } = await import('../lib/priceShare');
+          await shareFromNow();
+          await updateSettings({ sharePrices: 'yes', marketData: { ...s.marketData, enabled: true } }, { local: true });
+        }
+      })().catch(() => undefined);
     // 0.9.14: Your data: ticks made on other phones or in Home Assistant since Restock last looked.
-    if (!serverMode) void import('../lib/spending').then((f) => f.noteTicks()).catch(() => undefined);
+    if (!serverMode) void import('../lib/spending').then(async (f) => {
+      await f.noteTicks();
+      await f.maybeSendSpending(); // 0.10.0: Share my spending with the server
+    }).catch(() => undefined);
     // 0.9.14: Send prices back: what earlier searches and price checks read, if it didn't go yet.
     if (!serverMode) void import('../lib/priceShare').then((f) => f.sendPricesNow()).catch(() => undefined);
     const stopWidgets = watchWidgets();
@@ -605,6 +637,7 @@ function RestockApp() {
               >
                 <Icon name={t.icon} />
                 {t.label}
+                {betaFor(t.id, true)}
               </button>
             ),
           )}

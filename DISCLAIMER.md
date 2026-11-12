@@ -40,7 +40,7 @@ Costco is the one shop whose website terms say automated collection of product l
 
 Price checks use a small amount of internet data and battery. Background checks only run on a network connection and when the battery isn't low, and you can turn them off in Settings.
 
-Judge new items from day one, if you turn it on, downloads the shared price history for your shops once a week after the Thursday collection, or every day if you choose (on Wi-Fi only, unless you change that): roughly 1 MB for 8 weeks to 3 MB for 12 months with all four shops collected, and less for fewer. Settings → Prices and deals shows the size for yours. Send prices back uses a few kilobytes after each search or price check.
+Shared prices, while it's on, downloads the shared price history for your shops once a week after the Thursday collection, or every day if you choose (on Wi-Fi only, unless you change that): roughly 1 MB for 8 weeks to 3 MB for 12 months with all four shops collected, and less for fewer. Settings → Prices and deals shows the size for yours. Sending prices back uses a few kilobytes after each search or price check.
 
 ## No warranty
 
@@ -48,7 +48,7 @@ Restock is free, open-source software provided "as is", without warranty of any 
 
 ## Beta software
 
-Restock is beta software: it's still being built and tested, so things can change or break between versions. Features under Settings → Advanced are for testing and can change or disappear. If something goes wrong, Settings → Feedback tells us. Keep a backup of anything you'd hate to lose.
+Restock 0.10.0 is a release candidate: everything is in, and it's being tested before 1.0, so things can still change between versions. The Keg and Health tabs are marked Beta: they work the same way as Groceries, they just haven't been tested as thoroughly yet, and they'll keep being tested before they come out of beta. Features under Settings → Advanced are for testing and can change or disappear. If something goes wrong, Settings → Send feedback tells us. Keep a backup of anything you'd hate to lose.
 
 ---
 

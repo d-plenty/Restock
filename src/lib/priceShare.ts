@@ -1,7 +1,8 @@
 import { isNative } from '../stores/http';
 import type { StoreProduct } from '../stores/types';
 import { RestockNative } from './sql/native';
-import { cachedSettings, getKV, putKV } from './db';
+import { cachedSettings, getKV, putKV, queryRows } from './db';
+import type { Settings } from '../types';
 
 // 0.9.14: "Send prices back" (Settings → Privacy and sharing, on unless turned off). What a search
 // shows from Coles, Woolworths, Aldi and Costco waits in the "priceShareOutbox" store entry, and
@@ -23,7 +24,12 @@ export interface PriceShareStatus {
   error?: string;
 }
 
-export const sharing = (s = cachedSettings()) => !!s && s.sharePrices !== 'no';
+/**
+ * 0.10.0: Shared prices, one switch: getting the shared history (marketData.enabled) and sending
+ * prices back (sharePrices) go together, on unless turned off (settingsCheck keeps them the same).
+ */
+export const sharedOn = (s: Pick<Settings, 'sharePrices'>) => s.sharePrices !== 'no';
+export const sharing = (s = cachedSettings()) => !!s && sharedOn(s);
 
 const today = () => {
   const d = new Date();
@@ -86,3 +92,13 @@ export async function sendPricesNow(): Promise<number> {
 }
 
 export const priceShareStatus = () => getKV<PriceShareStatus>('priceShare');
+
+/**
+ * 0.10.0: Shared prices turned on after being off starts from now: prices read while it was off,
+ * and searches kept from then, never go (PriceShare.java sends from priceShareCursor on).
+ */
+export async function shareFromNow(): Promise<void> {
+  const [row] = await queryRows<{ m: number | null }>('SELECT MAX(id) AS m FROM prices');
+  await putKV('priceShareCursor', row?.m ?? 0);
+  await putKV(OUTBOX, []);
+}

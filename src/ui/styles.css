@@ -2826,11 +2826,39 @@ details.fold-inline {
   white-space: pre-wrap;
   line-height: 1.45;
 }
+/* 0.10.0: "Beta" on a tab button (Keg, Health): a small mark by its icon, so the label still fits. */
+.tab {
+  position: relative;
+}
+.beta-mark {
+  position: absolute;
+  top: 2px;
+  left: calc(50% + 6px);
+  font-size: calc(var(--fs-xs) * 0.75);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--r-full);
+  background: var(--amber-bg);
+  color: var(--amber-ink);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.dk-nav-item .beta-mark {
+  position: static;
+  margin-left: auto;
+}
 .tag.beta {
-  margin-left: 6px;
-  vertical-align: 1px;
+  margin-left: 10px;
+  vertical-align: middle;
   font-size: var(--fs-xs);
-  padding: 2px 6px;
+  padding: 3px 8px;
+  border-radius: var(--r-full);
+  background: var(--amber-bg);
+  color: var(--amber-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 @keyframes toast-in {
   from {

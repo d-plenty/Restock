@@ -8,7 +8,7 @@ import { allListEntries, getSettings } from '../../lib/db';
 import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { SECTION_NAMES } from '../../shops';
-import { Icon } from '../../ui/components';
+import { betaFor, Icon } from '../../ui/components';
 import { isSectionTab, useNav, type Screen, type Tab } from '../../ui/nav';
 import { api, api3, isV3, serverInfo } from '../api';
 import type { DesktopProps } from '../flag';
@@ -152,6 +152,7 @@ function SideNav({ tabs, place, go }: { tabs: Tab[]; place: Place; go: (p: Place
     <button key={p} className="dk-nav-item" aria-current={place === p ? 'page' : undefined} onClick={() => go(p)}>
       <Icon name={icon} size={20} />
       <span className="dk-nav-label">{label}</span>
+      {betaFor(p, true)}
       {extra}
     </button>
   );

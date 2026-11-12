@@ -5,8 +5,10 @@ import type { BackupSummary } from '../../lib/backup';
 import { allCards, getSettings, updateSettings } from '../../lib/db';
 import { syncInfo } from '../../lib/sync';
 import legal from '../../lib/legal.json';
-import { downloadMarket, MARKET_SOURCE_TEXT } from '../../lib/market';
+import { downloadMarket } from '../../lib/market';
 import { HistoryLengths } from './DayOne';
+import { SHARED_ONE_LINE, SHARED_TITLE, TurnOffShared } from './SharedPrices';
+import { shareFromNow, sharedOn } from '../../lib/priceShare';
 import { useLive } from '../../lib/useLive';
 import { enabledIn, sectionOn } from '../../shops';
 import { checkAll } from '../../lib/permissions';
@@ -14,7 +16,7 @@ import { SELF_UPDATE } from '../../lib/updates';
 import { DEFAULT_SETTINGS } from '../../types';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
-import { Icon, Logo, TopBar, useBackHandler } from '../components';
+import { BETA_NOTE, Icon, Logo, TopBar, useBackHandler } from '../components';
 import { useNav } from '../nav';
 import { AutoBackupSettings, SuggestLocalBackup } from './Backups';
 import { protection, suggestLocalText } from '../../lib/protection';
@@ -75,18 +77,18 @@ const ALL_TILES: Tile[] = [
   {
     id: 'keg',
     title: 'Bottle shops',
-    sub: 'Keg tab · 18+',
+    sub: 'Keg tab · 18+ · Beta',
     icon: 'keg',
     heading: 'Track bottle shops too?',
-    intro: 'Beer, wine and spirits on a Keg tab of their own, kept apart from groceries, so a search for chips never goes to a bottle shop.',
+    intro: `Beer, wine and spirits on a Keg tab of their own, kept apart from groceries, so a search for chips never goes to a bottle shop. ${BETA_NOTE}`,
   },
   {
     id: 'pharmacy',
     title: 'Chemists',
-    sub: 'Health tab',
+    sub: 'Health tab · Beta',
     icon: 'pharmacy',
     heading: 'Track chemists too?',
-    intro: 'Medicine, first aid and personal care on a Health tab of its own, kept apart from groceries.',
+    intro: `Medicine, first aid and personal care on a Health tab of its own, kept apart from groceries. ${BETA_NOTE}`,
   },
   {
     id: 'permissions',
@@ -123,12 +125,12 @@ const ALL_TILES: Tile[] = [
   },
   {
     id: 'history',
-    title: 'Price history',
+    title: 'Shared prices',
     sub: 'Judge new items from day one',
     icon: 'chart',
-    heading: 'Judge new items from day one?',
+    heading: 'Share prices, and judge new items from day one',
     intro:
-      "On its own, Restock needs about 4 to 8 weeks of watching an item before it knows its usual price. It still tells you about specials straight away, but can't say how good they are.",
+      "On its own, Restock needs about 4 to 8 weeks of watching an item before it knows its usual price. With shared prices, it knows from day one.",
   },
   {
     id: 'look',
@@ -389,58 +391,70 @@ function Welcome({ onSetUp, onRestore, onJoin }: { onSetUp: () => void; onRestor
 // ---------- tile pages ----------
 
 function MarketSetup({ settings }: { settings: Settings }) {
+  // 0.10.0: one switch, as in Settings → Privacy and sharing (SharedPrices.tsx), on to start with.
+  const on = sharedOn(settings);
+  const [asking, setAsking] = useState(false);
+  const turn = async (want: boolean) => {
+    if (want && settings.sharePrices === 'no') await shareFromNow();
+    await updateSettings({ sharePrices: want ? 'yes' : 'no', marketData: { ...settings.marketData, enabled: want } });
+  };
   return (
     <div className="card">
-      <div className="title">Judge new items from day one</div>
-      <p className="small">
-        Restock can download real Coles, Woolworths, Aldi and Costco prices from {MARKET_SOURCE_TEXT}, for just the shops you use. From that it works
-        out each product's usual price, usual sale price and how often it goes on sale, so new items get a proper verdict straight away, instead of
-        after 4 to 8 weeks of watching.
-      </p>
+      <p className="small">{SHARED_ONE_LINE}</p>
       <ul className="ticks">
         <li>
           <Icon name="check" size={16} />
           <span>
-            <strong>Small:</strong> once a week, after the Thursday collection, and only a short summary per product is kept on your phone.
+            <strong>What goes:</strong> only what the shop's own website showed: product, size, barcode, price, specials and the day.
           </span>
         </li>
         <li>
           <Icon name="check" size={16} />
           <span>
-            <strong>Private:</strong> everyone downloads the same file, so it can't tell what you buy or track.
+            <strong>Never:</strong> you, your account, lists, pantry, cards, branch, location, receipts, searches or prices you type in.
           </span>
         </li>
         <li>
           <Icon name="check" size={16} />
           <span>
-            <strong>Off unless you turn it on.</strong> Change it any time in Settings → Prices and deals.
+            <strong>Open:</strong> published on GitHub for anyone to use, never sold. Nothing in it identifies you.
+          </span>
+        </li>
+        <li>
+          <Icon name="check" size={16} />
+          <span>
+            <strong>Small:</strong> under a megabyte a week for the shops you use, a few kilobytes to send.
           </span>
         </li>
       </ul>
       <label className="check" style={{ padding: 0 }}>
         <input
-          type="checkbox" className="switch"
-          checked={settings.marketData.enabled}
-          onChange={(e) => updateSettings({ marketData: { ...settings.marketData, enabled: e.target.checked } })}
-          aria-label="Judge new items from day one"
+          type="checkbox"
+          className="switch"
+          checked={on}
+          onChange={(e) => (e.target.checked ? turn(true) : setAsking(true))}
+          aria-label={SHARED_TITLE}
         />
         <span className="title" style={{ fontSize: 15 }}>
-          Judge new items from day one
+          {SHARED_TITLE} {on ? '(on)' : '(off)'}
         </span>
       </label>
-      {/* 0.9.14: one setting, how far back Restock looks (its own prices and the shared ones). */}
       <span className="title" style={{ fontSize: 15 }}>
         How far back Restock looks
       </span>
       <HistoryLengths settings={settings} />
-      <label className="check" style={{ padding: 0 }}>
-        <input
-          type="checkbox" className="switch"
-          checked={settings.marketData.wifiOnly}
-          onChange={(e) => updateSettings({ marketData: { ...settings.marketData, wifiOnly: e.target.checked } })}
+      <p className="small" style={{ margin: 0 }}>
+        Change these any time in Settings → Privacy and sharing and Prices and deals.
+      </p>
+      {asking && (
+        <TurnOffShared
+          onKeep={() => setAsking(false)}
+          onOff={() => {
+            setAsking(false);
+            turn(false);
+          }}
         />
-        <span className="small">Only download on Wi-Fi</span>
-      </label>
+      )}
     </div>
   );
 }
@@ -769,15 +783,17 @@ export function Onboarding() {
   const fileRef = useRef<HTMLInputElement>(null);
   const finish = async () => {
     await updateSettings({ onboarded: true });
-    // Chose shared price history: start the first download now (it waits for Wi-Fi if asked).
+    // Shared prices on (0.10.0: on to start with): the first download now (it waits for Wi-Fi if asked).
     const md = (await getSettings()).marketData;
     if (md.enabled && isNative()) {
       downloadMarket(undefined, { onlyUnmetered: md.wifiOnly })
         .then((r) =>
           nav.toast(
             r.waitingForWifi
-              ? 'Shared price history will download next time you are on Wi-Fi.'
-              : `Shared price history ready for ${r.products.toLocaleString()} products`,
+              ? 'Shared prices will download next time you are on Wi-Fi.'
+              : r.products
+                ? `Shared prices ready for ${r.products.toLocaleString()} products`
+                : "Shared prices for your shops aren't published yet. Restock gets them as soon as they are.",
           ),
         )
         .catch((e) => nav.toast(e instanceof Error ? e.message : String(e)));

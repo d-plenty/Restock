@@ -1,6 +1,7 @@
 import type { DataSeries, DataStats, Period, TopItem, TopPage } from '../server-mode/ui/houseData';
 import type { SqlValue } from './sql/driver';
-import { onBeforeListDelete, queryRows, runSql } from './db';
+import { getKV, onBeforeListDelete, putKV, queryRows, runSql } from './db';
+import { RestockNative } from './sql/native';
 import { serverMode } from '../server-mode/flag';
 
 // 0.9.14: Settings → Your data on a phone without a Restock server: spending from what you tick off,
@@ -401,3 +402,34 @@ export function noteTicksSoon(): void {
 
 // Before ticked lines are cleared off the list, their purchases are noted (phones only).
 if (!serverMode) onBeforeListDelete(noteTicks);
+
+/** 0.10.0: whether Your data shows the Restock server's figures (and this phone shares its spending there). */
+export const spendingOnServer = (s: { yourData?: { server: boolean } }) => s.yourData?.server !== false;
+
+/**
+ * 0.10.0: Share my spending with the server: this phone's earlier spending (from before it joined,
+ * or ticks the server never saw) goes to the server once, 500 at a time (the server's limit for a
+ * request). The server keeps the ones it already has as they are. Resolves how many it added.
+ */
+export async function sendSpendingToServer(): Promise<number> {
+  if (serverMode) return 0;
+  if (await getKV<boolean>('spendSentToServer')) return 0;
+  await noteTicks();
+  const rows = await queryRows<Row>('SELECT entry_id, checked_at, chain, section, item_id, product_id, text, qty, price, usual, special FROM spend_log ORDER BY checked_at');
+  let added = 0;
+  for (let i = 0; i < rows.length; i += 500) added += (await RestockNative.serverSpend({ rows: rows.slice(i, i + 500) })).added;
+  await putKV('spendSentToServer', true);
+  return added;
+}
+
+/** At start: on a Restock server with Share my spending on, the earlier spending goes once. */
+export async function maybeSendSpending(): Promise<void> {
+  if (serverMode) return;
+  try {
+    const [{ syncInfo }, { getSettings }] = await Promise.all([import('./sync'), import('./db')]);
+    const i = await syncInfo();
+    if (i.server && i.serverApi === 3 && spendingOnServer(await getSettings())) await sendSpendingToServer();
+  } catch {
+    // the server is out of reach: next time
+  }
+}

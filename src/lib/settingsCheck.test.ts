@@ -76,7 +76,7 @@ describe('checking settings', () => {
     expect(s.defaultThresholdPct).toBe(90);
     expect(s.theme).toBe('system');
     expect(s.connection).toBe('auto');
-    expect(s.sharePrices).toBe('unasked');
+    expect(s.sharePrices).toBe('yes'); // 0.10.0: Shared prices is on to start with
     expect(s.alerts).toEqual(DEFAULT_SETTINGS.alerts);
     expect(s.a11y.text).toBe(1.5);
     expect(s.autoBackup).toEqual({ enabled: false, everyDays: 1, keep: 1 });
@@ -171,6 +171,9 @@ describe('0.9.14: one price history setting', () => {
     expect(checkSettings({ historyWeeks: 13 }).historyWeeks).toBe(26);
     expect(checkSettings({ historyWeeks: 13 }).marketData.days).toBe(182);
     expect(checkSettings({ historyWeeks: 52, marketData: { days: 56 } }).marketData.days).toBe(365);
-    expect(checkSettings({}).marketData).toEqual({ enabled: false, wifiOnly: true, days: 56, every: 'weekly' });
+    expect(checkSettings({}).marketData).toEqual({ enabled: true, wifiOnly: true, days: 56, every: 'weekly' });
+    // 0.10.0: one switch: getting shared prices follows sending them.
+    expect(checkSettings({ sharePrices: 'no', marketData: { enabled: true } }).marketData.enabled).toBe(false);
+    expect(checkSettings({ sharePrices: 'unasked', marketData: { enabled: false } }).marketData.enabled).toBe(true);
   });
 });

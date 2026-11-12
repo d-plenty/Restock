@@ -8,7 +8,9 @@ import { RestockNative } from '../../lib/sql/native';
 import { syncInfo, type SyncInfo } from '../../lib/sync';
 import { isNative } from '../../stores/http';
 import { allCards, allGiftCards, eraseEverything, getSettings as savedSettings, priceHistorySpan, updateSettings as saveNow } from '../../lib/db';
-import { priceShareStatus } from '../../lib/priceShare';
+import { sharedOn } from '../../lib/priceShare';
+import { SharedPricesSection } from './SharedPrices';
+import { sendSpendingToServer, spendingOnServer } from '../../lib/spending';
 // 0.9.5 (save): settings changed here wait for "Save settings" (settingsDraft.ts).
 import { afterSave, getSettings, updateSettings } from '../../lib/settingsDraft';
 import { PriceHelperSettings } from './PriceHelperSettings';
@@ -224,7 +226,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       case 'list':
         return `Shop around, receipts${settings.receipts.enabled ? ' (on)' : ''}`;
       case 'prices':
-        return `Price checks, how far back (${historyLabel(settings.historyWeeks)})${settings.marketData.enabled ? ', day-one prices on' : ''}`;
+        return `Price checks, how far back (${historyLabel(settings.historyWeeks)}), how a sale is judged`;
       case 'alerts':
         return `Deals, catalogue day, recalls${settings.recalls?.enabled ? ' (on)' : ''}`;
       case 'cards':
@@ -236,11 +238,11 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       case 'look':
         return 'Colours, app icon, text size, widgets';
       case 'privacy':
-        return settings.sharePrices === 'no' ? 'What stays on this phone, what’s shared' : 'What stays on this phone, what’s shared · sending shop prices back';
+        return `What stays on this phone · Shared prices ${sharedOn(settings) ? 'on' : 'off'} · permissions`;
       case 'help':
         return 'Tour, sample items, check your shops are working';
       case 'feedback':
-        return 'Tell us what works and what doesn’t: it really helps';
+        return 'Good or bad, tell us what works and what doesn’t. Screenshots welcome.';
       case 'about':
         return `Restock ${version}, updates, credits, fine print`;
       default:
@@ -249,7 +251,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
   };
   const open = (p: SettingsPage | 'cards' | 'feedback') =>
     p === 'cards' ? nav.push({ name: 'cards' }) : p === 'feedback' ? nav.push({ name: 'feedback' }) : nav.push({ name: 'settings', page: p });
-  const titleOf = (p: SettingsPage | 'cards' | 'feedback') => (p === 'cards' ? 'Cards' : p === 'feedback' ? 'Feedback' : SETTINGS_PAGES[p].title);
+  const titleOf = (p: SettingsPage | 'cards' | 'feedback') => (p === 'cards' ? 'Cards' : p === 'feedback' ? 'Send feedback' : SETTINGS_PAGES[p].title);
 
   const row = (title: string, sub: string, onClick: () => void) => (
     <button className="row" onClick={onClick}>
@@ -300,8 +302,9 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
           <div className="card flush">
             {/* 0.9.8: one row per tab of My shops; sign-ins and stock are on each shop's own row there. 0.9.14: each says its tab. */}
             {row('Supermarkets (Pantry tab)', `${shopSummary(settings, 'pantry')} · ${shopAccountsSummary(settings)}`, () => nav.push({ name: 'stores', section: 'pantry' }))}
-            {row('Bottle shops (Keg tab)', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
-            {row('Chemists (Health tab)', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
+            {/* 0.10.0: Keg and Health are beta (BETA_NOTE): the same as Groceries, less tested. */}
+            {row('Bottle shops (Keg tab) · Beta', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
+            {row('Chemists (Health tab) · Beta', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
           </div>
         </>
       )}
@@ -378,7 +381,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
               Each product's <strong>usual price</strong> is the middle of the regular prices Restock has seen for it over the history you keep (
               {historyLabel(settings.historyWeeks)}
               {settings.historyWeeks === 8 ? ' unless you change it' : ''}). Until it has seen one at a regular price, it goes by the shop's "was" price.
-              {settings.marketData.enabled ? ' For its first 4 weeks or so, shared price history fills in.' : ''} Member prices only count if you've added that
+              {sharedOn(settings) ? ' For its first 4 weeks or so, shared prices fill in.' : ''} Member prices only count if you've added that
               shop's card.
             </p>
             <p>
@@ -418,6 +421,38 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
           </div>
           {/* 0.9.3: the household on top, how the phones sync, then backups. Any of the three counts as kept elsewhere. */}
           <SyncOverview settings={settings} info={syncShown} onInfo={setSyncShown} haSummary={serverMode ? undefined : haSummary} />
+          {/* 0.10.0: with a Restock server, Your data can show the household's figures from it. */}
+          {syncShown?.server && syncShown.serverApi === 3 && (
+            <div className="card flush">
+              <label className="check">
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={spendingOnServer(settings)}
+                  onChange={async (e) => {
+                    const server = e.target.checked;
+                    await updateSettings({ yourData: { server } });
+                    if (server)
+                      await afterSave('spending', () =>
+                        void sendSpendingToServer()
+                          .then((n) => n && nav.toast(`Sent ${n} earlier purchase${n === 1 ? '' : 's'} to your Restock server`))
+                          .catch((err) => nav.toast(err instanceof Error ? err.message : String(err))),
+                      );
+                  }}
+                />
+                <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <span className="title" style={{ fontSize: 15 }}>
+                    Share my spending with the server
+                  </span>
+                  <span className="small">
+                    {spendingOnServer(settings)
+                      ? "On · Your data shows your household's spending from your Restock server, the same on every phone. This phone's earlier spending goes to it once."
+                      : 'Off · Your data shows only what this phone worked out, and keeps it here.'}
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
           <p className="small group-note">Sync keeps your phones the same, mistakes included. Backups let you go back.</p>
 
           <h3 className="group-head" id="s-backups">
@@ -565,7 +600,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
           </div>
           <div className="card flush">
             {row('Check my shops are working', 'Tries a search at each of your shops and shows what happens', () => setTesting(true))}
-            {row('Send feedback', 'Tell us what went wrong, with a screenshot if you like', () => nav.push({ name: 'feedback' }))}
+            {row('Send feedback', 'Good or bad, tell us what works and what doesn’t. Screenshots welcome.', () => nav.push({ name: 'feedback' }))}
             <a className="row" href="https://github.com/d-plenty/Restock/issues" target="_blank" rel="noreferrer">
               <span className="grow">
                 <span className="title">Restock on GitHub</span>
@@ -727,15 +762,11 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
 }
 
 /**
- * 0.9.13: Settings → Privacy and sharing. What stays on this phone, what goes where, and "Send
- * prices back" (it was "Share prices about products", 0.9.0): on unless turned off. 0.9.14: it
- * sends: what searches and price checks read from Coles, Woolworths, Aldi and Costco goes to
- * Restock's shared price service (priceShare.ts, PriceShare.java).
+ * 0.9.13: Settings → Privacy and sharing. What stays on this phone, what goes where, and 0.10.0's
+ * Shared prices (SharedPrices.tsx): one switch for Judge new items from day one and Send prices back.
  */
 function PrivacySharing({ settings }: { settings: Settings }) {
   const nav = useNav();
-  const sending = settings.sharePrices !== 'no';
-  const sent = useLive(priceShareStatus, []);
   return (
     <>
       <div className="eyebrow" id="s-privacy">
@@ -743,62 +774,14 @@ function PrivacySharing({ settings }: { settings: Settings }) {
       </div>
       <div className="card">
         <p className="small" style={{ margin: 0 }}>
-          Your pantry, shopping lists, cards, receipts, the prices you type in and the items you track stay on this phone. They only go to your own
-          household's phones, your own Restock server or Home Assistant if you set those up (Sync and backups), and into backups you make.
+          Your pantry, shopping lists, cards, receipts, what you spend, the prices you type in and the items you track stay on this phone. They only go
+          to your own household's phones, your own Restock server or Home Assistant if you set those up (Sync and backups), and into backups you make.
         </p>
       </div>
-      <div className="eyebrow" id="s-share">
-        What's shared
-      </div>
+      {/* 0.10.0: one switch for getting and sending shared prices (SharedPrices.tsx). */}
+      <SharedPricesSection settings={settings} />
+      <div className="eyebrow">Feedback</div>
       <div className="card flush">
-        <label className="check">
-          <input
-            type="checkbox"
-            className="switch"
-            checked={sending}
-            onChange={(e) => void updateSettings({ sharePrices: e.target.checked ? 'yes' : 'no' })}
-          />
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 15 }}>
-              Send prices back
-            </span>
-            <span className="small">
-              {sending ? 'On' : 'Off'} · prices your phone reads from the shops go to Restock's shared price history, so everyone's day-one prices
-              get better. The more phones that share, the better it is for everyone.
-            </span>
-          </span>
-        </label>
-        <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <p className="small" style={{ margin: 0 }}>
-            <strong>What goes:</strong> what a search or price check reads straight from Coles, Woolworths, Aldi and Costco: each product's shop,
-            product number, name, brand, size, barcode and price, any special, member price or multi-buy, and the day. It goes to
-            restock-prices.plenty.family a few minutes after a search, and after background price checks.
-          </p>
-          <p className="small" style={{ margin: 0 }}>
-            <strong>Never:</strong> anything you type in or change yourself, who you are, your cards, branch or location, your lists or what you tick
-            off, receipts, or which items you track. Prices you enter by hand stay on this phone and your own household.
-          </p>
-          <p className="small" style={{ margin: 0 }} role="status">
-            {!isNative()
-              ? 'Phones send them; this web page never does.'
-              : !sending
-                ? 'Nothing is sent while this is off.'
-                : sent?.lastSentAt
-                  ? `Last sent ${timeAgo(sent.lastSentAt)}${sent.total ? ` · ${sent.total.toLocaleString()} prices from this phone so far` : ''}.${sent.error ? ` Last try: ${sent.error}.` : ''}`
-                  : sent?.error
-                    ? `Not sent yet: ${sent.error}. It tries again later.`
-                    : 'Nothing sent yet. Prices go after your next search or price check.'}
-          </p>
-        </div>
-        <button className="row" onClick={() => nav.push({ name: 'settings', page: 'prices' })}>
-          <span className="grow">
-            <span className="title">Judge new items from day one</span>
-            <span className="small">
-              {settings.marketData.enabled ? 'On' : 'Off'} · downloads shared prices from restock-prices on GitHub (Prices and deals). Everyone downloads the same files.
-            </span>
-          </span>
-          <Icon name="chevron" size={18} />
-        </button>
         <button className="row" onClick={() => nav.push({ name: 'feedback' })}>
           <span className="grow">
             <span className="title">Feedback</span>

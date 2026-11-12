@@ -12,7 +12,7 @@ import { getSettings } from '../../lib/db';
 import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { activeSections } from '../../shops';
-import { Icon, TopBar } from '../../ui/components';
+import { betaFor, Icon, TopBar } from '../../ui/components';
 import { isSectionTab, useNav, type Screen, type Tab } from '../../ui/nav';
 import { isV3 } from '../api';
 import { syncNow, unsentChanges } from '../live';
@@ -78,6 +78,7 @@ function PhoneTabs() {
         >
           <Icon name={t.icon} />
           {t.label}
+          {betaFor(t.id, true)}
         </button>
       ))}
       <button

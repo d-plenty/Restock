@@ -330,11 +330,18 @@ export interface Settings {
     backgroundActivity: boolean;
   };
   household: { name: string };
-  /** Share prices about products (0.9.0): on unless 'no'. For now only saved in your own backups (sharedPrices.ts). */
-  /** 0.9.13 "Send prices back" (Privacy and sharing): on unless 'no'. */
+  /**
+   * Shared prices (0.10.0, one switch with marketData.enabled): on unless 'no'. Sends the shop prices
+   * this phone reads to restock-prices (priceShare.ts) and gets the shared history (market.ts).
+   */
   sharePrices: 'unasked' | 'yes' | 'no';
   /** 0.9.13: Beta and development features shown (this phone only). */
   beta?: { enabled: boolean };
+  /**
+   * 0.10.0: Your data with a Restock server: share this phone's spending with it and show the
+   * household's figures (on unless turned off), or keep this phone's own.
+   */
+  yourData?: { server: boolean };
   defaultThresholdPct: number;
   /** How often background price checks run. 168 = weekly, on checkWeekday. */
   checkIntervalHours: number;
@@ -451,7 +458,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   sync: { mode: 'device', schedule: 'background', weekday: 3, backgroundActivity: true },
   household: { name: 'Our house' },
-  sharePrices: 'unasked',
+  sharePrices: 'yes',
   defaultThresholdPct: 10,
   checkIntervalHours: 24,
   checkTime: '05:00',
@@ -463,7 +470,7 @@ export const DEFAULT_SETTINGS: Settings = {
   shopAroundMin: 1,
   otherContainerSizes: false,
   seenHints: [],
-  marketData: { enabled: false, wifiOnly: true, days: 56, every: 'weekly' },
+  marketData: { enabled: true, wifiOnly: true, days: 56, every: 'weekly' },
   look: { style: 'australia', icon: 'green' },
   a11y: { text: 1, contrast: false, motion: false, big: false },
   setup: { done: [], skipped: [] },

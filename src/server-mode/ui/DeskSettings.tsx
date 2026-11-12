@@ -7,7 +7,7 @@ import { confirmAction } from '../../lib/confirm';
 import { useLive } from '../../lib/useLive';
 import { money } from '../../lib/units';
 import type { Section } from '../../shops';
-import { Icon, Sheet, TopBar, timeAgo } from '../../ui/components';
+import { BETA_NOTE, BETA_SECTIONS, Icon, Sheet, TopBar, timeAgo } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { PassphraseForm } from './Gate';
 import { DeskHead, WhereNote } from './deskShared';
@@ -176,7 +176,7 @@ function ShopsSheet({ tab, onClose }: { tab: ShopsForTab; onClose: () => void })
         tab.choices.filter((c) => picked.has(c.id)).map((c) => c.id),
         tab.section === 'pantry' ? undefined : on,
       );
-      nav.toast(`${tab.title}: saved for every phone`);
+      nav.toast(`${tab.title.replace(/ · Beta$/, '')}: saved for every phone`);
       onClose();
     } catch (e) {
       nav.toast(e instanceof Error ? e.message : String(e));
@@ -187,6 +187,7 @@ function ShopsSheet({ tab, onClose }: { tab: ShopsForTab; onClose: () => void })
   return (
     <Sheet title={tab.title} onClose={onClose}>
       <p className="small">The shops the household uses on this tab. Each phone keeps its own branch and shop sign-ins.</p>
+      {BETA_SECTIONS.includes(tab.section) && <p className="small">{BETA_NOTE}</p>}
       {tab.section !== 'pantry' && (
         <label className="check card" style={{ flexDirection: 'row' }}>
           <input type="checkbox" className="switch" checked={on} onChange={(e) => setOn(e.target.checked)} />
@@ -194,7 +195,7 @@ function ShopsSheet({ tab, onClose }: { tab: ShopsForTab; onClose: () => void })
         </label>
       )}
       <fieldset className="card flush dk-fieldset" disabled={!on}>
-        <legend className="sr-only">Shops on {tab.title}</legend>
+        <legend className="sr-only">Shops on {tab.title.replace(/ · Beta$/, '')}</legend>
         {tab.choices.map((c) => (
           <label key={c.id} className="check">
             <input type="checkbox" checked={picked.has(c.id)} onChange={() => flip(c.id)} />
@@ -476,7 +477,12 @@ function HouseholdPart() {
       )}
 
       <Group id="dk-s-list" title="Shopping list and receipts">
-        <Line title="Shop around" htmlFor="dk-shop-around" sub="Only send an item to another shop if it saves at least this much" greyed={!editable}>
+        <Line
+          title="Shop around if it saves at least"
+          htmlFor="dk-shop-around"
+          sub="Below this, a shop that has everything on your list is recommended instead, so you're not making extra stops for a few cents."
+          greyed={!editable}
+        >
           <select
             id="dk-shop-around"
             className="input dk-select"
@@ -487,6 +493,7 @@ function HouseholdPart() {
             {SHOP_AROUND_MINS.map((v) => (
               <option key={v} value={String(v)}>
                 {v === 0 ? 'Any saving' : money(v)}
+                {v === 1 ? ' (default)' : ''}
               </option>
             ))}
           </select>
@@ -538,7 +545,7 @@ function HouseholdPart() {
         <Line title={'How far back Restock looks'} sub={'8 weeks, 6 months or 12 months of prices on each phone. This server keeps everything its phones send.'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
-        <Line title={'Judge new items from day one'} sub={'Shared price history for each phone\'s shops, weekly or every day.'} greyed>
+        <Line title={'Shared prices'} sub={'Judges new items from day one, and shares the shop prices each phone reads (Privacy and sharing).'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
       </Group>
@@ -575,6 +582,10 @@ function HouseholdPart() {
         ) : (
           <Line title="Spending, prices over time, what's stored" sub="Once this server keeps your household (Server and phones)." greyed />
         )}
+        {/* 0.10.0: as on the phone (Settings → Sync and backups → Share my spending with the server). */}
+        <Line title="Share my spending with the server" sub="Each phone chooses, on unless turned off. Off, a phone keeps its spending to itself and its Your data shows only that phone's." greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings → Sync and backups on the phone)." />
+        </Line>
       </Group>
 
       <Group id="dk-s-sync" title="Sync and backups">
@@ -596,7 +607,8 @@ function HouseholdPart() {
       </Group>
 
       <Group id="dk-s-privacy" title="Privacy and sharing">
-        <Line title={'Send prices back'} sub={'Each phone can share the shelf prices it reads from shops (price, barcode, shop). Never anything typed in, and nothing from this server.'} greyed>
+        {/* 0.10.0: one switch on each phone, as Settings → Privacy and sharing → Shared prices. */}
+        <Line title={'Shared prices'} sub={'Each phone gets the shared price history (new items judged from day one) and shares the shelf prices it reads from the shops. Never anything typed in, and nothing from this server.'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
         <Line title="Privacy policy and fine print" sub="What Restock keeps, where, and what it shares">
@@ -612,11 +624,11 @@ function HouseholdPart() {
       </Group>
 
       <Group id="dk-s-browser" title="Look and accessibility">
-        <Line title="Look" sub="Just for this browser">
-          <div className="dk-seg" role="group" aria-label="Look">
+        <Line title="Light or dark" sub="Just for this browser">
+          <div className="dk-seg" role="group" aria-label="Light or dark">
             {(
               [
-                ['system', 'Auto'],
+                ['system', 'System'],
                 ['light', 'Light'],
                 ['dark', 'Dark'],
               ] as const
@@ -683,7 +695,7 @@ function HouseholdPart() {
       </Group>
 
       <Group id="dk-s-help" title="Help">
-        <Line title="Send feedback" sub="Good or bad, it helps make Restock better. Screenshots welcome.">
+        <Line title="Send feedback" sub="Good or bad, tell us what works and what doesn’t. Screenshots welcome.">
           <button className="btn small" onClick={() => nav.push({ name: 'feedback' })}>
             Send feedback
           </button>
@@ -693,7 +705,7 @@ function HouseholdPart() {
             GitHub
           </a>
         </Line>
-        <Line title={'Tour, sample items, check my shops are working'} sub={'On each phone.'} greyed>
+        <Line title={'Tour, sample items, check your shops are working'} sub={'On each phone.'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
       </Group>

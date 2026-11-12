@@ -78,7 +78,7 @@ export function PriceHelperSettings({ settings }: { settings: Settings }) {
       <p className="small" style={{ margin: 0 }}>
         For a spare Android phone left on its charger at home. Through the week it searches Coles and Woolworths for {searches.length} everyday things,
         the first page of results each time, about one search every 10 minutes while it's charging on Wi-Fi. What it finds (products and shelf
-        prices only) goes to your restock-prices collector, which adds it to the shared price history at its weekly run. If a shop turns it away,
+        prices only) goes to your restock-prices collector, which adds it to the shared prices every night. If a shop turns it away,
         that shop rests for six hours.
       </p>
       <label className="check">

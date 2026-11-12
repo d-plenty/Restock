@@ -18,7 +18,8 @@ import org.json.JSONObject;
  * 0.9.14: "Send prices back" (Settings → Privacy and sharing, on unless turned off). The shelf
  * prices this phone read from Coles, Woolworths, Aldi and Costco go to Restock's shared price
  * service (the restock-prices collector, lib/share.mjs there), for everyone's day-one prices:
- *  - prices a price check recorded from the shop (source "auto"), newest first since the last send;
+ *  - prices a price check on this phone recorded from the shop (source "auto") since the last send,
+ *    never ones another phone or the Restock server synced here (that phone sends its own);
  *  - what searches showed (the app keeps them in the "priceShareOutbox" store entry, priceShare.ts).
  * Only what the shop's website said: never a price typed in or changed by hand (source "manual" or
  * "import"), sample items, shops added by hand, or anything about the person. A random install
@@ -139,6 +140,10 @@ final class PriceShare {
             + " FROM prices r JOIN products p ON p.id = r.product_id"
             + " WHERE r.id > ? AND r.source = 'auto' AND r.date >= ?"
             + " AND p.chain IN ('coles', 'woolworths', 'aldi', 'costco') AND p.store_product_id IS NOT NULL AND p.store_product_id != '' AND p.id NOT LIKE 'demo-%'"
+            // Only what this phone read itself: a price another phone (or the Restock server) synced here
+            // was sent by that phone already, so it isn't sent twice (and can't count as a second phone).
+            + " AND NOT EXISTS (SELECT 1 FROM sync_log l WHERE l.tbl = 'prices' AND l.pk = r.product_id || '|' || r.date"
+            + " AND l.device <> COALESCE((SELECT value FROM sync_meta WHERE key = 'device'), ''))"
             + " ORDER BY r.id LIMIT " + MAX_ROWS;
         try (Cursor c = db.rawQuery(sql, new String[] {String.valueOf(cursor), since})) {
             while (c.moveToNext()) {

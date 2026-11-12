@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Beta 0.9.14" src="https://img.shields.io/badge/status-beta%200.9.14-ffcd00">
+  <img alt="Release candidate 0.10.0" src="https://img.shields.io/badge/status-release%20candidate%200.10.0-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0914">New in 0.9.14</a> ·
+  <a href="#new-in-0100">New in 0.10.0</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -65,7 +65,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 ## Highlights
 
-- **Your shops, your items.** Coles, Woolworths and Aldi, plus bottle shops (Keg tab, 18+) and chemists (Health tab) if you want them, and any other shop's website.
+- **Your shops, your items.** Coles, Woolworths and Aldi, plus bottle shops (Keg tab, 18+) and chemists (Health tab, both marked Beta) if you want them, and any other shop's website.
 - **Four shopping lists.** Groceries, Keg, Health and **General**. General is a list only, for things that aren't in your pantry: Home Assistant puts anything there that matches nothing you track, or you add to it yourself.
 - **Scan to add.** An open-source barcode scanner built in, with Open Food Facts lookup. Restock finds the same product at each of your shops and ticks it for you.
 - **Undo.** After most changes (Add to list, a tick, a delete, an edit, "Add all to my list"), a small **Undo** shows for a few seconds. One tap puts it all back, however many things changed.
@@ -85,7 +85,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 <details>
 <summary><strong>Every feature, in detail</strong></summary>
 
-- **Three tabs, kept apart**: **Pantry** for supermarkets, **Keg** for bottle shops and **Health** for chemists. Keg and Health only appear if you switch them on. Each tab has its own items, categories, list and shops, and a search only goes to that tab's shops. Keg asks once that you're 18 or over.
+- **Three tabs, kept apart**: **Pantry** for supermarkets, **Keg** for bottle shops and **Health** for chemists. Keg and Health only appear if you switch them on, and are marked **Beta**: they work the same way as Groceries, they just haven't been tested as thoroughly yet. Each tab has its own items, categories, list and shops, and a search only goes to that tab's shops. Keg asks once that you're 18 or over.
 - **General list**: a fourth shopping list, with no pantry of its own. A Home Assistant add that matches nothing in your Pantry, Keg or Health goes there. You can add to it yourself too. Adding by hand to Groceries, Keg or Health works as before, even for words that match nothing (like "chips", to buy whatever's on special). Nothing else moves to General by itself. It's shared with the groceries.
 - **Bottle shops**: Dan Murphy's, BWS, Liquorland, Liquorland Warehouse, Liquorland Cellars, The Bottle-O, Cellarbrations, Thirsty Camel and Porters Liquor. Beers say whether they're a single, a 6 pack or a case.
 - **Chemists**: Chemist Warehouse, My Chemist (with Chemist Warehouse's prices), Amcal, Discount Drug Stores, Guardian / PharmaSave, Priceline Pharmacy, Soul Pattinson, TerryWhite Chemmart, Blooms The Chemist, Good Price Pharmacy, Pharmacy 4 Less, Direct Chemist Outlet, Star Discount Chemist, Capital Chemist, National Pharmacies and Chempro.
@@ -125,12 +125,22 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Look and colours**: Light, Dark or System, with true black for OLED screens; Australian or Plain; 24 accent colours; 16 app icon colours.
 - **Accessibility**: bigger text, high contrast, less motion and bigger buttons, checked with an automatic accessibility audit.
 - **Updates**: Settings → About → Check for updates, or turn on **Tell me when there's an update** to check every 24 hours (or every 7 days) when you open Restock. Or install through [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium and let them handle updates.
-- **Send prices back**: the shelf prices your phone reads from Coles, Woolworths, Aldi and Costco (shop, product, size, barcode, the price and the day) go to [restock-prices](https://github.com/d-plenty/restock-prices), so everyone's day-one prices get better. It's on unless you turn it off (Settings → Privacy and sharing). Prices you type in yourself never go, nothing about you is ever included, and the data will never be sold. See [Shared prices](#shared-prices).
-- **Judge new items from day one**: optionally download 8 weeks, 6 months or 12 months of shared history for your shops from [restock-prices](https://github.com/d-plenty/restock-prices) (Restock's own collection of Coles, Woolworths, Aldi and Costco prices, from its collector and from phones), so new items get a fair verdict straight away, weekly or every day. Off by default; turn it on in setup or Settings → Prices and deals.
-- **Your data**: Settings → Your data shows what you spent (from what you tick off), where, what specials saved, and any item's price over time, on the phone alone or from your Restock server.
-- **Feedback**: Settings → Feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
+- **Shared prices**: one switch, on unless you turn it off (Settings → Privacy and sharing, or setup). Your phone downloads 8 weeks, 6 months or 12 months of shared history for your shops from [restock-prices](https://github.com/d-plenty/restock-prices) (Restock's own collection of Coles, Woolworths, Aldi and Costco prices, from its collector and from phones), weekly or every day, so new items get a fair verdict from day one. In return it shares the shelf prices it reads from those shops (shop, product, size, barcode, the price and the day). Prices you type in yourself never go, nothing about you is ever included, and the data is free on GitHub and will never be sold. See [Shared prices](#shared-prices).
+- **Your data**: Settings → Your data shows what you spent (from what you tick off), where, what specials saved, and any item's price over time, on the phone alone or, with **Share my spending with the server** (on unless you turn it off), your household's figures from your Restock server.
+- **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.0
+
+The first release candidate for Restock 1.0: everything is in, and now it's being tested.
+
+- **Shared prices, one switch:** *Judge new items from day one* and *Send prices back* are now one setting, **Shared prices**, on by default (Settings → Privacy and sharing, and in setup). New items get a fair verdict from day one, and in return your phone shares the shelf prices it reads from Coles, Woolworths, Aldi and Costco. The page spells out what goes, what never goes, and where it goes: public on GitHub ([restock-prices](https://github.com/d-plenty/restock-prices)), free, never sold. Turning it off asks you first, then works straight away.
+- **Had sharing off?** It stays off. Restock asks once whether to turn Shared prices on, and if you do, it starts from then: nothing read while it was off is sent.
+- **Your data with a server:** with a Restock server, Your data shows your household's figures from the server, the same on every phone. **Share my spending with the server** (Settings → Sync and backups, on unless you turn it off) sends the spending your phone worked out before it joined, once.
+- **Keg and Health are marked Beta.** They work exactly the same way and are set up in the same place; they just haven't been tested as thoroughly as Groceries yet, and they'll keep being tested before they come out of beta.
+- **The same words everywhere:** settings names, descriptions and buttons now match on the phone, the web page and the iPhone web app.
+- **Fixes:** a phone only sends prices it read itself (not ones synced from your other phones), and email addresses in the feedback inbox show properly.
 
 ## New in 0.9.14
 
@@ -257,7 +267,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.9.14.apk` (on macOS, `shasum -a 256 restock-0.9.14.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.0.apk` (on macOS, `shasum -a 256 restock-0.10.0.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -416,7 +426,7 @@ Restock is built by one person in their spare time. Prices, shops and websites a
 
 | If you... | You can help by... |
 |---|---|
-| **Shop anywhere in Australia** | Using it for a couple of weeks and telling us what you find: **Settings → Feedback** in the app, or [an issue here](../../issues/new/choose). We especially want people in every state and territory, and in regional towns. |
+| **Shop anywhere in Australia** | Using it for a couple of weeks and telling us what you find: **Settings → Send feedback** in the app, or [an issue here](../../issues/new/choose). We especially want people in every state and territory, and in regional towns. |
 | **Notice a shop isn't working** | Opening a [**Shop stopped working**](../../issues/new?template=store-broken.yml) issue. In the app, Settings → Advanced (Turn on testing features) → Diagnostics → **Send search details** saves exactly what the shop sent back. Attach that file and it can usually be fixed fast. |
 | **See the wrong product or price** | Opening a [**Wrong product or price**](../../issues/new?template=product-mismatch.yml) issue with the barcode and what the shelf says. |
 | **Use a bottle shop or chemist** | Testing it! These connections are the newest and least tested. |
@@ -443,7 +453,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is in **beta**. There are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is at its **first release candidate** (0.10.0): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.
@@ -451,13 +461,14 @@ Restock is in **beta**. There are no dates and no version numbers for what's nex
 - **Data on the server:** spending from what you tick off, price charts, downloads, and Manage data with Auto delete.
 - **Let the web page search the shops** (opt-in), and a shop search when Pick my item finds nothing.
 - **General, Health, Undo and Save settings.**
+- **Shared prices** (day-one verdicts, and phones sharing the shop prices they read) and **Your data** on the phone.
 - **Your shopping list in Home Assistant, both ways** (add by voice with Assist). See [Home Assistant](#home-assistant).
 - **My catalogue, Shop around**, household-wide settings, a household recovery key, backup passwords, 12 months of price history, and a full security and privacy review.
 
 **🛠️ Still to come** (in no particular order)
 - **Permission from the price-history sources,** and a final read-through of the privacy policy.
 - **The main F-Droid repository,** built by F-Droid from the source, alongside GitHub and Obtainium.
-- **What you have at home**, **spending on your phone** and **shared prices**: see [Coming soon](#coming-soon).
+- **What you have at home**, **spending from receipts**, and Keg and Health **out of beta**: see [Coming soon](#coming-soon).
 - **Google Drive and other big-name drives,** if people want them.
 - **A real iPhone app,** if someone with an Apple developer account takes it on.
 - **Polish:** the last fixes and adjustments testers ask for.
@@ -471,22 +482,21 @@ These are planned, and each has its own page in the app under **Settings → Abo
 ### What you have at home
 Tell Restock roughly how much of something you've got (a full bottle, two left, nearly out) and it keeps track as you buy and use things. It learns how fast you get through each one, so it can put things on your shopping list before you run out, and time it with a good price: *"You're nearly out of coffee, and it's half price at Coles this week."* Ticking things off in the shop or scanning a receipt tops your stock back up.
 
-### Spending on your phone
-With a Restock server it's here now, in the server's **Data** tab: what you spent each month, where you shop and what you saved on specials, from what you tick off. Still to come: the same simple summary on the phone, with no server. Later, when reading receipts is better, a switch to use your receipts for spending instead. Full budgeting is planned as a separate app, so this stays light.
+### Spending
+It's here now: **Settings → Your data** on the phone (and the server's **Data** tab) shows what you spent each month, where you shop and what you saved on specials, from what you tick off. With a Restock server, phones share their spending with it unless you turn that off, so every phone shows the household's figures. Still to come, when reading receipts is better: a switch to use your receipts for spending instead. Full budgeting is planned as a separate app, so this stays light.
 
 ### An iPhone app
 Restock works on iPhone now, through your server ([Restock on iPhone](#restock-on-iphone)). A real iPhone app, with background checks, alerts, widgets and Wi-Fi sync, needs a developer with an Apple developer account: see [Wanted: someone to bring Restock to iPhone](#wanted-someone-to-bring-restock-to-iphone).
 
 ### Shared prices
-Every price Restock sees can help everyone else. With shared prices, a new item arrives with months of history, so you know straight away whether its "special" is real.
+It's here now. Every price Restock sees can help everyone else: with **Shared prices** on (the default), a new item arrives with months of history, so you know straight away whether its "special" is real, and your phone shares the shelf prices it reads in return.
 
-The plan is a **shared, decentralised network** of shop price data: Restock servers share prices with each other, instead of sending them to one central website or company. The prices will never be sold.
-
-- **Only prices and products:** each product's shop, name, brand, size and barcode, and its prices by day (the usual price, any special or multi-buy, the date).
+- **Only prices and products:** each product's shop, name, brand, size and barcode, and its prices by day (the shelf price, any special or multi-buy, the date).
 - **Never anything personal:** who you are, your loyalty or gift cards, your branch or location, the words you searched, your pantry, your shopping list or what you ticked off, your receipts, or prices you typed in. No account. (A random number for each install goes with the prices, only to tell phones apart and limit how much one sends.)
-- **Send prices back** is on unless you turn it off (Settings → Privacy and sharing). Prices you type in or change yourself are never shared.
+- **Public and free:** the shared history is on GitHub in [restock-prices](https://github.com/d-plenty/restock-prices), for anyone to use. It will never be sold.
+- **Your choice:** turn it off in Settings → Privacy and sharing. A Restock server sends nothing.
 
-**The first step is here:** a Restock server can download a full export file in an open, documented format (`restock-export`, in [docs/server-protocol.md](docs/server-protocol.md)). On the phone, since 0.9.0, Restock keeps a "shared prices" part in your backups, ready for later, since 0.9.11 Judge new items from day one downloads restock-prices' shared history, and since 0.9.14 phones send the shop prices they read back to it (Send prices back). A Restock server sends nothing. Restock will check the shops' terms and ask the data sources for permission before any prices are shared publicly.
+An idea for later: Restock servers sharing prices with each other directly.
 
 ### The main F-Droid repository
 Restock in the main [F-Droid](https://f-droid.org) repository, built by F-Droid from the source. Until then, [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) has every release.

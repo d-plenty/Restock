@@ -106,17 +106,22 @@ describe('the privacy policy', () => {
     expect(text).toMatch(/Erase everything[^\n]*signs you out[^\n]*exported/);
   });
 
-  it('0.9.13 and 0.9.14: says what feedback and Send prices back send, and where', () => {
+  it('0.9.13 to 0.10.0: says what feedback and Shared prices send, and where', () => {
     const text = render();
     expect(text).toContain('restock-prices.plenty.family');
     expect(text).toContain('restock-prices.plenty.family/share/prices');
     expect(text).toContain('Attach diagnostics');
-    expect(text).toMatch(/Send prices back[^\n]*on unless you turn it off/);
+    expect(text).toMatch(/"Shared prices" is on unless you turn it off/);
     // 0.9.14: it sends now, so the policy no longer says it doesn't.
     expect(text).not.toMatch(/For now nothing is sent anywhere/);
     expect(text).toMatch(/which products a phone's searches and price checks showed/);
     expect(text).toMatch(/Prices you type in or change yourself are never sent/);
-    expect(text).toMatch(/Your data[^\n]*never sent anywhere|never synced, never in a backup, never sent anywhere/);
+    // 0.10.0: spending can go to your own server (Share my spending with the server), never to us.
+    expect(text).toContain('Share my spending with the server');
+    expect(text).not.toContain('never synced, never in a backup, never sent anywhere');
+    // 0.10.0: one switch; turning it back on never sends what was read while it was off.
+    expect(text).toContain('prices read while it was off are never sent');
+    expect(text).not.toMatch(/decentralised|before any prices are shared publicly/);
     // Phones no longer download from hotprices.org, and the old "it will ask you first" promise is gone.
     expect(text).toContain("Phones don't download from hotprices.org");
     expect(text).not.toContain('it will ask you first');

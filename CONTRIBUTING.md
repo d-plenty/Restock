@@ -6,7 +6,7 @@ You don't have to write code to help. Most of the time, the most useful thing is
 
 ## Reporting a problem
 
-No GitHub account? Use **Settings → Feedback** in the app (or on your Restock server's web page): it goes straight to the people who make Restock, with screenshots and diagnostics if you like.
+No GitHub account? Use **Settings → Send feedback** in the app (or on your Restock server's web page): it goes straight to the people who make Restock, with screenshots and diagnostics if you like.
 
 On GitHub, use the [issue forms](../../issues/new/choose):
 

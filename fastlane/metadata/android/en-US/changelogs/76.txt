@@ -1,0 +1,1 @@
+Release candidate 0.10.0: Shared prices is one switch (day-one verdicts and sending shop prices back together), on by default, with what goes and what never goes spelled out. With a Restock server, Your data shows the household's figures (Share my spending with the server). Keg and Health are marked Beta. Wording matched across the phone, web page and iPhone web app.
