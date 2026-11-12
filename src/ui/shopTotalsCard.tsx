@@ -66,6 +66,18 @@ export function SwapWhy({
 
 type ShopLineT = import('../lib/shopTotals').ShopLine;
 
+/** 0.10.1: both ways of counting, always in this order and with these words, on every row and sheet. */
+export const bothWays = (same: number, till: number, approx = false) =>
+  `Same shopping ${approx ? '≈' : ''}${money(same)} · at the till ${approx ? '≈' : ''}${money(till)}`;
+
+/** A line whose like-for-like cost isn't what you'd pay for the pack (a bigger or smaller pack): say both. */
+const lineNote = (l: ShopLineT) =>
+  l.outOfStock
+    ? `Out of stock ${stockWhere(l.pick.product.chain)}`
+    : Math.abs(l.fair - lineCost(l.pick, l.qty)) > 0.25
+      ? `Same shopping ${money(l.fair)}`
+      : undefined;
+
 /** A line in a store's breakdown. Swapped lines say why (tap "Why this one?" or hold). */
 function SwapLine({ line, chainName, onOpen }: { line: ShopLineT; chainName?: string; onOpen: () => void }) {
   const [why, setWhy] = useState(false);
@@ -78,7 +90,7 @@ function SwapLine({ line, chainName, onOpen }: { line: ShopLineT; chainName?: st
           pick={line.pick}
           qty={line.qty}
           onOpen={onOpen}
-          note={line.outOfStock ? `Out of stock ${stockWhere(line.pick.product.chain)}` : undefined}
+          note={lineNote(line)}
         />
       </Hold>
       {swapped && (
@@ -142,11 +154,13 @@ type FindAt = (groupId: string, chain: StoreChain, query: string) => void;
 
 function StoreDetail({
   s,
+  by,
   onOpenItem,
   onFindAt,
   onClose,
 }: {
   s: StoreTotal;
+  by: import('../lib/shopTotals').CompareBy;
   onOpenItem: (groupId: string) => void;
   onFindAt?: FindAt;
   onClose: () => void;
@@ -162,9 +176,16 @@ function StoreDetail({
         <div className="section-head">
           <span className="title">Buy at {name}</span>
           <span className="num" style={{ fontWeight: 700 }}>
-            {money(s.total)}
+            {money(storeMeasure(s, by))}
           </span>
         </div>
+        {/* 0.10.1: the same numbers as this shop's row, both ways. */}
+        {s.lines.length > 0 && (
+          <p className="small" style={{ padding: '0 14px 8px', margin: 0 }}>
+            {s.missing.length ? `For the ${s.lines.length} here: ` : ''}
+            {bothWays(s.fair, s.total)}
+          </p>
+        )}
         {s.lines.map((l) => (
           <SwapLine key={l.groupId} line={l} chainName={name} onOpen={open(l.groupId)} />
         ))}
@@ -214,11 +235,12 @@ function StoreDetail({
           <div className="row" style={{ borderTop: '1px solid var(--line)' }}>
             <span className="grow">
               <span className="title" style={{ fontSize: 15 }}>
-                {name} plus the rest elsewhere
+                {name} plus the rest from other shops
               </span>
+              <span className="small">{bothWays(s.fair + s.elsewhereFair, s.totalWithElsewhere, true)}</span>
             </span>
             <span className="num" style={{ fontWeight: 700 }}>
-              {money(s.totalWithElsewhere)}
+              ≈{money(withElsewhere(s, by))}
             </span>
           </div>
         </div>
@@ -231,9 +253,13 @@ function StoreDetail({
 }
 
 function AroundDetail({ t, onOpenItem, onClose }: { t: Totals; onOpenItem: (groupId: string) => void; onClose: () => void }) {
+  const plan = aroundPlan(t, 'unit', 0);
   return (
     <Sheet title="Shopping around" onClose={onClose}>
       <p className="small">The cheapest of each item, from whichever shop has it in stock.</p>
+      <p className="small" style={{ margin: 0, fontWeight: 600 }}>
+        {bothWays(plan.around, plan.aroundOther)}
+      </p>
       <div className="card flush">
         {t.around.lines.map((l) => (
           <SwapLine
@@ -466,7 +492,6 @@ export function ShopTotalsCard({
   const storeRow = (s: StoreTotal) => {
     const has = s.lines.length;
     const missing = s.missing.length;
-    const other = by === 'unit' ? s.total : s.fair;
     return (
       <button key={s.chain} className="row" onClick={() => setDetail(s)}>
         <ChainDot chain={s.chain} />
@@ -485,14 +510,22 @@ export function ShopTotalsCard({
           ) : (
             <span className="have miss">None of your list</span>
           )}
-          <span className="small">
-            {outHere(s) > 0 ? `${outHere(s)} out of stock there · ` : ''}
-            {missing && s.missing.every((m) => m.elsewhere) && has
-              ? `${money(storeMeasure(s, by))} for the ${has} here, plus the ${missing === 1 ? 'one' : missing} from other shops`
-              : has && Math.abs(other - storeMeasure(s, by)) > 0.25
-                ? `${by === 'unit' ? 'At the till' : 'Same shopping'} ${money(other)}`
-                : ''}
-          </span>
+          {/* 0.10.1: both numbers on every row, labelled the same way everywhere. */}
+          {has > 0 && missing > 0 && s.missing.every((m) => m.elsewhere) ? (
+            <>
+              <span className="small">
+                {outHere(s) > 0 ? `${outHere(s)} out of stock there · ` : ''}
+                {`${money(storeMeasure(s, by))} for the ${has} here, plus the ${missing === 1 ? 'one' : missing} from other shops`}
+              </span>
+              <span className="small">{bothWays(s.fair + s.elsewhereFair, s.totalWithElsewhere, true)}</span>
+            </>
+          ) : has > 0 ? (
+            <span className="small">
+              {outHere(s) > 0 ? `${outHere(s)} out of stock there · ` : ''}
+              {missing ? `For the ${has} here: ` : ''}
+              {bothWays(s.fair, s.total)}
+            </span>
+          ) : null}
         </span>
         {/* A store missing things: its total with those bought elsewhere, so it isn't made to look cheap. */}
         <span className="num price-col">
@@ -574,7 +607,7 @@ export function ShopTotalsCard({
       )}
       {how && <HowPicked totals={totals} min={min} onClose={() => setHow(false)} />}
       {detail === 'around' && <AroundDetail t={totals} onOpenItem={onOpenItem} onClose={() => setDetail(undefined)} />}
-      {detail && detail !== 'around' && <StoreDetail s={detail} onOpenItem={onOpenItem} onFindAt={onFindAt} onClose={() => setDetail(undefined)} />}
+      {detail && detail !== 'around' && <StoreDetail s={detail} by={by} onOpenItem={onOpenItem} onFindAt={onFindAt} onClose={() => setDetail(undefined)} />}
     </div>
   );
 }

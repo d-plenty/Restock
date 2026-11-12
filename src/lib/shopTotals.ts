@@ -256,7 +256,14 @@ const countFor = (s: ShopTotal, by: CompareBy) => (by === 'unit' ? s.cheapestFor
 function fromFewestMissing(t: ShopTotals, by: CompareBy): Recommended {
   const withLines = t.stores.filter((s) => s.lines.length);
   const fewestMissing = Math.min(...withLines.map((s) => s.missing.length));
-  const pool = withLines.filter((s) => s.missing.length === fewestMissing);
+  // 0.10.1: a shop missing more than a few isn't one shop any more, so it's never the one store.
+  const pool = withLines.filter(
+    (s) => s.missing.length === fewestMissing && (!s.missing.length || (s.missing.length <= fewMissing(t.linked) && s.missing.every((m) => m.elsewhere))),
+  );
+  // 0.10.1: shops each missing something are compared with the rest bought elsewhere, not on the few
+  // things each one has (Coles' 3 items at $25.30 beat Woolworths' 3 at $45.50, but with the rest
+  // Coles came to $74.40 and Woolworths $70.40).
+  const measure = (s: ShopTotal, b: CompareBy) => (fewestMissing ? withElsewhere(s, b) : storeMeasure(s, b));
   const complete = withLines.filter((s) => !s.missing.length);
   const lowestOf = (list: ShopTotal[], f: (s: ShopTotal) => number) =>
     list.reduce<ShopTotal | undefined>(
@@ -378,6 +385,45 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], allChai
   };
   const unpriced = notLinked.length - priced.length;
 
+  // Each item's line at each store that has one of your picks (the same line that store's total uses).
+  const linesAt = new Map<string, Map<Chain3, ShopLine>>();
+  for (const { rec, qty } of linked) {
+    const at = new Map<Chain3, ShopLine>();
+    for (const chain of chains) {
+      const here = buy(
+        rec,
+        rec.options.filter((o) => o.product.chain === chain),
+        qty,
+      );
+      if (!here.pick) continue;
+      const l = line(rec, here, qty);
+      // With "Any size" the cost of getting your amount is the like-for-like cost.
+      const fair = here.packs ? lineCost(l.pick, l.qty) : (fairCost(rec, chain, qty) ?? sameAmountCost(here.pick, usual(rec), qty));
+      at.set(chain, { ...l, yours: here.pick, fair });
+    }
+    linesAt.set(rec.group.id, at);
+  }
+  /**
+   * 0.10.1: the cheapest of an item's store lines, measured the way the totals add them up (same
+   * shopping, or at the till), in stock first. Shopping around and every store's "from other shops"
+   * both pick with this, so a store plus the rest can never come to less than shopping around.
+   * Before, shopping around picked by price per 100 g or litre and then added up the like-for-like
+   * cost, which could be a different, dearer pack (so Aldi plus the rest once came out cheaper).
+   */
+  const cheapestLine = (groupId: string, except?: Chain3): ShopLine | undefined => {
+    const all = [...(linesAt.get(groupId)?.entries() ?? [])].filter(([c]) => c !== except).map(([, l]) => l);
+    const inStock = all.filter((l) => !l.outOfStock);
+    const other: CompareBy = by === 'unit' ? 'price' : 'unit';
+    return (inStock.length ? inStock : all).reduce<ShopLine | undefined>((b, l) => {
+      if (!b) return l;
+      const d = lineMeasure(l, by) - lineMeasure(b, by);
+      if (Math.abs(d) > 0.005) return d < 0 ? l : b;
+      const e = lineMeasure(l, other) - lineMeasure(b, other);
+      if (Math.abs(e) > 0.005) return e < 0 ? l : b;
+      return l.pick.role === 'main' && b.pick.role !== 'main' ? l : b;
+    }, undefined);
+  };
+
   const stores: ShopTotal[] = chains.map((chain) => {
     const t: ShopTotal = {
       chain,
@@ -394,35 +440,19 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], allChai
       oneOffs: 0,
     };
     for (const { rec, qty } of linked) {
-      const here = buy(
-        rec,
-        rec.options.filter((o) => o.product.chain === chain),
-        qty,
-      );
-      if (here.pick) {
-        const l = line(rec, here, qty);
-        // With "Any size" the cost of getting your amount is the like-for-like cost.
-        const fair = here.packs ? lineCost(l.pick, l.qty) : (fairCost(rec, chain, qty) ?? sameAmountCost(here.pick, usual(rec), qty));
-        t.lines.push({ ...l, yours: here.pick, fair });
+      const l = linesAt.get(rec.group.id)?.get(chain);
+      if (l) {
+        t.lines.push(l);
         t.total += lineCost(l.pick, l.qty);
-        t.fair += fair;
-        t.value += here.packs ? fair : sameAmountCost(here.pick, usual(rec), qty);
+        t.fair += l.fair;
+        t.value += l.packs ? l.fair : sameAmountCost(l.pick, usual(rec), qty);
       } else {
-        const got = buy(
-          rec,
-          rec.options.filter((o) => o.product.chain !== chain),
-          qty,
-        );
-        const elsewhere = got.pick;
+        const got = cheapestLine(rec.group.id, chain);
         const notHere = notAtList(rec.group).includes(chain);
-        t.missing.push({ item: rec.group.name, groupId: rec.group.id, elsewhere, qty: got.packs ?? qty, ...(notHere ? { notHere } : {}) });
-        if (elsewhere) {
-          const cost = lineCost(elsewhere, got.packs ?? qty);
-          t.totalWithElsewhere += cost;
-          t.elsewhereFair += got.packs
-            ? cost
-            : ((elsewhere.product.chain !== 'other' ? fairCost(rec, elsewhere.product.chain, qty) : undefined) ??
-              sameAmountCost(elsewhere, usual(rec), qty));
+        t.missing.push({ item: rec.group.name, groupId: rec.group.id, elsewhere: got?.pick, qty: got?.qty ?? qty, ...(notHere ? { notHere } : {}) });
+        if (got) {
+          t.totalWithElsewhere += lineCost(got.pick, got.qty);
+          t.elsewhereFair += got.fair;
         }
       }
     }
@@ -437,18 +467,16 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], allChai
 
   const around: ShopTotals['around'] = { total: 0, lines: [], missing: [], chains: [] };
   const pickFor = new Map<string, ShopLine>();
-  for (const { rec, qty } of linked) {
-    const got = buy(rec, rec.options, qty);
-    if (!got.pick) {
+  for (const { rec } of linked) {
+    const one = cheapestLine(rec.group.id);
+    if (!one) {
       around.missing.push(rec.group.name);
       continue;
     }
-    const l = line(rec, got, qty);
-    const one: ShopLine = { ...l, fair: got.packs ? lineCost(l.pick, l.qty) : sameAmountCost(l.pick, usual(rec), qty), yours: l.pick };
     around.lines.push(one);
     pickFor.set(rec.group.id, one);
-    around.total += lineCost(l.pick, l.qty);
-    const c = l.pick.product.chain as Chain3;
+    around.total += lineCost(one.pick, one.qty);
+    const c = one.pick.product.chain as Chain3;
     if (!around.chains.includes(c)) around.chains.push(c);
   }
   // The one-off buys, at the shop each was found at (0.9.0).
@@ -472,7 +500,9 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], allChai
   }
 
   // Stores with everything first, then cheapest first for how the list is set.
-  stores.sort((a, b) => a.missing.length - b.missing.length || measure(a, by) - measure(b, by) || a.total - b.total);
+  // 0.10.1: a shop missing something is sorted by what it comes to with the rest bought elsewhere.
+  const sortBy = (s: ShopTotal) => (s.missing.length ? withElsewhere(s, by) : measure(s, by));
+  stores.sort((a, b) => a.missing.length - b.missing.length || sortBy(a) - sortBy(b) || a.total - b.total);
   return { stores, around, pickFor, linked: linked.length, unpriced, oneOffs, by };
 }
 

@@ -346,6 +346,78 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         throw last != null ? last : new Exception("no server address");
     }
 
+    /**
+     * 0.10.1: readJson and postJson sealed both ways with the household's server key (RSF1), for Your
+     * data: what goes is sealed, the answer comes back sealed with this request's nonce inside, so
+     * nobody else on the network (the home Wi-Fi, say, with an http:// address) can read or swap it.
+     * A 0.10.0 or older server answers plain, as it always has; its answer is taken as before.
+     */
+    JSONObject readSealed(String pathAndQuery, byte[] sealKey, List<byte[]> openKeys) throws Exception {
+        return sealedCall("GET", pathAndQuery, null, sealKey, openKeys, SyncDav.MAX_LIST);
+    }
+
+    JSONObject postSealed(String path, JSONObject body, byte[] sealKey, List<byte[]> openKeys) throws Exception {
+        return sealedCall("POST", path, body, sealKey, openKeys, SyncDav.MAX_SMALL);
+    }
+
+    static final String SEALED = "application/x-restock-sealed";
+
+    private JSONObject sealedCall(String method, String path, JSONObject body, byte[] sealKey, List<byte[]> openKeys, int max) throws Exception {
+        if (sealKey == null) throw new IllegalStateException("This phone isn't in a household on a Restock server.");
+        byte[] data = body == null ? null : SyncFolder.seal(sealKey, body);
+        Exception last = null;
+        for (String b : bases) {
+            if (b == null) continue;
+            try {
+                String[] nonce = new String[1];
+                SyncDav.Response r = sendSealed(b, method, api + path, data, max, nonce);
+                if (r.status == 200) return openAnswer(r, openKeys, nonce[0]);
+                String said = messageOf(r);
+                throw new Refused(errorOf(r), said.isEmpty() ? "The server answered " + r.status + "." : said);
+            } catch (AccessException | Refused e) {
+                throw e;
+            } catch (Exception e) {
+                last = e;
+            }
+        }
+        throw last != null ? last : new Exception("no server address");
+    }
+
+    /** A sealed answer opened with this household's keys (newest first), checked against the request's nonce. */
+    static JSONObject openAnswer(SyncDav.Response r, List<byte[]> openKeys, String nonce) throws Exception {
+        String type = String.valueOf(r.header("content-type"));
+        if (!type.startsWith(SEALED)) return new JSONObject(r.text());
+        for (int i = openKeys.size() - 1; i >= 0; i--) {
+            JSONObject o;
+            try {
+                o = SyncFolder.open(openKeys.get(i), r.body);
+            } catch (Exception wrongKey) {
+                continue;
+            }
+            if (nonce == null || !nonce.equals(o.optString("reqN", null))) throw new Exception("The server's answer wasn't for this request.");
+            o.remove("reqN");
+            return o;
+        }
+        throw new Exception("The server's answer couldn't be opened with this household's keys.");
+    }
+
+    private SyncDav.Response sendSealed(String b, String method, String path, byte[] body, int max, String[] nonce) throws Exception {
+        SyncDav.Response r = sendOnce(b, method, path, body, max, true, nonce);
+        if (r.status == 401 && "clock".equals(errorOf(r))) {
+            long server = 0;
+            try {
+                server = Long.parseLong(String.valueOf(r.header("x-restock-time")).trim());
+            } catch (NumberFormatException ignored) {
+                // no time given
+            }
+            if (server <= 0) throw new AccessException(CLOCK, false);
+            SKEW.put(b, server - now());
+            r = sendOnce(b, method, path, body, max, true, nonce);
+            if (r.status == 401 && "clock".equals(errorOf(r))) throw new AccessException(CLOCK, false);
+        }
+        return r;
+    }
+
     /** The status of a signed request (after names()), for things that answer 404 or 410 when a code ran out. */
     int status(String method, String path, JSONObject body) throws Exception {
         return send(base(), method, api + path, body == null ? null : body.toString().getBytes(StandardCharsets.UTF_8), SyncDav.MAX_SMALL).status;
@@ -511,12 +583,23 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
     }
 
     private SyncDav.Response sendOnce(String b, String method, String path, byte[] body, int max) throws Exception {
+        return sendOnce(b, method, path, body, max, false, null);
+    }
+
+    private SyncDav.Response sendOnce(String b, String method, String path, byte[] body, int max, boolean sealed, String[] nonceOut) throws Exception {
         URI u = URI.create(b + path);
         String target = u.getRawPath() + (u.getRawQuery() == null ? "" : "?" + u.getRawQuery());
         Long skew = SKEW.get(b);
         Map<String, String> h = new LinkedHashMap<>();
-        h.put("Authorization", authorization(device, key, method, target, now() + (skew == null ? 0 : skew), body));
-        if (body != null) h.put("Content-Type", path.startsWith(api + "/files/") ? (path.endsWith(".json") ? "application/json" : "application/octet-stream") : "application/json");
+        String auth = authorization(device, key, method, target, now() + (skew == null ? 0 : skew), body);
+        h.put("Authorization", auth);
+        if (sealed) {
+            h.put("X-Restock-Seal", "rsf1");
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("n=([A-Za-z0-9_=-]+)").matcher(auth);
+            if (nonceOut != null) nonceOut[0] = m.find() ? m.group(1) : null;
+        }
+        if (body != null)
+            h.put("Content-Type", sealed ? SEALED : path.startsWith(api + "/files/") ? (path.endsWith(".json") ? "application/json" : "application/octet-stream") : "application/json");
         SyncDav.Response r = SyncDav.request(method, u, h, body, max);
         if (r.status == 401 || r.status == 403) {
             String err = errorOf(r);

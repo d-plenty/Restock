@@ -113,8 +113,10 @@ describe('one-shop totals: value, price and stock', () => {
     expect(t.stores[0].missing).toEqual([]);
     expect(t.stores[0].lines[0]).toMatchObject({ outOfStock: true });
     expect(t.stores[0].lines[0].pick.product.id).toBe('aldi-alt');
-    // Shopping around prefers something in stock.
-    expect(t.pickFor.get('spag')?.pick.product.id).toBe('fourpack-coles');
+    // Shopping around prefers something in stock, at the shops being compared (0.10.1: only those).
+    const both = shopTotals(entries, recs, ['aldi', 'coles'], 'unit');
+    expect(both.pickFor.get('spag')?.pick.product.id).toBe('fourpack-coles');
+    expect(t.pickFor.get('spag')?.pick.product.id).toBe('aldi-alt');
   });
 });
 

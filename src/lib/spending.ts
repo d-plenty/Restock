@@ -413,12 +413,17 @@ export const spendingOnServer = (s: { yourData?: { server: boolean } }) => s.you
  */
 export async function sendSpendingToServer(): Promise<number> {
   if (serverMode) return 0;
-  if (await getKV<boolean>('spendSentToServer')) return 0;
+  // 0.10.1: remembered per server (its address), so a phone that later joins another household's
+  // server sends its spending there too. 0.10.0 kept just "sent" (true): that's this server.
+  const { syncInfo } = await import('./sync');
+  const where = (await syncInfo()).serverHome ?? 'server';
+  const sent = await getKV<boolean | string>('spendSentToServer');
+  if (sent === true || sent === where) return 0;
   await noteTicks();
   const rows = await queryRows<Row>('SELECT entry_id, checked_at, chain, section, item_id, product_id, text, qty, price, usual, special FROM spend_log ORDER BY checked_at');
   let added = 0;
   for (let i = 0; i < rows.length; i += 500) added += (await RestockNative.serverSpend({ rows: rows.slice(i, i + 500) })).added;
-  await putKV('spendSentToServer', true);
+  await putKV('spendSentToServer', where);
   return added;
 }
 

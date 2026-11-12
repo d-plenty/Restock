@@ -8,8 +8,8 @@ const WORDS: Record<StockRow['state'], string> = { in: 'In stock', out: 'Out of 
 
 /** 0.9.9: why a shop's stock is unknown, in a few words. */
 function whyUnknown(chain: string): string {
-  if (chain === 'woolworths') return 'Sign in to Woolworths (Settings → Supermarkets) to see your branch’s stock.';
-  if (chain === 'coles') return 'Pick your Coles branch (Settings → Supermarkets) to see its stock.';
+  if (chain === 'woolworths') return 'Sign in to Woolworths (Settings → Supermarkets (Pantry tab)) to see your branch’s stock.';
+  if (chain === 'coles') return 'Pick your Coles branch (Settings → Supermarkets (Pantry tab)) to see its stock.';
   if (chain === 'aldi') return 'Aldi doesn’t say what’s in stock.';
   if (chain === 'costco') return 'Costco doesn’t say what’s in stock at a warehouse.';
   return 'This shop doesn’t tell Restock about stock at your branch.';

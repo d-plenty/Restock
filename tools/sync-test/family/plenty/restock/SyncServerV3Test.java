@@ -642,6 +642,16 @@ public class SyncServerV3Test {
         report("B6 a member that scans a code for its own household's server connects as a member: same key, its newer change kept",
             !noRow || !"3".equals(v.e.meta("server_api")) || !Arrays.equals(v.h.key(), w.h.key()) || !"Green tea".equals(has(v, "v-own")) || !"Green tea".equals(has(w, "v-own")),
             "api " + v.e.meta("server_api") + ", v " + has(v, "v-own") + ", w " + has(w, "v-own"));
+        // 0.10.1: Your data, sealed both ways with the household's server key (and the nonce checked).
+        {
+            JSONObject st = s(v).open().readSealed("/data/stats?period=3", s(v).sealKey(), s(v).fileKeys());
+            JSONObject row = new JSONObject().put("entry_id", "yd-1").put("checked_at", System.currentTimeMillis() - 3_600_000L).put("text", "Bread").put("chain", "aldi").put("qty", 1).put("price", 2.5);
+            JSONObject spent = s(v).open().postSealed("/data/spend", new JSONObject().put("rows", new org.json.JSONArray().put(row)), s(v).sealKey(), s(v).fileKeys());
+            JSONObject again = s(v).open().postSealed("/data/spend", new JSONObject().put("rows", new org.json.JSONArray().put(row)), s(v).sealKey(), s(v).fileKeys());
+            report("D1 Your data sealed both ways: the stats open with the household's key, the spending goes in once",
+                st.optJSONObject("spending") == null || st.has("reqN") || spent.optInt("added", -1) != 1 || again.optInt("added", -1) != 0,
+                "stats " + (st.optJSONObject("spending") != null) + ", added " + spent.optInt("added", -1) + " then " + again.optInt("added", -1));
+        }
         String other = null;
         try {
             s(y).joinAsMember(web(fresh, "invite", "Y again"));

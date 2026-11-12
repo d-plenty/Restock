@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.0" src="https://img.shields.io/badge/status-release%20candidate%200.10.0-ffcd00">
+  <img alt="Release candidate 0.10.1" src="https://img.shields.io/badge/status-release%20candidate%200.10.1-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0100">New in 0.10.0</a> ·
+  <a href="#new-in-0101">New in 0.10.1</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -130,6 +130,16 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.1
+
+Release candidate 2: the shopping list's totals, made clear and made right.
+
+- **Both numbers, everywhere:** every shop on the shopping list, and its sheet when you tap it, shows **Same shopping $X · at the till $Y**. *Same shopping* prices every item at the size you usually buy, so a big pack can't look dear just for being big; *at the till* is what you'd hand over for the packs Restock picked. A line whose pack is bigger or smaller than usual says its same-shopping price too.
+- **Shop around is always the cheapest:** it now picks each item the same way it adds them up, so a shop plus the rest from other shops can never come to less. (Before, Aldi plus the rest could come out a dollar under "every item at its cheapest shop".)
+- **A shop missing a few items** is compared with those items bought elsewhere, not on the few things it has, and is sorted that way. A shop missing more than a few isn't called the best one store.
+- **Your data is sealed** between your phone and your Restock server, like everything else: at home over plain http, nobody else on the Wi-Fi can read your spending.
+- **Fixes:** a phone that joins another household's server sends its earlier spending there too; links from synced or server data only ever open a web address; shared text is kept to a sensible length; old Settings paths in a few messages.
 
 ## New in 0.10.0
 
@@ -267,7 +277,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.0.apk` (on macOS, `shasum -a 256 restock-0.10.0.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.1.apk` (on macOS, `shasum -a 256 restock-0.10.1.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -453,7 +463,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is at its **first release candidate** (0.10.0): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is at its **second release candidate** (0.10.1): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.

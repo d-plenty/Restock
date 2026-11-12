@@ -74,7 +74,9 @@ export async function addShared(text: string): Promise<string> {
     }
   }
   if (!name) return "Couldn't tell what that was. Try sharing the product's page.";
-  name = cleanName(name);
+  // 0.10.1: a whole page of shared text is one line on the list, kept to a sensible length.
+  name = cleanName(name).slice(0, 200).trim();
+  if (!name) return "Couldn't tell what that was. Try sharing the product's page.";
   await addListEntry({ id: uid(), text: name, chain, price, section: chain ? sectionOf(chain) : 'pantry', checked: false, createdAt: nowIso() });
   return `${name}${chain ? ` (${chainName(chain)})` : ''} added to your shopping list${costcoLink ? `. ${COSTCO_LIST_NOTE}` : ''}`;
 }

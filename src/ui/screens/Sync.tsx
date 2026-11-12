@@ -30,6 +30,7 @@ import { useNav } from '../nav';
 // 0.9.5 (save): the sharing switches and this phone's name wait for Save settings.
 import { stage } from '../../lib/settingsDraft';
 import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar';
+import { webLink } from '../../lib/site';
 
 // Settings → Sync (0.8.0): phones in the same household sync with each other on the same Wi-Fi.
 // No server, no account: one phone shows a QR code, the other scans it.
@@ -1234,7 +1235,7 @@ export function AddPhoneSheet({ info, onClose, onWifi }: { info: SyncInfo; onClo
   const house = !!info.house || info.serverApi === 3;
   // Only the owner of a household without a server (or a phone not in one) shows a Wi-Fi code.
   const wifiOk = !house && (!info.paired || !!info.isOwner);
-  const page = info.serverHome ?? info.serverRow?.home;
+  const page = webLink(info.serverHome ?? info.serverRow?.home);
   return (
     <Sheet title="Add a phone" onClose={onClose}>
       {info.server || house ? (

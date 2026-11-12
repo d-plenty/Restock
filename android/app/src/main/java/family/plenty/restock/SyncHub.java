@@ -1173,14 +1173,15 @@ final class SyncHub {
     org.json.JSONObject serverSpend(org.json.JSONObject body) throws Exception {
         ServerSync s = server();
         if (!s.on() || !s.v3()) throw new IllegalStateException("This phone isn't in a household on a Restock server.");
-        return s.open().postJson("/data/spend", body);
+        // 0.10.1: sealed with the household's server key (an older server says it can't read it, and it waits).
+        return s.open().postSealed("/data/spend", body, s.sealKey(), s.fileKeys());
     }
 
     /** 0.9.14: the server's statistics for Your data (only a v3 household's server has them). */
     org.json.JSONObject serverRead(String pathAndQuery) throws Exception {
         ServerSync s = server();
         if (!s.on() || !s.v3()) throw new IllegalStateException("This phone isn't in a household on a Restock server.");
-        return s.open().readJson(pathAndQuery);
+        return s.open().readSealed(pathAndQuery, s.sealKey(), s.fileKeys());
     }
 
     boolean serverOn() {

@@ -750,7 +750,7 @@ function PhonesPart() {
   const [msg, setMsg] = useState<string>();
   if (error) return <p className="banner red small">{error}</p>;
   if (!phones) return <div aria-busy="true" />;
-  if (!phones.length) return <p className="small">No phones use this server yet. Add one on Household and phones.</p>;
+  if (!phones.length) return <p className="small">No phones use this server yet. Add one on Server and phones.</p>;
   const p = phones.find((x) => x.device === picked) ?? phones.find((x) => x.isOwner) ?? phones[0];
   return (
     <>
@@ -758,10 +758,10 @@ function PhonesPart() {
       <p className="small dk-tight" role="note">
         <strong>Home Assistant:</strong>{' '}
         {house()
-          ? 'runs on your server, for every phone and browser on it (Settings → Home Assistant).'
+          ? 'runs on your server, for every phone and browser on it (Home Assistant, on the Household tab).'
           : phones.some((x) => x.homeAssistant)
           ? `${phones.find((x) => x.homeAssistant)!.name} syncs your shopping list with it, for the whole household. To move it, turn Home Assistant on on another phone.`
-          : 'No phone syncs your shopping list with it. Turn it on on one phone (Settings → Home Assistant).'}
+          : 'No phone syncs your shopping list with it. Turn it on on one phone (Settings → Sync and backups → Home Assistant).'}
       </p>
       <div className="dk-phone-pick" role="group" aria-label="Phone">
         {phones.map((x) => (

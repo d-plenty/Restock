@@ -46,6 +46,7 @@ import { LegalSheet } from './Legal';
 import { readBackupFile, RestoreSheet } from './Restore';
 import { getHaConfig, haPhone, phoneLabel } from '../../lib/homeAssistant';
 import { serverMode } from '../../server-mode/flag';
+import { webLink } from '../../lib/site';
 
 /** Settings → Shopping list: how much shopping around has to save (0.9.0). */
 const SHOP_AROUND_MINS = [0, 0.5, 1, 2, 5, 10];
@@ -1195,7 +1196,7 @@ function UpdateRowsOn({ settings }: { settings: Settings }) {
               What's new in {found.version}
             </button>
           )}
-          <a className="small" href={found.pageUrl} target="_blank" rel="noreferrer">
+          <a className="small" href={webLink(found.pageUrl) ?? RELEASES} target="_blank" rel="noreferrer">
             Open the release on GitHub
           </a>
         </div>

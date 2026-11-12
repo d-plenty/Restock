@@ -1,0 +1,1 @@
+Release candidate 2 (0.10.1): Shop around always counts the same way it picks, so one shop plus the rest can't come out cheaper. Every shop row and its sheet show both: same shopping and at the till. A shop missing a few items is compared with the rest bought elsewhere. Your data is sealed between phone and server. Fixes to links and wording.

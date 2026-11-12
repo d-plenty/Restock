@@ -29,6 +29,7 @@ import { useNav } from '../nav';
 // 0.9.5 (save): the switch, the list and the address wait for Save settings; Test connection and Sync now run straight away.
 import { saveFirst, stage, staged } from '../../lib/settingsDraft';
 import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar';
+import { webLink } from '../../lib/site';
 
 /**
  * 0.9.4: which of the page's three states (design section 9): a phone household (or a phone on its
@@ -50,7 +51,9 @@ export function NotServerWide() {
 }
 
 /** The server's page: at home, and away from home if it has an address for that. */
-function ServerLinks({ house }: { house: HaHouse }) {
+function ServerLinks({ house: raw }: { house: HaHouse }) {
+  // 0.10.1: only a web address is a link.
+  const house = { home: webLink(raw.home), away: webLink(raw.away) };
   if (!house.home && !house.away) return null;
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

@@ -175,6 +175,12 @@ final class ServerSync {
         e.setMeta("server_filekeys", all.toString());
     }
 
+    /** 0.10.1: the serverKey this phone seals for its server with (the current one), or null. */
+    byte[] sealKey() throws Exception {
+        byte[] k = key();
+        return k == null ? null : SyncFolder.serverKey(k);
+    }
+
     /** Every serverKey this phone has known, oldest first, the current one last. */
     List<byte[]> fileKeys() throws Exception {
         String stored = e.meta("server_filekeys");

@@ -38,6 +38,21 @@ export function siteOf(host: string): string {
  * The address as https, or undefined if it isn't a proper web address with a domain name. A
  * plain http address is moved to https (Restock never uses http for a shop).
  */
+/**
+ * 0.10.1: a web address that's safe to show as a link: http or https only (never javascript: or
+ * data:), and no user name or password in it. Anything else isn't a link.
+ */
+export function webLink(url: string | undefined | null): string | undefined {
+  if (typeof url !== 'string' || !url.trim()) return undefined;
+  try {
+    const u = new URL(url.trim());
+    if ((u.protocol !== 'https:' && u.protocol !== 'http:') || u.username || u.password) return undefined;
+    return url.trim();
+  } catch {
+    return undefined;
+  }
+}
+
 export function asHttps(url: string | undefined): URL | undefined {
   if (typeof url !== 'string' || !url.trim()) return undefined;
   try {

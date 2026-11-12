@@ -24,6 +24,7 @@ import { memberNames } from '../live';
 import { useTrackSpecial } from './WebShopSearch'; // 0.9.5 (web search)
 
 const MINE_KEY = 'deskSpecialsMine';
+import { webLink } from '../../lib/site';
 
 function loadMine(): boolean {
   try {
@@ -192,12 +193,15 @@ export function SpecialSheet({ p, onAdd, onClose, tracker }: { p: StoreProduct; 
 }
 
 function ShopRow({ s }: { s: NonNullable<ReturnType<typeof useFollowed>>[number]['shops'][number] }) {
-  const link = (href: string | undefined, label: string, icon: string, primary?: boolean) =>
-    href ? (
+  const link = (raw: string | undefined, label: string, icon: string, primary?: boolean) => {
+    // 0.10.1: only a web address is a link (it came from a phone's sync).
+    const href = webLink(raw);
+    return href ? (
       <a className={`btn small${primary ? ' primary' : ''}`} href={href} target="_blank" rel="noopener noreferrer" aria-label={`${s.name} ${label.toLowerCase()} (opens a new tab)`}>
         <Icon name={icon} size={16} /> {label}
       </a>
     ) : null;
+  };
   return (
     <div className="dk-row">
       <span className="grow">
@@ -303,7 +307,7 @@ export function DeskSpecials({ narrow }: { narrow?: boolean }) {
             ))}
           </section>
         ))}
-        {followed && !followed.length && <p className="small">No shops picked yet. Pick them in Settings → Shops.</p>}
+        {followed && !followed.length && <p className="small">No shops picked yet. Pick them in Settings → Your shops.</p>}
         <p className="small">Catalogue prices can differ by state and branch. Your items' prices are checked by your phones, so you don't need to hunt for them here.</p>
       </section>
       {opener.sheet && <SpecialSheet p={opener.sheet} onAdd={(x) => void add(x)} onClose={opener.close} tracker={tracker} />}
