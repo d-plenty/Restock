@@ -2,6 +2,7 @@ import { adapterFor } from '../stores';
 import type { Chain } from '../types';
 import { isPressOnlyShop, kindOf, sectionOf, type Section } from '../shops';
 import { getKV, putKV } from './db';
+import { BlockedError, isBlockMessage } from '../stores/http';
 
 // How each store's connection has been going: the last time it worked, and since when it's
 // been failing. Price checks (PriceChecker.java) and searches update it, so Home can say
@@ -52,12 +53,58 @@ export function failingStores(h: StoreHealth, now = Date.now(), minHours = 20): 
     .sort((a, b) => a.since.localeCompare(b.since));
 }
 
+/**
+ * 0.10.4: the shop is turning Restock away (it answered 403, or showed a "checking your browser"
+ * page), as opposed to answering with nothing. The fix is Unblock: the person passes the shop's
+ * own check in Restock's built-in browser. Restock never solves or dodges a check itself.
+ */
+export const isBlockedError = (error: string | undefined): boolean => isBlockMessage(error);
+
+// 0.10.4: "Hide for a day" on a shop's warning. Kept on this phone only. After a day the warning
+// comes back if the shop is still failing.
+const HIDDEN_KEY = 'hiddenShopWarnings';
+export const HIDE_FOR_MS = 24 * 3_600_000;
+export type HiddenWarnings = Partial<Record<StoreChain, string>>;
+
+export async function getHiddenWarnings(): Promise<HiddenWarnings> {
+  return (await getKV<HiddenWarnings>(HIDDEN_KEY).catch(() => undefined)) ?? {};
+}
+
+/** Until when a shop's warning stays hidden (pure, for testing). */
+export function hideUntil(now = Date.now()): string {
+  return new Date(now + HIDE_FOR_MS).toISOString();
+}
+
+/** True while the shop's warning is hidden. A broken or far-future time never hides it for good. */
+export function isHidden(hidden: HiddenWarnings | undefined, chain: StoreChain, now = Date.now()): boolean {
+  const until = Date.parse(hidden?.[chain] ?? '');
+  return Number.isFinite(until) && until > now && until - now <= HIDE_FOR_MS;
+}
+
+export async function hideWarning(chain: StoreChain, now = Date.now()): Promise<void> {
+  const cur = await getHiddenWarnings();
+  // Drop the ones that have run out while here.
+  const next: HiddenWarnings = Object.fromEntries(Object.entries(cur).filter(([c]) => isHidden(cur, c as StoreChain, now)));
+  next[chain] = hideUntil(now);
+  await putKV(HIDDEN_KEY, next);
+}
+
+/** Show the warning again straight away (after Unblock worked, say). */
+export async function unhideWarning(chain: StoreChain): Promise<void> {
+  const cur = await getHiddenWarnings();
+  if (!cur[chain]) return;
+  delete cur[chain];
+  await putKV(HIDDEN_KEY, cur);
+}
+
 export interface ConnectionTest {
   chain: StoreChain;
   ok: boolean;
   count?: number;
   ms: number;
   error?: string;
+  /** 0.10.4: the shop turned Restock away (403, or a "checking your browser" page). */
+  blocked?: boolean;
 }
 
 /** Try a real search at each store, like adding an item would. */
@@ -76,7 +123,8 @@ export async function testConnections(chains: StoreChain[], storeIds: Partial<Re
         if (!items.length) return { chain, ok: false, ms: Date.now() - t0, error: `The shop answered but found nothing for "${word}"` };
         return { chain, ok: true, count: items.length, ms: Date.now() - t0 };
       } catch (e) {
-        return { chain, ok: false, ms: Date.now() - t0, error: e instanceof Error ? e.message : String(e) };
+        const error = e instanceof Error ? e.message : String(e);
+        return { chain, ok: false, ms: Date.now() - t0, error, blocked: e instanceof BlockedError || isBlockedError(error) };
       }
     }),
   );

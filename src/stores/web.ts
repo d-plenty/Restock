@@ -42,12 +42,16 @@ export async function searchInfo(chain: StoreChain, fresh = false, ignoreKnown =
   } catch (e) {
     if (e instanceof NativeOnlyError) throw e;
   }
-  if (!html && isNative()) html = (await render(chain, site).catch(() => ({ html: '' }))).html;
+  if ((!html || looksLikeBotCheck(html)) && isNative()) html = (await render(chain, site).catch(() => ({ html: '' }))).html;
+  // 0.10.4: a "checking your browser" page has no search box to find. Guess, and don't remember
+  // the guess, so the real page is looked at again once the shop is unblocked.
+  const checked = !!html && looksLikeBotCheck(html);
+  if (checked) html = '';
   const found = html
     ? findSearch(html, site)
     : { search: new URL(SEARCH_GUESSES.other[0], site).toString(), platform: 'other' as const, how: 'a guess' };
   const info: SearchInfo = known ? { ...found, search: known, how: 'Restock’s saved address for this shop' } : found;
-  if (!ignoreKnown) await putKV(KV(chain), { ...info, at: new Date().toISOString() } satisfies Cached).catch(() => undefined);
+  if (!ignoreKnown && !checked) await putKV(KV(chain), { ...info, at: new Date().toISOString() } satisfies Cached).catch(() => undefined);
   return info;
 }
 

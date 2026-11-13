@@ -3,7 +3,7 @@ import { aisleLabel, aisleOf, byAisle as sortByAisle, getAisles, type AisleAt } 
 import { noteTicksSoon } from '../../lib/spending';
 import { branchAdvice, branchName, stockRows } from '../../lib/stock';
 import { useFullRefresh } from '../refresh';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { nameHasSize } from '../../lib/naming';
 import { lookupBarcode, scanBarcode } from '../../lib/barcode';
 import { serverMode, serverUi } from '../../server-mode/flag';
@@ -302,6 +302,14 @@ export function ListScreen() {
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState(false);
+  // 0.10.4: the picked list stays in sight in the row of lists (sideways only: the page doesn't move).
+  const pills = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const row = pills.current;
+    const on = row?.querySelector<HTMLElement>('.on');
+    if (!row || !on) return;
+    if (on.offsetLeft < row.scrollLeft || on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = on.offsetLeft - 18;
+  });
   // Start shopping: first which shops you're going to today, then the in-store view for those.
   const [choosingShops, setChoosingShops] = useState(false);
   // 0.10.2: Change shops from shopping mode: closing the sheet goes back to that trip.
@@ -542,25 +550,31 @@ export function ListScreen() {
           )
         )}
       </div>
+      {/* 0.10.4: the lists in one slim row that scrolls sideways (it was a big box with five tabs). */}
       {sectionsOn.length > 1 && (
-        <div className="seg" role="tablist" aria-label="Which list">
+        <div className="list-pills" role="tablist" aria-label="Which list" ref={pills}>
           {sectionsOn.map((sec) => (
-            <button key={sec} role="tab" aria-selected={sec === section} className={sec === section ? 'on' : ''} onClick={() => setSection(sec)}>
-              <Icon name={sec} size={17} /> {LIST_NAMES[sec]}
+            <button
+              key={sec}
+              role="tab"
+              aria-selected={sec === section}
+              className={sec === section ? 'on' : ''}
+              onClick={() => setSection(sec)}
+            >
+              <Icon name={sec} size={16} /> {LIST_NAMES[sec]}
               {openCount(sec) > 0 && <span className="count">{openCount(sec)}</span>}
             </button>
           ))}
         </div>
       )}
-      <span className="sub num" style={{ marginTop: sectionsOn.length > 1 ? 0 : -8 }}>
-        {open.length} item{open.length === 1 ? '' : 's'}
-        {total > 0 ? ` · about ${money(total)} at the till` : ''}
-        {totals.linked > 0 ? ` · ${settings.listCompare === 'unit' ? 'best value' : 'lowest price'}` : ''}
-      </span>
-
-      {totals.linked > 0 && !selecting && (
-        <div className="compare-switch">
-          <div className="seg" role="group" aria-label="Pick the cheapest by">
+      {/* 0.10.4: the totals and Best value / Lowest price on one line (it wraps at big text sizes). */}
+      <div className="list-summary">
+        <span className="sub num">
+          {open.length} item{open.length === 1 ? '' : 's'}
+          {total > 0 ? ` · about ${money(total)}` : ''}
+        </span>
+        {totals.linked > 0 && !selecting && (
+          <div className="seg mini" role="group" aria-label="Pick the cheapest by">
             <button aria-pressed={settings.listCompare === 'unit'} onClick={() => updateSettings({ listCompare: 'unit' })}>
               Best value
             </button>
@@ -568,8 +582,8 @@ export function ListScreen() {
               Lowest price
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {firstTime && (
         <div className="card hint">

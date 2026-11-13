@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.3" src="https://img.shields.io/badge/status-release%20candidate%200.10.3-ffcd00">
+  <img alt="Release candidate 0.10.4" src="https://img.shields.io/badge/status-release%20candidate%200.10.4-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0103">New in 0.10.3</a> ·
+  <a href="#new-in-0104">New in 0.10.4</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -130,6 +130,20 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.4
+
+Release candidate 5: a nicer More, Unblock for shops that check for bots, and a tidier Shopping list.
+
+- **More, redone:** a navy top with your tabs as colour tiles (Keg, Health, Baby, Pets): how many things are in each, how many are on special, and which shop is cheapest most often. Tabs you haven't set up are small add buttons under them. Settings, Cards, Catalogues, Specials and Receipts are below. The same on the web page and the iPhone web app.
+- **"<shop> is blocking Restock":** when a shop's website checks that visitors aren't bots and turns Restock away, Restock now says so plainly (it's the shop's check, not Restock's), instead of "found nothing". It shows on Home, in Test connections, in Advanced → Diagnostics → Shop test, on the shop's Edit sheet in My shops ("Blocked") and in Add's results.
+- **Unblock <shop>:** the big green button opens the steps, then the shop's own page in Restock's built-in browser. Do its tick box or puzzle if it shows one, wait for its normal page with products, tap Done. Restock checks it again and says *working again* or *still blocked: try again later*. Works for every shop, the ones you add too. Restock never solves or gets around a check by itself, and nothing you type on the shop's page goes to Restock.
+- **Hide for a day:** a small link on a shop's warning on Home. It comes back after 24 hours if the shop still isn't working.
+- **Dan Murphy's and BWS:** if their data turns Restock away, Restock tries their normal search page, and says the shop is blocking it (not "found nothing for beer") if that doesn't work either.
+- **Add buttons:** **Add to both** stays big and green on top; under it, **Add to pantry** (navy, left) and **Add to list** (white, right). Keg, Health, Baby and Pets say *Add to keg*, *Add to health* and so on. The note under them goes in the same order. The same in Add, Pick my … and on the web page.
+- **A tidier Shopping list:** your lists in one slim row that scrolls sideways, and the total with **Best value / Lowest price** on one line, so more of your list fits.
+- **My shops:** the tab buttons (Pantry, Keg, Health, Baby, Pets) have the icon above the word and scroll sideways at big text sizes, so no word is broken in two. Titles don't break inside a word at the largest text either.
+- The privacy policy now says how each shop is read (its own data, or its website's search page) and what happens when you Unblock one.
 
 ## New in 0.10.3
 
@@ -307,7 +321,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.3.apk` (on macOS, `shasum -a 256 restock-0.10.3.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.4.apk` (on macOS, `shasum -a 256 restock-0.10.4.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -493,7 +507,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is at its **fourth release candidate** (0.10.3): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is at its **fifth release candidate** (0.10.4): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.

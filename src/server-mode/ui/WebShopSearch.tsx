@@ -16,7 +16,7 @@ import type { StoreProduct } from '../../stores/types';
 import { chainName, type ListEntry } from '../../types';
 import { ChainDot, ChainName, Icon, LoadingBar, MemberTag, Sheet, Thumb } from '../../ui/components';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from '../../ui/screens/addPicks';
-import { AlwaysTick, pickButtonsNote, toPantryNote } from '../../ui/screens/addPickWords';
+import { AddPair, addButtonsNote, AlwaysTick, pickButtonsNote, toPantryNote } from '../../ui/screens/addPickWords';
 import { useNav } from '../../ui/nav';
 import { ScanButton } from '../pwa/WebScanner';
 import { syncNow } from '../live';
@@ -512,14 +512,7 @@ export function WebShopSearch({
               <button className="btn primary" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
                 <Icon name="cart" size={18} /> Add to both
               </button>
-              <div className="two">
-                <button className="btn" onClick={() => void save('list')} disabled={saving || picks.size > 6}>
-                  <Icon name="cart" size={18} /> Add to list
-                </button>
-                <button className="btn" onClick={() => void save('pantry')} disabled={saving || picks.size > 6}>
-                  <Icon name={tab} size={18} /> Add to {SECTION_NAMES[tab].toLowerCase()}
-                </button>
-              </div>
+              <AddPair section={tab} disabled={saving || picks.size > 6} onPantry={() => void save('pantry')} onList={() => void save('list')} />
               <p className="small" style={{ margin: 0 }}>
                 {pickButtonsNote(SECTION_PLACE[tab])}
               </p>
@@ -559,19 +552,13 @@ export function WebShopSearch({
                   <button className="btn primary" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
                     <Icon name="cart" size={18} /> Add to both
                   </button>
-                  <div className="two">
-                    <button className="btn" onClick={() => void save('list')} disabled={saving || picks.size > 6}>
-                      <Icon name="cart" size={18} /> Add to list
-                    </button>
-                    <button className="btn" onClick={() => void save('pantry')} disabled={saving || picks.size > 6}>
-                      <Icon name={tab} size={18} /> Add to {SECTION_NAMES[tab].toLowerCase()}
-                    </button>
-                  </div>
+                  <AddPair section={tab} disabled={saving || picks.size > 6} onPantry={() => void save('pantry')} onList={() => void save('list')} />
                 </>
               )}
               <p className="small" style={{ margin: 0 }}>
-                Add to {SECTION_NAMES[tab].toLowerCase()} puts it in {SECTION_PLACE[tab]}, so Restock watches its price. Add to list puts it on the list for this trip only, at the
-                price shown.{listPick === 'general' ? ' General is a list only: Add to both also puts it in ' + SECTION_PLACE[tab] + '.' : ''}
+                {listPick === 'general'
+                  ? `Add to list puts it on the list for this trip only, at the price shown. General is a list only: Add to both also puts it in ${SECTION_PLACE[tab]}.`
+                  : addButtonsNote(SECTION_PLACE[tab])}
               </p>
             </>
           )}

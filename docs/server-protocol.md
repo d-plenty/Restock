@@ -914,3 +914,7 @@ Nothing new between phones and servers. On the phone only (never synced, never i
 - **Household settings:** `tab:baby` and `tab:pets` (`true | false`, shared with Groceries), and `shop:<chain>` rows may carry `tabs` (`{ on, tabs? }`, `{ on, shop, removed?, tabs? }` for a shop someone added): the tabs it's in, known tabs in order, at least one; none means its own tab. Older phones read `on` and leave `tabs` alone.
 - **Always on special** (phones and the web app, not on the wire): a product on special at least 14 of the last 21 days it has a price for, and never at its "was" price in that time, is judged `fake` (Always on special), on the phone's screens (verdict.ts) and its background alerts (Deals.java) alike (tools/sync-test/always-parity.sh).
 - **Loyalty cards:** a known card's name (IGA Rewards, Bunnings PowerPass…) is its `label`, as any other card's; nothing new is synced. The kind of barcode picked for a card is kept where the cards are (the phone's store entry `cardCodeTypes`, or the browser's card store), never synced.
+
+## 0.10.4: what changed on the wire
+
+Nothing new between phones and servers. On the phone only (never synced): the store entry `hiddenShopWarnings` (`{ "<chain>": "<until, ISO time>" }`, Hide for a day, at most 24 hours ahead) and `storeHealth` errors from a shop that turned Restock away (403 or a bot check) are shown as "blocked", with Unblock (Unblock.tsx, health.ts).

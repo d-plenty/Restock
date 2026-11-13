@@ -59,7 +59,8 @@ import {
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** The word Restock searches for when testing a shop. */
-import { TEST_WORD } from '../../lib/health';
+import { getHealth, isBlockedError, TEST_WORD } from '../../lib/health';
+import { UnblockButton } from '../Unblock';
 export { TEST_WORD };
 
 /**
@@ -751,7 +752,7 @@ export function SectionSwitch({ settings, section }: { settings: Settings; secti
   return (
     <>
       <div className="card flush">
-        <label className="check">
+        <label className="check tab-switch">
           <Icon name={section} size={22} />
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
             <span className="title" style={{ fontSize: 15 }}>
@@ -932,7 +933,7 @@ export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
   return (
     <div className="screen">
       <TopBar title="My shops" />
-      <div className="seg" role="tablist" aria-label="Which shops">
+      <div className="seg shop-tabs" role="tablist" aria-label="Which shops">
         {SECTIONS.map((sec) => (
           <button key={sec} role="tab" aria-selected={sec === tab} className={sec === tab ? 'on' : ''} onClick={() => setTab(sec)}>
             <Icon name={sec} size={17} /> {SECTION_NAMES[sec]}
@@ -1422,8 +1423,14 @@ function shopStatus(settings: Settings, chain: string): string {
  */
 function ShopEdit({ settings, chain }: { settings: Settings; chain: StoreChain }) {
   const [open, setOpen] = useState(false);
+  const blocked = useBlocked(chain);
   return (
     <div className="shop-extra">
+      {blocked && (
+        <span className="small shop-blocked">
+          <Icon name="alert" size={15} /> Blocked: tap Edit to unblock
+        </span>
+      )}
       <span className="small">{shopStatus(settings, chain)}</span>
       <button className="btn small" onClick={() => setOpen(true)} aria-label={`Edit ${chainName(chain)}`}>
         <Icon name="pencil" size={16} /> Edit {chainName(chain)}
@@ -1462,8 +1469,16 @@ function BranchByHand({ chain, choice, onSet }: { chain: StoreChain; choice: Sto
   );
 }
 
+/** 0.10.4: the shop's last search or price check was turned away (403 or a bot check). */
+function useBlocked(chain: StoreChain): boolean {
+  const health = useLive(getHealth, []);
+  const h = health?.[chain];
+  return !!h?.failingSince && isBlockedError(h.error);
+}
+
 function ShopEditSheet({ settings, chain, onClose }: { settings: Settings; chain: StoreChain; onClose: () => void }) {
   const s = storeChoice(settings, chain);
+  const blocked = useBlocked(chain);
   const setStore = async (key: 'primary' | 'secondary', value: string) => {
     const latest = await getSettings();
     await updateSettings({ stores: { ...latest.stores, [chain]: { ...storeChoice(latest, chain), [key]: value || undefined } } });
@@ -1471,6 +1486,15 @@ function ShopEditSheet({ settings, chain, onClose }: { settings: Settings; chain
   const signIn = chain === 'woolworths' || chain === 'coles' || chain === 'costco';
   return (
     <Sheet title={chainName(chain)} onClose={onClose}>
+      {blocked && (
+        <div className="banner amber" role="status">
+          <strong>{chainName(chain)} is blocking Restock</strong>
+          <span style={{ fontSize: 13 }}>Its website is checking for bots. That’s its check, not Restock’s. Unblock it once and prices carry on.</span>
+          <div className="unblock-actions">
+            <UnblockButton chain={chain} />
+          </div>
+        </div>
+      )}
       <div className="eyebrow">Branches</div>
       <p className="small" style={{ margin: 0 }}>
         {[s.primary && `Main: ${s.primary}`, s.secondary && `2nd: ${s.secondary}`].filter(Boolean).join(' · ') || `${NO_BRANCH_YET(chain)}.`}

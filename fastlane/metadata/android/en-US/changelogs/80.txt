@@ -1,0 +1,1 @@
+Release candidate 5 (0.10.4): a new More with your tabs as colour tiles, Unblock for shops whose website checks for bots (you pass its check yourself in Restock's browser), Hide for a day on shop warnings, Add to pantry (navy) and Add to list (white) side by side under Add to both, and a tidier Shopping list.

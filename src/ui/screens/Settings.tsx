@@ -26,7 +26,8 @@ import { useLive } from '../../lib/useLive';
 import { money } from '../../lib/units';
 import { STALE_DAYS } from '../../lib/verdict';
 import { chainName, CHECK_INTERVALS, GOOD_SALE, GREAT_SALE, historyLabel, WEEKDAYS, type Settings } from '../../types';
-import { ChainDot, Explain, Icon, Logo, OpenStoreButton, Sheet, timeAgo, TopBar } from '../components';
+import { ChainDot, Explain, Icon, Logo, Sheet, timeAgo, TopBar } from '../components';
+import { UnblockButton } from '../Unblock';
 import { AccessibilitySettings, LookSettings } from './Look';
 import { AutoBackupSettings } from './Backups';
 import { SyncOverview } from './SyncOverview';
@@ -695,7 +696,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
               <div className="row" style={{ flexWrap: 'wrap' }}>
                 <span className="grow" style={{ minWidth: 200 }}>
                   <span className="title">Shop keeps saying it's blocked?</span>
-                  <span className="small">Open its website here once and tick its "I'm a person" box.</span>
+                  <span className="small">Unblock it: open its website here once and do its check (a tick box or puzzle) yourself.</span>
                 </span>
               </div>
               {shopGroups(settings).map(({ section, chains }) => (
@@ -705,12 +706,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
                   </span>
                   <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {chains.map((c) => (
-                      <OpenStoreButton
-                        key={c}
-                        chain={c}
-                        label={chainName(c)}
-                        onDone={() => nav.toast(`Thanks. ${chainName(c)} should work again now.`)}
-                      />
+                      <UnblockButton key={c} chain={c} small label={chainName(c)} />
                     ))}
                   </span>
                 </div>
@@ -906,10 +902,16 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
                       <ChainDot chain={c} /> {chainName(c)}
                     </span>
                     <span className="small">
-                      {!r ? 'Testing…' : r.ok ? `Working: ${r.count} products in ${(r.ms / 1000).toFixed(1)} s` : `Not working: ${r.error}`}
+                      {!r
+                        ? 'Testing…'
+                        : r.ok
+                          ? `Working: ${r.count} products in ${(r.ms / 1000).toFixed(1)} s`
+                          : r.blocked
+                            ? "Blocked: its website is checking for bots. That's its check, not Restock's."
+                            : `Not working: ${r.error}`}
                     </span>
                     {h?.lastOk && <span className="small">Last worked {timeAgo(h.lastOk)}</span>}
-                    {r && !r.ok && <OpenStoreButton chain={c} onDone={run} />}
+                    {r && r.blocked && <UnblockButton chain={c} small onWorked={run} />}
                   </span>
                 </div>
               );
@@ -922,7 +924,7 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
         <Icon name="refresh" size={18} /> Test again
       </button>
       <p className="small">
-        Still failing? Try Shop connections → Always use the browser, or open the shop and tick "I'm not a robot" if it asks. If a shop keeps
+        Still failing? Try Shop connections → Always use the browser, or Unblock the shop and do its check if it asks. If a shop keeps
         failing, please{' '}
         <a href="https://github.com/d-plenty/Restock/issues/new/choose" target="_blank" rel="noreferrer">
           report it on GitHub

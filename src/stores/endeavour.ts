@@ -1,6 +1,6 @@
 import type { StoreChain } from '../shops';
 import { brandKind } from '../lib/brandKinds';
-import { isNative, looksMemberOnly, num, parseJson, request, stockFlag, viaBrowser, type HttpResult } from './http';
+import { BlockedError, isNative, looksMemberOnly, num, parseJson, request, stockFlag, viaBrowser, type HttpResult } from './http';
 import type { StoreAdapter, StoreProduct } from './types';
 import { searchWeb } from './web';
 import { cleanName } from './webPage';
@@ -254,16 +254,19 @@ async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send =
     moved = where || moved || CATEGORY[term.trim().toLowerCase()] || '';
     return true;
   };
+  // 0.10.4: a refusal (403, a bot-check page) is remembered, so "beer" (read as the beer
+  // department) never ends as "found nothing" when the shop actually turned Restock away.
+  let failed: unknown;
   try {
     const res = await send({ url: `${e.api}/Search/products`, method: 'POST', headers, body });
     if (!redirect(res)) {
       const out = flattenEndeavour(chain, parseJson<Raw>(e.name, res));
       if (out.length) return out;
     }
-  } catch {
+  } catch (err) {
     // try the other way of asking
+    if (err instanceof BlockedError) failed = err;
   }
-  let failed: unknown;
   if (moved === undefined) {
     try {
       const q = new URLSearchParams({ searchTerm: term, pageSize: '36', pageNumber: String(page), sortType: 'Relevance' });
@@ -279,8 +282,12 @@ async function apiSearch(chain: 'danmurphys' | 'bws', term: string, send: Send =
   // Sent to a category page, or nothing found for a category word: read that category.
   const where = moved || CATEGORY[term.trim().toLowerCase()];
   if (where) {
-    const out = await browse(chain, where, headers, send, page).catch(() => [] as StoreProduct[]);
+    const out = await browse(chain, where, headers, send, page).catch((err) => {
+      if (err instanceof BlockedError) failed = err;
+      return [] as StoreProduct[];
+    });
     if (out.length) return out;
+    if (failed instanceof BlockedError) throw failed;
     // Sent to a brand's page Restock can't read ("great northern" → its brand page): search for
     // the brand and what it is instead, which the shop does answer (0.8.6).
     const kind = brandKind(term);
@@ -300,17 +307,23 @@ export function endeavourAdapter(chain: 'danmurphys' | 'bws'): StoreAdapter {
         // The shop answered: that's the answer, even when it's nothing. Reading its website
         // instead only finds the same page of featured products for every word (0.8.6).
         return await apiSearch(chain, term, direct, page);
-      } catch {
+      } catch (err) {
+        let refused = err instanceof BlockedError ? err : undefined;
         // turned away: ask again from inside the shop's own page, the way the site itself does
         if (isNative())
           try {
             return await apiSearch(chain, term, inBrowser(chain), page);
-          } catch {
+          } catch (again) {
+            if (again instanceof BlockedError) refused = again;
             // fall back to reading the website
           }
+        // 0.10.4: then the shop's normal search page in the built-in browser. The website's own
+        // page only has the first lot. If that finds nothing too, say the shop is blocking
+        // Restock, not that it found nothing.
+        const web = page > 1 ? [] : await searchWeb(chain as StoreChain, term);
+        if (!web.length && refused) throw refused;
+        return web;
       }
-      // The website's own page only has the first lot.
-      return page > 1 ? [] : searchWeb(chain as StoreChain, term);
     },
   };
 }

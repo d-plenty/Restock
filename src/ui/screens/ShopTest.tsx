@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { shareTextFile } from '../../lib/backup';
 import { captureWhile, type Captured } from '../../lib/diagnostics';
-import { TEST_WORD } from '../../lib/health';
+import { isBlockedError, TEST_WORD } from '../../lib/health';
 import { money } from '../../lib/units';
 import { chainName, customShops, isPressOnlyShop, kindOf, sectionOf, shopsByGroup, type StoreChain } from '../../shops';
 import { adapterFor } from '../../stores';
@@ -14,13 +14,14 @@ import type { StoreProduct } from '../../stores/types';
 import { looksLikeBotCheck, searchInfo } from '../../stores/web';
 import { BETA_SHOPS, BetaTag, Icon, LoadingBar } from '../components';
 import { useNav } from '../nav';
+import { UnblockButton } from '../Unblock';
 
 const HOW: Record<string, string> = {
   woolworths: "Woolworths' own app data",
   coles: "Coles' own app data",
   aldi: "Aldi's own app data",
   costco: "Costco's public pages",
-  endeavour: "Dan Murphy's and BWS's own data",
+  endeavour: "Dan Murphy's and BWS's own data, then its search page",
   web: "the shop's website (its search page)",
 };
 
@@ -34,6 +35,8 @@ interface Result {
   searchPage?: string;
   searchFound?: string;
   botCheck: boolean;
+  /** 0.10.4: nothing came back and the shop answered 403/429 or a bot check. */
+  blocked?: boolean;
   answers: { kind: Captured['kind']; status: number; host: string; bytes: number }[];
 }
 
@@ -48,6 +51,7 @@ export function shopTestReport(r: Result, version: string): string {
     `Took: ${(r.ms / 1000).toFixed(1)} s`,
     r.error ? `Result: didn't work: ${r.error}` : `Result: ${r.found.length} found`,
     ...(r.botCheck ? ['The shop showed a bot check or "checking your browser" page.'] : []),
+    ...(r.blocked ? ['Blocked: the shop turned Restock away (Unblock offered).'] : []),
     ...r.found.slice(0, 8).map((p, i) => `${i + 1}. ${p.name}${p.size ? ` ${p.size}` : ''} · ${money(p.price)}${p.isSpecial ? ` (special${p.wasPrice ? `, was ${money(p.wasPrice)}` : ''})` : ''}`),
     `Answers: ${r.answers.map((a) => `${a.kind} ${a.host} ${a.status} ${Math.round(a.bytes / 1024)} KB`).join('; ') || 'none'}`,
   ];
@@ -63,6 +67,8 @@ export function ShopTest() {
   const [busy, setBusy] = useState(false);
   const [r, setR] = useState<Result>();
   const word = term.trim() || TEST_WORD[sectionOf(shop)];
+  // 0.10.4: a 403, or a "checking your browser" page, is the shop blocking Restock.
+  const blocked = !!r?.error && (r.botCheck || r.blocked || isBlockedError(r.error));
 
   const run = async () => {
     setBusy(true);
@@ -99,6 +105,7 @@ export function ShopTest() {
       searchPage,
       searchFound,
       botCheck: out.captured.some((c) => looksLikeBotCheck(c.body)),
+      blocked: !out.result?.length && (isBlockedError(out.error) || out.captured.some((c) => c.status === 403 || c.status === 429)),
       answers,
     });
     setBusy(false);
@@ -154,10 +161,21 @@ export function ShopTest() {
         {r && (
           <div className={`banner ${r.error ? 'amber' : 'green'}`} role="status" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
             <strong>
-              {r.error ? `${chainName(r.shop)} didn't work` : `${chainName(r.shop)} works: ${r.found.length} found`} {BETA_SHOPS.includes(r.shop) && <BetaTag />}
+              {r.error
+                ? blocked
+                  ? `Blocked: ${chainName(r.shop)} is blocking Restock`
+                  : `${chainName(r.shop)} didn't work`
+                : `${chainName(r.shop)} works: ${r.found.length} found`}{' '}
+              {BETA_SHOPS.includes(r.shop) && <BetaTag />}
             </strong>
-            {r.error && <span className="small">{r.error}</span>}
-            {r.botCheck && <span className="small">It showed a bot check ("checking your browser"), so Restock can't read it for now.</span>}
+            {r.error && !blocked && <span className="small">{r.error}</span>}
+            {blocked && (
+              <span className="small">
+                {r.botCheck ? 'It showed a bot check ("checking your browser"). ' : ''}Its website is checking for bots. That’s its check, not
+                Restock’s. Unblock it once and try again.
+              </span>
+            )}
+            {blocked && <UnblockButton chain={r.shop} onWorked={() => void run()} />}
             <span className="small">
               Read from {r.how}
               {r.searchPage ? ` · ${r.searchPage}` : ''} · {(r.ms / 1000).toFixed(1)} s

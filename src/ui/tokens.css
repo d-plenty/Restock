@@ -107,6 +107,19 @@
   --navy: #012169;
   --navy-2: #0b2f86;
   --on-accent: #ffffff;
+  /* 0.10.4: the "Add to pantry" button (filled navy; "Add to list" beside it is white). */
+  --pantry-btn: var(--navy);
+  /* 0.10.4: More's navy top and its tab tiles. */
+  --more-top: var(--shade-bg);
+  --tile-keg-bg: #fff4dc;
+  --tile-keg-ink: #5b3a00;
+  --tile-health-bg: #e4f4ea;
+  --tile-health-ink: #14532d;
+  --tile-baby-bg: #fce8f0;
+  --tile-baby-ink: #7a1f45;
+  --tile-pets-bg: #e6edfb;
+  --tile-pets-ink: #1c3361;
+  --tile-icon-bg: #ffffff;
   --shadow: rgba(15, 29, 61, 0.08);
   --tabbar-bg: var(--navy);
   /* The bars around the app (the phone's tab bar, the web's sidebar and top strip) in the
@@ -184,6 +197,16 @@
   --good-bg: #12321f;
   --navy: #0b2470;
   --navy-2: #0b2f86;
+  --pantry-btn: #2a4aa8;
+  --tile-keg-bg: #3a2b13;
+  --tile-keg-ink: #f3c27a;
+  --tile-health-bg: #12321f;
+  --tile-health-ink: #9fe3bd;
+  --tile-baby-bg: #3e1f2c;
+  --tile-baby-ink: #f4a8c4;
+  --tile-pets-bg: #1c2b42;
+  --tile-pets-ink: #b5cdf3;
+  --tile-icon-bg: rgba(255, 255, 255, 0.1);
   --shadow: rgba(0, 0, 0, 0.45);
   --tabbar-bg: #0b1a44;
   --shade-bg: #0b1a44;
@@ -223,6 +246,16 @@
     --good-bg: #12321f;
     --navy: #0b2470;
     --navy-2: #0b2f86;
+    --pantry-btn: #2a4aa8;
+    --tile-keg-bg: #3a2b13;
+    --tile-keg-ink: #f3c27a;
+    --tile-health-bg: #12321f;
+    --tile-health-ink: #9fe3bd;
+    --tile-baby-bg: #3e1f2c;
+    --tile-baby-ink: #f4a8c4;
+    --tile-pets-bg: #1c2b42;
+    --tile-pets-ink: #b5cdf3;
+    --tile-icon-bg: rgba(255, 255, 255, 0.1);
     --shadow: rgba(0, 0, 0, 0.45);
     --tabbar-bg: #0b1a44;
     --shade-bg: #0b1a44;
@@ -261,6 +294,7 @@
   --bubble-ring: var(--surface);
   /* The web's sidebar keeps light text, so in the Plain style it's a neutral dark, not navy. */
   --chrome-bg: #1b1f1d;
+  --more-top: var(--chrome-bg);
 }
 :root[data-style='plain'][data-theme='dark'] {
   --bg: #111412;

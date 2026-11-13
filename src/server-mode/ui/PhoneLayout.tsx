@@ -14,7 +14,7 @@ import { useLive } from '../../lib/useLive';
 import { activeSections } from '../../shops';
 import { betaFor, Icon, TopBar } from '../../ui/components';
 import { isMoreTab, isSectionTab, useNav, type Screen, type Tab } from '../../ui/nav';
-import { MoreTabs } from '../../ui/screens/More';
+import { MoreTop } from '../../ui/screens/More';
 import { isV3 } from '../api';
 import { syncNow, unsentChanges } from '../live';
 import { session } from '../session';
@@ -202,19 +202,25 @@ export function MorePage() {
   const signal = (sub: string) => (offline ? 'Needs signal' : sub);
   return (
     <div className="screen pt-more">
-      <TopBar title="More" back={false} />
+      {/* 0.10.4: the phone's navy top: Keg, Health, Baby and Pets as tiles, the others to add. */}
+      <MoreTop />
       <SyncCard />
-      {/* 0.10.3: Keg, Health, Baby and Pets, as on the phone's More. */}
-      <MoreTabs />
+      {/* 0.10.4: the same five rows as the phone's More, in the same order. */}
       <div className="eyebrow">Everything else</div>
       <div className="card flush">
-        <Row icon="flame" title="Specials and catalogues" sub={offline ? 'As last saved on this phone' : 'What your phones found on special'} onClick={() => go({ name: 'specials' })} />
+        <Row icon="settings" title="Settings" sub="Shops, lists, look and colours" onClick={() => go({ name: 'settings' })} />
         <Row icon="card" title="Cards" sub="Loyalty and gift cards, on this phone" onClick={() => go({ name: 'cards' })} />
-        {settings?.receipts.enabled && <Row icon="receipt" title="Receipts" sub="Shared by your phones" onClick={() => go({ name: 'receipts' })} />}
+        <Row icon="book" title="Catalogues" sub={offline ? 'As last saved on this phone' : "Your shops' catalogues"} onClick={() => go({ name: 'catalogues' })} />
+        <Row icon="flame" title="Specials" sub={offline ? 'As last saved on this phone' : 'What your phones found on special'} onClick={() => go({ name: 'specials' })} />
+        <Row
+          icon="receipt"
+          title="Receipts"
+          sub={settings?.receipts.enabled ? 'Shared by your phones' : 'Off: turn them on in Settings'}
+          onClick={() => go(settings?.receipts.enabled ? { name: 'receipts' } : { name: 'settings' })}
+        />
       </div>
       <div className="eyebrow">Your household</div>
       <div className="card flush">
-        <Row icon="settings" title="Settings" sub="Shops, lists, look and colours" onClick={() => go({ name: 'settings' })} />
         <Row icon="server" title={house ? 'Server and phones' : 'Phones'} sub={signal('The phones using this server')} warn={offline} onClick={() => go({ name: 'server', page: 'phones' })} />
         {house && <Row icon="chart" title="Data" sub={signal('Spending, prices, export and import')} warn={offline} onClick={() => go({ name: 'server', page: 'data' })} />}
         <Row icon="list" title="Activity" sub={signal("What's been sent and fetched")} warn={offline} onClick={() => go({ name: 'server', page: 'activity' })} />

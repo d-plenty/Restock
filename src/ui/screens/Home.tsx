@@ -10,12 +10,13 @@ import { money } from '../../lib/units';
 import { lineCost } from '../../lib/verdict';
 import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
-import { isBlockMessage, isNative } from '../../stores/http';
+import { isNative } from '../../stores/http';
 import { chainName, stockKnown, type ListEntry, type Settings } from '../../types';
-import { ChainDot, ChainName, Icon, LoadingBar, OpenStoreButton, Price, SectionMark, SwapBox, Thumb } from '../components';
+import { ChainDot, ChainName, Icon, LoadingBar, Price, SectionMark, SwapBox, Thumb } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { ActionInfoTag, MemberInfoTag, MultiInfoTag } from '../tagInfo';
-import { failingStores, getHealth } from '../../lib/health';
+import { failingStores, getHealth, getHiddenWarnings, isBlockedError, isHidden } from '../../lib/health';
+import { HideForADay, UnblockButton } from '../Unblock';
 import { exportBackup, needsBackupNudge } from '../../lib/backup';
 import { syncInfo } from '../../lib/sync';
 import { protection } from '../../lib/protection';
@@ -36,7 +37,8 @@ export function HomeScreen() {
   const sync = useLive(syncInfo, []);
   const allEntries = useLive(allListEntries, []);
   const health = useLive(getHealth, []);
-  const failingAll = health ? failingStores(health) : [];
+  const hidden = useLive(getHiddenWarnings, []);
+  const failingAll = health ? failingStores(health).filter((f) => !isHidden(hidden, f.chain)) : [];
   const [errors, setErrors] = useState<Record<string, string>>({});
   // The shops whose deals show (0.8.8: pick several, from a menu). None picked: every shop.
   const [picked, setPickedState] = useState<string[]>(() => {
@@ -244,22 +246,21 @@ export function HomeScreen() {
         </div>
       )}
 
-      {Object.entries(refresh.busy ? {} : errors).map(([chain, msg]) => (
-        <div key={chain} className="banner amber" role="alert">
-          <strong>{chainName(chain)}</strong>
-          <span style={{ fontSize: 13 }}>
-            {isBlockMessage(msg)
-              ? `${chainName(chain)} wants to check you're a person. Tap Open ${chainName(chain)}, let the page load (tick the box if it asks), tap Done, and Restock checks again.`
-              : msg}
-          </span>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn small" onClick={runCheck}>
-              <Icon name="refresh" size={16} /> Try again
-            </button>
-            {isBlockMessage(msg) && chain !== 'other' && <OpenStoreButton chain={chain as StoreChain} onDone={runCheck} />}
+      {Object.entries(refresh.busy ? {} : errors).map(([chain, msg]) =>
+        isBlockedError(msg) && chain !== 'other' ? (
+          <BlockedCard key={chain} chain={chain as StoreChain} onWorked={runCheck} />
+        ) : (
+          <div key={chain} className="banner amber" role="alert">
+            <strong>{chainName(chain)}</strong>
+            <span style={{ fontSize: 13 }}>{msg}</span>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn small" onClick={runCheck}>
+                <Icon name="refresh" size={16} /> Try again
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
+        ),
+      )}
 
       {!serverMode && sync && recs.length > 0 && needsBackupNudge(settings, recs.length, oldest, Date.now(), protection(false, sync).covered) && (
         <div className="card hint" style={{ flexDirection: 'column', gap: 8 }}>
@@ -281,30 +282,29 @@ export function HomeScreen() {
 
       {failing
         .filter((f) => !errors[f.chain])
-        .map((f) => (
-          <div key={f.chain} className="banner amber" role="alert">
-            <strong>
-              {chainName(f.chain)} hasn't worked for {f.days} day{f.days === 1 ? '' : 's'}
-            </strong>
-            <span style={{ fontSize: 13 }}>
-              Its prices may be out of date.{' '}
-              {isBlockMessage(f.error ?? '')
-                ? `${chainName(f.chain)} wants to check you're a person: tap Open ${chainName(f.chain)}.`
-                : f.error
-                  ? `Last error: ${f.error}.`
-                  : ''}
-            </span>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn small" onClick={runCheck}>
-                <Icon name="refresh" size={16} /> Try again
-              </button>
-              <OpenStoreButton chain={f.chain} onDone={runCheck} />
-              <button className="btn small" onClick={() => setTesting(true)}>
-                Test connections
-              </button>
+        .map((f) =>
+          isBlockedError(f.error) ? (
+            <BlockedCard key={f.chain} chain={f.chain} onWorked={runCheck} hide />
+          ) : (
+            <div key={f.chain} className="banner amber" role="alert">
+              <strong>
+                {chainName(f.chain)} hasn't worked for {f.days} day{f.days === 1 ? '' : 's'}
+              </strong>
+              <span style={{ fontSize: 13 }}>
+                Its prices may be out of date.{f.error ? ` Last error: ${f.error.replace(/\.$/, '')}.` : ''}
+              </span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn small" onClick={runCheck}>
+                  <Icon name="refresh" size={16} /> Try again
+                </button>
+                <button className="btn small" onClick={() => setTesting(true)}>
+                  Test connections
+                </button>
+              </div>
+              <HideForADay chain={f.chain} />
             </div>
-          </div>
-        ))}
+          ),
+        )}
 
       {!recs.length && (
         <div className="card guide">
@@ -601,4 +601,22 @@ export function nextCheck(
 ): string | undefined {
   if (!s.sync.backgroundActivity) return undefined;
   return nextCheckWords({ intervalHours: s.checkIntervalHours, time: s.checkTime, weekday: s.checkWeekday }, now);
+}
+
+/**
+ * 0.10.4: a shop that's turning Restock away. It says plainly that it's the shop's website checking
+ * for bots, not Restock, then the big green Unblock and a small grey "Hide for a day".
+ */
+function BlockedCard({ chain, onWorked, hide }: { chain: StoreChain; onWorked: () => void; hide?: boolean }) {
+  return (
+    <div className="banner amber" role="alert">
+      <strong>{chainName(chain)} is blocking Restock</strong>
+      <span style={{ fontSize: 13 }}>Its website is checking for bots. That’s its check, not Restock’s. Unblock it once and prices carry on.</span>
+      <div className="unblock-actions">
+        <UnblockButton chain={chain} onWorked={onWorked} />
+        {!isNative() && <span className="small">Unblock is in the Android app: the shop’s page opens on your phone.</span>}
+        {hide && <HideForADay chain={chain} />}
+      </div>
+    </div>
+  );
 }

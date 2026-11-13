@@ -63,7 +63,8 @@ import { shopDetails } from '../../stores/details';
 import { BlockedError, isNative, NativeOnlyError, promoLabel } from '../../stores/http';
 import { CostcoLines } from '../CostcoLines';
 import { COSTCO_LIST_NOTE } from '../../lib/costcoLocal';
-import { recordHealth } from '../../lib/health';
+import { isBlockedError, recordHealth } from '../../lib/health';
+import { UnblockButton } from '../Unblock';
 import { isExactBarcode, rankAll, score, tokens, type RankQuery } from '../../stores/rank';
 import { chainName, mainProductIds, searchStoreId, stockKnown, type AlertLevel, type Chain, type Group, type ListEntry, type ListProduct } from '../../types';
 import {
@@ -99,7 +100,6 @@ import {
   LoadingBar,
   MemberTag,
   MoreInfo,
-  OpenStoreButton,
   ProductPreview,
   Sheet,
   Thumb,
@@ -111,7 +111,7 @@ import { OtherSizesCard } from '../OtherSizes';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from './addPicks';
 import { addItemForLineUndoable, addItemFromPicks, pickedWords, saveStoreProducts } from './addSave';
 import { AlertPicker } from './Item';
-import { AlwaysTick, pickButtonsNote, toPantryNote } from './addPickWords';
+import { AddPair, addButtonsNote, AlwaysTick, pickButtonsNote, toPantryNote } from './addPickWords';
 
 /**
  * 0.9.5: "Search the shops" from the Pick sheet, for a list line that matches nothing in the pantry
@@ -371,7 +371,7 @@ export function AddScreen({
       }
       setResults((r) => ({
         ...r,
-        [chain]: { status: 'error', message: e instanceof Error ? e.message : String(e), blocked: e instanceof BlockedError },
+        [chain]: { status: 'error', message: e instanceof Error ? e.message : String(e), blocked: e instanceof BlockedError || isBlockedError(e instanceof Error ? e.message : String(e)) },
       }));
     }
   };
@@ -1604,14 +1604,21 @@ export function AddScreen({
                 )}
                 {r.status === 'error' && (
                   <div className="banner amber" style={{ fontSize: 13 }}>
-                    {r.message}
+                    {r.blocked ? (
+                      <>
+                        <strong>{chainName(chain)} is blocking Restock</strong>
+                        <span>Its website is checking for bots. That’s its check, not Restock’s. Unblock it once and prices carry on.</span>
+                      </>
+                    ) : (
+                      r.message
+                    )}
                     {settings && (
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
                         <button className="btn small" style={TAP} onClick={() => void searchChain(chain, lastText, rankQ, searchStoreId(settings, chain))}>
                           <Icon name="refresh" size={16} /> Try again
                         </button>
                         {r.blocked && (
-                          <OpenStoreButton chain={chain} onDone={() => void searchChain(chain, lastText, rankQ, searchStoreId(settings, chain))} />
+                          <UnblockButton small chain={chain} onWorked={() => void searchChain(chain, lastText, rankQ, searchStoreId(settings, chain))} />
                         )}
                       </div>
                     )}
@@ -1943,18 +1950,13 @@ export function AddScreen({
                     <button className="btn primary" onClick={() => save('both')} disabled={saving}>
                       <Icon name="cart" size={18} /> Add to both
                     </button>
-                    <div className="two">
-                      <button className="btn" onClick={() => save('list')} disabled={saving}>
-                        <Icon name="cart" size={18} /> Add to list
-                      </button>
-                      <button className="btn" onClick={() => save('pantry')} disabled={saving}>
-                        <Icon name={section} size={18} /> Add to {SECTION_NAMES[section].toLowerCase()}
-                      </button>
-                    </div>
+                    <AddPair section={section} disabled={saving} onPantry={() => save('pantry')} onList={() => save('list')} />
                   </>
                 )}
                 <p className="small" style={{ margin: 0 }}>
-                  Add to list puts it on your Shopping list for this trip only, at the price shown. Restock won't keep watching its price.
+                  {tabHidden
+                    ? "Add to list puts it on your Shopping list for this trip only, at the price shown. Restock won't keep watching its price."
+                    : addButtonsNote(SECTION_PLACE[section])}
                 </p>
               </>
             )
@@ -2176,14 +2178,8 @@ export function ManualSheet({
           <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('both')}>
             Add to both
           </button>
-          <div className="two">
-            <button className="btn" disabled={!name.trim() || saving} onClick={() => save('list')}>
-              Add to list
-            </button>
-            <button className="btn" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
-              Add to {SECTION_NAMES[section].toLowerCase()}
-            </button>
-          </div>
+          <AddPair section={section} disabled={!name.trim() || saving} onPantry={() => save('pantry')} onList={() => save('list')} />
+          <p className="small" style={{ margin: 0 }}>{addButtonsNote(SECTION_PLACE[section])}</p>
         </>
       )}
     </Sheet>
@@ -2329,14 +2325,7 @@ export function PickButtons({ forLine, section, saving, onSave }: { forLine: For
       <button className="btn primary" onClick={() => onSave('both')} disabled={saving}>
         <Icon name="cart" size={18} /> Add to both
       </button>
-      <div className="two">
-        <button className="btn" onClick={() => onSave('list')} disabled={saving}>
-          <Icon name="cart" size={18} /> Add to list
-        </button>
-        <button className="btn" onClick={() => onSave('pantry')} disabled={saving}>
-          <Icon name={section} size={18} /> Add to {SECTION_NAMES[section].toLowerCase()}
-        </button>
-      </div>
+      <AddPair section={section} disabled={saving} onPantry={() => onSave('pantry')} onList={() => onSave('list')} />
       <p className="small" style={{ margin: 0 }}>{pickButtonsNote(SECTION_PLACE[section])}</p>
     </>
   );

@@ -24,6 +24,13 @@ const paths: Record<string, ReactNode> = {
       <path d="M8 11V7a4 4 0 0 1 8 0v4" />
     </>
   ),
+  // 0.10.4: Unblock a shop (an open padlock).
+  unlock: (
+    <>
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 7.5-2" />
+    </>
+  ),
   folder: <path d="M3 6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
   // 0.9.4: a home server, and phones on the Wi-Fi (Sync and backups).
   server: <path d="M5 4h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM5 13h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2zM7 7.5h.01M7 16.5h.01" />,
