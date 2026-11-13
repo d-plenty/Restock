@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.2" src="https://img.shields.io/badge/status-release%20candidate%200.10.2-ffcd00">
+  <img alt="Release candidate 0.10.3" src="https://img.shields.io/badge/status-release%20candidate%200.10.3-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0102">New in 0.10.2</a> ·
+  <a href="#new-in-0103">New in 0.10.3</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -130,6 +130,20 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.3
+
+Release candidate 4: Baby and Pets tabs, any shop on any tab, a new bottom bar, IGA, and spotting specials that never end.
+
+- **A new bottom bar: Home, Pantry, Add, List and More.** More holds Keg, Health, Baby and Pets (once they're set up), Settings, Cards, Catalogues, Specials and Receipts, so the bar never gets crowded. The same on the web page and the iPhone web app.
+- **Baby and Pets tabs (Beta)**, working the same as Pantry: nappies, wipes and formula; pet food, litter and treats. Set them up in setup or from More, or skip them and they don't show.
+- **Shops for each tab:** every tab's page lists every shop Restock knows, under headings (Supermarkets, Chemists, Bottle shops, Baby shops, Pet shops, Big box stores, Other shops), and you tick the ones that tab searches. A shop can be on more than one tab (Woolworths for Pantry and for Baby, say), with the same branch. Nothing's ticked to start with on a new phone. Add your own shop is under Other shops.
+- **New shops (Beta):** IGA, Baby Bunting, Petbarn, Petstock, Pet Circle, Big W, Kmart, Target and Bunnings, read from their websites like the chemists.
+- **IGA:** each IGA sets its own prices, so tap **Choose your IGA store** under its tick, pick your store on IGA's own website (and sign in there if you like), and Restock reads that store's prices.
+- **Always on special:** something "on special" at least 14 of the last 21 days, and never seen at its "was" price in that time, is marked **ALWAYS ON SPECIAL**: the special price is really its usual price, so it isn't called a deal or sent as an alert.
+- **Set up a card:** pick the kind of barcode on it (with a picture of each), scan it, then find whose card it is: Flybuys, Everyday Rewards, IGA Rewards, Bunnings PowerPass, Petbarn, Priceline Sister Club, My Dan's and more, or Other with any name. Known cards show in their shop's colours (no logos).
+- **Advanced → Diagnostics → Shop test:** try any shop, see what came back and how it was read (or why not), and copy a report to send.
+- Updating from 0.10.2 keeps everything as it was: your supermarkets stay on Pantry, bottle shops on Keg and chemists on Health. Baby and Pets travel with Groceries between your phones and your server, so **update every phone to 0.10.3** (a phone still on 0.10.2 shows Baby and Pets things in its Pantry until it's updated).
 
 ## New in 0.10.2
 
@@ -293,7 +307,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.2.apk` (on macOS, `shasum -a 256 restock-0.10.2.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.3.apk` (on macOS, `shasum -a 256 restock-0.10.3.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -479,7 +493,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is at its **third release candidate** (0.10.2): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is at its **fourth release candidate** (0.10.3): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.

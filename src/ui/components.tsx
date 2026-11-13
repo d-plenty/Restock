@@ -47,6 +47,31 @@ const paths: Record<string, ReactNode> = {
       <path d="M12 7.5v9M7.5 12h9" stroke="#fff" strokeWidth="2.6" />
     </>
   ),
+  // 0.10.3: the Baby tab (a baby bottle) and the Pets tab (a paw), and More on the bottom bar (moretabs: a grid of four).
+  baby: (
+    <>
+      <path d="M10 2h4v3h-4z" />
+      <path d="M9 5h6l1 3v11a3 3 0 0 1-3 3h-2a3 3 0 0 1-3-3V8z" />
+      <path d="M8 12h3M8 16h3" />
+    </>
+  ),
+  pets: (
+    <>
+      <circle cx="7" cy="9" r="1.8" />
+      <circle cx="11" cy="5.5" r="1.8" />
+      <circle cx="16" cy="6.5" r="1.8" />
+      <circle cx="19" cy="11" r="1.8" />
+      <path d="M8.5 17.5c0-3 2-5.5 4.5-5.5s4.5 2.5 4.5 5c0 2-1.5 3-3 3-1 0-1.5-.6-2.5-.6s-1.6.6-2.5.6c-.6 0-1-.2-1-2.5z" />
+    </>
+  ),
+  moretabs: (
+    <>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.6" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6" />
+    </>
+  ),
   // 0.9.5: the General list (a shopping bag, in plain strokes).
   general: (
     <>
@@ -234,9 +259,9 @@ export function TopBar({ title, right, back = true }: { title: string; right?: R
  * 0.10.0: "Beta" beside the Keg and Health tabs and their shops, everywhere they're named (phone,
  * web page, iPhone web app): still being worked on. Nothing else about them changes.
  */
-export const BETA_SECTIONS: readonly string[] = ['keg', 'pharmacy'];
-/** 0.10.2: shops marked Beta where they're picked or set up (it works the same; it's tested less). */
-export const BETA_SHOPS: readonly string[] = ['costco'];
+export const BETA_SECTIONS: readonly string[] = ['keg', 'pharmacy', 'baby', 'pets'];
+/** 0.10.2: shops marked Beta where they're picked or set up (it works the same; it's tested less). 0.10.3: and IGA and the new shops (shops.ts). */
+export { BETA_SHOPS } from '../shops';
 export const COSTCO_BETA_NOTE = "Costco is in beta: it works the same way as the other supermarkets, it just hasn't been tested as thoroughly yet.";
 /** What the Beta means, wherever it's explained (setup, Settings, the tab itself, the web page). */
 export const BETA_NOTE =

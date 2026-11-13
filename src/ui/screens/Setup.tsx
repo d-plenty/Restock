@@ -40,6 +40,9 @@ export type TileId =
   | 'pantry'
   | 'keg'
   | 'pharmacy'
+  // 0.10.3 (beta): the Baby and Pets tabs.
+  | 'baby'
+  | 'pets'
   | 'permissions'
   | 'receipts'
   | 'recalls'
@@ -69,10 +72,11 @@ const ALL_TILES: Tile[] = [
   {
     id: 'pantry',
     title: 'Supermarkets',
-    sub: 'Woolworths, Coles, Aldi, Costco (beta)',
+    sub: 'Pantry tab · Woolworths, Coles, Aldi, IGA and more',
     icon: 'cart',
     heading: 'Where do you shop?',
-    intro: 'Pick your supermarkets and nearest branches. Each shop has its sign-in (optional) and what works under its tick.',
+    intro:
+      "Tick the shops your Pantry searches and compares: supermarkets, or any shop below. Nothing's ticked to start with. Each shop has its sign-in (optional) and what works under its tick.",
   },
   {
     id: 'keg',
@@ -89,6 +93,22 @@ const ALL_TILES: Tile[] = [
     icon: 'pharmacy',
     heading: 'Track chemists too?',
     intro: `Medicine, first aid and personal care on a Health tab of its own, kept apart from groceries. ${BETA_NOTE}`,
+  },
+  {
+    id: 'baby',
+    title: 'Baby',
+    sub: 'Baby tab · Beta',
+    icon: 'baby',
+    heading: 'Track baby things too?',
+    intro: `Nappies, wipes, formula and baby food on a Baby tab of its own. Pick any shops for it: Baby Bunting, chemists, Big W, supermarkets. Skip it if it's not for you, and it won't show. ${BETA_NOTE}`,
+  },
+  {
+    id: 'pets',
+    title: 'Pets',
+    sub: 'Pets tab · Beta',
+    icon: 'pets',
+    heading: 'Track pet things too?',
+    intro: `Pet food, litter and treats on a Pets tab of its own. Pick any shops for it: Petbarn, Petstock, Pet Circle, supermarkets, Bunnings. Skip it if it's not for you, and it won't show. ${BETA_NOTE}`,
   },
   {
     id: 'permissions',
@@ -218,7 +238,9 @@ const ALL_TILES: Tile[] = [
 // "Our house") and are all in Settings. The household's name is set in Sync and backups.
 // 0.9.12: what a new person cares about first: their shops, then how deals are judged and told,
 // then keeping it safe and shared, then the extras.
-const TILE_ORDER: TileId[] = ['a11y', 'pantry', 'history', 'alerts', 'accounts', 'permissions', 'backups', 'sync', 'keg', 'pharmacy', 'receipts', 'recalls'];
+const TILE_ORDER: TileId[] = ['a11y', 'pantry', 'history', 'alerts', 'accounts', 'permissions', 'backups', 'sync', 'keg', 'pharmacy', 'baby', 'pets', 'receipts', 'recalls'];
+const TAB_TILES: readonly string[] = ['keg', 'pharmacy', 'baby', 'pets'];
+const isTabTile = (id: TileId): id is 'keg' | 'pharmacy' | 'baby' | 'pets' => TAB_TILES.includes(id);
 // The Updates tile only where Restock updates itself from GitHub (not F-Droid builds).
 export const TILES: Tile[] = TILE_ORDER.filter((id) => SELF_UPDATE || id !== 'updates').map((id) => ALL_TILES.find((t) => t.id === id)!);
 
@@ -236,8 +258,8 @@ export function tileStatus(s: Settings, id: TileId, cover?: Cover): { text: stri
   if (id === 'receipts' && (s.receipts.enabled || s.setup.done.includes(id))) return { text: s.receipts.enabled ? 'On' : 'Off', ok: true };
   // Shop tiles count as done when the tab is really on (shops picked), after a restore or joining a
   // household, say, not only when set up here. Decided to leave it off: "Off", done.
-  if ((id === 'keg' || id === 'pharmacy') && sectionOn(s, id)) return { text: 'On', ok: true };
-  if ((id === 'keg' || id === 'pharmacy') && s.setup.done.includes(id)) return { text: 'Off', ok: true };
+  if (isTabTile(id) && sectionOn(s, id)) return { text: 'On', ok: true };
+  if (isTabTile(id) && s.setup.done.includes(id)) return { text: 'Off', ok: true };
   if (id === 'pantry' && !s.setup.done.includes(id) && Object.values(s.stores).some((c) => c?.primary || c?.storeId))
     return { text: 'Done ✓', ok: true };
   if (s.setup.done.includes(id)) return { text: 'Done ✓', ok: true };
@@ -566,6 +588,10 @@ function TileBody({ id, settings }: { id: TileId; settings: Settings }): ReactNo
       return <StoreFields settings={settings} section="keg" inSetup />;
     case 'pharmacy':
       return <StoreFields settings={settings} section="pharmacy" inSetup />;
+    case 'baby':
+      return <StoreFields settings={settings} section="baby" inSetup />;
+    case 'pets':
+      return <StoreFields settings={settings} section="pets" inSetup />;
     case 'permissions':
       return (
         <>
@@ -631,7 +657,15 @@ function TilePage({
   onBack: () => void;
   onNext: (how: 'done' | 'skipped') => void;
 }) {
-  const needsShop = tile.id === 'pantry' && !enabledIn(settings.enabledChains, 'pantry').length;
+  const needsShop = tile.id === 'pantry' && !enabledIn(settings.enabledChains, 'pantry', settings.shopTabs ?? {}).length;
+  // 0.10.3: on a new phone nothing's ticked to start with: you pick your shops (Pantry needs one).
+  // A phone that has shops already (restored, joined a household, set up before) keeps them.
+  useEffect(() => {
+    if (tile.id !== 'pantry' || settings.onboarded || settings.setup.done.includes('pantry')) return;
+    const untouched = settings.enabledChains.join() === 'woolworths,coles,aldi' && !Object.values(settings.stores).some((c) => c?.primary || c?.storeId);
+    if (untouched) void updateSettings({ enabledChains: [] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Changed something here and went back to the tiles without Next: that's set up, not skipped.
   const [opened] = useState(() => JSON.stringify(settings));
   const back = async () => {
@@ -658,9 +692,12 @@ function TilePage({
       <TileBody id={tile.id} settings={settings} />
       <div className="spacer" />
       <div className="setup-foot">
-        <button className="btn" onClick={() => onNext('skipped')}>
-          Skip
-        </button>
+        {/* 0.10.3: Pantry's shops can't be skipped (it's the heart of Restock); the other tabs can. */}
+        {tile.id !== 'pantry' && (
+          <button className="btn" onClick={() => onNext('skipped')}>
+            Skip
+          </button>
+        )}
         <button className="btn primary" disabled={needsShop} onClick={() => onNext('done')}>
           Next
         </button>

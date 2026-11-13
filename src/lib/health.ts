@@ -1,6 +1,6 @@
 import { adapterFor } from '../stores';
 import type { Chain } from '../types';
-import { isPressOnlyShop, kindOf, sectionOf } from '../shops';
+import { isPressOnlyShop, kindOf, sectionOf, type Section } from '../shops';
 import { getKV, putKV } from './db';
 
 // How each store's connection has been going: the last time it worked, and since when it's
@@ -61,12 +61,15 @@ export interface ConnectionTest {
 }
 
 /** Try a real search at each store, like adding an item would. */
+/** The word Restock searches for when testing a shop (0.10.3: Baby and Pets too). */
+export const TEST_WORD: Record<Section, string> = { pantry: 'milk', keg: 'beer', pharmacy: 'paracetamol', baby: 'nappies', pets: 'dog food' };
+
 export async function testConnections(chains: StoreChain[], storeIds: Partial<Record<StoreChain, string | undefined>>): Promise<ConnectionTest[]> {
   const results = await Promise.all(
     // 0.9.6: never Costco: it is only searched one page at a time, when a person presses Search.
     chains.filter((c) => !isPressOnlyShop(c)).map(async (chain): Promise<ConnectionTest> => {
       const t0 = Date.now();
-      const word = { pantry: 'milk', keg: 'beer', pharmacy: 'paracetamol' }[sectionOf(chain)];
+      const word = TEST_WORD[sectionOf(chain)];
       try {
         // Shop websites read through the hidden browser can take a while to draw.
         const items = await withTimeout(adapterFor(chain)!.search(word, storeIds[chain]), kindOf(chain) === 'web' ? 75_000 : 30_000);

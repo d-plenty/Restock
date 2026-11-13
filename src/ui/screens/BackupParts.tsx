@@ -102,7 +102,7 @@ export function PartsPicker({
       </span>
     </label>
   );
-  const SHOP_WORD: Record<Section, string> = { pantry: 'supermarkets', keg: 'bottle shops', pharmacy: 'pharmacies' };
+  const SHOP_WORD: Record<Section, string> = { pantry: 'supermarkets', keg: 'bottle shops', pharmacy: 'pharmacies', baby: 'baby shops', pets: 'pet shops' };
   const tabsWithItems = SECTIONS.filter((s) => counts.bySection[s] > 0);
   return (
     <div className="card flush">

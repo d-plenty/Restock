@@ -1,5 +1,5 @@
 import { stockKnown, type Product, type Settings } from '../types';
-import { customShop, priceSource, sectionOf, sectionOn, shopDef } from '../shops';
+import { customShop, priceSource, sectionOn, shopDef, tabsOf } from '../shops';
 import { allGroups, cardChains, getProducts, getProductsByBarcode, getSettings, groupProductIds, readingsFor } from './db';
 import { hasSize } from './unitPrice';
 import { recommend, type Recommendation } from './verdict';
@@ -10,13 +10,14 @@ import { recommend, type Recommendation } from './verdict';
  * same shops the price check checks (check.ts, PriceChecker.java). Hand-typed prices ('other')
  * always count; recommend() lets them through.
  */
-export function shopsOn(settings: Pick<Settings, 'enabledChains' | 'sections'> & Partial<Pick<Settings, 'costco'>>): Set<string> {
+export function shopsOn(settings: Pick<Settings, 'enabledChains' | 'sections'> & Partial<Pick<Settings, 'costco' | 'shopTabs'>>): Set<string> {
   const on = new Set<string>();
   // 0.9.6: Costco is this phone's own switch (settings.costco), not one of the household's shops.
   if (settings.costco?.on) on.add('costco');
   for (const c of settings.enabledChains ?? []) {
     if (!shopDef(c) && !customShop(c)) continue;
-    if (!sectionOn(settings, sectionOf(c))) continue;
+    // 0.10.3: counts when any tab it's in is on.
+    if (!tabsOf(c, settings.shopTabs ?? {}).some((t) => sectionOn(settings, t))) continue;
     on.add(c);
     on.add(priceSource(c));
   }

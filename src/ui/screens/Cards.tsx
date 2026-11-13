@@ -20,8 +20,9 @@ import {
 } from '../../lib/giftCards';
 import { shareTextFile } from '../../lib/shareFile';
 import { localDay } from '../../lib/verdict';
-import type { GiftCard, LoyaltyCard } from '../../types';
-import { Icon, Sheet, TopBar } from '../components';
+import type { GiftBarcodeType, GiftCard, LoyaltyCard } from '../../types';
+import { brandOf, loyaltyCodeType } from '../../lib/cardBrands';
+import { Icon, LoadingBar, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
 import { CardCode } from './CardCode';
 import { AddCardSheet, BalanceSheet, EditGiftSheet, keptText, PROGRAMS } from './CardForm';
@@ -73,6 +74,12 @@ function useCards(store: CardStore): { loyalty: LoyaltyCard[]; gifts: GiftCard[]
 
 type Pick = { kind: 'loyalty' | 'gift'; id: string };
 const loyaltyName = (c: LoyaltyCard) => (c.program === 'other' ? c.label : (PROGRAMS[c.program]?.name ?? c.label));
+// 0.10.3: a known card (by its name: Bunnings PowerPass, IGA Rewards) is drawn in its shop's colours.
+const loyaltyUse = (c: LoyaltyCard) => (c.program === 'other' ? (brandOf(c)?.use ?? PROGRAMS.other.use) : (PROGRAMS[c.program]?.use ?? ''));
+function loyaltySwatch(c: LoyaltyCard) {
+  const b = c.program === 'other' ? brandOf(c) : undefined;
+  return <span className={`swatch ${b ? 'brand' : c.program}`} style={b ? { background: b.bg } : undefined} aria-hidden="true" />;
+}
 const shortDay = (iso: string) => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 
 export function CardsScreen({
@@ -210,7 +217,7 @@ export function CardsScreen({
       <TopBar title="Cards" back={back} />
       {intro}
 
-      {shownLoyalty && <LoyaltyView card={shownLoyalty} />}
+      {shownLoyalty && <LoyaltyView store={store} card={shownLoyalty} />}
       {shownGift && <GiftView key={shownGift.id} store={store} card={shownGift} />}
 
       {shownGift && (
@@ -233,7 +240,7 @@ export function CardsScreen({
 
       {loyalty.length > 0 && <div className="eyebrow">Loyalty cards</div>}
       {loyalty.map((c) =>
-        listRow(c.id, 'loyalty', loyaltyName(c), PROGRAMS[c.program]?.use ?? '', <span className={`swatch ${c.program}`} aria-hidden="true" />, c.id === shownLoyalty?.id),
+        listRow(c.id, 'loyalty', loyaltyName(c), loyaltyUse(c), loyaltySwatch(c), c.id === shownLoyalty?.id),
       )}
       {active.length > 0 && <div className="eyebrow">Gift cards</div>}
       {active.map((g) => listRow(g.id, 'gift', g.name, giftSub(g), giftSwatch(g), g.id === shownGift?.id))}
@@ -303,17 +310,26 @@ export function CardsScreen({
   );
 }
 
-function LoyaltyView({ card }: { card: LoyaltyCard }) {
+function LoyaltyView({ store, card }: { store: CardStore; card: LoyaltyCard }) {
   const [reveal, setReveal] = useState(false);
+  const [types, setTypes] = useState<Partial<Record<string, GiftBarcodeType>>>();
   useEffect(() => setReveal(false), [card.id]);
+  useEffect(() => {
+    let alive = true;
+    void (store.codeTypes?.() ?? Promise.resolve({})).then((t) => alive && setTypes(t)).catch(() => alive && setTypes({}));
+    return () => {
+      alive = false;
+    };
+  }, [store, card.id]);
+  const b = card.program === 'other' ? brandOf(card) : undefined;
   return (
-    <div className={`loyalty ${card.program}`}>
+    <div className={`loyalty ${b ? 'brand' : card.program}`} style={b ? { background: b.bg, color: b.ink } : undefined}>
       <div className="cc-head">
         <div className="cc-name">{loyaltyName(card)}</div>
-        <div style={{ fontSize: 12 }}>{PROGRAMS[card.program]?.use.split(',')[0]}</div>
+        <div style={{ fontSize: 12 }}>{loyaltyUse(card).split(',')[0]}</div>
       </div>
       <div className="barcode-panel">
-        <CardBarcode value={card.number} />
+        {types ? <CardCode value={card.number} type={loyaltyCodeType(card, types)} cache={store.codeCache} /> : <LoadingBar seconds={1} />}
         <button className="num cc-reveal" onClick={() => setReveal((v) => !v)} aria-label={reveal ? 'Hide card number' : 'Show card number'}>
           {reveal ? card.number : masked(card.number)}
         </button>

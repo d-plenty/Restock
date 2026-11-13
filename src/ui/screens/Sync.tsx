@@ -272,7 +272,7 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
 
 /** The tabs a household can share, in plain words. */
 export const SHARE_TABS: { tab: Section; title: string; sub: string }[] = [
-  { tab: 'pantry', title: 'Groceries', sub: 'Pantry, its shopping list (and General) and prices' },
+  { tab: 'pantry', title: 'Groceries', sub: 'Pantry, its shopping list (and General, Baby and Pets) and prices' },
   { tab: 'keg', title: 'Bottle shops', sub: 'Keg tab · 18+' },
   { tab: 'pharmacy', title: 'Health', sub: 'Health tab' },
 ];

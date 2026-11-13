@@ -1,4 +1,4 @@
-import { SHOPS, isLocalOnlyShop, shopDef, type Section, type StoreChain } from '../shops';
+import { SHOPS, groupOf, isLocalOnlyShop, shopDef, type Section, type ShopGroup, type StoreChain } from '../shops';
 import { APP_UA, num, request, sleep } from '../stores/http';
 
 // Finding nearby stores, using OpenStreetMap's free public services from this phone:
@@ -119,9 +119,21 @@ const FAKE_NEAR: Record<Section, [StoreChain, string, number][]> = {
     ['priceline', 'Priceline Pharmacy Stockland', 9.4],
     ['amcal', 'Amcal Aitkenvale', 11.2],
   ],
+  baby: [
+    ['babybunting', 'Baby Bunting Townsville', 6.2],
+    ['bigw', 'Big W Willows', 5.6],
+    ['kmart', 'Kmart Willows', 5.7],
+  ],
+  pets: [
+    ['petbarn', 'Petbarn Townsville', 6.4],
+    ['petstock', 'Petstock Kirwan', 3.9],
+    ['bunnings', 'Bunnings Thuringowa', 4.6],
+  ],
 };
-function fakeNearby(section: Section, lat: number, lon: number): NearbyStore[] {
-  return FAKE_NEAR[section].map(([chain, name, km]) => ({ chain, name, km, lat, lon, address: name.split(' ').slice(-1)[0] }));
+function fakeNearby(section: Section, lat: number, lon: number, chains?: readonly string[]): NearbyStore[] {
+  // 0.10.3: a tab's shops can come from other tabs too (Woolworths in Baby): theirs as well.
+  const rows = [...FAKE_NEAR[section], ...Object.entries(FAKE_NEAR).filter(([s]) => s !== section).flatMap(([, r]) => r.filter(([c]) => chains?.includes(c)))];
+  return rows.map(([chain, name, km]) => ({ chain, name, km, lat, lon, address: name.split(' ').slice(-1)[0] }));
 }
 
 /** Suburb or postcode → places in Australia. */
@@ -149,15 +161,18 @@ export async function describePosition(lat: number, lon: number): Promise<string
 }
 
 /** Which shop a map entry is, among the shops in a section (or all of them). */
-export function chainOf(tags: Record<string, string>, section?: Section): StoreChain | undefined {
+export function chainOf(tags: Record<string, string>, section?: Section, chains?: readonly string[]): StoreChain | undefined {
   const s = `${tags.brand ?? ''} ${tags.name ?? ''} ${tags.operator ?? ''}`;
   // More specific names first, so "Liquorland Warehouse" isn't read as plain Liquorland.
-  const shops = SHOPS.filter((d) => !isLocalOnlyShop(d.id) && (!section || d.section === section)).sort((a, b) => b.name.length - a.name.length);
+  // 0.10.3: a tab's own shops, and any other shops picked for it (`chains`).
+  const shops = SHOPS.filter((d) => !isLocalOnlyShop(d.id) && (!section || d.section === section || !!chains?.includes(d.id))).sort(
+    (a, b) => b.name.length - a.name.length,
+  );
   for (const d of shops) if (d.map.test(s)) return d.id;
   return undefined;
 }
 
-export function parseStores(data: unknown, from: { lat: number; lon: number }, section?: Section): NearbyStore[] {
+export function parseStores(data: unknown, from: { lat: number; lon: number }, section?: Section, chains?: readonly string[]): NearbyStore[] {
   const els = ((data as Raw)?.elements ?? []) as Raw[];
   const out: NearbyStore[] = [];
   for (const e of els) {
@@ -165,7 +180,7 @@ export function parseStores(data: unknown, from: { lat: number; lon: number }, s
     const centre = (e.center ?? e) as Raw;
     const lat = num(centre.lat);
     const lon = num(centre.lon);
-    const chain = chainOf(tags, section);
+    const chain = chainOf(tags, section, chains);
     if (!chain || lat === undefined || lon === undefined) continue;
     const suburb = tags['addr:suburb'] ?? tags['addr:city'];
     const street = [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' ');
@@ -210,15 +225,28 @@ function storeNumber(tags: Record<string, string>): string | undefined {
 }
 
 /** Every supermarket, bottle shop or pharmacy nearby; the chains are picked out on the phone. Plain tag lookups keep this fast. */
-export function overpassQuery(lat: number, lon: number, metres: number, section: Section = 'pantry'): string {
+const GROUP_TAGS: Record<ShopGroup, string[]> = {
+  supermarket: ['["shop"="supermarket"]'],
+  bottle: ['["shop"~"^(alcohol|wine|beverages)$"]'],
+  pharmacy: ['["amenity"="pharmacy"]', '["shop"="chemist"]'],
+  baby: ['["shop"="baby_goods"]'],
+  pet: ['["shop"="pet"]'],
+  bigbox: ['["shop"~"^(department_store|variety_store)$"]'],
+  other: ['["shop"~"^(doityourself|hardware|wholesale)$"]'],
+};
+const TAB_GROUP: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bottle', pharmacy: 'pharmacy', baby: 'baby', pets: 'pet' };
+
+export function overpassQuery(lat: number, lon: number, metres: number, section: Section = 'pantry', chains?: readonly string[]): string {
   // 0.9.0: rounded to about 100 m (roundCoord); still written with 5 places, as before.
   const at = `(around:${metres},${roundCoord(lat).toFixed(5)},${roundCoord(lon).toFixed(5)})`;
-  const what =
-    section === 'keg'
-      ? `nwr["shop"~"^(alcohol|wine|beverages)$"]${at};`
-      : section === 'pharmacy'
-        ? `(nwr["amenity"="pharmacy"]${at};nwr["shop"="chemist"]${at};);`
-        : `nwr["shop"="supermarket"]${at};`;
+  // 0.10.3: the kinds of shop the tab's shops are (Woolworths in Baby: supermarkets too).
+  const groups = new Set<ShopGroup>([TAB_GROUP[section]]);
+  for (const c of chains ?? []) {
+    const d = shopDef(c);
+    if (d) groups.add(groupOf(d));
+  }
+  const parts = [...groups].flatMap((g) => GROUP_TAGS[g]).map((t) => `nwr${t}${at};`);
+  const what = parts.length === 1 ? parts[0] : `(${parts.join('')});`;
   return `[out:json][timeout:20];${what}out center tags 300;`;
 }
 
@@ -289,9 +317,9 @@ export async function overpassInTurn<T>(servers: string[], ask: (base: string) =
   throw last;
 }
 
-async function overpassFrom(base: string, lat: number, lon: number, section: Section): Promise<NearbyStore[]> {
+async function overpassFrom(base: string, lat: number, lon: number, section: Section, chains?: readonly string[]): Promise<NearbyStore[]> {
   const res = await request({
-    url: `${base}?data=${encodeURIComponent(overpassQuery(lat, lon, RADIUS_M, section))}`,
+    url: `${base}?data=${encodeURIComponent(overpassQuery(lat, lon, RADIUS_M, section, chains))}`,
     headers: HEADERS,
     timeoutMs: 25_000,
   });
@@ -299,7 +327,7 @@ async function overpassFrom(base: string, lat: number, lon: number, section: Sec
   const data = JSON.parse(res.text) as Raw;
   // A busy server answers "200 OK" with a remark instead of results.
   if (typeof data.remark === 'string' && /error|timed out/i.test(data.remark)) throw new Error('map server busy');
-  return dedupe(parseStores(data, { lat, lon }, section));
+  return dedupe(parseStores(data, { lat, lon }, section, chains));
 }
 
 /** Backup: ask Nominatim for each chain's name inside a box around you. */
@@ -354,7 +382,7 @@ export async function nominatimStores(lat: number, lon: number, section: Section
             },
           };
         });
-      all.push(...parseStores({ elements }, { lat, lon }, section));
+      all.push(...parseStores({ elements }, { lat, lon }, section, chains));
     }
     await sleep(1100); // Nominatim asks for no more than one request a second.
   }
@@ -366,7 +394,9 @@ export async function nominatimStores(lat: number, lon: number, section: Section
 const nearbyCache = new Map<string, NearbyStore[]>();
 
 export async function nearbyStores(lat: number, lon: number, section: Section = 'pantry', chains?: StoreChain[]): Promise<NearbyStore[]> {
-  const key = `${section}:${lat.toFixed(3)},${lon.toFixed(3)}`;
+  // 0.10.3: shops from other tabs change what's asked for, so they're part of the key.
+  const others = (chains ?? []).filter((c) => shopDef(c) && shopDef(c)!.section !== section).sort();
+  const key = `${section}${others.length ? `+${others.join(',')}` : ''}:${lat.toFixed(3)},${lon.toFixed(3)}`;
   const hit = nearbyCache.get(key);
   if (hit) return hit;
   const found = await nearbyStoresFresh(lat, lon, section, chains);
@@ -379,8 +409,8 @@ export async function nearbyStores(lat: number, lon: number, section: Section = 
  * search by each shop's name (which finds branches the map hasn't tagged with a brand).
  */
 export async function findPickedShops(lat: number, lon: number, section: Section, chains: StoreChain[]): Promise<NearbyStore[]> {
-  if (import.meta.env.VITE_FAKE_STORES === '1') return fakeNearby(section, lat, lon).filter((s) => chains.includes(s.chain));
-  const [map, byName] = await Promise.allSettled([nearbyStores(lat, lon, section), nominatimStores(lat, lon, section, chains)]);
+  if (import.meta.env.VITE_FAKE_STORES === '1') return fakeNearby(section, lat, lon, chains).filter((s) => chains.includes(s.chain));
+  const [map, byName] = await Promise.allSettled([nearbyStores(lat, lon, section, chains), nominatimStores(lat, lon, section, chains)]);
   if (map.status === 'rejected' && byName.status === 'rejected') throw map.reason;
   const all = [...(map.status === 'fulfilled' ? map.value : []), ...(byName.status === 'fulfilled' ? byName.value : [])];
   return dedupe(all.filter((s) => chains.includes(s.chain)).sort((a, b) => a.km - b.km));
@@ -388,12 +418,12 @@ export async function findPickedShops(lat: number, lon: number, section: Section
 
 async function nearbyStoresFresh(lat: number, lon: number, section: Section, chains?: StoreChain[]): Promise<NearbyStore[]> {
   // Test builds only (VITE_FAKE_STORES=1): canned shops so the finder can be clicked through off-phone.
-  if (import.meta.env.VITE_FAKE_STORES === '1') return fakeNearby(section, lat, lon);
+  if (import.meta.env.VITE_FAKE_STORES === '1') return fakeNearby(section, lat, lon, chains);
   // 0.9.0: ask the map servers one at a time, the next only if the one before fails, and take
   // the first good answer. If they're slow or all fail, the Nominatim backup starts too. Once the
   // backup has answered, no further map server is asked.
   let answered = false;
-  const servers = overpassInTurn(OVERPASS, (b) => overpassFrom(b, lat, lon, section), () => answered);
+  const servers = overpassInTurn(OVERPASS, (b) => overpassFrom(b, lat, lon, section, chains), () => answered);
   let backupStarted = false;
   const backup = new Promise<NearbyStore[]>((resolve, reject) => {
     const start = () => {

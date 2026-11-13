@@ -13,7 +13,8 @@ import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { activeSections } from '../../shops';
 import { betaFor, Icon, TopBar } from '../../ui/components';
-import { isSectionTab, useNav, type Screen, type Tab } from '../../ui/nav';
+import { isMoreTab, isSectionTab, useNav, type Screen, type Tab } from '../../ui/nav';
+import { MoreTabs } from '../../ui/screens/More';
 import { isV3 } from '../api';
 import { syncNow, unsentChanges } from '../live';
 import { session } from '../session';
@@ -36,11 +37,11 @@ const setMore = (d: number) => {
 };
 const useMoreOpen = () => useSyncExternalStore(onMore, () => moreOpen > 0);
 
+// 0.10.3: as the phone's bar (Home, Pantry, Add, List, More), without Add: Keg, Health, Baby and
+// Pets are in More, as on the phone.
 const BAR: { id: Tab; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'pantry', label: 'Pantry', icon: 'pantry' },
-  { id: 'keg', label: 'Keg', icon: 'keg' },
-  { id: 'pharmacy', label: 'Health', icon: 'pharmacy' },
   { id: 'list', label: 'List', icon: 'cart' },
 ];
 
@@ -61,11 +62,11 @@ function PhoneTabs() {
     return () => ro?.disconnect();
   }, [ready]);
   if (!settings) return null;
-  // As App.tsx: Keg and Health show when they're on and not hidden from the bar.
+  // As App.tsx: a tab that's off shows Pantry; Keg, Health, Baby and Pets light up More.
   const on = activeSections(settings);
-  const inBar = on.filter((sec) => sec === 'pantry' || !settings.hiddenTabs?.includes(sec));
-  const tabs = BAR.filter((t) => !isSectionTab(t.id) || inBar.includes(t.id));
-  const shown: Tab = isSectionTab(nav.tab) && !inBar.includes(nav.tab) ? 'pantry' : nav.tab;
+  const tabs = BAR;
+  const shown: Tab = isSectionTab(nav.tab) && !on.includes(nav.tab) ? 'pantry' : nav.tab;
+  const inMore = more || isMoreTab(shown);
   const n = tabs.length + 1;
   return (
     <nav ref={bar} className="tabs pt-tabs" aria-label="Main" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
@@ -73,7 +74,7 @@ function PhoneTabs() {
         <button
           key={t.id}
           className={`tab${t.id === 'pharmacy' ? ' pharm' : ''}`}
-          aria-current={!more && shown === t.id ? 'page' : undefined}
+          aria-current={!inMore && shown === t.id ? 'page' : undefined}
           onClick={() => nav.setTab(t.id)}
         >
           <Icon name={t.icon} />
@@ -83,12 +84,12 @@ function PhoneTabs() {
       ))}
       <button
         className="tab"
-        aria-current={more ? 'page' : undefined}
+        aria-current={inMore ? 'page' : undefined}
         onClick={() => {
           if (!more) nav.push({ name: 'server', page: 'more' });
         }}
       >
-        <Icon name="more" />
+        <Icon name="moretabs" />
         More
       </button>
     </nav>
@@ -203,6 +204,9 @@ export function MorePage() {
     <div className="screen pt-more">
       <TopBar title="More" back={false} />
       <SyncCard />
+      {/* 0.10.3: Keg, Health, Baby and Pets, as on the phone's More. */}
+      <MoreTabs />
+      <div className="eyebrow">Everything else</div>
       <div className="card flush">
         <Row icon="flame" title="Specials and catalogues" sub={offline ? 'As last saved on this phone' : 'What your phones found on special'} onClick={() => go({ name: 'specials' })} />
         <Row icon="card" title="Cards" sub="Loyalty and gift cards, on this phone" onClick={() => go({ name: 'cards' })} />

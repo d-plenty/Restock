@@ -37,11 +37,19 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'sale', label: 'Deals first' },
   { id: 'recent', label: 'Recently added' },
 ];
-const SEARCH_HINT: Record<Section, string> = { pantry: 'Search the pantry', keg: 'Search the keg', pharmacy: 'Search your pharmacy items' };
+const SEARCH_HINT: Record<Section, string> = {
+  pantry: 'Search the pantry',
+  keg: 'Search the keg',
+  pharmacy: 'Search your pharmacy items',
+  baby: 'Search your baby things',
+  pets: 'Search your pet things',
+};
 const EMPTY: Record<Section, string> = {
   pantry: 'Your pantry is empty. Add the things you buy on a phone, and Restock watches their prices.',
   keg: 'Nothing in the keg yet. Add the beer, wine or spirits you buy on a phone.',
   pharmacy: 'Nothing here yet. Add the medicine, first aid and personal care things you buy on a phone.',
+  baby: 'Nothing here yet. Add the nappies, wipes and baby things you buy on a phone.',
+  pets: 'Nothing here yet. Add the pet food, litter and treats you buy on a phone.',
 };
 /** The same deals the phone's Pantry counts ("wait" isn't a deal yet). */
 const onSale = (r: Recommendation) => r.action === 'buy' || r.action === 'alt' || r.action === 'small';

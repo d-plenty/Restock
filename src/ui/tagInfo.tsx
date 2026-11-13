@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { ShopLine } from '../lib/shopTotals';
 import { money } from '../lib/units';
 import { promoLabel } from '../stores/http';
-import { describe, multiText, VERDICT_LABEL, type ActionKind, type Option, type Recommendation } from '../lib/verdict';
+import { describe, multiText, verdictLabel, type ActionKind, type Option, type Recommendation } from '../lib/verdict';
 import { chainName, GOOD_SALE, GREAT_SALE, type Chain } from '../types';
 import { Icon, memberProgram, Sheet, stockWhere } from './components';
 import { SwapWhy } from './shopTotalsCard';
@@ -94,6 +94,10 @@ const LEGEND = (
       <span className="tag fake">FAKE SALE</span> tagged as a special or promotion on the shop's website, but no cheaper than its usual price
     </div>
     <div>
+      <span className="tag fake">ALWAYS ON SPECIAL</span> on special at least 14 of the last 21 days and never seen at its "was" price, so the
+      special price is really its usual price
+    </div>
+    <div>
       <span className="tag normal">USUAL PRICE</span> not on special
     </div>
   </div>
@@ -115,6 +119,25 @@ const near = (a?: number, b?: number) => a !== undefined && b !== undefined && M
 
 function FakeWhy({ o }: { o: Option }) {
   const cur = o.stats.current;
+  // 0.10.3: a special that never ends.
+  if (o.verdict.always && o.stats.always) {
+    const shop = chainName(o.product.chain);
+    return (
+      <div className="fake-why">
+        <div className="title" style={{ fontSize: 15 }}>
+          Why "always on special"?
+        </div>
+        <p className="small">
+          {shop} has had it on special {o.stats.always.days} of the last 21 days Restock checked, always "was {money(o.stats.always.was)}". In that
+          time Restock never once saw it sell for {money(o.stats.always.was)}, so the "was" price isn't what it really costs: {money(cur?.price)} is.
+        </p>
+        <p className="small">
+          It doesn't necessarily mean {shop} is misleading anyone, and Restock only sees the website's prices. It just isn't a saving worth rushing
+          for: it'll most likely still be this price next week.
+        </p>
+      </div>
+    );
+  }
   const shop = chainName(o.product.chain);
   const was = cur?.wasPrice !== undefined && cur.wasPrice > (cur.price ?? 0) + 0.004 ? cur.wasPrice : undefined;
   const label = promoLabel(cur?.promo);
@@ -151,7 +174,7 @@ export function VerdictBody({ o }: { o: Option }) {
   const cur = o.stats.current;
   return (
     <>
-      {o.verdict.headline.toLowerCase() !== VERDICT_LABEL[o.verdict.kind].toLowerCase() && (
+      {o.verdict.headline.toLowerCase() !== verdictLabel(o.verdict).toLowerCase() && (
         <p style={{ margin: 0, fontWeight: 600 }}>{o.verdict.headline}</p>
       )}
       <p className="small" style={{ fontSize: 15, margin: 0 }}>
@@ -183,7 +206,7 @@ export function VerdictBody({ o }: { o: Option }) {
 }
 
 export function VerdictInfoTag({ o }: { o: Option }) {
-  const label = VERDICT_LABEL[o.verdict.kind];
+  const label = verdictLabel(o.verdict);
   return (
     <InfoTag className={o.verdict.kind} label={label} title={cap(label)}>
       <VerdictBody o={o} />
@@ -198,7 +221,7 @@ export function ActionInfoTag({ rec, action, great }: { rec: Recommendation; act
     alt: ['alt', 'SWAP & SAVE'],
     small: ['small', 'SMALL SAVING'],
     wait: ['wait', 'WAIT'],
-    skip: ['fake', 'FAKE SALE'],
+    skip: ['fake', rec.best?.verdict.always ? 'ALWAYS ON SPECIAL' : 'FAKE SALE'],
     none: ['normal', 'USUAL PRICE'],
   };
   const [cls, label] = map[action];

@@ -2,8 +2,11 @@ import { createContext, useContext } from 'react';
 
 import type { Section, StoreChain } from '../shops';
 
-export type Tab = 'home' | Section | 'add' | 'list';
-export const isSectionTab = (t: Tab): t is Section => t === 'pantry' || t === 'keg' || t === 'pharmacy';
+/** 0.10.3: 'more' is the bottom bar's More: Keg, Health, Baby, Pets, Settings, Cards and the rest. */
+export type Tab = 'home' | Section | 'add' | 'list' | 'more';
+export const isSectionTab = (t: Tab): t is Section => t === 'pantry' || t === 'keg' || t === 'pharmacy' || t === 'baby' || t === 'pets';
+/** 0.10.3: the tabs reached from More (everything but Pantry). */
+export const isMoreTab = (t: Tab): boolean => t === 'more' || (isSectionTab(t) && t !== 'pantry');
 
 export type Screen =
   | { name: 'item'; groupId: string }

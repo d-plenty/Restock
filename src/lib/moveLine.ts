@@ -2,7 +2,7 @@ import { allCategories, allGroups, allListEntries, insertEntryOp, runOps, uid, u
 import { candidates, parseLine } from './haMatch';
 import { getAliases } from './listPicks';
 import { act } from './undo';
-import { LIST_NAMES, listShareTab, sectionOf, type ListSection, type Section } from '../shops';
+import { asListSection, LIST_NAMES, listShareTab, SECTIONS, shopOnTab, type ListSection, type Section } from '../shops';
 import type { Category, Group, ListEntry } from '../types';
 import type { SqlOp } from './sql/driver';
 
@@ -69,17 +69,18 @@ export async function moveFacts(): Promise<MoveFacts> {
   return { groups, categories, aliases, entries };
 }
 
-const tabOfGroup = (g: Group | undefined): Section => (g?.section === 'keg' || g?.section === 'pharmacy' ? g.section : 'pantry');
+const tabOfGroup = (g: Group | undefined): Section => (g?.section && (SECTIONS as string[]).includes(g.section) ? g.section : 'pantry');
 
 /** Which list a line is on now (List.tsx entrySection: its item's tab, else its own). */
 export function listOfLine(e: ListEntry, groups: Group[]): ListSection {
   const g = e.groupId ? groups.find((x) => x.id === e.groupId) : undefined;
   if (g) return tabOfGroup(g);
-  return e.section === 'keg' || e.section === 'pharmacy' || e.section === 'general' ? e.section : 'pantry';
+  return asListSection(e.section);
 }
 
 /** Whether a shop is one of a list's (General: any shop; "other", typed by hand, goes anywhere). */
-export const shopFits = (chain: string, to: ListSection) => to === 'general' || chain === 'other' || sectionOf(chain) === to;
+// 0.10.3: a shop picked for that tab fits it too (Woolworths nappies on the Baby list).
+export const shopFits = (chain: string, to: ListSection) => to === 'general' || chain === 'other' || shopOnTab(chain, to);
 
 /** What moving `e` to `to` would do, or undefined when it's on that list already. */
 export function planMove(e: ListEntry, to: ListSection, f: MoveFacts): MovePlan | undefined {

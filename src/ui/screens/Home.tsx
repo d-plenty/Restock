@@ -468,7 +468,9 @@ export function HomeScreen() {
             <Icon name="close" size={18} />
           </span>
           <span style={{ flex: 1, fontSize: 13, color: 'var(--ink-2)' }}>
-            Fake sale: {r.group.name} is "on special" at its usual price. Skipped.
+            {r.best?.verdict.always
+              ? `Always on special: ${r.group.name} has been "on special" nearly every day for 3 weeks. Skipped.`
+              : `Fake sale: ${r.group.name} is "on special" at its usual price. Skipped.`}
           </span>
         </button>
       ))}

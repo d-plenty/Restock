@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { findCatalogue, type CatalogueLink } from '../../lib/catalogues';
 import { getSettings } from '../../lib/db';
 import { useLive } from '../../lib/useLive';
-import { activeSections, chainName, enabledIn, hostOf, sectionOf, websiteOf, type Section, type StoreChain } from '../../shops';
+import { activeSections, chainName, enabledIn, hostOf, shopOnTab, websiteOf, type Section, type StoreChain } from '../../shops';
 import { isNative } from '../../stores/http';
 import { storeChoice, type Settings } from '../../types';
 import { ChainDot, Icon, TopBar } from '../components';
 import { useNav } from '../nav';
 
-const GROUP: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health' };
+const GROUP: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets' };
 
 /**
  * Your shops, by tab: every shop you've ticked, or made a store your primary or second one, on a
@@ -21,7 +21,7 @@ export function catalogueShops(settings: Settings): { section: Section; chains: 
   return activeSections(settings)
     .map((section) => ({
       section,
-      chains: [...new Set([...enabledIn(settings.enabledChains, section), ...withStore.filter((c) => sectionOf(c) === section && websiteOf(c))])],
+      chains: [...new Set([...enabledIn(settings.enabledChains, section), ...withStore.filter((c) => shopOnTab(c, section) && websiteOf(c))])],
     }))
     .filter((g) => g.chains.length > 0);
 }

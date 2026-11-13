@@ -10,18 +10,20 @@ import { RestockNative } from '../../lib/sql/native';
 import { asHttps, searchOnSite } from '../../lib/site';
 import { useLive } from '../../lib/useLive';
 import {
+  BETA_SHOPS,
   chainName,
   enabledIn,
-  GROCERY,
   hostOf,
+  pickForTab,
   SECTION_NAMES,
   SECTION_SHOPS,
+  SECTIONS,
   sectionOf,
-  sectionOn,
   shopDef,
-  shopsIn,
+  shopsByGroup,
   type CustomShop,
   type Section,
+  type ShopGroup,
   type StoreChain,
 } from '../../shops';
 import { adapterFor } from '../../stores';
@@ -57,7 +59,8 @@ import {
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** The word Restock searches for when testing a shop. */
-export const TEST_WORD: Record<Section, string> = { pantry: 'milk', keg: 'beer', pharmacy: 'paracetamol' };
+import { TEST_WORD } from '../../lib/health';
+export { TEST_WORD };
 
 /**
  * "Find near me": every supermarket, bottle shop or pharmacy Restock knows within about 25 km,
@@ -108,14 +111,14 @@ function NearbyFinder({ settings, section, only }: { settings: Settings; section
   /** How long the current search usually takes, for the loading bar. */
   const [wait, setWait] = useState<number>();
   const [error, setError] = useState<string>();
-  const picked0 = enabledIn(settings.enabledChains, section);
+  const picked0 = enabledIn(settings.enabledChains, section, settings.shopTabs ?? {});
   // With shops picked, start with just their branches; "Everything nearby" shows the rest.
   const [onlyMine, setOnlyMine] = useState(picked0.length > 0);
   const [deep, setDeep] = useState(false);
   const [expanded, setExpanded] = useState<Set<StoreChain>>(new Set());
   const what = SECTION_SHOPS[section];
   // 0.9.9 (0.9.10): in a shop's Edit sheet, only that shop's branches.
-  const picked: StoreChain[] = only ? [only] : enabledIn(settings.enabledChains, section);
+  const picked: StoreChain[] = only ? [only] : enabledIn(settings.enabledChains, section, settings.shopTabs ?? {});
 
   const loadStores = async (area: Area, harder = false) => {
     setAreas(undefined);
@@ -139,7 +142,7 @@ function NearbyFinder({ settings, section, only }: { settings: Settings; section
         setDeep(true);
         setOnlyMine(true);
       } else {
-        const found = await nearbyStores(area.lat, area.lon, section);
+        const found = await nearbyStores(area.lat, area.lon, section, picked.length ? picked : undefined);
         // One shop: its branches the map knows, and the same shop looked up by name as well.
         if (only) {
           const mine = found.filter((x) => x.chain === only);
@@ -426,77 +429,137 @@ export function byShop(stores: NearbyStore[]): { chain: StoreChain; branches: Ne
   return [...groups.entries()].map(([chain, branches]) => ({ chain, branches }));
 }
 
-/** Turn a shop on or off (and the tab with it, the first time a shop is picked). */
-async function setShop(chain: StoreChain, on: boolean) {
+/** 0.10.3: pick a shop for one tab, or take it off that tab (it stays on any other tab it's on). */
+async function setShopFor(chain: StoreChain, section: Section, on: boolean) {
   const s = await getSettings();
-  await updateSettings({ enabledChains: on ? [...new Set([...s.enabledChains, chain])] : s.enabledChains.filter((c) => c !== chain) });
+  await updateSettings(pickForTab(s, chain, section, on));
 }
 
+/** What the tab's shops are called in the picker's heading. */
+const TAB_SHOPS_TITLE: Record<Section, string> = {
+  pantry: 'Shops for Pantry',
+  keg: 'Shops for Keg',
+  pharmacy: 'Shops for Health',
+  baby: 'Shops for Baby',
+  pets: 'Shops for Pets',
+};
+/** The heading each tab opens with (the rest start folded away). */
+const TAB_GROUP: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bottle', pharmacy: 'pharmacy', baby: 'baby', pets: 'pet' };
+
 /**
- * The bottle shops or pharmacies to use, as a dropdown of ticks: there are too many to show
- * them all at once. Shops you added yourself are listed too, with a way to add another.
+ * 0.10.3: every shop Restock knows, under headings (Supermarkets, Chemists, Bottle shops, Baby
+ * shops, Pet shops, Big box stores, Other shops), on every tab's page: tick the ones this tab
+ * searches. A shop can be on more than one tab (Woolworths for Pantry and for Baby); its branch is
+ * the same on each. Nothing is ticked to start with. Under a ticked shop: its status and Edit.
  */
-export function ShopDropdown({ settings, section, startOpen }: { settings: Settings; section: Section; startOpen?: boolean }) {
+export function ShopPicker({ settings, section }: { settings: Settings; section: Section }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<CustomShop>();
-  const all = shopsIn(section);
-  const picked = enabledIn(settings.enabledChains, section);
-  // Open to start with in setup when nothing's picked; then it stays however the person leaves it.
-  const [open, setOpen] = useState(!!startOpen && !picked.length);
-  const summary = picked.length ? picked.map(chainName).join(', ') : `Pick your ${SECTION_SHOPS[section]}`;
+  const [costco, setCostco] = useState(false);
+  const picked = enabledIn(settings.enabledChains, section, settings.shopTabs ?? {});
+  const groups = shopsByGroup();
+  const tick = (id: StoreChain, on: boolean) => {
+    // Costco asks first, once (its notice), as before.
+    if (id === 'costco' && on && !settings.costco?.acceptedAt) return setCostco(true);
+    void setShopFor(id, section, on);
+  };
   return (
     <>
-      <details className="dropdown card flush" open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
-        <summary className="row">
-          <span className="grow">
-            <span className="title" style={{ fontSize: 15 }}>
-              {picked.length
-                ? `${picked.length} ${picked.length === 1 ? SECTION_SHOPS[section].replace(/s$/, '').replace(/ie$/, 'y') : SECTION_SHOPS[section]} picked`
-                : 'Choose shops'}
-            </span>
-            <span className="small clip">{summary}</span>
-          </span>
-          <Icon name="chevron" size={18} />
-        </summary>
-        {all.map((shop) => (
-          <label key={shop.id} className="check">
-            <input
-              type="checkbox"
-              checked={picked.includes(shop.id)}
-              onChange={(e) => void setShop(shop.id, e.target.checked)}
-              aria-label={`Use ${shop.name}`}
-            />
-            <ChainDot chain={shop.id} />
-            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <span>{shop.name}</span>
-              {shop.note && <span className="small">{shop.note}</span>}
-            </span>
-            {shop.custom && (
-              <button
-                type="button"
-                className="btn small ghost"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setEditing(settings.customShops.find((c) => c.id === shop.id));
-                }}
-              >
-                Edit
+      {groups.map((g) => {
+        const here = g.shops.filter((x) => picked.includes(x.id));
+        return (
+          <details
+            key={g.group}
+            className="dropdown card flush shop-group"
+            open={g.group === TAB_GROUP[section] || here.length > 0 || undefined}
+          >
+            <summary className="row">
+              <span className="grow">
+                <span className="title" style={{ fontSize: 15 }}>
+                  {g.name}
+                </span>
+                <span className="small clip">{here.length ? `${here.length} picked: ${here.map((x) => x.name).join(', ')}` : `${g.shops.length} ${g.shops.length === 1 ? 'shop' : 'shops'}`}</span>
+              </span>
+              <Icon name="chevron" size={18} />
+            </summary>
+            {g.shops.map((shop) => {
+              const on = picked.includes(shop.id);
+              const def = shopDef(shop.id);
+              return (
+                <div key={shop.id}>
+                  <label className="check">
+                    <input type="checkbox" checked={on} onChange={(e) => tick(shop.id, e.target.checked)} aria-label={`Use ${shop.name} for ${SECTION_NAMES[section]}`} />
+                    <ChainDot chain={shop.id} />
+                    <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                      <span>
+                        {shop.name} {BETA_SHOPS.includes(shop.id) && <BetaTag />}
+                      </span>
+                      {shop.id === 'costco' ? (
+                        <span className="small">{on ? COSTCO_SWITCH_HELP_ON : COSTCO_SWITCH_HELP}</span>
+                      ) : (
+                        shop.note && <span className="small">{shop.note}</span>
+                      )}
+                      {on && <span className="small">{branchText(storeChoice(settings, shop.id), shop.id)}</span>}
+                    </span>
+                    {shop.custom && (
+                      <button
+                        type="button"
+                        className="btn small ghost"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setEditing(settings.customShops.find((c) => c.id === shop.id));
+                        }}
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </label>
+                  {on && def?.pickOnSite && <PickOnSite chain={shop.id} />}
+                  {on && <ShopEdit settings={settings} chain={shop.id} />}
+                </div>
+              );
+            })}
+            {g.group === 'other' && (
+              <button className="row" onClick={() => setAdding(true)}>
+                <Icon name="plus" size={18} />
+                <span className="grow">
+                  <span className="title" style={{ fontSize: 15 }}>
+                    Add your own shop
+                  </span>
+                  <span className="small">Any shop with prices on its website: give it a name and its website, and Restock reads its search page.</span>
+                </span>
               </button>
             )}
-          </label>
-        ))}
-        <button className="row" onClick={() => setAdding(true)}>
-          <Icon name="plus" size={18} />
-          <span className="grow">
-            <span className="title" style={{ fontSize: 15 }}>
-              Other: add a shop's website
-            </span>
-            <span className="small">Any shop with prices on its website. Give it a name and Restock reads its search page.</span>
-          </span>
-        </button>
-      </details>
+          </details>
+        );
+      })}
       {(adding || editing) && <CustomShopSheet section={section} shop={editing} onClose={() => (setAdding(false), setEditing(undefined))} />}
+      {costco && <CostcoAsk section={section} onClose={() => setCostco(false)} />}
     </>
+  );
+}
+
+/** 0.10.3 (IGA): its prices are the store picked on its own website, so that's where you pick it. */
+function PickOnSite({ chain }: { chain: StoreChain }) {
+  const def = shopDef(chain);
+  const [done, setDone] = useState(false);
+  if (!def?.pickOnSite) return null;
+  return (
+    <div className="shop-extra">
+      <span className="small">
+        {done ? `Done. Restock now uses the store you picked on ${chainName(chain)}'s website.` : `${chainName(chain)}'s prices are each store's own: pick yours on its website.`}
+      </span>
+      <button
+        className="btn small"
+        disabled={!isNative()}
+        onClick={async () => {
+          await RestockNative.openStore({ chain, message: def.pickOnSite });
+          setDone(true);
+        }}
+      >
+        {isNative() ? `Choose your ${chainName(chain)} store` : 'Works in the Android app'}
+      </button>
+    </div>
   );
 }
 
@@ -653,9 +716,34 @@ export function CustomShopSheet({ section, shop, onClose }: { section: Section; 
 }
 
 /** Switch the Keg or Pharmacy tab on or off. Keg asks once that you're 18 or over. */
-export function SectionSwitch({ settings, section }: { settings: Settings; section: 'keg' | 'pharmacy' }) {
+/** 0.10.3: each tab's switch, what it's for, and its line in setup and Settings. */
+const TAB_ABOUT: Record<Exclude<Section, 'pantry'>, { title: string; text: string; seldom: string }> = {
+  keg: {
+    title: 'Bottle shops (Keg tab)',
+    text: 'Track beer, wine and spirits prices at the shops you pick. Kept separate from groceries.',
+    seldom: 'a drink',
+  },
+  pharmacy: {
+    title: 'Chemists (Health tab)',
+    text: 'Track medicine, first aid and personal care prices at the shops you pick. Kept separate from groceries.',
+    seldom: 'from a chemist',
+  },
+  baby: {
+    title: 'Baby tab',
+    text: 'Track nappies, wipes, formula and baby things at the shops you pick: Baby Bunting, chemists, Big W, supermarkets.',
+    seldom: 'baby things',
+  },
+  pets: {
+    title: 'Pets tab',
+    text: 'Track pet food, litter and treats at the shops you pick: pet shops, supermarkets, Bunnings.',
+    seldom: 'for a pet',
+  },
+};
+
+export function SectionSwitch({ settings, section }: { settings: Settings; section: Exclude<Section, 'pantry'> }) {
   const [askAge, setAskAge] = useState(false);
-  const on = settings.sections[section];
+  const on = !!settings.sections[section];
+  const about = TAB_ABOUT[section];
   const turn = async (v: boolean) => {
     if (v && section === 'keg' && !settings.adultConfirmed) return setAskAge(true);
     await updateSettings({ sections: { ...settings.sections, [section]: v } });
@@ -665,27 +753,23 @@ export function SectionSwitch({ settings, section }: { settings: Settings; secti
       <div className="card flush">
         <label className="check">
           <Icon name={section} size={22} />
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
             <span className="title" style={{ fontSize: 15 }}>
-              {section === 'keg' ? 'Bottle shops (Keg tab)' : 'Chemists (Health tab)'}
+              {about.title} <BetaTag />
             </span>
-            <span className="small">
-              {section === 'keg'
-                ? 'Track beer, wine and spirits prices at the bottle shops you pick. Kept separate from groceries.'
-                : 'Track medicine, first aid and personal care prices at the chemists you pick. Kept separate from groceries.'}
-            </span>
+            <span className="small">{about.text}</span>
           </span>
           <input type="checkbox" className="switch" checked={on} onChange={(e) => void turn(e.target.checked)} aria-label={`Use the ${SECTION_NAMES[section]} tab`} />
         </label>
         {on && (
           <label className="check" style={{ borderTop: '1px solid var(--line)' }}>
-            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               <span className="title" style={{ fontSize: 15 }}>
-                Show {SECTION_NAMES[section]} in the bottom bar
+                Show {SECTION_NAMES[section]} in More
               </span>
               <span className="small">
-                Turn this off if you only buy {section === 'keg' ? 'a drink' : 'from a chemist'} now and then. You can still search these shops on
-                Add and put things on your shopping list without tracking them.
+                Turn this off if you only buy {about.seldom} now and then. You can still search these shops on Add and put things on your
+                shopping list without tracking them.
               </span>
             </span>
             <input
@@ -698,7 +782,7 @@ export function SectionSwitch({ settings, section }: { settings: Settings; secti
                     : [...new Set([...(settings.hiddenTabs ?? []), section])],
                 })
               }
-              aria-label={`Show ${SECTION_NAMES[section]} in the bottom bar`}
+              aria-label={`Show ${SECTION_NAMES[section]} in More`}
             />
           </label>
         )}
@@ -728,7 +812,7 @@ export function SectionSwitch({ settings, section }: { settings: Settings; secti
 
 /** Store names typed by hand, for shops not on the map (or to name a branch differently). */
 function ManualNames({ settings, section }: { settings: Settings; section: Section }) {
-  const chains = enabledIn(settings.enabledChains, section);
+  const chains = enabledIn(settings.enabledChains, section, settings.shopTabs ?? {});
   const setStore = async (chain: StoreChain, key: 'primary' | 'secondary' | 'storeId', value: string) => {
     const latest = await getSettings();
     await updateSettings({ stores: { ...latest.stores, [chain]: { ...storeChoice(latest, chain), [key]: value || undefined } } });
@@ -785,107 +869,43 @@ function ManualNames({ settings, section }: { settings: Settings; section: Secti
 }
 
 /** Everything about one tab's shops: which ones, your nearest branches, and names typed by hand. */
-export function StoreFields({ settings, section = 'pantry', inSetup }: { settings: Settings; section?: Section; inSetup?: boolean }) {
-  const label = section === 'pantry' ? 'supermarkets' : SECTION_SHOPS[section];
-  if (section === 'pantry') {
-    return (
-      <>
-        <div className="eyebrow">1 · Your supermarkets</div>
-        <div className="card flush">
-          {GROCERY.map((chain) => {
-            const on = settings.enabledChains.includes(chain);
-            const st = storeChoice(settings, chain);
-            return (
-              <div key={chain}>
-                <label className="check">
-                  <input type="checkbox" checked={on} onChange={(e) => void setShop(chain, e.target.checked)} aria-label={`Use ${chainName(chain)}`} />
-                  <ChainDot chain={chain} />
-                  <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <span>{chainName(chain)}</span>
-                    {on && <span className="small">{branchText(st, chain)}</span>}
-                  </span>
-                </label>
-                {/* 0.9.8: each shop's sign-in, branch number and pros and cons, right under its tick. */}
-                {on && <ShopEdit settings={settings} chain={chain} />}
-              </div>
-            );
-          })}
-          <CostcoRow settings={settings} />
-          <ShopDropdownCustomOnly settings={settings} />
-        </div>
-        <div className="eyebrow">2 · Your branches</div>
-        {/* Keyed by tab only: picking a shop or a branch must not throw away the list you're looking at. */}
-        <NearbyFinder key="pantry" settings={settings} section="pantry" />
-        <ManualNames settings={settings} section="pantry" />
-        <AisleCard settings={settings} />
-      </>
-    );
-  }
-  const on = settings.sections[section];
+export function StoreFields({ settings, section = 'pantry' }: { settings: Settings; section?: Section; inSetup?: boolean }) {
+  const on = section === 'pantry' || !!settings.sections[section];
   return (
     <>
-      <SectionSwitch settings={settings} section={section} />
+      {section !== 'pantry' && <SectionSwitch settings={settings} section={section} />}
       {on && (
         <>
-          <div className="eyebrow">1 · Your {label}</div>
-          <SelectedSummary settings={settings} section={section} />
-          <ShopDropdown settings={settings} section={section} startOpen={inSetup} />
-          {!sectionOn(settings, section) && (
-            <p className="small">
-              Pick at least one {section === 'keg' ? 'bottle shop' : 'chemist'} (here, or a branch below) to show the {SECTION_NAMES[section]} tab.
+          <div className="eyebrow">1 · {TAB_SHOPS_TITLE[section]}</div>
+          <p className="small" style={{ margin: 0 }}>
+            Tick the shops {section === 'pantry' ? 'your Pantry' : `the ${SECTION_NAMES[section]} tab`} searches and compares. Every shop is here, so
+            you can mix them: a shop can be on more than one tab, with the same branch.
+          </p>
+          <ShopPicker settings={settings} section={section} />
+          {!enabledIn(settings.enabledChains, section, settings.shopTabs ?? {}).length && (
+            <p className="small" role="status">
+              {section === 'pantry' ? 'Pick at least one shop for your Pantry.' : `Pick at least one shop to show the ${SECTION_NAMES[section]} tab.`}
             </p>
           )}
           <div className="eyebrow">2 · Your branches</div>
+          {/* Keyed by tab only: picking a shop or a branch must not throw away the list you're looking at. */}
           <NearbyFinder key={section} settings={settings} section={section} />
           <ManualNames settings={settings} section={section} />
-          <p className="small">
-            Prices come from each shop's website, so they're the online price.
-            {section === 'pharmacy'
-              ? ' Some chemists only show prices in the shop, or set them per branch; those may come up with nothing.'
-              : ' Some bottle shops set prices per branch, so your local one can differ.'}{' '}
-            In shopping mode their things show Aisle: unknown: these shops' websites don't give aisle numbers.
-          </p>
+          {section === 'pantry' ? (
+            <AisleCard settings={settings} />
+          ) : (
+            <p className="small">
+              Prices come from each shop's website, so they're the online price.
+              {section === 'pharmacy'
+                ? ' Some chemists only show prices in the shop, or set them per branch; those may come up with nothing.'
+                : section === 'keg'
+                  ? ' Some bottle shops set prices per branch, so your local one can differ.'
+                  : ' Some shops set prices per branch, so your local one can differ.'}{' '}
+              In shopping mode their things show Aisle: unknown unless the shop gives aisle numbers.
+            </p>
+          )}
         </>
       )}
-    </>
-  );
-}
-
-/** Supermarkets: the person's own grocery shops (a farmers' market site, IGA, and so on). */
-function ShopDropdownCustomOnly({ settings }: { settings: Settings }) {
-  const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<CustomShop>();
-  const mine = settings.customShops.filter((c) => c.section === 'pantry');
-  return (
-    <>
-      {mine.map((shop) => (
-        <label key={shop.id} className="check">
-          <input
-            type="checkbox"
-            checked={settings.enabledChains.includes(shop.id)}
-            onChange={(e) => void setShop(shop.id, e.target.checked)}
-            aria-label={`Use ${shop.name}`}
-          />
-          <ChainDot chain={shop.id} />
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span>{shop.name}</span>
-            <span className="small">{hostOf(shop.website)}</span>
-          </span>
-          <button type="button" className="btn small ghost" onClick={(e) => (e.preventDefault(), setEditing(shop))}>
-            Edit
-          </button>
-        </label>
-      ))}
-      <button className="row" onClick={() => setAdding(true)}>
-        <Icon name="plus" size={18} />
-        <span className="grow">
-          <span className="title" style={{ fontSize: 15 }}>
-            Other: add a shop's website
-          </span>
-          <span className="small">IGA, a local grocer, or any shop with prices online</span>
-        </span>
-      </button>
-      {(adding || editing) && <CustomShopSheet section="pantry" shop={editing} onClose={() => (setAdding(false), setEditing(undefined))} />}
     </>
   );
 }
@@ -904,33 +924,6 @@ function branchText(st: StoreChoice, chain: StoreChain): string {
   return [primary && `Your branch: ${primary}`, second && `2nd: ${second}`].filter(Boolean).join(' · ');
 }
 
-/** Bottle shops and pharmacies: the shops in use and your branch at each, at a glance. */
-function SelectedSummary({ settings, section }: { settings: Settings; section: Section }) {
-  const chains = enabledIn(settings.enabledChains, section);
-  if (!chains.length) return null;
-  return (
-    <div className="card flush">
-      {chains.map((c) => {
-        const st = storeChoice(settings, c);
-        return (
-          <div key={c}>
-          <div className="row">
-            <ChainDot chain={c} />
-            <span className="grow">
-              <span className="title" style={{ fontSize: 15 }}>
-                {chainName(c)}
-              </span>
-              <span className="small">{branchText(st, c)}</span>
-            </span>
-          </div>
-          <ShopEdit settings={settings} chain={c} />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
   useSettingsDraft(); // 0.9.5 (save)
   const settings = useLive(getSettings, []);
@@ -940,9 +933,9 @@ export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
     <div className="screen">
       <TopBar title="My shops" />
       <div className="seg" role="tablist" aria-label="Which shops">
-        {(['pantry', 'keg', 'pharmacy'] as Section[]).map((sec) => (
+        {SECTIONS.map((sec) => (
           <button key={sec} role="tab" aria-selected={sec === tab} className={sec === tab ? 'on' : ''} onClick={() => setTab(sec)}>
-            <Icon name={sec} size={17} /> {sec === 'pantry' ? 'Groceries' : SECTION_NAMES[sec]}
+            <Icon name={sec} size={17} /> {SECTION_NAMES[sec]}
           </button>
         ))}
       </div>
@@ -955,7 +948,7 @@ export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
             // 0.9.5 (save): Done saves what's changed, then goes back.
             const changed = hasUnsaved();
             if (changed && !(await saveDraft())) return;
-            const label = tab === 'pantry' ? 'Supermarkets' : tab === 'keg' ? 'Bottle shops' : 'Chemists';
+            const label = tab === 'pantry' ? 'Pantry shops' : `${SECTION_NAMES[tab]} shops`;
             const summary = shopSummary(settings, tab);
             if (changed) nav.toast(summary === 'Off' ? `${label} are off.` : `${label} saved: ${summary}`);
             nav.pop();
@@ -1000,6 +993,7 @@ function AisleCard({ settings }: { settings: Settings }) {
           </li>
           <li>Woolworths: its website gives an online category, not an aisle number.</li>
           <li>Aldi and Costco: they don't publish aisle numbers.</li>
+          <li>IGA and the other shops: Aisle: unknown for now.</li>
         </ul>
       </div>
     </>
@@ -1009,7 +1003,7 @@ function AisleCard({ settings }: { settings: Settings }) {
 /** One line for Settings: which shops each tab uses. */
 export function shopSummary(settings: Settings, section: Section): string {
   if (section !== 'pantry' && !settings.sections[section]) return 'Off';
-  const chains = enabledIn(settings.enabledChains, section);
+  const chains = enabledIn(settings.enabledChains, section, settings.shopTabs ?? {});
   if (!chains.length) return section === 'pantry' ? 'None picked' : 'On, but no shops picked yet';
   return chains
     .map((c) => {
@@ -1417,6 +1411,8 @@ function shopStatus(settings: Settings, chain: string): string {
   }
   if (chain === 'aldi') return 'One price for everyone. No sign-in.';
   if (chain === 'costco') return settings.accounts?.costco?.signedIn ? 'Signed in · member prices' : 'Not signed in · online prices';
+  // 0.10.3: IGA's prices are the store picked on its website (sign in there too, if you like).
+  if (shopDef(chain)?.pickOnSite) return `Prices at the ${chainName(chain)} store you pick on its website.`;
   return "Prices from the shop's website. No sign-in.";
 }
 
@@ -1549,55 +1545,31 @@ function AldiAbout() {
  * 0.9.7: Costco, picked with the other supermarkets. Off by default; picking it shows the notice
  * first. Once picked: the notice stays a tap away, and you can sign in for member prices.
  */
-export function CostcoRow({ settings }: { settings: Settings }) {
-  const [asking, setAsking] = useState(false);
-  const on = settings.enabledChains.includes('costco');
-  const notice = (
-    <div className="banner grey" role="note" style={{ fontSize: 13, flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
-      <strong>{COSTCO_NOTICE_HEADING}</strong>
-      <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {COSTCO_NOTICE.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
-    </div>
-  );
+/** Costco's notice, the first time it's picked (then it's ticked like any shop). */
+function CostcoAsk({ section, onClose }: { section: Section; onClose: () => void }) {
   const pick = async () => {
-    setAsking(false);
+    onClose();
     const s = await getSettings();
     await updateSettings({ costco: { ...s.costco, on: true, acceptedAt: nowIso() } });
-    await setShop('costco', true);
+    await setShopFor('costco', section, true);
   };
   return (
-    <>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={on}
-          onChange={(e) => (e.target.checked ? setAsking(true) : void setShop('costco', false))}
-          aria-label="Use Costco"
-        />
-        <ChainDot chain="costco" />
-        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span>
-            {COSTCO_SETTING_TITLE} <BetaTag />
-          </span>
-          <span className="small">{on ? COSTCO_SWITCH_HELP_ON : COSTCO_SWITCH_HELP}</span>
-        </span>
-      </label>
-      {on && <ShopEdit settings={settings} chain="costco" />}
-      {asking && (
-        <Sheet title={COSTCO_SETTING_TITLE} onClose={() => setAsking(false)}>
-          {notice}
-          <button className="btn primary" onClick={() => void pick()}>
-            {COSTCO_TURN_ON}
-          </button>
-          <button className="btn" onClick={() => setAsking(false)}>
-            {COSTCO_CANCEL}
-          </button>
-        </Sheet>
-      )}
-    </>
+    <Sheet title={COSTCO_SETTING_TITLE} onClose={onClose}>
+      <div className="banner grey" role="note" style={{ fontSize: 13, flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+        <strong>{COSTCO_NOTICE_HEADING}</strong>
+        <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {COSTCO_NOTICE.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+      <button className="btn primary" onClick={() => void pick()}>
+        {COSTCO_TURN_ON}
+      </button>
+      <button className="btn" onClick={onClose}>
+        {COSTCO_CANCEL}
+      </button>
+    </Sheet>
   );
 }
 

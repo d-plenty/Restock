@@ -10,8 +10,10 @@
 //   productOrder          "size" | "cheapest" | "name"
 //   recalls.enabled       true | false             recall alerts
 //   tab:keg, tab:pharmacy true | false             the tab switched on
-//   shop:<chain>          { on }                   a built-in shop picked (on) or not, for its tab
-//   shop:custom-…         { on, shop, removed? }   a shop someone added: its name, website, tab
+//   tab:baby, tab:pets    true | false             0.10.3: the same (shared with Groceries)
+//   shop:<chain>          { on, tabs? }            a built-in shop picked (on) or not; 0.10.3: `tabs`,
+//                                                  the tabs it's in when not just its own
+//   shop:custom-…         { on, shop, removed?, tabs? }   a shop someone added: its name, website, tab
 //
 // - One row per setting and per shop, and the later change wins per row (sync's usual rule), so
 //   two people changing different settings, or picking different shops, both keep their change.
@@ -45,7 +47,7 @@
 //                                                  a phone that hasn't picked its own (StoreChoice
 //                                                  primary empty, or still the default it took)
 
-import { SHOPS, isLocalOnlyShop, shopDef, type CustomShop, type Section } from '../shops';
+import { SECTIONS, SHOPS, isLocalOnlyShop, shareTab, shopDef, type CustomShop, type Section } from '../shops';
 import { siteOf } from './site';
 
 export const ALL_TABS: Section[] = ['pantry', 'keg', 'pharmacy'];
@@ -74,8 +76,18 @@ const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.i
 // 0.9.6: Costco is this phone's own (shops.ts LOCAL_ONLY_SHOPS), never a household shop.
 export const builtIn = (id: string): boolean => !id.startsWith('custom-') && !!shopDef(id) && !isLocalOnlyShop(id);
 
-/** The built-in shops on a tab, in shops.ts order. */
-export const builtInsOn = (tab: string): string[] => SHOPS.filter((s) => s.section === tab && !isLocalOnlyShop(s.id)).map((s) => s.id);
+/** The built-in shops shared with a tab, in shops.ts order (0.10.3: Baby and Pets shops go with Groceries). */
+export const builtInsOn = (tab: string): string[] => SHOPS.filter((s) => shareTab(s.section) === tab && !isLocalOnlyShop(s.id)).map((s) => s.id);
+
+/** 0.10.3: the tab a section's rows are shared with: Baby and Pets with Groceries; anything else as it is. */
+export const rowTab = (t: string): string => (t === 'baby' || t === 'pets' ? 'pantry' : t);
+
+/** 0.10.3: a shop row's `tabs`, checked: known tabs, in their order, at least one (SharedSettings.java checkTabs). */
+export function checkTabs(v: unknown): Section[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const t = SECTIONS.filter((s) => v.includes(s));
+  return t.length ? t : undefined;
+}
 
 /** A row's value, decoded, or undefined when it isn't JSON. */
 export function decode(v: string | null | undefined): unknown {
@@ -105,7 +117,7 @@ export function checkShop(v: unknown, id: string): CustomShop | undefined {
   if (!isObj(v) || v.id !== id || !CUSTOM_ID.test(id)) return undefined;
   const name = typeof v.name === 'string' ? v.name.trim() : '';
   let website = typeof v.website === 'string' ? v.website.trim() : '';
-  const section = typeof v.section === 'string' && (ALL_TABS as string[]).includes(v.section) ? (v.section as Section) : undefined;
+  const section = typeof v.section === 'string' && (SECTIONS as string[]).includes(v.section) ? (v.section as Section) : undefined;
   const host = hostOf(website);
   if (!name || name.length > 80 || !website || website.length > 500 || !host || !section) return undefined;
   // As settingsCheck.ts keeps it: an http address moves to https.
@@ -158,15 +170,19 @@ export function checkValue(k: string, v: unknown): unknown {
     case 'recalls.enabled':
     case 'tab:keg':
     case 'tab:pharmacy':
+    case 'tab:baby':
+    case 'tab:pets':
       return typeof v === 'boolean' ? v : undefined;
   }
   if (k.startsWith(BRANCH_PREFIX)) return checkBranch(k, v);
   if (!k.startsWith('shop:') || !isObj(v) || typeof v.on !== 'boolean') return undefined;
   const id = k.slice(5);
-  if (builtIn(id)) return { on: v.on };
+  const tabs = checkTabs(v.tabs);
+  if (builtIn(id)) return tabs ? { on: v.on, tabs } : { on: v.on };
   const shop = checkShop(v.shop, id);
   if (!shop) return undefined;
-  return v.removed === true ? { on: false, removed: true, shop } : { on: v.on, shop };
+  if (v.removed === true) return { on: false, removed: true, shop };
+  return tabs ? { on: v.on, shop, tabs } : { on: v.on, shop };
 }
 
 // ---------- the shopping list's rows (not settings) ----------
@@ -256,26 +272,28 @@ export function settingChangeOk(pk: string, row: unknown, deleted: boolean, room
 
 /** Which tab a row is about (tab: and shop: rows), or null when it's the whole household's. */
 export function settingTab(k: string, v: string | null | undefined): string | null {
-  if (k.startsWith('tab:')) return k.slice(4);
+  // 0.10.3: Baby and Pets rows are shared with Groceries (rowTab).
+  if (k.startsWith('tab:')) return rowTab(k.slice(4));
   // 0.9.4: a default branch is about its shop's tab (a shop someone added: left alone).
   if (k.startsWith(BRANCH_PREFIX)) {
     const b = k.slice(BRANCH_PREFIX.length);
-    return builtIn(b) ? shopDef(b)!.section : 'unknown';
+    return builtIn(b) ? rowTab(shopDef(b)!.section) : 'unknown';
   }
   if (!k.startsWith('shop:')) return null;
   const id = k.slice(5);
-  if (builtIn(id)) return shopDef(id)!.section;
+  if (builtIn(id)) return rowTab(shopDef(id)!.section);
   const d = decode(v);
   const shop = isObj(d) ? d.shop : undefined;
   const sec = isObj(shop) && typeof shop.section === 'string' ? shop.section : null;
   // A row that doesn't say: no tab this phone shares (so it's left alone).
-  return sec ?? 'unknown';
+  return sec === null ? 'unknown' : rowTab(sec);
 }
 
 /** The same row value (a shop's fields compared one by one). */
 function same(a: unknown, b: unknown): boolean {
   if (isObj(a) && isObj(b)) {
     if (a.on !== b.on || (a.removed === true) !== (b.removed === true)) return false;
+    if (JSON.stringify(checkTabs(a.tabs) ?? null) !== JSON.stringify(checkTabs(b.tabs) ?? null)) return false;
     if (isObj(a.shop) || isObj(b.shop)) return isObj(a.shop) && isObj(b.shop) && sameShop(a.shop, b.shop);
     return true;
   }
@@ -316,8 +334,16 @@ export function applyRows(s: Obj, rows: { k: string; v: string }[], tabs: Readon
       const sec = isObj(s.sections) ? s.sections : {};
       // 18+: Keg isn't shown on a phone that hasn't confirmed it (switching it off always applies).
       if (k === 'tab:keg' && val === true && !adult) continue;
-      if ((sec[tab!] === true) !== val) {
-        s.sections = { keg: sec.keg === true, pharmacy: sec.pharmacy === true, [tab!]: val };
+      // 0.10.3: the tab's own name (tab:baby is shared with Groceries, but it's Baby that's switched).
+      const name = k.slice(4);
+      if ((sec[name] === true) !== val) {
+        s.sections = {
+          keg: sec.keg === true,
+          pharmacy: sec.pharmacy === true,
+          ...(sec.baby === true ? { baby: true } : {}),
+          ...(sec.pets === true ? { pets: true } : {}),
+          [name]: val,
+        };
         changed = true;
       }
     } else if (k.startsWith(BRANCH_PREFIX)) {
@@ -339,7 +365,18 @@ export function applyRows(s: Obj, rows: { k: string; v: string }[], tabs: Readon
       }
     } else {
       const id = k.slice(5);
-      const x = val as { on: boolean; removed?: boolean; shop?: CustomShop };
+      const x = val as { on: boolean; removed?: boolean; shop?: CustomShop; tabs?: Section[] };
+      // 0.10.3: the tabs it's in (none said: just its own).
+      const st: Obj = isObj(s.shopTabs) ? s.shopTabs : {};
+      const hadTabs = checkTabs(st[id]);
+      if (JSON.stringify(hadTabs ?? null) !== JSON.stringify(x.tabs ?? null)) {
+        const nextTabs: Obj = { ...st };
+        if (x.tabs) nextTabs[id] = x.tabs;
+        else delete nextTabs[id];
+        if (Object.keys(nextTabs).length) s.shopTabs = nextTabs;
+        else delete s.shopTabs;
+        changed = true;
+      }
       const chains: string[] = Array.isArray(s.enabledChains)
         ? (s.enabledChains as unknown[]).filter((c): c is string => typeof c === 'string')
         : [...DEFAULTS.enabledChains];
@@ -377,18 +414,19 @@ function valueOf(s: Obj, k: string): unknown {
   const id = k.slice(5);
   const chains: readonly unknown[] = Array.isArray(s.enabledChains) ? (s.enabledChains as unknown[]) : DEFAULTS.enabledChains;
   const on = chains.includes(id);
-  if (builtIn(id)) return { on };
+  const tabs = checkTabs(isObj(s.shopTabs) ? s.shopTabs[id] : undefined);
+  if (builtIn(id)) return tabs ? { on, tabs } : { on };
   const shop = (Array.isArray(s.customShops) ? (s.customShops as unknown[]) : []).find((c) => isObj(c) && c.id === id);
-  return shop ? { on, shop: checkShop(shop, id) } : undefined;
+  return shop ? (tabs ? { on, shop: checkShop(shop, id), tabs } : { on, shop: checkShop(shop, id) }) : undefined;
 }
 
 /** Every household setting key a settings object has, for these tabs. */
 export function keysFor(s: Obj, tabs: ReadonlySet<string>): string[] {
   const out: string[] = [...SCALAR_KEYS];
-  for (const t of ['keg', 'pharmacy']) if (tabs.has(t)) out.push('tab:' + t);
+  for (const t of ['keg', 'pharmacy', 'baby', 'pets']) if (tabs.has(rowTab(t))) out.push('tab:' + t);
   for (const t of ALL_TABS) if (tabs.has(t)) for (const id of builtInsOn(t)) out.push('shop:' + id);
   for (const c of Array.isArray(s.customShops) ? (s.customShops as unknown[]) : [])
-    if (isObj(c) && typeof c.id === 'string' && typeof c.section === 'string' && tabs.has(c.section) && checkShop(c, c.id)) out.push('shop:' + c.id);
+    if (isObj(c) && typeof c.id === 'string' && typeof c.section === 'string' && tabs.has(rowTab(c.section)) && checkShop(c, c.id)) out.push('shop:' + c.id);
   return out;
 }
 

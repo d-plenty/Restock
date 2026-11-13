@@ -14,7 +14,7 @@ import {
 } from '../types';
 import { changed } from './live';
 import { listLineWithoutCostco } from './costcoLocal';
-import { asListSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, shopDef, type ListSection, type Section } from '../shops';
+import { asListSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, setShopTabs, shareTab, shopDef, type ListSection, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
 import { GIFT_CARDS_TABLE, migrate, SPEND_TABLE } from './sql/schema';
 import { cleanGiftCard } from './giftCards'; // 0.9.6 (cards)
@@ -118,7 +118,8 @@ const toGroup = (r: Row): Group => ({
   createdAt: r.created_at as string,
 });
 
-const asSection = (v: unknown): Section => (v === 'keg' || v === 'pharmacy' ? v : 'pantry');
+// 0.10.3: Baby and Pets too.
+const asSection = (v: unknown): Section => (v === 'keg' || v === 'pharmacy' || v === 'baby' || v === 'pets' ? v : 'pantry');
 
 const toReading = (r: Row): PriceReading => ({
   id: r.id as number,
@@ -335,6 +336,7 @@ export const cachedSettings = () => lastSettings;
 export async function getSettings(): Promise<Settings> {
   const s = mergeSettings(await getKV<Partial<Settings>>('settings'));
   setCustomShops(s.customShops);
+  setShopTabs(s.shopTabs);
   setCostcoState(costcoStateOf(s));
   lastSettings = s;
   return s;
@@ -352,6 +354,7 @@ export async function updateSettings(patch: Partial<Settings>, opts: { local?: b
   const before = await getSettings();
   const next = mergeSettings({ ...before, ...patch });
   setCustomShops(next.customShops);
+  setShopTabs(next.shopTabs);
   setCostcoState(costcoStateOf(next));
   const ops: SqlOp[] = [{ sql: 'INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', params: ['settings', JSON.stringify(next)] }];
   if (!opts.local) ops.push(...(await householdSettingOps(before, next)));
@@ -362,7 +365,7 @@ export async function updateSettings(patch: Partial<Settings>, opts: { local?: b
 
 /** The household fields of the settings, to tell quickly whether any changed. */
 const sharedPart = (s: Settings) =>
-  JSON.stringify([s.shopAroundMin, s.defaultThresholdPct, s.listCompare, s.productOrder, s.recalls.enabled, s.enabledChains, s.sections, s.customShops]);
+  JSON.stringify([s.shopAroundMin, s.defaultThresholdPct, s.listCompare, s.productOrder, s.recalls.enabled, s.enabledChains, s.sections, s.customShops, s.shopTabs]);
 
 /**
  * 0.9.3: the household this phone (or the web app) is in, for household settings: the tabs it
@@ -436,6 +439,7 @@ export async function resetSettings(): Promise<Settings> {
   }
   const next = checkSettings(kept);
   setCustomShops(next.customShops);
+  setShopTabs(next.shopTabs);
   setCostcoState(costcoStateOf(next));
   await putKV('settings', next);
   lastSettings = next;
@@ -1095,7 +1099,7 @@ export interface RestoreParts {
 }
 
 /** Settings that are about your shops. */
-export const SHOP_SETTINGS = ['stores', 'enabledChains', 'sections', 'hiddenTabs', 'customShops', 'adultConfirmed', 'area'] as const;
+export const SHOP_SETTINGS = ['stores', 'enabledChains', 'sections', 'shopTabs', 'hiddenTabs', 'customShops', 'adultConfirmed', 'area'] as const;
 /** Settings that belong to this phone, never taken from a backup. */
 const DEVICE_SETTINGS = [
   'onboarded',
@@ -1163,7 +1167,8 @@ export function mergeRestoredSettings(
  * branch this phone already has for it.
  */
 export function mergeShopsFor(current: Settings, from: Settings, incoming: Partial<Settings>, tabs: Section[]): Partial<Settings> {
-  const tabOf = (c: string) => shopDef(c)?.section ?? [...from.customShops, ...current.customShops].find((x) => x.id === c)?.section ?? 'pantry';
+  // 0.10.3: by the tab each shop is shared with (Baby and Pets shops go with Groceries).
+  const tabOf = (c: string) => shareTab(shopDef(c)?.section ?? [...from.customShops, ...current.customShops].find((x) => x.id === c)?.section ?? 'pantry');
   const ours = (c: string) => tabs.includes(tabOf(c));
   const enabledChains = [...current.enabledChains.filter((c) => !ours(c)), ...from.enabledChains.filter((c) => ours(c))];
   const stores: Settings['stores'] = {};
@@ -1176,12 +1181,21 @@ export function mergeShopsFor(current: Settings, from: Settings, incoming: Parti
   const sections = { ...current.sections };
   if (tabs.includes('keg')) sections.keg = from.sections.keg;
   if (tabs.includes('pharmacy')) sections.pharmacy = from.sections.pharmacy;
+  // 0.10.3: Baby and Pets come back with Groceries (they're shared with it).
+  if (tabs.includes('pantry')) {
+    sections.baby = from.sections.baby;
+    sections.pets = from.sections.pets;
+  }
+  const shopTabs: Partial<Record<string, Section[]>> = {};
+  for (const [c, v] of Object.entries(current.shopTabs ?? {})) if (!ours(c) && v) shopTabs[c] = v;
+  for (const [c, v] of Object.entries(from.shopTabs ?? {})) if (ours(c) && v) shopTabs[c] = v;
   const hiddenFrom = 'hiddenTabs' in incoming ? (from.hiddenTabs ?? []) : [];
   const hiddenTabs = [...(current.hiddenTabs ?? []).filter((t) => !tabs.includes(t)), ...hiddenFrom.filter((t) => tabs.includes(t))];
   return {
     enabledChains: [...new Set(enabledChains)],
     stores,
     sections,
+    shopTabs: Object.keys(shopTabs).length ? shopTabs : undefined,
     hiddenTabs: hiddenTabs.length ? hiddenTabs : undefined,
     customShops: [...current.customShops.filter((x) => !tabs.includes(x.section)), ...from.customShops.filter((x) => tabs.includes(x.section))],
     adultConfirmed: tabs.includes('keg') ? current.adultConfirmed || from.adultConfirmed : current.adultConfirmed,
@@ -1354,6 +1368,7 @@ export async function eraseEverything(): Promise<void> {
   // on Home). Shop sign-ins, cookies and exported files are cleared on the Android side (eraseNative).
   lastSettings = undefined;
   setCustomShops([]);
+  setShopTabs(undefined);
   setCostcoState(undefined);
   for (const store of ['localStorage', 'sessionStorage'] as const) {
     try {

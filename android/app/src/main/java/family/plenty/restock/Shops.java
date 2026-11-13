@@ -11,7 +11,7 @@ import java.util.Map;
 final class Shops {
     static final class Shop {
         final String id;
-        /** pantry | keg | pharmacy */
+        /** pantry | keg | pharmacy | baby | pets: its own tab (0.10.3: settings.shopTabs can add more). */
         final String section;
         /** woolworths | coles | aldi | endeavour | web */
         final String kind;
@@ -66,6 +66,41 @@ final class Shops {
         add("capitalchemist", "pharmacy", "web", "https://www.capitalchemist.com.au", null);
         add("nationalpharmacies", "pharmacy", "web", "https://www.nationalpharmacies.com.au", null);
         add("chempro", "pharmacy", "web", "https://www.chempro.com.au", null);
+        // 0.10.3 (beta): IGA, and the baby, pet and big box shops, read from their websites.
+        add("iga", "pantry", "web", "https://www.igashop.com.au", null);
+        add("babybunting", "baby", "web", "https://www.babybunting.com.au", null);
+        add("petbarn", "pets", "web", "https://www.petbarn.com.au", null);
+        add("petstock", "pets", "web", "https://www.petstock.com.au", null);
+        add("petcircle", "pets", "web", "https://www.petcircle.com.au", null);
+        add("bigw", "baby", "web", "https://www.bigw.com.au", null);
+        add("kmart", "baby", "web", "https://www.kmart.com.au", null);
+        add("target", "baby", "web", "https://www.target.com.au", null);
+        add("bunnings", "pets", "web", "https://www.bunnings.com.au", null);
+    }
+
+    /** 0.10.3: every tab, in order (shops.ts SECTIONS). */
+    static final String[] SECTIONS = { "pantry", "keg", "pharmacy", "baby", "pets" };
+
+    /** 0.10.3: the tab a section's records are shared with: Baby and Pets with Groceries (shops.ts shareTab). */
+    static String shareTab(String section) {
+        return "baby".equals(section) || "pets".equals(section) ? "pantry" : section;
+    }
+
+    /**
+     * 0.10.3: the tabs a shop is in (shops.ts tabsOf): settings.shopTabs's list for it (known tabs,
+     * in order), or its own tab.
+     */
+    static java.util.List<String> tabsOf(org.json.JSONObject settings, String id) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        org.json.JSONObject m = settings == null ? null : settings.optJSONObject("shopTabs");
+        org.json.JSONArray a = m == null ? null : m.optJSONArray(id);
+        if (a != null) {
+            java.util.Set<String> has = new java.util.HashSet<>();
+            for (int i = 0; i < a.length(); i++) has.add(a.optString(i));
+            for (String s : SECTIONS) if (has.contains(s)) out.add(s);
+        }
+        if (out.isEmpty()) out.add(section(id));
+        return out;
     }
 
     private Shops() {}

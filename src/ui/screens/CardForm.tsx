@@ -19,6 +19,8 @@ import {
 } from '../../lib/giftCards';
 import { ensureNotificationPermission } from '../../lib/notify';
 import type { CardProgram, GiftBarcodeType, GiftCard, LoyaltyCard } from '../../types';
+import { searchBrands, type CardBrand } from '../../lib/cardBrands';
+import { CardCode } from './CardCode';
 import { Icon, Sheet } from '../components';
 import { useNav } from '../nav';
 
@@ -80,7 +82,7 @@ export function AddCardSheet({
       </div>
       <p className="small" style={{ margin: 0 }}>
         {kind === 'loyalty'
-          ? 'Flybuys, Everyday Rewards or another member card. Member prices count once the card is added.'
+          ? 'Flybuys, Everyday Rewards, IGA Rewards, Bunnings PowerPass or any card with a barcode. Member prices count once Flybuys or Everyday Rewards is added.'
           : 'A gift card with a balance: barcode, card number, PIN and expiry date.'}
       </p>
       {kind === 'loyalty' ? (
@@ -92,34 +94,104 @@ export function AddCardSheet({
   );
 }
 
+/** 0.10.3: a small drawing of each kind of barcode, to pick the one on the card. */
+function CodePicture({ type }: { type: GiftBarcodeType | 'auto' }) {
+  if (type === 'QR')
+    return (
+      <svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
+        <rect width="40" height="40" rx="4" fill="#fff" />
+        {[
+          [4, 4],
+          [24, 4],
+          [4, 24],
+        ].map(([x, y]) => (
+          <g key={`${x}${y}`}>
+            <rect x={x} y={y} width="12" height="12" fill="#111" />
+            <rect x={x + 3} y={y + 3} width="6" height="6" fill="#fff" />
+          </g>
+        ))}
+        <path d="M22 22h4v4h-4zM28 26h4v4h-4zM24 30h4v6h-4zM32 22h4v4h-4zM32 32h4v4h-4z" fill="#111" />
+      </svg>
+    );
+  if (type === 'auto')
+    return (
+      <svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
+        <rect width="40" height="40" rx="4" fill="#fff" />
+        <path d="M14 15a6 6 0 1 1 8.5 5.4c-1.6.8-2.5 2-2.5 3.6v1M20 30v.5" fill="none" stroke="#111" strokeWidth="3" strokeLinecap="round" />
+      </svg>
+    );
+  const bars = [2, 1, 3, 1, 1, 2, 1, 3, 2, 1, 1, 2, 3, 1, 2];
+  let x = 4;
+  return (
+    <svg viewBox="0 0 64 40" width="64" height="40" aria-hidden="true">
+      <rect width="64" height="40" rx="4" fill="#fff" />
+      {bars.map((w, i) => {
+        const r = i % 2 === 0 ? <rect key={i} x={x} y="5" width={w * 1.3} height={type === 'EAN' ? 24 : 30} fill="#111" /> : null;
+        x += w * 1.3 + 1.2;
+        return r;
+      })}
+      {type === 'EAN' && (
+        <text x="32" y="37" textAnchor="middle" fontSize="8" fontFamily="monospace" fill="#111">
+          9 312345 678901
+        </text>
+      )}
+    </svg>
+  );
+}
+
+const CODE_KINDS: { id: GiftBarcodeType | 'auto'; name: string; sub: string }[] = [
+  { id: 'CODE128', name: 'Barcode', sub: 'Black lines, like most loyalty cards' },
+  { id: 'EAN', name: 'Barcode with numbers under it', sub: 'Lines with a row of numbers' },
+  { id: 'QR', name: 'QR code', sub: 'A square of dots' },
+  { id: 'auto', name: "Not sure", sub: 'Scan it and Restock works it out' },
+];
+
+/**
+ * 0.10.3: Set up a card, in three steps: what kind of barcode is on it (with a picture of each),
+ * scan it (or type its number), then whose card it is, from a search of the cards Restock knows
+ * (Flybuys, Everyday Rewards, IGA Rewards, Bunnings PowerPass, Petbarn and more) or Other with
+ * any name. A known card is drawn in its shop's colours.
+ */
 function LoyaltyFields({ store, onAdded }: { store: CardStore; onAdded: (id: string) => void }) {
-  const [program, setProgram] = useState<CardProgram>('flybuys');
-  const [label, setLabel] = useState('');
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [type, setType] = useState<GiftBarcodeType | 'auto'>('auto');
   const [number, setNumber] = useState('');
+  const [q, setQ] = useState('');
+  const [brand, setBrand] = useState<CardBrand>();
+  // Other with the name typed: tapped, or nothing Restock knows matches it.
+  const [other, setOther] = useState(false);
   const [error, setError] = useState<string>();
+
+  const clean = number.replace(/\s+/g, '');
+  const kind: GiftBarcodeType = type === 'auto' ? guessBarcodeType(clean) : type;
+  const codeBad = clean ? barcodeProblem(clean, kind) : undefined;
 
   const scan = async () => {
     const out = await scanBarcode('Scan your card', CARD_SCAN);
-    if (out.ok) setNumber(out.code);
+    if (!out.ok) return;
+    setNumber(out.code);
+    if (type === 'auto') setType(guessBarcodeType(out.code));
   };
 
   // One save at a time, so a double tap doesn't add the card twice.
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const matches = searchBrands(q);
+  const name = brand ? brand.name : other || (q.trim() && !matches.length) ? q.trim() : '';
   const save = async () => {
-    const clean = number.replace(/\s+/g, '');
-    if (!clean || savingRef.current) return;
+    if (!clean || !name || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     const card: LoyaltyCard = {
       id: uid(),
-      program,
-      label: program === 'other' ? label.trim() || 'Card' : PROGRAMS[program].name,
+      program: brand?.program ?? 'other',
+      label: brand && brand.program !== 'other' ? PROGRAMS[brand.program].name : name.slice(0, 80),
       number: clean,
       createdAt: nowIso(),
     };
     try {
       await store.addLoyalty(card);
+      await store.setCodeType?.(card.id, kind).catch(() => undefined);
       onAdded(card.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -129,43 +201,141 @@ function LoyaltyFields({ store, onAdded }: { store: CardStore; onAdded: (id: str
     }
   };
 
+  const back = (to: 1 | 2) => (
+    <button type="button" className="btn ghost small" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => setStep(to)}>
+      <span style={{ display: 'inline-flex', transform: 'rotate(180deg)' }}>
+        <Icon name="chevron" size={16} />
+      </span>{' '}
+      Back
+    </button>
+  );
+
+  if (step === 1)
+    return (
+      <>
+        <div className="eyebrow">Step 1 of 3 · What's on the card?</div>
+        <div className="cc-kinds" role="group" aria-label="Kind of barcode">
+          {CODE_KINDS.map((k) => (
+            <button
+              key={k.id}
+              type="button"
+              className="cc-kind"
+              aria-pressed={type === k.id}
+              onClick={() => {
+                setType(k.id);
+                setStep(2);
+              }}
+            >
+              <CodePicture type={k.id} />
+              <span className="cc-kind-text">
+                <span className="title" style={{ fontSize: 15 }}>
+                  {k.name}
+                </span>
+                <span className="small">{k.sub}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </>
+    );
+
+  if (step === 2)
+    return (
+      <>
+        {back(1)}
+        <div className="eyebrow">Step 2 of 3 · Scan it</div>
+        <button className="btn primary" type="button" onClick={() => void scan()}>
+          <Icon name="scan" /> Scan the card
+        </button>
+        <label className="field">
+          <span>Or type the number on it</span>
+          <input
+            className="input num"
+            inputMode={kind === 'QR' ? 'text' : 'numeric'}
+            autoComplete="off"
+            value={number}
+            onChange={(e) => setNumber(e.target.value)}
+            placeholder="Card number"
+          />
+        </label>
+        {clean && !codeBad && (
+          <div className="barcode-panel">
+            <CardCode value={clean} type={kind} cache={store.codeCache} />
+          </div>
+        )}
+        {codeBad && (
+          <p className="small" role="alert">
+            {codeBad}
+          </p>
+        )}
+        <button className="btn primary" disabled={!clean || !!codeBad} onClick={() => setStep(3)}>
+          Next
+        </button>
+      </>
+    );
+
+  const found = matches;
+  const typed = q.trim().toLowerCase();
+  const exact = found.some((b) => b.name.toLowerCase() === typed || !!b.aka?.includes(typed));
   return (
     <>
-      <div className="seg cc-seg" role="group" aria-label="Card type">
-        {(Object.keys(PROGRAMS) as CardProgram[]).map((p) => (
-          <button key={p} type="button" aria-pressed={program === p} onClick={() => setProgram(p)}>
-            {p === 'other' ? 'Other' : PROGRAMS[p].name}
+      {back(2)}
+      <div className="eyebrow">Step 3 of 3 · Whose card is it?</div>
+      <div className="settings-search">
+        <Icon name="search" size={18} />
+        <input
+          className="input"
+          type="search"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setBrand(undefined);
+            setOther(false);
+          }}
+          placeholder="Type the shop, like Bunnings"
+          aria-label="Search for the card's shop"
+        />
+      </div>
+      <div className="card flush cc-brands" role="list">
+        {found.map((b) => (
+          <button key={b.id} type="button" role="listitem" className="row" aria-pressed={brand?.id === b.id} onClick={() => (setBrand(b), setOther(false))}>
+            <span className="swatch" style={{ background: b.bg }} aria-hidden="true" />
+            <span className="grow">
+              <span className="title" style={{ fontSize: 15 }}>
+                {b.name}
+              </span>
+              <span className="small">{b.use}</span>
+            </span>
+            {brand?.id === b.id && <Icon name="check" size={18} />}
           </button>
         ))}
+        {q.trim() && !exact && (
+          <button type="button" role="listitem" className="row" aria-pressed={!brand && !!name} onClick={() => (setBrand(undefined), setOther(true))}>
+            <span className="swatch other" aria-hidden="true" />
+            <span className="grow">
+              <span className="title" style={{ fontSize: 15 }}>
+                Other: “{q.trim()}”
+              </span>
+              <span className="small">Any card with a barcode, called what you typed</span>
+            </span>
+            {!brand && !!name && <Icon name="check" size={18} />}
+          </button>
+        )}
+        {!q.trim() && !brand && (
+          <div className="row" role="listitem">
+            <span className="small">Not listed? Type its name, and pick Other.</span>
+          </div>
+        )}
       </div>
-      {program === 'other' && (
-        <label className="field">
-          <span>Card name</span>
-          <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Library card" />
-        </label>
-      )}
-      <label className="field">
-        <span>Card number</span>
-        <input
-          className="input num"
-          inputMode="numeric"
-          autoComplete="off"
-          value={number}
-          onChange={(e) => setNumber(e.target.value)}
-          placeholder="Type it or scan the card"
-        />
-      </label>
-      <button className="btn" type="button" onClick={scan}>
-        <Icon name="scan" /> Scan the card's barcode
-      </button>
+      {brand && brand.program !== 'other' && <p className="small" style={{ margin: 0 }}>{brand.name}: member prices count once it's added.</p>}
       <p className="small">{keptText(store, 'loyalty')}</p>
       {error && (
         <p className="small" role="alert">
           {error}
         </p>
       )}
-      <button className="btn primary" disabled={!number.trim() || saving} onClick={save}>
-        Add card
+      <button className="btn primary" disabled={!name || saving} onClick={() => void save()}>
+        {name ? `Add ${name}` : q.trim() ? 'Pick one above' : 'Pick or type a name'}
       </button>
     </>
   );

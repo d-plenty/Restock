@@ -1763,3 +1763,8 @@ html.server-mode .dk-money .input {
   flex-direction: column;
   justify-content: center;
 }
+/* 0.10.3: the headings in a tab's shop list (Supermarkets, Chemists, Pet shops…). */
+.dk-fieldset .dk-shop-group {
+  margin: 0;
+  padding: 12px 14px 4px;
+}

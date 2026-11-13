@@ -167,8 +167,24 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
       if (bool(was.on, false) && !!when(was.acceptedAt) && !picked.includes('costco')) picked.push('costco');
       return picked;
     })(),
-    sections: { keg: bool(sec.keg, D.sections.keg), pharmacy: bool(sec.pharmacy, D.sections.pharmacy) },
+    sections: {
+      keg: bool(sec.keg, D.sections.keg),
+      pharmacy: bool(sec.pharmacy, D.sections.pharmacy),
+      // 0.10.3 (beta): only written once switched on.
+      ...(sec.baby === true ? { baby: true } : {}),
+      ...(sec.pets === true ? { pets: true } : {}),
+    },
     hiddenTabs: tabs(s.hiddenTabs),
+    // 0.10.3: the tabs a shop is in, when it isn't just its own (shops known here, at least one tab).
+    shopTabs: (() => {
+      if (!isObj(s.shopTabs)) return undefined;
+      const out: Partial<Record<string, Section[]>> = {};
+      for (const [k, v] of Object.entries(s.shopTabs)) {
+        const t = tabs(v);
+        if (isShop(k) && t) out[k] = t;
+      }
+      return Object.keys(out).length ? out : undefined;
+    })(),
     customShops,
     adultConfirmed: maybeBool(s.adultConfirmed),
     alerts: {

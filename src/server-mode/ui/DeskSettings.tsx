@@ -2,11 +2,11 @@
 // household, with what only the owner phone or each phone can change shown greyed. Phones: each
 // phone's own settings, greyed, to change on that phone. Everything it reads or changes goes
 // through settingsData.ts.
-import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { confirmAction } from '../../lib/confirm';
 import { useLive } from '../../lib/useLive';
 import { money } from '../../lib/units';
-import type { Section } from '../../shops';
+import { SECTION_NAMES, type Section } from '../../shops';
 import { BETA_NOTE, BETA_SECTIONS, Icon, Sheet, TopBar, timeAgo } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { PassphraseForm } from './Gate';
@@ -191,16 +191,20 @@ function ShopsSheet({ tab, onClose }: { tab: ShopsForTab; onClose: () => void })
       {tab.section !== 'pantry' && (
         <label className="check card" style={{ flexDirection: 'row' }}>
           <input type="checkbox" className="switch" checked={on} onChange={(e) => setOn(e.target.checked)} />
-          <span className="title">The {tab.section === 'keg' ? 'Keg' : 'Health'} tab is on</span>
+          <span className="title">The {SECTION_NAMES[tab.section]} tab is on</span>
         </label>
       )}
       <fieldset className="card flush dk-fieldset" disabled={!on}>
         <legend className="sr-only">Shops on {tab.title.replace(/ · Beta$/, '')}</legend>
-        {tab.choices.map((c) => (
-          <label key={c.id} className="check">
-            <input type="checkbox" checked={picked.has(c.id)} onChange={() => flip(c.id)} />
-            <span className="grow">{c.name}</span>
-          </label>
+        {tab.choices.map((c, i) => (
+          <Fragment key={c.id}>
+            {/* 0.10.3: every shop, under its heading, as on the phone. */}
+            {c.group && c.group !== tab.choices[i - 1]?.group && <div className="eyebrow dk-shop-group">{c.group}</div>}
+            <label className="check">
+              <input type="checkbox" checked={picked.has(c.id)} onChange={() => flip(c.id)} />
+              <span className="grow">{c.name}</span>
+            </label>
+          </Fragment>
         ))}
       </fieldset>
       {tab.section === 'pantry' && (

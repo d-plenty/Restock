@@ -263,7 +263,7 @@ describe('picking what to restore', () => {
     expect(tables.kv).toEqual([]);
     const summary = readBackup(JSON.stringify({ app: 'restock', version: 2, exportedAt: '', parts: { ...parts, prices: false }, tables }));
     expect(summary.sections).toEqual(['keg']);
-    expect(summary.counts.bySection).toEqual({ pantry: 0, keg: 1, pharmacy: 0 });
+    expect(summary.counts.bySection).toEqual({ pantry: 0, keg: 1, pharmacy: 0, baby: 0, pets: 0 });
     expect(summary.counts.hasSettings).toBe(false);
 
     // On the phone, the lager gets renamed; restoring the Keg part puts it back and keeps the pantry.

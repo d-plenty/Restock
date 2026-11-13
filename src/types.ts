@@ -300,8 +300,13 @@ export interface Settings {
   stores: Partial<Record<StoreChain, StoreChoice>>;
   /** The shops you use, in every section. */
   enabledChains: StoreChain[];
-  /** Keg and Pharmacy tabs: switched on? (They also need at least one shop picked.) */
-  sections: { keg: boolean; pharmacy: boolean };
+  /** Keg and Pharmacy tabs (0.10.3: and Baby and Pets): switched on? (They also need at least one shop picked.) */
+  sections: { keg: boolean; pharmacy: boolean; baby?: boolean; pets?: boolean };
+  /**
+   * 0.10.3: the tabs each shop is in, by shop id, when it isn't just its own tab (shops.ts tabsOf):
+   * Woolworths in Pantry and Baby, say. Shared with the household (shop:<chain> rows' `tabs`).
+   */
+  shopTabs?: Partial<Record<string, Section[]>>;
   /**
    * Tabs left out of the bottom bar. Their shops still come up on Add and the shopping list, for
    * the odd bottle of wine you don't want to track.

@@ -180,12 +180,21 @@ function stockNote(c: Ctx, e: ListEntry): { kind: 'second' | 'out'; text: string
   return { kind: 'out', text: `Out of stock ${stockWhere(p.chain, true)}` };
 }
 
-export const LIST_TITLE: Record<ListSection, string> = { pantry: 'Shopping list', keg: 'Bottle shop list', pharmacy: 'Health list', general: 'General list' };
+export const LIST_TITLE: Record<ListSection, string> = {
+  pantry: 'Shopping list',
+  keg: 'Bottle shop list',
+  pharmacy: 'Health list',
+  baby: 'Baby list',
+  pets: 'Pets list',
+  general: 'General list',
+};
 /** What to type in the add box, for each list. */
 export const ADD_HINT: Record<ListSection, string> = {
   pantry: 'Add anything, like bananas',
   keg: 'Add anything, like a bag of ice',
   pharmacy: 'Add anything, like sunscreen',
+  baby: 'Add anything, like wipes',
+  pets: 'Add anything, like dog treats',
   general: 'Add anything, like batteries',
 };
 

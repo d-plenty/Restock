@@ -76,7 +76,14 @@ function shared(raw: unknown) {
   }));
   return {
     enabledChains: [...((s.enabledChains as string[] | undefined) ?? [])].sort(),
-    sections: { keg: !!(s.sections as Record<string, unknown> | undefined)?.keg, pharmacy: !!(s.sections as Record<string, unknown> | undefined)?.pharmacy },
+    sections: {
+      keg: !!(s.sections as Record<string, unknown> | undefined)?.keg,
+      pharmacy: !!(s.sections as Record<string, unknown> | undefined)?.pharmacy,
+      // 0.10.3
+      baby: !!(s.sections as Record<string, unknown> | undefined)?.baby,
+      pets: !!(s.sections as Record<string, unknown> | undefined)?.pets,
+    },
+    shopTabs: (s.shopTabs as Record<string, unknown> | undefined) ?? null,
     customShops: shops.sort((a, b) => String(a.id).localeCompare(String(b.id))),
     shopAroundMin: Number(s.shopAroundMin),
     defaultThresholdPct: Number(s.defaultThresholdPct),
@@ -188,6 +195,8 @@ it.skipIf(!CP)('the web merges the phones’ files like a phone, and the phones 
   const after = await setHouseholdSettings({ shopAroundMin: 9, tabs: { pantry: { chains: ['coles', 'woolworths', 'custom-xyz'] } } });
   expect(after?.shopAroundMin).toBe(9);
   expect(after?.tabs.pantry?.chains.sort()).toEqual(['coles', 'custom-xyz', 'woolworths']);
+  // 0.10.3: Woolworths is still in Pets too, with Petbarn.
+  expect(after?.tabs.pets?.chains.sort()).toEqual(['petbarn', 'woolworths']);
   expect(db.query("SELECT device FROM sync_log WHERE tbl = 'household_settings' AND pk = 'shopAroundMin'")[0].device).toBe('web-parityref');
   const w = await syncRound(engine, remote, keys);
   expect(w.wrote).toBe(true);

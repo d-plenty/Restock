@@ -101,7 +101,7 @@ function deskScreen(top: Screen): ReactNode | undefined {
   return undefined;
 }
 
-const TAB_ICON: Record<string, string> = { home: 'home', pantry: 'pantry', keg: 'keg', pharmacy: 'pharmacy' };
+const TAB_ICON: Record<string, string> = { home: 'home', pantry: 'pantry', keg: 'keg', pharmacy: 'pharmacy', baby: 'baby', pets: 'pets' };
 
 /** How many phones use this server, checked when a sync round finishes (at most once a minute). */
 function usePhoneCount(at: string | undefined): number | undefined {

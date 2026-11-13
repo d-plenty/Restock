@@ -1,16 +1,34 @@
-// Every shop Restock knows about, and which tab it belongs to.
+// Every shop Restock knows about, and which tabs use it.
 //
-// Shops are kept apart by section, so a search for potato chips only goes to supermarkets and
-// a search for beer only goes to bottle shops. Each pantry item, shopping list line and category
-// belongs to one section too. Mirrored for background price checks in Shops.java.
+// Each tab searches only its own shops, so a search for potato chips goes to the shops picked for
+// Pantry and a search for beer to the ones picked for Keg. Each pantry item, shopping list line and
+// category belongs to one tab (section) too. Mirrored for background price checks in Shops.java.
+//
+// 0.10.3: a shop can be in more than one tab (Woolworths in Pantry and in Baby, for nappies):
+// settings.shopTabs says which, by shop; a shop it doesn't mention is in its own tab only (its
+// `section` below, which is also the tab it's shared with: shareTab). Baby and Pets are new tabs;
+// for household sync they go with Groceries, as the General list does, so phones and servers
+// still share three tabs.
 
-export type Section = 'pantry' | 'keg' | 'pharmacy';
-export const SECTIONS: Section[] = ['pantry', 'keg', 'pharmacy'];
-export const SECTION_NAMES: Record<Section, string> = { pantry: 'Pantry', keg: 'Keg', pharmacy: 'Health' };
+export type Section = 'pantry' | 'keg' | 'pharmacy' | 'baby' | 'pets';
+export const SECTIONS: Section[] = ['pantry', 'keg', 'pharmacy', 'baby', 'pets'];
+/** The tabs besides Pantry, in the order they're set up and shown in More. */
+export const EXTRA_SECTIONS: Exclude<Section, 'pantry'>[] = ['keg', 'pharmacy', 'baby', 'pets'];
+export const SECTION_NAMES: Record<Section, string> = { pantry: 'Pantry', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets' };
 /** "Added to your pantry / keg / Health list". */
-export const SECTION_PLACE: Record<Section, string> = { pantry: 'your pantry', keg: 'your keg', pharmacy: 'your Health list' };
+export const SECTION_PLACE: Record<Section, string> = {
+  pantry: 'your pantry',
+  keg: 'your keg',
+  pharmacy: 'your Health list',
+  baby: 'your Baby list',
+  pets: 'your Pets list',
+};
 /** What the shops in each section are called in sentences. */
-export const SECTION_SHOPS: Record<Section, string> = { pantry: 'supermarkets', keg: 'bottle shops', pharmacy: 'chemists' };
+export const SECTION_SHOPS: Record<Section, string> = { pantry: 'supermarkets', keg: 'bottle shops', pharmacy: 'chemists', baby: 'shops', pets: 'shops' };
+/** 0.10.3: the tab a section's records are shared with (household sync): Baby and Pets go with Groceries. */
+export type ShareTab = 'pantry' | 'keg' | 'pharmacy';
+export const SHARE_TABS: ShareTab[] = ['pantry', 'keg', 'pharmacy'];
+export const shareTab = (s: string | null | undefined): ShareTab => (s === 'keg' || s === 'pharmacy' ? s : 'pantry');
 
 /**
  * 0.9.5: the shopping lists. Each tab's own (Groceries is the Pantry tab's), and General: a list only,
@@ -19,15 +37,16 @@ export const SECTION_SHOPS: Record<Section, string> = { pantry: 'supermarkets', 
  * with Groceries (listShareTab), so a phone that shares Groceries shares General too.
  */
 export type ListSection = Section | 'general';
-export const LIST_SECTIONS: ListSection[] = ['pantry', 'keg', 'pharmacy', 'general'];
+export const LIST_SECTIONS: ListSection[] = ['pantry', 'keg', 'pharmacy', 'baby', 'pets', 'general'];
 /** The tab names on the list (phone and web). */
-export const LIST_NAMES: Record<ListSection, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', general: 'General' };
+export const LIST_NAMES: Record<ListSection, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets', general: 'General' };
 /** "Nothing on your General list", "tap the cart next to anything in your pantry". */
 export const LIST_PLACE: Record<ListSection, string> = { ...SECTION_PLACE, general: 'your pantry' };
 /** A list_entries section as stored: anything this version doesn't know is the grocery list. */
-export const asListSection = (v: unknown): ListSection => (v === 'keg' || v === 'pharmacy' || v === 'general' ? v : 'pantry');
+export const asListSection = (v: unknown): ListSection =>
+  v === 'keg' || v === 'pharmacy' || v === 'baby' || v === 'pets' || v === 'general' ? v : 'pantry';
 /** The tab a list's lines are shared with (household sync, the server, What this phone shares): General goes with Groceries. */
-export const listShareTab = (s: ListSection | null | undefined): Section => (s === 'keg' || s === 'pharmacy' ? s : 'pantry');
+export const listShareTab = (s: ListSection | null | undefined): ShareTab => shareTab(s);
 
 export type GroceryChain = 'woolworths' | 'coles' | 'aldi' | 'costco';
 export type LiquorChain =
@@ -49,7 +68,9 @@ export type PharmacyChain =
   | 'capitalchemist'
   | 'nationalpharmacies'
   | 'chempro';
-export type BuiltinChain = GroceryChain | LiquorChain | PharmacyChain;
+/** 0.10.3 (beta): IGA, and the baby, pet and big box shops. Read from their websites ('web'). */
+export type MoreChain = 'iga' | 'babybunting' | 'bigw' | 'kmart' | 'target' | 'petbarn' | 'petstock' | 'petcircle' | 'bunnings';
+export type BuiltinChain = GroceryChain | LiquorChain | PharmacyChain | MoreChain;
 /** A shop the person added themselves (a website and a name). */
 export type CustomChain = `custom-${string}`;
 export type Chain = BuiltinChain | CustomChain | 'other';
@@ -86,11 +107,31 @@ export interface ShopDef {
   note?: string;
   /** The shop's catalogue page, when known (otherwise it's looked for on the website). */
   catalogue?: { url: string; note: string };
+  /** 0.10.3: the heading it's under in the shop picker (otherwise its tab's). */
+  group?: ShopGroup;
+  /** 0.10.3: "Choose your store" opens the shop's website to pick it there (IGA: prices are each store's own). */
+  pickOnSite?: string;
 }
+
+/** 0.10.3: the headings in the shop picker, every tab's picker listing every shop under them. */
+export type ShopGroup = 'supermarket' | 'pharmacy' | 'bottle' | 'baby' | 'pet' | 'bigbox' | 'other';
+export const SHOP_GROUPS: { id: ShopGroup; name: string }[] = [
+  { id: 'supermarket', name: 'Supermarkets' },
+  { id: 'pharmacy', name: 'Chemists' },
+  { id: 'bottle', name: 'Bottle shops' },
+  { id: 'baby', name: 'Baby shops' },
+  { id: 'pet', name: 'Pet shops' },
+  { id: 'bigbox', name: 'Big box stores' },
+  { id: 'other', name: 'Other shops' },
+];
+const GROUP_OF: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bottle', pharmacy: 'pharmacy', baby: 'baby', pets: 'pet' };
+export const groupOf = (d: ShopDef): ShopGroup => d.group ?? GROUP_OF[d.section];
 
 const G = (d: Omit<ShopDef, 'section'>): ShopDef => ({ ...d, section: 'pantry' });
 const L = (d: Omit<ShopDef, 'section' | 'kind'> & { kind?: ShopKind }): ShopDef => ({ kind: 'web', ...d, section: 'keg' });
 const P = (d: Omit<ShopDef, 'section' | 'kind'> & { kind?: ShopKind }): ShopDef => ({ kind: 'web', ...d, section: 'pharmacy' });
+/** 0.10.3: a shop read from its website, whose own tab is `section`. */
+const W = (section: Section, d: Omit<ShopDef, 'section' | 'kind'>): ShopDef => ({ kind: 'web', ...d, section });
 
 export const SHOPS: ShopDef[] = [
   G({
@@ -132,6 +173,19 @@ export const SHOPS: ShopDef[] = [
     map: /\bcostco\b/i,
     note: 'Online prices, delivery included',
     catalogue: { url: 'https://www.costco.com.au/warehouse-savings', note: "Costco's warehouse savings for members." },
+    group: 'other',
+  }),
+  // 0.10.3 (beta): IGA. Each IGA is independently owned and sets its own prices, so its prices are
+  // the store picked on IGA's own shopping website (pickOnSite), read like any shop's website.
+  W('pantry', {
+    id: 'iga',
+    name: 'IGA',
+    color: '#e3001b',
+    website: 'https://www.igashop.com.au',
+    map: /\biga\b/i,
+    note: "Your store's own prices, from IGA's shopping website",
+    pickOnSite: 'Enter your postcode and choose your IGA store at the top of the page (sign in if you like). Then tap Done.',
+    catalogue: { url: 'https://www.igashop.com.au/specials/1', note: 'Specials at the store you picked.' },
   }),
 
   L({
@@ -304,7 +358,36 @@ export const SHOPS: ShopDef[] = [
     search: 'https://www.chempro.com.au/index.php?route=product/search&search={q}',
     map: /chempro/i,
   }),
+
+  // 0.10.3 (beta): baby, pet and big box shops, read from their websites like the chemists.
+  W('baby', { id: 'babybunting', name: 'Baby Bunting', color: '#00a6a6', website: 'https://www.babybunting.com.au', map: /baby bunting/i }),
+  W('pets', { id: 'petbarn', name: 'Petbarn', color: '#00843d', website: 'https://www.petbarn.com.au', map: /petbarn/i }),
+  W('pets', { id: 'petstock', name: 'Petstock', color: '#e4002b', website: 'https://www.petstock.com.au', map: /petstock/i }),
+  W('pets', {
+    id: 'petcircle',
+    name: 'Pet Circle',
+    color: '#ff6b00',
+    website: 'https://www.petcircle.com.au',
+    search: 'https://www.petcircle.com.au/search?q={q}',
+    map: /pet circle/i,
+    note: 'Online only, delivered',
+  }),
+  W('baby', { id: 'bigw', name: 'Big W', color: '#0055a5', website: 'https://www.bigw.com.au', search: 'https://www.bigw.com.au/search?text={q}', map: /big ?w\b/i, group: 'bigbox' }),
+  W('baby', { id: 'kmart', name: 'Kmart', color: '#e2231a', website: 'https://www.kmart.com.au', search: 'https://www.kmart.com.au/search/?searchTerm={q}', map: /\bkmart\b/i, group: 'bigbox' }),
+  W('baby', { id: 'target', name: 'Target', color: '#cc0000', website: 'https://www.target.com.au', map: /\btarget\b/i, group: 'bigbox' }),
+  W('pets', {
+    id: 'bunnings',
+    name: 'Bunnings',
+    color: '#0d5257',
+    website: 'https://www.bunnings.com.au',
+    search: 'https://www.bunnings.com.au/search/products?q={q}',
+    map: /bunnings/i,
+    group: 'other',
+  }),
 ];
+
+/** 0.10.3: the shops marked Beta in the picker (besides every shop on a Beta tab). */
+export const BETA_SHOPS: readonly string[] = ['costco', 'iga', 'babybunting', 'petbarn', 'petstock', 'petcircle', 'bigw', 'kmart', 'target', 'bunnings'];
 
 const BY_ID = new Map<string, ShopDef>(SHOPS.map((s) => [s.id, s]));
 export const GROCERY: GroceryChain[] = ['woolworths', 'coles', 'aldi'];
@@ -375,9 +458,55 @@ export function shopColor(c: Chain | string | undefined): string {
   return i >= 0 ? CUSTOM_COLORS[i % CUSTOM_COLORS.length] : '#a9a699';
 }
 
-/** Which tab a shop belongs to. Hand-typed prices ("other") go with whatever item they're on. */
+/**
+ * A shop's own tab (the one it's shared with, and the one it's in when settings.shopTabs doesn't
+ * say). Hand-typed prices ("other") go with whatever item they're on.
+ */
 export function sectionOf(c: Chain | string | undefined): Section {
   return shopDef(c)?.section ?? customShop(c)?.section ?? 'pantry';
+}
+
+// 0.10.3: which tabs each shop is in (settings.shopTabs), kept here like the person's own shops so
+// any screen can ask. Set from settings whenever they're read (db.ts).
+let shopTabsNow: Partial<Record<string, Section[]>> = {};
+export function setShopTabs(m: Partial<Record<string, readonly string[]>> | undefined) {
+  const out: Partial<Record<string, Section[]>> = {};
+  if (m && typeof m === 'object')
+    for (const [k, v] of Object.entries(m)) if (Array.isArray(v)) out[k] = SECTIONS.filter((s) => v.includes(s));
+  shopTabsNow = out;
+}
+/** The tabs a shop is in: what settings.shopTabs says, or its own tab. */
+export function tabsOf(c: Chain | string | undefined, m: Partial<Record<string, readonly string[]>> = shopTabsNow): Section[] {
+  const t = c ? m[c] : undefined;
+  if (Array.isArray(t)) return SECTIONS.filter((s) => t.includes(s));
+  return [sectionOf(c)];
+}
+/** Can this shop's things be on this tab's list (its own tab, or one it's picked for)? `m`: these settings' shopTabs (a screen's unsaved ones). */
+export const shopOnTab = (c: Chain | string | undefined, section: Section, m?: Partial<Record<string, readonly string[]>>): boolean =>
+  tabsOf(c, m ?? shopTabsNow).includes(section);
+
+/**
+ * 0.10.3: a shop picked (on) or not for one tab: the new enabledChains and shopTabs. A shop in no
+ * tab any more comes out of enabledChains, and a shop in just its own tab needs no shopTabs entry.
+ */
+export function pickForTab(
+  s: { enabledChains: readonly string[]; shopTabs?: Partial<Record<string, readonly string[]>> },
+  chain: string,
+  section: Section,
+  on: boolean,
+): { enabledChains: StoreChain[]; shopTabs: Partial<Record<string, Section[]>> } {
+  const map: Partial<Record<string, Section[]>> = {};
+  for (const [k, v] of Object.entries(s.shopTabs ?? {})) if (Array.isArray(v)) map[k] = SECTIONS.filter((x) => v.includes(x));
+  const was = s.enabledChains.includes(chain) ? tabsOf(chain, map) : [];
+  const now = SECTIONS.filter((x) => (x === section ? on : was.includes(x)));
+  let enabled = s.enabledChains.filter((c) => c !== chain) as StoreChain[];
+  if (now.length) {
+    const at = s.enabledChains.indexOf(chain);
+    enabled = at >= 0 ? (s.enabledChains as StoreChain[]).slice() : [...enabled, chain as StoreChain];
+  }
+  if (!now.length || (now.length === 1 && now[0] === sectionOf(chain))) delete map[chain];
+  else map[chain] = now;
+  return { enabledChains: enabled, shopTabs: map };
 }
 
 /** The shop's website, for opening it or finding its search page. */
@@ -393,6 +522,18 @@ export function kindOf(c: Chain | string): ShopKind | undefined {
 
 /** The shop whose website holds this shop's prices (itself, or Liquorland for its Warehouse and Cellars). */
 export const priceSource = (c: StoreChain): StoreChain => shopDef(c)?.pricesFrom ?? c;
+
+/** 0.10.3: every shop, under its picker heading (built-in ones; the person's own go under Other). */
+export function shopsByGroup(): { group: ShopGroup; name: string; shops: { id: StoreChain; name: string; note?: string; custom?: boolean }[] }[] {
+  return SHOP_GROUPS.map((g) => ({
+    group: g.id,
+    name: g.name,
+    shops: [
+      ...SHOPS.filter((s) => groupOf(s) === g.id).map((s) => ({ id: s.id as StoreChain, name: s.name, note: s.note })),
+      ...(g.id === 'other' ? custom.map((s) => ({ id: s.id, name: s.name, note: hostOf(s.website), custom: true })) : []),
+    ],
+  })).filter((g) => g.shops.length);
+}
 
 /** Every shop in a section, built-in first then the person's own. */
 export function shopsIn(section: Section): { id: StoreChain; name: string; note?: string; custom?: boolean }[] {
@@ -411,10 +552,12 @@ export function hostOf(url: string): string {
 }
 
 /** The shops picked in this section. */
-export function enabledIn(enabled: readonly string[], section: Section): StoreChain[] {
-  const out = enabled.filter((c): c is StoreChain => c !== 'other' && !isLocalOnlyShop(c) && sectionOf(c) === section && (!!shopDef(c) || !!customShop(c)));
-  // 0.9.6: Costco, when this phone has it switched on, comes after the shops picked for the household.
-  return section === 'pantry' && costcoOn ? [...out, 'costco'] : out;
+export function enabledIn(enabled: readonly string[], section: Section, m?: Partial<Record<string, readonly string[]>>): StoreChain[] {
+  const out = enabled.filter(
+    (c): c is StoreChain => c !== 'other' && c !== 'costco' && !isLocalOnlyShop(c) && shopOnTab(c, section, m) && (!!shopDef(c) || !!customShop(c)),
+  );
+  // 0.9.6: Costco, when it's picked, comes after the other shops (0.10.3: on each tab it's picked for).
+  return enabled.includes('costco') && shopOnTab('costco', section, m) ? [...out, 'costco'] : out;
 }
 
 /**
@@ -426,9 +569,12 @@ export function searchChainsIn(enabled: readonly string[], section: Section): St
 }
 
 /** A tab is shown when it's switched on and at least one of its shops is picked. Pantry always shows. */
-export function sectionOn(settings: { sections?: Partial<Record<Section, boolean>>; enabledChains: readonly string[] }, section: Section): boolean {
+export function sectionOn(
+  settings: { sections?: Partial<Record<Section, boolean | undefined>>; enabledChains: readonly string[]; shopTabs?: Partial<Record<string, readonly string[]>> },
+  section: Section,
+): boolean {
   if (section === 'pantry') return true;
-  return !!settings.sections?.[section] && enabledIn(settings.enabledChains, section).length > 0;
+  return !!settings.sections?.[section] && enabledIn(settings.enabledChains, section, settings.shopTabs).length > 0;
 }
 
 export const activeSections = (settings: Parameters<typeof sectionOn>[0]): Section[] => SECTIONS.filter((s) => sectionOn(settings, s));
@@ -440,4 +586,6 @@ export const DEFAULT_SECTION_CATEGORIES: Record<Section, string[]> = {
   pantry: ['Pantry', 'Fridge & freezer', 'Cleaning', 'Bathroom'],
   keg: ['Beer', 'Wine', 'Spirits', 'Mixers & other'],
   pharmacy: ['Medicine', 'First aid', 'Vitamins', 'Personal care'],
+  baby: ['Nappies & wipes', 'Feeding', 'Bath & skin care', 'Health'],
+  pets: ['Food', 'Treats', 'Litter & cleaning', 'Health & care'],
 };

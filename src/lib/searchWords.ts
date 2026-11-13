@@ -179,6 +179,8 @@ export const SEARCH_WORDS: Record<Section, string[]> = {
     'face wash',
     'razor',
   ],
+  baby: ['nappies', 'huggies nappies size 4', 'baby wipes', 'formula', 'nappy pants', 'baby food pouch'],
+  pets: ['dog food', 'dry dog food 15kg', 'cat food', 'cat litter', 'dog treats', 'flea treatment'],
 };
 
 /** A shorter list for the phone: the everyday ones, brand ones and a typo, about a quarter. */
@@ -254,4 +256,6 @@ export const PHONE_WORDS: Record<Section, string[]> = {
     'pregnancy test',
     'razor',
   ],
+  baby: ['nappies', 'baby wipes', 'formula'],
+  pets: ['dog food', 'cat food', 'cat litter'],
 };

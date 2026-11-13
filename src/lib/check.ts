@@ -1,5 +1,5 @@
 import { logProblem } from './diagnostics';
-import { isPressOnlyShop, kindOf, priceSource, sectionOn, sectionOf, type StoreChain } from '../shops';
+import { isPressOnlyShop, kindOf, priceSource, sectionOn, tabsOf, type StoreChain } from '../shops';
 import { adapterFor } from '../stores';
 import { isNative } from '../stores/http';
 import type { Chain, Settings } from '../types';
@@ -69,7 +69,7 @@ async function refreshPagelessProducts(limit = 30): Promise<{ checked: number; u
       (p) =>
         // A product is saved under the shop whose website has its price (My Chemist's under Chemist Warehouse).
         // 0.9.6 (review L1): never Costco ("Check at Costco" on the item is the only way, costcoCheck.ts).
-        !isPressOnlyShop(p.chain) && isPageless(p.chain, p.storeProductId) && sources.includes(p.chain as StoreChain) && sectionOn(settings, sectionOf(p.chain)),
+        !isPressOnlyShop(p.chain) && isPageless(p.chain, p.storeProductId) && sources.includes(p.chain as StoreChain) && tabsOf(p.chain, settings.shopTabs ?? {}).some((t) => sectionOn(settings, t)),
     )
     .slice(0, limit);
   if (!todo.length) return { checked: 0, updated: 0 };

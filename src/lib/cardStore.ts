@@ -3,8 +3,8 @@
 // - the phone: its database (loyalty cards in `cards`, synced only if the person shares them;
 //   gift cards in `gift_cards`, never synced) and its own private storage for card photos;
 // - the web: this browser only (server-mode/cardStore.ts, IndexedDB), never the server.
-import type { GiftCard, LoyaltyCard } from '../types';
-import { addCard, allCards, allGiftCards, deleteCard, deleteGiftCard, saveGiftCard } from './db';
+import type { GiftBarcodeType, GiftCard, LoyaltyCard } from '../types';
+import { addCard, allCards, allGiftCards, deleteCard, deleteGiftCard, getKV, putKV, saveGiftCard } from './db';
 import { onChange } from './live';
 import { act } from './undo';
 import { cardPhotoPath, deleteCardPhoto, readCardPhoto, writeCardPhoto } from './cardPhotos';
@@ -33,7 +33,16 @@ export interface CardStore {
   undoable: boolean;
   /** A drawn QR code kept for offline (the web: its QR maker isn't kept offline). */
   codeCache?: { get(key: string): Promise<string | undefined>; set(key: string, svg: string): Promise<void> };
+  /**
+   * 0.10.3: the kind of barcode picked for each loyalty card when it was added here (QR, a line
+   * barcode), by card id. Kept where the cards are (this phone, this browser), not synced: another
+   * phone works it out from the number.
+   */
+  codeTypes?(): Promise<Partial<Record<string, GiftBarcodeType>>>;
+  setCodeType?(id: string, type: GiftBarcodeType): Promise<void>;
 }
+
+const CODE_TYPES = 'cardCodeTypes';
 
 const reschedule = async () => scheduleCardReminders(await allGiftCards());
 
@@ -72,6 +81,14 @@ export const phoneCards: CardStore = {
   },
   deletePhoto: deleteCardPhoto,
   onChange,
+  async codeTypes() {
+    const m = await getKV<Partial<Record<string, GiftBarcodeType>>>(CODE_TYPES);
+    return m && typeof m === 'object' ? m : {};
+  },
+  async setCodeType(id, type) {
+    const m = (await getKV<Partial<Record<string, GiftBarcodeType>>>(CODE_TYPES)) ?? {};
+    await putKV(CODE_TYPES, { ...m, [id]: type });
+  },
   canRemind: true,
   undoable: true,
 };

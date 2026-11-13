@@ -23,7 +23,7 @@ import { woolworths } from '../stores/woolworths';
 import { normaliseQuery, sameCode, scoreAll, topPicks, unitTextOf } from '../lib/searchHelp';
 import { genericName } from '../lib/naming';
 import { checkBranch, DEFAULTS } from '../lib/sharedSettings';
-import { chainName, isCustom, kindOf, searchChainsIn, sectionOn, setCustomShops, shopDef, type Section, type StoreChain } from '../shops';
+import { chainName, isCustom, kindOf, searchChainsIn, sectionOn, setCustomShops, setShopTabs, shopDef, type Section, type StoreChain } from '../shops';
 
 export const SEARCH_LIMITS = {
   /** Characters in what's typed. */
@@ -83,6 +83,7 @@ export function searchPlan(
 ): { asks: ShopAsk[]; error?: 'tab' | 'shop' } {
   const s = (settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {}) as Record<string, unknown>;
   setCustomShops(Array.isArray(s.customShops) ? (s.customShops as never) : []);
+  setShopTabs(s.shopTabs as never);
   const enabledChains = Array.isArray(s.enabledChains) ? (s.enabledChains as unknown[]).filter((c): c is string => typeof c === 'string') : [...DEFAULTS.enabledChains];
   const sections = (s.sections && typeof s.sections === 'object' ? s.sections : {}) as Partial<Record<Section, boolean>>;
   if (!sectionOn({ sections, enabledChains }, section)) return { asks: [], error: 'tab' };

@@ -18,9 +18,8 @@ import {
 } from '../../lib/householdSettings';
 import { haPhone } from '../../lib/listPicks';
 import { PRODUCT_ORDERS } from '../../lib/productOrder';
-import { builtInsOn } from '../../lib/sharedSettings';
 import { useLive } from '../../lib/useLive';
-import { activeSections, chainName, SECTION_NAMES, searchChainsIn, type Section, type StoreChain } from '../../shops';
+import { activeSections, BETA_SHOPS, chainName, SECTION_NAMES, SECTIONS, searchChainsIn, shopsByGroup, type Section, type StoreChain } from '../../shops';
 import { historyLabel, type Category, type ProductOrder, type Settings } from '../../types';
 import { PROGRAMS } from '../../ui/screens/Cards';
 import { api, api3, isV3, serverInfo, type Device } from '../api';
@@ -37,6 +36,8 @@ export interface ShopChoice {
   id: StoreChain;
   name: string;
   picked: boolean;
+  /** 0.10.3: the heading it's under (Supermarkets, Chemists, Pet shops…), as on the phone's shop picker. */
+  group?: string;
 }
 
 export interface ShopsForTab {
@@ -86,9 +87,15 @@ export const SHOP_AROUND_MINS = [0, 0.5, 1, 2, 5, 10];
 export const NEW_ITEM_PCTS = [10, 15, 20, 30, 40, 50];
 export { PRODUCT_ORDERS };
 
-const TAB_TITLE: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg (bottle shops)', pharmacy: 'Health' };
+const TAB_TITLE: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg (bottle shops)', pharmacy: 'Health', baby: 'Baby', pets: 'Pets' };
 /** 0.10.0: the shop rows, named as on the phone's Settings → Your shops (Keg and Health are beta). */
-const SHOPS_TITLE: Record<Section, string> = { pantry: 'Supermarkets (Pantry tab)', keg: 'Bottle shops (Keg tab) · Beta', pharmacy: 'Chemists (Health tab) · Beta' };
+const SHOPS_TITLE: Record<Section, string> = {
+  pantry: 'Supermarkets (Pantry tab)',
+  keg: 'Bottle shops (Keg tab) · Beta',
+  pharmacy: 'Chemists (Health tab) · Beta',
+  baby: 'Baby tab · Beta',
+  pets: 'Pets tab · Beta',
+};
 
 function sharesText(tabs: string[], receipts: boolean): string {
   const names = tabs.map((t) => (t === 'pantry' ? 'Groceries' : (SECTION_NAMES[t as Section] ?? t)));
@@ -104,20 +111,25 @@ async function readHousehold(): Promise<HouseholdSettings> {
   const nameOf = (id: string) => (custom as Map<string, string>).get(id) ?? chainName(id as StoreChain);
   // The household's shared tabs (with their shops), or, before the first sync, what this browser shows.
   const shops: ShopsForTab[] = hs
-    ? (['pantry', 'keg', 'pharmacy'] as Section[])
-        .filter((t) => hs.tabs[t])
-        .map((t) => {
-          const tab = hs.tabs[t]!;
-          const ids = [...builtInsOn(t), ...tab.customShops.map((c) => c.id)] as StoreChain[];
-          return {
-            section: t,
-            title: SHOPS_TITLE[t],
-            on: tab.on,
-            shops: tab.chains.map((id) => ({ id, name: nameOf(id) })),
-            // 0.10.2: Costco is Beta, as on the phone.
-            choices: ids.map((id) => ({ id, name: `${nameOf(id)}${id === 'costco' ? ' · Beta' : ''}`, picked: tab.chains.includes(id) })),
-          };
-        })
+    ? SECTIONS.filter((t) => hs.tabs[t]).map((t) => {
+        const tab = hs.tabs[t]!;
+        // 0.10.3: every shop, under its heading, as on the phone (a shop can be on more than one tab).
+        const mine = new Set(tab.customShops.map((c) => c.id as string));
+        const choices: ShopChoice[] = shopsByGroup().flatMap((g) =>
+          g.shops
+            .filter((x) => !x.custom || mine.has(x.id))
+            .map((x) => ({ id: x.id, name: `${nameOf(x.id)}${BETA_SHOPS.includes(x.id) ? ' · Beta' : ''}`, picked: tab.chains.includes(x.id), group: g.name })),
+        );
+        for (const c of tab.customShops)
+          if (!choices.some((x) => x.id === c.id)) choices.push({ id: c.id, name: c.name, picked: tab.chains.includes(c.id), group: 'Other shops' });
+        return {
+          section: t,
+          title: SHOPS_TITLE[t],
+          on: tab.on,
+          shops: tab.chains.map((id) => ({ id, name: nameOf(id) })),
+          choices,
+        };
+      })
     : activeSections(s).map((t) => ({
         section: t,
         title: SHOPS_TITLE[t],

@@ -203,6 +203,8 @@ export const CLOCK_SLACK_MS = 24 * 3600 * 1000;
 export const OLD_DELETE_MS = 180 * 24 * 3600 * 1000;
 export const DELETE_WINS = new Set(['items', 'list_entries', 'products', 'categories', 'cards', 'receipts']);
 export const ALL_TABS = ['pantry', 'keg', 'pharmacy'];
+/** 0.10.3: Baby and Pets records are shared with Groceries (SyncEngine.java shared). */
+export const sharedTab = (t: string): string => (t === 'baby' || t === 'pets' ? 'pantry' : t);
 /** 0.9.5: sync_meta lists_v once catchUpLists has read everything again (SyncEngine.LISTS_V). */
 export const LISTS_V = '95';
 export const LOCAL_PRODUCT_COLUMNS = new Set(['in_stock', 'stock_at', 'in_stock_2']);
@@ -418,7 +420,8 @@ export class WebSyncEngine {
     // 0.9.6: Costco is one phone's own: a "tab" no device ever shares (SyncEngine.LOCAL_TAB).
     if (isLocalOnlyShop(chain)) return LOCAL_TAB;
     const def = shopDef(chain);
-    if (def) return def.section;
+    // 0.10.3: Baby and Pets shops are shared with Groceries (SyncEngine.java shared).
+    if (def) return sharedTab(def.section);
     if (!this.customTabs) {
       this.customTabs = new Map();
       try {
@@ -429,10 +432,16 @@ export class WebSyncEngine {
         // no settings yet
       }
     }
-    return this.customTabs.get(chain) ?? null;
+    const t = this.customTabs.get(chain);
+    return t === undefined ? null : sharedTab(t);
   }
 
   tabOf(tbl: string, row: Row | null | undefined): string | null {
+    const t = this.tabOfRaw(tbl, row);
+    return t === null ? null : sharedTab(t);
+  }
+
+  private tabOfRaw(tbl: string, row: Row | null | undefined): string | null {
     switch (tbl) {
       case 'categories':
       case 'items':

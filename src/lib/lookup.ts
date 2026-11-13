@@ -341,6 +341,8 @@ export const QUICK_PICKS: Record<Section, string[]> = {
   pantry: [],
   keg: ['Beer', 'Pre-mix cans', 'Wine', 'Spirits', 'Cider', 'Seltzer'],
   pharmacy: ['Paracetamol', 'Ibuprofen', 'Antihistamine', 'Cold and flu', 'Vitamins', 'Sunscreen', 'First aid'],
+  baby: ['Nappies', 'Wipes', 'Formula', 'Baby food', 'Nappy cream'],
+  pets: ['Dog food', 'Cat food', 'Cat litter', 'Treats', 'Flea and worm'],
 };
 
 /** Open Food Facts' size, only when it has a unit ("425 g", "6 x 375ml", "24 pack"); a bare "4" is noise. */

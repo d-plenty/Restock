@@ -14,7 +14,7 @@
 // Delete everything, a session that ran out) leaves them locked away, never shown to another
 // household. The next sign-in to another household asks "Keep your cards?" (askAboutOtherCards).
 // iOS may clear a web app's storage when the phone is low on space; the Cards tab says so.
-import type { GiftCard, LoyaltyCard } from '../types';
+import type { GiftBarcodeType, GiftCard, LoyaltyCard } from '../types';
 import type { CardStore } from '../lib/cardStore';
 import { cleanGiftCard, cleanLoyaltyCard, MAX_PHOTO_B64 } from '../lib/giftCards';
 import { strToU8 } from 'fflate';
@@ -197,6 +197,19 @@ export function browserCards(backend: CardsBackend, channelName = CARDS_DB): Bro
     },
     canRemind: false,
     undoable: false,
+    // 0.10.3: the barcode kind picked for each loyalty card, in this browser (with the drawn codes).
+    async codeTypes() {
+      const v = await backend.get('codes', 'types:loyalty').catch(() => undefined);
+      try {
+        return typeof v === 'string' ? (JSON.parse(v) as Partial<Record<string, GiftBarcodeType>>) : {};
+      } catch {
+        return {};
+      }
+    },
+    async setCodeType(id, type) {
+      const now = await this.codeTypes!();
+      await backend.put('codes', 'types:loyalty', JSON.stringify({ ...now, [id]: type })).catch(() => undefined);
+    },
     codeCache: {
       async get(key) {
         const v = await backend.get('codes', key).catch(() => undefined);

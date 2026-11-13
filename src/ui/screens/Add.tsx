@@ -86,6 +86,8 @@ const SEARCH_PLACEHOLDER: Record<Section, string> = {
   pantry: 'Search products',
   keg: 'Search drinks',
   pharmacy: 'Search Health',
+  baby: 'Search Baby',
+  pets: 'Search Pets',
 };
 /** Small buttons and links still get a 44 px target. */
 const TAP: CSSProperties = { minHeight: 44 };

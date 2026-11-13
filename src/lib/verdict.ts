@@ -32,6 +32,8 @@ export interface Verdict {
    * before this week's specials started. 'old': a price drop last seen over STALE_DAYS ago.
    */
   stale?: 'ended' | 'old';
+  /** 0.10.3: on special nearly all the time, never at its "was" price (alwaysOnSpecial): shown as Always on special. */
+  always?: true;
 }
 
 export const VERDICT_LABEL: Record<VerdictKind, string> = {
@@ -43,6 +45,28 @@ export const VERDICT_LABEL: Record<VerdictKind, string> = {
   normal: 'USUAL PRICE',
   nodata: 'NO PRICE YET',
 };
+/** 0.10.3: a verdict's tag ("ALWAYS ON SPECIAL" for a special that never ends). */
+export const verdictLabel = (v: Pick<Verdict, 'kind' | 'always'>): string => (v.always ? 'ALWAYS ON SPECIAL' : VERDICT_LABEL[v.kind]);
+
+/**
+ * 0.10.3: "Always on special" (as CartSavvy's perpetual specials): on special on at least
+ * ALWAYS_DAYS of the last ALWAYS_WINDOW days Restock has a price for, and in that time never seen
+ * at its "was" price, so the "special" is really its usual price. Any size of claimed discount.
+ * Mirrored in Deals.java.
+ */
+export const ALWAYS_WINDOW = 21;
+export const ALWAYS_DAYS = 14;
+export function alwaysOnSpecial(readings: PriceReading[], now: number): { days: number; was: number } | undefined {
+  const recent = readings.filter((r) => now - Date.parse(r.date) <= ALWAYS_WINDOW * DAY);
+  const special = recent.filter((r) => r.isSpecial);
+  if (special.length < ALWAYS_DAYS) return undefined;
+  let was: number | undefined;
+  for (const r of special) if (typeof r.wasPrice === 'number' && r.wasPrice > 0 && (was === undefined || r.wasPrice > was)) was = r.wasPrice;
+  if (was === undefined) return undefined;
+  const w = was;
+  if (recent.some((r) => r.price >= w - 0.005)) return undefined;
+  return { days: special.length, was };
+}
 
 export interface PriceStats {
   current?: PriceReading;
@@ -55,6 +79,8 @@ export interface PriceStats {
   readings: number;
   spanDays: number;
   cycleWeeks?: number;
+  /** 0.10.3: on special nearly all the time (alwaysOnSpecial). */
+  always?: { days: number; was: number };
   /** True when the normal price comes from shared price history rather than this phone's own. */
   fromMarket?: boolean;
   /** How much the shared history was scaled to match local prices (1.04 = 4% dearer here). */
@@ -162,6 +188,7 @@ export function computeStats(raw: PriceReading[], now = Date.now(), hasCard = tr
   }
 
   const spanDays = Math.round((Date.parse(current.date) - Date.parse(readings[0].date)) / DAY);
+  const always = alwaysOnSpecial(readings, now);
   return {
     current,
     typical,
@@ -173,6 +200,7 @@ export function computeStats(raw: PriceReading[], now = Date.now(), hasCard = tr
     spanDays,
     cycleWeeks,
     asOf: now,
+    ...(always ? { always } : {}),
   };
 }
 
@@ -316,6 +344,17 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
       detail: `It was ${multi ? multiText(multi) : `on special for ${money(p)}`} on ${shortDate(cur.date)}, before this week's specials started. Check prices to see this week's price.`,
       basis,
       stale: 'ended',
+    };
+  }
+  // 0.10.3: a "special" that never ends is its usual price.
+  if (isSpecial && stats.always) {
+    const a = stats.always;
+    return {
+      kind: 'fake',
+      headline: 'Always on special',
+      detail: `On special ${a.days} of the last ${ALWAYS_WINDOW} days, and never at ${money(a.was)} in that time, so ${money(p)} is really its usual price.`,
+      basis,
+      always: true,
     };
   }
   if (ref === undefined) {

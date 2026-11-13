@@ -56,7 +56,7 @@ export const sharesOf = (i: SyncInfo | undefined): Shares => ({
 type Kind = 'pantry' | 'keg' | 'pharmacy' | 'receipts' | 'cards';
 
 const ROWS: { kind: Kind; title: string; sub: string }[] = [
-  { kind: 'pantry', title: 'Groceries', sub: 'Pantry and shopping list (General too), ticks too, with their prices and alerts' },
+  { kind: 'pantry', title: 'Groceries', sub: 'Pantry and shopping list (General, Baby and Pets too), ticks too, with their prices and alerts' },
   { kind: 'keg', title: 'Keg', sub: 'Bottle shops. Off unless you want the house to see it' },
   { kind: 'pharmacy', title: 'Health', sub: 'Off unless you want the house to see it' },
   { kind: 'receipts', title: 'Receipts', sub: 'What you spent, and the photos. Off unless you want the house to see them' },

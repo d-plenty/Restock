@@ -306,6 +306,9 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             {/* 0.10.0: Keg and Health are beta (BETA_NOTE): the same as Groceries, less tested. */}
             {row('Bottle shops (Keg tab) · Beta', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
             {row('Chemists (Health tab) · Beta', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
+            {/* 0.10.3 (beta): Baby and Pets, any shops. */}
+            {row('Baby tab · Beta', shopSummary(settings, 'baby'), () => nav.push({ name: 'stores', section: 'baby' }))}
+            {row('Pets tab · Beta', shopSummary(settings, 'pets'), () => nav.push({ name: 'stores', section: 'pets' }))}
           </div>
         </>
       )}
@@ -663,7 +666,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             Diagnostics
           </div>
           <div className="card flush">
-            {row('Diagnostics', 'What went wrong lately, the search test and search details', () => nav.push({ name: 'diagnostics' }))}
+            {row('Diagnostics', 'Shop test, what went wrong lately, the search test and search details', () => nav.push({ name: 'diagnostics' }))}
             <details className="pick-more fold-inline">
               <summary>
                 <span className="grow">Shop connections</span>
@@ -851,7 +854,7 @@ function BetaGate({ settings, searching, children }: { settings: Settings; searc
 }
 
 /** Try each store and show whether it works, how long it took, or what went wrong. */
-const GROUP_LABEL: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health' };
+const GROUP_LABEL: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets' };
 
 /** The shops you use, by tab (one per website, so Liquorland's three shops show once). Tabs that are off are left out. */
 function shopGroups(settings: Settings): { section: Section; chains: StoreChain[] }[] {

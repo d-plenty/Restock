@@ -142,6 +142,8 @@ public final class Deals {
         public Reading current;
         public Double typical;
         public boolean typicalFromHistory;
+        /** 0.10.3: on special this many of the last 21 days and never at its was price (0: not). */
+        public int always;
         public Double low;
         public int readings;
         public int spanDays;
@@ -433,7 +435,28 @@ public final class Deals {
         st.current = current;
         st.readings = rs.size();
         st.spanDays = (int) Math.round((current.time() - rs.get(0).time()) / (double) DAY);
+        st.always = alwaysOnSpecial(rs, now);
         return st;
+    }
+
+    static final int ALWAYS_WINDOW = 21;
+    static final int ALWAYS_DAYS = 14;
+
+    /**
+     * 0.10.3: "Always on special" (verdict.ts alwaysOnSpecial): on special on at least 14 of the last
+     * 21 days with a price, and never seen at its "was" price in that time. Its days, or 0.
+     */
+    static int alwaysOnSpecial(List<Reading> rs, long now) {
+        int special = 0;
+        Double was = null;
+        for (Reading r : rs) {
+            if (now - r.time() > ALWAYS_WINDOW * DAY || !r.special) continue;
+            special++;
+            if (r.was != null && r.was > 0 && (was == null || r.was > was)) was = r.was;
+        }
+        if (special < ALWAYS_DAYS || was == null) return 0;
+        for (Reading r : rs) if (now - r.time() <= ALWAYS_WINDOW * DAY && r.price >= was - 0.005) return 0;
+        return special;
     }
 
     /** Shared price history fills in for a product that's still learning. Mirrors withMarket in verdict.ts. */
@@ -451,6 +474,7 @@ public final class Deals {
         out.spanDays = Math.max(st.spanDays, m.days);
         out.fromMarket = true;
         out.asOf = st.asOf;
+        out.always = st.always;
         return out;
     }
 
@@ -638,6 +662,8 @@ public final class Deals {
             if (o != null) o.stale = "ended";
             return Kind.NORMAL;
         }
+        // 0.10.3: a "special" that never ends is its usual price.
+        if (special && st.always > 0) return Kind.FAKE;
         if (ref == null) return special ? Kind.SMALL : Kind.NORMAL;
         double discount = 1 - p / ref;
         if (o != null) o.discount = discount;

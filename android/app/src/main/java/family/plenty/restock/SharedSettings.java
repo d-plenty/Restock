@@ -43,7 +43,8 @@ final class SharedSettings {
     static final List<String> DEFAULT_CHAINS = Arrays.asList("woolworths", "coles", "aldi");
     private static final Pattern CUSTOM_ID = Pattern.compile("custom-[A-Za-z0-9_-]{1,40}");
     private static final Pattern ORIGIN = Pattern.compile("^https?://[^\\s/?#]+", Pattern.CASE_INSENSITIVE);
-    private static final Set<String> TABS = new HashSet<>(Arrays.asList(SyncEngine.ALL_TABS));
+    /** 0.10.3: every tab a shop someone added can be for (shops.ts SECTIONS), not just the three shared ones. */
+    private static final Set<String> TABS = new HashSet<>(Arrays.asList(Shops.SECTIONS));
 
     private SharedSettings() {}
 
@@ -53,11 +54,27 @@ final class SharedSettings {
         return id != null && !id.startsWith("custom-") && Shops.known(id);
     }
 
-    /** The built-in shops on a tab, sorted. */
+    /** The built-in shops shared with a tab, sorted (0.10.3: Baby and Pets shops go with Groceries). */
     static List<String> builtInsOn(String tab) {
         List<String> out = new ArrayList<>();
-        for (String id : Shops.ids()) if (builtIn(id) && tab.equals(Shops.section(id))) out.add(id);
+        for (String id : Shops.ids()) if (builtIn(id) && tab.equals(Shops.shareTab(Shops.section(id)))) out.add(id);
         return out;
+    }
+
+    /** 0.10.3: the tab a section's rows are shared with (sharedSettings.ts rowTab). */
+    static String rowTab(String t) {
+        return "baby".equals(t) || "pets".equals(t) ? "pantry" : t;
+    }
+
+    /** 0.10.3: a shop row's `tabs`, checked (sharedSettings.ts checkTabs): known tabs, in order, at least one; or null. */
+    static JSONArray checkTabs(Object v) {
+        if (!(v instanceof JSONArray)) return null;
+        JSONArray a = (JSONArray) v;
+        Set<Object> has = new HashSet<>();
+        for (int i = 0; i < a.length(); i++) has.add(a.opt(i));
+        JSONArray out = new JSONArray();
+        for (String s : Shops.SECTIONS) if (has.contains(s)) out.put(s);
+        return out.length() == 0 ? null : out;
     }
 
     static Object decode(String v) {
@@ -178,6 +195,8 @@ final class SharedSettings {
             case "recalls.enabled":
             case "tab:keg":
             case "tab:pharmacy":
+            case "tab:baby":
+            case "tab:pets":
                 return v instanceof Boolean ? v : null;
             default:
                 break;
@@ -187,12 +206,13 @@ final class SharedSettings {
         JSONObject o = (JSONObject) v;
         String id = k.substring(5);
         boolean on = o.optBoolean("on");
+        JSONArray tabs = checkTabs(o.opt("tabs"));
         try {
-            if (builtIn(id)) return new JSONObject().put("on", on);
+            if (builtIn(id)) return tabs != null ? new JSONObject().put("on", on).put("tabs", tabs) : new JSONObject().put("on", on);
             JSONObject shop = checkShop(o.opt("shop"), id);
             if (shop == null) return null;
             if (Boolean.TRUE.equals(o.opt("removed"))) return new JSONObject().put("on", false).put("removed", true).put("shop", shop);
-            return new JSONObject().put("on", on).put("shop", shop);
+            return tabs != null ? new JSONObject().put("on", on).put("shop", shop).put("tabs", tabs) : new JSONObject().put("on", on).put("shop", shop);
         } catch (Exception e) {
             return null;
         }
@@ -288,19 +308,20 @@ final class SharedSettings {
     /** Which tab a row is about (tab: and shop: rows), or null when it's the whole household's. */
     static String tabOf(String k, String v) {
         if (k == null) return null;
-        if (k.startsWith("tab:")) return k.substring(4);
+        // 0.10.3: Baby and Pets rows are shared with Groceries (rowTab).
+        if (k.startsWith("tab:")) return rowTab(k.substring(4));
         // 0.9.4: a default branch is about its shop's tab (a shop someone added: left alone).
         if (k.startsWith(BRANCH_PREFIX)) {
             String b = k.substring(BRANCH_PREFIX.length());
-            return builtIn(b) ? Shops.section(b) : "unknown";
+            return builtIn(b) ? rowTab(Shops.section(b)) : "unknown";
         }
         if (!k.startsWith("shop:")) return null;
         String id = k.substring(5);
-        if (builtIn(id)) return Shops.section(id);
+        if (builtIn(id)) return rowTab(Shops.section(id));
         Object d = decode(v);
         Object shop = d instanceof JSONObject ? ((JSONObject) d).opt("shop") : null;
         Object sec = shop instanceof JSONObject ? ((JSONObject) shop).opt("section") : null;
-        return sec instanceof String ? (String) sec : "unknown";
+        return sec instanceof String ? rowTab((String) sec) : "unknown";
     }
 
     private static boolean sameNumber(Object a, Object b) {
@@ -342,12 +363,16 @@ final class SharedSettings {
                 // 18+: Keg isn't shown on a phone that hasn't confirmed it (switching it off always applies).
                 if ("tab:keg".equals(k) && Boolean.TRUE.equals(val) && !Boolean.TRUE.equals(s.opt("adultConfirmed"))) continue;
                 JSONObject sec = s.optJSONObject("sections");
-                boolean now = sec != null && Boolean.TRUE.equals(sec.opt(tab));
+                // 0.10.3: the tab's own name (tab:baby is shared with Groceries, but it's Baby that's switched).
+                String name = k.substring(4);
+                boolean now = sec != null && Boolean.TRUE.equals(sec.opt(name));
                 if (now != (Boolean) val) {
                     JSONObject next = new JSONObject();
                     next.put("keg", sec != null && Boolean.TRUE.equals(sec.opt("keg")));
                     next.put("pharmacy", sec != null && Boolean.TRUE.equals(sec.opt("pharmacy")));
-                    next.put(tab, val);
+                    if (sec != null && Boolean.TRUE.equals(sec.opt("baby"))) next.put("baby", true);
+                    if (sec != null && Boolean.TRUE.equals(sec.opt("pets"))) next.put("pets", true);
+                    next.put(name, val);
                     s.put("sections", next);
                     changed = true;
                 }
@@ -380,6 +405,19 @@ final class SharedSettings {
                 String id = k.substring(5);
                 JSONObject x = (JSONObject) val;
                 boolean on = x.getBoolean("on");
+                // 0.10.3: the tabs it's in (none said: just its own).
+                JSONObject st = s.optJSONObject("shopTabs");
+                JSONArray hadTabs = st == null ? null : checkTabs(st.opt(id));
+                JSONArray tabsNow = x.optJSONArray("tabs");
+                String a = hadTabs == null ? null : hadTabs.toString(), b = tabsNow == null ? null : tabsNow.toString();
+                if (a == null ? b != null : !a.equals(b)) {
+                    JSONObject nextTabs = st == null ? new JSONObject() : new JSONObject(st.toString());
+                    if (tabsNow != null) nextTabs.put(id, tabsNow);
+                    else nextTabs.remove(id);
+                    if (nextTabs.length() > 0) s.put("shopTabs", nextTabs);
+                    else s.remove("shopTabs");
+                    changed = true;
+                }
                 JSONArray had = s.optJSONArray("enabledChains");
                 List<String> chains = new ArrayList<>();
                 if (had != null) {
@@ -506,13 +544,16 @@ final class SharedSettings {
         boolean on = false;
         if (chains == null) on = DEFAULT_CHAINS.contains(id);
         else for (int i = 0; i < chains.length(); i++) if (id.equals(chains.opt(i))) on = true;
-        if (builtIn(id)) return new JSONObject().put("on", on);
+        JSONObject st = s.optJSONObject("shopTabs");
+        JSONArray tabs = st == null ? null : checkTabs(st.opt(id));
+        if (builtIn(id)) return tabs != null ? new JSONObject().put("on", on).put("tabs", tabs) : new JSONObject().put("on", on);
         JSONArray list = s.optJSONArray("customShops");
         if (list != null) for (int i = 0; i < list.length(); i++) {
             JSONObject c = list.optJSONObject(i);
             if (c != null && id.equals(c.opt("id"))) {
                 JSONObject shop = checkShop(c, id);
-                return shop == null ? null : new JSONObject().put("on", on).put("shop", shop);
+                if (shop == null) return null;
+                return tabs != null ? new JSONObject().put("on", on).put("shop", shop).put("tabs", tabs) : new JSONObject().put("on", on).put("shop", shop);
             }
         }
         return null;
@@ -521,14 +562,14 @@ final class SharedSettings {
     /** Every household setting this phone's settings have, for the tabs it syncs. */
     static List<String> keysFor(JSONObject s, Set<String> tabs) {
         List<String> out = new ArrayList<>(Arrays.asList(SCALARS));
-        for (String t : new String[] { "keg", "pharmacy" }) if (tabs.contains(t)) out.add("tab:" + t);
+        for (String t : new String[] { "keg", "pharmacy", "baby", "pets" }) if (tabs.contains(rowTab(t))) out.add("tab:" + t);
         for (String t : SyncEngine.ALL_TABS) if (tabs.contains(t)) for (String id : builtInsOn(t)) out.add("shop:" + id);
         JSONArray list = s.optJSONArray("customShops");
         if (list != null) for (int i = 0; i < list.length(); i++) {
             JSONObject c = list.optJSONObject(i);
             if (c == null || !(c.opt("id") instanceof String)) continue;
             String id = c.optString("id");
-            if (tabs.contains(c.optString("section")) && checkShop(c, id) != null) out.add("shop:" + id);
+            if (tabs.contains(rowTab(c.optString("section"))) && checkShop(c, id) != null) out.add("shop:" + id);
         }
         return out;
     }

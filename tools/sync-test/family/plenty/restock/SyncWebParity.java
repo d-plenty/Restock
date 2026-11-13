@@ -179,6 +179,10 @@ public class SyncWebParity {
         SharedSettings.set(a.e, "shop:custom-xyz", new JSONObject().put("on", true).put("shop", new JSONObject().put("id", "custom-xyz").put("name", "Corner store")
             .put("website", "https://corner.example.com").put("section", "pantry").put("search", "https://other.example.net/?q={q}").put("createdAt", "2026-11-01")));
         SharedSettings.set(a.e, "shop:danmurphys", new JSONObject().put("on", true));
+        // 0.10.3: the Pets tab on, Petbarn picked, and Woolworths in Pantry and Pets (its shop row's tabs).
+        SharedSettings.set(a.e, "tab:pets", true);
+        SharedSettings.set(a.e, "shop:petbarn", new JSONObject().put("on", true));
+        SharedSettings.set(b.e, "shop:woolworths", new JSONObject().put("on", true).put("tabs", new org.json.JSONArray().put("pantry").put("pets")));
 
         // The phones write their server files (with the phones' own SyncFolder), and A's gets its
         // prices too (a phone's server file carries recent prices; the folder-sync file doesn't).
@@ -246,8 +250,13 @@ public class SyncWebParity {
             JSONObject st = new JSONObject(x.one("SELECT value FROM kv WHERE key = 'settings'"));
             java.util.Set<String> ch = new java.util.TreeSet<>();
             for (int i = 0; i < st.getJSONArray("enabledChains").length(); i++) ch.add(st.getJSONArray("enabledChains").getString(i));
-            check(st.optDouble("shopAroundMin") == 9 && ch.equals(new java.util.TreeSet<>(Arrays.asList("coles", "woolworths", "custom-xyz", "danmurphys")))
-                && st.optDouble("defaultThresholdPct") == 25, "the web's household settings reach " + x.id + ": " + st.opt("shopAroundMin") + " " + ch);
+            // 0.10.3: Petbarn (Pets) too, and Woolworths still in Pantry and Pets.
+            JSONObject tabs = st.optJSONObject("shopTabs");
+            String wTabs = tabs == null ? null : String.valueOf(tabs.optJSONArray("woolworths"));
+            check(st.optDouble("shopAroundMin") == 9 && ch.equals(new java.util.TreeSet<>(Arrays.asList("coles", "woolworths", "custom-xyz", "danmurphys", "petbarn")))
+                && st.optDouble("defaultThresholdPct") == 25 && "[\"pantry\",\"pets\"]".equals(wTabs)
+                && st.getJSONObject("sections").optBoolean("pets"),
+                "the web's household settings reach " + x.id + ": " + st.opt("shopAroundMin") + " " + ch + " " + wTabs);
         }
         check(new JSONObject(b.one("SELECT value FROM kv WHERE key = 'settings'")).optInt("historyWeeks") == 26, "b2's own history setting is untouched");
         check(a.one("SELECT id FROM receipts WHERE id = 'r1' AND note = 'Checked on the web'") != null, "the web's note on a receipt reaches a1");

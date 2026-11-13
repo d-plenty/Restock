@@ -60,7 +60,7 @@ export function useServer<T>(load: () => Promise<T>, deps: unknown[] = []): { da
 
 // ---------- phones ----------
 
-const TAB_WORD: Record<string, string> = { pantry: 'Pantry, Shopping list', keg: 'Keg', pharmacy: 'Health' };
+const TAB_WORD: Record<string, string> = { pantry: 'Pantry, Baby, Pets, Shopping list', keg: 'Keg', pharmacy: 'Health' };
 
 /** "Shares Pantry, Shopping list, Keg · receipts" (what the phone said it shares, D9). */
 export function sharesText(p: Phone): string {

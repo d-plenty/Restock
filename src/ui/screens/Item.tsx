@@ -1395,7 +1395,7 @@ function PriceHistory({
       : v.kind === 'wait'
         ? { cls: 'amber', text: off ? `${off} · WAIT` : 'WAIT' }
         : v.kind === 'fake'
-          ? { cls: 'red', text: 'FAKE SALE' }
+          ? { cls: 'red', text: v.always ? 'ALWAYS ON SPECIAL' : 'FAKE SALE' }
           : v.kind === 'normal'
             ? { cls: 'grey', text: v.headline.toUpperCase() }
             : undefined;

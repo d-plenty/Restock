@@ -21,7 +21,8 @@
 // The phone's own Settings screens need nothing from here: updateSettings (db.ts) writes household
 // settings to the household as they change, and the phone follows changes from the others.
 
-import { applyRows, builtInsOn, checkShop, checkValue, decode, SCALAR_KEYS } from './sharedSettings';
+import { applyRows, checkShop, checkValue, decode, rowTab, SCALAR_KEYS } from './sharedSettings';
+import { SECTIONS, SHOPS, isLocalOnlyShop, sectionOf, tabsOf } from '../shops';
 import { getSettings, householdContext, queryRows, reapplyHouseholdSettings, runOps } from './db';
 import { cleanSummary, PER_PHONE, type PhoneSummary } from './phoneSummary';
 import type { CustomShop, ProductOrder, Section, Settings, StoreChain } from '../types';
@@ -60,7 +61,7 @@ export type HouseholdSettingsPatch = Partial<Omit<HouseholdSettings, 'tabs'>> & 
  * The household's settings, by their Settings path. Shops: which shops each shared tab uses
  * (enabledChains), the tab switched on (sections), and shops people added (customShops).
  */
-export const HOUSEHOLD_WIDE = ['enabledChains', 'sections', 'customShops', 'shopAroundMin', 'defaultThresholdPct', 'listCompare', 'productOrder', 'recalls.enabled'] as const;
+export const HOUSEHOLD_WIDE = ['enabledChains', 'sections', 'shopTabs', 'customShops', 'shopAroundMin', 'defaultThresholdPct', 'listCompare', 'productOrder', 'recalls.enabled'] as const;
 
 /**
  * Whose a setting is: 'household' (changed once for everyone) or 'phone' (each phone's own). By its
@@ -74,7 +75,11 @@ export function settingScope(path: string): 'household' | 'phone' {
   return (HOUSEHOLD_WIDE as readonly string[]).includes(top) ? 'household' : 'phone';
 }
 
-const TABS: Section[] = ['pantry', 'keg', 'pharmacy'];
+// 0.10.3: every tab; Baby and Pets are shared with Groceries (rowTab), so they're here when it is.
+const TABS: Section[] = SECTIONS;
+const shared = (tabs: Set<Section>, t: Section) => tabs.has(rowTab(t) as Section);
+/** A shop's tabs in these settings (shops.ts tabsOf, with these settings' shopTabs). */
+const tabsIn = (s: Settings, id: string): Section[] => tabsOf(id, s.shopTabs ?? {});
 
 function view(s: Settings, tabs: Set<Section>): HouseholdSettings {
   const out: HouseholdSettings = {
@@ -86,12 +91,12 @@ function view(s: Settings, tabs: Set<Section>): HouseholdSettings {
     tabs: {},
   };
   for (const t of TABS) {
-    if (!tabs.has(t)) continue;
+    if (!shared(tabs, t)) continue;
     const customShops = s.customShops.filter((c) => c.section === t);
-    const ids = new Set<string>([...builtInsOn(t), ...customShops.map((c) => c.id)]);
     out.tabs[t] = {
-      on: t === 'pantry' ? true : s.sections[t],
-      chains: s.enabledChains.filter((c) => ids.has(c)),
+      on: t === 'pantry' ? true : !!s.sections[t],
+      // 0.10.3: any shop can be on any tab (settings.shopTabs).
+      chains: s.enabledChains.filter((c) => tabsIn(s, c).includes(t)),
       customShops,
     };
   }
@@ -129,18 +134,46 @@ export async function setHouseholdSettings(patch: HouseholdSettingsPatch): Promi
     if (checkValue(k, scalar[k]) === undefined) throw new Error(`That isn't a value ${k} can have.`);
     rows.push([k, scalar[k]]);
   }
+  // 0.10.3: a shop's row says whether it's picked at all and the tabs it's in (none said: its own).
+  const shopTabs = new Map<string, Section[]>();
+  for (const id of c.s.enabledChains) shopTabs.set(id, tabsIn(c.s, id));
+  const tabsField = (id: string, sec: Section | undefined): { on: boolean; tabs?: Section[] } => {
+    const t = shopTabs.get(id) ?? [];
+    if (!t.length) return { on: false };
+    return t.length === 1 && t[0] === (sec ?? sectionOf(id)) ? { on: true } : { on: true, tabs: t };
+  };
+  const touched = new Set<string>();
   for (const t of TABS) {
     const p = patch.tabs?.[t];
     if (!p) continue;
-    if (!c.tabs.has(t)) throw new Error(`The household doesn't share the ${t} tab.`);
+    if (!shared(c.tabs, t)) throw new Error(`The household doesn't share the ${t} tab.`);
     if (p.on !== undefined && t !== 'pantry') rows.push(['tab:' + t, p.on]);
     const had = c.s.customShops.filter((x) => x.section === t);
     const shops = p.customShops ?? had;
     for (const x of shops) if (x.section !== t || !checkShop(x, x.id)) throw new Error(`${x.name || 'That shop'} can't be used.`);
-    const picked = new Set<string>(p.chains ?? c.s.enabledChains);
-    for (const id of builtInsOn(t)) if (p.chains) rows.push(['shop:' + id, { on: picked.has(id) }]);
-    for (const x of shops) if (p.chains || p.customShops) rows.push(['shop:' + x.id, { on: picked.has(x.id), shop: checkShop(x, x.id) }]);
-    if (p.customShops) for (const x of had) if (!shops.some((y) => y.id === x.id)) rows.push(['shop:' + x.id, { on: false, removed: true, shop: checkShop(x, x.id) }]);
+    if (p.chains) {
+      const picked = new Set<string>(p.chains);
+      const ids = [...SHOPS.filter((d) => !isLocalOnlyShop(d.id)).map((d) => d.id as string), ...c.s.customShops.map((x) => x.id), ...shops.map((x) => x.id)];
+      for (const id of new Set(ids)) {
+        const now = (shopTabs.get(id) ?? []).filter((x) => x !== t);
+        const next = picked.has(id) ? SECTIONS.filter((x) => x === t || now.includes(x)) : now;
+        if (JSON.stringify(next) !== JSON.stringify(shopTabs.get(id) ?? [])) {
+          shopTabs.set(id, next);
+          touched.add(id);
+        }
+      }
+    }
+    if (p.customShops) {
+      for (const x of shops) touched.add(x.id);
+      for (const x of had) if (!shops.some((y) => y.id === x.id)) rows.push(['shop:' + x.id, { on: false, removed: true, shop: checkShop(x, x.id) }]);
+    }
+  }
+  const customs = new Map<string, CustomShop>([...c.s.customShops, ...Object.values(patch.tabs ?? {}).flatMap((p) => p?.customShops ?? [])].map((x) => [x.id as string, x]));
+  for (const id of touched) {
+    const x = customs.get(id);
+    if (x && rows.some(([k, v]) => k === 'shop:' + id && (v as { removed?: boolean }).removed)) continue;
+    const v = tabsField(id, x?.section);
+    rows.push(['shop:' + id, x ? { ...v, shop: checkShop(x, x.id) } : v]);
   }
   // Only the rows that change (each a change of this device's, noted for sync by the table's triggers).
   const ops = rows

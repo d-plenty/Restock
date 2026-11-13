@@ -407,6 +407,15 @@ final class SyncEngine {
 
     /** tabOf for a TAKE_BACK_SQL row. */
     private String takeBackTab(String tbl, JSONObject r) throws Exception {
+        return shared(takeBackTabRaw(tbl, r));
+    }
+
+    /** 0.10.3: Baby and Pets records are shared with Groceries (shops.ts shareTab): the three tabs stay as they were. */
+    static String shared(String tab) {
+        return "baby".equals(tab) || "pets".equals(tab) ? "pantry" : tab;
+    }
+
+    private String takeBackTabRaw(String tbl, JSONObject r) throws Exception {
         switch (tbl) {
             case "categories":
             case "items":
@@ -708,7 +717,7 @@ final class SyncEngine {
     String chainTab(String chain) throws Exception {
         if (chain == null || chain.isEmpty()) return null;
         // 0.9.7: Costco is shared like any shop (0.9.6 kept it on one phone, LOCAL_TAB).
-        if (Shops.known(chain)) return Shops.section(chain);
+        if (Shops.known(chain)) return shared(Shops.section(chain));
         if (customTabs == null) {
             customTabs = new HashMap<>();
             try {
@@ -722,7 +731,7 @@ final class SyncEngine {
                 // no settings yet
             }
         }
-        return customTabs.get(chain);
+        return shared(customTabs.get(chain));
     }
 
     private static String str(JSONObject row, String k) {
@@ -733,6 +742,10 @@ final class SyncEngine {
 
     /** The tab a record belongs to, or null when it isn't on a tab (cards, the household) or can't tell. */
     String tabOf(String tbl, JSONObject row) throws Exception {
+        return shared(tabOfRaw(tbl, row));
+    }
+
+    private String tabOfRaw(String tbl, JSONObject row) throws Exception {
         switch (tbl) {
             case "categories":
             case "items": {

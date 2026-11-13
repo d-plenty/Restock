@@ -14,7 +14,8 @@ import { applyTheme, syncInsets } from '../lib/theme';
 import { scheduleReminders } from '../lib/notify';
 import { useLive } from '../lib/useLive';
 import { Announcer, betaFor, closeTopLayer, Icon, layerHost, runBackHandlers } from './components';
-import { isSectionTab, NavContext, type Nav, type Screen, type Tab } from './nav';
+import { isMoreTab, isSectionTab, NavContext, type Nav, type Screen, type Tab } from './nav';
+import { MoreScreen } from './screens/More';
 import { activeSections, type Section } from '../shops';
 import { ConfirmHost } from './ConfirmHost';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -56,13 +57,14 @@ import { onUndo, undo as undoStep, undoneText } from '../lib/undo'; // 0.9.5 (un
 import { canLeave, getSettings as shownSettings, hasUnsaved } from '../lib/settingsDraft'; // 0.9.5 (save)
 import { askChoice, askLeave } from '../lib/confirm'; // 0.9.5 (save), 0.10.0
 
+// 0.10.3: Home, Pantry, Add, List and More. Keg, Health, Baby and Pets are in More, so the bar
+// never gets crowded however many tabs are set up.
 const ALL_TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'pantry', label: 'Pantry', icon: 'pantry' },
-  { id: 'keg', label: 'Keg', icon: 'keg' },
-  { id: 'pharmacy', label: 'Health', icon: 'pharmacy' },
   { id: 'add', label: 'Add', icon: 'plus' },
   { id: 'list', label: 'List', icon: 'cart' },
+  { id: 'more', label: 'More', icon: 'moretabs' },
 ];
 
 /** 0.9.0: the whole app inside a safety net, so a screen that breaks shows a way out, not a blank page (ErrorBoundary.tsx). */
@@ -297,6 +299,8 @@ function RestockApp() {
       } else if (closeTopLayer()) return;
       else if (st.length) leave(() => popRef.current());
       else if (runBackHandlers()) return;
+      // 0.10.3: from Keg, Health, Baby or Pets, back goes to More (where they were opened).
+      else if (isMoreTab(t) && t !== 'more') leave(() => setTab('more'));
       else if (t !== 'home') leave(() => setTab('home'));
       // 0.9.8: leaving the app takes a second press on Home, so a stray press never throws you out.
       else if (Date.now() - exitArmed.current < 2500) CapApp.exitApp();
@@ -506,8 +510,9 @@ function RestockApp() {
   // A tab can also be left out of the bar while its shops stay in use (Add, shopping list).
   const inBar = on.filter((sec) => sec === 'pantry' || !settings.hiddenTabs?.includes(sec));
   // On a Restock server there's no Add tab: adding is by shop search, which only phones can do.
-  const tabs = ALL_TABS.filter((t) => (!isSectionTab(t.id) || inBar.includes(t.id)) && !(serverMode && t.id === 'add'));
-  const shownTab: Tab = isSectionTab(tab) && !inBar.includes(tab) ? 'pantry' : tab;
+  const tabs = ALL_TABS.filter((t) => !(serverMode && t.id === 'add'));
+  // A tab that's off shows Pantry instead (0.10.3: a hidden one still opens, from Add or a link).
+  const shownTab: Tab = isSectionTab(tab) && !on.includes(tab) ? 'pantry' : tab;
   const addSection: Section = on.includes(section) ? section : 'pantry';
 
   // The screen opened on top of the tab, if any (the server's own version where it has one).
@@ -601,7 +606,8 @@ function RestockApp() {
     const Desktop = serverUi.current.Desktop;
     return (
       <NavContext.Provider value={nav}>
-        <Desktop tabs={tabs.map((t) => t.id)} tab={shownTab} stack={stack} overlay={overlay} />
+        {/* 0.10.3: a wide window's sidebar has room for every tab that's on (no More there). */}
+        <Desktop tabs={['home', ...inBar, 'list'] as Tab[]} tab={shownTab === 'more' ? 'home' : shownTab} stack={stack} overlay={overlay} />
         <ConfirmHost />
         {layers}
       </NavContext.Provider>
@@ -618,6 +624,7 @@ function RestockApp() {
         {isSectionTab(shownTab) && <PantryScreen key={shownTab} section={shownTab} />}
         {shownTab === 'add' && (serverMode && serverUi.current ? <serverUi.current.Tab /> : <AddScreen key={`add-tab-${addSection}`} section={addSection} />)}
         {shownTab === 'list' && <ListScreen />}
+        {shownTab === 'more' && <MoreScreen />}
 
         <nav className="tabs" aria-label="Main" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
           {tabs.map((t) =>
@@ -632,7 +639,7 @@ function RestockApp() {
               <button
                 key={t.id}
                 className={`tab${t.id === 'pharmacy' ? ' pharm' : ''}`}
-                aria-current={shownTab === t.id ? 'page' : undefined}
+                aria-current={shownTab === t.id || (t.id === 'more' && isMoreTab(shownTab)) ? 'page' : undefined}
                 onClick={() => nav.setTab(t.id)}
               >
                 <Icon name={t.icon} />

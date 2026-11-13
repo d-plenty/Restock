@@ -278,8 +278,11 @@ final class PriceChecker {
         JSONObject sections = settings.optJSONObject("sections");
         for (int i = 0; i < chains.length(); i++) {
             String chain = chains.optString(i);
-            String section = Shops.section(chain);
-            if (!"pantry".equals(section) && (sections == null || !sections.optBoolean(section, false))) continue;
+            // 0.10.3: checked when any tab it's in is on (Pantry always is).
+            boolean any = false;
+            for (String section : Shops.tabsOf(settings, chain))
+                if ("pantry".equals(section) || (sections != null && sections.optBoolean(section, false))) any = true;
+            if (!any) continue;
             enabled.add(chain);
             enabled.add(Shops.priceSource(chain));
         }

@@ -5,7 +5,8 @@ import { captureWhile, clearProblems, problems, problemsText } from '../../lib/d
 import { recordTrolley } from '../../lib/accounts';
 import { getHealth } from '../../lib/health';
 import { useLive } from '../../lib/useLive';
-import { chainName, enabledIn, isPressOnlyShop, SECTION_NAMES, type Section, type StoreChain } from '../../shops';
+import { chainName, enabledIn, isPressOnlyShop, SECTION_NAMES, SECTIONS, type Section, type StoreChain } from '../../shops';
+import { ShopTest } from './ShopTest';
 import { adapterFor } from '../../stores';
 import { isNative } from '../../stores/http';
 import { localDay } from '../../lib/verdict';
@@ -39,8 +40,9 @@ export function DiagnosticsScreen() {
   const [busy, setBusy] = useState(false);
   if (!settings || !list || !health) return <div className="screen" />;
 
-  const sections: Section[] = ['pantry', 'keg', 'pharmacy'];
-  const shops = sections.flatMap((sec) => enabledIn(settings.enabledChains, sec).filter((c) => !isPressOnlyShop(c)).map((c) => ({ c, sec })));
+  // 0.10.3: every tab's shops, each once (a shop on two tabs shows with the first).
+  const seen = new Set<string>();
+  const shops = SECTIONS.flatMap((sec) => enabledIn(settings.enabledChains, sec).filter((c) => !isPressOnlyShop(c)).map((c) => ({ c, sec }))).filter(({ c }) => !seen.has(c) && !!seen.add(c));
   const shop = chain ?? shops[0]?.c;
 
   const copy = async () => {
@@ -91,6 +93,9 @@ export function DiagnosticsScreen() {
       <p className="sub">What went wrong lately, in plain words. It stays on your phone unless you copy or send it.</p>
 
       {isNative() && <BackgroundChecks />}
+
+      {/* 0.10.3: any shop, picked or not, with a report to send. */}
+      <ShopTest />
 
       <div className="eyebrow">Each shop</div>
       <div className="card flush">
@@ -264,7 +269,7 @@ function SearchTest() {
   const [every, setEvery] = useState(false);
   const [count, setCount] = useState<number>();
   const [test, setTest] = useState<SearchTestState>({});
-  const sections: Section[] = which === 'all' ? ['pantry', 'keg', 'pharmacy'] : [which];
+  const sections: Section[] = which === 'all' ? SECTIONS : [which];
   useEffect(() => watchSearchTest(setTest), []);
   useEffect(() => {
     void searchTestSize(sections, every).then(setCount);
@@ -298,7 +303,9 @@ function SearchTest() {
             <option value="pantry">Supermarkets</option>
             <option value="keg">Bottle shops</option>
             <option value="pharmacy">Chemists</option>
-            <option value="all">All three</option>
+            <option value="baby">Baby shops</option>
+            <option value="pets">Pet shops</option>
+            <option value="all">All of them</option>
           </select>
         </label>
         <label className="row" style={{ padding: 0 }}>

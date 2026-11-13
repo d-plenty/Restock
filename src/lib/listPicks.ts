@@ -22,7 +22,7 @@
 // row there, whether the server runs it or not (HaSync.java claimHaPhone does the same).
 
 import { allGroups, allListEntries, deleteListEntries, getKV, insertEntryOp, putKV, queryRows, runOps, uid, updateListEntry } from './db';
-import { sectionOf } from '../shops';
+import { shopOnTab } from '../shops';
 import { HA_STATE, LIST_ALIASES } from './haKeys';
 import { matchKey, parseLine } from './haMatch';
 import { ALIAS_PREFIX, checkListRow, decode, HA_PHONE, KEEP_PREFIX } from './sharedSettings';
@@ -167,7 +167,7 @@ export async function pickItemFor(entry: ListEntry, group: { id: string; name: s
       // 0.9.6: to Keg or Health the line is made again there and the old one taken off (as Move to does),
       // so a phone that shares only Groceries and General sees it go instead of keeping a stale copy.
       // 0.10.2: a one-off buy's shop was only where that product was cheapest: as an item, it's whichever is.
-      const fits = !now.product && (!now.chain || now.chain === 'other' || sectionOf(now.chain) === tab);
+      const fits = !now.product && (!now.chain || now.chain === 'other' || shopOnTab(now.chain, tab));
       const line: ListEntry = {
         id: uid(),
         text: group.name,
