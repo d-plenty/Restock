@@ -5,6 +5,10 @@
 export const pickButtonsNote = (place: string) =>
   `Both: kept in ${place}, and the line on your list becomes it. List: just the line, at the cheapest shop. ${place.replace(/^your /, '').replace(/^./, (c) => c.toUpperCase())}: kept in ${place}, and the line comes off your list.`;
 
+/** 0.10.2: under the one button of a line's "Add to pantry", the same on the phone and the web page. */
+export const toPantryNote = (place: string) =>
+  `Kept in ${place} with what you ticked, and the line stays on your list as it, at whichever shop is cheapest.`;
+
 /** "Next time "coconut cream" is added to your list, use this item." Shown once per screen. */
 export function AlwaysTick({ forLine }: { forLine: { always: boolean; onAlways: (on: boolean) => void; word: string } }) {
   return (

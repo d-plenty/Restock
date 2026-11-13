@@ -1333,6 +1333,8 @@ public class RestockNativePlugin extends Plugin {
                 o.put("peers", peers);
             }
             o.put("batteryExempt", hub.batteryExempt());
+            // 0.10.2: Android's own "Restricted" battery setting for Restock (background work held).
+            o.put("backgroundRestricted", backgroundRestricted());
             o.put("lastSyncAt", hub.lastSyncAt);
             o.put("lastError", hub.lastError);
             o.put("listening", hub.port() > 0);
@@ -2099,6 +2101,16 @@ public class RestockNativePlugin extends Plugin {
                 call.reject(e.getMessage(), e);
             }
         });
+    }
+
+    private boolean backgroundRestricted() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT < 28) return false;
+            android.app.ActivityManager am = (android.app.ActivityManager) getContext().getSystemService(android.content.Context.ACTIVITY_SERVICE);
+            return am != null && am.isBackgroundRestricted();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /** Android's "Allow Restock to always run in the background?" question. */

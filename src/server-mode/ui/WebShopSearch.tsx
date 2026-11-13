@@ -16,7 +16,7 @@ import type { StoreProduct } from '../../stores/types';
 import { chainName, type ListEntry } from '../../types';
 import { ChainDot, ChainName, Icon, LoadingBar, MemberTag, Sheet, Thumb } from '../../ui/components';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from '../../ui/screens/addPicks';
-import { AlwaysTick, pickButtonsNote } from '../../ui/screens/addPickWords';
+import { AlwaysTick, pickButtonsNote, toPantryNote } from '../../ui/screens/addPickWords';
 import { useNav } from '../../ui/nav';
 import { ScanButton } from '../pwa/WebScanner';
 import { syncNow } from '../live';
@@ -67,6 +67,8 @@ export interface WebForLine {
   word: string;
   always: boolean;
   onAlways: (on: boolean) => void;
+  /** 0.10.2: the line sheet's "Add to pantry": one button, the item made and the line kept as it. */
+  toPantry?: boolean;
 }
 
 /** The server saved it; this browser's copy has it once a sync has run (one may already be under way). */
@@ -495,6 +497,18 @@ export function WebShopSearch({
               {categorySelect}
               {/* 0.9.11: the same three buttons and tick as the phone's Pick sheet. */}
               <AlwaysTick forLine={forLine} />
+              {forLine.toPantry ? (
+                // 0.10.2: from the line's "Add to pantry", as on the phone: one button.
+                <>
+                  <button className="btn primary" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
+                    <Icon name={tab} size={18} /> Add to {SECTION_NAMES[tab].toLowerCase()}
+                  </button>
+                  <p className="small" style={{ margin: 0 }}>
+                    {toPantryNote(SECTION_PLACE[tab])}
+                  </p>
+                </>
+              ) : (
+              <>
               <button className="btn primary" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
                 <Icon name="cart" size={18} /> Add to both
               </button>
@@ -509,6 +523,8 @@ export function WebShopSearch({
               <p className="small" style={{ margin: 0 }}>
                 {pickButtonsNote(SECTION_PLACE[tab])}
               </p>
+              </>
+              )}
             </>
           ) : (
             <>
@@ -701,8 +717,28 @@ export function ShopSearchPanel({ list, wide, onAdded }: { list: ListSection; wi
 }
 
 /** The Pick sheet on the web: Search the shops for "chopsticks" (setting on), or where to do it (off). */
-export function PickSearchButton({ typed, pantryShown, busy, onSearch }: { typed: string; pantryShown: boolean; busy: boolean; onSearch: (q: string) => void }) {
+export function PickSearchButton({
+  typed,
+  pantryShown,
+  busy,
+  onSearch,
+  auto,
+}: {
+  typed: string;
+  pantryShown: boolean;
+  busy: boolean;
+  onSearch: (q: string) => void;
+  /** 0.10.2: a line's "Add to pantry": search straight away when the household has the web search on. */
+  auto?: boolean;
+}) {
   const on = useWebSearchOn();
+  const went = useRef(false);
+  useEffect(() => {
+    if (!auto || !on || went.current) return;
+    went.current = true;
+    onSearch(typed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto, on]);
   if (on === undefined) return null;
   if (!on)
     return (
@@ -726,6 +762,8 @@ export function PickSearchResults({
   onAlways,
   onDone,
   section = 'pantry',
+  toPantry,
+  wantId,
 }: {
   query: string;
   section?: Section;
@@ -734,8 +772,10 @@ export function PickSearchResults({
   always: boolean;
   onAlways: (on: boolean) => void;
   onDone: (said: string | undefined) => void;
+  toPantry?: boolean;
+  wantId?: string;
 }) {
-  return <WebShopSearch query={query} tab={section} forLine={{ entry, word, always, onAlways }} onDone={(said) => onDone(said)} />;
+  return <WebShopSearch query={query} tab={section} wantId={wantId} forLine={{ entry, word, always, onAlways, toPantry }} onDone={(said) => onDone(said)} />;
 }
 
 /** The phone layout's Shopping list on the web: Scan, as on the desktop list's add box. */

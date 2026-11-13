@@ -114,7 +114,8 @@ async function readHousehold(): Promise<HouseholdSettings> {
             title: SHOPS_TITLE[t],
             on: tab.on,
             shops: tab.chains.map((id) => ({ id, name: nameOf(id) })),
-            choices: ids.map((id) => ({ id, name: nameOf(id), picked: tab.chains.includes(id) })),
+            // 0.10.2: Costco is Beta, as on the phone.
+            choices: ids.map((id) => ({ id, name: `${nameOf(id)}${id === 'costco' ? ' · Beta' : ''}`, picked: tab.chains.includes(id) })),
           };
         })
     : activeSections(s).map((t) => ({

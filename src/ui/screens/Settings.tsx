@@ -358,6 +358,27 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
                 </select>
               </span>
             </label>
+            {/* 0.10.2: how shopping mode starts (picking one there saves it here too). */}
+            <label className="row field-row">
+              <span className="grow">
+                <span className="title">In shopping mode, start with</span>
+                <span className="small">How each shop's things are sorted when you start shopping. Aisle numbers come from your Coles branch.</span>
+                <select
+                  className="input"
+                  value={settings.shopSort ? `${settings.shopSort.by}${settings.shopSort.down ? '-down' : ''}` : 'aisle'}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    void updateSettings({ shopSort: { by: v.startsWith('aisle') ? 'aisle' : (v as 'category' | 'az'), ...(v === 'aisle-down' ? { down: true } : {}) } });
+                  }}
+                  aria-label="In shopping mode, start with"
+                >
+                  <option value="aisle">Aisle, 1 to 50 (default)</option>
+                  <option value="aisle-down">Aisle, 50 to 1</option>
+                  <option value="category">Category (your aisle groups)</option>
+                  <option value="az">A–Z</option>
+                </select>
+              </span>
+            </label>
           </div>
           <div className="eyebrow" id="s-receipts">
             Receipts

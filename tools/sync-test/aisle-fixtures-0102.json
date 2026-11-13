@@ -1,0 +1,110 @@
+{
+  "about": "0.10.2: Coles aisle locations, read the same way by src/stores/coles.ts colesAisle and Aisles.java. The not-available case is as Coles sent it for Tim Tams at store 4527 (13 Nov 2026).",
+  "cases": [
+    {
+      "name": "no locations (online store)",
+      "product": {
+        "id": 1
+      },
+      "want": null
+    },
+    {
+      "name": "Coles says it doesn't know",
+      "product": {
+        "locations": [
+          {
+            "aisleSide": null,
+            "description": "Aisle information is not available for this product. Please ask a Team Member at $STORE to help you find this product.",
+            "facing": 0,
+            "aisle": null,
+            "order": null,
+            "shelf": null
+          }
+        ]
+      },
+      "want": {}
+    },
+    {
+      "name": "aisle and side",
+      "product": {
+        "locations": [
+          {
+            "aisle": "12",
+            "aisleSide": "Left",
+            "description": "Aisle 12, Left",
+            "facing": 2,
+            "order": 1204,
+            "shelf": 3
+          }
+        ]
+      },
+      "want": {
+        "a": "12",
+        "side": "Left",
+        "o": 1204
+      }
+    },
+    {
+      "name": "order as text, no side",
+      "product": {
+        "locations": [
+          {
+            "aisle": "4",
+            "aisleSide": "",
+            "order": "88"
+          }
+        ]
+      },
+      "want": {
+        "a": "4",
+        "o": 88
+      }
+    },
+    {
+      "name": "first location with an aisle wins",
+      "product": {
+        "locations": [
+          {
+            "aisle": null
+          },
+          {
+            "aisle": "0"
+          },
+          {
+            "aisle": "Freezer",
+            "aisleSide": "Right"
+          },
+          {
+            "aisle": "9"
+          }
+        ]
+      },
+      "want": {
+        "a": "Freezer",
+        "side": "Right"
+      }
+    },
+    {
+      "name": "a long value is cut",
+      "product": {
+        "locations": [
+          {
+            "aisle": "Health and beauty specials end",
+            "aisleSide": "Opposite the registers"
+          }
+        ]
+      },
+      "want": {
+        "a": "Health and beauty specia",
+        "side": "Opposite the reg"
+      }
+    },
+    {
+      "name": "empty list",
+      "product": {
+        "locations": []
+      },
+      "want": {}
+    }
+  ]
+}

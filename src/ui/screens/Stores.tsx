@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { AISLE_NOTE } from '../../lib/aisles';
 import { nowIso, uid, updateSettings as saveNow } from '../../lib/db';
 // 0.9.5 (save): on My shops, changes wait for Save settings (settingsDraft.ts); in the setup steps they're saved at once.
 import { getSettings, hasUnsaved, saveDraft, updateSettings } from '../../lib/settingsDraft';
@@ -27,7 +28,7 @@ import { adapterFor } from '../../stores';
 import { colesAtStore } from '../../stores/coles';
 import { isNative } from '../../stores/http';
 import { forgetSearchInfo } from '../../stores/web';
-import { colesStoreNo, storeChoice, type Settings, type ShopAccount, type StoreChoice } from '../../types';
+import { colesStoreNo, secondBranch, storeChoice, type Settings, type ShopAccount, type StoreChoice } from '../../types';
 import {
   checkWoolworths,
   openWoolworths,
@@ -40,7 +41,7 @@ import {
   stopUsingWoolworths,
 } from '../../lib/accounts';
 import { confirmAction } from '../../lib/confirm';
-import { BETA_NOTE, BETA_SECTIONS, ChainDot, Icon, LoadingBar, Sheet, TopBar } from '../components';
+import { BETA_NOTE, BETA_SECTIONS, BetaTag, ChainDot, Icon, LoadingBar, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
 import { money } from '../../lib/units';
 import {
@@ -816,6 +817,7 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
         {/* Keyed by tab only: picking a shop or a branch must not throw away the list you're looking at. */}
         <NearbyFinder key="pantry" settings={settings} section="pantry" />
         <ManualNames settings={settings} section="pantry" />
+        <AisleCard settings={settings} />
       </>
     );
   }
@@ -840,7 +842,8 @@ export function StoreFields({ settings, section = 'pantry', inSetup }: { setting
             Prices come from each shop's website, so they're the online price.
             {section === 'pharmacy'
               ? ' Some chemists only show prices in the shop, or set them per branch; those may come up with nothing.'
-              : ' Some bottle shops set prices per branch, so your local one can differ.'}
+              : ' Some bottle shops set prices per branch, so your local one can differ.'}{' '}
+            In shopping mode their things show Aisle: unknown: these shops' websites don't give aisle numbers.
           </p>
         </>
       )}
@@ -963,6 +966,43 @@ export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
       )}
       <SaveBar />
     </div>
+  );
+}
+
+/**
+ * 0.10.2: where aisle numbers come from (setup and Settings → Supermarkets), with the disclaimer.
+ * Only Coles gives them, at your branch, with Prices and stock at my store on.
+ */
+function AisleCard({ settings }: { settings: Settings }) {
+  const coles = settings.enabledChains.includes('coles');
+  const branch = !!(settings.localPrices && storeChoice(settings, 'coles').branchStoreNo);
+  return (
+    <>
+      <div className="eyebrow" id="s-aisles">
+        Aisle numbers
+      </div>
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <p className="small" style={{ margin: 0 }}>
+          When you start shopping, each thing shows its aisle at your branch, and you can sort each shop by aisle, category or A–Z. Where a shop
+          doesn't say, it shows Aisle: unknown.
+        </p>
+        <p className="small" style={{ margin: 0, fontWeight: 600 }}>
+          {AISLE_NOTE}
+        </p>
+        <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
+          <li>
+            Coles:{' '}
+            {!coles
+              ? 'gives aisle numbers for most things, once you pick it.'
+              : branch
+                ? `yes, at ${storeChoice(settings, 'coles').primary ?? 'your branch'}${secondBranch(settings) ? ` and ${secondBranch(settings)}` : ''}, from the next price check.`
+                : 'turn on Prices and stock at my store (under Coles, above) and set your branch.'}
+          </li>
+          <li>Woolworths: its website gives an online category, not an aisle number.</li>
+          <li>Aldi and Costco: they don't publish aisle numbers.</li>
+        </ul>
+      </div>
+    </>
   );
 }
 
@@ -1539,7 +1579,9 @@ export function CostcoRow({ settings }: { settings: Settings }) {
         />
         <ChainDot chain="costco" />
         <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span>{COSTCO_SETTING_TITLE}</span>
+          <span>
+            {COSTCO_SETTING_TITLE} <BetaTag />
+          </span>
           <span className="small">{on ? COSTCO_SWITCH_HELP_ON : COSTCO_SWITCH_HELP}</span>
         </span>
       </label>

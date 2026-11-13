@@ -266,6 +266,8 @@ export interface SyncInfo {
   keepReady?: boolean;
   peers?: { device: string; name: string | null; syncedAt: string | null }[];
   batteryExempt: boolean;
+  /** 0.10.2: Android's "Restricted" battery setting for Restock (API 28+). */
+  backgroundRestricted?: boolean;
   lastSyncAt?: string | null;
   lastError?: string | null;
   listening?: boolean;

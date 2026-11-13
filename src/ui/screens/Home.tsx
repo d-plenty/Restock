@@ -12,7 +12,7 @@ import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { isBlockMessage, isNative } from '../../stores/http';
 import { chainName, stockKnown, type ListEntry, type Settings } from '../../types';
-import { ChainDot, ChainName, Icon, LoadingBar, OpenStoreButton, Price, SectionMark, SwapBox, Thumb, timeAgo } from '../components';
+import { ChainDot, ChainName, Icon, LoadingBar, OpenStoreButton, Price, SectionMark, SwapBox, Thumb } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { ActionInfoTag, MemberInfoTag, MultiInfoTag } from '../tagInfo';
 import { failingStores, getHealth } from '../../lib/health';
@@ -26,6 +26,7 @@ import { SetupNudges } from './SetupNudges';
 import { serverMode } from '../../server-mode/flag';
 import { ConnectionsSheet } from './Settings';
 import { nextCheckWords } from '../../lib/checkSchedule';
+import { getCheckLog, missedSlot, missedWords, whenWords } from '../../lib/checkLog';
 
 export function HomeScreen() {
   const nav = useNav();
@@ -65,6 +66,8 @@ export function HomeScreen() {
 
   const cards = useLive(allCards, []);
   const [testing, setTesting] = useState(false);
+  // 0.10.2: the background checks' log (above the early return: hooks always run in the same order).
+  const runs = useLive(getCheckLog, []) ?? [];
   if (!allRecs || !settings || !allEntries) return <div className="screen" />;
   const { on, recs, totals, oneStop, listSaving, listed, dealChain, dealRecs, dealShops, showing, buys, altDeals, smalls, waits, skips, normal, worth, saving } =
     weekDeals(allRecs, settings, allEntries, picked);
@@ -86,6 +89,11 @@ export function HomeScreen() {
     }
   };
   const next = nextCheck(settings);
+  // 0.10.2: a scheduled check that didn't happen says so (Advanced → Diagnostics says why).
+  const missed =
+    isNative() && !serverMode && settings.sync.backgroundActivity
+      ? missedSlot({ intervalHours: settings.checkIntervalHours, time: settings.checkTime, weekday: settings.checkWeekday }, settings.lastCheck, runs)
+      : undefined;
 
   const runCheck = () => {
     if (refresh.busy) return;
@@ -149,8 +157,16 @@ export function HomeScreen() {
                   : !isNative()
                   ? 'Live prices work in the Android app'
                   : settings.lastCheck
-                    ? `${settings.enabledChains.some((c) => stockKnown(settings, c)) ? 'Prices & stock' : 'Prices'} updated ${timeAgo(settings.lastCheck)}${next ? ` · next ${next}` : ''}`
+                    ? `${settings.enabledChains.some((c) => stockKnown(settings, c)) ? 'Prices & stock' : 'Prices'} updated ${whenWords(settings.lastCheck)}${next ? ` · next ${next}` : ''}`
                     : 'Prices not checked yet'}
+                {missed !== undefined && (
+                  <>
+                    <br />
+                    <button className="linkish small" style={{ padding: 0, color: 'var(--amber-ink)', fontWeight: 600 }} onClick={() => nav.push({ name: 'diagnostics' })}>
+                      {missedWords(missed, runs)}. Why?
+                    </button>
+                  </>
+                )}
               </span>
               {isNative() && (
                 <button className="btn primary small check-now" onClick={runCheck} aria-label="Check prices and stock now">

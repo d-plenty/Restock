@@ -342,6 +342,11 @@ export interface Settings {
    * household's figures (on unless turned off), or keep this phone's own.
    */
   yourData?: { server: boolean };
+  /**
+   * 0.10.2: how shopping mode sorts each shop's lines: by aisle (the default; 1 to 50, or 50 to 1
+   * with `down`), by category (your aisle groups), or A–Z. Picking one in shopping mode saves it.
+   */
+  shopSort?: { by: 'aisle' | 'category' | 'az'; down?: boolean };
   defaultThresholdPct: number;
   /** How often background price checks run. 168 = weekly, on checkWeekday. */
   checkIntervalHours: number;

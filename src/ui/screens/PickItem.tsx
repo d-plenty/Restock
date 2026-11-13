@@ -50,7 +50,22 @@ function useOnline(): boolean {
  * a Home Assistant line, and the one in the line's ⋯ sheet. Its own list's items (a Keg or Health
  * line looks in those), and the "next time" tick starts ticked.
  */
-export function PickItemSheet({ entry, onClose, fromHa = true }: { entry: ListEntry; onClose: () => void; fromHa?: boolean }) {
+export function PickItemSheet({
+  entry,
+  onClose,
+  fromHa = true,
+  toPantry = false,
+}: {
+  entry: ListEntry;
+  onClose: () => void;
+  fromHa?: boolean;
+  /**
+   * 0.10.2: the line sheet's "Add to pantry" (a line added to the list only): straight to the shop
+   * search, the shop's product the line came from ticked again, and one button that makes the item
+   * and keeps the line on the list as it. Back still goes to picking one of your items.
+   */
+  toPantry?: boolean;
+}) {
   const nav = useNav();
   const word = pickWord(entry.text);
   const section: Section = !entry.section || entry.section === 'general' ? 'pantry' : entry.section;
@@ -59,7 +74,11 @@ export function PickItemSheet({ entry, onClose, fromHa = true }: { entry: ListEn
   const [always, setAlways] = useState(true);
   const [busy, setBusy] = useState(false);
   /** The words searched at the shops, while that search is showing. */
-  const [shopsFor, setShopsFor] = useState<string>();
+  // In the app (online) it searches straight away; on the web page once it knows the household's
+  // web search is on (web.PickButton's `auto`).
+  const [shopsFor, setShopsFor] = useState<string | undefined>(() =>
+    toPantry && isNative() && (typeof navigator === 'undefined' || navigator.onLine !== false) ? word : undefined,
+  );
   const [byHand, setByHand] = useState(false);
   const online = useOnline();
   const native = isNative();
@@ -102,11 +121,20 @@ export function PickItemSheet({ entry, onClose, fromHa = true }: { entry: ListEn
     }
   };
 
-  const forLine: ForLine = { entry, word, always, onAlways: setAlways, onDone: (g, made, linked) => done(g, linked, made), onListed: onClose };
+  const forLine: ForLine = {
+    entry,
+    word,
+    always,
+    onAlways: setAlways,
+    onDone: (g, made, linked) => done(g, linked, made),
+    onListed: onClose,
+    toPantry,
+    preTick: toPantry ? entry.product : undefined,
+  };
 
   if (shopsFor !== undefined)
     return (
-      <Sheet title={`Search the shops for "${shopsFor}"`} onClose={onClose}>
+      <Sheet title={toPantry ? `Add ${entry.text} to ${place}` : `Search the shops for "${shopsFor}"`} onClose={onClose}>
         <div ref={top} style={{ display: 'contents' }} />
         <button className="linkish" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={() => setShopsFor(undefined)}>
           <span style={{ display: 'inline-flex', transform: 'rotate(180deg)' }}>
@@ -124,6 +152,8 @@ export function PickItemSheet({ entry, onClose, fromHa = true }: { entry: ListEn
             word={word}
             always={always}
             onAlways={setAlways}
+            toPantry={toPantry}
+            wantId={toPantry ? entry.product?.storeProductId : undefined}
             onDone={(said) => {
               if (said) nav.toast(said);
               onClose();
@@ -140,7 +170,7 @@ export function PickItemSheet({ entry, onClose, fromHa = true }: { entry: ListEn
   /** What's under the pantry list: search the shops (online, in the app), or why not. */
   const shopAction = web ? (
     // 0.9.5 (web search): Search the shops (on), or where to do it (off).
-    <web.PickButton typed={typed} pantryShown={!!pantry && shown.length > 0} busy={busy} onSearch={(q) => setShopsFor(q)} />
+    <web.PickButton typed={typed} pantryShown={!!pantry && shown.length > 0} busy={busy} onSearch={(q) => setShopsFor(q)} auto={toPantry} />
   ) : !native ? (
     <div className="banner grey">
       <strong>Shop search works in the Android app</strong>

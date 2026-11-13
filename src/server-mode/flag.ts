@@ -42,8 +42,8 @@ export interface ServerUi {
    * Shopping list the same as the desktop list's add box (a Scan button, Search the shops, results).
    */
   webSearch?: {
-    PickButton: ComponentType<{ typed: string; pantryShown: boolean; busy: boolean; onSearch: (q: string) => void }>;
-    PickResults: ComponentType<{ query: string; section?: Section; entry: ListEntry; word: string; always: boolean; onAlways: (on: boolean) => void; onDone: (said: string | undefined) => void }>;
+    PickButton: ComponentType<{ typed: string; pantryShown: boolean; busy: boolean; onSearch: (q: string) => void; auto?: boolean }>;
+    PickResults: ComponentType<{ query: string; section?: Section; entry: ListEntry; word: string; always: boolean; onAlways: (on: boolean) => void; onDone: (said: string | undefined) => void; toPantry?: boolean; wantId?: string }>;
     ListButton: ComponentType<{ text: string; list: ListSection }>;
     ListPanel: ComponentType<{ list: ListSection; onAdded?: () => void }>;
     Scan: ComponentType<{ section: Section }>;

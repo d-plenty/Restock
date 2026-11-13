@@ -901,3 +901,7 @@ plain JSON.
 
 - **Your data, sealed.** A phone may send `X-Restock-Seal: rsf1` with any request a phone may make under `/api/v3/data/`. The answer is then `application/x-restock-sealed`: the JSON, plus `reqN` (the request's own nonce, `n=` in its `Restock2` signature), sealed as an RSF1 file with the household's current serverKey. The phone opens it with any serverKey it knows and refuses an answer whose `reqN` isn't its request's. `POST /api/v3/data/spend` may likewise be sent sealed (`Content-Type: application/x-restock-sealed`, the body `{ rows }` sealed the same way); a body no serverKey opens is `400 sealed`. Requests without the header are answered plain, as before (0.9.14 and 0.10.0 phones).
 - **Shopping list totals** (phones and the web app, not on the wire): shopping around and each shop's items from other shops pick from the same per-shop lines that are added up, measured the way the list is set (same shopping or at the till), in stock first, and only at the shops being compared.
+
+## 0.10.2: what changed on the wire
+
+Nothing new between phones and servers. On the phone only (never synced, never in a backup): the store entry `aisles` (`{ "<product id>": { "1": { s: store number, a: aisle, side, o: order, at }, "2": … } }`, from Coles' product `locations` at your branches, read by Aisles.java and colesAisle in coles.ts) and `checkLog` (the last 12 scheduled price checks, PriceCheckWorker.java). Settings gain `shopSort: { by: "aisle" | "category" | "az", down? }`.

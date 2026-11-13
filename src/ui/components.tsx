@@ -16,6 +16,8 @@ import { useNav } from './nav';
 
 const paths: Record<string, ReactNode> = {
   home: <path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+  // 0.10.2: shopping mode's aisle order flip (1 to 50, 50 to 1).
+  sort: <path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4" />,
   lock: (
     <>
       <rect x="4" y="11" width="16" height="10" rx="2" />
@@ -233,6 +235,9 @@ export function TopBar({ title, right, back = true }: { title: string; right?: R
  * web page, iPhone web app): still being worked on. Nothing else about them changes.
  */
 export const BETA_SECTIONS: readonly string[] = ['keg', 'pharmacy'];
+/** 0.10.2: shops marked Beta where they're picked or set up (it works the same; it's tested less). */
+export const BETA_SHOPS: readonly string[] = ['costco'];
+export const COSTCO_BETA_NOTE = "Costco is in beta: it works the same way as the other supermarkets, it just hasn't been tested as thoroughly yet.";
 /** What the Beta means, wherever it's explained (setup, Settings, the tab itself, the web page). */
 export const BETA_NOTE =
   "Beta: it works the same way as Groceries, it just hasn't been tested as thoroughly yet. It'll keep being tested before it comes out of beta.";
@@ -462,7 +467,7 @@ function updateBehindSheets() {
  * the layer on <body>, and while it's open the app and any sheet under it are inert and hidden from
  * screen readers.
  */
-export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Sheet({ title, onClose, children, action }: { title: string; onClose: () => void; children: ReactNode; /** 0.10.2: a button beside the title (a line's "Add to pantry"). */ action?: ReactNode }) {
   useBackLayer(onClose);
   const ref = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
@@ -509,9 +514,20 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
     <div ref={backRef} className="sheet-back" onClick={onClose}>
       <div ref={ref} className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="topbar">
-          <h2 className="sheet-title" tabIndex={-1} style={{ flex: 1 }}>
-            {title}
-          </h2>
+          {action ? (
+            // The title and its button share the space left of Close, the button going under the
+            // title when they don't fit side by side (big text, a long name).
+            <div className="sheet-head">
+              <h2 className="sheet-title" tabIndex={-1}>
+                {title}
+              </h2>
+              {action}
+            </div>
+          ) : (
+            <h2 className="sheet-title" tabIndex={-1} style={{ flex: 1 }}>
+              {title}
+            </h2>
+          )}
           <button className="icon-btn" aria-label="Close" onClick={onClose}>
             <Icon name="close" size={20} />
           </button>

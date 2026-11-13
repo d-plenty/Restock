@@ -14,6 +14,7 @@ import androidx.work.WorkerParameters;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.concurrent.TimeUnit;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
@@ -42,6 +43,41 @@ public class PriceCheckWorker extends Worker {
 
     public PriceCheckWorker(Context context, WorkerParameters params) {
         super(context, params);
+    }
+
+    private Instant runSlot;
+    private Instant runStart;
+
+    /**
+     * 0.10.2: the background checks' own log, for Advanced → Diagnostics and the Home screen's
+     * "didn't run" line: the last 12 scheduled checks, newest first, in the "checkLog" store entry
+     * (this phone's only). Outcome: running, done, stopped (Android's time ran out), failed, or app
+     * (Restock had just checked, so that counted). A set time with no entry never ran at all.
+     */
+    static synchronized void noteRun(SQLiteDatabase db, Instant slot, Instant start, String outcome, JSONObject counts) {
+        try {
+            JSONObject log = PriceChecker.readKv(db, "checkLog");
+            JSONArray runs = log == null ? null : log.optJSONArray("runs");
+            JSONArray next = new JSONArray();
+            JSONObject me = new JSONObject().put("slot", slot.toString()).put("start", start.toString()).put("outcome", outcome);
+            if (!"running".equals(outcome)) me.put("end", Instant.now().toString());
+            if (counts != null) for (java.util.Iterator<String> k = counts.keys(); k.hasNext(); ) {
+                String key = k.next();
+                me.put(key, counts.get(key));
+            }
+            next.put(me);
+            if (runs != null) {
+                for (int i = 0; i < runs.length() && next.length() < 12; i++) {
+                    JSONObject r = runs.optJSONObject(i);
+                    // The same run, written again when it finishes: only the newest stays.
+                    if (r == null || (start.toString().equals(r.optString("start")) && slot.toString().equals(r.optString("slot")))) continue;
+                    next.put(r);
+                }
+            }
+            PriceChecker.writeKv(db, "checkLog", new JSONObject().put("runs", next));
+        } catch (Exception e) {
+            Log.w(TAG, "check log not saved", e);
+        }
     }
 
     @Override
@@ -76,15 +112,28 @@ public class PriceCheckWorker extends Worker {
             if (PriceChecker.recentlyChecked(settings, now)) {
                 // A check ran moments ago (the app's): that one counts, don't run another.
                 markServed(db, cs, zone, latest);
+                noteRun(db, latest, now, "app", null);
                 PriceChecker.summaryOnly(ctx);
                 return Result.success();
             }
+            runSlot = latest;
+            runStart = now;
+            noteRun(db, latest, now, "running", null);
             PriceChecker.Result r = PriceChecker.run(ctx, null, true);
             markServed(db, cs, zone, latest);
+            noteRun(db, latest, now, "done", new JSONObject().put("checked", r.checked).put("updated", r.updated).put("errors", r.errors.size()));
             Log.i(TAG, "background check: " + r.checked + " checked, " + r.updated + " updated, errors " + r.errors);
             return Result.success();
         } catch (Exception e) {
             Log.w(TAG, "background check failed", e);
+            // 0.10.2: Android stopped it (its time ran out), or it failed: either way, say so.
+            if (runSlot != null) {
+                try {
+                    noteRun(RestockDatabase.get(ctx), runSlot, runStart, isStopped() ? "stopped" : "failed", null);
+                } catch (Exception ignored) {
+                    // the note is only a note
+                }
+            }
             return getRunAttemptCount() < 3 ? Result.retry() : Result.failure();
         } finally {
             // 0.9.0: no shop page keeps running in the background after the check.

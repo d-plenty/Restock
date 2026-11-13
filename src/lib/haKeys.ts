@@ -19,7 +19,7 @@ export const LAST_CHECK_INFO = 'lastCheckInfo';
 
 /** This phone's own: never in a backup, and a restore keeps this phone's (the token isn't in the database at all). */
 /** 0.9.11: "priceHelper" (what the price helper did this week, PriceHelper.java) stays on this phone too. */
-export const LOCAL_ONLY_KV: readonly string[] = [HA_CONFIG, HA_STATE, HA_STATUS, LAST_CHECK_INFO, 'priceHelper', 'priceHelperOutbox', 'installId', 'feedbackOutbox', 'sharedPrices010', 'priceShare', 'priceShareOutbox', 'priceShareCursor', 'spendSentToServer'];
+export const LOCAL_ONLY_KV: readonly string[] = [HA_CONFIG, HA_STATE, HA_STATUS, LAST_CHECK_INFO, 'priceHelper', 'priceHelperOutbox', 'installId', 'feedbackOutbox', 'sharedPrices010', 'priceShare', 'priceShareOutbox', 'priceShareCursor', 'spendSentToServer', 'aisles', 'checkLog'];
 
 // A count of the times the pairing (HA_STATE) was started afresh on this phone: a new address or
 // list, a restore, Erase everything. A round already under way when that happens doesn't save its

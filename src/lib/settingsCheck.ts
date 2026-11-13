@@ -192,6 +192,9 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     sharePrices: oneOf(s.sharePrices, ['unasked', 'yes', 'no'] as const, D.sharePrices),
     ...(isObj(s.beta) ? { beta: { enabled: bool(s.beta.enabled, false) } } : {}),
     ...(isObj(s.yourData) ? { yourData: { server: bool(s.yourData.server, true) } } : {}),
+    ...(isObj(s.shopSort) && ['aisle', 'category', 'az'].includes(s.shopSort.by as string)
+      ? { shopSort: { by: s.shopSort.by as 'aisle' | 'category' | 'az', ...(s.shopSort.down === true ? { down: true } : {}) } }
+      : {}),
     defaultThresholdPct: number(s.defaultThresholdPct, D.defaultThresholdPct, 1, 90),
     checkIntervalHours: oneOf(s.checkIntervalHours, CHECK_INTERVALS, D.checkIntervalHours),
     // 0.9.14: 8 weeks, 6 months or 12 months (1 and 3 months become the next one up).

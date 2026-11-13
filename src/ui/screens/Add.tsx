@@ -65,7 +65,7 @@ import { CostcoLines } from '../CostcoLines';
 import { COSTCO_LIST_NOTE } from '../../lib/costcoLocal';
 import { recordHealth } from '../../lib/health';
 import { isExactBarcode, rankAll, score, tokens, type RankQuery } from '../../stores/rank';
-import { chainName, mainProductIds, searchStoreId, stockKnown, type AlertLevel, type Chain, type Group, type ListEntry } from '../../types';
+import { chainName, mainProductIds, searchStoreId, stockKnown, type AlertLevel, type Chain, type Group, type ListEntry, type ListProduct } from '../../types';
 import {
   activeSections,
   costcoIsOn,
@@ -109,7 +109,7 @@ import { OtherSizesCard } from '../OtherSizes';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from './addPicks';
 import { addItemForLineUndoable, addItemFromPicks, pickedWords, saveStoreProducts } from './addSave';
 import { AlertPicker } from './Item';
-import { AlwaysTick, pickButtonsNote } from './addPickWords';
+import { AlwaysTick, pickButtonsNote, toPantryNote } from './addPickWords';
 
 /**
  * 0.9.5: "Search the shops" from the Pick sheet, for a list line that matches nothing in the pantry
@@ -127,6 +127,10 @@ export interface ForLine {
   onDone: (group: { id: string; name: string }, made: boolean, linked: boolean) => void;
   /** 0.9.11: "Add to list" (no pantry item): the line was replaced, so the sheet just closes. */
   onListed: () => void;
+  /** 0.10.2: the line sheet's "Add to pantry": one button (PickButtons), the item made and the line kept as it. */
+  toPantry?: boolean;
+  /** 0.10.2: the shop's product the line came from, ticked again once that shop's results are in. */
+  preTick?: ListProduct;
 }
 
 type ChainResult =
@@ -270,7 +274,8 @@ export function AddScreen({
   const [sortBy, setSortBy] = useState<Partial<Record<Chain, SortKey>>>({});
   const [picks, setPicks] = useState<Map<string, StoreProduct>>(new Map());
   // From the shopping list, keep the name you typed there ("Nescafe").
-  const [name, setName] = useState(forList && query ? query : '');
+  // 0.10.2: a line's "Add to pantry" keeps the line's name ("Eggs").
+  const [name, setName] = useState(forLine?.toPantry ? forLine.entry.text : forList && query ? query : '');
   const [categoryId, setCategoryId] = useState('');
   const [alertLevel, setAlertLevel] = useState<AlertLevel>('good');
   const [allowBulk, setAllowBulk] = useState(false);
@@ -856,6 +861,19 @@ export function AddScreen({
     const pickedChains = new Set([...picks.values()].map((p) => p.chain).concat(sp.chain));
     setSuggest(matchesFor(sp, others).filter((m) => !pickedChains.has(m.chain)));
   };
+
+  // 0.10.2: a line's "Add to pantry": the product it was added as, ticked again once its shop answers
+  // (and its look-alikes at the other shops recommended, as a first tick does). Once only.
+  const preTicked = useRef(false);
+  const preTick = forLine?.preTick;
+  const preShop = preTick ? results[preTick.chain] : undefined;
+  useEffect(() => {
+    if (!preTick?.storeProductId || preTicked.current || preShop?.status !== 'ok') return;
+    preTicked.current = true;
+    const sp = preShop.items.find((p) => String(p.storeProductId) === String(preTick.storeProductId));
+    if (sp && !picks.has(keyOf(sp))) toggle(sp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preShop]);
 
   /** Save each picked store product (or reuse it if it's already tracked) with today's price. */
   const barcodeFor = (sp: StoreProduct) => sp.barcode ?? (isExactBarcode(rankQ, sp) || as === 'main' ? rankQ.barcode : undefined);
@@ -2292,6 +2310,17 @@ export function tickedShops(picks: StoreProduct[]): string {
  * three buttons as any add, and the "next time" tick (ticked to start with).
  */
 export function PickButtons({ forLine, section, saving, onSave }: { forLine: ForLine; section: Section; saving: boolean; onSave: (t: 'both' | 'list' | 'pantry') => void }) {
+  // 0.10.2: from the line's "Add to pantry": one button, the item made and the line kept as it.
+  if (forLine.toPantry)
+    return (
+      <>
+        <AlwaysTick forLine={forLine} />
+        <button className="btn primary" onClick={() => onSave('both')} disabled={saving}>
+          <Icon name={section} size={18} /> Add to {SECTION_NAMES[section].toLowerCase()}
+        </button>
+        <p className="small" style={{ margin: 0 }}>{toPantryNote(SECTION_PLACE[section])}</p>
+      </>
+    );
   return (
     <>
       <AlwaysTick forLine={forLine} />

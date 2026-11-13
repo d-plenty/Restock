@@ -3108,16 +3108,22 @@ h2,
   /* 0.9.12: grows to two lines when it must (was a fixed 36 px). */
   height: auto;
 }
-/* Tags: one pill shape and size, never on two lines. */
+/* Tags: one pill shape and size. 0.10.2: when a tag is wider than the space it's in (big text, a
+   narrow name column), it goes onto a second line inside the pill, so the colour always covers every
+   letter (it used to stop part-way through "RECOMMENDED" and "SPECIAL · SAVE"). */
 .tag {
-  height: 22px;
-  padding: 0 9px;
+  height: auto;
+  min-height: 22px;
+  padding: 3px 9px;
   border-radius: var(--r-full);
   font-size: var(--fs-xs);
   font-weight: 800;
   letter-spacing: 0.04em;
-  line-height: 1;
-  white-space: nowrap;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  box-sizing: border-box;
   gap: 4px;
   flex-shrink: 0;
 }
@@ -3136,15 +3142,20 @@ h2,
 .tag.best,
 .tag.rec,
 .badge {
-  height: 22px;
-  padding: 0 9px;
+  height: auto;
+  min-height: 22px;
+  padding: 3px 9px;
   border-radius: var(--r-full);
   font-size: var(--fs-xs);
   font-weight: 800;
   letter-spacing: 0.04em;
+  line-height: 1.2;
   display: inline-flex;
   align-items: center;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--green-solid);
   color: var(--on-accent);
 }
@@ -4458,4 +4469,57 @@ html.on-welcome,
 html.on-welcome body,
 html.on-welcome #root {
   background: var(--brand-navy);
+}
+
+/* 0.10.2: shopping mode's sort row, and where each thing is in the shop. */
+.shopmode-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 4px;
+  flex-wrap: wrap;
+}
+.shopmode-sort .seg {
+  flex: 1 1 200px;
+  margin: 0;
+  min-width: 0;
+}
+.shopmode-sort .seg button {
+  white-space: nowrap;
+  padding-inline: 6px;
+  min-width: 0;
+}
+.shopmode-sort .btn {
+  white-space: nowrap;
+}
+.tag.aisle {
+  background: var(--blue-bg);
+  color: var(--blue-ink);
+}
+.tag.aisle-unknown {
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+/* 0.10.2: a line's "Add to pantry", green beside the sheet's title (under it when they don't fit). */
+.sheet .topbar .sheet-head {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sheet .topbar .sheet-head .sheet-title {
+  flex: 1 1 6em;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.sheet .topbar .sheet-action {
+  flex: none;
+  white-space: nowrap;
+  min-height: 40px;
+  padding-inline: 12px;
 }

@@ -125,6 +125,11 @@ final class PriceChecker {
         int done = 0;
         // The phone's own calendar day, not UTC's (Deals.localDay).
         String today = Deals.localDay(now());
+        // 0.10.2: aisle numbers at your branches (Coles, with Prices and stock at my store on). Kept on
+        // this phone only, by product and branch: {"<product>": {"1": {"s": store, "a", "side", "o", "at"}, "2": …}}.
+        JSONObject aisles = readKv(db, "aisles");
+        if (aisles == null) aisles = new JSONObject();
+        boolean aislesChanged = false;
         for (Map.Entry<String, List<String[]>> entry : byChain.entrySet()) {
             String chain = entry.getKey();
             String storeId = null;
@@ -153,12 +158,14 @@ final class PriceChecker {
                         if (!ownBranch) throw e;
                         q = null;
                     }
+                    if (ownBranch && q != null && noteAisle(aisles, p[0], "1", storeId, q.aisle)) aislesChanged = true;
                     // Your branch didn't have it, or didn't answer: the online store's price instead.
                     if (q == null && ownBranch) q = client.refresh(chain, p[3], p[2], null);
                     if (second != null) {
                         try {
                             StoreClient.Quote q2 = client.refresh(chain, p[3], p[2], second);
                             saveStock2(db, p[0], q2 != null ? q2.inStock : null);
+                            if (q2 != null && noteAisle(aisles, p[0], "2", second, q2.aisle)) aislesChanged = true;
                         } catch (StoreClient.BlockedException e) {
                             throw e;
                         } catch (Exception e) {
@@ -190,6 +197,11 @@ final class PriceChecker {
                 if (progress != null) progress.onProgress(done, total);
                 Thread.sleep(PAUSE_MS);
             }
+        }
+
+        if (aislesChanged) {
+            tidyAisles(aisles);
+            writeKv(db, "aisles", aisles);
         }
 
         // Store health: when each store last worked, and since when it's been failing (health.ts).
@@ -593,6 +605,50 @@ final class PriceChecker {
      * Online stock as the store says now; null (the store doesn't say) clears an old answer.
      * Skipped quietly if the app hasn't added the column yet.
      */
+    /**
+     * 0.10.2: notes where a product is at a branch (slot "1" your branch, "2" your second). A shop that
+     * said nothing (null) changes nothing; one that says it doesn't know ({}) clears an old aisle.
+     */
+    static boolean noteAisle(JSONObject aisles, String productId, String slot, String store, JSONObject found) {
+        if (found == null || store == null) return false;
+        try {
+            JSONObject mine = aisles.optJSONObject(productId);
+            if (mine == null) mine = new JSONObject();
+            JSONObject v = new JSONObject(found.toString()).put("s", store).put("at", now());
+            mine.put(slot, v);
+            aisles.put(productId, mine);
+            // Always saved: "at" says it was checked, so tidyAisles keeps what's still on the list.
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Aisles not seen for 120 days go (a product that's left the list, or a branch you've changed). */
+    static void tidyAisles(JSONObject aisles) {
+        long cutoff = Instant.now().toEpochMilli() - 120L * 24 * 3600_000L;
+        java.util.Iterator<String> it = aisles.keys();
+        List<String> gone = new java.util.ArrayList<>();
+        while (it.hasNext()) {
+            String id = it.next();
+            JSONObject mine = aisles.optJSONObject(id);
+            if (mine == null) {
+                gone.add(id);
+                continue;
+            }
+            for (String slot : new String[] { "1", "2" }) {
+                JSONObject v = mine.optJSONObject(slot);
+                try {
+                    if (v != null && Instant.parse(v.optString("at")).toEpochMilli() < cutoff) mine.remove(slot);
+                } catch (Exception ignored) {
+                    mine.remove(slot);
+                }
+            }
+            if (mine.length() == 0) gone.add(id);
+        }
+        for (String id : gone) aisles.remove(id);
+    }
+
     /** Stock at your second Coles (in_stock_2, from 0.6.11). */
     private static void saveStock2(SQLiteDatabase db, String productId, Boolean inStock) {
         try {

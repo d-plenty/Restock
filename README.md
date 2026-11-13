@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.1" src="https://img.shields.io/badge/status-release%20candidate%200.10.1-ffcd00">
+  <img alt="Release candidate 0.10.2" src="https://img.shields.io/badge/status-release%20candidate%200.10.2-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0101">New in 0.10.1</a> ·
+  <a href="#new-in-0102">New in 0.10.2</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -65,7 +65,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 ## Highlights
 
-- **Your shops, your items.** Coles, Woolworths and Aldi, plus bottle shops (Keg tab, 18+) and chemists (Health tab, both marked Beta) if you want them, and any other shop's website.
+- **Your shops, your items.** Coles, Woolworths and Aldi, plus Costco (marked Beta), bottle shops (Keg tab, 18+) and chemists (Health tab, both marked Beta) if you want them, and any other shop's website.
 - **Four shopping lists.** Groceries, Keg, Health and **General**. General is a list only, for things that aren't in your pantry: Home Assistant puts anything there that matches nothing you track, or you add to it yourself.
 - **Scan to add.** An open-source barcode scanner built in, with Open Food Facts lookup. Restock finds the same product at each of your shops and ticks it for you.
 - **Undo.** After most changes (Add to list, a tick, a delete, an edit, "Add all to my list"), a small **Undo** shows for a few seconds. One tap puts it all back, however many things changed.
@@ -99,7 +99,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Best match**: after a scan, the same product (brand, variant and size) is ticked at each shop. If the barcode only names the brand, you pick which one it is once and Restock ticks it everywhere and remembers.
 - **Your branch's prices and stock**: sign in to your Woolworths account inside Restock, on Woolworths' own page, so your password only ever goes to Woolworths, and Restock shows your branch's prices and stock and can fill your Woolworths trolley. For Coles, tap **Choose your Coles branch** in My shops and tap your branch in Coles' own store finder; Restock picks up its number by itself. Without these, Restock shows online prices and leaves stock out.
 - **Hold to preview**: press and hold any product for a bigger photo, its full name, size, price, ingredients, allergens and nutrition.
-- **Shopping list**: Shop around first, with its stops and what it saves, then "If you only go to one shop" with HAS ALL or N MISSING for each, and what the missing ones would cost elsewhere. Views: **By shop · Aisle group · One list**. Quantities, A to Z, Best value or Lowest price, share as text, or send to the Coles or Woolworths app. Type in the list and your pantry items come up first; or add the words as they are, or **Find the cheapest** to search the shops for a one-off buy.
+- **Shopping list**: Shop around first, with its stops and what it saves, then "If you only go to one shop" with HAS ALL or N MISSING for each, and what the missing ones would cost elsewhere. Views: **By shop · Aisle group · One list**. **Start shopping** sorts each shop **by aisle** (1 to 50, or 50 to 1), category or A–Z, with each thing's aisle at your Coles branch (Aisle: unknown where a shop doesn't say). Quantities, A to Z, Best value or Lowest price, share as text, or send to the Coles or Woolworths app. Type in the list and your pantry items come up first; or add the words as they are, or **Find the cheapest** to search the shops for a one-off buy.
 - **Pick my milk**: a line added as words (by voice through Home Assistant, say) has a **Pick my milk** button. Pick the pantry item, and tick *Always use this for "milk"* to match it straight away next time. If nothing in your pantry matches ("chopsticks"), the picker searches the shops for it, the same as adding a new item.
 - **Undo**: a small Undo after adding to the list, ticking, removing, editing and bulk changes. One tap undoes all of it, on every phone and the server too.
 - **Save settings**: changes on a settings screen wait for **Save settings**. If you leave with changes not saved, Restock asks.
@@ -130,6 +130,22 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.2
+
+Release candidate 3: aisle numbers, and knowing when a price check didn't happen.
+
+- **Aisle numbers in shopping mode:** each thing shows where it is at your branch, like *Aisle 9 · Left*. Coles gives them, at your branch and your second one, with *Prices and stock at my store* on; Woolworths' website gives an online category instead of an aisle, and Aldi and Costco don't publish them, so those say **Aisle: unknown**. They only show once you start shopping, and they stay on your phone.
+- **Sort each shop** by **Aisle** (the default; tap **1→50** to go **50→1**), **Category** (your aisle groups) or **A–Z**. Things with an aisle come first, in aisle order; the ones without follow, A–Z. Restock remembers what you picked, and *Settings → Shopping list and receipts → In shopping mode, start with* sets it.
+- **At your other Coles today?** Its aisles instead, one tap from the Coles heading.
+- **Change shops** is a button beside your loyalty cards (it was a link under the total).
+- **Aisle numbers come straight from each shop**, for that branch: shops move things around, so if one's wrong, that's the shop's information, not Restock's. That's said in setup, Settings → Supermarkets (Pantry tab) and the fine print.
+- **Add to pantry from the shopping list:** a line that isn't in your pantry yet (you tapped *Add to list* instead of *Add to pantry*) has a green **Add to pantry** at the top of its sheet. The product you added is ticked again; tick the others, and the line stays on your list as the new pantry item.
+- **Tags are coloured all the way across** at big text sizes (*RECOMMENDED* and *SPECIAL · SAVE* used to stop part-way).
+- **Costco is marked Beta**, like Keg and Health: it works the same, it's just tested less so far.
+- **When prices were last checked:** Home says the day and time (*Wednesday 5:02 pm*, not *2 days ago*), and if a scheduled check didn't run (*Yesterday's 5 pm check didn't run. Why?*).
+- **Advanced → Diagnostics → Background checks:** the last few scheduled checks and how each went (done, stopped part way, didn't finish, never started), and Restock's battery setting, with a button to let it run in the background.
+- **Shared prices:** an unusual price now needs two phones on **two different internet addresses** to agree (in memory only, never written down), so one person can't fake a second phone.
 
 ## New in 0.10.1
 
@@ -277,7 +293,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.1.apk` (on macOS, `shasum -a 256 restock-0.10.1.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.2.apk` (on macOS, `shasum -a 256 restock-0.10.2.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -463,7 +479,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is at its **second release candidate** (0.10.1): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is at its **third release candidate** (0.10.2): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.

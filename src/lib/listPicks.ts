@@ -166,7 +166,8 @@ export async function pickItemFor(entry: ListEntry, group: { id: string; name: s
     if (picked && tab && tab !== 'pantry') {
       // 0.9.6: to Keg or Health the line is made again there and the old one taken off (as Move to does),
       // so a phone that shares only Groceries and General sees it go instead of keeping a stale copy.
-      const fits = !now.chain || now.chain === 'other' || sectionOf(now.chain) === tab;
+      // 0.10.2: a one-off buy's shop was only where that product was cheapest: as an item, it's whichever is.
+      const fits = !now.product && (!now.chain || now.chain === 'other' || sectionOf(now.chain) === tab);
       const line: ListEntry = {
         id: uid(),
         text: group.name,
@@ -182,7 +183,14 @@ export async function pickItemFor(entry: ListEntry, group: { id: string; name: s
       };
       await runOps([insertEntryOp(line), { sql: 'DELETE FROM list_entries WHERE id = ?', params: [now.id] }]);
     } else {
-      await updateListEntry(now.id, { groupId: group.id, text: group.name, ...(tab ? { section: tab } : {}) });
+      // 0.10.2: a one-off buy (added to the list only) that's now a pantry item goes to whichever of
+      // its shops is cheapest, as any item's line does, not the shop its one product was at.
+      await updateListEntry(now.id, {
+        groupId: group.id,
+        text: group.name,
+        ...(tab ? { section: tab } : {}),
+        ...(now.product ? { chain: undefined, price: undefined } : {}),
+      });
     }
   }
   return true;

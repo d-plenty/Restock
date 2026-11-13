@@ -33,6 +33,11 @@ final class StoreClient {
         String imageUrl;
         /** Online stock, or null when the store doesn't say. Same rules as the app's store adapters. */
         Boolean inStock;
+        /**
+         * 0.10.2: where it is in the store asked about (Coles' locations): {"a": aisle, "side", "o": order},
+         * {} when Coles says it doesn't know, null when it said nothing (its online store).
+         */
+        JSONObject aisle;
     }
 
     /** Makes a request from inside a store's own web page (StoreWeb on Android). Returns {status, body}. */
@@ -486,6 +491,7 @@ final class StoreClient {
             if (uri != null) q.imageUrl = "https://productimages.coles.com.au/productimages" + uri;
         }
         q.inStock = bool(p, "availability");
+        q.aisle = Aisles.coles(p);
         return q;
     }
 

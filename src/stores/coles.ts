@@ -46,6 +46,41 @@ async function ensureKey(force = false, jar = ''): Promise<string> {
 
 type Raw = Record<string, unknown>;
 
+/** 0.10.2: where a product is at the Coles branch it was asked about. Mirrored in Aisles.java. */
+export interface ColesAisle {
+  a?: string;
+  side?: string;
+  o?: number;
+}
+
+/**
+ * 0.10.2: the first of a Coles product's locations with an aisle. {} when Coles says aisle information
+ * isn't available, undefined (null in Java) when there are no locations at all (its online store).
+ * tools/sync-test/aisle-fixtures-0102.json holds the answers both sides check.
+ */
+export function colesAisle(p: Raw): ColesAisle | undefined {
+  const locs = p.locations;
+  if (!Array.isArray(locs)) return undefined;
+  const text = (v: unknown) => {
+    if (v === null || v === undefined) return undefined;
+    const t = String(v).trim();
+    return !t || t.toLowerCase() === 'null' ? undefined : t;
+  };
+  for (const l of locs) {
+    if (!l || typeof l !== 'object') continue;
+    const r = l as Raw;
+    const a = text(r.aisle);
+    if (!a || a === '0') continue;
+    const out: ColesAisle = { a: a.slice(0, 24) };
+    const side = text(r.aisleSide);
+    if (side) out.side = side.slice(0, 16);
+    if (typeof r.order === 'number' && Number.isFinite(r.order)) out.o = Math.trunc(r.order);
+    else if (typeof r.order === 'string' && /^-?\d{1,6}$/.test(r.order.trim())) out.o = Number.parseInt(r.order.trim(), 10);
+    return out;
+  }
+  return {};
+}
+
 /**
  * Is a Coles price a sale? Coles tags most products with a promotion type, and most aren't sales:
  * "EVERYDAY" is its ordinary price and "BONUSCOLLECTABLE" a collectables promotion (seen in a real

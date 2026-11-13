@@ -477,6 +477,10 @@ function HouseholdPart() {
       )}
 
       <Group id="dk-s-list" title="Shopping list and receipts">
+        {/* 0.10.2: as on the phone; aisle numbers are the phone's (its Coles branch). */}
+        <Line title="In shopping mode, start with" sub="Aisle, 1 to 50 (default), Aisle, 50 to 1, Category, or A–Z." greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings → Shopping list and receipts on the phone)." />
+        </Line>
         <Line
           title="Shop around if it saves at least"
           htmlFor="dk-shop-around"

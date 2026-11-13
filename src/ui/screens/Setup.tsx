@@ -69,7 +69,7 @@ const ALL_TILES: Tile[] = [
   {
     id: 'pantry',
     title: 'Supermarkets',
-    sub: 'Woolworths, Coles, Aldi, Costco',
+    sub: 'Woolworths, Coles, Aldi, Costco (beta)',
     icon: 'cart',
     heading: 'Where do you shop?',
     intro: 'Pick your supermarkets and nearest branches. Each shop has its sign-in (optional) and what works under its tick.',

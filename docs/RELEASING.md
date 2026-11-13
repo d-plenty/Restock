@@ -66,5 +66,8 @@ Obtainium picks up new releases from the Releases page automatically.
 
 ## Before 1.0
 
-- Ask the shops and data sources for permission before anything like shared prices goes public.
 - F-Droid needs builds it can reproduce from the source; check their inclusion policy when it's time.
+
+## After 1.0
+
+- Shared prices are public on GitHub (restock-prices) from 0.10.0. Ask the shops and data sources (Coles, Woolworths, Aldi, Costco, hotprices.org) whether they're happy with that, and act on what they say.

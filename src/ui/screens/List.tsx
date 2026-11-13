@@ -1,4 +1,5 @@
 import { StockTag } from '../StockTag';
+import { aisleLabel, aisleOf, byAisle as sortByAisle, getAisles, type AisleAt } from '../../lib/aisles';
 import { noteTicksSoon } from '../../lib/spending';
 import { branchAdvice, branchName, stockRows } from '../../lib/stock';
 import { useFullRefresh } from '../refresh';
@@ -56,7 +57,7 @@ import { PickItemSheet } from './PickItem';
 import { MoveManySheet, MoveToSheet } from './MoveTo'; // 0.9.6 (Move to)
 import { linesToPick, pickWord } from '../../lib/homeAssistant';
 import { useNav } from '../nav';
-import { enabledIn, isLocalOnlyShop, LIST_NAMES, LIST_PLACE, listSectionsOn, priceSource, searchChainsIn, SECTIONS, type ListSection, type Section, type StoreChain } from '../../shops';
+import { enabledIn, isLocalOnlyShop, LIST_NAMES, SECTION_NAMES, LIST_PLACE, listSectionsOn, priceSource, searchChainsIn, SECTIONS, type ListSection, type Section, type StoreChain } from '../../shops';
 import { CardBarcode, PROGRAMS } from './Cards';
 import { ShopTotalsCard } from '../shopTotalsCard';
 
@@ -294,6 +295,8 @@ export function ListScreen() {
   const [menu, setMenu] = useState(false);
   // Start shopping: first which shops you're going to today, then the in-store view for those.
   const [choosingShops, setChoosingShops] = useState(false);
+  // 0.10.2: Change shops from shopping mode: closing the sheet goes back to that trip.
+  const [changingFrom, setChangingFrom] = useState<StoreChain[]>();
   const [shopping, setShopping] = useState<StoreChain[]>();
   const [skipToday, setSkipToday] = useState<Set<string>>(new Set());
   const [preview, setPreview] = useState<ListEntry>();
@@ -302,6 +305,8 @@ export function ListScreen() {
   // 0.9.3: lines from Home Assistant to pick a pantry item for ("Pick my milk"), on every phone and the web (listPicks.ts).
   const toPick = useLive(linesToPick, []);
   const [picking, setPicking] = useState<ListEntry>();
+  // 0.10.2: a line's "Add to pantry": the same Pick sheet, straight to the shop search.
+  const [pantrying, setPantrying] = useState<ListEntry>();
   const [movingMany, setMovingMany] = useState(false); // 0.9.6 (Move to)
 
   const full = useFullRefresh();
@@ -868,6 +873,7 @@ export function ListScreen() {
       )}
 
       {picking && <PickItemSheet entry={picking} fromHa={!!toPick?.has(picking.id)} onClose={() => setPicking(undefined)} />}
+      {pantrying && <PickItemSheet entry={pantrying} toPantry fromHa={false} onClose={() => setPantrying(undefined)} />}
 
       {sending && (
         <SendToShopSheet
@@ -917,13 +923,19 @@ export function ListScreen() {
           compare={settings.listCompare}
           min={settings.shopAroundMin ?? 1}
           start={(() => {
+            if (changingFrom) return changingFrom;
             // The recommendation on the list: one store when it wins, otherwise the shops shopping around uses.
             const pick = aroundPlan(totals, totals.by, settings.shopAroundMin ?? 1).pick;
             return pick === 'around' ? totals.around.chains : [pick.chain];
           })()}
-          onClose={() => setChoosingShops(false)}
+          onClose={() => {
+            setChoosingShops(false);
+            if (changingFrom) setShopping(changingFrom);
+            setChangingFrom(undefined);
+          }}
           onStart={(chosen, skip) => {
             setChoosingShops(false);
+            setChangingFrom(undefined);
             setSkipToday(skip);
             setShopping(chosen);
           }}
@@ -939,6 +951,7 @@ export function ListScreen() {
           entries={entries}
           categories={categories}
           onChangeShops={() => {
+            setChangingFrom(shopping);
             setShopping(undefined);
             setChoosingShops(true);
           }}
@@ -966,6 +979,7 @@ export function ListScreen() {
           name={recFor(c, editing)?.group.name}
           lists={sectionsOn}
           onPick={setPicking}
+          onAddToPantry={setPantrying}
           onClose={() => setEditing(undefined)}
         />
       )}
@@ -1258,7 +1272,35 @@ function ShoppingMode({
 
   const order = new Map(categories.map((cat, i) => [cat.id, i]));
   const catOf = (e: ListEntry) => recFor(c, e)?.group.categoryId ?? e.categoryId;
-  const byAisle = (a: ListEntry, b: ListEntry) => (order.get(catOf(a) ?? '') ?? 99) - (order.get(catOf(b) ?? '') ?? 99);
+  const nameOf = (e: ListEntry) => recFor(c, e)?.group.name ?? e.text;
+  const azOf = (a: ListEntry, b: ListEntry) => nameOf(a).localeCompare(nameOf(b), 'en-AU', { sensitivity: 'base' });
+  const byCategory = (a: ListEntry, b: ListEntry) => (order.get(catOf(a) ?? '') ?? 99) - (order.get(catOf(b) ?? '') ?? 99) || azOf(a, b);
+
+  // 0.10.2: each shop's lines by aisle (the default; 1 to 50, or 50 to 1), category, or A–Z. Your
+  // pick is remembered (Settings → Shopping list and receipts, In shopping mode, start with).
+  const live = useLive(getSettings, []) ?? cachedSettings();
+  const [sort, setSortState] = useState<NonNullable<Settings['shopSort']>>(() => {
+    const start = cachedSettings()?.shopSort ?? { by: 'aisle' };
+    // The web has no aisle numbers: it starts with your categories instead.
+    return serverMode && start.by === 'aisle' ? { by: 'category' } : start;
+  });
+  const setSort = (next: NonNullable<Settings['shopSort']>) => {
+    setSortState(next);
+    void updateSettings({ shopSort: next });
+  };
+  // Aisle numbers are noted by the phone's price check; the web has none (they stay on the phone).
+  const aisles = useLive(getAisles, []);
+  // 0.10.2: which Coles you're at, when you have two (aisles and the branch name follow it).
+  const [colesSlot, setColesSlot] = useState<'1' | '2'>('1');
+  const colesStoreNo = live?.localPrices ? (colesSlot === '1' ? live.stores?.coles?.branchStoreNo : live.stores?.coles?.branchStoreNo2) : undefined;
+  const second = secondBranch(live);
+  const aisleAt = (e: ListEntry): AisleAt | undefined => {
+    const d = dealFor(c, e);
+    if (!d || d.product.chain !== 'coles' || !colesStoreNo) return undefined;
+    return aisleOf(aisles, d.product.id, colesSlot, colesStoreNo);
+  };
+  const sortShop = (items: ListEntry[]) =>
+    sort.by === 'az' ? [...items].sort(azOf) : sort.by === 'category' ? [...items].sort(byCategory) : sortByAisle(items, aisleAt, nameOf, !!sort.down);
   const inTrolley = entries.filter((e) => e.checked && !elsewhere(e)).reduce((s, e) => s + (priceOf(c, e) ?? 0), 0);
   const notHere = entries.filter((e) => elsewhere(e));
   const left = entries.filter((e) => !e.checked);
@@ -1315,11 +1357,6 @@ function ShoppingMode({
               <span style={{ width: `${Math.round(((entries.length - left.length) / entries.length) * 100)}%` }} />
             </div>
           )}
-          {chosen.length < shops.length && (
-            <button className="linkish small" style={{ padding: 0 }} onClick={onChangeShops}>
-              At {chosen.map((x) => chainName(x)).join(', ')} · change
-            </button>
-          )}
         </div>
         {!serverMode && (
           <button className="icon-btn" aria-label="Scan to tick off" onClick={() => void scanToTick()}>
@@ -1330,19 +1367,52 @@ function ShoppingMode({
           Done
         </button>
       </div>
-      {cards && cards.length > 0 && (
+      {/* 0.10.2: Change shops is a button (it was a link under the total), beside your cards. */}
+      {(shops.length > 1 || (cards && cards.length > 0)) && (
         <div className="chips shopmode-cards">
-          {cards.map((k) => (
+          {shops.length > 1 && (
+            <button className="chip" onClick={onChangeShops} aria-label={`Change shops. Shopping at ${chosen.map((x) => chainName(x)).join(', ')}`}>
+              <Icon name="cart" size={16} /> Change shops
+            </button>
+          )}
+          {cards?.map((k) => (
             <button key={k.id} className="chip" onClick={() => setCard(k)}>
               <Icon name="card" size={16} /> Show {k.program === 'other' ? k.label : PROGRAMS[k.program].name}
             </button>
           ))}
         </div>
       )}
+      <div className="shopmode-sort">
+        <span className="small" style={{ fontWeight: 600 }}>
+          Sort by
+        </span>
+        <div className="seg" role="group" aria-label="Sort each shop by">
+          <button type="button" aria-pressed={sort.by === 'aisle'} disabled={serverMode} onClick={() => setSort({ ...sort, by: 'aisle' })}>
+            Aisle
+          </button>
+          <button type="button" aria-pressed={sort.by === 'category'} onClick={() => setSort({ ...sort, by: 'category' })}>
+            Category
+          </button>
+          <button type="button" aria-pressed={sort.by === 'az'} onClick={() => setSort({ ...sort, by: 'az' })}>
+            A–Z
+          </button>
+        </div>
+        {sort.by === 'aisle' && !serverMode && (
+          <button
+            type="button"
+            className="btn small ghost"
+            onClick={() => setSort({ ...sort, down: !sort.down })}
+            aria-label={sort.down ? 'Aisles 50 to 1. Tap for 1 to 50' : 'Aisles 1 to 50. Tap for 50 to 1'}
+          >
+            <Icon name="sort" size={14} /> {sort.down ? '50→1' : '1→50'}
+          </button>
+        )}
+      </div>
+      {serverMode && <PhoneOnlyNote compact text="Aisle numbers are in shopping mode on the phone (they come from your Coles branch)." />}
       <div className="shopmode-list">
         {info && <ProductPreview product={info} onClose={() => setInfo(undefined)} />}
         {c.order.map((shop) => {
-          const items = entries.filter((e) => !elsewhere(e) && shopOf(c, e) === shop).sort(byAisle);
+          const items = sortShop(entries.filter((e) => !elsewhere(e) && shopOf(c, e) === shop));
           if (!items.length) return null;
           return (
             <section key={shop}>
@@ -1355,7 +1425,14 @@ function ShoppingMode({
                   padding: '12px 16px 4px',
                 }}
               >
-                {shop !== 'any' && <ChainDot chain={shop} />} {shop === 'any' ? 'Any shop' : branchName(cachedSettings(), shop)}
+                {shop !== 'any' && <ChainDot chain={shop} />}{' '}
+                {shop === 'any' ? 'Any shop' : shop === 'coles' && colesSlot === '2' && second ? second : branchName(cachedSettings(), shop)}
+                {/* 0.10.2: at your other Coles today? Its aisles instead. */}
+                {shop === 'coles' && second && !serverMode && (
+                  <button type="button" className="linkish small" style={{ marginLeft: 'auto', padding: 0, textTransform: 'none', letterSpacing: 0 }} onClick={() => setColesSlot(colesSlot === '1' ? '2' : '1')}>
+                    At {colesSlot === '1' ? second : branchName(cachedSettings(), 'coles')} instead
+                  </button>
+                )}
               </div>
               {items.map((e) => {
                 const d = dealFor(c, e);
@@ -1407,6 +1484,12 @@ function ShoppingMode({
                           {d.product.name}
                         </span>
                       ) : e.product && <span className="small">{e.product.name}</span>}
+                      {/* 0.10.2: where it is in the shop (shopping mode only). */}
+                      {!e.checked && !serverMode && (
+                        <span className="tags" style={{ marginTop: 3 }}>
+                          <span className={`tag ${aisleAt(e) ? 'aisle' : 'aisle-unknown'}`}>{aisleLabel(aisleAt(e))}</span>
+                        </span>
+                      )}
                       {stockNote(c, e) && (
                         <span
                           className="small"
@@ -1490,9 +1573,12 @@ export function EditEntry({
   name,
   lists,
   onPick,
+  onAddToPantry,
 }: {
   /** 0.9.11: "Pick my cordial" opens the Pick sheet, as the line's search button does. */
   onPick?: (e: ListEntry) => void;
+  /** 0.10.2: "Add to pantry" at the top, for a line that isn't a pantry item yet (added to the list only). */
+  onAddToPantry?: (e: ListEntry) => void;
   entry: ListEntry;
   categories: { id: string; name: string }[];
   shops: StoreChain[];
@@ -1527,8 +1613,23 @@ export function EditEntry({
   if (looking && deal) return <ProductPreview product={previewFromOption(deal)} onClose={() => setLooking(false)} />;
   if (looking && oneOff) return <ProductPreview product={oneOff} onClose={() => setLooking(false)} />;
   if (moving && lists) return <MoveToSheet entry={entry} name={name ?? entry.text} lists={lists} onClose={onClose} />;
+  // 0.10.2: added to the list only ("Add to list" by mistake)? It can still go in the pantry from here.
+  const tab: Section = !entry.section || entry.section === 'general' ? 'pantry' : entry.section;
+  const toPantry =
+    !linked && onAddToPantry ? (
+      <button
+        type="button"
+        className="btn primary small sheet-action"
+        onClick={() => {
+          onClose();
+          onAddToPantry(entry);
+        }}
+      >
+        <Icon name="plus" size={16} /> Add to {SECTION_NAMES[tab].toLowerCase()}
+      </button>
+    ) : undefined;
   return (
-    <Sheet title={name ?? entry.text} onClose={onClose}>
+    <Sheet title={name ?? entry.text} onClose={onClose} action={toPantry}>
       {deal ? (
         <div className="list-product">
           <button type="button" className="list-product-photo" onClick={() => setLooking(true)} aria-label={`Bigger photo of ${deal.product.name}`}>

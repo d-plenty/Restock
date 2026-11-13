@@ -16,6 +16,8 @@ Restock is an independent project. It isn't made, endorsed or supported by Coles
 
 Prices, specials, member prices and stock come from each shop's website and can be wrong, late or different at your branch or in your state. "In stock" means the shop's online stock, not the shelf near you. Verdicts like "Great deal" or "Wait" are worked out from the price history on your phone and are only a guide. Always check the shelf price and your receipt.
 
+Aisle numbers in shopping mode come straight from each shop's own website, for your branch (only Coles gives them, with Prices and stock at my store on). Shops move things around, so if one's wrong, that's the shop's information, not Restock's. Where a shop doesn't say, it shows Aisle: unknown.
+
 Bottle shop and chemist prices are the online prices on each shop's website. Many chemists and some bottle shops set prices per branch, or show some prices only in the shop, so the price at your local shop can be different, and some shops may show nothing at all.
 
 ## Product information
@@ -48,7 +50,7 @@ Restock is free, open-source software provided "as is", without warranty of any 
 
 ## Beta software
 
-Restock 0.10.0 is a release candidate: everything is in, and it's being tested before 1.0, so things can still change between versions. The Keg and Health tabs are marked Beta: they work the same way as Groceries, they just haven't been tested as thoroughly yet, and they'll keep being tested before they come out of beta. Features under Settings → Advanced are for testing and can change or disappear. If something goes wrong, Settings → Send feedback tells us. Keep a backup of anything you'd hate to lose.
+Restock 0.10.2 is a release candidate: everything is in, and it's being tested before 1.0, so things can still change between versions. The Keg and Health tabs, and Costco, are marked Beta: they work the same way as the rest, they just haven't been tested as thoroughly yet, and they'll keep being tested before they come out of beta. Features under Settings → Advanced are for testing and can change or disappear. If something goes wrong, Settings → Send feedback tells us. Keep a backup of anything you'd hate to lose.
 
 ---
 

@@ -19,6 +19,9 @@ import {
 } from '../../lib/searchTest';
 import { CheckedAgo, ChainDot, Icon, LoadingBar, TopBar } from '../components';
 import { useNav } from '../nav';
+import { getCheckLog, missedSlot, missedWords, OUTCOME_WORDS, whenWords } from '../../lib/checkLog';
+import { syncInfo } from '../../lib/sync';
+import { RestockNative } from '../../lib/sql/native';
 
 // Settings → Diagnostics: what went wrong lately, shop by shop, and "Send search details" to
 // capture exactly what a shop sends back, so its connection can be fixed.
@@ -86,6 +89,8 @@ export function DiagnosticsScreen() {
     <div className="screen">
       <TopBar title="Diagnostics" />
       <p className="sub">What went wrong lately, in plain words. It stays on your phone unless you copy or send it.</p>
+
+      {isNative() && <BackgroundChecks />}
 
       <div className="eyebrow">Each shop</div>
       <div className="card flush">
@@ -334,6 +339,76 @@ function SearchTest() {
               Send the last test
             </button>
           </>
+        )}
+      </div>
+    </>
+  );
+}
+
+/**
+ * 0.10.2: the scheduled price checks: the last few, whether each ran and finished, and Restock's
+ * battery setting (Android decides when background work runs, and can hold it back).
+ */
+function BackgroundChecks() {
+  const settings = useLive(getSettings, []);
+  const runs = useLive(getCheckLog, []) ?? [];
+  const info = useLive(syncInfo, []);
+  if (!settings) return null;
+  const plan = { intervalHours: settings.checkIntervalHours, time: settings.checkTime, weekday: settings.checkWeekday };
+  const missed = settings.sync.backgroundActivity ? missedSlot(plan, settings.lastCheck, runs) : undefined;
+  const held = !!info?.backgroundRestricted || info?.batteryExempt === false;
+  return (
+    <>
+      <div className="eyebrow" id="d-checks">
+        Background checks
+      </div>
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {!settings.sync.backgroundActivity ? (
+          <p className="small" style={{ margin: 0 }}>
+            Background activity is off (Settings → Sync and backups), so prices are only checked when you tap Check now.
+          </p>
+        ) : (
+          <>
+            <p className="small" style={{ margin: 0 }}>
+              Last finished: <strong>{whenWords(settings.lastCheck)}</strong>.
+              {missed !== undefined ? ` ${missedWords(missed, runs)}.` : ''}
+            </p>
+            {runs.length > 0 ? (
+              <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
+                {runs.slice(0, 6).map((r) => (
+                  <li key={r.start}>
+                    {whenWords(r.slot)} check: {OUTCOME_WORDS[r.outcome]}
+                    {r.outcome === 'done' && r.checked !== undefined ? ` (${r.checked} checked${r.errors ? `, ${r.errors} shop${r.errors === 1 ? '' : 's'} with a problem` : ''})` : ''}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="small" style={{ margin: 0 }}>
+                No scheduled checks noted yet (they're noted from 0.10.2).
+              </p>
+            )}
+            <p className="small" style={{ margin: 0 }}>
+              A check that never started was held back by Android, or was waiting for a connection or more battery (it needs both). One that
+              stopped part way ran out of the time Android gives it.
+            </p>
+          </>
+        )}
+        <p className="small" style={{ margin: 0, fontWeight: 600, color: held ? 'var(--amber-ink)' : 'var(--green-ink)' }}>
+          {info?.backgroundRestricted
+            ? "Restock's battery setting is Restricted, so Android holds its checks back."
+            : info?.batteryExempt === false
+              ? "Restock's battery setting is Optimised, so Android can delay its checks."
+              : "Restock's battery setting is Unrestricted: checks run on time."}
+        </p>
+        {held && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn small primary" onClick={() => void RestockNative.requestBatteryExemption().catch(() => undefined)}>
+              Let it run in the background
+            </button>
+            <button className="btn small" onClick={() => void RestockNative.openAppSettings().catch(() => undefined)}>
+              Open Restock's settings
+            </button>
+          </div>
         )}
       </div>
     </>

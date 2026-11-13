@@ -160,6 +160,8 @@ export function DeskList() {
   const [view, setViewState] = useState<View>(loadView);
   const [editing, setEditing] = useState<ListEntry>();
   const [picking, setPicking] = useState<ListEntry>();
+  // 0.10.2: a line's "Add to pantry": the same Pick sheet, straight to the shop search.
+  const [pantrying, setPantrying] = useState<ListEntry>();
   const setView = (v: View) => {
     setViewState(v);
     try {
@@ -413,6 +415,7 @@ export function DeskList() {
       )}
 
       {picking && <PickItemSheet entry={picking} fromHa={!!toPick?.has(picking.id)} onClose={() => setPicking(undefined)} />}
+      {pantrying && <PickItemSheet entry={pantrying} toPantry fromHa={false} onClose={() => setPantrying(undefined)} />}
       {editing && (
         <EditEntry
           entry={editing}
@@ -422,6 +425,7 @@ export function DeskList() {
           name={recFor(c, editing)?.group.name}
           lists={sectionsOn /* 0.9.6 (Move to) */}
           onPick={setPicking /* 0.9.11: the same Pick sheet as the phone */}
+          onAddToPantry={setPantrying}
           onClose={() => setEditing(undefined)}
         />
       )}
