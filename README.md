@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.4" src="https://img.shields.io/badge/status-release%20candidate%200.10.4-ffcd00">
+  <img alt="Release candidate 0.10.5" src="https://img.shields.io/badge/status-release%20candidate%200.10.5-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0104">New in 0.10.4</a> ·
+  <a href="#new-in-0105">New in 0.10.5</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -130,6 +130,19 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.5
+
+Release candidate 6: a redesigned Shopping list, faster shop tests, and Unblock for shops that never answer.
+
+- **Shopping list, redesigned:** the list's name is now the list picker: tap **Groceries ▾ Switch** to go to Keg, Health, Baby, Pets or General, each with how many things are on it. One **⋯** button holds the view (by shop, aisle group, one list), Best value / Lowest price, Open or fold all shops, Select items, Share (the whole list or one shop's) and Send to the Woolworths or Coles app.
+- **One summary card** under it: how many things, how many shops, about how much, and what shopping around saves. Tap **Compare** for every shop's total and *if you only go to one shop*, with Start shopping at the bottom.
+- **Simpler rows:** tick, photo, name, one line saying what to buy, the price, and at most one tag (out of stock, swap & save, the deal, a multi-buy or a member price). **Pick my …** sits under anything that isn't a pantry item yet.
+- **Tap a line** for its sheet: how many (the + and − moved here), both prices, every tag, swap & save explained, stock at your other Coles, then Shop, Category, Save, **Pantry item**, **Move to** and Remove.
+- **Got it** folds down to one line with **Clear**; tap it to see what you've ticked.
+- **Test connections is much faster:** three shops are tested at once (it was one at a time), the shops with their own app data go first, and each result shows as soon as it's in. Each shop's time limit starts when its own test does, so a shop near the end of the queue no longer "times out" before it's even tried. Shop pages also stop waiting sooner once they've finished loading.
+- **Unblock shows up more:** a shop read through its website (Dan Murphy's and BWS too) that doesn't answer, or finds nothing for its test word, most likely has a bot check that never cleared, so its warning on Home now has the green **Unblock** button, with Try again beside it. The same in Test connections, Shop test, Add's results and My shops. Old warnings saved by 0.10.4 count too.
+- **Shared prices (restock-prices):** limits count the real address only when the request came through your own proxy, so nobody can pretend to be many phones; pictures are only kept from the shops' own picture servers; the GitHub token is kept off git's command line.
 
 ## New in 0.10.4
 
@@ -321,7 +334,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.4.apk` (on macOS, `shasum -a 256 restock-0.10.4.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.5.apk` (on macOS, `shasum -a 256 restock-0.10.5.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

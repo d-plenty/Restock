@@ -15,7 +15,7 @@ import { chainName, stockKnown, type ListEntry, type Settings } from '../../type
 import { ChainDot, ChainName, Icon, LoadingBar, Price, SectionMark, SwapBox, Thumb } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { ActionInfoTag, MemberInfoTag, MultiInfoTag } from '../tagInfo';
-import { failingStores, getHealth, getHiddenWarnings, isBlockedError, isHidden } from '../../lib/health';
+import { failingStores, getHealth, getHiddenWarnings, isBlockedError, isHidden, offerUnblock } from '../../lib/health';
 import { HideForADay, UnblockButton } from '../Unblock';
 import { exportBackup, needsBackupNudge } from '../../lib/backup';
 import { syncInfo } from '../../lib/sync';
@@ -247,8 +247,8 @@ export function HomeScreen() {
       )}
 
       {Object.entries(refresh.busy ? {} : errors).map(([chain, msg]) =>
-        isBlockedError(msg) && chain !== 'other' ? (
-          <BlockedCard key={chain} chain={chain as StoreChain} onWorked={runCheck} />
+        offerUnblock(chain, msg) && chain !== 'other' ? (
+          <BlockedCard key={chain} chain={chain as StoreChain} onWorked={runCheck} maybe={!isBlockedError(msg)} />
         ) : (
           <div key={chain} className="banner amber" role="alert">
             <strong>{chainName(chain)}</strong>
@@ -283,8 +283,8 @@ export function HomeScreen() {
       {failing
         .filter((f) => !errors[f.chain])
         .map((f) =>
-          isBlockedError(f.error) ? (
-            <BlockedCard key={f.chain} chain={f.chain} onWorked={runCheck} hide />
+          offerUnblock(f.chain, f.error) ? (
+            <BlockedCard key={f.chain} chain={f.chain} onWorked={runCheck} hide maybe={!isBlockedError(f.error)} days={f.days} />
           ) : (
             <div key={f.chain} className="banner amber" role="alert">
               <strong>
@@ -606,15 +606,30 @@ export function nextCheck(
 /**
  * 0.10.4: a shop that's turning Restock away. It says plainly that it's the shop's website checking
  * for bots, not Restock, then the big green Unblock and a small grey "Hide for a day".
+ * 0.10.5: also for a shop read through the hidden browser that never answers or finds nothing
+ * (`maybe`): its check most likely never cleared, so Unblock comes first, with Try again beside it.
  */
-function BlockedCard({ chain, onWorked, hide }: { chain: StoreChain; onWorked: () => void; hide?: boolean }) {
+function BlockedCard({ chain, onWorked, hide, maybe, days }: { chain: StoreChain; onWorked: () => void; hide?: boolean; maybe?: boolean; days?: number }) {
   return (
     <div className="banner amber" role="alert">
-      <strong>{chainName(chain)} is blocking Restock</strong>
-      <span style={{ fontSize: 13 }}>Its website is checking for bots. That’s its check, not Restock’s. Unblock it once and prices carry on.</span>
+      <strong>
+        {maybe
+          ? `${chainName(chain)} ${days ? `hasn't worked for ${days} day${days === 1 ? '' : 's'}` : "isn't answering"}`
+          : `${chainName(chain)} is blocking Restock`}
+      </strong>
+      <span style={{ fontSize: 13 }}>
+        {maybe
+          ? 'Its website may be checking for bots. That’s its check, not Restock’s. Unblock it once and prices carry on.'
+          : 'Its website is checking for bots. That’s its check, not Restock’s. Unblock it once and prices carry on.'}
+      </span>
       <div className="unblock-actions">
         <UnblockButton chain={chain} onWorked={onWorked} />
         {!isNative() && <span className="small">Unblock is in the Android app: the shop’s page opens on your phone.</span>}
+        {maybe && (
+          <button className="btn small" style={{ alignSelf: 'flex-start', marginTop: 6 }} onClick={onWorked}>
+            <Icon name="refresh" size={16} /> Try again
+          </button>
+        )}
         {hide && <HideForADay chain={chain} />}
       </div>
     </div>

@@ -184,7 +184,7 @@
       {
         "title": "Beta software",
         "body": [
-          "Restock 0.10.4 is a release candidate: everything is in, and it's being tested before 1.0, so things can still change between versions. The Keg, Health, Baby and Pets tabs, and Costco, IGA and the shops added in 0.10.3, are marked Beta: they work the same way as the rest, they just haven't been tested as thoroughly yet, and they'll keep being tested before they come out of beta. Features under Settings → Advanced are for testing and can change or disappear. If something goes wrong, Settings → Send feedback tells us. Keep a backup of anything you'd hate to lose."
+          "Restock 0.10.5 is a release candidate: everything is in, and it's being tested before 1.0, so things can still change between versions. The Keg, Health, Baby and Pets tabs, and Costco, IGA and the shops added in 0.10.3, are marked Beta: they work the same way as the rest, they just haven't been tested as thoroughly yet, and they'll keep being tested before they come out of beta. Features under Settings → Advanced are for testing and can change or disappear. If something goes wrong, Settings → Send feedback tells us. Keep a backup of anything you'd hate to lose."
         ]
       }
     ]

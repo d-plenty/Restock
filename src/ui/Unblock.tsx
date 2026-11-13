@@ -45,7 +45,7 @@ export function UnblockSheet({ chain, onClose, onWorked }: { chain: StoreChain; 
   return (
     <Sheet title={`Unblock ${name}`} onClose={onClose}>
       <p style={{ margin: 0 }}>
-        {name} is blocking Restock. Its website is checking for bots. That’s its check, not Restock’s. Pass it once yourself and prices carry on.
+        {name} isn’t letting Restock in. Its website is most likely checking for bots. That’s its check, not Restock’s. Pass it once yourself and prices carry on.
       </p>
       <ol className="unblock-steps">
         <li>The shop’s own page opens.</li>

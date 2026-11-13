@@ -59,7 +59,7 @@ import {
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** The word Restock searches for when testing a shop. */
-import { getHealth, isBlockedError, TEST_WORD } from '../../lib/health';
+import { getHealth, offerUnblock, TEST_WORD } from '../../lib/health';
 import { UnblockButton } from '../Unblock';
 export { TEST_WORD };
 
@@ -1428,7 +1428,7 @@ function ShopEdit({ settings, chain }: { settings: Settings; chain: StoreChain }
     <div className="shop-extra">
       {blocked && (
         <span className="small shop-blocked">
-          <Icon name="alert" size={15} /> Blocked: tap Edit to unblock
+          <Icon name="alert" size={15} /> Not working: tap Edit to unblock
         </span>
       )}
       <span className="small">{shopStatus(settings, chain)}</span>
@@ -1473,7 +1473,8 @@ function BranchByHand({ chain, choice, onSet }: { chain: StoreChain; choice: Sto
 function useBlocked(chain: StoreChain): boolean {
   const health = useLive(getHealth, []);
   const h = health?.[chain];
-  return !!h?.failingSince && isBlockedError(h.error);
+  // 0.10.5: also a hidden-browser shop that keeps timing out or finding nothing.
+  return !!h?.failingSince && offerUnblock(chain, h.error);
 }
 
 function ShopEditSheet({ settings, chain, onClose }: { settings: Settings; chain: StoreChain; onClose: () => void }) {
@@ -1488,8 +1489,8 @@ function ShopEditSheet({ settings, chain, onClose }: { settings: Settings; chain
     <Sheet title={chainName(chain)} onClose={onClose}>
       {blocked && (
         <div className="banner amber" role="status">
-          <strong>{chainName(chain)} is blocking Restock</strong>
-          <span style={{ fontSize: 13 }}>Its website is checking for bots. That’s its check, not Restock’s. Unblock it once and prices carry on.</span>
+          <strong>{chainName(chain)} isn’t working</strong>
+          <span style={{ fontSize: 13 }}>Its website may be checking for bots. That’s its check, not Restock’s. Unblock it once and prices carry on.</span>
           <div className="unblock-actions">
             <UnblockButton chain={chain} />
           </div>

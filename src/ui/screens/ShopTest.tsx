@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { shareTextFile } from '../../lib/backup';
 import { captureWhile, type Captured } from '../../lib/diagnostics';
-import { isBlockedError, TEST_WORD } from '../../lib/health';
+import { isBlockedError, offerUnblock, TEST_WORD } from '../../lib/health';
 import { money } from '../../lib/units';
 import { chainName, customShops, isPressOnlyShop, kindOf, sectionOf, shopsByGroup, type StoreChain } from '../../shops';
 import { adapterFor } from '../../stores';
@@ -69,6 +69,8 @@ export function ShopTest() {
   const word = term.trim() || TEST_WORD[sectionOf(shop)];
   // 0.10.4: a 403, or a "checking your browser" page, is the shop blocking Restock.
   const blocked = !!r?.error && (r.botCheck || r.blocked || isBlockedError(r.error));
+  // 0.10.5: Unblock is offered for a hidden-browser shop that found nothing, too.
+  const unblock = blocked || (!!r?.error && offerUnblock(r.shop, r.error));
 
   const run = async () => {
     setBusy(true);
@@ -175,7 +177,7 @@ export function ShopTest() {
                 Restock’s. Unblock it once and try again.
               </span>
             )}
-            {blocked && <UnblockButton chain={r.shop} onWorked={() => void run()} />}
+            {unblock && <UnblockButton chain={r.shop} onWorked={() => void run()} />}
             <span className="small">
               Read from {r.how}
               {r.searchPage ? ` · ${r.searchPage}` : ''} · {(r.ms / 1000).toFixed(1)} s

@@ -419,7 +419,9 @@ public class RestockNativePlugin extends Plugin {
 
     // ---------- stores through a real browser page ----------
 
-    private final java.util.concurrent.ExecutorService webThread = Executors.newSingleThreadExecutor();
+    // 0.10.5: three shops' hidden pages at once (it was one at a time, so a slow shop held up every
+    // shop behind it). Each shop's page still does one thing at a time (StoreWeb is per shop).
+    private final java.util.concurrent.ExecutorService webThread = Executors.newFixedThreadPool(3);
 
     /** A shop the page names: built in, or one the person added (registered with its website). */
     private static boolean knownShop(String chain, String home) {

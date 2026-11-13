@@ -864,9 +864,16 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
   const chains: StoreChain[] = groups.flatMap((g) => g.chains);
   const [results, setResults] = useState<ConnectionTest[]>();
   const health = useLive(getHealth, []);
+  const [running, setRunning] = useState(false);
   const run = async () => {
-    setResults(undefined);
-    setResults(await testConnections(chains, Object.fromEntries(chains.map((c) => [c, settings.stores[c]?.storeId]))));
+    // 0.10.5: each shop's result shows as soon as it's in.
+    setResults([]);
+    setRunning(true);
+    await testConnections(
+      chains,
+      Object.fromEntries(chains.map((c) => [c, settings.stores[c]?.storeId])),
+      (r) => setResults((cur) => [...(cur ?? []).filter((x) => x.chain !== r.chain), r]),
+    ).finally(() => setRunning(false));
   };
   useEffect(() => {
     void run();
@@ -908,10 +915,10 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
                           ? `Working: ${r.count} products in ${(r.ms / 1000).toFixed(1)} s`
                           : r.blocked
                             ? "Blocked: its website is checking for bots. That's its check, not Restock's."
-                            : `Not working: ${r.error}`}
+                            : `Not working: ${r.error}${r.unblock ? '. Its website may be checking for bots: try Unblock.' : ''}`}
                     </span>
                     {h?.lastOk && <span className="small">Last worked {timeAgo(h.lastOk)}</span>}
-                    {r && r.blocked && <UnblockButton chain={c} small onWorked={run} />}
+                    {r && (r.blocked || r.unblock) && <UnblockButton chain={c} small onWorked={run} />}
                   </span>
                 </div>
               );
@@ -920,7 +927,7 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
         </div>
       ))}
       {!chains.length && <p className="small">No shops picked yet. Choose them in Settings → My shops.</p>}
-      <button className="btn" disabled={!results} onClick={run}>
+      <button className="btn" disabled={running} onClick={run}>
         <Icon name="refresh" size={18} /> Test again
       </button>
       <p className="small">

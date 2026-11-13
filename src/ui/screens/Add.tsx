@@ -63,7 +63,7 @@ import { shopDetails } from '../../stores/details';
 import { BlockedError, isNative, NativeOnlyError, promoLabel } from '../../stores/http';
 import { CostcoLines } from '../CostcoLines';
 import { COSTCO_LIST_NOTE } from '../../lib/costcoLocal';
-import { isBlockedError, recordHealth } from '../../lib/health';
+import { isBlockedError, offerUnblock, recordHealth } from '../../lib/health';
 import { UnblockButton } from '../Unblock';
 import { isExactBarcode, rankAll, score, tokens, type RankQuery } from '../../stores/rank';
 import { chainName, mainProductIds, searchStoreId, stockKnown, type AlertLevel, type Chain, type Group, type ListEntry, type ListProduct } from '../../types';
@@ -149,7 +149,7 @@ type ChainResult =
       more?: boolean;
       loadingMore?: boolean;
     }
-  | { status: 'error'; message: string; blocked?: boolean };
+  | { status: 'error'; message: string; blocked?: boolean; unblock?: boolean };
 
 /** A shop sending back fewer than this on a page has no more to send. */
 const FULL_PAGE = 12;
@@ -371,7 +371,13 @@ export function AddScreen({
       }
       setResults((r) => ({
         ...r,
-        [chain]: { status: 'error', message: e instanceof Error ? e.message : String(e), blocked: e instanceof BlockedError || isBlockedError(e instanceof Error ? e.message : String(e)) },
+        [chain]: {
+          status: 'error',
+          message: e instanceof Error ? e.message : String(e),
+          blocked: e instanceof BlockedError || isBlockedError(e instanceof Error ? e.message : String(e)),
+          // 0.10.5: also when a hidden-browser shop doesn't answer.
+          unblock: e instanceof BlockedError || offerUnblock(chain, e instanceof Error ? e.message : String(e)),
+        },
       }));
     }
   };
@@ -1617,7 +1623,7 @@ export function AddScreen({
                         <button className="btn small" style={TAP} onClick={() => void searchChain(chain, lastText, rankQ, searchStoreId(settings, chain))}>
                           <Icon name="refresh" size={16} /> Try again
                         </button>
-                        {r.blocked && (
+                        {(r.blocked || r.unblock) && (
                           <UnblockButton small chain={chain} onWorked={() => void searchChain(chain, lastText, rankQ, searchStoreId(settings, chain))} />
                         )}
                       </div>

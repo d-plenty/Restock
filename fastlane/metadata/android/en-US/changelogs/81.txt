@@ -1,0 +1,1 @@
+Release candidate 6 (0.10.5): a redesigned Shopping list (the list's name is the list picker, one summary card with Compare, simpler rows, a sheet for each line, Got it folded), Test connections three shops at once and fair time limits, and Unblock for shops that never answer.

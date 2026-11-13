@@ -105,31 +105,88 @@ export interface ConnectionTest {
   error?: string;
   /** 0.10.4: the shop turned Restock away (403, or a "checking your browser" page). */
   blocked?: boolean;
+  /** 0.10.5: offer Unblock (blocked, or a hidden-browser shop that timed out or found nothing). */
+  unblock?: boolean;
 }
 
-/** Try a real search at each store, like adding an item would. */
 /** The word Restock searches for when testing a shop (0.10.3: Baby and Pets too). */
 export const TEST_WORD: Record<Section, string> = { pantry: 'milk', keg: 'beer', pharmacy: 'paracetamol', baby: 'nappies', pets: 'dog food' };
 
-export async function testConnections(chains: StoreChain[], storeIds: Partial<Record<StoreChain, string | undefined>>): Promise<ConnectionTest[]> {
-  const results = await Promise.all(
-    // 0.9.6: never Costco: it is only searched one page at a time, when a person presses Search.
-    chains.filter((c) => !isPressOnlyShop(c)).map(async (chain): Promise<ConnectionTest> => {
-      const t0 = Date.now();
-      const word = TEST_WORD[sectionOf(chain)];
-      try {
-        // Shop websites read through the hidden browser can take a while to draw.
-        const items = await withTimeout(adapterFor(chain)!.search(word, storeIds[chain]), kindOf(chain) === 'web' ? 75_000 : 30_000);
-        if (!items.length) return { chain, ok: false, ms: Date.now() - t0, error: `The shop answered but found nothing for "${word}"` };
-        return { chain, ok: true, count: items.length, ms: Date.now() - t0 };
-      } catch (e) {
-        const error = e instanceof Error ? e.message : String(e);
-        return { chain, ok: false, ms: Date.now() - t0, error, blocked: e instanceof BlockedError || isBlockedError(error) };
-      }
-    }),
-  );
+/** 0.10.5: shops read through the hidden browser (their website, or Dan Murphy's/BWS falling back to it). */
+export const usesBrowser = (chain: StoreChain): boolean => {
+  const k = kindOf(chain) ?? 'web';
+  return k === 'web' || k === 'endeavour';
+};
+
+/**
+ * 0.10.5: when to offer Unblock. A clear block (403, a "checking your browser" page), and also, for a
+ * shop read through the hidden browser, a search that never answers or finds nothing for its test
+ * word: a bottle shop with no beer is a shop whose check never cleared, not an empty shop.
+ * Errors saved by older versions ("found nothing for "beer"") count too.
+ */
+export function offerUnblock(chain: StoreChain | string, error: string | undefined): boolean {
+  if (!error) return false;
+  if (isBlockedError(error)) return true;
+  if (chain === 'other' || !usesBrowser(chain as StoreChain)) return false;
+  return /no answer after|found nothing for|nothing came back/i.test(error);
+}
+
+/** 0.10.5: how many shops are tested at once (the phone's hidden browser opens this many pages at once). */
+export const TEST_AT_ONCE = 3;
+
+/** How long one shop gets, counted from when its own test starts (not from pressing Test). */
+export function testTimeoutMs(chain: StoreChain): number {
+  const k = kindOf(chain) ?? 'web';
+  return k === 'web' ? 75_000 : k === 'endeavour' ? 60_000 : 30_000;
+}
+
+/** Run `jobs` with at most `n` going at once, in order. */
+export async function inTurns<T, R>(items: T[], n: number, job: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await job(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+  return out;
+}
+
+/**
+ * Try a real search at each store, like adding an item would. 0.10.5: three at a time, quick shops
+ * first, each shop's clock starting when its own turn comes; `onEach` hears each result as it lands.
+ */
+export async function testConnections(
+  chains: StoreChain[],
+  storeIds: Partial<Record<StoreChain, string | undefined>>,
+  onEach?: (r: ConnectionTest) => void,
+): Promise<ConnectionTest[]> {
+  // 0.9.6: never Costco: it is only searched one page at a time, when a person presses Search.
+  const todo = chains.filter((c) => !isPressOnlyShop(c));
+  // The shops with their own app data answer in a second or so: do them first.
+  const ordered = [...todo.filter((c) => !usesBrowser(c)), ...todo.filter((c) => usesBrowser(c))];
+  const results = await inTurns(ordered, TEST_AT_ONCE, async (chain): Promise<ConnectionTest> => {
+    const t0 = Date.now();
+    const word = TEST_WORD[sectionOf(chain)];
+    let r: ConnectionTest;
+    try {
+      const items = await withTimeout(adapterFor(chain)!.search(word, storeIds[chain]), testTimeoutMs(chain));
+      r = items.length
+        ? { chain, ok: true, count: items.length, ms: Date.now() - t0 }
+        : { chain, ok: false, ms: Date.now() - t0, error: `The shop answered but found nothing for "${word}"` };
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      r = { chain, ok: false, ms: Date.now() - t0, error, blocked: e instanceof BlockedError || isBlockedError(error) };
+    }
+    if (!r.ok) r.unblock = !!r.blocked || offerUnblock(chain, r.error);
+    onEach?.(r);
+    return r;
+  });
   await recordHealth(Object.fromEntries(results.map((r) => [r.chain, r.ok ? null : (r.error ?? 'failed')])));
-  return results;
+  // Back in the order asked for.
+  return todo.map((c) => results.find((r) => r.chain === c)!);
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {

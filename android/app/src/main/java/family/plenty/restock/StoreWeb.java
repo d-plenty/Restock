@@ -338,7 +338,8 @@ final class StoreWeb implements StoreClient.WebFetcher {
         pageStatus = 200;
         ensureWebView();
         main.post(() -> web.loadUrl(url));
-        if (!latch.await(40, TimeUnit.SECONDS)) Log.w(TAG, chain + " page slow to load; reading what's there");
+        // 0.10.5: 25 seconds (was 40). A page that slow is read as it is.
+        if (!latch.await(25, TimeUnit.SECONDS)) Log.w(TAG, chain + " page slow to load; reading what's there");
         loadedAt = System.currentTimeMillis();
         // A bot check ("Just a moment…", "Checking your browser") usually clears itself and then
         // loads the real page. Give it up to about 15 seconds before reading anything.
@@ -359,6 +360,8 @@ final class StoreWeb implements StoreClient.WebFetcher {
             boolean hasPrices = parts.length > 1 && (!parts[0].equals("0") || !parts[1].equals("0"));
             steady = now.equals(last) ? steady + 1 : 0;
             if (hasPrices && steady >= 2) break;
+            // 0.10.5: a page with no prices that has stopped changing is done (it waited the full 11 s).
+            if (!hasPrices && steady >= 4) break;
             last = now;
             Thread.sleep(700);
         }
@@ -481,9 +484,10 @@ final class StoreWeb implements StoreClient.WebFetcher {
                         pageUrl = url;
                         // Give the site's own bot check a moment to finish (it may reload the page).
                         final CountDownLatch l = pageLatch;
+                        // 0.10.5: 1.2 s (was 2.5). A check still showing is waited out below.
                         main.postDelayed(() -> {
                             if (l != null) l.countDown();
-                        }, 2500);
+                        }, 1200);
                     }
                 });
             }
