@@ -43,7 +43,7 @@ import {
   stopUsingWoolworths,
 } from '../../lib/accounts';
 import { confirmAction } from '../../lib/confirm';
-import { BETA_NOTE, BETA_SECTIONS, BetaTag, ChainDot, Icon, LoadingBar, Sheet, TopBar } from '../components';
+import { BETA_NOTE, BETA_SECTIONS, BetaTag, ChainDot, Icon, LoadingBar, Sheet, TopBar, SearchField } from '../components';
 import { useNav } from '../nav';
 import { money } from '../../lib/units';
 import {
@@ -263,13 +263,7 @@ function NearbyFinder({ settings, section, only }: { settings: Settings; section
             if (q.trim()) void search();
           }}
         >
-          <input
-            className="input"
-            placeholder="Or type a suburb or postcode"
-            aria-label="Suburb or postcode"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+          <SearchField placeholder="Or type a suburb or postcode" aria-label="Suburb or postcode" value={q} onValue={setQ} />
           <button className="btn" type="submit" aria-label="Search" style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }} disabled={!!busy}>
             <Icon name="search" />
           </button>

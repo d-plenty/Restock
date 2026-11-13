@@ -1,0 +1,1 @@
+Release candidate 7 (0.10.6): fixes only. Shopping list: Edit and Open all back where you can see them, Share on every shop (Woolworths and Coles: their app or as text). Every search box has a magnifying glass and an X to clear it. No more words broken in two at big text. Dan Murphy's no longer says it's blocked when it isn't.

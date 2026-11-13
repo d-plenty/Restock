@@ -652,7 +652,8 @@ button.dk-tile:hover {
   min-width: 200px;
   color: var(--muted);
 }
-.dk-search svg {
+.dk-search > svg,
+.dk-search .search-field > svg {
   position: absolute;
   left: 14px;
 }

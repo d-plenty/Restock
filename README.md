@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.5" src="https://img.shields.io/badge/status-release%20candidate%200.10.5-ffcd00">
+  <img alt="Release candidate 0.10.6" src="https://img.shields.io/badge/status-release%20candidate%200.10.6-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0105">New in 0.10.5</a> ·
+  <a href="#new-in-0106">New in 0.10.6</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -130,6 +130,24 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.6
+
+Release candidate 7: fixes only, no new features.
+
+- **Shopping list, easier to use:**
+  - **Edit** (the pencil next to the list's name) is back where you can see it. It was *Select items*, hidden in the ⋯ menu.
+  - **Open all / Close all** sits above the shops again.
+  - **Every shop has its own Share button again.** For Woolworths and Coles it asks: **Send to the app** or **Share as text**. Other shops share as text straight away.
+  - The ⋯ button is now **View options** (the sliders): By shop, Aisle group or One list; Best value or Lowest price; and Share the whole list as text.
+  - **Start shopping** stays down by the tabs on a short list (it used to float halfway up the screen).
+  - When you're picking items, the tick boxes and names are a proper finger size to tap.
+- **Search boxes:** every one has a magnifying glass inside it, and an **X** to clear it once you've typed something. That's Add, Pantry, Settings, Pick my …, Move to, Your data, Cards, finding a branch, and the web page.
+- **No more words broken in two at big text sizes.** Tab buttons such as Add's *Pantry · Keg · Health · Baby* keep each word whole and scroll sideways if they have to. The list's name gets smaller before it's cut short.
+- **Dan Murphy's and BWS:**
+  - Searching a whole department such as **beer** now asks the way the shop's own pages do, so it finds products.
+  - Finding nothing no longer counts as "blocked", so the "isn't letting Restock in" warning and Unblock only show for a real refusal.
+- **Credits and README:** "A Plenty Technologies project" is gone. The Diagnostics probe tool says "Send this file to the developer".
 
 ## New in 0.10.5
 
@@ -334,7 +352,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.5.apk` (on macOS, `shasum -a 256 restock-0.10.5.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.6.apk` (on macOS, `shasum -a 256 restock-0.10.6.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -520,7 +538,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is at its **fifth release candidate** (0.10.4): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is at its **seventh release candidate** (0.10.6): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.
@@ -633,4 +651,4 @@ Restock isn't connected with, endorsed by or paid by any supermarket, bottle sho
 [hotprices-au](https://github.com/Javex/hotprices-au) (used by the restock-prices collector) ·
 Food Standards Australia New Zealand, Product Safety Australia and the TGA for publishing recalls openly.
 
-<p align="center"><sub>Made in Australia, for Australian shoppers. A <strong>Plenty Technologies</strong> project.</sub></p>
+<p align="center"><sub>Made in Australia, for Australian shoppers.</sub></p>

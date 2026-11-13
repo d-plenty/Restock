@@ -57,7 +57,7 @@ export function Credits() {
       </span>
       <List items={CODE} />
       <p className="small" style={{ margin: 0 }}>
-        Shop prices come from each shop's own website. Restock isn't connected with any shop. A Plenty Technologies project, made in Australia.
+        Shop prices come from each shop's own website. Restock isn't connected with any shop. Made in Australia, for Australian shoppers.
       </p>
     </div>
   );

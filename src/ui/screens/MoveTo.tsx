@@ -5,7 +5,7 @@ import { listOfLine, moveAll, moveFacts, moveNote, moveTo, pickableFor, pickMove
 import { useLive } from '../../lib/useLive';
 import { LIST_NAMES, type ListSection } from '../../shops';
 import { chainName, type ListEntry } from '../../types';
-import { Icon, Sheet } from '../components';
+import { Icon, Sheet, SearchField } from '../components';
 
 /**
  * 0.9.6: "Move to" another list, from a line's details (phone and web, List.tsx EditEntry). Each
@@ -26,10 +26,7 @@ export function MoveToSheet({ entry, name, lists, onClose }: { entry: ListEntry;
         <p className="small" style={{ margin: 0 }}>
           "{name}" is on {LIST_NAMES[picking.to]} now. Which {LIST_NAMES[picking.to]} item is it? Restock then shows its price and cheapest shop.
         </p>
-        <div className="settings-search">
-          <Icon name="search" size={18} />
-          <input className="input" type="search" value={query} placeholder={`Search ${LIST_NAMES[picking.to]}`} aria-label={`Search ${LIST_NAMES[picking.to]} items`} onChange={(e) => setQuery(e.target.value)} />
-        </div>
+        <SearchField value={query} placeholder={`Search ${LIST_NAMES[picking.to]}`} aria-label={`Search ${LIST_NAMES[picking.to]} items`} onValue={setQuery} />
         <div className="card flush">
           {shown.map((g) => (
             <button

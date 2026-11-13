@@ -128,6 +128,10 @@ export function offerUnblock(chain: StoreChain | string, error: string | undefin
   if (!error) return false;
   if (isBlockedError(error)) return true;
   if (chain === 'other' || !usesBrowser(chain as StoreChain)) return false;
+  // 0.10.6: Dan Murphy's and BWS answer from inside their own page even when their data turns the
+  // app away, so "found nothing" there is an answer, not a check that never cleared. Only a real
+  // refusal (above), or no answer at all, offers Unblock for them.
+  if (kindOf(chain as StoreChain) === 'endeavour') return /no answer after/i.test(error);
   return /no answer after|found nothing for|nothing came back/i.test(error);
 }
 

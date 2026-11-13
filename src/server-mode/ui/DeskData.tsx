@@ -10,7 +10,7 @@ import { useLive } from '../../lib/useLive';
 import { money } from '../../lib/units';
 import { monthsWord } from '../../lib/autoDelete';
 import { chainName, SECTION_NAMES } from '../../shops';
-import { Icon } from '../../ui/components';
+import { Icon, SearchField } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { householdInfo } from '../live';
 import { HousePage } from './DeskServer';
@@ -115,24 +115,20 @@ function PriceOverTime({ period, pick, onPick, top }: { period: Period; pick?: s
           <label className="sr-only" htmlFor="dd-find">
             Find an item
           </label>
-          <span className="dk-search dd-find">
-            <Icon name="search" size={18} />
-            <input
-              id="dd-find"
-              className="input"
-              type="search"
-              placeholder="Find an item"
-              value={find}
-              aria-describedby="dd-find-count"
-              onChange={(e) => {
-                setFind(e.target.value);
-                // The first that matches shows straight away.
-                const w = e.target.value.trim().toLowerCase();
-                const first = w ? items.find((g) => g.name.toLowerCase().includes(w)) : undefined;
-                if (first) onPick(first.id);
-              }}
-            />
-          </span>
+          <SearchField
+            className="dd-find"
+            id="dd-find"
+            placeholder="Find an item"
+            value={find}
+            aria-describedby="dd-find-count"
+            onValue={(v) => {
+              setFind(v);
+              // The first that matches shows straight away.
+              const w = v.trim().toLowerCase();
+              const first = w ? items.find((g) => g.name.toLowerCase().includes(w)) : undefined;
+              if (first) onPick(first.id);
+            }}
+          />
           <span id="dd-find-count" className="dk-sub" aria-live="polite">
             {find ? (shown.length === 0 ? 'No items match.' : `${shown.length} match${shown.length === 1 ? 'es' : ''}`) : ''}
           </span>

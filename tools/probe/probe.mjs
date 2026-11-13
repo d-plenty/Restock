@@ -170,5 +170,5 @@ await ctx.close();
 writeFileSync(join(out, 'all.json'), JSON.stringify(results, null, 1));
 const archive = `${out}.tar.gz`;
 execFileSync('tar', ['-czf', archive, '-C', dirname(out), out.split('/').pop()]);
-console.log(`\nDone. Send this file to Claude:\n  ${archive}`);
+console.log(`\nDone. Send this file to the developer:\n  ${archive}`);
 if (!existsSync(archive)) process.exitCode = 1;

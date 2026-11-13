@@ -918,3 +918,7 @@ Nothing new between phones and servers. On the phone only (never synced, never i
 ## 0.10.4: what changed on the wire
 
 Nothing new between phones and servers. On the phone only (never synced): the store entry `hiddenShopWarnings` (`{ "<chain>": "<until, ISO time>" }`, Hide for a day, at most 24 hours ahead) and `storeHealth` errors from a shop that turned Restock away (403 or a bot check) are shown as "blocked", with Unblock (Unblock.tsx, health.ts).
+
+## 0.10.6: what changed on the wire
+
+Nothing. Fixes only (the Shopping list's buttons, search boxes, big text, Dan Murphy's and BWS departments).

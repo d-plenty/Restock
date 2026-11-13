@@ -13,7 +13,8 @@ describe('offering Unblock', () => {
     expect(offerUnblock('cellarbrations', 'No answer after 75 seconds')).toBe(true);
     expect(offerUnblock('danmurphys', 'No answer after 30 seconds')).toBe(true);
     // Saved by 0.10.4 and older.
-    expect(offerUnblock('danmurphys', 'The shop answered but found nothing for "beer"')).toBe(true);
+    // 0.10.6: Dan Murphy's finding nothing is an answer, not a check (endeavour0106.test.ts).
+    expect(offerUnblock('danmurphys', 'The shop answered but found nothing for "beer"')).toBe(false);
   });
   it('not for shops with their own app data, or no error', () => {
     expect(offerUnblock('woolworths', 'No answer after 30 seconds')).toBe(false);

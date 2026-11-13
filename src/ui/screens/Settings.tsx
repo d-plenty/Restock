@@ -26,7 +26,7 @@ import { useLive } from '../../lib/useLive';
 import { money } from '../../lib/units';
 import { STALE_DAYS } from '../../lib/verdict';
 import { chainName, CHECK_INTERVALS, GOOD_SALE, GREAT_SALE, historyLabel, WEEKDAYS, type Settings } from '../../types';
-import { ChainDot, Explain, Icon, Logo, Sheet, timeAgo, TopBar } from '../components';
+import { ChainDot, Explain, Icon, Logo, Sheet, timeAgo, TopBar, SearchField } from '../components';
 import { UnblockButton } from '../Unblock';
 import { AccessibilitySettings, LookSettings } from './Look';
 import { AutoBackupSettings } from './Backups';
@@ -270,21 +270,8 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       <TopBar title={page ? SETTINGS_PAGES[page].title : 'Settings'} />
       {!page && (
         <>
-          <div className="settings-search" data-keep="1">
-            <Icon name="search" size={18} />
-            <input
-              className="input"
-              type="search"
-              placeholder="Search settings"
-              aria-label="Search settings"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            {query && (
-              <button className="icon-btn" aria-label="Clear search" onClick={() => setQuery('')}>
-                <Icon name="close" size={16} />
-              </button>
-            )}
+          <div data-keep="1">
+            <SearchField placeholder="Search settings" aria-label="Search settings" value={query} onValue={setQuery} />
           </div>
           {query.trim() && matches === 0 && (
             <p className="small" data-keep="1">

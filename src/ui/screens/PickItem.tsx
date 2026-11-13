@@ -8,7 +8,7 @@ import { enabledIn, SECTION_PLACE, type Section } from '../../shops';
 import { isNative } from '../../stores/http';
 import { serverMode, serverUi } from '../../server-mode/flag'; // 0.9.5 (web search)
 import type { ListEntry } from '../../types';
-import { Icon, Sheet, useBackLayer } from '../components';
+import { Icon, Sheet, useBackLayer, SearchField } from '../components';
 import { useNav } from '../nav';
 import type { ForLine } from './Add';
 import { alwaysWords } from './addPickWords';
@@ -203,17 +203,7 @@ export function PickItemSheet({
         {fromHa ? `"${entry.text}" came from Home Assistant. ` : ''}Which of the items in {place} is it? Or search the shops for it. Restock then shows its
         price and cheapest shop{fromHa ? ', and Home Assistant gets its name.' : '.'}
       </p>
-      <div className="settings-search">
-        <Icon name="search" size={18} />
-        <input
-          className="input"
-          type="search"
-          value={query}
-          placeholder={`Search ${place}`}
-          aria-label={`Search ${place}`}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
+      <SearchField value={query} placeholder={`Search ${place}`} aria-label={`Search ${place}`} onValue={setQuery} />
       <label className="check" style={{ padding: '4px 2px', minHeight: 44 }}>
         <input type="checkbox" checked={always} onChange={(e) => setAlways(e.target.checked)} />
         <span>{alwaysWords(word)}</span>

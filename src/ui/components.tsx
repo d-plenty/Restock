@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { nameHasSize } from '../lib/naming';
 import { RestockNative } from '../lib/sql/native';
@@ -1309,6 +1309,43 @@ export function CheckedAgo({ date, source }: { date?: string; source?: string })
   return (
     <span className={`checked-ago${old ? ' old' : ''}`} title={old ? 'This price may be out of date' : undefined}>
       {word} {when}
+    </span>
+  );
+}
+
+/**
+ * 0.10.6: every search box looks the same: a magnifying glass inside it, so it reads as a search
+ * box, and an X once something's typed, to empty it in one tap (the focus stays in the box).
+ */
+export function SearchField({
+  value,
+  onValue,
+  className,
+  style,
+  ...rest
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type' | 'className'> & {
+  value: string;
+  onValue: (v: string) => void;
+  className?: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <span className={`search-field${className ? ` ${className}` : ''}`} style={style}>
+      <Icon name="search" size={18} />
+      <input ref={ref} className="input" type="search" value={value} onChange={(e) => onValue(e.target.value)} {...rest} />
+      {value && (
+        <button
+          type="button"
+          className="search-clear"
+          aria-label="Clear"
+          onClick={() => {
+            onValue('');
+            ref.current?.focus();
+          }}
+        >
+          <Icon name="close" size={16} />
+        </button>
+      )}
     </span>
   );
 }

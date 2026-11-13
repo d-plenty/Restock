@@ -12,6 +12,7 @@ import { PERIODS, type DataSeries, type DataStats, type Period } from '../../ser
 import { isNative } from '../../stores/http';
 import { chainName } from '../../shops';
 import { useNav } from '../nav';
+import { SearchField } from '../components';
 
 // 0.9.14: Settings → Your data, the phone's version of the server's Data tab: what you spent (from
 // what you tick off), where, what specials saved, any item's price over time, and what's stored.
@@ -202,7 +203,7 @@ export function YourData() {
           </p>
         ) : (
           <>
-            <input className="input" type="search" placeholder="Find an item" aria-label="Find an item" value={find} onChange={(e) => setFind(e.target.value)} />
+            <SearchField placeholder="Find an item" aria-label="Find an item" value={find} onValue={setFind} />
             <select className="input" aria-label="Item" value={itemId ?? ''} onChange={(e) => setItemId(e.target.value)}>
               {itemId && !shown.some((g) => g.id === itemId) && <option value={itemId}>{items.find((g) => g.id === itemId)?.name ?? 'This item'}</option>}
               {shown.map((g) => (

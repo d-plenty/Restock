@@ -302,6 +302,8 @@ export function ListScreen() {
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [menu, setMenu] = useState(false);
+  // 0.10.6: a shop card's Share for Woolworths or Coles: their app, or as text.
+  const [sharing, setSharing] = useState<'woolworths' | 'coles'>();
   // 0.10.5: the list picker is a dropdown under the list's name (it was a row of pills).
   const [switching, setSwitching] = useState(false);
   // 0.10.5: Compare shops (the "where to shop" card) is a sheet off the summary card.
@@ -481,8 +483,11 @@ export function ListScreen() {
       <Hold key={e.id} onLong={() => previewOf(e) && !selecting && setPreview(e)}>
         <div className={`row list-row${isPicked ? ' selected' : ''}${e.checked && !selecting ? ' got' : ''}`}>
           {selecting ? (
-            <button className={`pick${isPicked ? ' on' : ''}`} onClick={() => pick(e.id)} aria-pressed={isPicked} aria-label={`Select ${title}`}>
-              {isPicked && <Icon name="check" size={16} />}
+            // 0.10.6: a finger-sized button around the little box (it was only the 24 px box).
+            <button className="tick-hit pick-hit" onClick={() => pick(e.id)} aria-pressed={isPicked} aria-label={`Select ${title}`}>
+              <span className={`pick${isPicked ? ' on' : ''}`} aria-hidden>
+                {isPicked && <Icon name="check" size={16} />}
+              </span>
             </button>
           ) : (
             <label className="tick-hit">
@@ -540,7 +545,7 @@ export function ListScreen() {
     <div className="screen" {...full.props}>
       {full.indicator}
       {full.status}
-      {/* 0.10.5: the list's name is the list picker (a dropdown), with one ⋯ for everything else. */}
+      {/* 0.10.5: the list's name is the list picker (a dropdown). 0.10.6: then Edit, and the view options. */}
       <div className="list-top">
         {sectionsOn.length > 1 && !selecting && <span className="eyebrow list-top-eyebrow">Shopping list · tap to switch</span>}
         <div className="list-top-row">
@@ -555,7 +560,8 @@ export function ListScreen() {
               <Icon name={section} size={22} />
               <span className="list-switch-name">{LIST_NAMES[section]}</span>
               <span className="list-switch-pill">
-                Switch <span className={switching ? 'turn-up' : 'turn-down'}><Icon name="chevron" size={14} /></span>
+                {/* 0.10.6: just the arrow (the word made room for "Groce…" only, beside Edit). */}
+                <span className={switching ? 'turn-up' : 'turn-down'}><Icon name="chevron" size={16} /></span>
               </span>
             </button>
           ) : (
@@ -567,9 +573,16 @@ export function ListScreen() {
                 Done
               </button>
             ) : (
-              <button className="icon-btn" aria-label="List options" onClick={() => setMenu(true)}>
-                <Icon name="more" size={20} />
-              </button>
+              // 0.10.6: Edit (pick items to move, delete or tick) out where it's seen, and the view
+              // options behind the sliders.
+              <>
+                <button className="icon-btn" aria-label="Edit the list: pick items" onClick={() => setSelecting(true)}>
+                  <Icon name="pencil" size={20} />
+                </button>
+                <button className="icon-btn" aria-label="View options: by shop, aisle group, one list" onClick={() => setMenu(true)}>
+                  <Icon name="sliders" size={20} />
+                </button>
+              </>
             ))}
         </div>
         {switching && !selecting && (
@@ -737,6 +750,17 @@ export function ListScreen() {
             </section>
           ))}
 
+      {/* 0.10.6: Open all / Close all, out where it's seen (it was in the ⋯ menu). */}
+      {view === 'shop' && shopsInList.length > 1 && !selecting && (
+        <div className="list-head">
+          <span className="eyebrow" style={{ margin: 0 }}>
+            Your list by shop
+          </span>
+          <button className="linkish" onClick={() => setOpenShops(allOpen ? new Set() : new Set(shopsInList))}>
+            {allOpen ? 'Close all' : 'Open all'} <span className={allOpen ? 'turn-up' : 'turn-down'}><Icon name="chevron" size={14} /></span>
+          </button>
+        </div>
+      )}
       {view === 'shop' &&
         c.order.map((shop) => {
           const items = open.filter((e) => shopOf(c, e) === shop);
@@ -771,7 +795,21 @@ export function ListScreen() {
                   </span>
                 )}
                 <span className="num price-col">{sub > 0 ? money(sub) : ''}</span>
-                {/* 0.10.5: Send to the shop's app and Share are in the list's ⋯ menu. */}
+                {/* 0.10.6: every shop's list has Share again. Woolworths and Coles ask: their app, or as text. */}
+                {!selecting && (
+                  <button
+                    className="icon-btn"
+                    style={{ width: 36, height: 36 }}
+                    aria-label={`Share the ${shop === 'any' ? 'any shop' : chainName(shop)} list`}
+                    onClick={async () => {
+                      if (shop === 'woolworths' || shop === 'coles') return setSharing(shop);
+                      const how = await shareText(listAsText(c, open, shop));
+                      nav.toast(how === 'shared' ? 'Shared' : 'Copied, ready to paste');
+                    }}
+                  >
+                    <Icon name="share" size={16} />
+                  </button>
+                )}
                 {shopsInList.length > 1 && !selecting && (
                   <button
                     className="icon-btn"
@@ -909,7 +947,7 @@ export function ListScreen() {
       )}
 
       {menu && (
-        <Sheet title="List options" onClose={() => setMenu(false)}>
+        <Sheet title="View options" onClose={() => setMenu(false)}>
           <div className="field">
             <span>Show</span>
             <div className="seg" role="group" aria-label="View">
@@ -937,29 +975,6 @@ export function ListScreen() {
               </div>
             </div>
           )}
-          {view === 'shop' && shopsInList.length > 1 && (
-            <button
-              className="btn"
-              onClick={() => {
-                setOpenShops(allOpen ? new Set() : new Set(shopsInList));
-                setMenu(false);
-              }}
-            >
-              <span className={allOpen ? 'turn-up' : 'turn-down'}>
-                <Icon name="chevron" size={18} />
-              </span>{' '}
-              {allOpen ? 'Fold all shops' : 'Open all shops'}
-            </button>
-          )}
-          <button
-            className="btn"
-            onClick={() => {
-              setMenu(false);
-              setSelecting(true);
-            }}
-          >
-            <Icon name="pencil" size={18} /> Select items
-          </button>
           <button
             className="btn"
             onClick={async () => {
@@ -970,38 +985,32 @@ export function ListScreen() {
           >
             <Icon name="share" size={18} /> Share the whole list as text
           </button>
-          {/* 0.10.5: moved here from each shop's heading. */}
-          {shopsInList.length > 1 && (
-            <div className="chips" role="group" aria-label="Share one shop's list">
-              {shopsInList.map((shop) => (
-                <button
-                  key={shop}
-                  className="chip"
-                  onClick={async () => {
-                    const how = await shareText(listAsText(c, open, shop));
-                    setMenu(false);
-                    nav.toast(how === 'shared' ? 'Shared' : 'Copied, ready to paste');
-                  }}
-                >
-                  <Icon name="share" size={14} /> {shop === 'any' ? 'Any shop' : chainName(shop)}
-                </button>
-              ))}
-            </div>
-          )}
-          {(['woolworths', 'coles'] as const)
-            .filter((shop) => shopsInList.includes(shop))
-            .map((shop) => (
-              <button
-                key={shop}
-                className="btn"
-                onClick={() => {
-                  setMenu(false);
-                  setSending(shop);
-                }}
-              >
-                <Icon name="cartPlus" size={18} /> Send the {chainName(shop)} list to the {chainName(shop)} app
-              </button>
-            ))}
+        </Sheet>
+      )}
+
+      {sharing && (
+        <Sheet title={`Share the ${chainName(sharing)} list`} onClose={() => setSharing(undefined)}>
+          <button
+            className="btn primary block"
+            onClick={() => {
+              const shop = sharing;
+              setSharing(undefined);
+              setSending(shop);
+            }}
+          >
+            <Icon name="cartPlus" size={18} /> Send to the {chainName(sharing)} app
+          </button>
+          <button
+            className="btn block"
+            onClick={async () => {
+              const shop = sharing;
+              setSharing(undefined);
+              const how = await shareText(listAsText(c, open, shop));
+              nav.toast(how === 'shared' ? 'Shared' : 'Copied, ready to paste');
+            }}
+          >
+            <Icon name="share" size={18} /> Share as text
+          </button>
         </Sheet>
       )}
 

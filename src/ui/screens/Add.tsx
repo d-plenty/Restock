@@ -92,20 +92,7 @@ const SEARCH_PLACEHOLDER: Record<Section, string> = {
 };
 /** Small buttons and links still get a 44 px target. */
 const TAP: CSSProperties = { minHeight: 44 };
-import {
-  ChainDot,
-  ChainName,
-  Hold,
-  Icon,
-  LoadingBar,
-  MemberTag,
-  MoreInfo,
-  ProductPreview,
-  Sheet,
-  Thumb,
-  TopBar,
-  type PreviewProduct,
-} from '../components';
+import { ChainDot, ChainName, Hold, Icon, LoadingBar, MemberTag, MoreInfo, ProductPreview, Sheet, Thumb, TopBar, type PreviewProduct, SearchField } from '../components';
 import { useNav } from '../nav';
 import { OtherSizesCard } from '../OtherSizes';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from './addPicks';
@@ -1190,15 +1177,7 @@ export function AddScreen({
         }}
         style={{ display: 'flex', gap: 8 }}
       >
-        <input
-          className="input"
-          type="search"
-          placeholder={SEARCH_PLACEHOLDER[section]}
-          aria-label={`Search ${SECTION_SHOPS[section]}`}
-          enterKeyHint="search"
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-        />
+        <SearchField placeholder={SEARCH_PLACEHOLDER[section]} aria-label={`Search ${SECTION_SHOPS[section]}`} enterKeyHint="search" value={term} onValue={setTerm} />
         <button className="btn" type="submit" aria-label="Search" style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }}>
           <Icon name="search" />
         </button>

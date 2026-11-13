@@ -21,7 +21,7 @@ import { ensureNotificationPermission } from '../../lib/notify';
 import type { CardProgram, GiftBarcodeType, GiftCard, LoyaltyCard } from '../../types';
 import { searchBrands, type CardBrand } from '../../lib/cardBrands';
 import { CardCode } from './CardCode';
-import { Icon, Sheet } from '../components';
+import { Icon, Sheet, SearchField } from '../components';
 import { useNav } from '../nav';
 
 export const PROGRAMS: Record<CardProgram, { name: string; use: string }> = {
@@ -281,21 +281,16 @@ function LoyaltyFields({ store, onAdded }: { store: CardStore; onAdded: (id: str
     <>
       {back(2)}
       <div className="eyebrow">Step 3 of 3 · Whose card is it?</div>
-      <div className="settings-search">
-        <Icon name="search" size={18} />
-        <input
-          className="input"
-          type="search"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setBrand(undefined);
-            setOther(false);
-          }}
-          placeholder="Type the shop, like Bunnings"
-          aria-label="Search for the card's shop"
-        />
-      </div>
+      <SearchField
+        value={q}
+        onValue={(v) => {
+          setQ(v);
+          setBrand(undefined);
+          setOther(false);
+        }}
+        placeholder="Type the shop, like Bunnings"
+        aria-label="Search for the card's shop"
+      />
       <div className="card flush cc-brands" role="list">
         {found.map((b) => (
           <button key={b.id} type="button" role="listitem" className="row" aria-pressed={brand?.id === b.id} onClick={() => (setBrand(b), setOther(false))}>

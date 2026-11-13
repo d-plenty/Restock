@@ -9,7 +9,7 @@ import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import { bothPrices, tiedWithBest, type Recommendation } from '../../lib/verdict';
 import { chainName, LEARNING_DAYS } from '../../types';
-import { BETA_NOTE, BETA_SECTIONS, betaFor, Hold, Icon, MoreInfo, stockWhere, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, Thumb } from '../components';
+import { BETA_NOTE, BETA_SECTIONS, betaFor, Hold, Icon, MoreInfo, stockWhere, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, Thumb, SearchField } from '../components';
 import { ActionInfoTag } from '../tagInfo';
 import { useNav } from '../nav';
 import { SECTION_NAMES, type Section } from '../../shops';
@@ -226,20 +226,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       </div>
       {/* 0.10.0: what Beta means, until it's been read once on this tab. */}
       <BetaHint section={section} />
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
-        <span style={{ position: 'absolute', left: 14, color: 'var(--muted)', display: 'flex' }}>
-          <Icon name="search" size={18} />
-        </span>
-        <input
-          className="input"
-          type="search"
-          placeholder={SEARCH_HINT[section]}
-          aria-label={SEARCH_HINT[section]}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          style={{ paddingLeft: 40 }}
-        />
-      </label>
+      <SearchField placeholder={SEARCH_HINT[section]} aria-label={SEARCH_HINT[section]} value={q} onValue={setQ} />
       {recs.length > 0 && (
         <div className="chips" role="group" aria-label="Filter and sort">
           <button className="chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>

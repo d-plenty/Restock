@@ -177,6 +177,16 @@ const inBrowser =
   (o) =>
     viaBrowser(chain, o.method ?? 'GET', o.url, o.body);
 
+/** A list of products, or nothing (an answer that isn't a list is nothing; a refusal is still thrown). */
+function readList(chain: 'danmurphys' | 'bws', name: string, res: HttpResult): StoreProduct[] {
+  try {
+    return flattenEndeavour(chain, parseJson<Raw>(name, res));
+  } catch (err) {
+    if (err instanceof BlockedError) throw err;
+    return [];
+  }
+}
+
 async function browse(chain: 'danmurphys' | 'bws', location: string, headers: Record<string, string>, send: Send, page = 1): Promise<StoreProduct[]> {
   const e = ENDEAVOUR[chain];
   // "/beer/all" is the whole beer department.
@@ -194,7 +204,27 @@ async function browse(chain: 'danmurphys' | 'bws', location: string, headers: Re
   if (sub) q.set('subDepartment', sub.replace(/-/g, ' '));
   if (category) q.set('category', category);
   const res = await send({ url: `${e.api}/Browse?${q}`, headers });
-  const out = flattenEndeavour(chain, parseJson<Raw>(e.name, res));
+  let out = readList(chain, e.name, res);
+  // 0.10.6: the shop's own pages ask for a department with a POST. If the GET doesn't bring
+  // products back (it can answer empty, or not at all, from inside the shop's page), ask that way.
+  if (!out.length) {
+    const body = {
+      department,
+      ...(sub ? { subDepartment: sub.replace(/-/g, ' ') } : {}),
+      ...(category ? { category } : {}),
+      filters: [],
+      pageNumber: page,
+      pageSize: 40,
+      sortType: 'Browse_Relevance_LocalSales',
+      Location: path,
+    };
+    out = await send({ url: `${e.api}/Browse`, method: 'POST', headers, body })
+      .then((r) => readList(chain, e.name, r))
+      .catch((err) => {
+        if (err instanceof BlockedError) throw err;
+        return [] as StoreProduct[];
+      });
+  }
   if (out.length || sub) return out;
   // A whole department's page ("/beer") is made of lists: best sellers and specials.
   const lists = await Promise.all(

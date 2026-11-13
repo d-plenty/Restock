@@ -4987,3 +4987,108 @@ html.on-welcome #root {
   text-overflow: ellipsis;
   max-width: 100%;
 }
+
+/* 0.10.6: a short list keeps Start shopping down on the tabs, not halfway up the screen. */
+.screen > .sticky-cta {
+  margin-top: auto;
+}
+
+/* ---------- 0.10.6: every search box: a magnifying glass inside, an X to empty it ---------- */
+.search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* Full width; beside a button (Search, Scan) it shrinks to leave the button room. Never stretched
+     taller in a column (a screen or a sheet). */
+  flex: 0 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+.search-field > svg {
+  position: absolute;
+  left: 14px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.search-field > .input {
+  flex: 1;
+  min-width: 0;
+  padding-left: 42px;
+  padding-right: 44px;
+}
+/* The browser's own little X: Restock draws one that's big enough to tap. */
+.search-field > .input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+.search-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.search-clear:active {
+  background: var(--line);
+}
+/* 0.10.6: the list picker's arrow, a round button by itself. */
+.list-switch-pill {
+  width: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
+/* 0.10.6: at big text the list's name keeps its room: Edit and View options go under it if they must. */
+.list-top-row {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.list-top-row > .list-switch {
+  min-width: min(100%, 10.5em);
+}
+
+/* 0.10.6: no segmented button ever breaks inside a word ("Pa ntr y", "He alt h" at big text).
+   Each button is at least as wide as its longest word; labels wrap only between words, and when the
+   words can't all fit, the row scrolls sideways instead. */
+.seg {
+  grid-auto-columns: minmax(min-content, 1fr);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.seg::-webkit-scrollbar {
+  display: none;
+}
+.seg button {
+  min-width: min-content;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+/* 0.10.6: the list's name gets smaller before it gets cut short ("Groce…" at the largest text). */
+.list-switch-name {
+  font-size: min(var(--fs-2xl), 8vw);
+}
+:root[data-text='1.3'] .list-switch > svg,
+:root[data-text='1.5'] .list-switch > svg {
+  display: none;
+}
+:root[data-text='1.5'] .list-switch-name {
+  font-size: min(var(--fs-2xl), 7vw);
+}
+/* 0.10.6: list rows: the select box and the name are finger-sized to tap. */
+.pick-hit {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.list-row-main {
+  min-height: var(--hit);
+}
