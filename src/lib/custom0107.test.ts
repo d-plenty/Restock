@@ -12,6 +12,13 @@ describe('0.10.7 custom sections', () => {
     expect(checkCustomDef({ name: '', colour: 'pink', icon: 'pack:car' })).toBeUndefined();
     expect(checkCustomDef({ name: '<b>', colour: 'pink', icon: 'pack:car' })).toBeUndefined();
     expect(checkCustomDef({ name: 'x'.repeat(31), colour: 'pink', icon: 'pack:car' })).toBeUndefined();
+    // 0.10.8: emoji only (with the joiners and skin tones that build one), and no hidden marks in a name
+    for (const ok of ['🐶', '👨‍👩‍👧', '🇦🇺', '👍🏽', '❤️', '🛠️🚗']) expect(checkCustomDef({ name: 'X', colour: 'pink', icon: ok })?.icon, ok).toBe(ok);
+    for (const bad of ['é', '车', 'Ω', '\u200d', '\u202e🐶', '🐶 🐱', '🐶'.repeat(9)])
+      expect(checkCustomDef({ name: 'X', colour: 'pink', icon: bad }), bad).toBeUndefined();
+    expect(checkCustomDef({ name: 'Car\u202estuff', colour: 'pink', icon: 'pack:car' })).toBeUndefined();
+    expect(checkCustomDef({ name: 'Ca\u200br', colour: 'pink', icon: 'pack:car' })).toBeUndefined();
+    expect(checkCustomDef({ name: 'Café crème', colour: 'pink', icon: 'pack:car' })?.name).toBe('Café crème');
   });
 
   it('Baby and Pets keep their look until changed; names follow settings', () => {

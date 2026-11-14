@@ -1,0 +1,1 @@
+Release candidate 9 (0.10.8): a tidier Add screen, with Find it from a photo in its own sheet and only the best words; no "Aisle: unknown" in shopping mode; fixes from a full review: safer custom section names and icons, the shop answer copy takes out names, emails and phone numbers, IGA's store saves straight away, and smaller fixes.

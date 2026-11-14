@@ -33,7 +33,7 @@ import { ListScreen } from './screens/List';
 import { Onboarding } from './screens/Onboarding';
 import { SetupScreen } from './screens/Setup';
 import { addShared, nameFromLink, splitShared } from '../lib/shared';
-import { lensBarcode } from '../lib/lens';
+import { takeLensBarcode } from '../lib/lens';
 import { ScannedScreen } from './screens/Scanned';
 import { okToLeave, unsavedWork } from './leaveGuard';
 import { rescueOldScans } from '../lib/scanQueue';
@@ -345,10 +345,11 @@ function RestockApp() {
         // 0.10.7: "Restock: Search shops": search the words (a name from Google Lens, say), with the
         // barcode Lens was just asked about, so picking a result remembers that barcode.
         const { words, url } = splitShared(a.text);
-        const query = words || (url ? nameFromLink(url) : undefined);
+        // 0.10.8: a sensible length (a whole page of shared text isn't a product name)
+        const query = (words || (url ? nameFromLink(url) : undefined))?.slice(0, 120).trim();
         if (query) {
           nav.setTab('home');
-          setStack([{ name: 'add', query, barcode: lensBarcode() }]);
+          setStack([{ name: 'add', query, barcode: takeLensBarcode() }]);
         }
       } else if (a.action === 'list') nav.setTab('list');
       else if (a.action === 'receipt') setStack((st) => [...st, { name: 'receipt' }]);

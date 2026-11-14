@@ -791,11 +791,11 @@ export function PhotoFindButton({ section, className = 'btn' }: { section: Secti
   const [words, setWords] = useState('');
   return (
     <>
-      <button type="button" className={className} aria-label="Find from a photo" title="Find from a photo" onClick={() => setOpen(true)}>
+      <button type="button" className={className} aria-label="Find it from a photo" title="Find it from a photo" onClick={() => setOpen(true)}>
         <Icon name="camera" size={20} />
       </button>
       {open && (
-        <Sheet title="Find from a photo" onClose={() => setOpen(false)}>
+        <Sheet title="Find it from a photo" onClose={() => setOpen(false)}>
           <p className="small" style={{ margin: 0 }}>
             Take a photo of the front of the pack. Restock reads the name in this browser, then you can search the shops for it.
           </p>

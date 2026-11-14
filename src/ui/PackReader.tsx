@@ -15,6 +15,7 @@ export function PackReader({
   onName,
   label = 'Take a photo',
   primary = true,
+  onSearch,
 }: {
   /** The barcode this is for, so a name shared back from Google Lens can be matched to it. */
   barcode?: string;
@@ -22,6 +23,11 @@ export function PackReader({
   onName: (name: string, search: boolean) => void;
   label?: string;
   primary?: boolean;
+  /**
+   * 0.10.8: in a sheet, a "Search for …" button instead of searching straight away: the sheet
+   * closes and the search runs when it's tapped.
+   */
+  onSearch?: (name: string) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string>();
@@ -31,6 +37,7 @@ export function PackReader({
   const [lines, setLines] = useState<ReadLine[]>([]);
   const [chosen, setChosen] = useState<number[]>([]);
   const [lensSaid, setLensSaid] = useState<string>();
+  const [allWords, setAllWords] = useState(false);
 
   useEffect(() => () => void (photoUrl && URL.revokeObjectURL(photoUrl)), [photoUrl]);
 
@@ -40,18 +47,19 @@ export function PackReader({
     setLensSaid(undefined);
     setLines([]);
     setChosen([]);
+    setAllWords(false);
     setPhoto(file);
     setPhotoUrl(URL.createObjectURL(file));
     setBusy('Reading the pack…');
     try {
       const out = await readText(file, setBusy);
-      // The words worth showing: real words, biggest first, at most a dozen.
-      const shown = out.lines.filter((l) => /[A-Za-z]{2}/.test(l.text) && l.confidence > 40).slice(0, 12);
+      // The words worth showing: real words (the buttons show the best few, 0.10.8).
+      const shown = out.lines.filter((l) => /[A-Za-z]{2}/.test(l.text) && l.confidence > 40).slice(0, 40);
       setLines(shown);
       const pick = packPick(shown);
       if (pick) {
         setChosen(pick.used);
-        onName(pick.name, true);
+        onName(pick.name, !onSearch);
       } else setNote("Couldn't make out the name. Try again closer, with the name filling most of the photo, or type it in.");
     } catch (e) {
       setNote(`Couldn't read it: ${e instanceof Error ? e.message : e}`);
@@ -80,10 +88,31 @@ export function PackReader({
     }
   };
 
+  // 0.10.8: the words worth a button: the ones picked, then the biggest short ones (a name, not a
+  // sentence from the back of the pack), eight at most; the rest behind "More words".
+  const words = (s: string) => s.trim().split(/\s+/).length;
+  const order = lines
+    .map((l, i) => ({ i, l }))
+    .sort(
+      (a, b) =>
+        Number(chosen.includes(b.i)) - Number(chosen.includes(a.i)) ||
+        Number(words(a.l.text) > 5) - Number(words(b.l.text) > 5) ||
+        b.l.height - a.l.height,
+    )
+    .map((x) => x.i);
+  const LIMIT = 8;
+  const shown = allWords ? order : order.slice(0, LIMIT);
+  const hidden = order.length - shown.length;
+  const name = chosen
+    .map((x) => lines[x]?.text)
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <>
       <input ref={input} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void go(e.target.files?.[0])} />
-      <button type="button" className={`btn ${primary ? 'primary' : ''}`} disabled={!!busy} onClick={() => input.current?.click()}>
+      {/* 0.10.8: once there's a photo, taking another is the quiet option */}
+      <button type="button" className={`btn ${primary && !photo ? 'primary' : ''}`} disabled={!!busy} onClick={() => input.current?.click()}>
         <Icon name="camera" size={18} /> {photo ? 'Take another photo' : label}
       </button>
       {busy && (
@@ -104,17 +133,33 @@ export function PackReader({
           {photoUrl && <img src={photoUrl} alt="Your photo of the pack" className="pack-photo" />}
           <div style={{ display: 'grid', gap: 6, minWidth: 0 }}>
             <span className="small" id="pack-words-label">
-              Words on the pack. Tap to add or take away, then Search.
+              Words Restock read. Tap to add or take away.
             </span>
             <div className="chips" role="group" aria-labelledby="pack-words-label">
-              {lines.map((l, i) => (
-                <button key={i} type="button" className={`chip${chosen.includes(i) ? ' on' : ''}`} aria-pressed={chosen.includes(i)} onClick={() => toggle(i)}>
-                  {l.text}
+              {shown.map((i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`chip${chosen.includes(i) ? ' on' : ''}`}
+                  aria-pressed={chosen.includes(i)}
+                  onClick={() => toggle(i)}
+                >
+                  {lines[i].text}
                 </button>
               ))}
+              {hidden > 0 && (
+                <button type="button" className="chip chip-more" onClick={() => setAllWords(true)}>
+                  {hidden} more
+                </button>
+              )}
             </div>
           </div>
         </div>
+      )}
+      {onSearch && lines.length > 0 && !busy && (
+        <button type="button" className="btn primary" disabled={!name} onClick={() => onSearch(name)}>
+          <Icon name="search" size={18} /> {name ? `Search for “${name.length > 32 ? `${name.slice(0, 30)}…` : name}”` : 'Pick a word to search'}
+        </button>
       )}
       {photo && !busy && (
         <div style={{ display: 'grid', gap: 4 }}>

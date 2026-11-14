@@ -226,6 +226,15 @@ public class SyncTest093 {
         // A forged shop row (search page elsewhere, odd tab) is refused outright.
         check(SharedSettings.checkValue("shop:custom-x", new JSONObject().put("on", true).put("shop", new JSONObject().put("id", "custom-y").put("name", "X").put("website", "https://x.example").put("section", "pantry"))) == null
             && SharedSettings.checkValue("shopAroundMin", -5) == null && SharedSettings.checkValue("listCompare", "cheapest") == null, "rows that aren't right are refused");
+        // 0.10.8: custom sections' icons are emoji only and names have no hidden marks (the same as shops.ts)
+        {
+            boolean ok = true;
+            for (String e : new String[] {"🐶", "👨‍👩‍👧", "🇦🇺", "👍🏽", "❤️", "🛠️🚗"}) ok &= SharedSettings.isEmojiIcon(e);
+            for (String e : new String[] {"é", "车", "Ω", "\u200d", "\u202e🐶", "🐶 🐱", "🐶🐶🐶🐶🐶🐶🐶🐶🐶"}) ok &= !SharedSettings.isEmojiIcon(e);
+            ok &= SharedSettings.checkCustomDef(new JSONObject().put("name", "Car\u202estuff").put("colour", "pink").put("icon", "pack:car")) == null;
+            ok &= SharedSettings.checkCustomDef(new JSONObject().put("name", "Café crème").put("colour", "pink").put("icon", "pack:car")) != null;
+            check(ok, "custom sections: emoji icons and hidden marks, as on the web");
+        }
         // Review: a search page on www. (or another part) of the shop's own site is kept, as the
         // phone's own Settings keep it, so a shop's own row doesn't take its search page away.
         JSONObject www = new JSONObject().put("id", "custom-w").put("name", "W").put("website", "https://farm.example.com.au").put("section", "pantry")

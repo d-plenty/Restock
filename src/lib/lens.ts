@@ -25,6 +25,16 @@ export function lensBarcode(): string | undefined {
   }
 }
 
+/**
+ * 0.10.8: the same, but only once: the first name shared back gets the barcode, and anything shared
+ * after that (something else entirely, say) doesn't.
+ */
+export function takeLensBarcode(): string | undefined {
+  const b = lensBarcode();
+  remember(undefined);
+  return b;
+}
+
 function remember(barcode?: string) {
   try {
     if (barcode) localStorage.setItem(KEY, JSON.stringify({ barcode, at: Date.now() }));

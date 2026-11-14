@@ -1,6 +1,6 @@
 import { useFullRefresh } from '../refresh';
 import { useRef, useState } from 'react';
-import { allCategories, allListEntries, deleteGroup, getSettings, updateGroup, updateSettings } from '../../lib/db';
+import { allCategories, allListEntries, cachedSettings, deleteGroup, getSettings, updateGroup, updateSettings } from '../../lib/db';
 import { addAllToList, addToList, buzz, takeOffList } from '../../lib/listActions';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { loadRecommendations } from '../../lib/recs';
@@ -246,7 +246,10 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       )}
       {recs.length > 0 && !editing && !seenSwipe() && (
         <p className="small" style={{ margin: 0 }}>
-          Tip: swipe an item right to add it to your shopping list, left to delete it, or press and hold it for a bigger look and product details.
+          {/* 0.10.8: with No swiping on, the tip doesn't talk about swiping */}
+          {cachedSettings()?.a11y?.noSwipe
+            ? 'Tip: tap the cart to add an item to your shopping list, or press and hold it for a bigger look and product details.'
+            : 'Tip: swipe an item right to add it to your shopping list, left to delete it, or press and hold it for a bigger look and product details.'}
         </p>
       )}
 
@@ -359,7 +362,6 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           total={shown.length}
           onAll={() => setPicked(new Set(shown.map((r) => r.group.id)))}
           onNone={() => setPicked(new Set())}
-          onDone={stopEditing}
         >
           <button className="btn small" disabled={!selected.length} onClick={addSelectedToList}>
             <Icon name="cartPlus" size={18} /> Shopping list

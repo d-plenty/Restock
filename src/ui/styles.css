@@ -5402,3 +5402,63 @@ html.on-welcome #root {
   max-width: 100%;
   flex-shrink: 1;
 }
+
+/* 0.10.8: Add's ways in: Scan a barcode, then equal tiles for the others, then what's left to match. */
+.add-ways {
+  display: grid;
+  gap: 8px;
+}
+.add-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 5em), 1fr));
+  gap: 8px;
+}
+.add-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 8px 6px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.add-tool svg {
+  color: var(--green);
+}
+.add-tool:active {
+  background: var(--line);
+}
+.add-scans {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--hit);
+  padding: 10px 14px;
+  border: 1px solid var(--line-2);
+  color: var(--green-ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+}
+.chip.chip-more {
+  color: var(--green-ink);
+  border-style: dashed;
+}
+.add-tools.one {
+  grid-template-columns: 1fr;
+}
+.add-tools.one .add-tool {
+  flex-direction: row;
+  gap: 8px;
+  min-height: var(--hit);
+}

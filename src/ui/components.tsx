@@ -813,7 +813,8 @@ export function SelectBar({
   total: number;
   onAll: () => void;
   onNone: () => void;
-  onDone: () => void;
+  /** 0.10.8: only where the screen has no Done of its own (the Pantry and the list have one at the top). */
+  onDone?: () => void;
   children: ReactNode;
 }) {
   return (
@@ -824,9 +825,11 @@ export function SelectBar({
           {count === total ? 'Select none' : 'Select all'}
         </button>
         <span style={{ flex: 1 }} />
-        <button className="chip" onClick={onDone}>
-          Done
-        </button>
+        {onDone && (
+          <button className="chip" onClick={onDone}>
+            Done
+          </button>
+        )}
       </div>
       <div className="selectbar-actions">{children}</div>
     </div>

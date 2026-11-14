@@ -19,13 +19,23 @@ function whyUnknown(chain: string): string {
  * 0.9.9: a small stock tag ("In stock", "Out at Coles Thuringowa", "Stock unknown") for an item or a
  * list line. Tap it: every shop and branch, in stock, out or unknown, and when it was checked.
  */
-export function StockTag({ products, name }: { products: Pick<Product, 'chain' | 'name' | 'inStock' | 'inStock2' | 'stockAt'>[]; name: string }) {
+export function StockTag({
+  products,
+  name,
+  onlyOut,
+}: {
+  products: Pick<Product, 'chain' | 'name' | 'inStock' | 'inStock2' | 'stockAt'>[];
+  name: string;
+  /** 0.10.8: shopping mode: only say when it's out ("In stock" on every line is just noise there). */
+  onlyOut?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const rows = stockRows(products, cachedSettings());
   if (!rows.length) return null;
   const tag = stockTag(rows);
   // 0.10.7: nothing at all until stock's been checked ("Check stock" on the list): no "Stock unknown" everywhere.
   if (tag.kind === 'unknown') return null;
+  if (onlyOut && tag.kind === 'in') return null;
   const cls = tag.kind === 'in' ? 'good' : 'wait';
   return (
     <>

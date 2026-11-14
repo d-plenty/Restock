@@ -527,7 +527,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           {group.alertLevel === 'custom' ? ` (${group.alertPct ?? 30}%+)` : ''}
         </button>
         <button className="chip" onClick={() => setSheet('alerts')} aria-label="Set a target price">
-          <Icon name="tag" size={14} /> {group.targetPrice !== undefined ? `Under ${money(group.targetPrice)}` : 'Set a price alert'}
+          <Icon name="tag" size={14} /> {group.targetPrice !== undefined ? `Under ${money(group.targetPrice)}` : 'Alert at a price'}
         </button>
       </div>
       {/* Not for a price that may not be today's any more (0.9.0): it says "right now". */}
@@ -1639,8 +1639,8 @@ function PriceHistory({
         ) : (
           <p className="small" style={{ margin: 0 }}>
             {stats.readings} price{stats.readings === 1 ? '' : 's'} seen over {stats.spanDays} days
-            {stats.low !== undefined ? ` · lowest ${money(stats.low)}` : ''}. The usual price is the middle regular price over the last 6 months; a week counts
-            as on special when it was on special or under its usual price.
+            {stats.low !== undefined ? ` · lowest ${money(Math.min(stats.low, stats.current?.price ?? Infinity))}` : ''}. The usual price is the
+            middle regular price over the last 6 months; a week counts as on special when it was on special or under its usual price.
           </p>
         ))}
     </div>

@@ -545,11 +545,12 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       {on('a11y') && <AccessibilitySettings settings={settings} />}
       {on('look') && (
         <>
-          <div className="eyebrow" id="s-look">
+          {/* 0.10.8: on its own page the title already says it (only shown when searching all of Settings) */}
+          <div className={all ? 'eyebrow' : 'sr-only'} id="s-look">
             Look and colours
           </div>
           <LookSettings settings={settings} />
-          <div className="eyebrow" id="s-widgets">
+          <div className={all ? 'eyebrow' : 'sr-only'} id="s-widgets">
             Home screen widgets
           </div>
           <Fold title="Home screen widgets" sub="Deals, shopping list and quick actions">

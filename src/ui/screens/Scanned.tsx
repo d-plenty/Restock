@@ -4,7 +4,7 @@ import { allGroups, findProductByBarcode, groupProductIds } from '../../lib/db';
 import { addToList } from '../../lib/listActions';
 import { genericName } from '../../lib/naming';
 import { addScanLine, clearDone, onScanLines, scanLines, toMatch, type ScanLine } from '../../lib/scanQueue';
-import { SECTION_PLACE, type Section } from '../../shops';
+import { SECTION_NAMES, type Section } from '../../shops';
 import { Icon, TopBar } from '../components';
 import { useNav } from '../nav';
 
@@ -71,7 +71,7 @@ export function ScannedScreen({ section, start }: { section: Section; start?: bo
           {l.status === 'new'
             ? 'Not matched yet'
             : l.status === 'matched'
-              ? `Matched. In ${SECTION_PLACE[section]}.`
+              ? 'Matched'
               : l.status === 'added'
                 ? 'Added to your shopping list'
                 : 'Already on your shopping list'}
@@ -118,7 +118,7 @@ export function ScannedScreen({ section, start }: { section: Section; start?: bo
               Clear the done ones
             </button>
             <button className="btn" onClick={() => nav.setTab(section)}>
-              Back to {section === 'pantry' ? 'pantry' : 'your tab'}
+              Back to {section === 'pantry' ? 'Pantry' : SECTION_NAMES[section]}
             </button>
           </div>
         </>

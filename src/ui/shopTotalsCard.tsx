@@ -68,7 +68,10 @@ type ShopLineT = import('../lib/shopTotals').ShopLine;
 
 /** 0.10.1: both ways of counting, always in this order and with these words, on every row and sheet. */
 export const bothWays = (same: number, till: number, approx = false) =>
-  `Same shopping ${approx ? '≈' : ''}${money(same)} · at the till ${approx ? '≈' : ''}${money(till)}`;
+  // 0.10.8: once when they're the same ("Same shopping $21.80 · at the till $21.80" said it twice)
+  Math.abs(same - till) < 0.25
+    ? `${approx ? '≈' : ''}${money(till)} either way`
+    : `Same shopping ${approx ? '≈' : ''}${money(same)} · at the till ${approx ? '≈' : ''}${money(till)}`;
 
 /** A line whose like-for-like cost isn't what you'd pay for the pack (a bigger or smaller pack): say both. */
 const lineNote = (l: ShopLineT) =>
@@ -475,7 +478,7 @@ export function ShopTotalsCard({
             : plan.complete
               ? 'Every item at its cheapest shop.'
               : 'Every item at its cheapest shop. No one shop has everything on your list.'}
-        {` About ${money(plan.aroundOther)} ${otherWord}.`}
+        {Math.abs(plan.aroundOther - plan.around) >= 0.25 ? ` About ${money(plan.aroundOther)} ${otherWord}.` : ''}
       </span>
       {plan.stops.length > 1 && (
         <span className="stops">

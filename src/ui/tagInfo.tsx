@@ -169,6 +169,13 @@ function FakeWhy({ o }: { o: Option }) {
   );
 }
 
+/** The lowest price seen, today's included (stats.low is the lowest before today, for "Wait"). */
+const lowestSeen = (o: Option) => {
+  const today = o.locked ? undefined : o.stats.current?.price;
+  const vals = [o.stats.low, today].filter((v): v is number => typeof v === 'number');
+  return vals.length ? Math.min(...vals) : undefined;
+};
+
 /** What a verdict tag means for this product, with its numbers. */
 export function VerdictBody({ o }: { o: Option }) {
   const cur = o.stats.current;
@@ -192,7 +199,8 @@ export function VerdictBody({ o }: { o: Option }) {
         </div>
         <div className="stat">
           <span className="k">Lowest seen</span>
-          <span className="v num">{money(o.stats.low)}</span>
+          {/* 0.10.8: today counts too (it said "lowest $2.00" next to "today $1.80") */}
+          <span className="v num">{money(lowestSeen(o))}</span>
         </div>
       </div>
       <p className="small">The usual price comes from {basisText(o)}.</p>

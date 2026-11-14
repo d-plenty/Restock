@@ -63,10 +63,33 @@ export interface CustomDef {
   icon: string;
 }
 /**
- * An emoji (or a short run of them, like a flag) can stand in for a pack icon: kept simple, and the
- * same in SharedSettings.java: up to 16 characters, none of them plain letters, digits or spaces.
+ * An emoji (or a short run of them, like a flag) can stand in for a pack icon, the same in
+ * SharedSettings.java: up to 16 characters, all from the emoji blocks (and the joiners, skin tones
+ * and variation marks that build one), with at least one picture. 0.10.8: only emoji, not any
+ * non-English letters (a word in the icon's box) or invisible marks that flip text around.
  */
-const EMOJI = /^[^\u0000-\u007f \t\n\r\f\v\u00a0]+$/;
+const EMOJI_PART = (c: number) =>
+  (c >= 0x1f000 && c <= 0x1faff) || // pictures, flags, skin tones
+  (c >= 0x2600 && c <= 0x27bf) || // ☀ ✂ ✈ ❤
+  (c >= 0x2300 && c <= 0x23ff) || // ⌚ ⏰
+  (c >= 0x2b00 && c <= 0x2bff) || // ⬆ ⭐
+  (c >= 0x2190 && c <= 0x21ff) || // ↔
+  (c >= 0x25a0 && c <= 0x25ff) || // ▪ ◼
+  (c >= 0xe0020 && c <= 0xe007f) || // tag letters (some flags)
+  [0x00a9, 0x00ae, 0x203c, 0x2049, 0x2122, 0x2139, 0x24c2, 0x2934, 0x2935, 0x3030, 0x303d, 0x3297, 0x3299].includes(c);
+const EMOJI_GLUE = (c: number) => c === 0x200d || c === 0xfe0f || c === 0xfe0e || c === 0x20e3;
+export function isEmojiIcon(s: string): boolean {
+  if (!s || s.length > 16) return false;
+  let picture = false;
+  for (const ch of s) {
+    const c = ch.codePointAt(0)!;
+    if (EMOJI_PART(c)) picture = true;
+    else if (!EMOJI_GLUE(c)) return false;
+  }
+  return picture;
+}
+/** Letters that are invisible or turn text around (bidi controls, zero-width spaces), never in a name. */
+const HIDDEN = /[\u0080-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/;
 /** The pack's icons (components.tsx PACK_ICONS has the drawings). */
 export const PACK_ICON_IDS = [
   'bottle', 'paw', 'car', 'tools', 'papers', 'office', 'plant', 'roller', 'bulb', 'gift', 'shirt', 'book',
@@ -80,10 +103,10 @@ export function checkCustomDef(v: unknown): CustomDef | undefined {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
   const o = v as Record<string, unknown>;
   const name = typeof o.name === 'string' ? o.name.replace(/[ \t\n\r\f\v]+/g, ' ').trim() : '';
-  if (!name || name.length > 30 || /[\u0000-\u001f\u007f<>]/.test(name)) return undefined;
+  if (!name || name.length > 30 || /[\u0000-\u001f\u007f<>]/.test(name) || HIDDEN.test(name)) return undefined;
   if (!(CUSTOM_COLOURS as readonly string[]).includes(o.colour as string)) return undefined;
   const icon = typeof o.icon === 'string' ? o.icon.trim() : '';
-  const okIcon = (icon.startsWith('pack:') && (PACK_ICON_IDS as readonly string[]).includes(icon.slice(5))) || (icon.length <= 16 && EMOJI.test(icon));
+  const okIcon = (icon.startsWith('pack:') && (PACK_ICON_IDS as readonly string[]).includes(icon.slice(5))) || isEmojiIcon(icon);
   if (!okIcon) return undefined;
   return { name, colour: o.colour as CustomColour, icon };
 }

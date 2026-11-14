@@ -168,19 +168,43 @@ final class SharedSettings {
         "bottle", "paw", "car", "tools", "papers", "office", "plant", "roller", "bulb", "gift", "shirt", "book",
         "gamepad", "dumbbell", "tent", "fishing", "couch", "phone", "spray", "scissors", "ball", "coffee", "wine", "star" };
 
+    /** 0.10.8: letters that are invisible or turn text around, never in a name (shops.ts HIDDEN). */
+    private static final Pattern HIDDEN = Pattern.compile("[\\u0080-\\u009f\\u200b-\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff]");
+    private static final int[] EMOJI_ONE = {0x00a9, 0x00ae, 0x203c, 0x2049, 0x2122, 0x2139, 0x24c2, 0x2934, 0x2935, 0x3030, 0x303d, 0x3297, 0x3299};
+
+    private static boolean emojiPart(int c) {
+        if ((c >= 0x1f000 && c <= 0x1faff) || (c >= 0x2600 && c <= 0x27bf) || (c >= 0x2300 && c <= 0x23ff) || (c >= 0x2b00 && c <= 0x2bff)
+            || (c >= 0x2190 && c <= 0x21ff) || (c >= 0x25a0 && c <= 0x25ff) || (c >= 0xe0020 && c <= 0xe007f)) return true;
+        for (int x : EMOJI_ONE) if (x == c) return true;
+        return false;
+    }
+
+    /** 0.10.8: an emoji icon, the same as shops.ts isEmojiIcon (up to 16 UTF-16 units, emoji only). */
+    static boolean isEmojiIcon(String s) {
+        if (s == null || s.isEmpty() || s.length() > 16) return false;
+        boolean picture = false;
+        for (int i = 0; i < s.length(); ) {
+            int c = s.codePointAt(i);
+            i += Character.charCount(c);
+            if (emojiPart(c)) picture = true;
+            else if (!(c == 0x200d || c == 0xfe0f || c == 0xfe0e || c == 0x20e3)) return false;
+        }
+        return picture;
+    }
+
     /** A custom section's name, colour and icon as it may be kept (shops.ts checkCustomDef), or null. */
     static JSONObject checkCustomDef(Object v) {
         if (!(v instanceof JSONObject)) return null;
         JSONObject o = (JSONObject) v;
         Object n = o.opt("name");
         String name = n instanceof String ? ((String) n).replaceAll("[ \\t\\n\\r\\f\\u000b]+", " ").trim() : "";
-        if (name.isEmpty() || name.length() > 30 || name.matches("(?s).*[\\x00-\\x1f\\x7f<>].*")) return null;
+        if (name.isEmpty() || name.length() > 30 || name.matches("(?s).*[\\x00-\\x1f\\x7f<>].*") || HIDDEN.matcher(name).find()) return null;
         Object c = o.opt("colour");
         if (!(c instanceof String) || !Arrays.asList(CUSTOM_COLOURS).contains(c)) return null;
         Object i = o.opt("icon");
         String icon = i instanceof String ? ((String) i).trim() : "";
         boolean ok = (icon.startsWith("pack:") && Arrays.asList(PACK_ICONS).contains(icon.substring(5)))
-            || (!icon.isEmpty() && icon.length() <= 16 && icon.matches("[^\\x00-\\x7f \\t\\n\\r\\f\\u000b\\u00a0]+"));
+            || isEmojiIcon(icon);
         if (!ok) return null;
         try {
             return new JSONObject().put("name", name).put("colour", c).put("icon", icon);

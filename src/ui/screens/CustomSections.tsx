@@ -13,6 +13,7 @@ import {
   MAX_CUSTOM,
   PACK_ICON_IDS,
   customDef,
+  isEmojiIcon,
   type CustomColour,
   type CustomDef,
   type CustomSection,
@@ -62,7 +63,13 @@ export async function makeCustomSection(def: CustomDef, want?: CustomSection): P
   if (customsInUse(s).length >= MAX_CUSTOM) return undefined;
   const id = freeSlot(s, want);
   if (!id) return undefined;
-  await saveNow({ sections: { ...s.sections, [id]: true }, customSections: { ...s.customSections, [id]: def } });
+  const patch = {
+    sections: { ...s.sections, [id]: true },
+    customSections: { ...s.customSections, [id]: def },
+  };
+  await saveNow(patch);
+  // 0.10.8: an open settings page agrees, so its Save can't undo this
+  await updateSettings(patch);
   await ensureDefaults().catch(() => undefined);
   return id;
 }
@@ -148,6 +155,7 @@ export function CustomSectionHead({ settings, section }: { settings: Settings; s
   const nav = useNav();
   const def = customDef(settings, section);
   const [emoji, setEmoji] = useState(def.icon.startsWith('pack:') ? '' : def.icon);
+  const [lastName] = useState(def.name.trim() || 'My section');
   const [asking, setAsking] = useState(false);
   const set = (patch: Partial<CustomDef>) => void updateSettings({ customSections: { ...settings.customSections, [section]: { ...def, ...patch } } });
   const nameOk = def.name.trim().length > 0;
@@ -160,13 +168,22 @@ export function CustomSectionHead({ settings, section }: { settings: Settings; s
             className="input"
             value={def.name}
             maxLength={30}
-            onChange={(e) => set({ name: e.target.value.replace(/[<>]/g, '') })}
+            // 0.10.8: no invisible or text-flipping marks (a pasted name can carry them), and an empty
+            // name goes back to what it was when you leave the box, instead of saving as "Custom".
+            onChange={(e) =>
+              set({
+                name: e.target.value.replace(/[<>\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, ''),
+              })
+            }
+            onBlur={() => {
+              if (!def.name.trim()) set({ name: lastName });
+            }}
             aria-invalid={!nameOk}
           />
         </label>
         {!nameOk && (
           <p className="small" role="alert" style={{ margin: 0 }}>
-            Give it a name.
+            Give it a name (or it goes back to {lastName}).
           </p>
         )}
         <fieldset className="plain-fieldset">
@@ -214,11 +231,18 @@ export function CustomSectionHead({ settings, section }: { settings: Settings; s
               onChange={(e) => {
                 const v = e.target.value.trim();
                 setEmoji(v);
-                // only kept when it's an emoji (letters and numbers aren't)
-                if (v && v.length <= 16 && /^[^\u0000-\u007f \t\n\r\f\v ]+$/.test(v)) set({ icon: v });
+                // only kept when it's an emoji (shops.ts isEmojiIcon)
+                if (isEmojiIcon(v)) set({ icon: v });
               }}
+              aria-invalid={!!emoji && !isEmojiIcon(emoji)}
+              aria-describedby="custom-emoji-note"
             />
           </label>
+          {emoji && !isEmojiIcon(emoji) && (
+            <p className="small" id="custom-emoji-note" role="alert" style={{ margin: 0 }}>
+              That isn't an emoji. Pick one (or a few) from your keyboard's emoji page.
+            </p>
+          )}
         </fieldset>
       </div>
       <button className="btn danger-ghost" onClick={() => setAsking(true)}>
@@ -238,7 +262,10 @@ export function CustomSectionHead({ settings, section }: { settings: Settings; s
               className="btn danger"
               onClick={async () => {
                 const s = await getSaved();
-                await saveNow({ sections: { ...s.sections, [section]: false } });
+                const sections = { ...s.sections, [section]: false };
+                await saveNow({ sections });
+                // 0.10.8: and the settings page agrees (an unsaved change to its tabs can't switch it back on)
+                await updateSettings({ sections });
                 setAsking(false);
                 nav.pop();
                 nav.toast(`${def.name} deleted`);

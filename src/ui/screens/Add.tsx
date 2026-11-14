@@ -260,6 +260,8 @@ export function AddScreen({
   const tabHidden = section !== 'pantry' && !!settings?.hiddenTabs?.includes(section);
 
   const [term, setTerm] = useState(query ?? '');
+  // 0.10.8: Find it from a photo, in a sheet (it used to open in the page, pushing everything down)
+  const [photoFind, setPhotoFind] = useState(false);
   const [rankQ, setRankQ] = useState<RankQuery>({ text: query ?? '' });
   const [scanned, setScanned] = useState<BarcodeInfo>();
   const [lookingUp, setLookingUp] = useState(false);
@@ -1193,6 +1195,8 @@ export function AddScreen({
     </div>
   );
 
+  // 0.10.8: how many of Add's small ways in show (one on its own is a plain button, not a lone tile)
+  const toolCount = [!attachTo, !scanned, !attachTo && !overlay && !!settings?.receipts.enabled].filter(Boolean).length;
   return (
     // Inside the Pick sheet the sheet scrolls, so the bar at the bottom stays in view there too.
     <div className="screen" style={forLine ? { padding: 0, overflow: 'visible', flex: 'none' } : undefined}>
@@ -1211,47 +1215,65 @@ export function AddScreen({
         </div>
       )}
 
+      {/* 0.10.8: one tidy block: Scan a barcode, then the other ways in as equal tiles (Scan several,
+          Photo, Receipt), and the scanned barcodes still to match as one line. */}
       {!forLine && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn primary" style={{ flex: '1 1 auto' }} onClick={doScan}>
+        <div className="add-ways">
+          <button className="btn primary block" onClick={doScan}>
             <Icon name="scan" /> Scan a barcode
           </button>
-          {!attachTo && (
-            <button className="btn" style={{ flex: '1 1 auto' }} onClick={() => nav.push({ name: 'scanned', section, start: true })} aria-label="Scan several things in a row">
-              Scan several
+          {toolCount > 0 && (
+            <div className={`add-tools${toolCount === 1 ? ' one' : ''}`}>
+              {!attachTo && (
+                <button
+                  className="add-tool"
+                  onClick={() => nav.push({ name: 'scanned', section, start: true })}
+                  aria-label="Scan several things in a row"
+                >
+                  <Icon name="scan" size={22} />
+                  <span>Scan several</span>
+                </button>
+              )}
+              {!scanned && (
+                <button className="add-tool" onClick={() => setPhotoFind(true)} aria-label="Find it from a photo of the pack">
+                  <Icon name="camera" size={22} />
+                  <span>{toolCount === 1 ? 'Find it from a photo' : 'Photo'}</span>
+                </button>
+              )}
+              {!attachTo && !overlay && settings?.receipts.enabled && (
+                <button className="add-tool" onClick={() => nav.push({ name: 'receipt' })} aria-label="Add a receipt">
+                  <Icon name="receipt" size={22} />
+                  <span>Receipt</span>
+                </button>
+              )}
+            </div>
+          )}
+          {!attachTo && scansLeft > 0 && (
+            <button className="card add-scans" onClick={() => nav.push({ name: 'scanned', section })}>
+              <Icon name="scan" size={18} />
+              <span className="grow">{scansLeft === 1 ? '1 scanned barcode to match' : `${scansLeft} scanned barcodes to match`}</span>
+              <Icon name="chevron" size={16} />
             </button>
           )}
         </div>
       )}
-      {/* 0.10.7: find something with no barcode (or a worn one) from a photo of the pack. */}
-      {!forLine && !scanned && (
-        <details className="photo-find">
-          <summary className="linkish small">
-            <Icon name="camera" size={16} /> Find from a photo
-          </summary>
-          <div style={{ display: 'grid', gap: 8, paddingTop: 8 }}>
-            <PackReader
-              label="Take a photo of the pack"
-              onName={(n, go) => {
-                setTerm(n);
-                if (!go) return;
-                setSearchedFor(n);
-                const fixed = normaliseQuery(n);
-                void search(fixed, { text: fixed }, section, true);
-              }}
-            />
-          </div>
-        </details>
-      )}
-      {!forLine && !attachTo && scansLeft > 0 && (
-        <button className="btn ghost small" style={{ alignSelf: 'flex-start', ...TAP }} onClick={() => nav.push({ name: 'scanned', section })}>
-          <Icon name="scan" size={16} /> Scanned barcodes ({scansLeft} to match)
-        </button>
-      )}
-      {!forLine && !attachTo && !overlay && settings?.receipts.enabled && (
-        <button className="btn ghost small" style={{ alignSelf: 'flex-start', ...TAP }} onClick={() => nav.push({ name: 'receipt' })}>
-          <Icon name="receipt" size={16} /> Add a receipt
-        </button>
+      {photoFind && (
+        <Sheet title="Find it from a photo" onClose={() => setPhotoFind(false)}>
+          <p className="small" style={{ margin: 0 }}>
+            Take a photo of the front of the pack, with the name filling most of it. Restock reads it on your phone.
+          </p>
+          <PackReader
+            label="Take a photo of the pack"
+            onName={(n) => setTerm(n)}
+            onSearch={(n) => {
+              setPhotoFind(false);
+              setTerm(n);
+              setSearchedFor(n);
+              const fixed = normaliseQuery(n);
+              void search(fixed, { text: fixed }, section, true);
+            }}
+          />
+        </Sheet>
       )}
 
       <form
@@ -1368,7 +1390,8 @@ export function AddScreen({
         </div>
       )}
 
-      {scanned && !known && (
+      {/* 0.10.8: not as well as the "already have" card above (the same photo twice) */}
+      {scanned && !known && !(alreadyHave && !dismissedHave) && (
         <div className="card" style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Thumb src={scanned.imageUrl} icon="scan" />
           <div style={{ flex: 1 }}>

@@ -44,7 +44,14 @@ interface Result {
 }
 
 /** Keys that could say who you are or where you shop. Their values never go in the copy. */
-const PERSONAL = /cookie|token|session|auth|e-?mail|phone|mobile|address|postcode|post_code|suburb|street|latitude|longitude|geo|store_?id|storeid|branch|customer|member_?(id|number)|account|user|login|password|card|ip$/i;
+const PERSONAL =
+  /cookie|token|session|auth|e-?mail|phone|mobile|address|postcode|post_code|suburb|street|latitude|longitude|geo|store_?id|storeid|branch|customer|member_?(id|number)|account|user|login|password|card|ip$|(first|last|given|family|sur|full|display|nick)_?name|greeting|birth|dob|gender|shopper/i;
+
+/** 0.10.8: emails and phone numbers anywhere in the text (a signed-in page can greet you by them). */
+const scrubText = (s: string) =>
+  s
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '(email removed)')
+    .replace(/(?<!\d)(?:\+?61[ -]?|0)[2-478](?:[ -]?\d){8}(?!\d)/g, '(phone removed)');
 
 /**
  * 0.10.7: what the shop sent back, cut down to what's needed to fix how it's read: a few products
@@ -80,6 +87,7 @@ export function shopAnswerCopy(c: Captured, limit = 60_000): string {
       .replace(/("?(?:email|phone|postcode|suburb|address|token|session)"?\s*[:=]\s*)"[^"]*"/gi, '$1"(removed)"')
       .replace(/\s+/g, ' ');
   }
+  body = scrubText(body);
   return `${head}\n${body.length > limit ? `${body.slice(0, limit)}\n… (cut short)` : body}`;
 }
 

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.7" src="https://img.shields.io/badge/status-release%20candidate%200.10.7-ffcd00">
+  <img alt="Release candidate 0.10.8" src="https://img.shields.io/badge/status-release%20candidate%200.10.8-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0107">New in 0.10.7</a> ·
+  <a href="#new-in-0108">New in 0.10.8</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -131,6 +131,20 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.8
+
+Release candidate 9: a tidy-up after a full review of 0.10.7.
+
+- **A tidier Add screen.** Scan a barcode, then equal tiles for **Scan several**, **Photo** and **Receipt**, and the barcodes still to match as one line.
+- **Find it from a photo** opens in its own sheet: at most 8 of the words it read (the biggest short ones; the rest behind "more"), then **Search for "…"**. A photo of the back of a pack no longer fills the screen with sentences.
+- **Shopping mode:** no "Aisle: unknown" on every line. A line shows its aisle only when the shop has said, and with no aisles known (most shops don't say) there's no Aisle sort; the list goes by category. "In stock" no longer shows on every line, only "Out of stock".
+- **Check stock** sits under the list's total, so the list's own buttons keep to one row.
+- **Custom sections:** the icon has to be an emoji (not letters), names can't carry invisible or text-flipping marks, and an empty name goes back to what it was. A start you've already made (Pets, say) isn't offered again. Making or deleting one while Settings is open can't be undone by its Save.
+- **IGA:** the store read from IGA's website is saved straight away.
+- **Shop test, Copy the shop's answer:** names, emails and phone numbers are taken out wherever they are.
+- **"Restock: Search shops"** attaches the barcode you asked Google Lens about only to the first name shared back, and a long shared text is cut to a sensible length.
+- **Smaller fixes:** the explanation's "Lowest seen" counts today's price; compare totals say a price once when both ways agree; one Done while picking items (not two); "Alert at a price" instead of two buttons both called alerts; Pantry's tip doesn't mention swiping with No swiping on; and the text reader uses less memory on big photos.
 
 ## New in 0.10.7
 
@@ -363,7 +377,7 @@ Restock is meant for everyone. Accessibility is the first step of setup (there's
 - **Less motion**: no sliding or popping (also when your phone asks for less motion).
 - **Messages stay longer**: messages and their Undo stay three times as long.
 - Works with **TalkBack** and your phone's own display settings. Every button says what it does, and colours are never the only way something is shown.
-- **Checked against WCAG 2.2 AA:** 0.10.7's main screens were run through an automatic audit (axe), in light and dark, on the phone and the web page, and what it found was fixed. An automatic audit doesn't catch everything, so if something is hard to use, please say so in Settings → Send feedback.
+- **Checked against WCAG 2.2 AA:** The main screens were run through an automatic audit (axe) for 0.10.7 and again for 0.10.8, in light and dark, on the phone and the web page, and what it found was fixed. An automatic audit doesn't catch everything, so if something is hard to use, please say so in Settings → Send feedback.
 
 ## Private by design
 
@@ -388,7 +402,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.7.apk` (on macOS, `shasum -a 256 restock-0.10.7.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.8.apk` (on macOS, `shasum -a 256 restock-0.10.8.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -574,7 +588,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is at its **eighth release candidate** (0.10.7): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is at its **ninth release candidate** (0.10.8): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.

@@ -563,7 +563,14 @@ function PickOnSite({ chain }: { chain: StoreChain }) {
   const [saved, setSaved] = useState<string>();
   const keep = async (name: string) => {
     const latest = await getSettings();
-    await updateSettings({ stores: { ...latest.stores, [chain]: { ...storeChoice(latest, chain), primary: name } } });
+    const stores = {
+      ...latest.stores,
+      [chain]: { ...storeChoice(latest, chain), primary: name },
+    };
+    // 0.10.8: saved straight away (you've just picked it on the website; it isn't waiting on Save),
+    // and the open settings page agrees, so it doesn't show as unsaved.
+    await saveNow({ stores });
+    await updateSettings({ stores });
     setSaved(name);
     setAsk(undefined);
   };

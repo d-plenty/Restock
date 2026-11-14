@@ -28,4 +28,32 @@ describe("0.10.7 Copy the shop's answer", () => {
     expect(out).toContain('"name":"Beer"');
     expect(out).toContain('(cut short)');
   });
+
+  it('0.10.8: takes out names, emails and phone numbers wherever they are', () => {
+    const body = JSON.stringify({
+      FirstName: 'Declan',
+      Greeting: 'Hi Declan',
+      Note: 'Contact a@b.com.au or 0412 345 678',
+      Products: [{ Name: 'Milk 2L', Stockcode: 123456 }],
+    });
+    const out = shopAnswerCopy({
+      kind: 'browser fetch',
+      url: 'https://www.woolworths.com.au/apis/x',
+      status: 200,
+      body,
+    });
+    expect(out).not.toContain('Declan');
+    expect(out).not.toContain('a@b.com.au');
+    expect(out).not.toContain('0412 345 678');
+    expect(out).toContain('Milk 2L');
+    expect(out).toContain('123456');
+    const page = shopAnswerCopy({
+      kind: 'browser page',
+      url: 'https://www.iga.com.au/x',
+      status: 200,
+      body: '<p>Signed in as me@home.net, +61 412 345 678</p>',
+    });
+    expect(page).not.toContain('me@home.net');
+    expect(page).not.toContain('412 345 678');
+  });
 });

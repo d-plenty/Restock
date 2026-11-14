@@ -890,7 +890,6 @@ export function ListScreen() {
           total={entries.length}
           onAll={() => setPicked(new Set(entries.map((e) => e.id)))}
           onNone={() => setPicked(new Set())}
-          onDone={stopSelecting}
         >
           <button
             className="btn small"
@@ -1466,8 +1465,12 @@ function ShoppingMode({
     if (!d || d.product.chain !== 'coles' || !colesStoreNo) return undefined;
     return aisleOf(aisles, d.product.id, colesSlot, colesStoreNo);
   };
+  // 0.10.8: no aisle known for anything on the list (most shops don't say): no Aisle option, and
+  // the list goes by category, until an aisle is known (your pick is kept for when it is).
+  const anyAisle = !serverMode && entries.some((e) => !e.checked && !!aisleAt(e));
+  const by = sort.by === 'aisle' && !anyAisle ? 'category' : sort.by;
   const sortShop = (items: ListEntry[]) =>
-    sort.by === 'az' ? [...items].sort(azOf) : sort.by === 'category' ? [...items].sort(byCategory) : sortByAisle(items, aisleAt, nameOf, !!sort.down);
+    by === 'az' ? [...items].sort(azOf) : by === 'category' ? [...items].sort(byCategory) : sortByAisle(items, aisleAt, nameOf, !!sort.down);
   const inTrolley = entries.filter((e) => e.checked && !elsewhere(e)).reduce((s, e) => s + (priceOf(c, e) ?? 0), 0);
   const notHere = entries.filter((e) => elsewhere(e));
   const left = entries.filter((e) => !e.checked);
@@ -1554,17 +1557,19 @@ function ShoppingMode({
           Sort by
         </span>
         <div className="seg" role="group" aria-label="Sort each shop by">
-          <button type="button" aria-pressed={sort.by === 'aisle'} disabled={serverMode} onClick={() => setSort({ ...sort, by: 'aisle' })}>
-            Aisle
-          </button>
-          <button type="button" aria-pressed={sort.by === 'category'} onClick={() => setSort({ ...sort, by: 'category' })}>
+          {(anyAisle || serverMode) && (
+            <button type="button" aria-pressed={by === 'aisle'} disabled={serverMode} onClick={() => setSort({ ...sort, by: 'aisle' })}>
+              Aisle
+            </button>
+          )}
+          <button type="button" aria-pressed={by === 'category'} onClick={() => setSort({ ...sort, by: 'category' })}>
             Category
           </button>
-          <button type="button" aria-pressed={sort.by === 'az'} onClick={() => setSort({ ...sort, by: 'az' })}>
+          <button type="button" aria-pressed={by === 'az'} onClick={() => setSort({ ...sort, by: 'az' })}>
             A–Z
           </button>
         </div>
-        {sort.by === 'aisle' && !serverMode && (
+        {by === 'aisle' && !serverMode && (
           <button
             type="button"
             className="btn small ghost"
@@ -1650,11 +1655,14 @@ function ShoppingMode({
                           {packsOf(c, e)}
                           {d.product.name}
                         </span>
-                      ) : e.product && <span className="small">{e.product.name}</span>}
-                      {/* 0.10.2: where it is in the shop (shopping mode only). */}
-                      {!e.checked && !serverMode && (
+                      ) : (
+                        e.product && <span className="small">{e.product.name}</span>
+                      )}
+                      {/* 0.10.2: where it is in the shop (shopping mode only). 0.10.8: only when the shop
+                          has said; no 'Aisle: unknown' on every line. */}
+                      {!e.checked && !serverMode && aisleAt(e) && (
                         <span className="tags" style={{ marginTop: 3 }}>
-                          <span className={`tag ${aisleAt(e) ? 'aisle' : 'aisle-unknown'}`}>{aisleLabel(aisleAt(e))}</span>
+                          <span className="tag aisle">{aisleLabel(aisleAt(e))}</span>
                         </span>
                       )}
                       {stockNote(c, e) && (
@@ -1668,7 +1676,13 @@ function ShoppingMode({
                       {/* 0.9.9: stock at each shop the item is bought at, a tap away. */}
                       {!e.checked && recFor(c, e) && (
                         <span className="tags" style={{ marginTop: 3 }}>
-                          <StockTag products={recFor(c, e)!.options.filter((o) => o.role === 'main').map((o) => o.product)} name={name} />
+                          <StockTag
+                            products={recFor(c, e)!
+                              .options.filter((o) => o.role === 'main')
+                              .map((o) => o.product)}
+                            name={name}
+                            onlyOut
+                          />
                         </span>
                       )}
                     </span>

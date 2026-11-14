@@ -89,11 +89,16 @@ function pixels(image: HTMLCanvasElement): { width: number; height: number; data
 
 async function canvasFrom(image: Blob | HTMLCanvasElement): Promise<HTMLCanvasElement> {
   if (!(image instanceof Blob)) return image;
-  const bmp = await createImageBitmap(image, { imageOrientation: 'from-image' });
+  const bmp = await createImageBitmap(image, {
+    imageOrientation: 'from-image',
+  });
+  // 0.10.8: drawn straight at the reading size (a 12-megapixel photo at full size is ~48 MB of
+  // memory for nothing, which an older phone may not have)
+  const k = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
   const c = document.createElement('canvas');
-  c.width = bmp.width;
-  c.height = bmp.height;
-  c.getContext('2d')!.drawImage(bmp, 0, 0);
+  c.width = Math.round(bmp.width * k);
+  c.height = Math.round(bmp.height * k);
+  c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
   bmp.close();
   return c;
 }
