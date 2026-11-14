@@ -742,15 +742,19 @@ export function SetupTiles({
   onOpen,
   onLater,
   onContinue,
+  onFinish,
   inSettings,
 }: {
   settings: Settings;
   onOpen: (id: TileId) => void;
   onLater?: () => void;
   onContinue: () => void;
+  /** Shown in place of Continue once every tile is done or skipped. */
+  onFinish?: () => void;
   inSettings?: boolean;
 }) {
   const cover = useLive(syncInfo, []);
+  const nothingLeft = tilesLeft(settings, cover).length === 0;
   const essDone = TILES.filter((t) => isEssential(t.id) && tileStatus(settings, t.id, cover).ok).length;
   useEffect(() => {
     void noticeSetUpTiles();
@@ -807,9 +811,16 @@ export function SetupTiles({
             Set up later
           </button>
         )}
-        <button className="btn primary" onClick={onContinue}>
-          Continue →
-        </button>
+        {/* 0.10.11: with nothing left to set up, the button finishes (Continue said "All set up." and left you to press Back) */}
+        {nothingLeft && onFinish ? (
+          <button className="btn primary" onClick={onFinish}>
+            <Icon name="check" size={18} /> Finish setup
+          </button>
+        ) : (
+          <button className="btn primary" onClick={onContinue}>
+            Continue →
+          </button>
+        )}
       </div>
     </>
   );
@@ -1060,7 +1071,7 @@ export function Onboarding() {
       )}
 
       {stage === 'tiles' && !tile && (
-        <SetupTiles settings={settings} onOpen={walk.setOpen} onLater={() => void finish()} onContinue={() => void walk.next(undefined)} />
+        <SetupTiles settings={settings} onOpen={walk.setOpen} onLater={() => void finish()} onContinue={() => void walk.next(undefined)} onFinish={() => void finish()} />
       )}
       {stage === 'tiles' && tile && (
         <TilePage tile={tile} settings={settings} onBack={() => walk.setOpen(undefined)} onNext={(how) => void walk.next(tile.id, how)} />
@@ -1126,7 +1137,16 @@ export function SetupScreen() {
         <>
           <TopBar title="Setup" />
           <p className="sub">Everything from first setup, in one place. Tap a tile to change it.</p>
-          <SetupTiles settings={settings} inSettings onOpen={walk.setOpen} onContinue={() => void walk.next(undefined)} />
+          <SetupTiles
+            settings={settings}
+            inSettings
+            onOpen={walk.setOpen}
+            onContinue={() => void walk.next(undefined)}
+            onFinish={() => {
+              nav.toast('All set up.');
+              nav.pop();
+            }}
+          />
         </>
       )}
       {tile && <TilePage tile={tile} settings={settings} onBack={() => walk.setOpen(undefined)} onNext={(how) => void walk.next(tile.id, how)} />}

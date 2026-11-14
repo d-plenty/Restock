@@ -5,6 +5,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
 import androidx.work.Constraints;
+import androidx.work.Data;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.ExistingWorkPolicy;
 import androidx.work.NetworkType;
@@ -41,6 +42,8 @@ import org.json.JSONObject;
 public class PriceHelper extends Worker {
     static final String UNIQUE = "restock-price-helper";
     static final String UNIQUE_NOW = "restock-price-helper-now";
+    /** 0.10.11: "Run the whole list now": run after run, straight on, until the week's list is done or Stop. */
+    static final String UNIQUE_ALL = "restock-price-helper-all";
     private static final String TAG = "RestockHelper";
     static final String STATE = "priceHelper";
     static final String OUTBOX = "priceHelperOutbox";
@@ -78,6 +81,40 @@ public class PriceHelper extends Worker {
         WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE_NOW, ExistingWorkPolicy.KEEP, req);
     }
 
+    /**
+     * 0.10.11: "Run the whole list now". The same few searches a run, with the same pauses, but the
+     * next run starts as soon as one ends (not half an hour later), until the week's list is done,
+     * both shops are resting, or Stop. Charging or not, on any network.
+     */
+    static void runAll(Context context) {
+        WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE_ALL, ExistingWorkPolicy.REPLACE, allRequest(0));
+    }
+
+    private static OneTimeWorkRequest allRequest(int delaySeconds) {
+        Constraints c = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
+        return new OneTimeWorkRequest.Builder(PriceHelper.class)
+            .setConstraints(c)
+            .setInputData(new Data.Builder().putBoolean("all", true).build())
+            .setInitialDelay(delaySeconds, TimeUnit.SECONDS)
+            .build();
+    }
+
+    /** Stop: no more runs of the whole list (the half-hourly job carries on as before). */
+    static void stopAll(Context context) {
+        WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_ALL);
+        try {
+            SQLiteDatabase db = RestockDatabase.get(context);
+            if (!RestockDatabase.ready(db)) return;
+            JSONObject state = PriceChecker.readKv(db, STATE);
+            if (state == null) return;
+            state.remove("all");
+            state.remove("runningSince");
+            PriceChecker.writeKv(db, STATE, state);
+        } catch (Exception e) {
+            Log.w(TAG, "couldn't note the stop", e);
+        }
+    }
+
     static boolean ready(JSONObject ph) {
         return ph != null && ph.optBoolean("enabled", false) && !ph.optString("url", "").isEmpty() && !ph.optString("key", "").isEmpty();
     }
@@ -91,7 +128,13 @@ public class PriceHelper extends Worker {
     public Result doWork() {
         // 0.9.12: one run at a time. "Run a few now" tapped twice, or tapped while the half-hourly
         // run is going, used to search the same things twice.
-        if (!LOCK.tryLock()) return Result.success();
+        if (!LOCK.tryLock()) {
+            // 0.10.11: the whole-list run waits its turn (a minute) rather than ending there.
+            if (getInputData().getBoolean("all", false) && !isStopped()) {
+                WorkManager.getInstance(getApplicationContext()).enqueueUniqueWork(UNIQUE_ALL, ExistingWorkPolicy.APPEND_OR_REPLACE, allRequest(60));
+            }
+            return Result.success();
+        }
         try {
             return run();
         } finally {
@@ -130,6 +173,9 @@ public class PriceHelper extends Worker {
                 tracked(db, outbox);
             }
             state.put("of", terms.length());
+            // 0.10.11: part of "Run the whole list now" (the Settings screen says so, and offers Stop).
+            final boolean all = getInputData().getBoolean("all", false);
+            if (all) state.put("all", true);
             // 0.9.12: the Settings screen shows "Running now" (and each search as it's done).
             state.put("runningSince", PriceChecker.now());
             state.remove("lastError");
@@ -185,13 +231,30 @@ public class PriceHelper extends Worker {
             state.put("waiting", waiting);
             state.put("lastAt", PriceChecker.now());
             state.remove("runningSince");
+            if (all) {
+                // The whole list: on to the next few straight away, unless it's done, stopped, or
+                // both shops are resting (then the half-hourly job picks it up when they're back).
+                boolean resting = true;
+                long t = System.currentTimeMillis();
+                for (String chain : CHAINS) {
+                    String until = paused.optString(chain, "");
+                    if (until.isEmpty() || Instant.parse(until).toEpochMilli() <= t) resting = false;
+                }
+                if (done < terms.length() && !resting && !isStopped()) {
+                    WorkManager.getInstance(ctx).enqueueUniqueWork(UNIQUE_ALL, ExistingWorkPolicy.APPEND_OR_REPLACE, allRequest(25));
+                } else {
+                    state.remove("all");
+                }
+            }
             PriceChecker.writeKv(db, STATE, state);
         } catch (Exception e) {
             Log.w(TAG, "price helper run failed", e);
             if (db != null && state != null) {
                 try {
                     state.remove("runningSince");
-                    state.put("lastError", "The run stopped: " + e.getMessage());
+                    // 0.10.11: a whole-list run that ends here (stopped, or a fault) isn't still going.
+                    state.remove("all");
+                    if (!isStopped()) state.put("lastError", "The run stopped: " + e.getMessage());
                     PriceChecker.writeKv(db, STATE, state);
                 } catch (Exception ignored) {
                     // nothing more to do

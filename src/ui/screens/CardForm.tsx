@@ -21,7 +21,7 @@ import { ensureNotificationPermission } from '../../lib/notify';
 import type { CardProgram, GiftBarcodeType, GiftCard, LoyaltyCard } from '../../types';
 import { searchBrands, type CardBrand } from '../../lib/cardBrands';
 import { CardCode } from './CardCode';
-import { Icon, Sheet, SearchField } from '../components';
+import { Icon, Sheet, SearchField, useSheetGuard } from '../components';
 import { useNav } from '../nav';
 
 export const PROGRAMS: Record<CardProgram, { name: string; use: string }> = {
@@ -176,6 +176,8 @@ function LoyaltyFields({ store, onAdded }: { store: CardStore; onAdded: (id: str
   // One save at a time, so a double tap doesn't add the card twice.
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  // 0.10.11: closing the sheet with a card half typed asks first
+  useSheetGuard(() => !savingRef.current && (!!clean || !!q.trim()));
   const matches = searchBrands(q);
   const name = brand ? brand.name : other || (q.trim() && !matches.length) ? q.trim() : '';
   const save = async () => {
@@ -367,6 +369,19 @@ function GiftFields({ store, card, onSaved }: { store: CardStore; card?: GiftCar
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const inputs = { front: useRef<HTMLInputElement>(null), back: useRef<HTMLInputElement>(null) };
+  // 0.10.11: closing the sheet with changes not saved asks first
+  useSheetGuard(
+    () =>
+      !savingRef.current &&
+      (name !== (card?.name ?? '') ||
+        barcode !== (card?.barcode ?? '') ||
+        number !== (card?.number ?? '') ||
+        pin !== (card?.pin ?? '') ||
+        notes !== (card?.notes ?? '') ||
+        expiry !== (card?.expiry ?? '') ||
+        balance !== (card?.balance === undefined ? '' : String(card.balance)) ||
+        Object.keys(photos).length > 0),
+  );
 
   const scan = async () => {
     const out = await scanBarcode('Scan the gift card', CARD_SCAN);
@@ -626,7 +641,7 @@ export function BalanceSheet({ store, card, onClose }: { store: CardStore; card:
     }
   };
   return (
-    <Sheet title="Update balance" onClose={onClose}>
+    <Sheet title="Update balance" onClose={onClose} unsaved={!!text.trim() && !saving}>
       <p className="small" style={{ margin: 0 }}>
         {card.balance === undefined ? `${card.name} has no balance yet.` : `${card.name} has ${money(card.balance)} left.`}
       </p>

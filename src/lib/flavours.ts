@@ -89,3 +89,49 @@ export function flavourBarNote(ticked: Iterable<{ chain: string; name: string }>
   if (!sets.length) return undefined;
   return `${sets.map(([c, n]) => `${n.length} ${flavourWord(n)} at ${chainName(c)}`).join(', ')}: one item, any of them will do`;
 }
+
+// ---------- 0.10.11: "Tick the other 4 flavours" ----------
+
+interface Pack {
+  name: string;
+  brand?: string;
+  size?: string;
+}
+const SIZE = /\b\d+(?:[.,]\d+)?\s?(?:kg|g|ml|l|pk|pack|ea|each|sheets?|x\s?\d+(?:[.,]\d+)?\s?(?:g|ml|l|kg)?)\b/gi;
+const tidy = (t?: string) => (t ?? '').toLowerCase().replace(/\s+/g, '');
+const KIND_WORDS = ['wet', 'dry', 'puppy', 'adult', 'senior', 'kitten', 'zero', 'diet', 'decaf', 'frozen', 'lite', 'light', 'skim', 'refill', 'mini', 'large', 'small', 'kids'];
+/** A name's words without its size and its brand: what's left is the kind of thing and its flavour. */
+function core(p: Pack): string[] {
+  const brand = new Set(words((p.brand ?? '').toLowerCase()));
+  return words(p.name.toLowerCase().replace(SIZE, ' ').replace(/[^a-z0-9&' ]+/g, ' ')).filter((w) => !brand.has(w));
+}
+/** The size as written: the size given, else the one in the name. */
+const sizeOf = (p: Pack) => tidy(p.size) || tidy((p.name.match(SIZE) ?? []).join(''));
+
+/**
+ * The same thing in another flavour (scent, colour): the same brand and the same size, with a name
+ * that's mostly the same words. "Pedigree Wet Dog Food Beef 700g" and "Pedigree Wet Dog Food
+ * Chicken & Rice 700g" are; a 1.2 kg can, another brand, or dry food aren't.
+ */
+export function sameButFlavour(a: Pack, b: Pack): boolean {
+  if (tidy(a.brand) !== tidy(b.brand) && tidy(a.brand) && tidy(b.brand)) return false;
+  const sa = sizeOf(a);
+  const sb = sizeOf(b);
+  if (!sa || sa !== sb) return false;
+  const wa = core(a);
+  const wb = new Set(core(b));
+  if (!wa.length || !wb.size) return false;
+  // A word that makes it a different product, not a flavour, has to be on both or neither.
+  if (KIND_WORDS.some((k) => wa.includes(k) !== wb.has(k))) return false;
+  const both = wa.filter((w) => wb.has(w)).length;
+  if (both === wa.length && both === wb.size) return false; // the very same name
+  // Most of the shorter name's words are in the other, and at least two (or a brand in common).
+  const need = tidy(a.brand) && tidy(a.brand) === tidy(b.brand) ? 1 : 2;
+  return both >= need && both / Math.min(wa.length, wb.size) >= 0.6;
+}
+
+/** From a shop's results: the other flavours of what's ticked there, that aren't ticked yet. */
+export function otherFlavours<T extends Pack>(ticked: T[], results: T[], same: (a: T, b: T) => boolean = (a, b) => a === b): T[] {
+  if (!ticked.length) return [];
+  return results.filter((r) => !ticked.some((t) => same(t, r)) && ticked.some((t) => sameButFlavour(t, r)));
+}

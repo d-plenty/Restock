@@ -5,7 +5,8 @@
 import { useState } from 'react';
 import { useLive } from '../../lib/useLive';
 import { ensureDefaults, getSettings as getSaved, updateSettings as saveNow } from '../../lib/db';
-import { updateSettings } from '../../lib/settingsDraft';
+import { discardDraft, getSettings as getDraft, updateSettings } from '../../lib/settingsDraft';
+import { confirmAction } from '../../lib/confirm';
 import {
   CUSTOM_COLOURS,
   CUSTOM_SECTIONS,
@@ -17,6 +18,7 @@ import {
   type CustomColour,
   type CustomDef,
   type CustomSection,
+  type Section,
 } from '../../shops';
 import type { Settings } from '../../types';
 import { Icon, Sheet } from '../components';
@@ -57,7 +59,53 @@ function freeSlot(s: Settings, want?: CustomSection): CustomSection | undefined 
   return [...CUSTOM_SLOTS, 'baby' as const, 'pets' as const].find((c) => !s.sections[c] && !s.customSections?.[c]) ?? [...CUSTOM_SLOTS].find((c) => !s.sections[c]);
 }
 
-/** Makes a section (saved straight away) and opens its page in Settings to pick its shops. */
+// ---------- 0.10.11: a new section isn't kept until you tap Save section ----------
+// Tapping a start (Office, say) used to make the section there and then, so having a look and going
+// Back left an Office section behind. Now its page opens as "not saved yet": Save section keeps it;
+// Back asks "You haven't saved", and leaving takes it away again (with any shops ticked for it).
+let fresh: { id: CustomSection; at: number } | undefined;
+let pending: CustomSection | undefined;
+/** The new section whose page is open and not saved yet. */
+export const pendingCustom = (): CustomSection | undefined => pending;
+/** Its page has opened (StoresScreen): from now, leaving asks first. Only just after it was made. */
+export function openedCustomPage(section: string): void {
+  if (fresh && fresh.id === section && Date.now() - fresh.at < 10_000) pending = fresh.id;
+  fresh = undefined;
+}
+/** Save section: it's kept. */
+export function keepPendingCustom(): void {
+  pending = undefined;
+}
+/** Back from a new section that isn't saved: asks, and on Leave takes the section away again. True to go on. */
+export async function leavePendingCustom(): Promise<boolean> {
+  const id = pending;
+  if (!id) return true;
+  const shown = await getDraft();
+  const name = customDef(shown, id).name.trim() || 'This section';
+  const ok = await confirmAction("You haven't saved", {
+    detail: `${name} isn't saved yet. If you leave now, it won't be made. To keep it, stay and tap Save section at the bottom.`,
+    action: 'Leave without saving',
+    danger: true,
+  });
+  if (!ok) return false;
+  pending = undefined;
+  discardDraft();
+  const s = await getSaved();
+  const customSections = { ...s.customSections };
+  delete customSections[id];
+  const shopTabs: Record<string, Section[]> = {};
+  for (const [k, v] of Object.entries(s.shopTabs ?? {})) {
+    const left = (v ?? []).filter((x) => x !== id) as Section[];
+    if (left.length) shopTabs[k] = left;
+  }
+  const patch = { sections: { ...s.sections, [id]: false }, customSections, shopTabs };
+  await saveNow(patch);
+  await updateSettings(patch);
+  discardDraft();
+  return true;
+}
+
+/** Makes a section and opens its page in Settings to pick its shops (0.10.11: kept once you tap Save section there). */
 export async function makeCustomSection(def: CustomDef, want?: CustomSection): Promise<CustomSection | undefined> {
   const s = await getSaved();
   if (customsInUse(s).length >= MAX_CUSTOM) return undefined;
@@ -71,6 +119,7 @@ export async function makeCustomSection(def: CustomDef, want?: CustomSection): P
   // 0.10.8: an open settings page agrees, so its Save can't undo this
   await updateSettings(patch);
   await ensureDefaults().catch(() => undefined);
+  fresh = { id, at: Date.now() };
   return id;
 }
 
@@ -245,9 +294,12 @@ export function CustomSectionHead({ settings, section }: { settings: Settings; s
           )}
         </fieldset>
       </div>
-      <button className="btn danger-ghost" onClick={() => setAsking(true)}>
-        <Icon name="trash" size={18} /> Delete this section
-      </button>
+      {/* 0.10.11: nothing to delete until it's been saved */}
+      {pendingCustom() !== section && (
+        <button className="btn danger-ghost" onClick={() => setAsking(true)}>
+          <Icon name="trash" size={18} /> Delete this section
+        </button>
+      )}
       {asking && (
         <Sheet title={`Delete ${def.name}?`} onClose={() => setAsking(false)}>
           <p style={{ margin: 0 }}>

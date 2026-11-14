@@ -33,9 +33,10 @@ export function unsavedWork(): string | undefined {
 export async function okToLeave(): Promise<boolean> {
   const what = unsavedWork();
   if (!what) return true;
-  return confirmAction('Leave without saving?', {
-    detail: `You're in the middle of ${what}. If you leave now, it isn't kept.`,
-    action: 'Leave',
+  // 0.10.11: the same words everywhere something isn't saved
+  return confirmAction("You haven't saved", {
+    detail: `You're in the middle of ${what}. Leave anyway? It won't be kept.`,
+    action: 'Leave without saving',
     danger: true,
   });
 }

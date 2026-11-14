@@ -843,7 +843,20 @@ export function EditSheet({
   };
 
   return (
-    <Sheet title={alertsOnly ? 'Price alerts' : 'Edit item'} onClose={onClose}>
+    <Sheet
+      title={alertsOnly ? 'Price alerts' : 'Edit item'}
+      onClose={onClose}
+      // 0.10.11: closing with something changed and not saved asks first
+      unsaved={
+        name !== group.name ||
+        categoryId !== (group.categoryId ?? '') ||
+        alertLevel !== group.alertLevel ||
+        (alertLevel === 'custom' && alertPct !== (group.alertPct ?? 30)) ||
+        allowBulk !== (group.allowBulk !== false) ||
+        allowMulti !== (group.allowMulti !== false) ||
+        target !== (group.targetPrice !== undefined ? group.targetPrice.toFixed(2) : '')
+      }
+    >
       {!alertsOnly && (
         <>
           <label className="field">

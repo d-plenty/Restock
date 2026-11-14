@@ -35,6 +35,7 @@ import { SetupScreen } from './screens/Setup';
 import { addShared, nameFromLink, splitShared } from '../lib/shared';
 import { takeLensBarcode } from '../lib/lens';
 import { ScannedScreen } from './screens/Scanned';
+import { leavePendingCustom, pendingCustom } from './screens/CustomSections';
 import { okToLeave, unsavedWork } from './leaveGuard';
 import { rescueOldScans } from '../lib/scanQueue';
 import { scanBarcode } from '../lib/barcode';
@@ -232,6 +233,16 @@ function RestockApp() {
     go();
   }, []);
 
+  // 0.10.11: going back (or to another tab) from a new custom section that isn't saved asks first,
+  // and leaving takes it away again. Opening something from its page doesn't ask.
+  const leaveBack = useCallback(
+    (go: () => void) => {
+      if (pendingCustom()) return void leavePendingCustom().then((ok) => ok && go());
+      leave(go);
+    },
+    [leave],
+  );
+
   // 0.9.8: each screen keeps its scroll place. Opening a screen on top notes where the one below was;
   // coming back puts it there again (Settings, after Restore a backup or Recall alerts, say).
   const scrolls = useRef<number[]>([]);
@@ -277,7 +288,7 @@ function RestockApp() {
       tab,
       section,
       setTab: (t, sec) =>
-        leave(() => {
+        leaveBack(() => {
           setStack([]);
           scrolls.current.length = 0;
           setTab(t);
@@ -285,10 +296,10 @@ function RestockApp() {
           else if (sec) setSection(sec);
         }),
       push: (s) => leave(() => pushScreen(s)),
-      pop: () => leave(() => popScreen()),
+      pop: () => leaveBack(() => popScreen()),
       toast,
     }),
-    [tab, section, toast, leave],
+    [tab, section, toast, leave, leaveBack],
   );
 
   // Android back button: one thing per press. The scanner, then the top sheet or shopping mode,
@@ -304,7 +315,7 @@ function RestockApp() {
       if (document.querySelector('.scanner')) {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
       } else if (closeTopLayer()) return;
-      else if (st.length) leave(() => popRef.current());
+      else if (st.length) leaveBack(() => popRef.current());
       else if (runBackHandlers()) return;
       // 0.10.3: from Keg, Health, Baby or Pets, back goes to More (where they were opened).
       else if (isMoreTab(t) && t !== 'more') leave(() => setTab('more'));

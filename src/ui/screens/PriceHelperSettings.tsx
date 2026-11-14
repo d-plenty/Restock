@@ -5,11 +5,13 @@ import {
   HELPER_SEARCHES,
   helperSearches,
   helperStatus,
+  wholeListTime,
   tidyHelperUrl,
   tidySearches,
   type PriceHelperSettings,
   type PriceHelperState,
 } from '../../lib/priceHelper';
+import { confirmAction } from '../../lib/confirm';
 import { RestockNative } from '../../lib/sql/native';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
@@ -70,6 +72,7 @@ export function PriceHelperSettings({ settings }: { settings: Settings }) {
   };
 
   const searches = helperSearches(ph);
+  const left = Math.max(0, searches.length - (state?.week ? (state.done ?? 0) : 0));
   const custom = !!ph.searches?.length && ph.searches.join('\n') !== HELPER_SEARCHES.join('\n');
   const badUrl = url.trim() !== '' && !tidyHelperUrl(url);
 
@@ -172,6 +175,36 @@ export function PriceHelperSettings({ settings }: { settings: Settings }) {
           Run a few now
         </button>
       </div>
+      {/* 0.10.11: the whole week's list in one go (run after run, with the same pauses), and Stop */}
+      {state?.all ? (
+        <button
+          className="btn"
+          onClick={async () => {
+            await RestockNative.priceHelperStop();
+            setAsked(undefined);
+          }}
+        >
+          Stop the whole-list run
+        </button>
+      ) : (
+        <button
+          className="btn"
+          disabled={!ph.enabled || !ph.url || !ph.key || left <= 0}
+          onClick={async () => {
+            const ok = await confirmAction(`Run ${left === searches.length ? `all ${left}` : `the ${left} left of this week's`} searches now?`, {
+              detail: `${wholeListTime(left)}: each search asks Coles and Woolworths, with a pause between, the same as the half-hourly runs. Keep this phone on its charger. If a shop turns it away, that shop rests for six hours and the run picks up later. You can stop it here any time.`,
+              action: 'Run them',
+            });
+            if (!ok) return;
+            const u = tidyHelperUrl(url);
+            if (u && (u !== ph.url || key.trim() !== ph.key)) await save({ url: u, key: key.trim() || undefined });
+            await RestockNative.priceHelperRunAll();
+            setAsked(Date.now());
+          }}
+        >
+          {left > 0 ? `Run the whole list now (${left} searches)` : "This week's list is done"}
+        </button>
+      )}
       <div className="small" role="status" aria-live="polite">
         {helperStatus({ state, enabled: ph.enabled, of: searches.length, asked, now: Date.now() }).map((line) => (
           <span key={line} style={{ display: 'block' }}>

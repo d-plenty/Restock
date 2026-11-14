@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.10" src="https://img.shields.io/badge/status-release%20candidate%200.10.10-ffcd00">
+  <img alt="Release candidate 0.10.11" src="https://img.shields.io/badge/status-release%20candidate%200.10.11-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-01010">New in 0.10.10</a> ·
+  <a href="#new-in-01011">New in 0.10.11</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -131,6 +131,19 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.11
+
+Release candidate 12.
+
+- **Costco can be unticked.** Its tick came back on its own: an old setting from 0.9.6 stayed on and put Costco back with your shops. Costco is under Other shops, on every tab's shop page, ticked and unticked like any shop.
+- **A new custom section is only kept when you tap Save section.** Tapping a start (Office, say) opens its page marked "Not saved yet"; going Back asks **You haven't saved**, and leaving takes the section away again.
+- **"You haven't saved" everywhere.** Closing a sheet with something changed and not saved (a card, a gift card's balance, a shop of your own, Edit item, Add by hand) asks first. Its own Save and Cancel buttons work as before.
+- **Finish setup.** With nothing left to set up, Setup's Continue button becomes Finish setup and takes you out.
+- **Find it from a photo** has two buttons: Take a photo of the pack, or **Choose from photo library**.
+- **Tick the other flavours in one tap.** Tick one flavour in search and a button over that shop's results offers the rest ("Tick the other 4 flavours too"): the same brand and size, in its other flavours, scents or colours.
+- **The Add page no longer slides sideways.** A long line in the bar at the bottom ("4 flavours at Coles, 3 flavours at Woolworths: one item, any of them will do") ran off the edge and made the whole page wider than the screen; it wraps now.
+- **Price helper phone:** **Run the whole list now** runs this week's searches one after another (the same pauses as the half-hourly runs), with Stop.
 
 ## New in 0.10.10
 
@@ -428,7 +441,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.10.apk` (on macOS, `shasum -a 256 restock-0.10.10.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.11.apk` (on macOS, `shasum -a 256 restock-0.10.11.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -614,7 +627,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is at its **eleventh release candidate** (0.10.10): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is at its **twelfth release candidate** (0.10.11): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.

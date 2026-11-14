@@ -4,7 +4,7 @@ import { nowIso, uid, updateSettings as saveNow } from '../../lib/db';
 // 0.9.5 (save): on My shops, changes wait for Save settings (settingsDraft.ts); in the setup steps they're saved at once.
 import { getSettings, hasUnsaved, saveDraft, updateSettings } from '../../lib/settingsDraft';
 import { SaveBar, useSettingsDraft } from '../SaveBar';
-import { CustomSectionHead } from './CustomSections';
+import { CustomSectionHead, keepPendingCustom, openedCustomPage, pendingCustom } from './CustomSections';
 import { StoreMap } from '../StoreMap';
 import { request as askPermission } from '../../lib/permissions';
 import { describePosition, findPickedShops, nearbyStores, searchArea, type Area, type NearbyStore } from '../../lib/places';
@@ -449,7 +449,12 @@ export function byShop(stores: NearbyStore[]): { chain: StoreChain; branches: Ne
 /** 0.10.3: pick a shop for one tab, or take it off that tab (it stays on any other tab it's on). */
 async function setShopFor(chain: StoreChain, section: Section, on: boolean) {
   const s = await getSettings();
-  await updateSettings(pickForTab(s, chain, section, on));
+  const next = pickForTab(s, chain, section, on);
+  // 0.10.11: Costco's own switch (from 0.9.6) follows its tick. It stayed on when Costco was
+  // unticked, and settings that are on put Costco back with the picked shops (settingsCheck.ts),
+  // so the box ticked itself again.
+  const costco = chain === 'costco' && s.costco ? { costco: { ...s.costco, on: next.enabledChains.includes('costco') } } : {};
+  await updateSettings({ ...next, ...costco });
 }
 
 /** What the tab's shops are called in the picker's heading. */
@@ -680,6 +685,7 @@ export function CustomShopSheet({ section, shop, onClose }: { section: Section; 
 
   return (
     <Sheet
+      unsaved={!test?.text && (name !== (shop?.name ?? '') || site !== (shop?.website ?? '') || searchAt !== (shop?.search ?? ''))}
       title={shop ? `Edit ${shop.name}` : `Add a ${section === 'keg' ? 'bottle shop' : section === 'pharmacy' ? 'pharmacy' : 'shop'}`}
       onClose={onClose}
     >
@@ -986,9 +992,19 @@ export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
   const nav = useNav();
   // 0.10.7: one section per page (Back, then the next one in Settings): no row of tabs along the top.
   const tab = section;
+  // 0.10.11: a section just made isn't kept until Save section (CustomSections.tsx).
+  const [isNew] = useState(() => {
+    openedCustomPage(section);
+    return pendingCustom() === section;
+  });
   return (
     <div className="screen">
       <TopBar title={sectionPageTitle(tab)} />
+      {isNew && (
+        <p className="small" role="note" style={{ margin: 0 }}>
+          Not saved yet. Set it up, then tap <strong>Save section</strong> at the bottom. Going back without saving doesn't keep it.
+        </p>
+      )}
       {BETA_SECTIONS.includes(tab) && <p className="small" style={{ margin: 0 }}>{BETA_NOTE}</p>}
       {settings && <StoreFields key={tab} settings={settings} section={tab} />}
       {settings && (
@@ -998,13 +1014,19 @@ export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
             // 0.9.5 (save): Done saves what's changed, then goes back.
             const changed = hasUnsaved();
             if (changed && !(await saveDraft())) return;
+            if (isNew) {
+              keepPendingCustom();
+              nav.toast(`${SECTION_NAMES[tab]} saved`);
+              nav.pop();
+              return;
+            }
             const label = tab === 'pantry' ? 'Pantry shops' : `${SECTION_NAMES[tab]} shops`;
             const summary = shopSummary(settings, tab);
             if (changed) nav.toast(summary === 'Off' ? `${label} are off.` : `${label} saved: ${summary}`);
             nav.pop();
           }}
         >
-          <Icon name="check" size={18} /> Done
+          <Icon name="check" size={18} /> {isNew ? 'Save section' : 'Done'}
         </button>
       )}
       <SaveBar />

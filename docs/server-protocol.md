@@ -942,3 +942,7 @@ Nothing. Fixes only (the Shopping list's buttons, search boxes, big text, Dan Mu
 ## 0.10.10: what changed on the wire
 
 - Nothing between phones and the server. The Keg and Health tabs are now called Bottle shop and Chemist on the screen; their ids (`keg`, `pharmacy`) are the same, and the server's list names (`data.mjs` LIST_NAMES) follow.
+
+## 0.10.11: what changed on the wire
+
+- Nothing between phones and the server.

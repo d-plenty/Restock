@@ -16,6 +16,9 @@ export interface RestockNativePlugin {
   /** 0.9.11: price helper phone mode (PriceHelper.java). */
   priceHelperSchedule(): Promise<void>;
   priceHelperRunNow(): Promise<void>;
+  /** 0.10.11: the whole list, run after run, until it's done or stopped. */
+  priceHelperRunAll(): Promise<void>;
+  priceHelperStop(): Promise<void>;
   priceHelperTest(opts: { url: string; key: string }): Promise<{ ok: boolean; status?: number; error?: string }>;
   /**
    * Run a price check now, in native code, and wait for it. `slot`: this is the catch-up for a

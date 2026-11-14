@@ -55,6 +55,8 @@ export interface PriceHelperState {
   paused?: Record<string, string>;
   /** 0.9.12: set while a run is going. */
   runningSince?: string;
+  /** 0.10.11: set while "Run the whole list now" is going (run after run). */
+  all?: boolean;
 }
 
 /**
@@ -66,7 +68,12 @@ export function helperStatus(o: { state?: PriceHelperState; enabled: boolean; of
   const s = o.state;
   const running = !!s?.runningSince && o.now - Date.parse(s.runningSince) < 15 * 60_000;
   const lines: string[] = [];
-  if (running) lines.push(`Running now: search ${Math.min((s?.done ?? 0) + 1, s?.of ?? o.of)} of ${s?.of ?? o.of}. Each one takes about a minute.`);
+  const at = Math.min((s?.done ?? 0) + 1, s?.of ?? o.of);
+  const total = s?.of ?? o.of;
+  // Still going: a run is on, or one ended in the last quarter of an hour (the next starts within the minute).
+  const allOn = !!s?.all && (running || (!!s.lastAt && o.now - Date.parse(s.lastAt) < 15 * 60_000));
+  if (allOn) lines.push(`Running the whole list: search ${at} of ${total}. ${wholeListTime(total - at + 1)} to go. Keep this phone on its charger.`);
+  else if (running) lines.push(`Running now: search ${at} of ${total}. Each one takes about a minute.`);
   else if (o.asked && o.now - o.asked < 60_000 && (!s?.lastAt || Date.parse(s.lastAt) < o.asked)) lines.push('Starting…');
   if (s?.week) {
     const parts = [`This week: ${Math.min(s.done ?? 0, s.of ?? o.of)} of ${s.of ?? o.of} searches done`, `${(s.sent ?? 0).toLocaleString()} prices sent`];
@@ -83,6 +90,14 @@ export function helperStatus(o: { state?: PriceHelperState; enabled: boolean; of
     );
   }
   return lines;
+}
+
+/** 0.10.11: about how long that many searches take, a minute or so each ("About 8 hours", "About 20 minutes"). */
+export function wholeListTime(searches: number): string {
+  const mins = Math.max(1, Math.round(searches * 1.2));
+  if (mins < 90) return `About ${mins} minute${mins === 1 ? '' : 's'}`;
+  const h = Math.round(mins / 60);
+  return `About ${h} hours`;
 }
 
 /** The built-in list: 500 everyday things people buy at the supermarket. */

@@ -5681,3 +5681,24 @@ svg.icon-info {
   opacity: 1;
   color: var(--muted);
 }
+
+/* ---------- 0.10.11 ---------- */
+/* The add bar's lines stay inside the bar. A long one ("4 flavours at Coles, 3 flavours at
+   Woolworths: one item, any of them will do") ran out past the arrow and made the whole page slide
+   sideways: its lines were as wide as their words, however long. */
+.add-mini-text > * {
+  max-width: 100%;
+  min-width: 0;
+}
+.add-mini-text > .small:not(.clip) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* "Tick the other 4 flavours too", over a shop's results once one is ticked. */
+.btn.small.flavour-all {
+  align-self: flex-start;
+  height: auto;
+  min-height: 44px;
+  white-space: normal;
+  text-align: left;
+}

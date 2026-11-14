@@ -243,6 +243,20 @@ public class RestockNativePlugin extends Plugin {
         call.resolve();
     }
 
+    /** 0.10.11: "Run the whole list now": run after run until the week's list is done. */
+    @PluginMethod
+    public void priceHelperRunAll(PluginCall call) {
+        PriceHelper.runAll(getContext());
+        call.resolve();
+    }
+
+    /** 0.10.11: Stop the whole-list run. */
+    @PluginMethod
+    public void priceHelperStop(PluginCall call) {
+        PriceHelper.stopAll(getContext());
+        call.resolve();
+    }
+
     /** "Test": does the collector at this address take this key? {ok, status?, error?} */
     @PluginMethod
     public void priceHelperTest(final PluginCall call) {

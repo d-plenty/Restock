@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type MutableRefObject, type InputHTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { nameHasSize } from '../lib/naming';
 import { RestockNative } from '../lib/sql/native';
@@ -9,6 +9,7 @@ import { bothPrices, describe, productQty, type Option } from '../lib/verdict';
 import { sizeLabel } from '../lib/unitPrice';
 import { chainName, stockAtBranch, type Chain, type PriceReading } from '../types';
 import { cachedSettings } from '../lib/db';
+import { confirmAction } from '../lib/confirm';
 import { onSectionIcons, SECTION_NAMES, shopColor, websiteOf, type Section } from '../shops';
 import { useNav } from './nav';
 
@@ -585,8 +586,42 @@ function updateBehindSheets() {
  * the layer on <body>, and while it's open the app and any sheet under it are inert and hidden from
  * screen readers.
  */
-export function Sheet({ title, onClose, children, action }: { title: string; onClose: () => void; children: ReactNode; /** 0.10.2: a button beside the title (a line's "Add to pantry"). */ action?: ReactNode }) {
-  useBackLayer(onClose);
+// 0.10.11: "You haven't saved". A sheet with a form in it (a card being typed, a shop being added)
+// says when something's been changed (useSheetGuard), and closing it by X, Back or a tap outside asks
+// first. Its own Save and Cancel buttons close it straight away, as they always did.
+const SheetGuard = createContext<MutableRefObject<(() => boolean) | undefined> | null>(null);
+/** Inside a Sheet: while `dirty` is true, closing the sheet without saving asks first. */
+export function useSheetGuard(dirty: boolean | (() => boolean)): void {
+  const ctx = useContext(SheetGuard);
+  const ref = useRef(dirty);
+  ref.current = dirty;
+  useEffect(() => {
+    if (!ctx) return;
+    const fn = () => (typeof ref.current === 'function' ? ref.current() : ref.current);
+    ctx.current = fn;
+    return () => {
+      if (ctx.current === fn) ctx.current = undefined;
+    };
+  }, [ctx]);
+}
+
+export function Sheet({ title, onClose, children, action, unsaved }: { title: string; onClose: () => void; children: ReactNode; /** 0.10.11: something's been changed and not saved: closing by X, Back or a tap outside asks first. */ unsaved?: boolean; /** 0.10.2: a button beside the title (a line's "Add to pantry"). */ action?: ReactNode }) {
+  const guard = useRef<(() => boolean) | undefined>(undefined);
+  const asking = useRef(false);
+  const close = useRef(onClose);
+  close.current = onClose;
+  const unsavedRef = useRef(unsaved);
+  unsavedRef.current = unsaved;
+  const [dismiss] = useState(() => () => {
+    if (!unsavedRef.current && !guard.current?.()) return close.current();
+    if (asking.current) return;
+    asking.current = true;
+    void confirmAction("You haven't saved", { detail: "Leave anyway? What you've changed here won't be kept.", action: 'Leave without saving', danger: true }).then((ok) => {
+      asking.current = false;
+      if (ok) close.current();
+    });
+  });
+  useBackLayer(dismiss);
   const ref = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
   // What had focus before the sheet drew (the button that opened it), so focus can go back there.
@@ -629,7 +664,7 @@ export function Sheet({ title, onClose, children, action }: { title: string; onC
   }, [opener]);
   // 0.9.1: drawn in the layer on <body>, not inside whatever screen opened it.
   return createPortal(
-    <div ref={backRef} className="sheet-back" onClick={onClose}>
+    <div ref={backRef} className="sheet-back" onClick={dismiss}>
       <div ref={ref} className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="topbar">
           {action ? (
@@ -646,11 +681,11 @@ export function Sheet({ title, onClose, children, action }: { title: string; onC
               {title}
             </h2>
           )}
-          <button className="icon-btn" aria-label="Close" onClick={onClose}>
+          <button className="icon-btn" aria-label="Close" onClick={dismiss}>
             <Icon name="close" size={20} />
           </button>
         </div>
-        {children}
+        <SheetGuard.Provider value={guard}>{children}</SheetGuard.Provider>
       </div>
     </div>,
     layerHost(),

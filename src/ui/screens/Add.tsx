@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
-import { flavourBarNote } from '../../lib/flavours';
+import { flavourBarNote, flavourWord, otherFlavours } from '../../lib/flavours';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { productCode, scanBarcode, type BarcodeInfo } from '../../lib/barcode';
 import { displayName, identifyBarcode, QUICK_PICKS, searchTermFor, weakName } from '../../lib/lookup';
@@ -1116,7 +1116,7 @@ export function AddScreen({
       ? `Tick what you'd buy as "${forLine.word}" at each shop, then tap the bar at the bottom to add it to your pantry.`
       : forList
         ? 'Tick the ones you’d buy, at any shop. The cheapest of them goes on your Shopping list for this trip only. Then tap the bar at the bottom.'
-        : 'Tick what you buy at each shop, so Restock can tell you where it’s cheapest. Then tap the bar at the bottom. Tap a photo for a closer look.';
+        : 'Tick what you buy at each shop, so Restock can tell you where it’s cheapest. Then tap the bar at the bottom.';
 
   // A ticked product that's already a pantry item: from the Pick sheet, the line can just be that item.
   const trackedPick = forLine ? [...picks.keys()].map((k) => pantry?.get(k)).find((g): g is Group => !!g) : undefined;
@@ -1658,7 +1658,7 @@ export function AddScreen({
 
       {anyResults && (
         <p className="small">
-          {hint} Not sure it's the right one? Tap the photo (or press and hold the product) for a bigger look, ingredients and nutrition.
+          {hint} Not sure it's the right one? Tap its photo for a bigger look.
         </p>
       )}
 
@@ -1801,6 +1801,29 @@ export function AddScreen({
                     </button>
                   </p>
                 )}
+                {/* 0.10.11: tick one flavour, and the same thing's other flavours here (same brand and size) are one tap */}
+                {(() => {
+                  const mine = [...picks.values()].filter((x) => x.chain === chain);
+                  const more = otherFlavours(mine, pool, (a, b) => keyOf(a) === keyOf(b));
+                  if (!more.length) return null;
+                  const word = flavourWord([...mine, ...more].map((x) => x.name));
+                  return (
+                    <button
+                      className="btn small flavour-all"
+                      style={TAP}
+                      onClick={() => {
+                        setPicks((prev) => {
+                          const next = new Map(prev);
+                          for (const x of more) next.set(keyOf(x), x);
+                          return next;
+                        });
+                        setShowing((m) => ({ ...m, [chain]: Math.max(m[chain] ?? 0, pool.length) }));
+                      }}
+                    >
+                      <Icon name="check" size={16} /> Tick the other {more.length === 1 ? word.replace(/s$/, '') : `${more.length} ${word}`} too
+                    </button>
+                  );
+                })()}
                 {list.length > 0 && (
                   <div className="card flush">
                     {list.map((sp) => {
@@ -1952,7 +1975,7 @@ export function AddScreen({
               {picks.size} ticked · tap to add
             </span>
             <span className="small clip">{tickedShops([...picks.values()])}</span>
-            {flavourBarNote(picks.values(), chainName) && <span className="small clip">{flavourBarNote(picks.values(), chainName)}</span>}
+            {flavourBarNote(picks.values(), chainName) && <span className="small">{flavourBarNote(picks.values(), chainName)}</span>}
             {recShops.length > 0 && <span className="small clip">Picked for you at {recShops.map((c) => chainName(c)).join(' and ')}</span>}
           </span>
           <span className="add-mini-arrow" aria-hidden="true">
@@ -2267,7 +2290,7 @@ export function ManualSheet({
   };
 
   return (
-    <Sheet title="Add by hand" onClose={onClose}>
+    <Sheet title="Add by hand" onClose={onClose} unsaved={!saving && !busyAs && (name.trim() !== defaultName.trim() || !!size.trim() || !!price.trim())}>
       <p className="small">Prices for hand-added products aren't checked automatically. Enter them from the shelf or catalogue as you see them.</p>
       <label className="field">
         <span>Product name</span>

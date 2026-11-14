@@ -30,6 +30,13 @@ export function PackReader({
   onSearch?: (name: string) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const library = useRef<HTMLInputElement>(null);
+  // The same photo can be picked twice in a row (the box is emptied once it's been read).
+  const pickFrom = async (el: HTMLInputElement) => {
+    const f = el.files?.[0];
+    el.value = '';
+    await go(f);
+  };
   const [busy, setBusy] = useState<string>();
   const [note, setNote] = useState<string>();
   const [photo, setPhoto] = useState<File>();
@@ -110,10 +117,15 @@ export function PackReader({
 
   return (
     <>
-      <input ref={input} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void go(e.target.files?.[0])} />
+      <input ref={input} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void pickFrom(e.target)} />
+      {/* 0.10.11: or a photo you already have (no capture, so the phone offers its photo library) */}
+      <input ref={library} type="file" accept="image/*" hidden onChange={(e) => void pickFrom(e.target)} />
       {/* 0.10.8: once there's a photo, taking another is the quiet option */}
       <button type="button" className={`btn ${primary && !photo ? 'primary' : ''}`} disabled={!!busy} onClick={() => input.current?.click()}>
         <Icon name="camera" size={18} /> {photo ? 'Take another photo' : label}
+      </button>
+      <button type="button" className="btn" disabled={!!busy} onClick={() => library.current?.click()}>
+        <Icon name="image" size={18} /> Choose from photo library
       </button>
       {busy && (
         <div style={{ display: 'grid', gap: 6 }}>
