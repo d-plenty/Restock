@@ -5,6 +5,7 @@
 // bar's green arrow opens the details sheet (name, which list incl. General, Picked for you at your
 // other shops, category), then Track, Add to list, or both. The server saves it all (the price the
 // shop gave it), and this browser's copy gets it at the sync that follows.
+import { flavourBarNote } from '../../lib/flavours';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { allCategories, deleteListEntries } from '../../lib/db';
 import { pickItemFor, pickItemOffList } from '../../lib/listPicks';
@@ -14,7 +15,8 @@ import { useLive } from '../../lib/useLive';
 import { SECTION_NAMES, SECTION_PLACE, type ListSection, type Section, type StoreChain } from '../../shops';
 import type { StoreProduct } from '../../stores/types';
 import { chainName, type ListEntry } from '../../types';
-import { ChainDot, ChainName, Icon, LoadingBar, MemberTag, Sheet, Thumb } from '../../ui/components';
+import { ChainDot, ChainName, Icon, LoadingBar, MemberTag, Sheet, specialTag, Thumb } from '../../ui/components';
+import { promoLabel } from '../../stores/http';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from '../../ui/screens/addPicks';
 import { AddBtn, AddPair, addButtonsNote, AlwaysTick, pickButtonsNote, toPantryNote } from '../../ui/screens/addPickWords';
 import { useNav } from '../../ui/nav';
@@ -251,7 +253,7 @@ export function WebShopSearch({
     const k = keyOf(sp);
     const picked = picks.has(k);
     return (
-      <label key={k} className={`row${picked ? ' selected' : ''}`}>
+      <label key={k} className={`row pick-row${picked ? ' selected' : ''}`}>
         <input type="checkbox" checked={picked} onChange={() => toggle(sp)} aria-label={`Tick ${sp.name} at ${chainName(sp.chain)}, ${money(sp.price)}`} />
         <button
           type="button"
@@ -273,16 +275,6 @@ export function WebShopSearch({
             {sp.name}
           </span>
           {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
-          <span className="tags">
-            {barcode && sp.barcode === barcode && <span className="tag good">EXACT MATCH</span>}
-            {!barcode && top.has(sp.storeProductId) && <span className="tag good">RECOMMENDED</span>}
-            {sp.itemId && <span className="tag normal">IN YOUR PANTRY</span>}
-            {sp.isSpecial && !sp.memberOnly && (
-              <span className="tag wait">{sp.halfPrice ? 'HALF PRICE' : sp.wasPrice ? `ON SPECIAL · SAVE ${money(sp.wasPrice - (sp.price ?? sp.wasPrice))}` : 'ON SPECIAL'}</span>
-            )}
-            {sp.isSpecial && sp.promo && <span className="tag normal">{sp.promo.toUpperCase()}</span>}
-            {sp.memberOnly && <MemberTag chain={sp.chain} />}
-          </span>
         </span>
         <span style={{ textAlign: 'right', flex: 'none' }}>
           <span className="num" style={{ fontWeight: 600, display: 'block' }}>
@@ -295,12 +287,21 @@ export function WebShopSearch({
           )}
           {sp.wasPrice ? (
             <span className="small" style={{ display: 'block' }}>
-              usual price{' '}
+              was{' '}
               <span className="num" style={{ textDecoration: 'line-through' }}>
                 {money(sp.wasPrice)}
               </span>
             </span>
           ) : null}
+        </span>
+        {/* 0.10.9: the same tags, words and layout as the phone's search (Add.tsx): their own line */}
+        <span className="tags pick-tags">
+          {barcode && sp.barcode === barcode && <span className="tag good">EXACT MATCH</span>}
+          {!barcode && top.has(sp.storeProductId) && <span className="tag good">RECOMMENDED</span>}
+          {sp.itemId && <span className="tag normal">IN YOUR PANTRY</span>}
+          {sp.isSpecial && !sp.memberOnly && <span className="tag wait">{specialTag(sp.price, sp.wasPrice, sp.halfPrice)}</span>}
+          {sp.isSpecial && promoLabel(sp.promo) && <span className="tag normal">{promoLabel(sp.promo)}</span>}
+          {sp.memberOnly && <MemberTag chain={sp.chain} />}
         </span>
       </label>
     );
@@ -455,6 +456,7 @@ export function WebShopSearch({
               {picks.size} ticked · tap to add
             </span>
             <span className="small clip">{tickedShops(picks.values())}</span>
+            {flavourBarNote(picks.values(), chainName) && <span className="small clip">{flavourBarNote(picks.values(), chainName)}</span>}
             {recShops.length > 0 && <span className="small clip">Picked for you at {recShops.map((c) => chainName(c)).join(' and ')}</span>}
           </span>
           <span className="add-mini-arrow" aria-hidden="true">

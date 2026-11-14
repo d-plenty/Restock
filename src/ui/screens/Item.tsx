@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { flavourNoteFor, flavourSets } from '../../lib/flavours';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import {
   addReading,
@@ -456,9 +457,15 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       <TopBar
         title={group.name}
         right={
-          <button className="icon-btn" aria-label="More options" onClick={() => setSheet('menu')}>
-            <Icon name="more" size={20} />
-          </button>
+          // 0.10.8: Edit (name, category and alerts) is its own button; ⋯ has Enter a price and Delete.
+          <span className="item-head-btns">
+            <button className="btn small" onClick={() => setSheet('edit')} aria-label={`Edit ${group.name}: name, category and alerts`}>
+              <Icon name="pencil" size={16} /> Edit
+            </button>
+            <button className="icon-btn" aria-label="More: enter a price or delete" onClick={() => setSheet('menu')}>
+              <Icon name="more" size={20} />
+            </button>
+          </span>
         }
       />
 
@@ -468,6 +475,12 @@ export function ItemScreen({ groupId }: { groupId: string }) {
         </div>
         <div className="big">{rec.headline}</div>
         {rec.detail && <p style={{ fontSize: 15 }}>{rec.detail}</p>}
+        {flavourNoteFor(rec) && (
+          // 0.10.9: "On special in all 3 scents", or which ones are
+          <p style={{ fontSize: 15, fontWeight: 700 }}>
+            {chainName(rec.best!.product.chain)}: {flavourNoteFor(rec)}.
+          </p>
+        )}
         {rec.saving !== undefined && <p style={{ fontSize: 15, fontWeight: 700 }}>Saves about {money(rec.saving)}</p>}
       </div>
       {rec.action === 'alt' && rec.alt && (
@@ -612,6 +625,15 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             {productsAndShops(mains)}
           </p>
         )}
+        {/* 0.10.9: several of the same thing at one shop are flavours (scents, colours) of it */}
+        {flavourSets(rec).map((f) => (
+          <p key={f.chain} className="small flavour-note">
+            <strong>
+              Any of your {f.n} {f.word} at {chainName(f.chain)}
+            </strong>{' '}
+            will do: Restock watches them all, and a special on any of them counts. Tick only the one you want if it has to be that one.
+          </p>
+        ))}
         {mains.length > 0 && (
           <div className="size-choice">
             <div className="seg" role="radiogroup" aria-label="Which sizes">
@@ -755,12 +777,6 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       {sheet === 'menu' && (
         <Sheet title={group.name} onClose={() => setSheet(undefined)}>
           <div className="card flush">
-            <button className="row" onClick={() => setSheet('edit')}>
-              <Icon name="pencil" size={18} />
-              <span className="grow">
-                <span className="title">Edit name, category and alerts</span>
-              </span>
-            </button>
             <button className="row" disabled={!rec.options.length} onClick={() => setSheet('price')}>
               <Icon name="tag" size={18} />
               <span className="grow">

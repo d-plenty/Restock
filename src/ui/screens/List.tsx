@@ -1,4 +1,5 @@
 import { StockTag } from '../StockTag';
+import { flavourSets } from '../../lib/flavours';
 import { CheckStockButton } from '../CheckStock';
 import type { StockItem } from '../../lib/stockWhere';
 import { aisleLabel, aisleOf, byAisle as sortByAisle, getAisles, type AisleAt } from '../../lib/aisles';
@@ -1161,7 +1162,107 @@ const onlyAt = (recs: Recommendation[], chains: StoreChain[]): Recommendation[] 
  * A line in shopping mode. On the phone the whole line ticks it (a big target in the shop). 0.9.4,
  * the web on a server (design 15): only the checkbox ticks, and the line opens its product.
  */
-function ShopRow({ e, name, onOpen, extra, children }: { e: ListEntry; name: string; onOpen?: () => void; extra?: ReactNode; children: ReactNode }) {
+/**
+ * 0.10.9: shopping mode's shops to pick from: "Where are you first?", each shop with how many things
+ * and about how much, then "Where to next?" with the done ones greyed (tap one to go back in).
+ */
+function ShopPicker({
+  shops,
+  doneAt,
+  anyCount,
+  name,
+  stats,
+  onPick,
+  onAll,
+  onFinish,
+}: {
+  shops: ShopKey[];
+  doneAt: ShopKey[];
+  anyCount: number;
+  name: (s: ShopKey) => string;
+  stats: (s: ShopKey) => { n: number; got: number; left: number; total: number; spent: number };
+  onPick: (s: ShopKey) => void;
+  onAll: () => void;
+  onFinish: () => void;
+}) {
+  const toDo = shops.filter((s) => !doneAt.includes(s));
+  const done = shops.filter((s) => doneAt.includes(s));
+  const last = doneAt[doneAt.length - 1];
+  // The shop with the most still to get, marked the first time (the obvious place to start).
+  const most = !doneAt.length ? [...toDo].sort((a, b) => stats(b).left - stats(a).left)[0] : undefined;
+  const card = (s: ShopKey, isDone: boolean) => {
+    const st = stats(s);
+    return (
+      <button key={s} type="button" className={`shop-pick${isDone ? ' done' : ''}${s === most || (!isDone && s === toDo[0] && doneAt.length) ? ' next' : ''}`} onClick={() => onPick(s)}>
+        {isDone ? (
+          <span className="shop-pick-tick" aria-hidden>
+            <Icon name="check" size={14} />
+          </span>
+        ) : (
+          <ChainDot chain={s as Chain} />
+        )}
+        <span className="grow" style={{ minWidth: 0 }}>
+          <span className="title shop-pick-name">{name(s)}</span>
+          <span className="small num">
+            {isDone
+              ? `Done · ${st.got} of ${st.n} · ${money(st.spent)} · tap to go back in`
+              : `${st.left === 1 ? '1 thing' : `${st.left} things`}${st.total > 0 ? ` · about ${money(st.total - st.spent)}` : ''}`}
+          </span>
+          {s === most && <span className="tag good shop-pick-tag">MOST ON YOUR LIST</span>}
+        </span>
+        {!isDone && <Icon name="chevron" size={18} />}
+      </button>
+    );
+  };
+  return (
+    <div className="shop-picker">
+      {last && (
+        <div className="shop-picker-done" role="status">
+          <Icon name="check" size={18} /> {chainName(last)} done: {stats(last).got} of {stats(last).n} in the trolley
+        </div>
+      )}
+      <h2 className="shop-picker-title">{!toDo.length ? 'Every shop done' : doneAt.length ? 'Where to next?' : 'Where are you first?'}</h2>
+      {!doneAt.length && (
+        <p className="small" style={{ margin: 0 }}>
+          Tap a shop to see only what to get there. When you've got it all, you come back here for the next one.
+        </p>
+      )}
+      <div className="shop-picks">
+        {toDo.map((s) => card(s, false))}
+        {done.map((s) => card(s, true))}
+      </div>
+      {anyCount > 0 && (
+        <p className="small" style={{ margin: 0 }}>
+          {anyCount === 1 ? '1 thing has' : `${anyCount} things have`} no shop picked, so {anyCount === 1 ? 'it shows' : 'they show'} at every shop.
+        </p>
+      )}
+      {!toDo.length && (
+        <button className="btn primary block" onClick={onFinish}>
+          <Icon name="check" size={18} /> Finish shopping
+        </button>
+      )}
+      <button type="button" className="linkish shop-picker-all" onClick={onAll}>
+        See everything in one list
+      </button>
+    </div>
+  );
+}
+
+function ShopRow({
+  e,
+  name,
+  onOpen,
+  thumb,
+  extra,
+  children,
+}: {
+  e: ListEntry;
+  name: string;
+  onOpen?: () => void;
+  thumb?: ReactNode;
+  extra?: ReactNode;
+  children: ReactNode;
+}) {
   const tick = (ev: { target: { checked: boolean } }) => {
     buzz(10);
     void tickEntry(e, ev.target.checked, name);
@@ -1170,6 +1271,7 @@ function ShopRow({ e, name, onOpen, extra, children }: { e: ListEntry; name: str
     return (
       <label className={`shoprow${e.checked ? ' got' : ''}`}>
         <input type="checkbox" checked={e.checked} onChange={tick} />
+        {thumb}
         {children}
         {extra}
       </label>
@@ -1179,6 +1281,7 @@ function ShopRow({ e, name, onOpen, extra, children }: { e: ListEntry; name: str
       <label className="tick-hit">
         <input type="checkbox" checked={e.checked} onChange={tick} aria-label={`Got ${name}`} />
       </label>
+      {thumb}
       {onOpen ? (
         <button type="button" className="shoprow-open" onClick={onOpen} aria-label={`${name}, open the item`}>
           {children}
@@ -1411,8 +1514,15 @@ function ShoppingMode({
   const cards = useLive(allCards, []);
   const [card, setCard] = useState<LoyaltyCard>();
 
-  // Back (or Escape) closes shopping mode, unless a sheet is open on top of it.
-  useBackLayer(onClose);
+  // 0.10.9: one shop at a time. With things at two or more shops, shopping mode starts by asking
+  // which shop you're at; that shop's things show (and the ones with no shop), then "Done at Coles"
+  // goes back to the shops, with the done ones greyed. "See everything in one list" is the old view.
+  const [at, setAt] = useState<ShopKey | 'all'>();
+  const [doneAt, setDoneAt] = useState<ShopKey[]>([]);
+
+  // Back (or Escape) goes back to the shops from one shop, else closes shopping mode, unless a sheet
+  // is open on top of it.
+  useBackLayer(() => (at ? setAt(undefined) : onClose()));
 
   // Keep the screen on while shopping: asked for once, let go when shopping mode closes.
   useEffect(() => {
@@ -1474,6 +1584,29 @@ function ShoppingMode({
   const inTrolley = entries.filter((e) => e.checked && !elsewhere(e)).reduce((s, e) => s + (priceOf(c, e) ?? 0), 0);
   const notHere = entries.filter((e) => elsewhere(e));
   const left = entries.filter((e) => !e.checked);
+  const here = (shop: ShopKey) => entries.filter((e) => !elsewhere(e) && shopOf(c, e) === shop);
+  const shopKeys = c.order.filter((s) => s !== 'any' && here(s).length > 0);
+  const byShop = shopKeys.length > 1;
+  /** The shop showing: one shop, all of them in one list, or none (the shops to pick from). */
+  const view: ShopKey | 'all' | undefined = byShop ? at : 'all';
+  const shopName = (shop: ShopKey) =>
+    shop === 'any' ? 'Any shop' : shop === 'coles' && colesSlot === '2' && second ? second : branchName(cachedSettings(), shop);
+  const statsOf = (shop: ShopKey) => {
+    const items = here(shop);
+    const got = items.filter((e) => e.checked);
+    return {
+      n: items.length,
+      got: got.length,
+      left: items.length - got.length,
+      total: items.reduce((s, e) => s + (priceOf(c, e) ?? 0), 0),
+      spent: got.reduce((s, e) => s + (priceOf(c, e) ?? 0), 0),
+    };
+  };
+  // (the shops' page says it's done, in a banner that's read out too)
+  const doneHere = (shop: ShopKey) => {
+    setDoneAt((d) => (d.includes(shop) ? d : [...d, shop]));
+    setAt(undefined);
+  };
   const nav = useNav();
   const toast = nav.toast;
   // 0.9.4, the web on a server: a line opens its product (only the checkbox ticks); see ShopRow.
@@ -1515,19 +1648,47 @@ function ShoppingMode({
   return (
     <div className="shopmode" role="dialog" aria-label="Shopping">
       <div className="shopmode-top">
-        <div style={{ flex: 1 }}>
-          <div className="title" style={{ fontSize: 17 }}>
-            Shopping
-          </div>
-          <div className="small num">
-            In the trolley: <strong>{money(inTrolley)}</strong> · {left.length} to go
-          </div>
-          {entries.length > 0 && (
-            <div className="shop-progress" aria-hidden>
-              <span style={{ width: `${Math.round(((entries.length - left.length) / entries.length) * 100)}%` }} />
+        {byShop && view && (
+          <button className="icon-btn" aria-label="Back to your shops" onClick={() => setAt(undefined)}>
+            <Icon name="back" size={20} />
+          </button>
+        )}
+        {view && view !== 'all' ? (
+          // 0.10.9: at one shop: its name, and how far through its things you are
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="title" style={{ fontSize: 17, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ChainDot chain={view as Chain} /> <span className="clip">{shopName(view)}</span>
             </div>
-          )}
-        </div>
+            <div className="small num">
+              {statsOf(view).got} of {statsOf(view).n} in the trolley · <strong>{money(statsOf(view).spent)}</strong>
+            </div>
+            <div className="shop-progress" aria-hidden>
+              <span style={{ width: `${Math.round((statsOf(view).got / Math.max(1, statsOf(view).n)) * 100)}%` }} />
+            </div>
+          </div>
+        ) : (
+          <div style={{ flex: 1 }}>
+            <div className="title" style={{ fontSize: 17 }}>
+              Shopping
+            </div>
+            <div className="small num">
+              {!view && byShop ? (
+                <>
+                  {doneAt.length} of {shopKeys.length} shops done · <strong>{money(inTrolley)}</strong> so far
+                </>
+              ) : (
+                <>
+                  In the trolley: <strong>{money(inTrolley)}</strong> · {left.length} to go
+                </>
+              )}
+            </div>
+            {entries.length > 0 && (
+              <div className="shop-progress" aria-hidden>
+                <span style={{ width: `${Math.round(((entries.length - left.length) / entries.length) * 100)}%` }} />
+              </div>
+            )}
+          </div>
+        )}
         {!serverMode && (
           <button className="icon-btn" aria-label="Scan to tick off" onClick={() => void scanToTick()}>
             <Icon name="scan" size={20} />
@@ -1552,6 +1713,7 @@ function ShoppingMode({
           ))}
         </div>
       )}
+      {view && (
       <div className="shopmode-sort">
         <span className="small" style={{ fontWeight: 600 }}>
           Sort by
@@ -1580,11 +1742,24 @@ function ShoppingMode({
           </button>
         )}
       </div>
-      {serverMode && <PhoneOnlyNote compact text="Aisle numbers are in shopping mode on the phone (they come from your Coles branch)." />}
+      )}
+      {view && serverMode && <PhoneOnlyNote compact text="Aisle numbers are in shopping mode on the phone (they come from your Coles branch)." />}
       <div className="shopmode-list">
         {info && <ProductPreview product={info} onClose={() => setInfo(undefined)} />}
-        {c.order.map((shop) => {
-          const items = sortShop(entries.filter((e) => !elsewhere(e) && shopOf(c, e) === shop));
+        {!view && (
+          <ShopPicker
+            shops={shopKeys}
+            doneAt={doneAt}
+            anyCount={here('any').filter((e) => !e.checked).length}
+            name={shopName}
+            stats={statsOf}
+            onPick={setAt}
+            onAll={() => setAt('all')}
+            onFinish={onClose}
+          />
+        )}
+        {(view === 'all' ? c.order : view ? [view, 'any' as ShopKey] : []).map((shop) => {
+          const items = sortShop(here(shop));
           if (!items.length) return null;
           return (
             <section key={shop}>
@@ -1597,8 +1772,7 @@ function ShoppingMode({
                   padding: '12px 16px 4px',
                 }}
               >
-                {shop !== 'any' && <ChainDot chain={shop} />}{' '}
-                {shop === 'any' ? 'Any shop' : shop === 'coles' && colesSlot === '2' && second ? second : branchName(cachedSettings(), shop)}
+                {shop !== 'any' && <ChainDot chain={shop} />} {shopName(shop)}
                 {/* 0.10.2: at your other Coles today? Its aisles instead. */}
                 {shop === 'coles' && second && !serverMode && (
                   <button type="button" className="linkish small" style={{ marginLeft: 'auto', padding: 0, textTransform: 'none', letterSpacing: 0 }} onClick={() => setColesSlot(colesSlot === '1' ? '2' : '1')}>
@@ -1615,26 +1789,22 @@ function ShoppingMode({
                     e={e}
                     name={name}
                     onOpen={openOf(e)}
+                    // 0.10.8: its photo, with the blue ⓘ, as on the list: tap it to see the product in full
+                    // (photo, size, ingredients), so you know what you're looking for on the shelf.
+                    thumb={
+                      shelfLook(e) ? (
+                        <MoreInfo src={shelfLook(e)!.imageUrl} name={name} onOpen={() => setInfo(shelfLook(e))} />
+                      ) : items.some((x) => !!shelfLook(x)) ? (
+                        // keeps the names lined up with the ones that have a photo
+                        <span className="thumb-space" aria-hidden />
+                      ) : undefined
+                    }
                     extra={
                       <>
                         {priceOf(c, e) !== undefined && (
                           <span className="num" style={{ fontWeight: 700, fontSize: 17 }}>
                             {money(priceOf(c, e))}
                           </span>
-                        )}
-                        {shelfLook(e) && (
-                          <button
-                            type="button"
-                            className="info-btn shop-info"
-                            aria-label={`What ${name} looks like`}
-                            onClick={(ev) => {
-                              ev.preventDefault();
-                              ev.stopPropagation();
-                              setInfo(shelfLook(e));
-                            }}
-                          >
-                            <Icon name="info" size={22} />
-                          </button>
                         )}
                       </>
                     }
@@ -1654,6 +1824,11 @@ function ShoppingMode({
                         <span className="small">
                           {packsOf(c, e)}
                           {d.product.name}
+                          {/* 0.10.9: or any of the others you picked here (flavours, scents, colours) */}
+                          {(() => {
+                            const f = flavourSets(recFor(c, e)!).find((x) => x.chain === d.product.chain);
+                            return f ? `, or any of your ${f.n} ${f.word}` : '';
+                          })()}
                         </span>
                       ) : (
                         e.product && <span className="small">{e.product.name}</span>
@@ -1692,12 +1867,25 @@ function ShoppingMode({
             </section>
           );
         })}
-        {skipped.length > 0 && (
+        {view !== undefined && view !== 'all' && (
+          // 0.10.9: done here: back to the shops (the done one greyed)
+          <div className="shop-done-bar">
+            <button className="btn primary block" onClick={() => doneHere(view)}>
+              <Icon name="check" size={18} /> Done at {chainName(view)}
+            </button>
+            {statsOf(view).left > 0 && (
+              <span className="small">
+                {statsOf(view).left === 1 ? "The 1 you didn't tick stays" : `The ${statsOf(view).left} you didn't tick stay`} on your list.
+              </span>
+            )}
+          </div>
+        )}
+        {view !== undefined && view !== 'all' ? null : skipped.length > 0 && (
           <p className="small" style={{ padding: '12px 16px 0', margin: 0 }}>
             Skipped today (out of stock): {skipped.map((e) => recFor(all, e)?.group.name ?? e.text).join(', ')}. Still on your list.
           </p>
         )}
-        {notHere.length > 0 && (
+        {notHere.length > 0 && (view === 'all' || !view) && (
           <section>
             <div className="eyebrow" style={{ padding: '12px 16px 4px', color: 'var(--amber-ink, inherit)' }}>
               Not at {chosen.map((x) => chainName(x)).join(' or ')}
@@ -1709,7 +1897,19 @@ function ShoppingMode({
               const best = dealFor(all, e);
               const name = recFor(all, e)?.group.name ?? e.text;
               return (
-                <ShopRow key={e.id} e={e} name={name} onOpen={openOf(e)}>
+                <ShopRow
+                  key={e.id}
+                  e={e}
+                  name={name}
+                  onOpen={openOf(e)}
+                  thumb={
+                    best ? (
+                      <MoreInfo src={previewFromOption(best).imageUrl} name={name} onOpen={() => setInfo(previewFromOption(best))} />
+                    ) : notHere.some((x) => !!dealFor(all, x)) ? (
+                      <span className="thumb-space" aria-hidden />
+                    ) : undefined
+                  }
+                >
                   <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <span className="title" style={{ fontSize: 17 }}>
                       {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}

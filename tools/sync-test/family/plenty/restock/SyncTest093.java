@@ -226,6 +226,17 @@ public class SyncTest093 {
         // A forged shop row (search page elsewhere, odd tab) is refused outright.
         check(SharedSettings.checkValue("shop:custom-x", new JSONObject().put("on", true).put("shop", new JSONObject().put("id", "custom-y").put("name", "X").put("website", "https://x.example").put("section", "pantry"))) == null
             && SharedSettings.checkValue("shopAroundMin", -5) == null && SharedSettings.checkValue("listCompare", "cheapest") == null, "rows that aren't right are refused");
+        // 0.10.9: flavours, scents and colours say which are on special, the same as flavours.ts
+        {
+            java.util.List<String> wash = java.util.Arrays.asList("Coles Simply Milk & Honey Body Wash 1L", "Coles Revitalising Ocean Breeze Body Wash 1L", "Coles Body Wash Guava & Peach 1L");
+            java.util.List<String> chips = java.util.Arrays.asList("Doritos Cheese Supreme 170g", "Doritos Nacho Cheese 170g", "Doritos Original 170g");
+            boolean ok = "on special in all 3 scents".equals(Deals.flavourNote(wash, java.util.Arrays.asList(true, true, true)))
+                && "Nacho Cheese and Original on special, not Cheese Supreme".equals(Deals.flavourNote(chips, java.util.Arrays.asList(false, true, true)))
+                && "Revitalising Ocean Breeze on special, not Simply Milk & Honey and Guava & Peach".equals(Deals.flavourNote(wash, java.util.Arrays.asList(false, true, false)))
+                && Deals.flavourNote(wash, java.util.Arrays.asList(false, false, false)) == null
+                && "colours".equals(Deals.flavourWord(java.util.Arrays.asList("Kleenex Tissues White", "Kleenex Tissues Pink")));
+            check(ok, "flavours: which are on special, as on the web");
+        }
         // 0.10.8: custom sections' icons are emoji only and names have no hidden marks (the same as shops.ts)
         {
             boolean ok = true;

@@ -28,6 +28,38 @@ interface DemoGroup {
 }
 
 const GROUPS: DemoGroup[] = [
+  // 0.10.9: three scents of one thing at Coles (flavours, scents and colours): two on special.
+  {
+    key: 'wash',
+    name: 'Body wash',
+    category: 'Bathroom',
+    usual: {
+      key: 'wash-coles-honey',
+      chain: 'coles',
+      name: 'Body Wash Milk & Honey 1L (sample)',
+      size: '1L',
+      normal: 4.8,
+      current: { price: 4.8 },
+    },
+    same: [
+      {
+        key: 'wash-coles-ocean',
+        chain: 'coles',
+        name: 'Body Wash Ocean Breeze 1L (sample)',
+        size: '1L',
+        normal: 4.8,
+        current: { price: 3.3, special: true, was: 4.8 },
+      },
+      {
+        key: 'wash-coles-guava',
+        chain: 'coles',
+        name: 'Body Wash Guava & Peach 1L (sample)',
+        size: '1L',
+        normal: 4.8,
+        current: { price: 3.3, special: true, was: 4.8 },
+      },
+    ],
+  },
   {
     key: 'paper',
     name: 'A4 copy paper',

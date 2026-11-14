@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.8" src="https://img.shields.io/badge/status-release%20candidate%200.10.8-ffcd00">
+  <img alt="Release candidate 0.10.9" src="https://img.shields.io/badge/status-release%20candidate%200.10.9-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0108">New in 0.10.8</a> ·
+  <a href="#new-in-0109">New in 0.10.9</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -131,6 +131,17 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.9
+
+Release candidate 10.
+
+- **Shopping, one shop at a time.** With things at two or more shops, Start shopping asks **Where are you first?**: each shop with how many things and about how much, the one with the most marked. Tap one and only its things show (and the ones with no shop). **Done at Coles** takes you back, with Coles greyed and ticked (tap it to go back in), to **Where to next?** When every shop's done, **Finish shopping**. "See everything in one list" is still there.
+- **See what you're looking for.** Every line in shopping mode has the product's photo with the blue ⓘ: tap it for the product in full (a big photo, size, ingredients). On the web page, the shopping list's and the Pantry's photos open it too.
+- **Tags don't split in the middle of a word** ("RECOMMENDE / D"): in search results they get their own line under the name and price, and anywhere else they only wrap between words.
+- **Flavours, scents and colours.** Tick several of the same thing at one shop (Milk & Honey, Ocean Breeze and Guava & Peach body wash) and they're one item: any of them will do. Restock watches them all, and says which are on special: "on special in all 3 scents", or "Ocean Breeze and Guava & Peach on special, not Milk & Honey", on Home, the item page and in alerts. A special on any of them counts. The add bar says so as you tick ("3 scents at Coles: one item, any of them will do"), and shopping mode says "or any of your 3 scents".
+- **The item page has an Edit button** (name, category and alerts) beside ⋯, which keeps Enter a price and Delete.
+- **The same everywhere:** every ⓘ is the same blue on the phone, the web page and the iPhone web app; search results on the web page use the phone's tags and words ("SPECIAL · SAVE $3.30", "HALF PRICE · SAVE $2.50", "was $11.00").
 
 ## New in 0.10.8
 
@@ -402,7 +413,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.8.apk` (on macOS, `shasum -a 256 restock-0.10.8.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.9.apk` (on macOS, `shasum -a 256 restock-0.10.9.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -588,7 +599,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is at its **ninth release candidate** (0.10.8): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is at its **tenth release candidate** (0.10.9): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.

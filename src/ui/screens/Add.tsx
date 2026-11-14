@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { flavourBarNote } from '../../lib/flavours';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { productCode, scanBarcode, type BarcodeInfo } from '../../lib/barcode';
 import { displayName, identifyBarcode, QUICK_PICKS, searchTermFor, weakName } from '../../lib/lookup';
@@ -94,7 +95,7 @@ const SEARCH_PLACEHOLDER: Record<Section, string> = {
 };
 /** Small buttons and links still get a 44 px target. */
 const TAP: CSSProperties = { minHeight: 44 };
-import { ChainDot, ChainName, Hold, Icon, useBackHandler, LoadingBar, MemberTag, MoreInfo, ProductPreview, Sheet, Thumb, TopBar, type PreviewProduct, SearchField } from '../components';
+import { ChainDot, ChainName, Hold, Icon, useBackHandler, LoadingBar, MemberTag, MoreInfo, ProductPreview, Sheet, specialTag, Thumb, TopBar, type PreviewProduct, SearchField } from '../components';
 import { useNav } from '../nav';
 import { OtherSizesCard } from '../OtherSizes';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from './addPicks';
@@ -1783,7 +1784,7 @@ export function AddScreen({
                       const unitText = unitTextOf(sp);
                       return (
                         <Hold key={k} onLong={() => setPreview(sp)}>
-                          <label className={`row${picked ? ' selected' : ''}`}>
+                          <label className={`row pick-row${picked ? ' selected' : ''}`}>
                             <input
                               type="checkbox"
                               checked={picked}
@@ -1810,21 +1811,6 @@ export function AddScreen({
                                 {sp.name}
                               </span>
                               {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
-                              <span className="tags">
-                                {isExactBarcode(rankQ, sp) && <span className="tag good">EXACT MATCH</span>}
-                                {!isExactBarcode(rankQ, sp) && k === sureKey && <span className="tag good">BEST MATCH · TICKED FOR YOU</span>}
-                                {!isExactBarcode(rankQ, sp) && k !== sureKey && !rankQ.barcode && top.has(k) && (
-                                  <span className="tag good">RECOMMENDED</span>
-                                )}
-                                {tracked && <span className="tag normal">IN YOUR PANTRY</span>}
-                                {sp.isSpecial && !sp.memberOnly && (
-                                  <span className="tag wait">
-                                    {sp.wasPrice ? `SPECIAL · SAVE ${money(sp.wasPrice - (sp.price ?? sp.wasPrice))}` : 'SPECIAL'}
-                                  </span>
-                                )}
-                                {sp.isSpecial && sp.chain !== 'costco' && promoLabel(sp.promo) && <span className="tag normal">{promoLabel(sp.promo)}</span>}
-                                {sp.memberOnly && sp.chain !== 'costco' && <MemberTag chain={sp.chain} />}
-                              </span>
                               <CostcoLines sp={sp} />
                             </span>
                             <span style={{ textAlign: 'right' }}>
@@ -1851,6 +1837,21 @@ export function AddScreen({
                                 </span>
                               )}
                             </span>
+                            {/* 0.10.8: the tags get the row's full width under the name and price
+                                ("RECOMMENDED" was split in two in the narrow name column) */}
+                              <span className="tags pick-tags">
+                                {isExactBarcode(rankQ, sp) && <span className="tag good">EXACT MATCH</span>}
+                                {!isExactBarcode(rankQ, sp) && k === sureKey && <span className="tag good">BEST MATCH · TICKED FOR YOU</span>}
+                                {!isExactBarcode(rankQ, sp) && k !== sureKey && !rankQ.barcode && top.has(k) && (
+                                  <span className="tag good">RECOMMENDED</span>
+                                )}
+                                {tracked && <span className="tag normal">IN YOUR PANTRY</span>}
+                                {sp.isSpecial && !sp.memberOnly && (
+                                  <span className="tag wait">{specialTag(sp.price, sp.wasPrice)}</span>
+                                )}
+                                {sp.isSpecial && sp.chain !== 'costco' && promoLabel(sp.promo) && <span className="tag normal">{promoLabel(sp.promo)}</span>}
+                                {sp.memberOnly && sp.chain !== 'costco' && <MemberTag chain={sp.chain} />}
+                              </span>
                           </label>
                         </Hold>
                       );
@@ -1925,6 +1926,7 @@ export function AddScreen({
               {picks.size} ticked · tap to add
             </span>
             <span className="small clip">{tickedShops([...picks.values()])}</span>
+            {flavourBarNote(picks.values(), chainName) && <span className="small clip">{flavourBarNote(picks.values(), chainName)}</span>}
             {recShops.length > 0 && <span className="small clip">Picked for you at {recShops.map((c) => chainName(c)).join(' and ')}</span>}
           </span>
           <span className="add-mini-arrow" aria-hidden="true">

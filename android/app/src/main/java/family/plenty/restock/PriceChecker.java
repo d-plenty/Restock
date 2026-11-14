@@ -515,6 +515,9 @@ final class PriceChecker {
                 if (stockUp && deal.stats.cycleWeeks != null && deal.stats.cycleWeeks >= 4 && cur.special) {
                     what += String.format(Locale.ROOT, " · usually on special every %d weeks, a good time to stock up", deal.stats.cycleWeeks);
                 }
+                // 0.10.9: several flavours (scents, colours) at that shop: which of them are on special
+                String flavours = Deals.flavourNoteFor(item, rec, products, readings);
+                if (flavours != null) what += " · " + flavours;
                 lines.add(item.name + ": " + rec.headline + what);
                 dealItems.add(item.id);
             }

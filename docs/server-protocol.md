@@ -934,3 +934,7 @@ Nothing. Fixes only (the Shopping list's buttons, search boxes, big text, Dan Mu
 
 - **Custom sections' rows** (`custom:<section>`) are checked more tightly, the same in sharedSettings.ts and SharedSettings.java: the icon is `pack:<icon>` or emoji only (up to 16 UTF-16 units from the emoji blocks, with joiners, skin tones and variation marks), and a name with invisible or bidirectional control characters is refused. A 0.10.7 phone still accepts what a 0.10.8 phone sends.
 - Nothing else changed between phones and the server.
+
+## 0.10.9: what changed on the wire
+
+- Nothing between phones and the server. Shopping mode's shop-by-shop view is on the screen only (which shops are done isn't saved or synced).

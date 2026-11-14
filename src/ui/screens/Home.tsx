@@ -1,4 +1,5 @@
 import { greeting, todayText } from '../../lib/greeting';
+import { flavourNoteFor } from '../../lib/flavours';
 import { useState } from 'react';
 import { refreshText, useFullRefresh } from '../refresh';
 import { allCards, allListEntries, getSettings, updateSettings } from '../../lib/db';
@@ -514,6 +515,7 @@ function DealCard({ rec, listed }: { rec: Recommendation; listed?: string }) {
             </span>
             <span className="sub">
               <ChainName chain={deal.product.chain} /> · {isAlt ? `swap to ${deal.product.name}` : rec.detail}
+              {!isAlt && flavourNoteFor(rec) ? ` · ${flavourNoteFor(rec)}` : ''}
             </span>
             <span className="tags">
               <ActionInfoTag rec={rec} action={rec.action} great={rec.best?.verdict.kind === 'great'} />

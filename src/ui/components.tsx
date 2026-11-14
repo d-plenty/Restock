@@ -312,6 +312,8 @@ export function Icon({
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
+      // 0.10.8: every ⓘ is the same blue, everywhere (styles.css .icon-info)
+      className={name === 'info' ? 'icon-info' : undefined}
     >
       {drawn ?? paths[name]}
     </svg>
@@ -388,6 +390,16 @@ export function memberProgram(chain: string): { name?: string; cls: 'flybuys' | 
   if (chain === 'woolworths' || chain === 'bws') return { name: 'Everyday Rewards', cls: 'everyday' };
   if (chain === 'danmurphys') return { name: "My Dan's", cls: 'normal' };
   return { cls: 'normal' };
+}
+
+/**
+ * 0.10.9: a special's tag, worded the same on the phone and the web page: "HALF PRICE · SAVE $2.50",
+ * "SPECIAL · SAVE $3.30", or "SPECIAL" when the shop doesn't say what it was.
+ */
+export function specialTag(price: number | undefined, was: number | undefined, half?: boolean): string {
+  if (!was || price === undefined || was <= price) return half ? 'HALF PRICE' : 'SPECIAL';
+  const save = `SAVE ${money(was - price)}`;
+  return half || price <= was / 2 + 0.005 ? `HALF PRICE · ${save}` : `SPECIAL · ${save}`;
 }
 
 export function MemberTag({ chain }: { chain: Chain }) {

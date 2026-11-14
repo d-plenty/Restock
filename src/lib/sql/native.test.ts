@@ -59,7 +59,7 @@ describe('native bridge contract', () => {
     await addCard({ id: uid(), program: 'flybuys', label: 'Flybuys', number: '6008940000000000', createdAt: '' });
     const recs = await loadRecommendations();
 
-    expect(recs).toHaveLength(7);
+    expect(recs).toHaveLength(8); // 0.10.9: with the body wash (three scents at Coles)
     expect(Object.fromEntries(recs.map((r) => [r.group.name, r.action]))).toMatchObject({
       'A4 copy paper': 'buy',
       'Toilet paper': 'alt',

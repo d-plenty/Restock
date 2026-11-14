@@ -20,7 +20,7 @@ import { useLive } from '../../lib/useLive';
 import { ALERT_LEVELS, bothPrices, computeStats, HISTORY_DAYS, multiBuy, optionStyle, tiedWithBest, withMarket, type Option, type Recommendation } from '../../lib/verdict';
 import { SECTION_NAMES, type Section, slots } from '../../shops';
 import { chainName, type AlertLevel } from '../../types';
-import { BETA_NOTE, BETA_SECTIONS, ChainName, Icon, PriceChart, Thumb, SearchField } from '../../ui/components';
+import { BETA_NOTE, BETA_SECTIONS, ChainName, Icon, MoreInfo, PriceChart, previewFromOption, ProductPreview, Thumb, SearchField, type PreviewProduct } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { EditSheet, LastUpdated, PriceSheet } from '../../ui/screens/Item';
 import { DEAL_RANK, underTarget } from '../../ui/screens/Pantry';
@@ -81,6 +81,8 @@ export function DeskPantry({ section }: { section: Section }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [sort, setSort] = useState<Sort>('az');
   const [open, setOpen] = useState<string | undefined>(takeOpenItem);
+  // 0.10.9: an item's photo, with the blue ⓘ, opens the product in full, as on the phone
+  const [looking, setLooking] = useState<PreviewProduct>();
   const recs = useMemo(() => allRecs?.filter((r) => (r.group.section ?? 'pantry') === section), [allRecs, section]);
   if (!recs || !allCats || !entries) return <div className="dk-page" aria-busy="true" />;
   const categories = allCats.filter((c) => c.section === section);
@@ -173,7 +175,11 @@ export function DeskPantry({ section }: { section: Section }) {
                     return (
                       <tr key={r.group.id} className={isOpen ? 'on' : undefined} onClick={() => setOpen(r.group.id)}>
                         <td className="dk-item-cell">
-                          <Thumb src={recPhoto(r, deal)} />
+                          {deal ?? r.best ? (
+                            <MoreInfo src={recPhoto(r, deal)} name={r.group.name} onOpen={() => setLooking(previewFromOption((deal ?? r.best)!))} />
+                          ) : (
+                            <Thumb src={recPhoto(r, deal)} />
+                          )}
                           <span className="dk-item-words">
                           <button
                             className="dk-name"
@@ -226,6 +232,7 @@ export function DeskPantry({ section }: { section: Section }) {
           )}
           <p className="small">Adding items and checking prices happen on your phones. Everything else about an item can be changed here.</p>
         </section>
+        {looking && <ProductPreview product={looking} onClose={() => setLooking(undefined)} />}
         {open && <ItemPanel key={open} groupId={open} listed={onList.get(open)} onClose={() => setOpen(undefined)} nav={nav} />}
       </div>
     </div>

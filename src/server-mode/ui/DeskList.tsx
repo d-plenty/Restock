@@ -9,7 +9,7 @@ import { bothPrices } from '../../lib/verdict';
 import { useLive } from '../../lib/useLive';
 import { LIST_NAMES, type ListSection } from '../../shops';
 import { chainName, type ListEntry } from '../../types';
-import { ChainName, Icon, Thumb } from '../../ui/components';
+import { ChainName, Icon, MoreInfo, previewFromOption, ProductPreview, Thumb, type PreviewProduct } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import {
   dealFor,
@@ -161,6 +161,8 @@ export function DeskList() {
   const [picked, setPicked] = useState<ListSection>(nav.section);
   const [view, setViewState] = useState<View>(loadView);
   const [editing, setEditing] = useState<ListEntry>();
+  // 0.10.9: a line's photo, with the blue ⓘ, opens the product in full, as on the phone
+  const [looking, setLooking] = useState<PreviewProduct>();
   const [picking, setPicking] = useState<ListEntry>();
   // 0.10.2: a line's "Add to pantry": the same Pick sheet, straight to the shop search.
   const [pantrying, setPantrying] = useState<ListEntry>();
@@ -233,7 +235,9 @@ export function DeskList() {
             onChange={(ev) => void tickEntry(e, ev.target.checked, title) /* 0.9.5 (undo) */}
           />
         </label>
-        {rec?.best?.product.imageUrl || deal?.product.imageUrl ? <Thumb src={thumbOf((deal ?? rec?.best)?.product.imageUrl)} /> : null}
+        {(deal ?? rec?.best) && (rec?.best?.product.imageUrl || deal?.product.imageUrl) ? (
+          <MoreInfo src={thumbOf((deal ?? rec?.best)!.product.imageUrl)} name={title} onOpen={() => setLooking(previewFromOption((deal ?? rec?.best)!))} />
+        ) : null}
         <span className="grow">
           <button
             type="button"
@@ -418,6 +422,7 @@ export function DeskList() {
         </div>
       )}
 
+      {looking && <ProductPreview product={looking} onClose={() => setLooking(undefined)} />}
       {picking && <PickItemSheet entry={picking} fromHa={!!toPick?.has(picking.id)} onClose={() => setPicking(undefined)} />}
       {pantrying && <PickItemSheet entry={pantrying} toPantry fromHa={false} onClose={() => setPantrying(undefined)} />}
       {editing && (

@@ -859,6 +859,89 @@ public final class Deals {
     }
 
     /** The option a deal is about: the alternative for ALT, your product for BUY / SMALL. */
+    // ---------- flavours, scents and colours (flavours.ts, 0.10.9) ----------
+
+    private static final Pattern SCENTS = Pattern.compile("\\b(body ?wash|shower|shampoo|conditioner|soap|hand ?wash|deodorant|antiperspirant|detergent|laundry|washing|dishwash|cleaner|spray|candle|softener|freshener|wipe|lotion|moisturiser)s?\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern COLOURS = Pattern.compile("\\b(paper|towel|tissue|serviette|napkin|pen|marker|highlighter|paint|nail|dye|colour|color|crayon|balloon|ribbon)s?\\b", Pattern.CASE_INSENSITIVE);
+
+    /** "flavours", "scents" or "colours", from what the things are (flavours.ts flavourWord). */
+    public static String flavourWord(List<String> names) {
+        String all = String.join(" ", names);
+        return SCENTS.matcher(all).find() ? "scents" : COLOURS.matcher(all).find() ? "colours" : "flavours";
+    }
+
+    /** Their names without the words they all share (flavours.ts flavourLabels). */
+    public static List<String> flavourLabels(List<String> names) {
+        if (names.size() < 2) return names;
+        List<String[]> ws = new ArrayList<>();
+        for (String n : names) ws.add(n.trim().isEmpty() ? new String[0] : n.trim().split("\\s+"));
+        Set<String> shared = null;
+        for (String[] w : ws) {
+            Set<String> set = new HashSet<>();
+            for (String x : w) set.add(x.toLowerCase(java.util.Locale.ROOT));
+            if (shared == null) shared = set;
+            else shared.retainAll(set);
+        }
+        List<String> out = new ArrayList<>();
+        for (int i = 0; i < ws.size(); i++) {
+            StringBuilder b = new StringBuilder();
+            for (String x : ws.get(i)) {
+                if (shared.contains(x.toLowerCase(java.util.Locale.ROOT))) continue;
+                if (b.length() > 0) b.append(' ');
+                b.append(x);
+            }
+            out.add(b.length() > 0 ? b.toString() : names.get(i));
+        }
+        return out;
+    }
+
+    private static String andList(List<String> xs) {
+        if (xs.size() <= 1) return String.join("", xs);
+        return String.join(", ", xs.subList(0, xs.size() - 1)) + " and " + xs.get(xs.size() - 1);
+    }
+
+    /** Which of several of the same thing at one shop are on special, or null (flavours.ts flavourNote). */
+    public static String flavourNote(List<String> names, List<Boolean> special) {
+        int n = names.size();
+        if (n < 2) return null;
+        int k = 0;
+        for (Boolean b : special) if (Boolean.TRUE.equals(b)) k++;
+        if (k == 0) return null;
+        String word = flavourWord(names);
+        if (k == n) return "on special in all " + n + " " + word;
+        List<String> labels = flavourLabels(names);
+        List<String> on = new ArrayList<>();
+        List<String> off = new ArrayList<>();
+        boolean longOne = false;
+        for (int i = 0; i < n; i++) {
+            (Boolean.TRUE.equals(special.get(i)) ? on : off).add(labels.get(i));
+            if (labels.get(i).length() > 28) longOne = true;
+        }
+        if (n > 4 || longOne) return "on special in " + k + " of your " + n + " " + word;
+        return andList(on) + " on special, not " + andList(off);
+    }
+
+    /** The note for an item's deal: its picks at the deal's shop (flavours.ts flavourNoteFor). */
+    public static String flavourNoteFor(Item item, Recommendation rec, Map<String, Product> products, Map<String, List<Reading>> readings) {
+        if (rec.best == null || rec.best.product == null) return null;
+        String chain = rec.best.product.chain;
+        List<String> ids = new ArrayList<>();
+        if (item.usual != null) ids.add(item.usual);
+        ids.addAll(item.same);
+        List<String> names = new ArrayList<>();
+        List<Boolean> special = new ArrayList<>();
+        for (String id : ids) {
+            Product p = products.get(id);
+            List<Reading> rs = readings.get(id);
+            if (p == null || !chain.equals(p.chain) || rs == null || rs.isEmpty()) continue;
+            Reading cur = null;
+            for (Reading r : rs) if (cur == null || r.date.compareTo(cur.date) > 0) cur = r;
+            names.add(p.name);
+            special.add(cur != null && cur.special);
+        }
+        return flavourNote(names, special);
+    }
+
     public static Option dealOption(Recommendation rec) {
         if (rec.action == Action.ALT) return rec.alt;
         if (rec.action == Action.BUY || rec.action == Action.SMALL) return rec.best;
