@@ -3,7 +3,7 @@ import { isPressOnlyShop, kindOf, priceSource, sectionOn, tabsOf, type StoreChai
 import { adapterFor } from '../stores';
 import { isNative } from '../stores/http';
 import type { Chain, Settings } from '../types';
-import { addReading, allProducts, getSettings, nowIso, readingsFor, refresh, updateProduct } from './db';
+import { addReading, allProducts, getSettings, nowIso, readingsFor, refresh } from './db';
 import { RestockNative } from './sql/native';
 import { localDay } from './verdict';
 import { background } from './undo';
@@ -96,7 +96,7 @@ async function refreshPagelessProducts(limit = 30): Promise<{ checked: number; u
           promo: hit.promo,
           source: 'auto',
         });
-        if (hit.inStock !== undefined) await updateProduct(p.id, { inStock: hit.inStock, stockAt: nowIso() });
+        // 0.10.7: stock isn't kept from price checks any more: only "Check stock" on the list asks.
       });
       updated++;
     } catch {

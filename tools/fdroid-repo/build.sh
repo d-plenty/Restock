@@ -42,7 +42,7 @@ keystore: keystore.p12
 repo_keyalias: $ALIAS
 keystorepass: "$FDROID_KEYSTORE_PASS"
 keypass: "$FDROID_KEYSTORE_PASS"
-keydname: CN=Restock F-Droid repo, O=Plenty Technologies, C=AU
+keydname: CN=Restock F-Droid repo, O=D Plenty, C=AU
 EOF
 # apksigner comes from the Android SDK (GitHub's runners have one) or from PATH.
 if [ -n "${ANDROID_HOME:-}" ]; then echo "sdk_path: $ANDROID_HOME" >> config.yml; fi

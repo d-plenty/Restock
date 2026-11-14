@@ -173,12 +173,39 @@ export const CARD_SCAN: ScanKind = {
   typeHint: 'Card number',
 };
 
-export type ScanRequest = { title: string; kind?: ScanKind; resolve: (o: ScanOutcome) => void };
+export type ScanRequest = {
+  title: string;
+  kind?: ScanKind;
+  resolve: (o: ScanOutcome) => void;
+  /**
+   * 0.10.7: scan several in a row. The camera stays open; each code goes to this (which saves it
+   * and says what happened), a count shows, and Done ends it. Resolves 'cancelled' when done.
+   */
+  several?: (code: string) => Promise<string>;
+};
 type Listener = (req: ScanRequest | undefined) => void;
 let listener: Listener | undefined;
 
 export function setScannerListener(fn: Listener | undefined) {
   listener = fn;
+}
+
+/**
+ * 0.10.7: scan several things in a row. The camera stays open: each barcode is handed to `onCode`
+ * (which saves it and returns what to say: "Added: Toilet paper") and counted, until Done.
+ */
+export function scanSeveral(title: string, onCode: (code: string) => Promise<string>): Promise<void> {
+  return new Promise((resolve) => {
+    if (!listener) return resolve();
+    listener({
+      title,
+      several: onCode,
+      resolve: () => {
+        listener?.(undefined);
+        resolve();
+      },
+    });
+  });
 }
 
 /** Opens the camera scanner and resolves with the code (or cancelled). */

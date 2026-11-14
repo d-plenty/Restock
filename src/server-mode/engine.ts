@@ -32,7 +32,7 @@
 // - card numbers are still blanked as they come in.
 // A phone's own choice of receipts (sync_meta share_receipts, "0" = off) now counts here too.
 
-import { isLocalOnlyShop, LOCAL_ONLY_SHOPS, shopDef } from '../shops';
+import { isCustomSection, isLocalOnlyShop, LOCAL_ONLY_SHOPS, shopDef } from '../shops';
 
 /** 0.9.6: the pseudo tab of records that never leave one phone (Costco's products and prices). Never in any shared set. SyncEngine.LOCAL_TAB. */
 const LOCAL_TAB = 'local';
@@ -204,7 +204,7 @@ export const OLD_DELETE_MS = 180 * 24 * 3600 * 1000;
 export const DELETE_WINS = new Set(['items', 'list_entries', 'products', 'categories', 'cards', 'receipts']);
 export const ALL_TABS = ['pantry', 'keg', 'pharmacy'];
 /** 0.10.3: Baby and Pets records are shared with Groceries (SyncEngine.java shared). */
-export const sharedTab = (t: string): string => (t === 'baby' || t === 'pets' ? 'pantry' : t);
+export const sharedTab = (t: string): string => (isCustomSection(t) ? 'pantry' : t);
 /** 0.9.5: sync_meta lists_v once catchUpLists has read everything again (SyncEngine.LISTS_V). */
 export const LISTS_V = '95';
 export const LOCAL_PRODUCT_COLUMNS = new Set(['in_stock', 'stock_at', 'in_stock_2']);

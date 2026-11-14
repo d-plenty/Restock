@@ -79,11 +79,18 @@ final class Shops {
     }
 
     /** 0.10.3: every tab, in order (shops.ts SECTIONS). */
-    static final String[] SECTIONS = { "pantry", "keg", "pharmacy", "baby", "pets" };
+    static final String[] SECTIONS = { "pantry", "keg", "pharmacy", "baby", "pets", "c1", "c2", "c3", "c4", "c5", "c6" };
+    /** 0.10.7: the custom sections (shops.ts CUSTOM_SECTIONS): Baby, Pets and c1–c6. */
+    static final String[] CUSTOM_SECTIONS = { "baby", "pets", "c1", "c2", "c3", "c4", "c5", "c6" };
 
-    /** 0.10.3: the tab a section's records are shared with: Baby and Pets with Groceries (shops.ts shareTab). */
+    static boolean isCustom(String section) {
+        for (String c : CUSTOM_SECTIONS) if (c.equals(section)) return true;
+        return false;
+    }
+
+    /** 0.10.3: the tab a section's records are shared with: Baby and Pets with Groceries (shops.ts shareTab). 0.10.7: every custom section. */
     static String shareTab(String section) {
-        return "baby".equals(section) || "pets".equals(section) ? "pantry" : section;
+        return isCustom(section) ? "pantry" : section;
     }
 
     /**

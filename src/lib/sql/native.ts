@@ -251,6 +251,8 @@ export interface RestockNativePlugin {
   requestBatteryExemption(): Promise<void>;
   addListener(event: 'syncChanged', fn: () => void): Promise<PluginListenerHandle>;
   addListener(event: 'syncDone', fn: (info: SyncInfo) => void): Promise<PluginListenerHandle>;
+  /** 0.10.7: hand one photo (JPEG, base64) to the Google app's Lens. opened=false: the Google app isn't on the phone. */
+  lensSearch(opts: { jpeg: string }): Promise<{ opened: boolean }>;
   /** Text or a link shared to Restock from another app, and app icon shortcuts, if any are waiting. */
   takeLaunchAction(): Promise<{ action?: LaunchAction; text?: string }>;
   addListener(event: 'launchAction', fn: (e: { action: LaunchAction; text?: string }) => void): Promise<PluginListenerHandle>;
@@ -378,7 +380,7 @@ export interface ServerCodeCheck {
 }
 
 /** Why Restock was opened: a share, an app icon shortcut, a widget or a notification. */
-export type LaunchAction = 'scan' | 'list' | 'receipt' | 'share' | 'recalls' | 'deals';
+export type LaunchAction = 'scan' | 'list' | 'receipt' | 'share' | 'search' | 'recalls' | 'deals';
 
 export interface NativePermissions {
   camera: PermissionState;

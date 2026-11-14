@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { findCatalogue, type CatalogueLink } from '../../lib/catalogues';
 import { getSettings } from '../../lib/db';
 import { useLive } from '../../lib/useLive';
-import { activeSections, chainName, enabledIn, hostOf, shopOnTab, websiteOf, type Section, type StoreChain } from '../../shops';
+import { activeSections, chainName, enabledIn, hostOf, shopOnTab, websiteOf, type Section, type StoreChain, withCustom } from '../../shops';
 import { isNative } from '../../stores/http';
 import { storeChoice, type Settings } from '../../types';
 import { ChainDot, Icon, TopBar } from '../components';
 import { useNav } from '../nav';
 
-const GROUP: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets' };
+const GROUP: Record<Section, string> = withCustom({ pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health' }, (n) => n);
 
 /**
  * Your shops, by tab: every shop you've ticked, or made a store your primary or second one, on a

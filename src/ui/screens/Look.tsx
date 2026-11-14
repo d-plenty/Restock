@@ -177,10 +177,13 @@ const TEXT_SIZES = [
   { v: 1.5, label: 'Largest' },
 ];
 
-export function AccessibilitySettings({ settings }: { settings: Settings }) {
+/** web: on the server's web page (Settings there), where it's this browser's own and sits under its own heading. */
+export function AccessibilitySettings({ settings, web }: { settings: Settings; web?: boolean }) {
+  const H = web ? 'h3' : 'h2';
   const a = settings.a11y;
   const set = (patch: Partial<Settings['a11y']>) => updateSettings({ a11y: { ...a, ...patch } });
-  const toggle = (key: 'contrast' | 'motion' | 'big', title: string, detail: string) => (
+  type Key = 'contrast' | 'motion' | 'big' | 'bold' | 'spacing' | 'links' | 'noSwipe' | 'slowMessages';
+  const toggle = (key: Key, title: string, detail: string) => (
     <label className="check">
       <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <span className="title" style={{ fontSize: 15 }}>
@@ -188,28 +191,44 @@ export function AccessibilitySettings({ settings }: { settings: Settings }) {
         </span>
         <span className="small">{detail}</span>
       </span>
-      <input type="checkbox" className="switch" checked={a[key]} onChange={(e) => void set({ [key]: e.target.checked })} />
+      <input type="checkbox" className="switch" checked={!!a[key]} onChange={(e) => void set({ [key]: e.target.checked })} />
     </label>
   );
   return (
-    <div className="card flush">
-      <div className="field" style={{ padding: '12px 14px' }}>
-        <span>Text size in Restock</span>
-        <div className="seg" role="group" aria-label="Text size">
-          {TEXT_SIZES.map((t) => (
-            <button key={t.v} type="button" aria-pressed={a.text === t.v} onClick={() => void set({ text: t.v })}>
-              {t.label}
-            </button>
-          ))}
+    <>
+      <H className="eyebrow">Seeing</H>
+      <div className="card flush">
+        <div className="field" style={{ padding: '12px 14px' }}>
+          <span id="a11y-text-size">Text size in Restock</span>
+          <div className="seg seg-wrap" role="group" aria-labelledby="a11y-text-size">
+            {TEXT_SIZES.map((t) => (
+              <button key={t.v} type="button" aria-pressed={a.text === t.v} onClick={() => void set({ text: t.v })}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <span className="small">
+            {web ? "On top of your browser's own text size, in this browser only." : "On top of your phone's own font size."} Everything grows together, so
+            nothing gets cut off.
+          </span>
         </div>
-        <span className="small">On top of your phone's own font size. Everything grows together, so nothing gets cut off.</span>
+        {toggle('bold', 'Bold text', 'Heavier letters everywhere, easier to read.')}
+        {toggle('contrast', 'High contrast', 'Darker grey text and stronger outlines on cards, buttons and boxes.')}
+        {toggle('spacing', 'Easier reading spacing', 'More space between letters, words and lines. Can help with dyslexia.')}
+        {toggle('links', 'Underline links', 'Links are underlined, not just coloured.')}
       </div>
-      {toggle('contrast', 'High contrast', 'Darker grey text and stronger outlines on cards, buttons and boxes.')}
-      {toggle('motion', 'Less motion', 'No sliding or popping animations. Restock also does this when your phone asks for less motion.')}
-      {toggle('big', 'Bigger buttons', 'Every button and checkbox at least finger-sized.')}
-      <p className="small" style={{ padding: '0 14px 12px', margin: 0 }}>
-        Restock works with TalkBack, Android's screen reader: every button says what it does.
+      <H className="eyebrow">Moving and touching</H>
+      <div className="card flush">
+        {toggle('big', 'Bigger buttons', 'Every button and checkbox at least finger-sized.')}
+        {toggle('noSwipe', 'No swiping', "Rows don't move when you swipe them. Everything a swipe does has a button too.")}
+        {toggle('motion', 'Less motion', 'No sliding or popping animations. Restock also does this when your phone asks for less motion.')}
+        {toggle('slowMessages', 'Messages stay longer', 'Messages at the bottom of the screen, and their Undo, stay three times as long.')}
+      </div>
+      <p className="small" style={{ margin: 0 }}>
+        {web
+          ? "These are this browser's own. The page works with screen readers and your browser's zoom. Every button says what it does."
+          : "Restock works with TalkBack, Android's screen reader, and with your phone's own text size and display settings. Every button says what it does."}
       </p>
-    </div>
+    </>
   );
 }

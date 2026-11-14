@@ -1198,7 +1198,11 @@ public class RestockNativePlugin extends Plugin {
             String text = intent.getStringExtra(Intent.EXTRA_TEXT);
             String subject = intent.getStringExtra(Intent.EXTRA_SUBJECT);
             if (text == null && subject == null) return null;
-            a.put("action", "share");
+            // 0.10.7: "Restock: Search shops" in the share menu (the SearchShops alias) searches;
+            // "Restock: Add to shopping list" adds.
+            android.content.ComponentName via = intent.getComponent();
+            boolean search = via != null && via.getClassName().endsWith(".SearchShops");
+            a.put("action", search ? "search" : "share");
             a.put("text", ((subject != null && (text == null || !text.contains(subject))) ? subject + " " : "") + (text == null ? "" : text));
             return a;
         }
@@ -2127,6 +2131,49 @@ public class RestockNativePlugin extends Plugin {
             call.resolve();
         } catch (Exception e) {
             call.reject(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 0.10.7: "Search with Google Lens": hands one photo (a JPEG, base64) to the Google app, only
+     * when the person taps the button. Resolves {opened:false} when the Google app isn't on the phone,
+     * so the page can open Google Lens in the browser instead. The photo is written to Restock's cache
+     * (lens/) and lent to the Google app for that one share; the folder is emptied each time.
+     */
+    @PluginMethod
+    public void lensSearch(PluginCall call) {
+        String b64 = call.getString("jpeg");
+        if (b64 == null || b64.isEmpty()) {
+            call.reject("No photo");
+            return;
+        }
+        try {
+            java.io.File dir = new java.io.File(getContext().getCacheDir(), "lens");
+            if (dir.isDirectory()) {
+                java.io.File[] old = dir.listFiles();
+                if (old != null) for (java.io.File f : old) if (!f.delete()) f.deleteOnExit();
+            } else if (!dir.mkdirs()) throw new java.io.IOException("Couldn't make the cache folder");
+            java.io.File photo = new java.io.File(dir, "photo-" + System.currentTimeMillis() + ".jpg");
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(photo)) {
+                out.write(android.util.Base64.decode(b64, android.util.Base64.DEFAULT));
+            }
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", photo);
+            Intent i = new Intent(Intent.ACTION_SEND);
+            i.setType("image/jpeg");
+            i.putExtra(Intent.EXTRA_STREAM, uri);
+            i.setPackage("com.google.android.googlequicksearchbox");
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            JSObject r = new JSObject();
+            if (i.resolveActivity(getContext().getPackageManager()) == null) {
+                if (!photo.delete()) photo.deleteOnExit();
+                r.put("opened", false);
+            } else {
+                getContext().startActivity(i);
+                r.put("opened", true);
+            }
+            call.resolve(r);
+        } catch (Exception e) {
+            call.reject(e.getMessage() != null ? e.getMessage() : e.toString());
         }
     }
 

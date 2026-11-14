@@ -66,6 +66,42 @@ export async function render(chain: StoreChain, url: string): Promise<{ status: 
   return { status: r.status, html: r.html ?? '', url: r.url ?? url };
 }
 
+/**
+ * 0.10.7: the store picked on a shop's own website (IGA), read back from its page: "Click & Collect
+ * from Westbury's Mundingburra IGA", "Shopping at …", "Your store: …". Undefined when it can't tell.
+ */
+export function storeNameFrom(html: string): string | undefined {
+  const text = html
+    .replace(/<(script|style|svg)\b[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<[^>]+>/g, '\n')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;|&rsquo;|&#x27;/g, "'")
+    .replace(/[ \t]+/g, ' ');
+  const lines = text
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const clean = (v: string) => v.replace(/\s+/g, ' ').trim();
+  const ok = (v: string | undefined) => !!v && v.length >= 3 && v.length <= 60 && !/select|search|change|view map|store$|^store/i.test(v);
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^(?:click\s*&\s*collect from|delivering from|shopping at|your store:?|your iga:?|you're shopping at)\s*(.*)$/i.exec(lines[i]);
+    if (!m) continue;
+    const same = clean(m[1]);
+    if (ok(same)) return same;
+    const next = lines[i + 1] && clean(lines[i + 1]);
+    if (ok(next)) return next;
+  }
+  return undefined;
+}
+
+/** The store picked on a shop's website, read from its home page in the hidden browser. */
+export async function siteStoreName(chain: StoreChain): Promise<string | undefined> {
+  const site = websiteOf(chain);
+  if (!site) return undefined;
+  const page = await render(chain, site);
+  return storeNameFrom(page.html);
+}
+
 async function platformSearch(chain: StoreChain, info: SearchInfo, term: string): Promise<StoreProduct[]> {
   const site = websiteOf(chain)!;
   const origin = new URL(info.search ?? site).origin;

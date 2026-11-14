@@ -23,10 +23,21 @@ export function ScannerHost() {
     return () => setScannerListener(undefined);
   }, []);
   if (!req) return null;
-  return <Scanner title={req.title} kind={req.kind} onDone={req.resolve} />;
+  return <Scanner title={req.title} kind={req.kind} several={req.several} onDone={req.resolve} />;
 }
 
-function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDone: (o: ScanOutcome) => void }) {
+function Scanner({
+  title,
+  kind,
+  several,
+  onDone,
+}: {
+  title: string;
+  kind?: ScanKind;
+  /** 0.10.7: scan several in a row (see scanSeveral). */
+  several?: (code: string) => Promise<string>;
+  onDone: (o: ScanOutcome) => void;
+}) {
   // A product barcode, unless this scan is for something else (0.8.0: the sync pairing code).
   const read = (text: string) => (kind ? kind.accept(text) : productCode(text));
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -38,6 +49,10 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
   const [live, setLive] = useState(false);
   const [notice, setNotice] = useState<string>();
   const [reading, setReading] = useState(false);
+  // 0.10.7 (several): how many saved so far, and what the last one was.
+  const [count, setCount] = useState(0);
+  const [last, setLast] = useState<string>();
+  const recentRef = useRef<{ code: string; at: number }>(undefined);
   const doneRef = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
   // A QR code that isn't a product (a website, Wi-Fi details) is ignored for a few seconds.
@@ -55,6 +70,22 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
     doneRef.current = true;
     trackRef.current?.stop();
     onDone(o);
+  };
+
+  /** A code was read: one scan ends here, several carry on (the same code twice in a row only counts once). */
+  const got = async (code: string) => {
+    if (!several) return finish({ ok: true, code });
+    const r = recentRef.current;
+    if (r && r.code === code && Date.now() - r.at < 4000) return;
+    recentRef.current = { code, at: Date.now() };
+    setNotice(undefined);
+    setLast('Saving…');
+    try {
+      setLast(await several(code));
+      setCount((n) => n + 1);
+    } catch (e) {
+      setLast(`Couldn't save that one: ${e instanceof Error ? e.message : String(e)}`);
+    }
   };
 
   // Android back button (App sends Escape) closes the scanner.
@@ -100,13 +131,18 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
             const code = read(text);
             if (code) {
               navigator.vibrate?.(60);
-              finish({ ok: true, code });
-              return;
-            }
-            const ig = ignoredRef.current;
-            if (!ig || ig.text !== text || ig.until < Date.now()) {
-              ignoredRef.current = { text, until: Date.now() + 4000 };
-              setNotice(notProduct(text));
+              if (!several) {
+                finish({ ok: true, code });
+                return;
+              }
+              // several: save it, and carry on looking
+              await got(code);
+            } else {
+              const ig = ignoredRef.current;
+              if (!ig || ig.text !== text || ig.until < Date.now()) {
+                ignoredRef.current = { text, until: Date.now() + 4000 };
+                setNotice(notProduct(text));
+              }
             }
           }
         } catch (e) {
@@ -191,10 +227,17 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
       />
       <canvas ref={canvasRef} hidden />
       <div className="scanner-top">
-        <button className="icon-btn dark" aria-label="Close scanner" onClick={() => finish({ ok: false, reason: 'cancelled' })}>
+        <button className="icon-btn dark" aria-label={several ? 'Done scanning' : 'Close scanner'} onClick={() => finish({ ok: false, reason: 'cancelled' })}>
           <Icon name="close" size={20} />
         </button>
-        <span className="scanner-title">{title}</span>
+        <span className="scanner-title">
+          {title}
+          {several && (
+            <span className="scanner-count" role="status">
+              {count === 1 ? '1 scanned' : `${count} scanned`}
+            </span>
+          )}
+        </span>
         {torch !== undefined ? (
           <button className="icon-btn dark" aria-label={torch ? 'Torch off' : 'Torch on'} aria-pressed={torch} onClick={toggleTorch}>
             <Icon name="torch" size={20} />
@@ -205,6 +248,16 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
       </div>
       <div className={`scanner-frame${kind?.qr ? ' square' : ''}`} aria-hidden="true" />
       <div className="scanner-bottom">
+        {several && last && (
+          <p className="scanner-msg ok" role="status">
+            {last}
+          </p>
+        )}
+        {several && (
+          <button className="btn primary block" onClick={() => finish({ ok: false, reason: 'cancelled' })}>
+            <Icon name="check" size={18} /> Done{count ? ` (${count} saved)` : ''}
+          </button>
+        )}
         {notice ? (
           <p className="scanner-msg warn" role="status">
             {notice}
@@ -235,7 +288,7 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
             try {
               const text = await decodePhoto(file);
               const code = text && read(text);
-              if (code) finish({ ok: true, code });
+              if (code) await got(code);
               else setNotice(text ? notProduct(text) : "Couldn't find a barcode in that photo. Try one that's sharp and close up.");
             } catch (err) {
               console.error('photo decode failed', err);
@@ -252,7 +305,10 @@ function Scanner({ title, kind, onDone }: { title: string; kind?: ScanKind; onDo
             const code = kind ? typed.trim() : typed.replace(/\s+/g, '');
             if (!code) return;
             const product = read(code);
-            if (product) finish({ ok: true, code: product });
+            if (product) {
+              setTyped('');
+              void got(product);
+            }
             else setNotice(kind ? kind.wrong : "That doesn't look like a barcode number. They're 8, 12, 13 or 14 digits.");
           }}
         >

@@ -1,6 +1,6 @@
 # Privacy policy
 
-_Last updated 13 November 2026_
+_Last updated 14 November 2026_
 
 **Privacy policy? We collect almost nothing, and we tell you exactly what. Here's the long version.**
 
@@ -11,7 +11,7 @@ Restock is a free, open-source app that helps you spend less on groceries. It is
 - Everything you put in Restock stays on your phone.
 - No account, no ads, no analytics, no tracking.
 - Permissions are only used for the feature that asks for them, and only when you use it.
-- Costco is off until you pick it with your shops. Its website terms ask people not to collect its listings, so Restock shows you a notice first and only looks when you search.
+- Costco is off until you pick it with your shops. Its website terms don't allow automated collection, so Restock tells you first and only checks it when you search.
 - The app talks directly to the shops and a few open services. It sends things to us only for feedback you send and, with Shared prices on, the shelf prices it reads from the shops, in return for the shared price history it downloads from GitHub.
 - If you turn on sync, your household's phones share your Restock data straight with each other over your Wi-Fi, encrypted, or through a folder you pick, sealed so only your phones can read it. It never goes through us.
 - If you run your own Restock server, it keeps what your phones share with it, at your home. It only contacts the shops if you turn on "Let the web page search the shops", and only when someone presses Search.
@@ -63,13 +63,13 @@ Photos: there's no photos permission. If you import a barcode from a picture, An
 
 ## Services the app talks to, straight from your phone
 
-The shops you pick (Coles, Woolworths and Aldi, and any bottle shops, chemists or shop websites you add): when you search, add an item, check prices or open a product's details, your phone asks that shop's website for product names, prices and stock, just like visiting the site. Searches only go to the shops on the tab you're using, so a grocery search never goes to a bottle shop or chemist. The shop sees an ordinary visit from your phone's internet connection, and may set its usual cookies. Sometimes Restock opens the shop's website in a hidden built-in browser to do this; the shop's own website code, including its analytics, runs there as it would in any browser. Each shop's own privacy policy applies to these visits.
+The shops you pick (Coles, Woolworths and Aldi, and any bottle shops, chemists or shop websites you add): when you search, add an item, check prices or open a product's details, your phone asks that shop's website for product names and prices, just like visiting the site, and for stock only when you tap Check stock on your shopping list (since 0.10.7). Searches only go to the shops on the tab you're using, so a grocery search never goes to a bottle shop or chemist. The shop sees an ordinary visit from your phone's internet connection, and may set its usual cookies. Sometimes Restock opens the shop's website in a hidden built-in browser to do this; the shop's own website code, including its analytics, runs there as it would in any browser. Each shop's own privacy policy applies to these visits.
 
 How each shop is read: Woolworths, Coles, Aldi, Dan Murphy's and BWS through the data their own websites and apps use (Dan Murphy's and BWS through their search page if that's turned away); every other shop (the other bottle shops, the chemists, the Baby and Pets shops, IGA and any shop you add) through its website's search page. Unblock: some shops' websites check that visitors aren't bots and turn Restock away (it then says "<shop> is blocking Restock"). If you tap Unblock, the shop's own page opens in Restock's built-in browser and you do its check yourself (a tick box or a puzzle), then Restock reads that shop through the same visit until the shop asks again. Restock never solves, skips or hides from a check by itself. The check is the shop's (or the company it uses for checks): it can see that visit like any visit to its website, under its own privacy policy. Nothing you type on a shop's page goes to Restock. "Hide for a day" on a warning is kept on your phone only.
 
 Your Woolworths account, only if you sign in to it inside Restock: you sign in on Woolworths' own page in Restock's built-in browser, so your email and password go to Woolworths, never to Restock. Restock then asks Woolworths' website for your branch's prices and stock, and can add items to your trolley, the way the website does. Restock keeps only whether you're signed in and which branch your account uses. Stop using it any time in Settings → My shops, and sign out on the Woolworths page to end the session there. Your Coles branch number, if you give it, is sent to Coles with each search so the prices and stock are for that branch.
 
-Costco, only if you pick it with your shops (it's off until you do). Read this first: Costco's website terms say automated collection of product listings isn't allowed. Restock only looks when you search, one page at a time. It never checks Costco in the background or with Check now, and never in bulk. Costco may block it or change its pages, so it may stop working. Treat it as a test feature. It's your choice to turn this on, and your responsibility. Prices are Costco's online prices, which include delivery. They can differ from warehouse to warehouse and from the shelf. Restock asks Costco's website from inside its own page in the app, like Woolworths. You can sign in to Costco there for member prices: your password goes to Costco, not Restock. Costco prices are shared and backed up like any shop's, and with Shared prices on, the Costco prices your searches show go to Restock's shared price service too.
+Costco, only if you pick it with your shops (it's off until you do). Restock only checks Costco when you search, one page at a time, like you browsing its website: never in the background, with Check now, or in bulk. Costco's website terms don't allow automated collection, so it's your choice to switch it on. Prices are Costco's online prices, which include delivery, so the warehouse can differ. If Costco changes or blocks its website, its prices stop until that's sorted. Restock asks Costco's website from inside its own page in the app, like Woolworths. You can sign in to Costco there for member prices: your password goes to Costco, not Restock. Costco prices are shared and backed up like any shop's, and with Shared prices on, the Costco prices your searches show go to Restock's shared price service too.
 
 Diagnostics recordings, only when you start one: while you add something to a shop's trolley yourself, Restock notes what that shop's own page asks its servers. Sign-in, account, payment and tracking calls are left out, and names, emails, phone numbers, addresses, card and member numbers, and the values in web addresses (such as search words) are blanked. The recording stays on your phone unless you choose to share it.
 
@@ -83,7 +83,11 @@ OpenStreetMap (Nominatim at nominatim.openstreetmap.org, and the Overpass map se
 
 The official recall lists (Food Standards Australia New Zealand, Product Safety Australia and the Therapeutic Goods Administration), while recall alerts are on: once a day, and when you tap Check now, Restock downloads their public lists of recent recalls, the same for everyone. Matching them against your items, list and receipts happens on your phone; nothing about you is sent.
 
-No service, for receipts: the receipt reader (Tesseract, open-source text recognition, and its English model) is built into Restock since version 0.7.4, so nothing is downloaded. Receipts are read on your phone and never sent anywhere.
+No service, for reading photos: the text reader (PaddleOCR's open-source models, run by ONNX Runtime, since 0.10.7; Tesseract before) is built into Restock, so nothing is downloaded. Receipts and photos of packs are read on your phone and never sent anywhere.
+
+Google Lens, only when you tap "Search with Google Lens" (after Restock couldn't find something from a photo of its pack): that one photo is handed to the Google app (or, without it, you add it to Google Lens in your browser), under Google's own privacy policy. Restock never sends a photo to Google by itself, and Google doesn't send anything back to Restock: you share or copy the name back yourself.
+
+OpenFreeMap (tiles.openfreemap.org, free maps made from OpenStreetMap), only when you tap "Show on a map" while picking your branches: the map pictures for the area it shows are downloaded, so OpenFreeMap sees which area that is, like any map. Nothing else is sent.
 
 Store catalogue links open in your phone's web browser, under that website's own policy.
 

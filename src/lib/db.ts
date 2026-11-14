@@ -14,7 +14,7 @@ import {
 } from '../types';
 import { changed } from './live';
 import { listLineWithoutCostco } from './costcoLocal';
-import { asListSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, setShopTabs, shareTab, shopDef, type ListSection, type Section } from '../shops';
+import { applyCustomSections, asListSection, isCustomSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, setShopTabs, shareTab, shopDef, type ListSection, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
 import { GIFT_CARDS_TABLE, migrate, SPEND_TABLE } from './sql/schema';
 import { cleanGiftCard } from './giftCards'; // 0.9.6 (cards)
@@ -119,7 +119,7 @@ const toGroup = (r: Row): Group => ({
 });
 
 // 0.10.3: Baby and Pets too.
-const asSection = (v: unknown): Section => (v === 'keg' || v === 'pharmacy' || v === 'baby' || v === 'pets' ? v : 'pantry');
+const asSection = (v: unknown): Section => (v === 'keg' || v === 'pharmacy' || isCustomSection(v) ? v : 'pantry');
 
 const toReading = (r: Row): PriceReading => ({
   id: r.id as number,
@@ -339,6 +339,7 @@ export async function getSettings(): Promise<Settings> {
   setShopTabs(s.shopTabs);
   setCostcoState(costcoStateOf(s));
   lastSettings = s;
+  applyCustomSections(s);
   return s;
 }
 
@@ -360,6 +361,7 @@ export async function updateSettings(patch: Partial<Settings>, opts: { local?: b
   if (!opts.local) ops.push(...(await householdSettingOps(before, next)));
   await write(ops);
   lastSettings = next;
+  applyCustomSections(next);
   return next;
 }
 
@@ -443,6 +445,7 @@ export async function resetSettings(): Promise<Settings> {
   setCostcoState(costcoStateOf(next));
   await putKV('settings', next);
   lastSettings = next;
+  applyCustomSections(next);
   // 0.9.3: the household's settings stay the household's.
   if (await reapplyHouseholdSettings().catch(() => false)) return getSettings();
   return next;
@@ -457,6 +460,8 @@ export async function ensureDefaults(): Promise<void> {
   const ops: SqlOp[] = [];
   for (const section of SECTIONS) {
     if (have.some((h) => h.section === section && Number(h.c) > 0)) continue;
+    // 0.10.7: a custom section (c1–c6) gets its category once it's made, not before.
+    if (/^c\d$/.test(section) && !lastSettings?.sections?.[section as 'c1']) continue;
     const seeded = `categoriesSeeded:${section}`;
     if (section !== 'pantry' && (await getKV<boolean>(seeded))) continue;
     DEFAULT_SECTION_CATEGORIES[section].forEach((name, order) => ops.push(insertCategoryOp({ id: uid(), name, order, section })));

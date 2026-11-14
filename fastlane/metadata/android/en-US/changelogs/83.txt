@@ -1,0 +1,1 @@
+Release candidate 8 (0.10.7): a new text reader (PaddleOCR) for receipts and packs; find a product from a photo (Google Lens as a backup); Scan several fixed; Check stock on the list, only when you ask; custom sections in place of Baby and Pets; Accessibility of its own, first in setup; Dan Murphy's pack prices fixed; Back goes one step and asks before you lose work.

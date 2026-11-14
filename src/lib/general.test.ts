@@ -27,8 +27,9 @@ const line = (id: string, text: string, more: Partial<ListEntry> = {}): ListEntr
 
 describe('General: names and sections', () => {
   it('is the fourth list, after the tabs, with its own name', () => {
-    expect(LIST_SECTIONS).toEqual(['pantry', 'keg', 'pharmacy', 'baby', 'pets', 'general']);
-    expect(LIST_NAMES).toEqual({ pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets', general: 'General' });
+    // 0.10.7: and the custom sections c1–c6 before General
+    expect(LIST_SECTIONS).toEqual(['pantry', 'keg', 'pharmacy', 'baby', 'pets', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'general']);
+    expect(LIST_NAMES).toMatchObject({ pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets', general: 'General' });
   });
   it('a stored section: general kept, anything unknown is the grocery list', () => {
     expect(['general', 'keg', 'pharmacy', 'pantry', null, undefined, 'tools'].map(asListSection)).toEqual(['general', 'keg', 'pharmacy', 'pantry', 'pantry', 'pantry', 'pantry']);

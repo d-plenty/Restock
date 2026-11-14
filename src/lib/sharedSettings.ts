@@ -11,6 +11,9 @@
 //   recalls.enabled       true | false             recall alerts
 //   tab:keg, tab:pharmacy true | false             the tab switched on
 //   tab:baby, tab:pets    true | false             0.10.3: the same (shared with Groceries)
+//   tab:c1 … tab:c6       true | false             0.10.7: a custom section switched on (with Groceries)
+//   custom:<section>      { name, colour, icon }   0.10.7: a custom section's name, colour and icon
+//                                                  (baby, pets, c1–c6; shared with Groceries)
 //   shop:<chain>          { on, tabs? }            a built-in shop picked (on) or not; 0.10.3: `tabs`,
 //                                                  the tabs it's in when not just its own
 //   shop:custom-…         { on, shop, removed?, tabs? }   a shop someone added: its name, website, tab
@@ -47,7 +50,7 @@
 //                                                  a phone that hasn't picked its own (StoreChoice
 //                                                  primary empty, or still the default it took)
 
-import { SECTIONS, SHOPS, isLocalOnlyShop, shareTab, shopDef, type CustomShop, type Section } from '../shops';
+import { CUSTOM_SECTIONS, SECTIONS, SHOPS, checkCustomDef, isCustomSection, isLocalOnlyShop, shareTab, shopDef, type CustomShop, type Section } from '../shops';
 import { siteOf } from './site';
 
 export const ALL_TABS: Section[] = ['pantry', 'keg', 'pharmacy'];
@@ -80,7 +83,7 @@ export const builtIn = (id: string): boolean => !id.startsWith('custom-') && !!s
 export const builtInsOn = (tab: string): string[] => SHOPS.filter((s) => shareTab(s.section) === tab && !isLocalOnlyShop(s.id)).map((s) => s.id);
 
 /** 0.10.3: the tab a section's rows are shared with: Baby and Pets with Groceries; anything else as it is. */
-export const rowTab = (t: string): string => (t === 'baby' || t === 'pets' ? 'pantry' : t);
+export const rowTab = (t: string): string => (isCustomSection(t) ? 'pantry' : t);
 
 /** 0.10.3: a shop row's `tabs`, checked: known tabs, in their order, at least one (SharedSettings.java checkTabs). */
 export function checkTabs(v: unknown): Section[] | undefined {
@@ -143,6 +146,8 @@ export function sameShop(a: Obj, b: Obj): boolean {
 }
 
 export const BRANCH_PREFIX = 'branch:';
+/** 0.10.7: a custom section's name, colour and icon (custom:baby, custom:c1 …). */
+export const CUSTOM_PREFIX = 'custom:';
 
 /** 0.9.4: a branch:<chain> row's value, checked (SharedSettings.java checkBranch), or undefined. */
 export function checkBranch(k: string, v: unknown): { name: string; storeNo?: string } | undefined {
@@ -170,10 +175,11 @@ export function checkValue(k: string, v: unknown): unknown {
     case 'recalls.enabled':
     case 'tab:keg':
     case 'tab:pharmacy':
-    case 'tab:baby':
-    case 'tab:pets':
       return typeof v === 'boolean' ? v : undefined;
   }
+  // 0.10.7: custom sections (Baby, Pets, c1–c6): switched on, and their name, colour and icon
+  if (k.startsWith('tab:') && isCustomSection(k.slice(4))) return typeof v === 'boolean' ? v : undefined;
+  if (k.startsWith(CUSTOM_PREFIX)) return isCustomSection(k.slice(CUSTOM_PREFIX.length)) ? checkCustomDef(v) : undefined;
   if (k.startsWith(BRANCH_PREFIX)) return checkBranch(k, v);
   if (!k.startsWith('shop:') || !isObj(v) || typeof v.on !== 'boolean') return undefined;
   const id = k.slice(5);
@@ -272,8 +278,9 @@ export function settingChangeOk(pk: string, row: unknown, deleted: boolean, room
 
 /** Which tab a row is about (tab: and shop: rows), or null when it's the whole household's. */
 export function settingTab(k: string, v: string | null | undefined): string | null {
-  // 0.10.3: Baby and Pets rows are shared with Groceries (rowTab).
+  // 0.10.3: Baby and Pets rows are shared with Groceries (rowTab). 0.10.7: every custom section's too.
   if (k.startsWith('tab:')) return rowTab(k.slice(4));
+  if (k.startsWith(CUSTOM_PREFIX)) return 'pantry';
   // 0.9.4: a default branch is about its shop's tab (a shop someone added: left alone).
   if (k.startsWith(BRANCH_PREFIX)) {
     const b = k.slice(BRANCH_PREFIX.length);
@@ -340,10 +347,17 @@ export function applyRows(s: Obj, rows: { k: string; v: string }[], tabs: Readon
         s.sections = {
           keg: sec.keg === true,
           pharmacy: sec.pharmacy === true,
-          ...(sec.baby === true ? { baby: true } : {}),
-          ...(sec.pets === true ? { pets: true } : {}),
+          ...Object.fromEntries(CUSTOM_SECTIONS.filter((c) => sec[c] === true).map((c) => [c, true])),
           [name]: val,
         };
+        changed = true;
+      }
+    } else if (k.startsWith(CUSTOM_PREFIX)) {
+      // 0.10.7: a custom section's name, colour and icon
+      const id = k.slice(CUSTOM_PREFIX.length);
+      const cs = isObj(s.customSections) ? s.customSections : {};
+      if (JSON.stringify(cs[id] ?? null) !== JSON.stringify(val)) {
+        s.customSections = { ...cs, [id]: val };
         changed = true;
       }
     } else if (k.startsWith(BRANCH_PREFIX)) {
@@ -411,6 +425,10 @@ function valueOf(s: Obj, k: string): unknown {
   if (k === 'recalls.enabled') return isObj(s.recalls) && typeof s.recalls.enabled === 'boolean' ? s.recalls.enabled : DEFAULTS['recalls.enabled'];
   if ((SCALAR_KEYS as readonly string[]).includes(k)) return s[k] ?? DEFAULTS[k as ScalarKey];
   if (k.startsWith('tab:')) return isObj(s.sections) ? s.sections[k.slice(4)] === true : false;
+  if (k.startsWith(CUSTOM_PREFIX)) {
+    const cs = isObj(s.customSections) ? s.customSections : {};
+    return checkCustomDef(cs[k.slice(CUSTOM_PREFIX.length)]);
+  }
   const id = k.slice(5);
   const chains: readonly unknown[] = Array.isArray(s.enabledChains) ? (s.enabledChains as unknown[]) : DEFAULTS.enabledChains;
   const on = chains.includes(id);
@@ -423,7 +441,10 @@ function valueOf(s: Obj, k: string): unknown {
 /** Every household setting key a settings object has, for these tabs. */
 export function keysFor(s: Obj, tabs: ReadonlySet<string>): string[] {
   const out: string[] = [...SCALAR_KEYS];
-  for (const t of ['keg', 'pharmacy', 'baby', 'pets']) if (tabs.has(rowTab(t))) out.push('tab:' + t);
+  for (const t of ['keg', 'pharmacy', ...CUSTOM_SECTIONS]) if (tabs.has(rowTab(t))) out.push('tab:' + t);
+  // 0.10.7: the custom sections that have a name of their own
+  const cs = isObj(s.customSections) ? s.customSections : {};
+  if (tabs.has('pantry')) for (const c of CUSTOM_SECTIONS) if (checkCustomDef(cs[c])) out.push(CUSTOM_PREFIX + c);
   for (const t of ALL_TABS) if (tabs.has(t)) for (const id of builtInsOn(t)) out.push('shop:' + id);
   for (const c of Array.isArray(s.customShops) ? (s.customShops as unknown[]) : [])
     if (isObj(c) && typeof c.id === 'string' && typeof c.section === 'string' && tabs.has(rowTab(c.section)) && checkShop(c, c.id)) out.push('shop:' + c.id);

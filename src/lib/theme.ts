@@ -106,6 +106,15 @@ function paint() {
   else delete root.dataset.motion;
   if (a11y.big) root.dataset.big = '1';
   else delete root.dataset.big;
+  // 0.10.7: bold text, easier-reading spacing, underlined links
+  for (const [key, on] of [
+    ['bold', a11y.bold],
+    ['spacing', a11y.spacing],
+    ['links', a11y.links],
+  ] as const) {
+    if (on) root.dataset[key] = '1';
+    else delete root.dataset[key];
+  }
   if (Capacitor.isNativePlatform()) {
     // The Australian style has a navy strip behind the clock, so its icons are always light.
     const lightIcons = dark || look.style !== 'plain';

@@ -9,7 +9,7 @@ import { bothPrices, describe, productQty, type Option } from '../lib/verdict';
 import { sizeLabel } from '../lib/unitPrice';
 import { chainName, stockAtBranch, type Chain, type PriceReading } from '../types';
 import { cachedSettings } from '../lib/db';
-import { SECTION_NAMES, shopColor, websiteOf, type Section } from '../shops';
+import { onSectionIcons, SECTION_NAMES, shopColor, websiteOf, type Section } from '../shops';
 import { useNav } from './nav';
 
 // ---------- icons (inline stroke SVG) ----------
@@ -217,6 +217,70 @@ const paths: Record<string, ReactNode> = {
   ),
 };
 
+
+/**
+ * 0.10.7: the icon pack for custom sections (shops.ts PACK_ICON_IDS), drawn like the rest: 24 × 24,
+ * round 2 px lines in the text colour, so they sit with Keg, Health and the others.
+ */
+export const PACK_ICONS: Record<string, ReactNode> = {
+  bottle: paths.baby,
+  paw: paths.pets,
+  car: (
+    <>
+      <path d="M3 16v-3l2-5a2 2 0 0 1 1.9-1.4h10.2A2 2 0 0 1 19 8l2 5v3a1 1 0 0 1-1 1h-1M5 17H4a1 1 0 0 1-1-1M3 13h18M9 17h6" />
+      <circle cx="7" cy="17" r="2" />
+      <circle cx="17" cy="17" r="2" />
+    </>
+  ),
+  tools: <path d="M14.5 6.5a4 4 0 0 1-5 5L4 17a1.5 1.5 0 0 0 3 3l5.5-5.5a4 4 0 0 1 5-5l-2.5-2.5zM15 3l2 2-2 2M19 9l2-2M13 17l4 4 3-3-4-4" />,
+  papers: <path d="M8 3h8l4 4v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM16 3v4h4M9 11h7M9 15h7M4 7v12a2 2 0 0 0 2 2" />,
+  office: <path d="M4 20h16M6 20V9l6-5 6 5v11M10 20v-5h4v5M9 11h.01M15 11h.01" />,
+  plant: <path d="M12 21v-9M12 12c0-4 3-7 8-7 0 5-3 8-8 7zM12 15c0-3-2.5-5.5-7-5.5 0 4 2.5 6.5 7 5.5zM7 21h10" />,
+  roller: <path d="M4 4h14v5H4zM18 6.5h2v5h-8v3M11 14.5h2V21h-2z" />,
+  bulb: <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.7 1 2.5h6c0-.8.2-1.7 1-2.5A6 6 0 0 0 12 3z" />,
+  gift: <path d="M3 9h18v4H3zM5 13h14v8H5zM12 9v12M12 9c-1-3-5-4-5-1.5S10 9 12 9zM12 9c1-3 5-4 5-1.5S14 9 12 9z" />,
+  shirt: <path d="M8 3l-5 3 2 4 2-1v12h10V9l2 1 2-4-5-3a4 4 0 0 1-8 0z" />,
+  book: <path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2zM4 20a2 2 0 0 0 2 1h13v-3M8 7h7" />,
+  gamepad: (
+    <>
+      <path d="M7 8h10a4 4 0 0 1 4 4l-1 5a2.5 2.5 0 0 1-4.5 1L14 16h-4l-1.5 2A2.5 2.5 0 0 1 4 17l-1-5a4 4 0 0 1 4-4zM8 11v3M6.5 12.5h3" />
+      <circle cx="15.5" cy="11.5" r=".8" />
+      <circle cx="17.5" cy="13.5" r=".8" />
+    </>
+  ),
+  dumbbell: <path d="M6 7v10M3 9.5v5M18 7v10M21 9.5v5M6 12h12" />,
+  tent: <path d="M12 4L2 20h20L12 4zM12 4v16M9 20l3-5 3 5" />,
+  fishing: <path d="M5 21V3l13 4M18 7v8a3 3 0 0 1-6 0v-1M12 14l1.5-1.5" />,
+  couch: <path d="M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3M3 13a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v5H3zM5 18v2M19 18v2" />,
+  phone: <path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2" />,
+  spray: <path d="M9 9h6v12H9zM10 9V6h4l3-2M14 6h4M11 4h1M9 14h6" />,
+  scissors: (
+    <>
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="6" cy="18" r="2.5" />
+      <path d="M8 7.5L20 18M8 16.5L20 6" />
+    </>
+  ),
+  ball: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7l4 3-1.5 4.5h-5L8 10zM12 7V3M16 10l4-1M14.5 14.5l2 3.5M9.5 14.5l-2 3.5M8 10l-4-1" />
+    </>
+  ),
+  coffee: <path d="M4 9h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM16 11h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3" />,
+  wine: <path d="M8 3h8l-.5 6a3.5 3.5 0 0 1-7 0zM12 12.5V20M8.5 21h7M8.3 7h7.4" />,
+  star: <path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9z" />,
+};
+
+/**
+ * The icon a custom section shows (its own pick: a pack icon or an emoji). Set from settings
+ * (setSectionIcons), so every <Icon name={section}> follows it.
+ */
+let sectionIcons: Partial<Record<string, string>> = {};
+export function setSectionIcons(map: Partial<Record<string, string>>) {
+  sectionIcons = map;
+}
+
 export function Icon({
   name,
   size = 22,
@@ -228,6 +292,15 @@ export function Icon({
   fill?: string;
   stroke?: number;
 }) {
+  // 0.10.7: a custom section's own icon: from the pack, or an emoji
+  const own = sectionIcons[name];
+  if (own && !own.startsWith('pack:'))
+    return (
+      <span className="emoji-icon" style={{ fontSize: size * 0.9, width: size, height: size }} aria-hidden="true">
+        {own}
+      </span>
+    );
+  const drawn = own ? PACK_ICONS[own.slice(5)] : name.startsWith('pack:') ? PACK_ICONS[name.slice(5)] : undefined;
   return (
     <svg
       width={size}
@@ -240,7 +313,7 @@ export function Icon({
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {paths[name]}
+      {drawn ?? paths[name]}
     </svg>
   );
 }
@@ -266,7 +339,8 @@ export function TopBar({ title, right, back = true }: { title: string; right?: R
  * 0.10.0: "Beta" beside the Keg and Health tabs and their shops, everywhere they're named (phone,
  * web page, iPhone web app): still being worked on. Nothing else about them changes.
  */
-export const BETA_SECTIONS: readonly string[] = ['keg', 'pharmacy', 'baby', 'pets'];
+// 0.10.7: Baby and Pets are custom sections now (not beta tabs).
+export const BETA_SECTIONS: readonly string[] = ['keg', 'pharmacy'];
 /** 0.10.2: shops marked Beta where they're picked or set up (it works the same; it's tested less). 0.10.3: and IGA and the new shops (shops.ts). */
 export { BETA_SHOPS } from '../shops';
 export const COSTCO_BETA_NOTE = "Costco is in beta: it works the same way as the other supermarkets, it just hasn't been tested as thoroughly yet.";
@@ -901,6 +975,8 @@ export function SwipeRow({
   const start = useRef<{ x: number; y: number; dir?: 'h' | 'v' } | undefined>(undefined);
   const swiped = useRef(false);
   const TRIGGER = 90;
+  // 0.10.7: Accessibility → No swiping: rows stay put (their buttons do the same things)
+  if (cachedSettings()?.a11y?.noSwipe) disabled = true;
   const reset = () => {
     start.current = undefined;
     setDx(0);
@@ -1349,3 +1425,6 @@ export function SearchField({
     </span>
   );
 }
+
+// 0.10.7: custom sections' icons follow settings (shops.ts applyCustomSections).
+onSectionIcons(setSectionIcons);

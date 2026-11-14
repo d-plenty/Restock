@@ -20,8 +20,12 @@ export interface ShellManifest {
   files: string[];
 }
 
-/** Big files not needed offline (the phone's receipt reader; the QR maker for Add a phone), left out of the shell. */
-const LEAVE_OUT = /(^|\/)(tesseract[^/]*|[^/]*traineddata[^/]*|worker\.min[^/]*|zxing_writer[^/]*\.wasm)$/i;
+/**
+ * Big files not needed offline (the text reader, 0.10.7: its models, engine and worker; the QR
+ * maker for Add a phone; the shop map, which needs a connection anyway), left out of the shell. They
+ * load when they're first used.
+ */
+const LEAVE_OUT = /(^|\/)(ppocrv5[^/]*|ort-wasm[^/]*|ocrWorker[^/]*|maplibre-gl[^/]*|zxing_writer[^/]*\.wasm)$/i;
 const KEEP = /\.(html|js|mjs|css|wasm|woff2?|ttf|png|svg|ico|webmanifest)$/i;
 
 /** Which of the build's files go in the app shell (sorted, so the build id is stable). */

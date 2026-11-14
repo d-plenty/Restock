@@ -216,29 +216,47 @@ export function itemLines(text: string): string[] {
     .filter((l) => l.length >= 3);
 }
 
-/** The product's name on the front of a pack: the biggest words (used when a barcode isn't known). */
+/** Words on a pack that are never its name. */
+const PACK_FLUFF = /^(new|now|improved|limited|edition|bonus|value|free|save|only|best|award|no\.?\s?1|n[o0]1|best seller)$/i;
+
+/**
+ * The product's name on the front of a pack (used when a barcode isn't known): the biggest few
+ * lines of writing, in the order they're on the pack. 0.10.7: the brand's logo is often far bigger
+ * than the rest ("Bref" over "Self Active"), so the next two biggest short lines count too, as long
+ * as they aren't small print; and "New", "No.1" and the like never do.
+ */
 export function packName(lines: { text: string; height: number; confidence: number }[]): string | undefined {
+  return packPick(lines)?.name;
+}
+
+/** packName, and which of the lines it used (0.10.7: shown ticked on the pack reader's word chips). */
+export function packPick(lines: { text: string; height: number; confidence: number }[]): { name: string; used: number[] } | undefined {
   const words = lines
-    .filter((l) => l.confidence > 50 && /[A-Za-z]{3}/.test(l.text))
-    .map((l) => ({
+    .map((l, at) => ({
       ...l,
+      at,
       text: l.text
         .replace(/[^A-Za-z0-9'&%.\- ]+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim(),
     }))
-    .filter((l) => l.text.length >= 3)
+    .filter((l) => l.confidence > 50 && /[A-Za-z]{3}/.test(l.text) && l.text.length >= 3 && !PACK_FLUFF.test(l.text) && l.text.split(' ').length <= 4)
     .sort((a, b) => b.height - a.height);
   if (!words.length) return undefined;
   const big = words[0].height;
-  // The biggest line, plus anything nearly as big (brand on one line, product on the next).
-  const picked = words.filter((w) => w.height >= big * 0.6).slice(0, 3);
-  return picked
-    .map((w) => w.text)
-    .join(' ')
-    .split(' ')
-    .slice(0, 8)
-    .join(' ');
+  const picked = words.filter((w) => w.height >= big * 0.15).slice(0, 3);
+  // the third only when it's near the second's size (not the small print under the name)
+  if (picked.length === 3 && picked[2].height < picked[1].height * 0.5) picked.pop();
+  const inOrder = picked.sort((a, b) => a.at - b.at);
+  return {
+    name: inOrder
+      .map((w) => w.text)
+      .join(' ')
+      .split(' ')
+      .slice(0, 8)
+      .join(' '),
+    used: inOrder.map((w) => w.at),
+  };
 }
 
 // ---------- a long receipt in several photos ----------

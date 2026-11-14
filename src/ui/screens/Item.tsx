@@ -376,7 +376,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
     <Hold key={o.product.id} onLong={() => setPreview(o)}>
       <div className="row">
         <MoreInfo src={o.product.imageUrl} name={o.product.name} onOpen={() => setPreview(o)} />
-        <button className="row-main" style={{ color: 'inherit', font: 'inherit' }} onClick={() => setSheet({ option: o })}>
+        <div className="row-main row-stretch">
+          <button className="row-hit" onClick={() => setSheet({ option: o })} aria-label={`${o.product.name}, ${chainName(o.product.chain)}: details`} />
           <span className="grow">
             <span className="title two-lines" style={{ fontSize: 15 }}>
               {o.product.name}
@@ -434,7 +435,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
               </span>
             )}
           </span>
-        </button>
+        </div>
       </div>
     </Hold>
   );

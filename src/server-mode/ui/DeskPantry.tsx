@@ -18,7 +18,7 @@ import { money, parseMoney, tidySize } from '../../lib/units';
 import { productLine, sizeLabel, type CompareStyle } from '../../lib/unitPrice';
 import { useLive } from '../../lib/useLive';
 import { ALERT_LEVELS, bothPrices, computeStats, HISTORY_DAYS, multiBuy, optionStyle, tiedWithBest, withMarket, type Option, type Recommendation } from '../../lib/verdict';
-import { SECTION_NAMES, type Section } from '../../shops';
+import { SECTION_NAMES, type Section, slots } from '../../shops';
 import { chainName, type AlertLevel } from '../../types';
 import { BETA_NOTE, BETA_SECTIONS, ChainName, Icon, PriceChart, Thumb, SearchField } from '../../ui/components';
 import { useNav } from '../../ui/nav';
@@ -43,6 +43,7 @@ const SEARCH_HINT: Record<Section, string> = {
   pharmacy: 'Search your pharmacy items',
   baby: 'Search your baby things',
   pets: 'Search your pet things',
+  ...slots('Search this tab'),
 };
 const EMPTY: Record<Section, string> = {
   pantry: 'Your pantry is empty. Add the things you buy on a phone, and Restock watches their prices.',
@@ -50,6 +51,7 @@ const EMPTY: Record<Section, string> = {
   pharmacy: 'Nothing here yet. Add the medicine, first aid and personal care things you buy on a phone.',
   baby: 'Nothing here yet. Add the nappies, wipes and baby things you buy on a phone.',
   pets: 'Nothing here yet. Add the pet food, litter and treats you buy on a phone.',
+  ...slots('Nothing here yet. Add the things you buy on a phone.'),
 };
 /** The same deals the phone's Pantry counts ("wait" isn't a deal yet). */
 const onSale = (r: Recommendation) => r.action === 'buy' || r.action === 'alt' || r.action === 'small';

@@ -85,11 +85,13 @@ export function mapEndeavour(chain: 'danmurphys' | 'bws', p: Raw): StoreProduct 
   const promo = priceOf(prices.promoprice ?? prices.PromoPrice);
   const member = priceOf(prices.memberprice ?? prices.MemberPrice ?? prices.memberofferprice);
   const was = priceOf(prices.wasprice) ?? num(p.WasPrice);
-  const price = promo ?? single;
   const promoText =
     (typeof (prices.promoprice as Raw | undefined)?.Message === 'string' && ((prices.promoprice as Raw).Message as string)) ||
     (typeof p.PromotionDescription === 'string' ? p.PromotionDescription : undefined) ||
     detail(p, 'webpromotiondescription', 'promotiondescription');
+  // 0.10.7: "2 for $55" is a deal on two, not the price of one: the price stays the shelf price
+  // and the deal goes in as its words (the multi-buy setting counts it from those).
+  const price = promo !== undefined && !isMultiBuy(promoText || undefined) ? promo : single;
   const brand = detail(p, 'webbrandname', 'brand') ?? (typeof p.Brand === 'string' ? p.Brand : undefined);
   const baseName = nameOf(p);
   const image =
@@ -102,7 +104,7 @@ export function mapEndeavour(chain: 'danmurphys' | 'bws', p: Raw): StoreProduct 
   const kind = detail(p, 'webpacktype')?.toLowerCase();
   const pack = qty > 1 ? (kind === 'case' ? `Case of ${qty}` : `${qty} Pack`) : undefined;
   const size = pack && one ? `${qty} x ${one}` : one;
-  const before = was ?? (promo !== undefined && single !== undefined && single > promo ? single : undefined);
+  const before = was ?? (price !== undefined && single !== undefined && single > price ? single : undefined);
   return {
     chain,
     storeProductId: String(id),
@@ -126,6 +128,97 @@ export function mapEndeavour(chain: 'danmurphys' | 'bws', p: Raw): StoreProduct 
 const withPack = (name: string, pack: string | undefined) =>
   pack && !new RegExp(`\\b${pack.replace(/\s+/g, '\\s*')}\\b`, 'i').test(name) ? `${name} · ${pack}` : name;
 
+/** "2 for $55", "Any 6 for $20": a deal on several (same rule as multiBuy in lib/verdict.ts). */
+const isMultiBuy = (t?: string) => !!t && /(?<!\d)([2-9]|1[0-2])\s*for\s*\$\s*\d/i.test(t);
+
+type Unit = { kind: 'single' | 'pack' | 'case'; qty: number };
+
+/** What one of the shop's prices is for, from its own words: "per case of 24", "Pack (4)", "per bottle". */
+export function unitOf(text?: string): Unit | undefined {
+  if (!text || isMultiBuy(text)) return undefined;
+  const n = Number(text.match(/(\d{1,3})/)?.[1] ?? 0);
+  if (/\bcase/i.test(text)) return { kind: 'case', qty: n };
+  if (/\bpack/i.test(text)) return { kind: 'pack', qty: n };
+  if (/\b(bottle|can|each|single|unit)s?\b/i.test(text)) return { kind: 'single', qty: 1 };
+  return undefined;
+}
+
+/**
+ * How the name counts what's in the product (Dan Murphy's names the biggest way it's sold):
+ *  "6x4x375mL": a case of 24 made of 4 packs; "500mLx12": a case of 12 bottles; "6X375ml": a 6 pack.
+ * `cut` takes the count out of the name (the size stays), so every way it's sold shares one name.
+ */
+export function countIn(name: string): { base: Unit; all?: number; cut: (s: string) => string } | undefined {
+  const size = String.raw`\d+(?:\.\d+)?\s*(?:ml|l|g|kg)(?![a-wyz])`;
+  let m = name.match(new RegExp(String.raw`\b(\d{1,2})\s*x\s*(\d{1,2})\s*x\s*(?=${size})`, 'i'));
+  if (m) return { base: { kind: 'pack', qty: Number(m[2]) }, all: Number(m[1]) * Number(m[2]), cut: (s) => s.replace(/\b\d{1,2}\s*x\s*\d{1,2}\s*x\s*/i, '') };
+  m = name.match(new RegExp(String.raw`(${size})\s*x\s*(\d{1,2})\b`, 'i'));
+  if (m) return { base: { kind: 'single', qty: 1 }, all: Number(m[2]), cut: (s) => s.replace(new RegExp(String.raw`(${size})\s*x\s*\d{1,2}\b`, 'i'), '$1') };
+  m = name.match(new RegExp(String.raw`\b(\d{1,2})\s*x\s*(?=${size})`, 'i'));
+  if (m) {
+    const n = Number(m[1]);
+    return { base: n >= 10 ? { kind: 'case', qty: n } : { kind: 'pack', qty: n }, cut: (s) => s.replace(new RegExp(String.raw`\b\d{1,2}\s*x\s*(?=${size})`, 'i'), '') };
+  }
+  return undefined;
+}
+
+const label = (u: Unit) => (u.kind === 'single' || u.qty <= 1 ? undefined : u.kind === 'case' ? (u.qty ? `Case of ${u.qty}` : 'Case') : `${u.qty} Pack`);
+
+/**
+ * 0.10.7: Dan Murphy's sells one product several ways under one stock code: a 4 pack and a case of
+ * 24, say. Its answer has a price for each ("singleprice" is the smallest way it's sold online,
+ * "caseprice" the case), and the name describes the case. Before 0.10.7 Restock showed the case's
+ * name with the pack's price. Now each way it's sold is its own item, like BWS (which already lists
+ * them separately): "4 Pines Dark Lager Cans 375mL · 4 Pack" $17.99 and "… · Case of 24" $89.99.
+ */
+export function mapEndeavourAll(chain: 'danmurphys' | 'bws', p: Raw): StoreProduct[] {
+  const first = mapEndeavour(chain, p);
+  if (!first || chain !== 'danmurphys') return first ? [first] : [];
+  const prices = (p.Prices ?? p.prices ?? {}) as Raw;
+  const msg = (o: unknown) => (o && typeof o === 'object' && typeof (o as Raw).Message === 'string' ? ((o as Raw).Message as string) : undefined);
+  const singleRaw = prices.singleprice ?? prices.SinglePrice;
+  const caseRaw = prices.caseprice ?? prices.CasePrice;
+  const promoRaw = prices.promoprice ?? prices.PromoPrice;
+  const casePrice = priceOf(caseRaw);
+  const counted = countIn(first.name);
+  const base: Unit | undefined = unitOf(msg(singleRaw)) ?? counted?.base;
+  if (!base) return [first];
+  const caseUnit: Unit = unitOf(msg(caseRaw)) ?? { kind: 'case', qty: counted?.all ?? 0 };
+  if (caseUnit.kind !== 'case') caseUnit.kind = 'case';
+  if (!caseUnit.qty && counted?.all) caseUnit.qty = counted.all;
+  // the name without its count ("… Can 6x4x375mL" → "… Can 375mL"), and without a pack word we add back
+  const plain = (counted ? counted.cut(first.name) : first.name).replace(/\s{2,}/g, ' ').trim();
+  const one = (first.size ?? '').replace(/^\d+\s*x\s*/i, '') || undefined;
+  const sizeFor = (u: Unit) => (u.qty > 1 && one ? `${u.qty} x ${one}` : one);
+  // a special worded for the case is on the case, unless the main price already is the case's
+  const promoOnCase = base.kind !== 'case' && unitOf(msg(promoRaw))?.kind === 'case';
+  const out: StoreProduct[] = [];
+  const baseItem: StoreProduct = { ...first, name: withPack(plain, label(base)), size: sizeFor(base) };
+  if (promoOnCase) {
+    // the special is on the case: the pack keeps its shelf price
+    const shelf = priceOf(singleRaw) ?? first.price;
+    Object.assign(baseItem, { price: shelf, wasPrice: undefined, isSpecial: false, promo: undefined });
+  }
+  out.push(baseItem);
+  if (casePrice !== undefined && caseUnit.qty !== base.qty) {
+    const special = promoOnCase ? priceOf(promoRaw) : undefined;
+    out.push({
+      ...first,
+      storeProductId: `${first.storeProductId}-case`,
+      name: withPack(plain, label(caseUnit)),
+      size: sizeFor(caseUnit),
+      barcode: undefined,
+      price: special !== undefined && special < casePrice ? special : casePrice,
+      wasPrice: special !== undefined && special < casePrice ? casePrice : undefined,
+      isSpecial: special !== undefined && special < casePrice,
+      memberOnly: promoOnCase ? first.memberOnly : false,
+      promo: promoOnCase ? first.promo : undefined,
+      unitPriceText: undefined,
+    });
+  }
+  return out;
+}
+
 /** Search answers nest products inside bundles; flatten them. */
 export function flattenEndeavour(chain: 'danmurphys' | 'bws', data: Raw): StoreProduct[] {
   const out: StoreProduct[] = [];
@@ -134,8 +227,7 @@ export function flattenEndeavour(chain: 'danmurphys' | 'bws', data: Raw): StoreP
   for (const entry of outer) {
     const inner = Array.isArray(entry.Products) ? (entry.Products as Raw[]) : [entry];
     for (const p of inner) {
-      const m = mapEndeavour(chain, p);
-      if (m && m.price !== undefined) out.push(m);
+      for (const m of mapEndeavourAll(chain, p)) if (m.price !== undefined) out.push(m);
     }
   }
   return out;

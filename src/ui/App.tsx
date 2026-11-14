@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { openDatabase } from '../lib/boot';
 import { wireSync } from '../lib/sync';
 import { checkPrices, syncBackgroundSchedule } from '../lib/check';
-import { getKV, getSettings, pruneHistory, putKV, refresh, updateSettings } from '../lib/db';
+import { cachedSettings, getKV, getSettings, pruneHistory, putKV, refresh, updateSettings } from '../lib/db';
 import { checkForUpdate, SELF_UPDATE, weeklyCheckDue } from '../lib/updates';
 import { version as appVersion } from '../../package.json';
 import { setConnectionMode } from '../stores/http';
@@ -32,7 +32,11 @@ import { ItemScreen } from './screens/Item';
 import { ListScreen } from './screens/List';
 import { Onboarding } from './screens/Onboarding';
 import { SetupScreen } from './screens/Setup';
-import { addShared } from '../lib/shared';
+import { addShared, nameFromLink, splitShared } from '../lib/shared';
+import { lensBarcode } from '../lib/lens';
+import { ScannedScreen } from './screens/Scanned';
+import { okToLeave, unsavedWork } from './leaveGuard';
+import { rescueOldScans } from '../lib/scanQueue';
 import { scanBarcode } from '../lib/barcode';
 import { RestockNative } from '../lib/sql/native';
 import { DiagnosticsScreen } from './screens/Diagnostics';
@@ -156,7 +160,8 @@ function RestockApp() {
       setToastMsg(msg);
       setToastUndo(() => undo);
       toastHeld.current = false;
-      toastLeft.current = undo ? 5000 : 2800;
+      // 0.10.7: Accessibility → Messages stay longer: three times as long
+      toastLeft.current = (undo ? 5000 : 2800) * (cachedSettings()?.a11y?.slowMessages ? 3 : 1);
       startToastTimer();
     },
     [startToastTimer],
@@ -220,9 +225,11 @@ function RestockApp() {
   }, [toast]);
 
   // 0.9.5 (save): leaving a settings screen with changes not saved asks first (settingsDraft.ts).
+  // 0.10.7: and other work under way that isn't saved (leaveGuard.ts): "Leave without saving?"
   const leave = useCallback((go: () => void) => {
-    if (!hasUnsaved()) return go();
-    void canLeave(askLeave).then((ok) => ok && go());
+    if (hasUnsaved()) return void canLeave(askLeave).then((ok) => ok && go());
+    if (unsavedWork()) return void okToLeave().then((ok) => ok && go());
+    go();
   }, []);
 
   // 0.9.8: each screen keeps its scroll place. Opening a screen on top notes where the one below was;
@@ -317,6 +324,15 @@ function RestockApp() {
   // Check prices when the app opens or comes back, if it's been a while.
   const onboarded = settings?.onboarded;
 
+  // 0.10.7: barcode-number lines Scan several used to put on the list go back to Scanned barcodes.
+  useEffect(() => {
+    if (!onboarded) return;
+    void rescueOldScans()
+      .then((n) => n > 0 && toast(`${n === 1 ? '1 scanned barcode' : `${n} scanned barcodes`} moved off your list. Match them from Add → Scanned barcodes.`))
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboarded]);
+
   // Something shared to Restock from another app, or an app icon shortcut (Scan, List, Receipt).
   useEffect(() => {
     if (!onboarded || !Capacitor.isNativePlatform()) return;
@@ -325,6 +341,15 @@ function RestockApp() {
       if (a.action === 'share' && a.text) {
         nav.setTab('list');
         toast(await addShared(a.text));
+      } else if (a.action === 'search' && a.text) {
+        // 0.10.7: "Restock: Search shops": search the words (a name from Google Lens, say), with the
+        // barcode Lens was just asked about, so picking a result remembers that barcode.
+        const { words, url } = splitShared(a.text);
+        const query = words || (url ? nameFromLink(url) : undefined);
+        if (query) {
+          nav.setTab('home');
+          setStack([{ name: 'add', query, barcode: lensBarcode() }]);
+        }
       } else if (a.action === 'list') nav.setTab('list');
       else if (a.action === 'receipt') setStack((st) => [...st, { name: 'receipt' }]);
       else if (a.action === 'recalls') setStack((st) => [...st, { name: 'recalls' }]);
@@ -532,9 +557,11 @@ function RestockApp() {
             section={top.section ?? addSection}
             forList={top.forList}
             replaceEntry={top.replaceEntry}
+            fromScans={top.fromScans}
             overlay
           />
         )}
+        {top.name === 'scanned' && <ScannedScreen section={top.section ?? addSection} start={top.start} />}
         {top.name === 'catalogues' && <CataloguesScreen />}
         {top.name === 'mycatalogue' && <MyCatalogueScreen />}
         {top.name === 'permissions' && <PermissionsScreen />}

@@ -10,7 +10,8 @@ import { HistoryLengths } from './DayOne';
 import { SHARED_ONE_LINE, SHARED_TITLE, TurnOffShared } from './SharedPrices';
 import { shareFromNow, sharedOn } from '../../lib/priceShare';
 import { useLive } from '../../lib/useLive';
-import { enabledIn, sectionOn } from '../../shops';
+import { enabledIn, SECTION_NAMES, sectionOn, type CustomSection } from '../../shops';
+import { CustomStarts, customsInUse } from './CustomSections';
 import { checkAll } from '../../lib/permissions';
 import { SELF_UPDATE } from '../../lib/updates';
 import { DEFAULT_SETTINGS } from '../../types';
@@ -40,9 +41,10 @@ export type TileId =
   | 'pantry'
   | 'keg'
   | 'pharmacy'
-  // 0.10.3 (beta): the Baby and Pets tabs.
+  // 0.10.3 (beta): the Baby and Pets tabs. 0.10.7: custom sections in their place (old tiles stay readable).
   | 'baby'
   | 'pets'
+  | 'custom'
   | 'permissions'
   | 'receipts'
   | 'recalls'
@@ -95,20 +97,13 @@ const ALL_TILES: Tile[] = [
     intro: `Medicine, first aid and personal care on a Health tab of its own, kept apart from groceries. ${BETA_NOTE}`,
   },
   {
-    id: 'baby',
-    title: 'Baby',
-    sub: 'Baby tab · Beta',
-    icon: 'baby',
-    heading: 'Track baby things too?',
-    intro: `Nappies, wipes, formula and baby food on a Baby tab of its own. Pick any shops for it: Baby Bunting, chemists, Big W, supermarkets. Skip it if it's not for you, and it won't show. ${BETA_NOTE}`,
-  },
-  {
-    id: 'pets',
-    title: 'Pets',
-    sub: 'Pets tab · Beta',
-    icon: 'pets',
-    heading: 'Track pet things too?',
-    intro: `Pet food, litter and treats on a Pets tab of its own. Pick any shops for it: Petbarn, Petstock, Pet Circle, supermarkets, Bunnings. Skip it if it's not for you, and it won't show. ${BETA_NOTE}`,
+    id: 'custom',
+    title: 'Custom sections',
+    sub: 'Pets, tools, automotive, baby and more',
+    icon: 'pack:star',
+    heading: 'Compare other kinds of shops?',
+    intro:
+      "Make a section for anything else you buy: pet shops, tools, automotive, baby things. Each gets its own name, colour, icon and shops. Skip it if it's not for you; you can make one later from More.",
   },
   {
     id: 'permissions',
@@ -238,9 +233,9 @@ const ALL_TILES: Tile[] = [
 // "Our house") and are all in Settings. The household's name is set in Sync and backups.
 // 0.9.12: what a new person cares about first: their shops, then how deals are judged and told,
 // then keeping it safe and shared, then the extras.
-const TILE_ORDER: TileId[] = ['a11y', 'pantry', 'history', 'alerts', 'accounts', 'permissions', 'backups', 'sync', 'keg', 'pharmacy', 'baby', 'pets', 'receipts', 'recalls'];
-const TAB_TILES: readonly string[] = ['keg', 'pharmacy', 'baby', 'pets'];
-const isTabTile = (id: TileId): id is 'keg' | 'pharmacy' | 'baby' | 'pets' => TAB_TILES.includes(id);
+const TILE_ORDER: TileId[] = ['a11y', 'pantry', 'history', 'alerts', 'accounts', 'permissions', 'backups', 'sync', 'keg', 'pharmacy', 'custom', 'receipts', 'recalls'];
+const TAB_TILES: readonly string[] = ['keg', 'pharmacy'];
+const isTabTile = (id: TileId): id is 'keg' | 'pharmacy' => TAB_TILES.includes(id);
 // The Updates tile only where Restock updates itself from GitHub (not F-Droid builds).
 export const TILES: Tile[] = TILE_ORDER.filter((id) => SELF_UPDATE || id !== 'updates').map((id) => ALL_TILES.find((t) => t.id === id)!);
 
@@ -260,6 +255,9 @@ export function tileStatus(s: Settings, id: TileId, cover?: Cover): { text: stri
   // household, say, not only when set up here. Decided to leave it off: "Off", done.
   if (isTabTile(id) && sectionOn(s, id)) return { text: 'On', ok: true };
   if (isTabTile(id) && s.setup.done.includes(id)) return { text: 'Off', ok: true };
+  // 0.10.7: custom sections: done once one's made (or the tile's been passed)
+  if (id === 'custom' && customsInUse(s).length) return { text: `${customsInUse(s).length} made`, ok: true };
+  if (id === 'custom' && s.setup.done.includes(id)) return { text: 'None', ok: true };
   if (id === 'pantry' && !s.setup.done.includes(id) && Object.values(s.stores).some((c) => c?.primary || c?.storeId))
     return { text: 'Done ✓', ok: true };
   if (s.setup.done.includes(id)) return { text: 'Done ✓', ok: true };
@@ -363,7 +361,7 @@ function FlagBackground() {
   );
 }
 
-function Welcome({ onSetUp, onRestore, onJoin }: { onSetUp: () => void; onRestore: () => void; onJoin: () => void }) {
+function Welcome({ onSetUp, onRestore, onJoin, onA11y }: { onSetUp: () => void; onRestore: () => void; onJoin: () => void; onA11y: () => void }) {
   // 0.9.10: navy behind the clock and the gesture bar, with light icons, while the welcome shows.
   useEffect(() => {
     document.documentElement.classList.add('on-welcome');
@@ -377,6 +375,10 @@ function Welcome({ onSetUp, onRestore, onJoin }: { onSetUp: () => void; onRestor
     <div className="welcome">
       <FlagBackground />
       <div className="welcome-shade" aria-hidden="true" />
+      {/* 0.10.7: accessibility before anything else, for anyone who can't read the rest yet */}
+      <button className="welcome-a11y" onClick={onA11y}>
+        <Icon name="access" size={20} /> Accessibility
+      </button>
       <div className="welcome-body">
         <Logo size={104} />
         <div className="welcome-hello">Welcome to</div>
@@ -580,6 +582,27 @@ function SyncTile() {
   );
 }
 
+/** 0.10.7: setup's custom sections: the starts, then the shops for the one just made. */
+function CustomTile({ settings }: { settings: Settings }) {
+  const [made, setMade] = useState<CustomSection>();
+  const mine = customsInUse(settings);
+  return (
+    <>
+      {mine.length > 0 && <p className="small" style={{ margin: 0 }}>Made so far: {mine.map((c) => SECTION_NAMES[c]).join(', ')}.</p>}
+      {made ? (
+        <>
+          <StoreFields settings={settings} section={made} inSetup />
+          <button className="btn" onClick={() => setMade(undefined)}>
+            Make another
+          </button>
+        </>
+      ) : (
+        <CustomStarts onMade={setMade} />
+      )}
+    </>
+  );
+}
+
 function TileBody({ id, settings }: { id: TileId; settings: Settings }): ReactNode {
   switch (id) {
     case 'pantry':
@@ -589,9 +612,9 @@ function TileBody({ id, settings }: { id: TileId; settings: Settings }): ReactNo
     case 'pharmacy':
       return <StoreFields settings={settings} section="pharmacy" inSetup />;
     case 'baby':
-      return <StoreFields settings={settings} section="baby" inSetup />;
     case 'pets':
-      return <StoreFields settings={settings} section="pets" inSetup />;
+    case 'custom':
+      return <CustomTile settings={settings} />;
     case 'permissions':
       return (
         <>
@@ -809,7 +832,10 @@ function useTileWalk(onFinished: () => void) {
 
 export function Onboarding() {
   const settings = useLive(getSettings, []);
-  const [stage, setStage] = useState<'welcome' | 'privacy' | 'tiles' | 'restored'>('welcome');
+  // 0.10.7: accessibility comes straight after the welcome, before anything else is asked
+  const [stage, setStage] = useState<'welcome' | 'a11y' | 'privacy' | 'tiles' | 'restored'>('welcome');
+  /** Where Continue goes from the accessibility step: on through setup, or back to the welcome. */
+  const [a11yThen, setA11yThen] = useState<'privacy' | 'welcome'>('privacy');
   // 0.8.2: joining a household from the first screen: privacy, then scan the owner phone's code.
   const [joiningHousehold, setJoiningHousehold] = useState(false);
   const [joinCode, setJoinCode] = useState<string>();
@@ -840,8 +866,8 @@ export function Onboarding() {
   // Android's back button steps back through setup instead of closing Restock.
   useBackHandler(() => {
     if (walk.open) return false; // the tile page handles it
-    if (stage === 'privacy' || stage === 'tiles') {
-      setStage(stage === 'tiles' ? 'privacy' : 'welcome');
+    if (stage === 'a11y' || stage === 'privacy' || stage === 'tiles') {
+      setStage(stage === 'tiles' ? 'privacy' : stage === 'privacy' ? 'a11y' : 'welcome');
       return true;
     }
     return false;
@@ -908,12 +934,18 @@ export function Onboarding() {
         <Welcome
           onSetUp={() => {
             setJoiningHousehold(false);
-            setStage('privacy');
+            setA11yThen('privacy');
+            setStage('a11y');
           }}
           onRestore={() => fileRef.current?.click()}
           onJoin={() => {
             setJoiningHousehold(true);
-            setStage('privacy');
+            setA11yThen('privacy');
+            setStage('a11y');
+          }}
+          onA11y={() => {
+            setA11yThen('welcome');
+            setStage('a11y');
           }}
         />
         {fileInput}
@@ -924,6 +956,32 @@ export function Onboarding() {
   const tile = walk.open && TILES.find((t) => t.id === walk.open);
   return (
     <div className="screen" style={{ gap: 16 }}>
+      {stage === 'a11y' && (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="eyebrow green">Step 1</div>
+            <h1>Make Restock easier to see and use</h1>
+            <p className="sub">Set these first, so the rest of setup is easy to read. You can change them any time in Settings → Accessibility.</p>
+          </div>
+          <AccessibilitySettings settings={settings} />
+          <div className="spacer" />
+          <div className="two">
+            <button className="btn" onClick={() => setStage('welcome')}>
+              Back
+            </button>
+            <button
+              className="btn primary"
+              onClick={async () => {
+                const s = await getSettings();
+                if (!s.setup.done.includes('a11y')) await updateSettings({ setup: { ...s.setup, done: [...s.setup.done, 'a11y'] } });
+                setStage(a11yThen);
+              }}
+            >
+              {a11yThen === 'welcome' ? 'Done' : 'Continue'}
+            </button>
+          </div>
+        </>
+      )}
       {stage === 'privacy' && (
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -962,7 +1020,7 @@ export function Onboarding() {
           </div>
           <div className="spacer" />
           <div className="two">
-            <button className="btn" onClick={() => setStage('welcome')}>
+            <button className="btn" onClick={() => setStage('a11y')}>
               Back
             </button>
             <button

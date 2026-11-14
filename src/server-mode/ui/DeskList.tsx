@@ -39,7 +39,8 @@ import { AisleTip } from './DeskAisleTip';
 import { thumbOf } from './DeskSpecials';
 import { ScanButton } from '../pwa/WebScanner'; // 0.9.5 (PWA)
 // 0.9.5 (web search): Search the shops from the add box (Let the web page search the shops).
-import { ShopSearchButton, ShopSearchPanel } from './WebShopSearch';
+import { PhotoFindButton, ShopSearchButton, ShopSearchPanel } from './WebShopSearch';
+import { CheckStockButton } from '../../ui/CheckStock';
 import { askShops, enterDoes, useWebSearchOn } from './webSearch';
 
 type View = 'shop' | 'aisle' | 'all';
@@ -111,6 +112,7 @@ export function DeskAddBox({
         />
         {/* 0.9.5 (PWA): scan a barcode with the camera. */}
         <ScanButton section={nav.section} onSaid={(t) => nav.toast(t)} />
+        <PhotoFindButton section={nav.section} />
         <button className="btn primary" type="submit">
           <Icon name="plus" size={18} /> Add
         </button>
@@ -314,6 +316,8 @@ export function DeskList() {
             </button>
           </div>
         )}
+        {/* 0.10.7: as on the phone's list; it asks the shops from a phone, so here it says so. */}
+        <CheckStockButton items={sums.stockItems} />
       </div>
 
       <DeskAddBox adder={adder} label="Add to the list" placeholder="Add something: milk, 2 bread, dog food…" shopSearch={section} />

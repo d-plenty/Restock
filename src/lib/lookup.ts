@@ -1,4 +1,4 @@
-import { enabledIn, type Section } from '../shops';
+import { enabledIn, type Section, slots } from '../shops';
 import { adapterFor } from '../stores';
 import type { BarcodeInfo } from './barcode';
 import { findProductByBarcode, getSettings } from './db';
@@ -343,6 +343,7 @@ export const QUICK_PICKS: Record<Section, string[]> = {
   pharmacy: ['Paracetamol', 'Ibuprofen', 'Antihistamine', 'Cold and flu', 'Vitamins', 'Sunscreen', 'First aid'],
   baby: ['Nappies', 'Wipes', 'Formula', 'Baby food', 'Nappy cream'],
   pets: ['Dog food', 'Cat food', 'Cat litter', 'Treats', 'Flea and worm'],
+  ...slots([] as string[]),
 };
 
 /** Open Food Facts' size, only when it has a unit ("425 g", "6 x 375ml", "24 pack"); a bare "4" is noise. */

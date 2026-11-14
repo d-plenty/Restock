@@ -196,11 +196,11 @@ export const coles: StoreAdapter = {
       try {
         const mine = await searchStore(term, store, page);
         if (mine.length) return mine;
-        noteFallback(store, `no results for "${term}"`);
+        noteFallback(store, `Your Coles branch (${store}) has no match for "${term}", so the online price was used.`);
       } catch (e) {
         // Coles' bot check is about the phone, not the store: let the usual "open Coles" help show.
         if (e instanceof ColesCheckError) throw e;
-        noteFallback(store, e instanceof Error ? e.message : String(e));
+        noteFallback(store, `Your Coles branch (${store}) didn't answer (${e instanceof Error ? e.message : String(e)}), so the online prices were used.`);
       }
     }
     return searchStore(term, DEFAULT_STORE, page);
@@ -222,10 +222,11 @@ export const colesAtStore = (term: string, store: string) => searchStore(term, s
 
 /** Logs (once a session per store) that your branch didn't answer, for Settings → Diagnostics. */
 const noted = new Set<string>();
-function noteFallback(store: string, why: string) {
+function noteFallback(store: string, note: string) {
   if (noted.has(store)) return;
   noted.add(store);
-  void Promise.resolve(logProblem('coles', 'search', `Your Coles branch (${store}) didn't answer (${why}), so the online prices were used.`)).catch(
+  // 0.10.7: "has no match" when the branch answered with nothing; "didn't answer" only when it didn't.
+  void Promise.resolve(logProblem('coles', 'search', note)).catch(
     () => undefined,
   );
 }

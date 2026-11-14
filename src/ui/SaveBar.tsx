@@ -80,11 +80,11 @@ export function saveStatusText(s: DraftState & { justSaved: boolean }): string {
 }
 
 /** Phone: a bar at the bottom of a settings screen, above the tabs: "Unsaved changes · Save settings". */
-export function SaveBar({ label, onlyWhenChanged }: { label?: string; onlyWhenChanged?: boolean }) {
+export function SaveBar({ label }: { label?: string; onlyWhenChanged?: boolean }) {
   const s = useDraftState();
   const text = saveStatusText(s);
-  // On a page that's mostly buttons that run now: only once something's waiting to be saved.
-  if (onlyWhenChanged && !s.dirty && !s.justSaved && !s.error && !s.saving) return null;
+  // 0.10.7: only once something's changed (and "Saved" for a moment after): no "No changes to save" bar.
+  if (!s.dirty && !s.justSaved && !s.error && !s.saving) return null;
   return (
     <div className={`save-bar${s.dirty ? ' dirty' : ''}`} data-keep="1">
       <span className={`save-bar-text${s.error ? ' err' : ''}`} role="status" aria-live="polite">

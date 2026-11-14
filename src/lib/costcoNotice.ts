@@ -19,20 +19,21 @@ export const COSTCO_SWITCH_HELP = 'Off until you pick it. Online prices, deliver
 export const COSTCO_SWITCH_HELP_ON = 'Searched with your other shops when you search. Prices are online prices.';
 
 /** The heading above the disclosure, in the sheet that asks first and in the setting itself. */
-export const COSTCO_NOTICE_HEADING = 'Before you pick Costco';
+export const COSTCO_NOTICE_HEADING = 'About Costco (test)';
 
 /**
  * The disclosure. Shown in full before Costco can be turned on, and kept visible in the setting
  * afterwards. The README, PRIVACY.md, legal.json and the release notes use these same sentences.
  */
+// 0.10.7: shorter and friendlier, with the same facts (the terms line stays: it's a real fact people
+// should know before switching it on).
 export const COSTCO_NOTICE: readonly string[] = [
-  "Costco's website terms say automated collection of product listings isn't allowed.",
-  'Restock only looks when you search, one page at a time. It never checks Costco in the background or with Check now, and never in bulk.',
-  'Costco may block it or change its pages, so it may stop working. Treat it as a test feature.',
-  "It's your choice to turn this on, and your responsibility.",
-  "Prices are Costco's online prices, which include delivery. They can differ from warehouse to warehouse and from the shelf.",
+  'Restock only checks Costco when you search, one page at a time, like you browsing its website.',
+  "Costco's website terms don't allow automated collection, so it's your choice to switch it on.",
+  "Prices are Costco's online prices, which include delivery, so the warehouse can differ.",
+  "If Costco changes or blocks its website, its prices stop until that's sorted. That's on Costco's side, not something you did.",
   // 0.9.14: Send prices back.
-  "With Shared prices on (Settings → Privacy and sharing), the Costco prices your searches show go to Restock's shared price service too, like the other supermarkets'.",
+  'With Shared prices on, Costco prices you find are shared like the other shops’.',
 ];
 
 /** The disclosure as one paragraph (README, release notes). */

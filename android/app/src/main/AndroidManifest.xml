@@ -30,6 +30,20 @@
             </intent-filter>
         </activity>
 
+        <!-- 0.10.7: "Restock: Search shops" in the share menu: a product name from Google Lens (or
+             anywhere) is searched at your shops instead of going on the list. -->
+        <activity-alias
+            android:name=".SearchShops"
+            android:targetActivity=".MainActivity"
+            android:label="@string/share_to_search"
+            android:exported="true">
+            <intent-filter android:label="@string/share_to_search">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- The launcher icon. One entry per icon colour (Settings → Look and colours → App icon);
              exactly one is switched on at a time. Green is the default. -->
         <activity-alias
@@ -358,5 +372,7 @@
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
+        <!-- 0.10.7: "Search with Google Lens" checks the Google app is on the phone before handing it a photo. -->
+        <package android:name="com.google.android.googlequicksearchbox" />
     </queries>
 </manifest>

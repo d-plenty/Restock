@@ -1,4 +1,6 @@
 import { StockTag } from '../StockTag';
+import { CheckStockButton } from '../CheckStock';
+import type { StockItem } from '../../lib/stockWhere';
 import { aisleLabel, aisleOf, byAisle as sortByAisle, getAisles, type AisleAt } from '../../lib/aisles';
 import { noteTicksSoon } from '../../lib/spending';
 import { branchAdvice, branchName, stockRows } from '../../lib/stock';
@@ -35,11 +37,13 @@ import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { money, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
-import { chainName, secondBranch, stockAtBranch, type Category, type Chain, type ListEntry, type LoyaltyCard, type Settings } from '../../types';
+import { chainName, secondBranch, type Category, type Chain, type ListEntry, type LoyaltyCard, type Settings } from '../../types';
+import { stockPlaces } from '../../lib/stockWhere';
 import {
   ChainDot,
   ChainName,
   Hold,
+  useBackHandler,
   Icon,
   MoreInfo,
   previewFromOption,
@@ -57,7 +61,7 @@ import { PickItemSheet } from './PickItem';
 import { MoveManySheet, MoveToSheet } from './MoveTo'; // 0.9.6 (Move to)
 import { linesToPick, pickWord } from '../../lib/homeAssistant';
 import { useNav } from '../nav';
-import { enabledIn, isLocalOnlyShop, LIST_NAMES, SECTION_NAMES, LIST_PLACE, listSectionsOn, priceSource, searchChainsIn, SECTIONS, type ListSection, type Section, type StoreChain } from '../../shops';
+import { enabledIn, isLocalOnlyShop, LIST_NAMES, SECTION_NAMES, LIST_PLACE, listSectionsOn, priceSource, searchChainsIn, SECTIONS, type ListSection, type Section, type StoreChain, slots, withCustom } from '../../shops';
 import { CardBarcode, PROGRAMS } from './Cards';
 import { ShopTotalsCard } from '../shopTotalsCard';
 
@@ -172,22 +176,19 @@ function stockNote(c: Ctx, e: ListEntry): { kind: 'second' | 'out'; text: string
   const line = lineFor(c, e);
   if (!line?.outOfStock || e.checked) return undefined;
   const p = line.pick.product;
-  const s = cachedSettings();
-  const first = stockAtBranch(s, p.chain);
-  const second = p.chain === 'coles' ? secondBranch(s) : undefined;
+  // 0.10.7: where it was checked (stockWhere.ts): your branch, and your second Coles
+  const places = stockPlaces(cachedSettings(), p.chain);
+  const first = places.where ?? chainName(p.chain);
+  const second = places.where2;
   if (second && p.inStock2 === true) return { kind: 'second', text: `Out at ${first} · in stock at ${second}` };
   if (second && p.inStock2 === false) return { kind: 'out', text: `Out of stock at ${first} and ${second}` };
   return { kind: 'out', text: `Out of stock ${stockWhere(p.chain, true)}` };
 }
 
-export const LIST_TITLE: Record<ListSection, string> = {
-  pantry: 'Shopping list',
-  keg: 'Bottle shop list',
-  pharmacy: 'Health list',
-  baby: 'Baby list',
-  pets: 'Pets list',
-  general: 'General list',
-};
+export const LIST_TITLE: Record<ListSection, string> = withCustom<string, ListSection>(
+  { pantry: 'Shopping list', keg: 'Bottle shop list', pharmacy: 'Health list', general: 'General list' },
+  (n) => `${n} list`,
+);
 /** What to type in the add box, for each list. */
 export const ADD_HINT: Record<ListSection, string> = {
   pantry: 'Add anything, like bananas',
@@ -195,6 +196,7 @@ export const ADD_HINT: Record<ListSection, string> = {
   pharmacy: 'Add anything, like sunscreen',
   baby: 'Add anything, like wipes',
   pets: 'Add anything, like dog treats',
+  ...slots('Add anything'),
   general: 'Add anything, like batteries',
 };
 
@@ -224,7 +226,17 @@ export function listSums(allEntries: ListEntry[], allRecs: Recommendation[], set
   const names = new Map(recs.map((r) => [r.group.id, r.group.name]));
   const order: ShopKey[] = [...shops, ...all.filter((x) => !shops.includes(x)), 'other', 'any'];
   const c: Ctx = { totals: picks, recs, order, title: LIST_TITLE[section] };
-  return { sectionsOn, section, groupSection, entries, recs, shops, totals, picks, names, c };
+  // 0.10.7: what Check stock asks about: what you'd buy for each open line, at its shop.
+  const stockItems: StockItem[] = entries
+    .filter((e) => !e.checked)
+    .flatMap((e): StockItem[] => {
+      const p = lineFor(c, e)?.pick.product;
+      const name = recFor(c, e)?.group.name ?? e.text;
+      if (p?.chain && p.storeProductId) return [{ name, chain: p.chain, productName: p.name, storeProductId: p.storeProductId, productId: p.id }];
+      if (e.product?.storeProductId) return [{ name, chain: e.product.chain, productName: e.product.name, storeProductId: e.product.storeProductId }];
+      return [];
+    });
+  return { sectionsOn, section, groupSection, entries, recs, shops, totals, picks, names, c, stockItems };
 }
 
 /**
@@ -334,8 +346,14 @@ export function ListScreen() {
     [allEntries, allRecs, settings, picked0],
   );
   const adder = useListAdd(sums?.entries ?? [], sums?.recs ?? [], sums?.section ?? 'pantry');
+  // 0.10.7: Back while picking items stops picking (one step), instead of leaving the list.
+  useBackHandler(() => {
+    setSelecting(false);
+    setPicked(new Set());
+    return true;
+  }, selecting);
   if (!allEntries || !allRecs || !allCats || !settings || !sums) return <div className="screen" />;
-  const { sectionsOn, section, groupSection, entries, recs, shops, totals, names, c } = sums;
+  const { sectionsOn, section, groupSection, entries, recs, shops, totals, names, c, stockItems } = sums;
   const categories = allCats.filter((x) => x.section === section);
   const openCount = (sec: ListSection) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;
 
@@ -636,6 +654,12 @@ export function ListScreen() {
             {total > 0 ? ` · about ${money(total)}` : ''}
           </span>
         ))}
+      {/* 0.10.7: stock, only when asked (under the summary, so the list's own buttons keep one row) */}
+      {open.length > 0 && !selecting && (
+        <div className="list-stock-row">
+          <CheckStockButton items={stockItems} />
+        </div>
+      )}
 
       {firstTime && (
         <div className="card hint">

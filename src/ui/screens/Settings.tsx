@@ -40,7 +40,8 @@ import { startTour } from '../Tour';
 import { getHealth, testConnections, type ConnectionTest, type StoreChain } from '../../lib/health';
 import { useNav } from '../nav';
 import { checkForUpdate, installUpdate, RELEASES, SELF_UPDATE, type UpdateInfo } from '../../lib/updates';
-import { activeSections, searchChainsIn, type Section } from '../../shops';
+import { activeSections, MAX_CUSTOM, SECTION_NAMES, searchChainsIn, type Section, withCustom } from '../../shops';
+import { customsInUse, NewCustomSheet } from './CustomSections';
 import { shopSummary } from './Stores';
 import { ExportSheet, pricesIn } from './BackupParts';
 import { LegalSheet } from './Legal';
@@ -163,14 +164,16 @@ async function eraseAll() {
  * Settings' own pages, each opened from a row on the main list (0.9.13). 0.9.14: grouped for
  * someone who just wants it to work: Your shops, Everyday, Your phone, Help, then Advanced.
  */
-export type SettingsPage = 'list' | 'prices' | 'alerts' | 'data' | 'sync' | 'look' | 'privacy' | 'help' | 'about' | 'advanced';
+export type SettingsPage = 'a11y' | 'list' | 'prices' | 'alerts' | 'data' | 'sync' | 'look' | 'privacy' | 'help' | 'about' | 'advanced';
 export const SETTINGS_PAGES: Record<SettingsPage, { title: string }> = {
+  // 0.10.7: Accessibility, its own page (it was inside Look and accessibility)
+  a11y: { title: 'Accessibility' },
   list: { title: 'Shopping list and receipts' },
   prices: { title: 'Prices and deals' },
   alerts: { title: 'Notifications' },
   data: { title: 'Your data' },
   sync: { title: 'Sync and backups' },
-  look: { title: 'Look and accessibility' },
+  look: { title: 'Look and colours' },
   privacy: { title: 'Privacy and sharing' },
   help: { title: 'Help' },
   about: { title: 'About' },
@@ -178,6 +181,7 @@ export const SETTINGS_PAGES: Record<SettingsPage, { title: string }> = {
 };
 /** The main list's groups of rows, in order (Feedback sits in Help; Advanced is last). */
 const GROUPS: { title: string; pages: (SettingsPage | 'cards' | 'feedback')[] }[] = [
+  { title: 'Accessibility', pages: ['a11y'] },
   { title: 'Everyday', pages: ['list', 'prices', 'alerts', 'cards'] },
   { title: 'Your phone', pages: ['data', 'sync', 'privacy', 'look'] },
   { title: 'Help', pages: ['help', 'feedback', 'about'] },
@@ -192,6 +196,8 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
   // 0.9.3: Sync now in Sync and backups shows its result straight away.
   const [syncNowInfo, setSyncShown] = useState<SyncInfo>();
   const syncShown = syncNowInfo ?? sync;
+  // 0.10.7: More → Custom's sheet, from Settings too
+  const [newCustom, setNewCustom] = useState(false);
   // …until the next look: then what's live again (leaving the household, say, shows straight away).
   useEffect(() => setSyncShown(undefined), [sync]);
   // 0.9.1: how much price history a backup holds.
@@ -237,8 +243,10 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
         return 'Spending, prices over time, what’s stored';
       case 'sync':
         return 'Household, Restock server, Phone sharing, Home Assistant, backups';
+      case 'a11y':
+        return 'Text size, bold text, contrast, spacing, bigger buttons, less motion';
       case 'look':
-        return 'Colours, app icon, text size, widgets';
+        return 'Colours, dark mode, app icon, widgets';
       case 'privacy':
         return `What stays on this phone · Shared prices ${sharedOn(settings) ? 'on' : 'off'} · permissions`;
       case 'help':
@@ -294,10 +302,12 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             {/* 0.10.0: Keg and Health are beta (BETA_NOTE): the same as Groceries, less tested. */}
             {row('Bottle shops (Keg tab) · Beta', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
             {row('Chemists (Health tab) · Beta', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
-            {/* 0.10.3 (beta): Baby and Pets, any shops. */}
-            {row('Baby tab · Beta', shopSummary(settings, 'baby'), () => nav.push({ name: 'stores', section: 'baby' }))}
-            {row('Pets tab · Beta', shopSummary(settings, 'pets'), () => nav.push({ name: 'stores', section: 'pets' }))}
+            {/* 0.10.7: each custom section (Baby and Pets are custom sections now), then making another */}
+            {customsInUse(settings).map((c) => row(SECTION_NAMES[c], shopSummary(settings, c), () => nav.push({ name: 'stores', section: c })))}
+            {customsInUse(settings).length < MAX_CUSTOM &&
+              row('Make a custom section', 'Compare pet shops, tools, automotive, baby products and more', () => setNewCustom(true))}
           </div>
+          {newCustom && <NewCustomSheet onClose={() => setNewCustom(false)} />}
         </>
       )}
       {/* 0.9.13: everything else is a row that opens its own page. */}
@@ -532,16 +542,13 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
           </div>
         </>
       )}
+      {on('a11y') && <AccessibilitySettings settings={settings} />}
       {on('look') && (
         <>
           <div className="eyebrow" id="s-look">
             Look and colours
           </div>
           <LookSettings settings={settings} />
-          <div className="eyebrow" id="s-a11y">
-            Accessibility
-          </div>
-          <AccessibilitySettings settings={settings} />
           <div className="eyebrow" id="s-widgets">
             Home screen widgets
           </div>
@@ -837,7 +844,7 @@ function BetaGate({ settings, searching, children }: { settings: Settings; searc
 }
 
 /** Try each store and show whether it works, how long it took, or what went wrong. */
-const GROUP_LABEL: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets' };
+const GROUP_LABEL: Record<Section, string> = withCustom({ pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health' }, (n) => n);
 
 /** The shops you use, by tab (one per website, so Liquorland's three shops show once). Tabs that are off are left out. */
 function shopGroups(settings: Settings): { section: Section; chains: StoreChain[] }[] {

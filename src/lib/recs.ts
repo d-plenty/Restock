@@ -1,4 +1,5 @@
-import { stockKnown, type Product, type Settings } from '../types';
+import { type Product, type Settings } from '../types';
+import { stockFresh, stockPlaces } from './stockWhere';
 import { customShop, priceSource, sectionOn, shopDef, tabsOf } from '../shops';
 import { allGroups, cardChains, getProducts, getProductsByBarcode, getSettings, groupProductIds, readingsFor } from './db';
 import { hasSize } from './unitPrice';
@@ -29,10 +30,11 @@ export async function loadRecommendations(): Promise<Recommendation[]> {
   const [groups, cards, settings] = await Promise.all([allGroups(), cardChains(), getSettings()]);
   const ids = [...new Set(groups.flatMap(groupProductIds))];
   const [productRows, readings] = await Promise.all([getProducts(ids), readingsFor(ids)]);
-  // Stock only counts when it's about your own store (Woolworths signed in, Coles with your store
-  // number). The shops' online stock isn't reliable for your store, so it's left out altogether.
+  // Stock only counts when it's about your own store (Woolworths signed in, Coles with your branch).
+  // 0.10.7: and only from a "Check stock" in the last few hours: it isn't checked in the background
+  // any more, and older answers aren't shown (stock changes during the day).
   const products = new Map<string, Product>(
-    productRows.map((p) => [p.id, stockKnown(settings, p.chain) ? p : { ...p, inStock: undefined, inStock2: undefined }]),
+    productRows.map((p) => [p.id, stockFresh(p.stockAt) && !stockPlaces(settings, p.chain).cant ? p : { ...p, inStock: undefined, inStock2: undefined }]),
   );
   // Shops you've switched off don't count anywhere: Home, the tabs, item pages, the list, widgets (0.9.0).
   const on = shopsOn(settings);

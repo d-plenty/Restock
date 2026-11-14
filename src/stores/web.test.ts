@@ -229,11 +229,12 @@ describe("Dan Murphy's and BWS", () => {
     expect(out[0]).toMatchObject({
       chain: 'danmurphys',
       storeProductId: '915769',
-      name: 'Great Northern Super Crisp Lager Can 375mL',
+      // 0.10.7: its price is for a case of 30, and now it says so
+      name: 'Great Northern Super Crisp Lager Can 375mL · Case of 30',
       price: 54,
       wasPrice: 62.99,
       isSpecial: true,
-      size: '375mL',
+      size: '30 x 375mL',
       promo: 'Save $8.99 on a case',
     });
     expect(out[1]).toMatchObject({ price: 19, memberOnly: true });

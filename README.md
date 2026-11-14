@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.6" src="https://img.shields.io/badge/status-release%20candidate%200.10.6-ffcd00">
+  <img alt="Release candidate 0.10.7" src="https://img.shields.io/badge/status-release%20candidate%200.10.7-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,8 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0106">New in 0.10.6</a> ·
+  <a href="#new-in-0107">New in 0.10.7</a> ·
+  <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
@@ -89,7 +90,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **General list**: a fourth shopping list, with no pantry of its own. A Home Assistant add that matches nothing in your Pantry, Keg or Health goes there. You can add to it yourself too. Adding by hand to Groceries, Keg or Health works as before, even for words that match nothing (like "chips", to buy whatever's on special). Nothing else moves to General by itself. It's shared with the groceries.
 - **Bottle shops**: Dan Murphy's, BWS, Liquorland, Liquorland Warehouse, Liquorland Cellars, The Bottle-O, Cellarbrations, Thirsty Camel and Porters Liquor. Beers say whether they're a single, a 6 pack or a case.
 - **Chemists**: Chemist Warehouse, My Chemist (with Chemist Warehouse's prices), Amcal, Discount Drug Stores, Guardian / PharmaSave, Priceline Pharmacy, Soul Pattinson, TerryWhite Chemmart, Blooms The Chemist, Good Price Pharmacy, Pharmacy 4 Less, Direct Chemist Outlet, Star Discount Chemist, Capital Chemist, National Pharmacies and Chempro.
-- **Costco** (off until you pick it with your supermarkets): everything Costco sells online, next to Woolworths, Coles and Aldi, shared with your household and server like any shop. Sign in to Costco in the app for member prices (optional). **Please read this first:** Costco's website terms say automated collection of product listings isn't allowed. Restock only looks when you search, one page at a time. It never checks Costco in the background or with Check now, and never in bulk. Costco may block it or change its pages, so it may stop working. Treat it as a test feature. It's your choice to turn this on, and your responsibility. Prices are Costco's online prices, which include delivery. They can differ from warehouse to warehouse and from the shelf. The shelf price in the warehouse can be typed in by hand.
+- **Costco** (off until you pick it with your supermarkets): everything Costco sells online, next to Woolworths, Coles and Aldi, shared with your household and server like any shop. Sign in to Costco in the app for member prices (optional). Restock only checks Costco when you search, one page at a time, like you browsing its website. Costco's website terms don't allow automated collection, so it's your choice to switch it on. Prices are Costco's online prices, which include delivery, so the warehouse can differ. If Costco changes or blocks its website, its prices stop until that's sorted. The shelf price in the warehouse can be typed in by hand.
 - **Any other shop**: add its website and Restock finds its search page and reads the products and prices, with Save and test to check it works.
 - **Pantry**: each item has My picks (what you buy at each shop, which can differ shop to shop) and Would also take (others you'd buy when they're cheaper, for Swap & save), on This size or Any size, and shops marked Not at this shop. Listed by shop then size, cheapest first, or A to Z. Swipe to add to your list or delete.
 - **Add**: search all your shops at once. Tap a result to tick it into the bar at the bottom ("1 ticked · tap to add"); nothing jumps up in your way. The green arrow opens the details (name, and Picked for you at your other shops) when you're ready.
@@ -110,7 +111,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Near me**: find every supermarket, bottle shop or chemist nearby from OpenStreetMap and pick your branch.
 - **Shop health**: Home tells you if a shop hasn't worked for a day, and Settings → Help → Check my shops are working shows what went wrong.
 - **Diagnostics**: what went wrong lately, shop by shop, **Send search details** to capture exactly what a shop sent back, and a recording of what a shop's website does when you add something to its trolley yourself (sign-in and personal details left out), so connections can be fixed.
-- **Receipts** (optional): finds the receipt's edges, straightens it, makes it crisp black and white, and reads the shop, date and total with Tesseract on the phone. The reader is built in and works offline. Photos stay inside Restock, not in your gallery.
+- **Receipts** (optional): finds the receipt's edges, straightens it, makes it crisp black and white, and reads the shop, date and total with PaddleOCR on the phone. The reader is built in and works offline. Photos stay inside Restock, not in your gallery.
 - **Recall alerts**: on by default, checked every 24 hours separately from price checks, matched against your Pantry, Keg, Health, lists and kept receipts, with the official notice one tap away.
 - **Cards**: loyalty cards (member prices only count if you've added the card) and gift cards, with the barcode, card number, a PIN that stays hidden until you tap it, the balance and what you spent, an expiry reminder and photos. Cards stay on your phone.
 - **My catalogue**: specials on the things you buy, a page per shop, Wednesday to Tuesday, with what you could save, half prices and multi-buys on the cover. **Add all to my list** says how many, and Undo takes them all back off.
@@ -123,13 +124,35 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Backups**: export and restore exactly the parts you pick, plus optional automatic backups into a folder you choose. Lock any backup with a password (encrypted on the phone). Restock also keeps a copy from just before each update, so an update can be undone.
 - **Spreadsheets**: export your pantry, shopping list and price history as CSV files for Excel, Google Sheets, LibreOffice or Numbers.
 - **Look and colours**: Light, Dark or System, with true black for OLED screens; Australian or Plain; 24 accent colours; 16 app icon colours.
-- **Accessibility**: bigger text, high contrast, less motion and bigger buttons, checked with an automatic accessibility audit.
+- **Accessibility**: the first step of setup and its own page in Settings: text size, bold text, high contrast, easier reading spacing, bigger buttons, no swiping, less motion and more. See [Accessibility](#accessibility).
 - **Updates**: Settings → About → Check for updates, or turn on **Tell me when there's an update** to check every 24 hours (or every 7 days) when you open Restock. Or install through [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium and let them handle updates.
 - **Shared prices**: one switch, on unless you turn it off (Settings → Privacy and sharing, or setup). Your phone downloads 8 weeks, 6 months or 12 months of shared history for your shops from [restock-prices](https://github.com/d-plenty/restock-prices) (Restock's own collection of Coles, Woolworths, Aldi and Costco prices, from its collector and from phones), weekly or every day, so new items get a fair verdict from day one. In return it shares the shelf prices it reads from those shops (shop, product, size, barcode, the price and the day). Prices you type in yourself never go, nothing about you is ever included, and the data is free on GitHub and will never be sold. See [Shared prices](#shared-prices).
 - **Your data**: Settings → Your data shows what you spent (from what you tick off), where, what specials saved, and any item's price over time, on the phone alone or, with **Share my spending with the server** (on unless you turn it off), your household's figures from your Restock server.
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.7
+
+Release candidate 8.
+
+- **A much better text reader.** Receipts and photos of packs are read by PaddleOCR now, not Tesseract: far better on real photos (shiny or curved packs, crumpled receipts, a crooked photo). It's built into the app, works offline, and the photo never leaves your phone.
+- **Find it from a photo.** Scan a barcode Restock doesn't know and tap **Take a photo**: Restock reads the name off the pack and searches your shops. The words it read are buttons, to add or take away. **Not right? Search with Google Lens** sends that one photo to Google, only when you tap it. Pick the right product and Restock remembers the barcode. Also in Add (**Find from a photo**) and on the web page.
+- **Restock: Search shops** in your phone's Share menu: share a product's name (from Google Lens, say) and Restock searches your shops for it.
+- **Scan several, fixed.** A count while you scan, and **Done**. Things you have go on your list; new ones wait in **Scanned barcodes** to be matched, one at a time, and after each you come back to the rest. They don't go on your shopping list as barcode numbers any more (the old "Item 9310…" lines move there once, after the update).
+- **You already have this.** Scan something you track and it says so: **View it**, **Add anyway** or **Cancel**. That works even when the barcode wasn't on your item yet: View it puts it there.
+- **Add buttons:** only the one you tap shows it's adding; the others stay as they are.
+- **Stock, only when you ask.** No more "Stock unknown" everywhere, and the background checks don't ask for stock. On the shopping list, **Check stock** asks your shops now: "Coles Aitkenvale: 3 not in stock", and your second store, only when it has everything.
+- **Custom sections** in place of the Baby and Pets tabs: compare pet shops, tools, automotive, baby things or anything else. Each has its own name, colour, icon (from Restock's icon pack, or any emoji) and shops. Up to 8. Baby and Pets became custom sections, with everything in them. Made from More → Custom, edited in Settings. On the web page you can change a custom section's shops; making one is on a phone.
+- **Settings:** the Save bar only shows once you've changed something, and Save always saves (some changes used to stay "unsaved"). Each section has its own page (no row of tabs along the top).
+- **Back goes one step**, and leaving with work not saved (products ticked, a receipt, settings) asks first.
+- **Accessibility**, its own page in Settings and the first step of setup (and a button on the welcome screen): text size, **bold text**, high contrast, **easier reading spacing**, **underlined links**, bigger buttons, **no swiping**, less motion and **messages that stay longer**. The tags you tap to explain a price (GREAT DEAL, SMALL SAVING) are no longer buttons inside a button, so TalkBack reaches them properly, and they're at least 24px tall.
+- **The ⓘ on product photos** is always blue (never your colour scheme's red) and sits at the top left.
+- **Dan Murphy's:** each pack size is its own item with its own price ("4 Pack" $17.99, "Case of 24" $89.99); the case's name no longer goes with the pack's price. A "2 for $55" deal no longer shows as the price of one.
+- **Shop test: Copy the shop's answer**, to send when a shop isn't read right.
+- **IGA:** pick your store on IGA's website once, and that's your branch. **Show on a map** when picking branches.
+- **Home:** small savings look like the other deals, with their photos.
+- Friendlier words in places (Costco's note, Unblock), and Cellarbrations no longer says "bot check" when it found things.
 
 ## New in 0.10.6
 
@@ -329,6 +352,19 @@ Fixes and tidy-ups, mostly for the price helper phone.
   - **Previous** and **Next** above and below catalogue pages (and the arrow keys), products that open when clicked, and a big photo at the top of an item;
   - **Restock on iPhone**: add the server's page to your home screen.
 
+## Accessibility
+
+Restock is meant for everyone. Accessibility is the first step of setup (there's a button for it on the welcome screen too), and it has its own page in Settings:
+
+- **Text size** in Restock, on top of your phone's own: Normal, Large, Larger, Largest. Nothing gets cut off.
+- **Bold text**, **High contrast**, **Easier reading spacing** (more space between letters, words and lines, which can help with dyslexia) and **Underline links**.
+- **Bigger buttons**: every button and tick box at least finger-sized.
+- **No swiping**: rows stay put; everything a swipe does has a button too.
+- **Less motion**: no sliding or popping (also when your phone asks for less motion).
+- **Messages stay longer**: messages and their Undo stay three times as long.
+- Works with **TalkBack** and your phone's own display settings. Every button says what it does, and colours are never the only way something is shown.
+- **Checked against WCAG 2.2 AA:** 0.10.7's main screens were run through an automatic audit (axe), in light and dark, on the phone and the web page, and what it found was fixed. An automatic audit doesn't catch everything, so if something is hard to use, please say so in Settings → Send feedback.
+
 ## Private by design
 
 - Everything lives in a database **on your phone**, and works offline. No account, no ads, no analytics, no tracking.
@@ -352,7 +388,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.6.apk` (on macOS, `shasum -a 256 restock-0.10.6.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.7.apk` (on macOS, `shasum -a 256 restock-0.10.7.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -538,7 +574,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is at its **seventh release candidate** (0.10.6): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is at its **eighth release candidate** (0.10.7): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.
@@ -645,7 +681,7 @@ Restock isn't connected with, endorsed by or paid by any supermarket, bottle sho
 [Open Food Facts](https://world.openfoodfacts.org) (product data, ODbL) ·
 [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (shop locations, ODbL) ·
 [zxing-cpp](https://github.com/zxing-cpp/zxing-cpp) (barcode scanning) ·
-[Tesseract](https://github.com/tesseract-ocr/tesseract) and [tesseract.js](https://github.com/naptha/tesseract.js) (receipt reading) ·
+[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR), [OnnxOCR](https://github.com/jingsongliujing/OnnxOCR), [ONNX Runtime](https://github.com/microsoft/onnxruntime) and [paddleocr.js](https://github.com/x3zvawq/paddleocr.js) (reading receipts and packs) · [MapLibre](https://maplibre.org) and [OpenFreeMap](https://openfreemap.org) (the shop map) ·
 [sql.js](https://github.com/sql-js/sql.js) ·
 [Capacitor](https://capacitorjs.com) ·
 [hotprices-au](https://github.com/Javex/hotprices-au) (used by the restock-prices collector) ·

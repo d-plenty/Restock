@@ -1,5 +1,5 @@
 import { CHECK_INTERVALS, DEFAULT_SETTINGS, HISTORY_WEEKS, keepDays, keepWeeks, type HomeArea, type Settings, type ShopAccount, type StoreChoice } from '../types';
-import { SECTIONS, isLocalOnlyShop, shopDef, type CustomShop, type Section, type StoreChain } from '../shops';
+import { CUSTOM_SECTIONS, SECTIONS, checkCustomDef, isLocalOnlyShop, shopDef, type CustomDef, type CustomSection, type CustomShop, type Section, type StoreChain } from '../shops';
 import { isCheckTime } from './checkSchedule';
 import { ICON_COLOURS } from './looks';
 import { asHttps, searchOnSite } from './site';
@@ -170,10 +170,17 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     sections: {
       keg: bool(sec.keg, D.sections.keg),
       pharmacy: bool(sec.pharmacy, D.sections.pharmacy),
-      // 0.10.3 (beta): only written once switched on.
-      ...(sec.baby === true ? { baby: true } : {}),
-      ...(sec.pets === true ? { pets: true } : {}),
+      // 0.10.3 (beta): only written once switched on. 0.10.7: the same for every custom section.
+      ...Object.fromEntries(CUSTOM_SECTIONS.filter((c) => sec[c] === true).map((c) => [c, true])),
     },
+    // 0.10.7: each custom section's name, colour and icon
+    customSections: (() => {
+      const cs = obj(s.customSections);
+      const out = Object.fromEntries(
+        CUSTOM_SECTIONS.map((c) => [c, checkCustomDef(cs[c])] as const).filter((x): x is readonly [CustomSection, CustomDef] => !!x[1]),
+      );
+      return Object.keys(out).length ? out : undefined;
+    })(),
     hiddenTabs: tabs(s.hiddenTabs),
     // 0.10.3: the tabs a shop is in, when it isn't just its own (shops known here, at least one tab).
     shopTabs: (() => {
@@ -288,6 +295,11 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
       contrast: bool(ax.contrast, D.a11y.contrast),
       motion: bool(ax.motion, D.a11y.motion),
       big: bool(ax.big, D.a11y.big),
+      bold: maybeBool(ax.bold),
+      spacing: maybeBool(ax.spacing),
+      links: maybeBool(ax.links),
+      noSwipe: maybeBool(ax.noSwipe),
+      slowMessages: maybeBool(ax.slowMessages),
     },
     setup: compact({ done: words(su.done, []), skipped: words(su.skipped, []), dismissed: maybeBool(su.dismissed) }),
     tour: compact({

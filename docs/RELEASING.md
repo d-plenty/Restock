@@ -10,7 +10,7 @@ Android only installs an update over the top if it's signed with the same key as
 mkdir -p ~/.restock
 chmod 700 ~/.restock
 PASS=$(openssl rand -base64 24 | tr -d '/+=')
-"$JAVA_HOME/bin/keytool" -genkeypair -v -keystore ~/.restock/restock-release.keystore -alias restock -keyalg RSA -keysize 4096 -validity 36500 -storepass "$PASS" -keypass "$PASS" -dname "CN=Restock, O=Plenty Technologies, C=AU"
+"$JAVA_HOME/bin/keytool" -genkeypair -v -keystore ~/.restock/restock-release.keystore -alias restock -keyalg RSA -keysize 4096 -validity 36500 -storepass "$PASS" -keypass "$PASS" -dname "CN=Restock, O=D Plenty, C=AU"
 printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=restock\nkeyPassword=%s\n' "$HOME/.restock/restock-release.keystore" "$PASS" "$PASS" > ~/.restock/signing.properties
 chmod 600 ~/.restock/signing.properties
 unset PASS

@@ -101,7 +101,8 @@ function deskScreen(top: Screen): ReactNode | undefined {
   return undefined;
 }
 
-const TAB_ICON: Record<string, string> = { home: 'home', pantry: 'pantry', keg: 'keg', pharmacy: 'pharmacy', baby: 'baby', pets: 'pets' };
+// 0.10.7: a custom section's icon is its own (Icon takes the section's id).
+const TAB_ICON: Record<string, string> = { home: 'home', pantry: 'pantry', keg: 'keg', pharmacy: 'pharmacy', baby: 'baby', pets: 'pets', c1: 'c1', c2: 'c2', c3: 'c3', c4: 'c4', c5: 'c5', c6: 'c6' };
 
 /** How many phones use this server, checked when a sync round finishes (at most once a minute). */
 function usePhoneCount(at: string | undefined): number | undefined {

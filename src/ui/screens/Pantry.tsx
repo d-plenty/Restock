@@ -1,4 +1,3 @@
-import { StockTag } from '../StockTag';
 import { useFullRefresh } from '../refresh';
 import { useRef, useState } from 'react';
 import { allCategories, allListEntries, deleteGroup, getSettings, updateGroup, updateSettings } from '../../lib/db';
@@ -12,7 +11,7 @@ import { chainName, LEARNING_DAYS } from '../../types';
 import { BETA_NOTE, BETA_SECTIONS, betaFor, Hold, Icon, MoreInfo, stockWhere, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, Thumb, SearchField } from '../components';
 import { ActionInfoTag } from '../tagInfo';
 import { useNav } from '../nav';
-import { SECTION_NAMES, type Section } from '../../shops';
+import { SECTION_NAMES, type Section, slots } from '../../shops';
 import { confirmAction } from '../../lib/confirm';
 
 type Filter = 'all' | 'sale' | string; // string = category id
@@ -57,6 +56,7 @@ const EMPTY: Record<Section, string> = {
   pharmacy: 'Nothing here yet. Add the medicine, first aid and personal care things you buy, and Restock watches the chemists you picked.',
   baby: 'Nothing here yet. Add the nappies, wipes and baby things you buy, and Restock watches the shops you picked for Baby.',
   pets: 'Nothing here yet. Add the pet food, litter and treats you buy, and Restock watches the shops you picked for Pets.',
+  ...slots('Nothing here yet. Add the things you buy, and Restock watches the shops you picked for this tab.'),
 };
 const SEARCH_HINT: Record<Section, string> = {
   pantry: 'Search your pantry',
@@ -64,6 +64,7 @@ const SEARCH_HINT: Record<Section, string> = {
   pharmacy: 'Search your health items',
   baby: 'Search your baby things',
   pets: 'Search your pet things',
+  ...slots('Search this tab'),
 };
 
 /** At or under the item's "alert me under $X" price at its cheapest shop. */
@@ -305,12 +306,13 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                     }}
                   >
                     {!editing && <MoreInfo src={(r.best ?? mains[0])?.product.imageUrl} name={r.group.name} onOpen={() => setPreview(r)} />}
-                    <button
-                      className="row-main"
-                      onClick={() => (editing ? pick(r.group.id) : nav.push({ name: 'item', groupId: r.group.id }))}
-                      aria-pressed={editing ? isPicked : undefined}
-                      aria-label={editing ? `Select ${r.group.name}` : undefined}
-                    >
+                    <div className="row-main row-stretch">
+                      <button
+                        className="row-hit"
+                        onClick={() => (editing ? pick(r.group.id) : nav.push({ name: 'item', groupId: r.group.id }))}
+                        aria-pressed={editing ? isPicked : undefined}
+                        aria-label={editing ? `Select ${r.group.name}` : r.group.name}
+                      />
                       {editing && (
                         <span className={`pick${isPicked ? ' on' : ''}`} aria-hidden>
                           {isPicked && <Icon name="check" size={16} />}
@@ -327,14 +329,12 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                         <span className="tags" style={{ marginTop: 3 }}>
                           {r.action !== 'none' && <ActionInfoTag rec={r} action={r.action} great={r.best?.verdict.kind === 'great'} />}
                           {underTarget(r) && <span className="tag good">UNDER {money(r.group.targetPrice)}</span>}
-                          {/* 0.9.9: stock at each shop, a tap away. */}
-                          {!editing && <StockTag products={mains.map((o) => o.product)} name={r.group.name} />}
                         </span>
                       </span>
                       <span className="num small" style={{ fontWeight: 600 }}>
                         {money((r.action === 'alt' ? r.alt : r.best)?.price)}
                       </span>
-                    </button>
+                    </div>
                     {!editing && (
                       <button
                         className={`cart-btn${listed ? ' on' : ''}`}

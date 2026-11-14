@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
-import { lookupBarcode, productCode, scanBarcode, type BarcodeInfo } from '../../lib/barcode';
+import { productCode, scanBarcode, type BarcodeInfo } from '../../lib/barcode';
 import { displayName, identifyBarcode, QUICK_PICKS, searchTermFor, weakName } from '../../lib/lookup';
 import { PackReader } from '../PackReader';
+import { markMatched, onScanLines, toMatch } from '../../lib/scanQueue';
+import { okToLeave, useLeaveGuard } from '../leaveGuard';
 import { logProblem } from '../../lib/diagnostics';
 import {
   addGroup,
@@ -16,13 +18,13 @@ import {
   findProductByBarcode,
   getGroup,
   getProducts,
-  cachedSettings,
   getSettings,
   groupProductIds,
   nowIso,
   readingsFor,
   uid,
   updateGroup,
+  updateProduct,
   updateSettings,
 } from '../../lib/db';
 import { pickItemFor, pickItemOffList } from '../../lib/listPicks';
@@ -66,7 +68,7 @@ import { COSTCO_LIST_NOTE } from '../../lib/costcoLocal';
 import { isBlockedError, offerUnblock, recordHealth } from '../../lib/health';
 import { UnblockButton } from '../Unblock';
 import { isExactBarcode, rankAll, score, tokens, type RankQuery } from '../../stores/rank';
-import { chainName, mainProductIds, searchStoreId, stockKnown, type AlertLevel, type Chain, type Group, type ListEntry, type ListProduct } from '../../types';
+import { chainName, mainProductIds, searchStoreId, type AlertLevel, type Chain, type Group, type ListEntry, type ListProduct } from '../../types';
 import {
   activeSections,
   costcoIsOn,
@@ -79,8 +81,7 @@ import {
   shopDef,
   type Section,
   type StoreChain,
-  kindOf as shopKindOf,
-} from '../../shops';
+  kindOf as shopKindOf, slots } from '../../shops';
 
 // Short enough to show in full at 390 px wide with the largest text (0.9.5: "Or search a proc…").
 const SEARCH_PLACEHOLDER: Record<Section, string> = {
@@ -89,16 +90,17 @@ const SEARCH_PLACEHOLDER: Record<Section, string> = {
   pharmacy: 'Search Health',
   baby: 'Search Baby',
   pets: 'Search Pets',
+  ...slots('Search products'),
 };
 /** Small buttons and links still get a 44 px target. */
 const TAP: CSSProperties = { minHeight: 44 };
-import { ChainDot, ChainName, Hold, Icon, LoadingBar, MemberTag, MoreInfo, ProductPreview, Sheet, Thumb, TopBar, type PreviewProduct, SearchField } from '../components';
+import { ChainDot, ChainName, Hold, Icon, useBackHandler, LoadingBar, MemberTag, MoreInfo, ProductPreview, Sheet, Thumb, TopBar, type PreviewProduct, SearchField } from '../components';
 import { useNav } from '../nav';
 import { OtherSizesCard } from '../OtherSizes';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from './addPicks';
 import { addItemForLineUndoable, addItemFromPicks, pickedWords, saveStoreProducts } from './addSave';
 import { AlertPicker } from './Item';
-import { AddPair, addButtonsNote, AlwaysTick, pickButtonsNote, toPantryNote } from './addPickWords';
+import { AddBtn, AddPair, addButtonsNote, AlwaysTick, pickButtonsNote, toPantryNote } from './addPickWords';
 
 /**
  * 0.9.5: "Search the shops" from the Pick sheet, for a list line that matches nothing in the pantry
@@ -215,6 +217,7 @@ export function AddScreen({
   replaceEntry,
   overlay,
   forLine,
+  fromScans,
 }: {
   barcode?: string;
   attachTo?: string;
@@ -231,6 +234,8 @@ export function AddScreen({
   overlay?: boolean;
   /** Inside the Pick sheet: make a pantry item for this list line (see ForLine). */
   forLine?: ForLine;
+  /** 0.10.7: matching a barcode from Scan several: after saving, back to that list. */
+  fromScans?: boolean;
 }) {
   const nav = useNav();
   const settings = useLive(getSettings, []);
@@ -272,13 +277,24 @@ export function AddScreen({
   const [alertPct, setAlertPct] = useState<number>(30);
   const [manual, setManual] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** 0.10.7: which Add button is saving, so only that one shows it. */
+  const [busyAs, setBusyAs] = useState<Target>();
   const [specialsOnly, setSpecialsOnly] = useState(false);
   const [searchedFor, setSearchedFor] = useState<string>();
   const [known, setKnown] = useState<Group>();
   const [whatIsIt, setWhatIsIt] = useState('');
   const [suggest, setSuggest] = useState<StoreProduct[]>([]);
   const [recent, setRecent] = useState<string[]>(recentSearches);
-  const [stocktake, setStocktake] = useState(false);
+  // 0.10.7: "Add anyway" on "Looks like you already have this".
+  const [dismissedHave, setDismissedHave] = useState(false);
+  // 0.10.7: products ticked but not added yet: leaving asks first (leaveGuard.ts). Set once saved.
+  const doneAdding = useRef(false);
+  useLeaveGuard(() => picks.size > 0 && !doneAdding.current && !forLine, 'adding something: you’ve ticked products but not added them');
+  useEffect(() => {
+    if (picks.size) doneAdding.current = false;
+  }, [picks]);
+  // 0.10.7: barcodes from Scan several still to match.
+  const scansLeft = useSyncExternalStore(onScanLines, () => toMatch());
   const [preview, setPreview] = useState<StoreProduct>();
   // After a scan: the product at each shop Restock is sure is the same one, ticked for you.
   const [auto, setAuto] = useState<Map<string, BestMatch>>();
@@ -313,6 +329,22 @@ export function AddScreen({
     }
     return out;
   }, []);
+
+  /** 0.10.7: a scanned barcode whose shop match is already one of your items (the barcode isn't linked to it yet). */
+  const alreadyHave = (() => {
+    if (!scanned || known || !auto || attachTo || forLine) return undefined;
+    for (const m of auto.values()) {
+      const productKey = `${m.sp.chain}:${m.sp.storeProductId}`;
+      const group = pantry?.get(productKey);
+      if (group) return { group, productKey };
+    }
+    return undefined;
+  })();
+  /** Puts the scanned barcode on your product, so the next scan knows it straight away. */
+  const linkBarcode = async (productKey: string, code: string) => {
+    const p = (await allProducts()).find((x) => `${x.chain}:${x.storeProductId}` === productKey);
+    if (p && !p.barcode) await updateProduct(p.id, { barcode: code });
+  };
 
   /** This tab's shops only. When adding your product at another store, only the stores it isn't linked to yet. */
   const chainsToSearch = (all: StoreChain[], sec: Section = section) => {
@@ -581,14 +613,19 @@ export function AddScreen({
   };
 
   useEffect(() => {
-    if (barcode) void handleBarcode(barcode);
+    // 0.10.7: with words too (a name shared back from Google Lens), those words are the search.
+    if (barcode && !query) void handleBarcode(barcode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barcode]);
 
   // Coming from an item's "Find at another store": search straight away.
   const ready = !attachTo || attach !== undefined;
   useEffect(() => {
-    if (query && ready && settings) void search(query, { text: query });
+    if (query && ready && settings) {
+      // 0.10.7: the words for a barcode (from Google Lens): picking a result remembers the barcode.
+      if (barcode) setScanned({ barcode, name: query } as BarcodeInfo);
+      void search(query, { text: query, barcode });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, ready, !!settings]);
 
@@ -902,6 +939,7 @@ export function AddScreen({
         });
       }
       });
+      doneAdding.current = true;
       nav.pop();
     } finally {
       setSaving(false);
@@ -909,8 +947,9 @@ export function AddScreen({
   };
 
   const save = async (target: Target) => {
-    if (!picks.size) return;
+    if (!picks.size || saving) return;
     setSaving(true);
+    setBusyAs(target);
     try {
       const first = [...picks.values()][0];
       const itemName = name.trim() || genericName(first.name, first.brand);
@@ -973,13 +1012,28 @@ export function AddScreen({
         if (old) await deleteListEntries([old]);
       }
       });
+      doneAdding.current = true;
+      const code = barcode ?? scanned?.barcode;
+      // 0.10.7: from Scan several, "Add to pantry" puts the item itself on the list in place of the scanned line.
+      if (fromScans && target === 'pantry' && groupId && replaceEntry) {
+        const g = await getGroup(groupId);
+        await deleteListEntries([replaceEntry]);
+        if (g) await addToList(g);
+      }
       reset();
       // 0.9.11: "Add to list" from the Pick sheet: the line is now this product, and the sheet closes.
       if (forLine) return forLine.onListed();
+      // 0.10.7: from Scan several: ticked off there, and back to the rest.
+      if (fromScans && code) {
+        markMatched(code, itemName, groupId);
+        nav.pop();
+        return;
+      }
       if (overlay) nav.pop();
       if (groupId) nav.push({ name: 'item', groupId });
     } finally {
       setSaving(false);
+      setBusyAs(undefined);
     }
   };
 
@@ -994,9 +1048,20 @@ export function AddScreen({
     setKnown(undefined);
     setSearchedFor(undefined);
     setAuto(undefined);
+    setDismissedHave(false);
   };
 
   const anyResults = Object.keys(results).length > 0;
+  // 0.10.7: on the Add tab, Back goes one step (results, or a scan, back to the start of Add), not
+  // out to Home; with products ticked it asks first.
+  useBackHandler(() => {
+    if (picks.size) {
+      void okToLeave().then((ok) => ok && reset());
+      return true;
+    }
+    reset();
+    return true;
+  }, !overlay && !forLine && (!!scanned || anyResults || !!term.trim()));
   /** A shop without a photo: show the scanned product's photo (Open Food Facts) when it's the same product. */
   const photoFor = (sp: StoreProduct): string | undefined => {
     if (!scanned?.imageUrl) return undefined;
@@ -1152,11 +1217,36 @@ export function AddScreen({
             <Icon name="scan" /> Scan a barcode
           </button>
           {!attachTo && (
-            <button className="btn" style={{ flex: '1 1 auto' }} onClick={() => setStocktake(true)} aria-label="Scan several things in a row">
+            <button className="btn" style={{ flex: '1 1 auto' }} onClick={() => nav.push({ name: 'scanned', section, start: true })} aria-label="Scan several things in a row">
               Scan several
             </button>
           )}
         </div>
+      )}
+      {/* 0.10.7: find something with no barcode (or a worn one) from a photo of the pack. */}
+      {!forLine && !scanned && (
+        <details className="photo-find">
+          <summary className="linkish small">
+            <Icon name="camera" size={16} /> Find from a photo
+          </summary>
+          <div style={{ display: 'grid', gap: 8, paddingTop: 8 }}>
+            <PackReader
+              label="Take a photo of the pack"
+              onName={(n, go) => {
+                setTerm(n);
+                if (!go) return;
+                setSearchedFor(n);
+                const fixed = normaliseQuery(n);
+                void search(fixed, { text: fixed }, section, true);
+              }}
+            />
+          </div>
+        </details>
+      )}
+      {!forLine && !attachTo && scansLeft > 0 && (
+        <button className="btn ghost small" style={{ alignSelf: 'flex-start', ...TAP }} onClick={() => nav.push({ name: 'scanned', section })}>
+          <Icon name="scan" size={16} /> Scanned barcodes ({scansLeft} to match)
+        </button>
       )}
       {!forLine && !attachTo && !overlay && settings?.receipts.enabled && (
         <button className="btn ghost small" style={{ alignSelf: 'flex-start', ...TAP }} onClick={() => nav.push({ name: 'receipt' })}>
@@ -1230,33 +1320,51 @@ export function AddScreen({
         </p>
       )}
 
-      {known && scanned && (
-        <div className="card">
+      {/* 0.10.7: you already have this: View it, Add anyway, or Cancel. Also when the barcode isn't
+          linked to it yet but the shop's match is already in your pantry (scanned "pineapple" when you
+          track "Canned pineapple"): then View it links the barcode, so next time it's known straight away. */}
+      {scanned && (known || (alreadyHave && !dismissedHave)) && (
+        <div className="card" role="region" aria-labelledby="already-have">
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <Thumb src={scanned.imageUrl} icon="scan" />
             <div style={{ flex: 1 }}>
-              <div className="eyebrow green">Already tracking this</div>
-              <div className="title">{known.name}</div>
+              <div className="eyebrow green" id="already-have">
+                {known ? `You already have this in ${SECTION_PLACE[known.section ?? section]}` : `Looks like you already have this in ${SECTION_PLACE[(alreadyHave?.group.section ?? section) as Section]}`}
+              </div>
+              <div className="title">{(known ?? alreadyHave?.group)?.name}</div>
             </div>
           </div>
-          <div className="two">
+          <div className="three-btns">
             <button
               className="btn primary"
               onClick={async () => {
-                const added = await addToList(known); // 0.9.5 (undo)
-                if (!added) nav.toast(`${known.name} is already on your shopping list`);
+                const g = known ?? alreadyHave?.group;
+                if (!g) return;
+                if (!known && alreadyHave) await linkBarcode(alreadyHave.productKey, scanned.barcode);
+                nav.push({ name: 'item', groupId: g.id });
+              }}
+            >
+              View it
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                if (known) void handleBarcode(scanned.barcode, true);
+                else setDismissedHave(true);
+              }}
+            >
+              Add anyway
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                setDismissedHave(false);
                 reset();
               }}
             >
-              <Icon name="cartPlus" size={18} /> Add to list
-            </button>
-            <button className="btn" onClick={() => nav.push({ name: 'item', groupId: known.id })}>
-              Open it
+              Cancel
             </button>
           </div>
-          <button className="linkish small" style={{ alignSelf: 'flex-start', ...TAP }} onClick={() => void handleBarcode(scanned.barcode, true)}>
-            Search the shops anyway
-          </button>
         </div>
       )}
 
@@ -1287,8 +1395,34 @@ export function AddScreen({
         >
           <div className="title">What is it?</div>
           <p className="small">
-            Type what's on the pack, like "Arnott's Tim Tam Original". Restock searches for it and remembers this barcode next time.
+            Take a photo of the front of the pack and Restock reads the name, or type it in. Restock searches for it and remembers this barcode
+            next time.
           </p>
+          {/* 0.10.7: for everyone (it used to need the Receipts add-on), and Google Lens as the backup. */}
+          <PackReader
+            barcode={scanned.barcode}
+            onName={(n, go) => {
+              setWhatIsIt(n);
+              if (!go) return;
+              setTerm(n);
+              setSearchedFor(n);
+              if (!attachGroup) setName(genericName(n));
+              const fixed = normaliseQuery(n);
+              void search(fixed, { text: fixed, barcode: scanned.barcode });
+            }}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="input"
+              value={whatIsIt}
+              onChange={(e) => setWhatIsIt(e.target.value)}
+              placeholder="Brand and product"
+              aria-label="What is it?"
+            />
+            <button className="btn primary" type="submit" style={{ padding: '0 14px' }}>
+              Search
+            </button>
+          </div>
           {QUICK_PICKS[section].length > 0 && (
             <div className="chips" role="group" aria-label="Quick picks">
               {QUICK_PICKS[section].map((q) => (
@@ -1309,29 +1443,6 @@ export function AddScreen({
               ))}
             </div>
           )}
-          {settings?.receipts.installed && (
-            <PackReader
-              onName={(n) => {
-                setWhatIsIt(n);
-                setTerm(n);
-                setSearchedFor(n);
-                const fixed = normaliseQuery(n);
-                void search(fixed, { text: fixed, barcode: scanned.barcode });
-              }}
-            />
-          )}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              className="input"
-              value={whatIsIt}
-              onChange={(e) => setWhatIsIt(e.target.value)}
-              placeholder="Brand and product"
-              aria-label="What is it?"
-            />
-            <button className="btn primary" type="submit" style={{ padding: '0 14px' }}>
-              Search
-            </button>
-          </div>
         </form>
       )}
 
@@ -1846,7 +1957,7 @@ export function AddScreen({
                   <AlertPicker level={alertLevel} pct={alertPct} onChange={(l, p) => (setAlertLevel(l), setAlertPct(p))} />
                 </div>
               </details>
-              <PickButtons forLine={forLine} section={section} saving={saving} onSave={(t) => void save(t)} />
+              <PickButtons forLine={forLine} section={section} saving={saving} busy={busyAs} onSave={(t) => void save(t)} />
             </>
           ) : (
             forList && !attachGroup ? (
@@ -1856,9 +1967,9 @@ export function AddScreen({
                   <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Coffee" />
                 </label>
                 {picksForYou}
-                <button className="btn primary" onClick={() => save('list')} disabled={saving}>
+                <AddBtn target="list" busy={busyAs} className="btn primary" onClick={() => void save('list')}>
                   <Icon name="cart" size={18} /> Add to list
-                </button>
+                </AddBtn>
                 <p className="small" style={{ margin: 0 }}>
                   Just for this trip, at the cheapest of what you ticked. It doesn't go in your pantry, and Restock won't keep watching its price.
                 </p>
@@ -1869,9 +1980,9 @@ export function AddScreen({
                 )}
               </>
             ) : attachGroup ? (
-              <button className="btn primary" onClick={saveAttach} disabled={saving}>
+              <AddBtn target="pantry" busy={saving ? 'pantry' : undefined} className="btn primary" onClick={() => void saveAttach()}>
                 {as === 'alt' ? 'Add to Would also take' : `Add to ${attachGroup.name}`}
-              </button>
+              </AddBtn>
             ) : (
               <>
                 <label className="field">
@@ -1923,19 +2034,19 @@ export function AddScreen({
                 {/* 0.9.12: one layout everywhere: Add to both first, then list or pantry on their own. */}
                 {tabHidden ? (
                   <div className="two">
-                    <button className="btn primary" onClick={() => save('list')} disabled={saving}>
+                    <AddBtn target="list" busy={busyAs} className="btn primary" onClick={() => void save('list')}>
                       <Icon name="cart" size={18} /> Add to list
-                    </button>
-                    <button className="btn" onClick={() => save('both')} disabled={saving}>
+                    </AddBtn>
+                    <AddBtn target="both" busy={busyAs} className="btn" onClick={() => void save('both')}>
                       <Icon name={section} size={18} /> Add to both
-                    </button>
+                    </AddBtn>
                   </div>
                 ) : (
                   <>
-                    <button className="btn primary" onClick={() => save('both')} disabled={saving}>
+                    <AddBtn target="both" busy={busyAs} className="btn primary" onClick={() => void save('both')}>
                       <Icon name="cart" size={18} /> Add to both
-                    </button>
-                    <AddPair section={section} disabled={saving} onPantry={() => save('pantry')} onList={() => save('list')} />
+                    </AddBtn>
+                    <AddPair section={section} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
                   </>
                 )}
                 <p className="small" style={{ margin: 0 }}>
@@ -1949,7 +2060,6 @@ export function AddScreen({
         </Sheet>
       )}
 
-      {stocktake && <Stocktake section={section} onClose={() => setStocktake(false)} />}
       {preview && (
         <ProductPreview
           product={storePreview(preview)}
@@ -2027,17 +2137,20 @@ export function ManualSheet({
   const [categoryId, setCategoryId] = useState('');
   // One save at a time, so a double tap doesn't add it twice.
   const [saving, setSaving] = useState(false);
+  const [busyAs, setBusyAs] = useState<Target>();
   const savingRef = useRef(false);
 
   const save = async (target: Target) => {
     if (!name.trim() || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
+    setBusyAs(target);
     try {
       await saveAs(target);
     } finally {
       savingRef.current = false;
       setSaving(false);
+      setBusyAs(undefined);
     }
   };
 
@@ -2151,7 +2264,7 @@ export function ManualSheet({
       )}
       {forLine ? (
         <>
-          <PickButtons forLine={forLine} section={section} saving={saving || !name.trim()} onSave={(t) => void save(t)} />
+          <PickButtons forLine={forLine} section={section} saving={saving} busy={busyAs} blocked={!name.trim()} onSave={(t) => void save(t)} />
         </>
       ) : attachTo ? (
         <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
@@ -2160,94 +2273,13 @@ export function ManualSheet({
       ) : (
         <>
           {/* 0.9.12: the same layout as the search results and Pick my…. */}
-          <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('both')}>
+          <AddBtn target="both" busy={busyAs} blocked={!name.trim()} className="btn primary" onClick={() => void save('both')}>
             Add to both
-          </button>
-          <AddPair section={section} disabled={!name.trim() || saving} onPantry={() => save('pantry')} onList={() => save('list')} />
+          </AddBtn>
+          <AddPair section={section} disabled={!name.trim()} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
           <p className="small" style={{ margin: 0 }}>{addButtonsNote(SECTION_PLACE[section])}</p>
         </>
       )}
-    </Sheet>
-  );
-}
-
-type TakeLine = { code: string; name: string; groupId?: string; status: 'added' | 'already' | 'new' };
-
-/**
- * Scan several things in a row, like walking past the cupboard: anything you track goes
- * on the shopping list, anything new goes on as plain text with a button to start tracking it.
- */
-function Stocktake({ section, onClose }: { section: Section; onClose: () => void }) {
-  const nav = useNav();
-  const [lines, setLines] = useState<TakeLine[]>([]);
-  const [busy, setBusy] = useState(false);
-
-  const scanNext = async () => {
-    setBusy(true);
-    try {
-      for (;;) {
-        const out = await scanBarcode('Scan the next thing. Press back when you are done.');
-        if (!out.ok) break;
-        const product = await findProductByBarcode(out.code);
-        const group = product && (await allGroups()).find((g) => groupProductIds(g).includes(product.id));
-        if (group) {
-          const added = await addToList(group); // 0.9.5 (undo)
-          setLines((l) => [{ code: out.code, name: group.name, groupId: group.id, status: added ? 'added' : 'already' }, ...l]);
-        } else {
-          const info = await lookupBarcode(out.code);
-          const name = info.name ? genericName(info.name, info.brand) : `Item ${out.code}`;
-          await act(`${name} added to your shopping list`, () => addListEntry({ id: uid(), text: name, qty: 1, section, checked: false, createdAt: nowIso() })); // 0.9.5 (undo)
-          setLines((l) => [{ code: out.code, name, status: 'new' }, ...l]);
-        }
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Sheet title="Scan several" onClose={onClose}>
-      <p className="small">
-        Scan whatever is running low, one after another. Things in your pantry go straight on your shopping list. New things go on too, and you can
-        start tracking their price here.
-      </p>
-      <button className="btn primary block" disabled={busy} onClick={scanNext}>
-        <Icon name="scan" /> {lines.length ? 'Scan more' : 'Start scanning'}
-      </button>
-      {lines.length > 0 && (
-        <div className="card flush">
-          {lines.map((l, i) => (
-            <div key={`${l.code}-${i}`} className="row">
-              <span className="grow">
-                <span className="title" style={{ fontSize: 15 }}>
-                  {l.name}
-                </span>
-                <span className="small">
-                  {l.status === 'added'
-                    ? 'Added to your shopping list'
-                    : l.status === 'already'
-                      ? 'Already on your shopping list'
-                      : 'New. Added to your shopping list'}
-                </span>
-              </span>
-              {l.status === 'new' && (
-                <button
-                  className="btn small"
-                  onClick={() => {
-                    onClose();
-                    nav.push({ name: 'add', barcode: l.code });
-                  }}
-                >
-                  Track price
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      <button className="btn" onClick={onClose}>
-        Done
-      </button>
     </Sheet>
   );
 }
@@ -2276,8 +2308,8 @@ function storePreview(sp: StoreProduct): PreviewProduct {
     memberOnly: sp.memberOnly,
     promo: sp.promo,
     unitText: unitTextOf(sp) || undefined,
-    // Only stock about your own store (see stockKnown); online stock isn't shown.
-    inStock: stockKnown(cachedSettings(), sp.chain) ? sp.inStock : undefined,
+    // 0.10.7: no stock in search results: it's only checked when asked, on the shopping list.
+    inStock: undefined,
   };
 }
 
@@ -2292,25 +2324,42 @@ export function tickedShops(picks: StoreProduct[]): string {
  * 0.9.11: the end of "Pick my coconut cream", on the phone (shop search and Add by hand): the same
  * three buttons as any add, and the "next time" tick (ticked to start with).
  */
-export function PickButtons({ forLine, section, saving, onSave }: { forLine: ForLine; section: Section; saving: boolean; onSave: (t: 'both' | 'list' | 'pantry') => void }) {
+export function PickButtons({
+  forLine,
+  section,
+  saving,
+  busy,
+  blocked,
+  onSave,
+}: {
+  forLine: ForLine;
+  section: Section;
+  saving: boolean;
+  /** 0.10.7: which button is saving (only that one shows it). */
+  busy?: Target;
+  /** Nothing to add yet. */
+  blocked?: boolean;
+  onSave: (t: 'both' | 'list' | 'pantry') => void;
+}) {
+  const busyAs = busy ?? (saving ? 'both' : undefined);
   // 0.10.2: from the line's "Add to pantry": one button, the item made and the line kept as it.
   if (forLine.toPantry)
     return (
       <>
         <AlwaysTick forLine={forLine} />
-        <button className="btn primary" onClick={() => onSave('both')} disabled={saving}>
+        <AddBtn target="both" busy={busyAs} blocked={blocked} className="btn primary" onClick={() => onSave('both')}>
           <Icon name={section} size={18} /> Add to {SECTION_NAMES[section].toLowerCase()}
-        </button>
+        </AddBtn>
         <p className="small" style={{ margin: 0 }}>{toPantryNote(SECTION_PLACE[section])}</p>
       </>
     );
   return (
     <>
       <AlwaysTick forLine={forLine} />
-      <button className="btn primary" onClick={() => onSave('both')} disabled={saving}>
+      <AddBtn target="both" busy={busyAs} blocked={blocked} className="btn primary" onClick={() => onSave('both')}>
         <Icon name="cart" size={18} /> Add to both
-      </button>
-      <AddPair section={section} disabled={saving} onPantry={() => onSave('pantry')} onList={() => onSave('list')} />
+      </AddBtn>
+      <AddPair section={section} disabled={blocked} busy={busyAs} onPantry={() => onSave('pantry')} onList={() => onSave('list')} />
       <p className="small" style={{ margin: 0 }}>{pickButtonsNote(SECTION_PLACE[section])}</p>
     </>
   );

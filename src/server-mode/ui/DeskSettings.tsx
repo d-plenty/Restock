@@ -43,6 +43,8 @@ import type { ProductOrder } from '../../types';
 import { changeHousehold } from './settingsData';
 import { saveDraft } from '../../lib/settingsDraft';
 import { DeskSave, useDraftPart, useSettingsDraft } from '../../ui/SaveBar';
+import { AccessibilitySettings } from '../../ui/screens/Look';
+import { getSettings as getDraftSettings } from '../../lib/settingsDraft';
 
 type Part = 'household' | 'phones';
 
@@ -345,6 +347,10 @@ function HouseholdPart() {
             {where('phone')}
           </Line>
         )}
+        {/* 0.10.7: custom sections are made, named and deleted on a phone; their shops can be changed here once they're made. */}
+        <Line title="Custom sections" sub="Compare pet shops, tools, automotive, baby things and more, in a section of your own: a name, a colour and an icon." greyed>
+          <WhereNote>Make one on a phone: Settings → Make a custom section</WhereNote>
+        </Line>
       </Group>
 
       {v3 ? (
@@ -631,7 +637,15 @@ function HouseholdPart() {
         </Line>
       </Group>
 
-      <Group id="dk-s-browser" title="Look and accessibility">
+      {/* 0.10.7: Accessibility, as on the phone (this browser's own) */}
+      <h2 className="dk-eyebrow" id="dk-s-a11y">
+        Accessibility
+      </h2>
+      <section className="dk-a11y" aria-labelledby="dk-s-a11y">
+        <DeskA11y />
+      </section>
+
+      <Group id="dk-s-browser" title="Look">
         <Line title="Light or dark" sub="Just for this browser">
           <div className="dk-seg" role="group" aria-label="Light or dark">
             {(
@@ -839,6 +853,12 @@ function PhonesPart() {
       )}
     </>
   );
+}
+
+/** 0.10.7: this browser's accessibility settings, the same controls as the phone's. */
+function DeskA11y() {
+  const settings = useLive(getDraftSettings, []);
+  return settings ? <AccessibilitySettings settings={settings} web /> : null;
 }
 
 export function DeskSettings({ narrow }: { narrow?: boolean } = {}) {

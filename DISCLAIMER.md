@@ -1,6 +1,6 @@
 # Fine print
 
-_Last updated 13 November 2026_
+_Last updated 14 November 2026_
 
 ## In short
 
@@ -38,7 +38,7 @@ Restock only checks the items you track, one at a time with pauses in between, l
 
 If you turn on "Let the web page search the shops" on your own Restock server, it searches only when someone presses Search on its web page, one search at a time, and never in the background. A shop may block searches from a server; then search on a phone.
 
-Costco is the one shop whose website terms say automated collection of product listings isn't allowed, so it's off until you pick it with your shops. Costco's website terms say automated collection of product listings isn't allowed. Restock only looks when you search, one page at a time. It never checks Costco in the background or with Check now, and never in bulk. Costco may block it or change its pages, so it may stop working. Treat it as a test feature. It's your choice to turn this on, and your responsibility. Prices are Costco's online prices, which include delivery. They can differ from warehouse to warehouse and from the shelf. Turning it on is your choice and your responsibility.
+Costco is off until you pick it with your shops. Restock only checks it when you search, one page at a time, like you browsing its website. Costco's website terms don't allow automated collection, so it's your choice to switch it on. Prices are Costco's online prices, which include delivery, so the warehouse can differ. If Costco changes or blocks its website, its prices stop until that's sorted; that's on Costco's side.
 
 ## Data and battery
 
@@ -52,7 +52,7 @@ Restock is free, open-source software provided "as is", without warranty of any 
 
 ## Beta software
 
-Restock 0.10.6 is a release candidate: everything is in, and it's being tested before 1.0, so things can still change between versions. The Keg, Health, Baby and Pets tabs, and Costco, IGA and the shops added in 0.10.3, are marked Beta: they work the same way as the rest, they just haven't been tested as thoroughly yet, and they'll keep being tested before they come out of beta. Features under Settings → Advanced are for testing and can change or disappear. If something goes wrong, Settings → Send feedback tells us. Keep a backup of anything you'd hate to lose.
+Restock 0.10.7 is a release candidate: everything is in, and it's being tested before 1.0, so things can still change between versions. The Keg and Health tabs, and Costco, IGA and the shops added in 0.10.3, are marked Beta: they work the same way as the rest, they just haven't been tested as thoroughly yet, and they'll keep being tested before they come out of beta. Features under Settings → Advanced are for testing and can change or disappear. If something goes wrong, Settings → Send feedback tells us. Keep a backup of anything you'd hate to lose.
 
 ---
 

@@ -24,7 +24,9 @@ export function StockTag({ products, name }: { products: Pick<Product, 'chain' |
   const rows = stockRows(products, cachedSettings());
   if (!rows.length) return null;
   const tag = stockTag(rows);
-  const cls = tag.kind === 'in' ? 'good' : tag.kind === 'unknown' ? 'normal' : 'wait';
+  // 0.10.7: nothing at all until stock's been checked ("Check stock" on the list): no "Stock unknown" everywhere.
+  if (tag.kind === 'unknown') return null;
+  const cls = tag.kind === 'in' ? 'good' : 'wait';
   return (
     <>
       <span
@@ -65,7 +67,7 @@ export function StockTag({ products, name }: { products: Pick<Product, 'chain' |
               </div>
             ))}
           </div>
-          <p className="small">Stock is what each shop said at the last price check. It can change during the day.</p>
+          <p className="small">Stock is what each shop said when you last tapped Check stock on your list. It can change during the day.</p>
         </Sheet>
         </span>
       )}

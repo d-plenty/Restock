@@ -3,24 +3,26 @@
 // besides Pantry (Keg, Health, Baby and Pets, once they're set up), a way to set up the others,
 // and Settings, Cards, Catalogues, Specials and Receipts. The web page's phone layout shows the
 // same tab rows on its own More (PhoneLayout.tsx MorePage), so the phone and the web match.
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { getSettings } from '../../lib/db';
 import { loadRecommendations } from '../../lib/recs';
 import { useLive } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
-import { chainName, EXTRA_SECTIONS, enabledIn, SECTION_NAMES, sectionOn, type Section } from '../../shops';
+import { chainName, customDef, EXTRA_SECTIONS, enabledIn, isCustomSection, MAX_CUSTOM, SECTION_NAMES, sectionOn, type Section, withCustom } from '../../shops';
+import { customsInUse, NewCustomSheet } from './CustomSections';
 import type { Chain } from '../../types';
 import { serverMode } from '../../server-mode/flag';
 import { BetaTag, Icon } from '../components';
 import { useNav } from '../nav';
 
 /** What each tab is for, under its name when it isn't set up yet. */
-const TAB_FOR: Record<Exclude<Section, 'pantry'>, string> = {
-  keg: 'Beer, wine and spirits at the bottle shops you pick (18+)',
-  pharmacy: 'Medicine, first aid and personal care at the shops you pick',
-  baby: 'Nappies, wipes and formula at the shops you pick',
-  pets: 'Pet food, litter and treats at the shops you pick',
-};
+const TAB_FOR: Record<Exclude<Section, 'pantry'>, string> = withCustom<string, Exclude<Section, 'pantry'>>(
+  {
+    keg: 'Beer, wine and spirits at the bottle shops you pick (18+)',
+    pharmacy: 'Medicine, first aid and personal care at the shops you pick',
+  },
+  (name) => `${name}: the shops you pick`,
+);
 
 /** 0.10.4: what a tab's tile says: how many things, how many on special, and the shop that's cheapest most often. */
 export function tabSummary(recs: Recommendation[] | undefined, section: Section): { things: number; onSpecial: number; cheapest?: Chain } {
@@ -46,8 +48,14 @@ export function MoreTop({ children }: { children?: ReactNode }) {
   const nav = useNav();
   const settings = useLive(getSettings, []);
   const recs = useLive(loadRecommendations, []);
-  const shown = settings ? EXTRA_SECTIONS.filter((s) => sectionOn(settings, s) && !settings.hiddenTabs?.includes(s)) : [];
-  const notYet = settings ? EXTRA_SECTIONS.filter((s) => !sectionOn(settings, s)) : [];
+  // 0.10.7: a custom section shows as soon as it's made, before its shops are picked (tapping it opens its page in Settings).
+  const shown = settings
+    ? EXTRA_SECTIONS.filter((s) => (sectionOn(settings, s) || (isCustomSection(s) && !!settings.sections?.[s])) && !settings.hiddenTabs?.includes(s))
+    : [];
+  // 0.10.7: Keg and Health to set up; custom sections are made from the Custom box instead.
+  const notYet = settings ? (['keg', 'pharmacy'] as const).filter((s) => !sectionOn(settings, s)) : [];
+  const customRoom = settings ? customsInUse(settings).length < MAX_CUSTOM : false;
+  const [making, setMaking] = useState(false);
   return (
     <div className="more-top">
       <h1>More</h1>
@@ -60,12 +68,20 @@ export function MoreTop({ children }: { children?: ReactNode }) {
               const t = tabSummary(recs, s);
               const shops = settings ? enabledIn(settings.enabledChains, s, settings.shopTabs ?? {}) : [];
               return (
-                <button key={s} className={`more-tile tile-${s}`} onClick={() => nav.setTab(s)}>
+                <button
+                  key={s}
+                  className={`more-tile ${isCustomSection(s) ? `tile-colour-${customDef(settings, s).colour}` : `tile-${s}`}`}
+                  onClick={() => {
+                    if (shops.length) return nav.setTab(s);
+                    nav.push({ name: 'settings' });
+                    if (!serverMode) nav.push({ name: 'stores', section: s });
+                  }}
+                >
                   <span className="more-tile-icon">
                     <Icon name={s} size={24} />
                   </span>
                   <span className="more-tile-name">
-                    {SECTION_NAMES[s]} <BetaTag />
+                    {SECTION_NAMES[s]} {!isCustomSection(s) && <BetaTag />}
                   </span>
                   <span className="more-tile-count">
                     {t.things ? `${t.things} ${t.things === 1 ? 'thing' : 'things'} · ${t.onSpecial} on special` : 'Nothing yet'}
@@ -79,9 +95,9 @@ export function MoreTop({ children }: { children?: ReactNode }) {
           </div>
         </>
       )}
-      {notYet.length > 0 && (
+      {(notYet.length > 0 || customRoom) && (
         <>
-          <h2 className="more-top-label">{shown.length ? 'Add a tab' : 'Add a tab: Keg, Health, Baby or Pets'}</h2>
+          <h2 className="more-top-label">Add a tab</h2>
           <div className="more-adds">
             {notYet.map((s) => (
               // On the web page, the household's shops are set in Settings (a phone sets its own on its shop pages).
@@ -96,9 +112,21 @@ export function MoreTop({ children }: { children?: ReactNode }) {
                 <Icon name="plus" size={18} />
               </button>
             ))}
+            {/* 0.10.7: Custom: pet shops, tools, automotive, baby and anything else (set up in Settings) */}
+            {customRoom && (
+              <button className="more-add more-custom" onClick={() => (serverMode ? nav.push({ name: 'settings' }) : setMaking(true))}>
+                <Icon name="pack:star" size={20} />
+                <span className="grow" style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                  <span>Custom</span>
+                  <span className="more-custom-about">Compare pet shops, tools, automotive, baby products and more</span>
+                </span>
+                <Icon name="plus" size={18} />
+              </button>
+            )}
           </div>
         </>
       )}
+      {making && <NewCustomSheet onClose={() => setMaking(false)} />}
     </div>
   );
 }

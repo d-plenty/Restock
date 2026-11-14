@@ -1,13 +1,22 @@
-import workerUrl from 'tesseract.js/dist/worker.min.js?url';
 import { RestockNative } from './sql/native';
 import { isNative } from '../stores/http';
+import { toLines, type ReadLine } from './reader/lines';
+import type { FromWorker, ToWorker, WorkerFiles } from './reader/ocrWorker';
+// The text reader's files, all part of the app (0.10.7). The models are PaddleOCR's PP-OCRv5 mobile
+// (Apache-2.0); the engine is ONNX Runtime Web (MIT). See src/assets/reader/NOTICE.md.
+import detFile from '../assets/reader/ppocrv5-mobile-det.onnx?url';
+import recFile from '../assets/reader/ppocrv5-mobile-rec.onnx?url';
+import dictFile from '../assets/reader/ppocrv5-dict.txt?url';
+import wasmFile from '../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm?url';
+import mjsFile from '../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs?url';
 
-// The receipt reader: Tesseract (open-source text recognition) running on the phone. Since 0.7.4
-// its engine and English model ship inside the app (about 7 MB), so nothing is downloaded and it
-// works offline. Nothing is sent anywhere to read a receipt. Both come from npm packages
-// (tesseract.js-core, Apache-2.0; @tesseract.js-data/eng, MIT), so F-Droid builds them from source.
-import coreFile from 'tesseract.js-core/tesseract-core-simd-lstm.wasm.js?url';
-import langFile from '@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz?url';
+// The text reader: reads receipts and the fronts of packs, on the phone (or in the browser, for
+// the web page). 0.10.7: PaddleOCR in place of Tesseract, which was made for flat scanned pages
+// and struggled with photos (shiny or curved packs, crumpled receipts, a crooked photo). It runs in
+// its own worker so the screen keeps moving while it reads. Nothing is downloaded and nothing is
+// sent anywhere: the photo is read where it is.
+
+export type { ReadLine };
 
 /** The reader is part of the app: always there. Kept so older screens and settings keep working. */
 export async function readerInstalled(): Promise<boolean> {
@@ -23,94 +32,83 @@ export async function removeOldDownload(): Promise<void> {
   await RestockNative.deleteAppDir({ path: 'receipt-reader' }).catch(() => undefined);
 }
 
-async function fileBytes(url: string): Promise<ArrayBuffer> {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`Couldn't load the receipt reader (${r.status}).`);
-  return r.arrayBuffer();
-}
+const files = (): WorkerFiles => ({
+  det: new URL(detFile, location.href).href,
+  rec: new URL(recFile, location.href).href,
+  dict: new URL(dictFile, location.href).href,
+  wasm: new URL(wasmFile, location.href).href,
+  mjs: new URL(mjsFile, location.href).href,
+});
 
-/**
- * The English model, packed (gzip). It's built as "….gz.bin" so Android leaves it alone (0.8.7);
- * in case a build still unpacked it and dropped the ".gz", the unpacked copy is tried too.
- */
-async function modelBytes(): Promise<{ bytes: ArrayBuffer; packed: boolean }> {
-  try {
-    return { bytes: await fileBytes(langFile), packed: true };
-  } catch (e) {
-    const unpacked = langFile.replace(/\.gz(\.bin)?$/, '');
-    if (unpacked === langFile) throw e;
-    return { bytes: await fileBytes(unpacked), packed: false };
-  }
-}
-
-type TWorker = import('tesseract.js').Worker;
-let worker: Promise<TWorker> | undefined;
+let worker: Worker | undefined;
 let idle: ReturnType<typeof setTimeout> | undefined;
+let next = 1;
+const waiting = new Map<number, { ok: (lines: FromWorker['lines']) => void; fail: (e: Error) => void }>();
 
-/** Starts the reader (a second or two), or reuses the running one. */
-function getWorker(onStatus?: (s: string) => void): Promise<TWorker> {
+function getWorker(): Worker {
   if (idle) clearTimeout(idle);
   if (!worker) {
-    worker = (async () => {
-      onStatus?.('Starting the receipt reader…');
-      const [{ createWorker, OEM }, core, model] = await Promise.all([import('tesseract.js'), fileBytes(coreFile), modelBytes()]);
-      // Everything is handed to Tesseract from memory, so nothing is fetched by its worker: the
-      // engine as a blob (the "#.js" tells Tesseract it's the file itself, not a folder), and the
-      // English model through a small wrapper that answers the worker's request for it.
-      const blobUrl = (data: BlobPart, type: string) => URL.createObjectURL(new Blob([data], { type }));
-      const coreUrl = `${blobUrl(core, 'text/javascript')}#core.wasm.js`;
-      const langUrl = blobUrl(model.bytes, model.packed ? 'application/gzip' : 'application/octet-stream');
-      const realWorker = new URL(workerUrl, location.href).href;
-      const wrapper = blobUrl(
-        `const f = self.fetch.bind(self);
-self.fetch = (u, o) => (String(u).endsWith('/eng.traineddata.gz') || String(u).endsWith('/eng.traineddata') ? f(${JSON.stringify(langUrl)}) : f(u, o));
-importScripts(${JSON.stringify(realWorker)});`,
-        'text/javascript',
-      );
-      return createWorker('eng', OEM.LSTM_ONLY, {
-        workerPath: wrapper,
-        corePath: coreUrl,
-        langPath: 'https://reader.restock.invalid',
-        cacheMethod: 'none',
-        gzip: model.packed,
-      });
-    })();
-    worker.catch(() => (worker = undefined));
+    worker = new Worker(new URL('./reader/ocrWorker.ts', import.meta.url), { type: 'module' });
+    worker.onmessage = (e: MessageEvent<FromWorker>) => {
+      const w = waiting.get(e.data.id);
+      if (!w) return;
+      waiting.delete(e.data.id);
+      if (e.data.error) w.fail(new Error(e.data.error));
+      else w.ok(e.data.lines ?? []);
+    };
+    worker.onerror = (e) => {
+      for (const w of waiting.values()) w.fail(new Error(e.message || "The text reader stopped. Try again."));
+      waiting.clear();
+      stopReader();
+    };
   }
   return worker;
 }
 
 /** Stops the reader to free its memory (it restarts when needed). */
 export function stopReader(): void {
-  const w = worker;
+  worker?.terminate();
   worker = undefined;
-  void w?.then((x) => x.terminate()).catch(() => undefined);
 }
 
-export interface ReadLine {
-  text: string;
-  /** Height of the text, in pixels: big text on a pack is usually the product's name. */
-  height: number;
-  confidence: number;
+/** Big photos are read at this size at most: plenty for print, and far quicker on a phone. */
+const MAX_SIDE = 2000;
+
+function pixels(image: HTMLCanvasElement): { width: number; height: number; data: Uint8ClampedArray } {
+  const k = Math.min(1, MAX_SIDE / Math.max(image.width, image.height));
+  let c = image;
+  if (k < 1) {
+    c = document.createElement('canvas');
+    c.width = Math.round(image.width * k);
+    c.height = Math.round(image.height * k);
+    c.getContext('2d')!.drawImage(image, 0, 0, c.width, c.height);
+  }
+  const d = c.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, c.width, c.height);
+  return { width: d.width, height: d.height, data: d.data };
 }
 
-/** Reads the words in a picture. */
+async function canvasFrom(image: Blob | HTMLCanvasElement): Promise<HTMLCanvasElement> {
+  if (!(image instanceof Blob)) return image;
+  const bmp = await createImageBitmap(image, { imageOrientation: 'from-image' });
+  const c = document.createElement('canvas');
+  c.width = bmp.width;
+  c.height = bmp.height;
+  c.getContext('2d')!.drawImage(bmp, 0, 0);
+  bmp.close();
+  return c;
+}
+
+/** Reads the words in a picture: the text line by line, and each line's size (for a pack's name). */
 export async function readText(image: Blob | HTMLCanvasElement, onStatus?: (s: string) => void): Promise<{ text: string; lines: ReadLine[] }> {
-  const w = await getWorker(onStatus);
   onStatus?.('Reading the words…');
-  const { data } = await w.recognize(image, {}, { text: true, blocks: true });
-  const lines: ReadLine[] = [];
-  for (const b of data.blocks ?? [])
-    for (const p of b.paragraphs)
-      for (const l of p.lines) lines.push({ text: l.text.trim(), height: l.bbox.y1 - l.bbox.y0, confidence: l.confidence });
+  const px = pixels(await canvasFrom(image));
+  const w = getWorker();
+  const id = next++;
+  const found = await new Promise<FromWorker['lines']>((ok, fail) => {
+    waiting.set(id, { ok, fail });
+    w.postMessage({ id, files: files(), ...px } satisfies ToWorker, [px.data.buffer]);
+  });
   // Keep it loaded for a minute in case there's another one; then let the memory go.
   idle = setTimeout(stopReader, 60_000);
-  // Stray marks at the paper's edge come out as lines of "|" or dots: leave those out.
-  const text = data.text
-    .split('\n')
-    .filter((l) => !l.trim() || /[A-Za-z0-9]/.test(l))
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-  return { text, lines: lines.filter((l) => /[A-Za-z0-9]/.test(l.text)) };
+  return toLines(found ?? []);
 }

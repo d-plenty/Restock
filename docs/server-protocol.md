@@ -922,3 +922,10 @@ Nothing new between phones and servers. On the phone only (never synced): the st
 ## 0.10.6: what changed on the wire
 
 Nothing. Fixes only (the Shopping list's buttons, search boxes, big text, Dan Murphy's and BWS departments).
+
+## 0.10.7: what changed on the wire
+
+- **Custom sections.** Besides `pantry`, `keg`, `pharmacy`, `baby` and `pets`, an item, list line or category can be in `c1` to `c6` (a section someone made). Like Baby and Pets they're shared with Groceries. A phone on 0.10.6 or older shows them under Groceries.
+- **Household settings rows:** `tab:c1` … `tab:c6` (true or false, a custom section switched on) and `custom:<section>` (`{ name, colour, icon }`: up to 30 characters; one of pink, blue, teal, purple, orange, amber, green, slate; `pack:<icon>` or an emoji), both with Groceries. Checked the same in sharedSettings.ts and SharedSettings.java.
+- **Stock:** background price checks don't save stock any more; it's only asked for by Check stock on the list.
+- The shop map is on the phone only. The server's web page doesn't load maps, so its Content-Security-Policy is unchanged.

@@ -1,6 +1,6 @@
 import { adapterFor } from '../stores';
 import type { Chain } from '../types';
-import { isPressOnlyShop, kindOf, sectionOf, type Section } from '../shops';
+import { isPressOnlyShop, kindOf, sectionOf, type Section, slots } from '../shops';
 import { getKV, putKV } from './db';
 import { BlockedError, isBlockMessage } from '../stores/http';
 
@@ -110,7 +110,7 @@ export interface ConnectionTest {
 }
 
 /** The word Restock searches for when testing a shop (0.10.3: Baby and Pets too). */
-export const TEST_WORD: Record<Section, string> = { pantry: 'milk', keg: 'beer', pharmacy: 'paracetamol', baby: 'nappies', pets: 'dog food' };
+export const TEST_WORD: Record<Section, string> = { pantry: 'milk', keg: 'beer', pharmacy: 'paracetamol', baby: 'nappies', pets: 'dog food', ...slots('soap') };
 
 /** 0.10.5: shops read through the hidden browser (their website, or Dan Murphy's/BWS falling back to it). */
 export const usesBrowser = (chain: StoreChain): boolean => {

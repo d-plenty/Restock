@@ -1,6 +1,6 @@
 // Core data types. Everything here is stored on the device in SQLite.
 
-import type { Chain, CustomShop, ListSection, Section, StoreChain } from './shops';
+import type { Chain, CustomDef, CustomSection, CustomShop, ListSection, Section, StoreChain } from './shops';
 export type { Chain, CustomShop, ListSection, Section, StoreChain } from './shops';
 export { chainName } from './shops';
 
@@ -301,7 +301,9 @@ export interface Settings {
   /** The shops you use, in every section. */
   enabledChains: StoreChain[];
   /** Keg and Pharmacy tabs (0.10.3: and Baby and Pets): switched on? (They also need at least one shop picked.) */
-  sections: { keg: boolean; pharmacy: boolean; baby?: boolean; pets?: boolean };
+  sections: { keg: boolean; pharmacy: boolean } & Partial<Record<CustomSection, boolean>>;
+  /** 0.10.7: each custom section's name, colour and icon (shops.ts customDef; shared with the household). */
+  customSections?: Partial<Record<CustomSection, CustomDef>>;
   /**
    * 0.10.3: the tabs each shop is in, by shop id, when it isn't just its own tab (shops.ts tabsOf):
    * Woolworths in Pantry and Baby, say. Shared with the household (shop:<chain> rows' `tabs`).
@@ -421,7 +423,22 @@ export interface Settings {
   /** `black`: true black in dark mode, for OLED screens (0.8.9). On unless set to false (0.9.0). */
   look: { style: 'australia' | 'plain'; accent?: string; icon: string; black?: boolean };
   /** Accessibility: text size (1 = normal), high contrast, less motion, bigger buttons. */
-  a11y: { text: number; contrast: boolean; motion: boolean; big: boolean };
+  a11y: {
+    text: number;
+    contrast: boolean;
+    motion: boolean;
+    big: boolean;
+    /** 0.10.7: heavier text */
+    bold?: boolean;
+    /** 0.10.7: more space between letters, words and lines (WCAG 1.4.12) */
+    spacing?: boolean;
+    /** 0.10.7: links underlined, not just coloured */
+    links?: boolean;
+    /** 0.10.7: no swiping on rows (every swipe has a button too) */
+    noSwipe?: boolean;
+    /** 0.10.7: messages (and their Undo) stay three times as long */
+    slowMessages?: boolean;
+  };
   /** Setup tiles finished or skipped, and whether the "Finish setting up" card was dismissed. */
   setup: { done: string[]; skipped: string[]; dismissed?: boolean };
   /** The guided tour: finished (or dismissed), or running with sample items. */

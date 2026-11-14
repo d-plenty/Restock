@@ -2214,16 +2214,20 @@ table.nutrition td.num {
   height: 36px;
   flex: none;
 }
-/* The ⓘ on product photos is the way into more info, so it's big enough to see and tap. */
+/* The ⓘ on product photos is the way into more info, so it's big enough to see and tap. 0.10.7: a
+   fixed blue (it isn't a warning, whatever colour the app is set to), at the top left of the photo;
+   the whole photo is the button. */
 .thumb-btn .info-dot {
   width: 24px;
   height: 24px;
   border-radius: var(--r-md);
-  right: -6px;
-  bottom: -6px;
-  background: var(--green-solid);
+  left: -6px;
+  top: -6px;
+  right: auto;
+  bottom: auto;
+  background: var(--info-dot);
   border: 2px solid var(--surface);
-  color: var(--on-accent);
+  color: var(--white);
 }
 .thumb-btn .info-dot svg {
   width: 14px;
@@ -5091,4 +5095,310 @@ html.on-welcome #root {
 }
 .list-row-main {
   min-height: var(--hit);
+}
+
+/* 0.10.7: while one Add button saves, the others keep their colours (not greyed): they just can't be pressed. */
+.btn.held {
+  pointer-events: none;
+}
+.btn.is-busy {
+  pointer-events: none;
+  gap: 10px;
+}
+.btn.is-busy .spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  border-color: color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+}
+
+/* 0.10.7: scanning several in a row: the count by the title, and what the last one did. */
+.scanner-title .scanner-count {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  opacity: 0.9;
+}
+.scanner-msg.ok {
+  background: rgba(40, 180, 90, 0.22);
+  border-radius: var(--r-md);
+  padding: 8px 10px;
+}
+
+/* 0.10.7: Scan several: a tick for the done ones, the scan mark for the ones still to match. */
+.scan-mark {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.scan-mark.done {
+  background: var(--green-bg);
+  color: var(--green);
+}
+.scan-mark.todo {
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+/* 0.10.7: the pack reader: your photo, and the words it read as buttons. */
+.pack-words {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.pack-photo {
+  width: 72px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+}
+.photo-find > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--hit);
+  cursor: pointer;
+  list-style: none;
+}
+.photo-find > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* 0.10.7: "You already have this": View it, Add anyway, Cancel. Side by side; stacked when there's no room. */
+.three-btns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.5em), 1fr));
+  gap: 8px;
+}
+
+/* 0.10.7: a custom section's emoji, where its icon would be */
+.emoji-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* 0.10.7: custom sections' tiles, in the colour each one picked */
+.more-tile.tile-colour-pink { background: var(--tile-pink-bg); color: var(--tile-pink-ink); }
+.more-tile.tile-colour-blue { background: var(--tile-blue-bg); color: var(--tile-blue-ink); }
+.more-tile.tile-colour-amber { background: var(--tile-amber-bg); color: var(--tile-amber-ink); }
+.more-tile.tile-colour-green { background: var(--tile-green-bg); color: var(--tile-green-ink); }
+.more-tile.tile-colour-teal { background: var(--tile-teal-bg); color: var(--tile-teal-ink); }
+.more-tile.tile-colour-purple { background: var(--tile-purple-bg); color: var(--tile-purple-ink); }
+.more-tile.tile-colour-orange { background: var(--tile-orange-bg); color: var(--tile-orange-ink); }
+.more-tile.tile-colour-slate { background: var(--tile-slate-bg); color: var(--tile-slate-ink); }
+.colour-swatch {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+}
+.colour-swatch[aria-pressed='true'] {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+.icon-pick {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-pick[aria-pressed='true'] {
+  border-color: var(--green);
+  background: var(--green-bg);
+  outline: 2px solid var(--green);
+}
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 8px;
+}
+
+/* 0.10.7: a custom section's settings */
+.plain-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.field-label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-2);
+  padding: 0;
+  margin-bottom: 8px;
+}
+.custom-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.custom-mark.tile-colour-pink { background: var(--tile-pink-bg); color: var(--tile-pink-ink); }
+.custom-mark.tile-colour-blue { background: var(--tile-blue-bg); color: var(--tile-blue-ink); }
+.custom-mark.tile-colour-amber { background: var(--tile-amber-bg); color: var(--tile-amber-ink); }
+.custom-mark.tile-colour-green { background: var(--tile-green-bg); color: var(--tile-green-ink); }
+.custom-mark.tile-colour-teal { background: var(--tile-teal-bg); color: var(--tile-teal-ink); }
+.custom-mark.tile-colour-purple { background: var(--tile-purple-bg); color: var(--tile-purple-ink); }
+.custom-mark.tile-colour-orange { background: var(--tile-orange-bg); color: var(--tile-orange-ink); }
+.custom-mark.tile-colour-slate { background: var(--tile-slate-bg); color: var(--tile-slate-ink); }
+.colour-swatch.more-tile {
+  min-height: 0;
+  padding: 0;
+}
+.more-custom-about {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--on-navy-muted);
+}
+
+/* 0.10.7: Accessibility → Bold text, Easier reading spacing (WCAG 1.4.12), Underline links */
+:root[data-bold='1'] body,
+:root[data-bold='1'] :where(p, li, label, input, select, textarea, .small, .sub, .chip, .linkish, span) {
+  font-weight: 600;
+}
+:root[data-bold='1'] :where(.title, h1, h2, h3, strong, b, .btn, .eyebrow) {
+  font-weight: 800;
+}
+:root[data-spacing='1'] body {
+  line-height: 1.6;
+  letter-spacing: 0.05em;
+  word-spacing: 0.16em;
+}
+:root[data-spacing='1'] p {
+  margin-block-end: 0.8em;
+}
+:root[data-links='1'] a,
+:root[data-links='1'] .linkish,
+:root[data-links='1'] .link-quiet {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 0.10.7: Accessibility, at the top of the welcome screen */
+.welcome-a11y {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--top, 0px) + 12px);
+  right: 16px;
+  min-height: var(--hit);
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--r-full);
+  border: 1.5px solid var(--on-navy-line);
+  background: var(--brand-navy);
+  color: var(--white);
+  font: inherit;
+  font-weight: 700;
+}
+
+/* 0.10.7: shops on a map */
+.store-map-wrap {
+  display: grid;
+  gap: 8px;
+}
+.store-map {
+  height: 300px;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.map-pin {
+  width: 26px;
+  height: 26px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 2px solid var(--white);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  padding: 0;
+  cursor: pointer;
+}
+
+/* 0.10.7: a row's main button sits behind its content instead of around it, so the tags you tap
+   for an explanation aren't buttons inside a button (WCAG 4.1.2). Taps anywhere else on the row
+   still open it. */
+.row-stretch {
+  position: relative;
+}
+.row-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.row-stretch .tag.tag-btn {
+  z-index: 2;
+}
+/* and they're at least 24px tall (WCAG 2.5.8), as well as the 44px tap around them */
+.tag.tag-btn {
+  min-height: 24px;
+}
+.row-hit:focus-visible {
+  outline: 3px solid var(--green);
+  outline-offset: -3px;
+}
+
+/* 0.10.7: Accessibility on the web page's Settings: the phone's own cards, under the page's heading. */
+.dk-a11y {
+  display: grid;
+  gap: 10px;
+}
+.dk-a11y h3.eyebrow {
+  margin: 4px 0 0;
+}
+.list-stock-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+}
+
+/* 0.10.7: the text size buttons go two by two when they don't fit in a row (at Largest on a small
+   phone, "Largest" was scrolled out of sight), and the words read off a pack wrap instead of
+   scrolling sideways. */
+.seg.seg-wrap {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: visible;
+}
+:root[data-text='1.3'] .seg.seg-wrap,
+:root[data-text='1.5'] .seg.seg-wrap {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.pack-words .chips {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.pack-words .chip {
+  height: auto;
+  min-height: 36px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+  max-width: 100%;
+  flex-shrink: 1;
 }

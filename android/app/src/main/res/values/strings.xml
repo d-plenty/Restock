@@ -14,4 +14,5 @@
     <string name="widget_list_description">What\'s on your shopping list</string>
     <string name="widget_quick_description">Scan, shopping list and receipts in one tap</string>
     <string name="share_to_list">Restock: Add to shopping list</string>
+    <string name="share_to_search">Restock: Search shops</string>
 </resources>

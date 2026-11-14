@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { EVERYTHING, exportBackup, exportCounts, GIFT_NO_PASSWORD_WARNING, giftCardsUnlocked, type ExportParts } from '../../lib/backup';
 import { confirmAction } from '../../lib/confirm';
 import { getSettings, priceHistorySpan } from '../../lib/db';
-import { SECTION_NAMES, SECTIONS, type Section } from '../../shops';
+import { SECTION_NAMES, SECTIONS, type Section, slots } from '../../shops';
 import { historyLabel, type Settings } from '../../types';
 import { cardsCount } from '../../lib/giftCards';
 import { Icon, Sheet } from '../components';
@@ -102,7 +102,7 @@ export function PartsPicker({
       </span>
     </label>
   );
-  const SHOP_WORD: Record<Section, string> = { pantry: 'supermarkets', keg: 'bottle shops', pharmacy: 'pharmacies', baby: 'baby shops', pets: 'pet shops' };
+  const SHOP_WORD: Record<Section, string> = { pantry: 'supermarkets', keg: 'bottle shops', pharmacy: 'pharmacies', baby: 'baby shops', pets: 'pet shops', ...slots('shops') };
   const tabsWithItems = SECTIONS.filter((s) => counts.bySection[s] > 0);
   return (
     <div className="card flush">

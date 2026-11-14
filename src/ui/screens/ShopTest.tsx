@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { shareTextFile } from '../../lib/backup';
 import { captureWhile, type Captured } from '../../lib/diagnostics';
 import { isBlockedError, offerUnblock, TEST_WORD } from '../../lib/health';
+import { nameHasSize } from '../../lib/naming';
 import { money } from '../../lib/units';
 import { chainName, customShops, isPressOnlyShop, kindOf, sectionOf, shopsByGroup, type StoreChain } from '../../shops';
 import { adapterFor } from '../../stores';
@@ -38,6 +39,48 @@ interface Result {
   /** 0.10.4: nothing came back and the shop answered 403/429 or a bot check. */
   blocked?: boolean;
   answers: { kind: Captured['kind']; status: number; host: string; bytes: number }[];
+  /** 0.10.7: the biggest answer that worked, for "Copy the shop's answer". Kept only on screen. */
+  raw?: Captured;
+}
+
+/** Keys that could say who you are or where you shop. Their values never go in the copy. */
+const PERSONAL = /cookie|token|session|auth|e-?mail|phone|mobile|address|postcode|post_code|suburb|street|latitude|longitude|geo|store_?id|storeid|branch|customer|member_?(id|number)|account|user|login|password|card|ip$/i;
+
+/**
+ * 0.10.7: what the shop sent back, cut down to what's needed to fix how it's read: a few products
+ * of each list, long text shortened, and details like an email, address or store number taken
+ * out (a web page can still name its branch). JSON stays JSON; a web page loses its scripts' code, styles and pictures.
+ */
+export function shopAnswerCopy(c: Captured, limit = 60_000): string {
+  const head = `Restock ${__APP_VERSION__} · shop answer · ${c.kind} ${(() => {
+    try {
+      return new URL(c.url).host + new URL(c.url).pathname.replace(/\d{3,}/g, '#');
+    } catch {
+      return '';
+    }
+  })()} · ${c.status}`;
+  let body: string;
+  try {
+    const trim = (v: unknown, depth: number): unknown => {
+      if (Array.isArray(v)) return v.slice(0, depth < 3 ? 3 : 2).map((x) => trim(x, depth + 1));
+      if (v && typeof v === 'object')
+        return Object.fromEntries(
+          Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, PERSONAL.test(k) ? '(removed)' : trim(x, depth + 1)]),
+        );
+      if (typeof v === 'string') return v.length > 300 ? `${v.slice(0, 300)}…` : v;
+      return v;
+    };
+    body = JSON.stringify(trim(JSON.parse(c.body), 0), null, 1);
+  } catch {
+    body = c.body
+      .replace(/<script\b(?![^>]*(application\/(ld\+)?json))[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<(style|svg|noscript)\b[\s\S]*?<\/\1>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/data:[a-z/+.-]+;base64,[A-Za-z0-9+/=]+/g, 'data:…')
+      .replace(/("?(?:email|phone|postcode|suburb|address|token|session)"?\s*[:=]\s*)"[^"]*"/gi, '$1"(removed)"')
+      .replace(/\s+/g, ' ');
+  }
+  return `${head}\n${body.length > limit ? `${body.slice(0, limit)}\n… (cut short)` : body}`;
 }
 
 /** The report to copy: plain text, nothing personal (no branch, store number, cookies or account). */
@@ -50,9 +93,10 @@ export function shopTestReport(r: Result, version: string): string {
     ...(r.searchPage ? [`Search page: ${r.searchPage}${r.searchFound ? ` (${r.searchFound})` : ''}`] : []),
     `Took: ${(r.ms / 1000).toFixed(1)} s`,
     r.error ? `Result: didn't work: ${r.error}` : `Result: ${r.found.length} found`,
-    ...(r.botCheck ? ['The shop showed a bot check or "checking your browser" page.'] : []),
+    // 0.10.7: a bot check that Restock got past isn't a problem: say so plainly.
+    ...(r.botCheck ? [r.found.length ? "The first try met a bot check; Restock's built-in browser got through." : 'The shop showed a bot check or "checking your browser" page.'] : []),
     ...(r.blocked ? ['Blocked: the shop turned Restock away (Unblock offered).'] : []),
-    ...r.found.slice(0, 8).map((p, i) => `${i + 1}. ${p.name}${p.size ? ` ${p.size}` : ''} · ${money(p.price)}${p.isSpecial ? ` (special${p.wasPrice ? `, was ${money(p.wasPrice)}` : ''})` : ''}`),
+    ...r.found.slice(0, 8).map((p, i) => `${i + 1}. ${p.name}${p.size && !nameHasSize(p.name, p.size) ? ` ${p.size}` : ''} · ${money(p.price)}${p.isSpecial ? ` (special${p.wasPrice ? `, was ${money(p.wasPrice)}` : ''})` : ''}`),
     `Answers: ${r.answers.map((a) => `${a.kind} ${a.host} ${a.status} ${Math.round(a.bytes / 1024)} KB`).join('; ') || 'none'}`,
   ];
   return lines.join('\n');
@@ -109,6 +153,7 @@ export function ShopTest() {
       botCheck: out.captured.some((c) => looksLikeBotCheck(c.body)),
       blocked: !out.result?.length && (isBlockedError(out.error) || out.captured.some((c) => c.status === 403 || c.status === 429)),
       answers,
+      raw: out.captured.filter((c) => c.status >= 200 && c.status < 300 && c.body.length > 0).sort((a, b) => b.body.length - a.body.length)[0],
     });
     setBusy(false);
   };
@@ -121,6 +166,17 @@ export function ShopTest() {
       nav.toast('Report copied. Paste it in a message to the developer.');
     } catch {
       await shareTextFile(`restock-shop-test-${r.shop}.txt`, text, 'text/plain');
+    }
+  };
+
+  const copyAnswer = async () => {
+    if (!r?.raw) return;
+    const text = shopAnswerCopy(r.raw);
+    try {
+      await navigator.clipboard.writeText(text);
+      nav.toast("The shop's answer is copied. Paste it in a message to the developer.");
+    } catch {
+      await shareTextFile(`restock-shop-answer-${r.shop}.txt`, text, 'text/plain');
     }
   };
 
@@ -191,6 +247,17 @@ export function ShopTest() {
             <button className="btn" onClick={() => void copy()}>
               <Icon name="share" size={17} /> Copy report
             </button>
+            {r.raw && (
+              <>
+                <button className="btn" onClick={() => void copyAnswer()}>
+                  <Icon name="share" size={17} /> Copy the shop's answer
+                </button>
+                <span className="small">
+                  What the shop sent back, cut down, with details like your email, address or store number taken out. A shop's web page can still name
+                  the branch it's set to.
+                </span>
+              </>
+            )}
           </div>
         )}
       </div>

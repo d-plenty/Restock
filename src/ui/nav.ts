@@ -1,10 +1,10 @@
 import { createContext, useContext } from 'react';
 
-import type { Section, StoreChain } from '../shops';
+import { isCustomSection, type Section, type StoreChain } from '../shops';
 
 /** 0.10.3: 'more' is the bottom bar's More: Keg, Health, Baby, Pets, Settings, Cards and the rest. */
 export type Tab = 'home' | Section | 'add' | 'list' | 'more';
-export const isSectionTab = (t: Tab): t is Section => t === 'pantry' || t === 'keg' || t === 'pharmacy' || t === 'baby' || t === 'pets';
+export const isSectionTab = (t: Tab): t is Section => t === 'pantry' || t === 'keg' || t === 'pharmacy' || isCustomSection(t);
 /** 0.10.3: the tabs reached from More (everything but Pantry). */
 export const isMoreTab = (t: Tab): boolean => t === 'more' || (isSectionTab(t) && t !== 'pantry');
 
@@ -28,7 +28,11 @@ export type Screen =
       forList?: boolean;
       /** With forList: the plain list line this replaces ("Nescafe" becomes the product found). */
       replaceEntry?: string;
+      /** 0.10.7: matching a barcode from Scan several: after saving, back to that list. */
+      fromScans?: boolean;
     }
+  /** 0.10.7: Scan several, and the barcodes still to match. */
+  | { name: 'scanned'; section?: Section; start?: boolean }
   | { name: 'settings'; page?: import('./screens/Settings').SettingsPage }
   | { name: 'feedback' }
   | { name: 'catalogues' }

@@ -1,4 +1,4 @@
-import { SHOPS, groupOf, isLocalOnlyShop, shopDef, type Section, type ShopGroup, type StoreChain } from '../shops';
+import { SHOPS, groupOf, isLocalOnlyShop, shopDef, type Section, type ShopGroup, type StoreChain, slots } from '../shops';
 import { APP_UA, num, request, sleep } from '../stores/http';
 
 // Finding nearby stores, using OpenStreetMap's free public services from this phone:
@@ -129,6 +129,7 @@ const FAKE_NEAR: Record<Section, [StoreChain, string, number][]> = {
     ['petstock', 'Petstock Kirwan', 3.9],
     ['bunnings', 'Bunnings Thuringowa', 4.6],
   ],
+  ...slots([] as [StoreChain, string, number][]),
 };
 function fakeNearby(section: Section, lat: number, lon: number, chains?: readonly string[]): NearbyStore[] {
   // 0.10.3: a tab's shops can come from other tabs too (Woolworths in Baby): theirs as well.
@@ -234,7 +235,7 @@ const GROUP_TAGS: Record<ShopGroup, string[]> = {
   bigbox: ['["shop"~"^(department_store|variety_store)$"]'],
   other: ['["shop"~"^(doityourself|hardware|wholesale)$"]'],
 };
-const TAB_GROUP: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bottle', pharmacy: 'pharmacy', baby: 'baby', pets: 'pet' };
+const TAB_GROUP: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bottle', pharmacy: 'pharmacy', baby: 'baby', pets: 'pet', ...slots('other' as ShopGroup) };
 
 export function overpassQuery(lat: number, lon: number, metres: number, section: Section = 'pantry', chains?: readonly string[]): string {
   // 0.9.0: rounded to about 100 m (roundCoord); still written with 5 places, as before.

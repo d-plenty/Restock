@@ -252,3 +252,29 @@ describe('leaving with changes not saved', () => {
     expect(asked).toBe(1);
   });
 });
+
+describe('0.10.7 Save always saves', () => {
+  it('a change the saved settings tidy (put in order) still leaves the draft', async () => {
+    close = openDraft();
+    await updateSettings({ hiddenTabs: ['pharmacy', 'keg'] });
+    expect(hasUnsaved()).toBe(true);
+    expect(await saveDraft()).toBe(true);
+    expect(hasUnsaved()).toBe(false);
+    expect((await savedSettings()).hiddenTabs).toEqual(['keg', 'pharmacy']);
+  });
+
+  it("closing a page brings back the draft of the page underneath, with its changes", async () => {
+    const closeOuter = openDraft();
+    await updateSettings({ shopAroundMin: 7 });
+    const closeInner = openDraft();
+    expect(hasUnsaved()).toBe(false);
+    await updateSettings({ shopAroundMin: 9 });
+    closeInner();
+    expect(hasUnsaved()).toBe(true);
+    expect((await getSettings()).shopAroundMin).toBe(7);
+    expect(await saveDraft()).toBe(true);
+    expect((await savedSettings()).shopAroundMin).toBe(7);
+    closeOuter();
+    expect(draftState().open).toBe(false);
+  });
+});

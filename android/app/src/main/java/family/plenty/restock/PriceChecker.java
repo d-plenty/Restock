@@ -141,7 +141,8 @@ final class PriceChecker {
                 if ("coles".equals(chain) && settings.optBoolean("localPrices", false) && !branch.isEmpty() && !"null".equals(branch)) storeId = branch;
             }
             final boolean ownBranch = "coles".equals(chain) && storeId != null && settings.optBoolean("localPrices", false);
-            // Your second Coles (0.6.11): its stock too, so "out at yours" can say "in at the other one".
+            // Your second Coles (0.6.11): its aisles, for shopping there. 0.10.7: not its stock any more
+            // (stock is only checked when someone taps Check stock on the list).
             String second = null;
             if (ownBranch && stores != null && stores.optJSONObject(chain) != null) {
                 String s2 = stores.optJSONObject(chain).optString("branchStoreNo2", "");
@@ -164,7 +165,6 @@ final class PriceChecker {
                     if (second != null) {
                         try {
                             StoreClient.Quote q2 = client.refresh(chain, p[3], p[2], second);
-                            saveStock2(db, p[0], q2 != null ? q2.inStock : null);
                             if (q2 != null && noteAisle(aisles, p[0], "2", second, q2.aisle)) aislesChanged = true;
                         } catch (StoreClient.BlockedException e) {
                             throw e;
@@ -175,7 +175,6 @@ final class PriceChecker {
                     result.checked++;
                     if (q != null) {
                         if (saveIfChanged(db, p[0], q, today)) result.updated++;
-                        saveStock(db, p[0], q.inStock);
                         if (p[4] == null && q.imageUrl != null) {
                             ContentValues v = new ContentValues();
                             v.put("image_url", q.imageUrl);
@@ -605,10 +604,6 @@ final class PriceChecker {
     }
 
     /**
-     * Online stock as the store says now; null (the store doesn't say) clears an old answer.
-     * Skipped quietly if the app hasn't added the column yet.
-     */
-    /**
      * 0.10.2: notes where a product is at a branch (slot "1" your branch, "2" your second). A shop that
      * said nothing (null) changes nothing; one that says it doesn't know ({}) clears an old aisle.
      */
@@ -652,34 +647,6 @@ final class PriceChecker {
         for (String id : gone) aisles.remove(id);
     }
 
-    /** Stock at your second Coles (in_stock_2, from 0.6.11). */
-    private static void saveStock2(SQLiteDatabase db, String productId, Boolean inStock) {
-        try {
-            if (!hasColumn(db, "products", "in_stock_2")) return;
-            ContentValues v = new ContentValues();
-            if (inStock == null) v.putNull("in_stock_2");
-            else v.put("in_stock_2", inStock ? 1 : 0);
-            db.update("products", v, "id = ?", new String[] {productId});
-        } catch (Exception e) {
-            Log.w(TAG, "couldn't save second store stock", e);
-        }
-    }
-
-    private static void saveStock(SQLiteDatabase db, String productId, Boolean inStock) {
-        try {
-            ContentValues v = new ContentValues();
-            if (inStock == null) {
-                v.putNull("in_stock");
-                v.putNull("stock_at");
-            } else {
-                v.put("in_stock", inStock ? 1 : 0);
-                v.put("stock_at", now());
-            }
-            db.update("products", v, "id = ?", new String[] {productId});
-        } catch (Exception e) {
-            Log.w(TAG, "couldn't save stock", e);
-        }
-    }
 
     private static List<String> ids(String json) {
         List<String> out = new ArrayList<>();

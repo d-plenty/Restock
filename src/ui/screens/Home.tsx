@@ -406,51 +406,10 @@ export function HomeScreen() {
       ))}
 
       {smalls.length > 0 && <div className="eyebrow green">Small savings</div>}
-      {smalls.length > 0 && (
-        <div className="card flush">
-          {smalls.map((r) => (
-            <div key={r.group.id} className="row" style={{ gap: 8 }}>
-              <button
-                className="row-main"
-                style={{ color: 'inherit', font: 'inherit' }}
-                onClick={() => nav.push({ name: 'item', groupId: r.group.id })}
-              >
-                <span className="grow">
-                  <span className="title clip" style={{ fontSize: 15 }}>
-                    <SectionMark section={r.group.section} />
-                    {r.group.name}
-                  </span>
-                  <span className="small clip">
-                    {chainName(r.best!.product.chain)} · {r.detail}
-                  </span>
-                </span>
-                <span className="num" style={{ fontWeight: 600 }}>
-                  {money(r.best?.price)}
-                </span>
-              </button>
-              {/* The same add-to-list button as every other deal (0.7.3). */}
-              <button
-                className={`cart-btn${listed.get(r.group.id) ? ' on' : ''}`}
-                aria-label={
-                  listed.get(r.group.id) ? `${r.group.name} is on your shopping list. Tap to take it off` : `Add ${r.group.name} to shopping list`
-                }
-                aria-pressed={!!listed.get(r.group.id)}
-                onClick={async () => {
-                  const id = listed.get(r.group.id);
-                  if (id) {
-                    await takeOffList([id], r.group.name); // 0.9.5 (undo)
-                    return;
-                  }
-                  const added = await addToList(r.group); // 0.9.5 (undo)
-                  if (!added) nav.toast(`${r.group.name} is already on your list`);
-                }}
-              >
-                <Icon name={listed.get(r.group.id) ? 'cartCheck' : 'cartPlus'} size={22} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* 0.10.7: the same cards as every other deal (photo, shop, tags); they were plain lines. */}
+      {smalls.map((r) => (
+        <DealCard key={r.group.id} rec={r} listed={listed.get(r.group.id)} />
+      ))}
 
       {waits.length > 0 && <div className="eyebrow amber">Wait for a better sale</div>}
       {waits.map((r) => (
@@ -464,9 +423,8 @@ export function HomeScreen() {
           style={{ flexDirection: 'row', alignItems: 'center', textAlign: 'left' }}
           onClick={() => nav.push({ name: 'item', groupId: r.group.id })}
         >
-          <span style={{ color: 'var(--muted)' }}>
-            <Icon name="close" size={18} />
-          </span>
+          {/* 0.10.7: its photo, like every other card here */}
+          <Thumb src={r.best?.product.imageUrl} icon={r.group.section ?? "pantry"} />
           <span style={{ flex: 1, fontSize: 13, color: 'var(--ink-2)' }}>
             {r.best?.verdict.always
               ? `Always on special: ${r.group.name} has been "on special" nearly every day for 3 weeks. Skipped.`
@@ -544,7 +502,10 @@ function DealCard({ rec, listed }: { rec: Recommendation; listed?: string }) {
   return (
     <div className="card deal">
       <div className="deal-top">
-        <button className="row-main" onClick={open} aria-label={`${rec.group.name}: ${rec.headline}`}>
+        {/* 0.10.7: the row's button sits behind its content (not around it), so the tags you can tap
+            aren't buttons inside a button (WCAG 4.1.2). */}
+        <div className="row-main row-stretch">
+          <button className="row-hit" onClick={open} aria-label={`${rec.group.name}: ${rec.headline}`} />
           <Thumb src={deal.product.imageUrl ?? mine?.product.imageUrl} />
           <span className="grow">
             <span className="title clip">
@@ -561,7 +522,7 @@ function DealCard({ rec, listed }: { rec: Recommendation; listed?: string }) {
             </span>
           </span>
           {!isAlt && <Price value={deal.multi ? deal.shelfPrice : deal.price} was={cur?.wasPrice} />}
-        </button>
+        </div>
         <button
           className={`cart-btn${listed ? ' on' : ''}`}
           aria-label={listed ? `${rec.group.name} is on your shopping list. Tap to take it off` : `Add ${rec.group.name} to shopping list`}

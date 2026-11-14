@@ -63,7 +63,7 @@ final class SharedSettings {
 
     /** 0.10.3: the tab a section's rows are shared with (sharedSettings.ts rowTab). */
     static String rowTab(String t) {
-        return "baby".equals(t) || "pets".equals(t) ? "pantry" : t;
+        return Shops.isCustom(t) ? "pantry" : t;
     }
 
     /** 0.10.3: a shop row's `tabs`, checked (sharedSettings.ts checkTabs): known tabs, in order, at least one; or null. */
@@ -161,6 +161,33 @@ final class SharedSettings {
     }
 
     static final String BRANCH_PREFIX = "branch:";
+    /** 0.10.7: a custom section's name, colour and icon (sharedSettings.ts CUSTOM_PREFIX). */
+    static final String CUSTOM_PREFIX = "custom:";
+    static final String[] CUSTOM_COLOURS = { "pink", "blue", "teal", "purple", "orange", "amber", "green", "slate" };
+    static final String[] PACK_ICONS = {
+        "bottle", "paw", "car", "tools", "papers", "office", "plant", "roller", "bulb", "gift", "shirt", "book",
+        "gamepad", "dumbbell", "tent", "fishing", "couch", "phone", "spray", "scissors", "ball", "coffee", "wine", "star" };
+
+    /** A custom section's name, colour and icon as it may be kept (shops.ts checkCustomDef), or null. */
+    static JSONObject checkCustomDef(Object v) {
+        if (!(v instanceof JSONObject)) return null;
+        JSONObject o = (JSONObject) v;
+        Object n = o.opt("name");
+        String name = n instanceof String ? ((String) n).replaceAll("[ \\t\\n\\r\\f\\u000b]+", " ").trim() : "";
+        if (name.isEmpty() || name.length() > 30 || name.matches("(?s).*[\\x00-\\x1f\\x7f<>].*")) return null;
+        Object c = o.opt("colour");
+        if (!(c instanceof String) || !Arrays.asList(CUSTOM_COLOURS).contains(c)) return null;
+        Object i = o.opt("icon");
+        String icon = i instanceof String ? ((String) i).trim() : "";
+        boolean ok = (icon.startsWith("pack:") && Arrays.asList(PACK_ICONS).contains(icon.substring(5)))
+            || (!icon.isEmpty() && icon.length() <= 16 && icon.matches("[^\\x00-\\x7f \\t\\n\\r\\f\\u000b\\u00a0]+"));
+        if (!ok) return null;
+        try {
+            return new JSONObject().put("name", name).put("colour", c).put("icon", icon);
+        } catch (Exception e) {
+            return null;
+        }
+    }
     private static final Pattern STORE_NO = Pattern.compile("[A-Za-z0-9 _-]{1,16}");
 
     /** 0.9.4: a branch:<chain> row's value (the household's default branch), checked (sharedSettings.ts checkBranch), or null. */
@@ -195,12 +222,13 @@ final class SharedSettings {
             case "recalls.enabled":
             case "tab:keg":
             case "tab:pharmacy":
-            case "tab:baby":
-            case "tab:pets":
                 return v instanceof Boolean ? v : null;
             default:
                 break;
         }
+        // 0.10.7: custom sections (Baby, Pets, c1–c6): switched on, and their name, colour and icon
+        if (k.startsWith("tab:") && Shops.isCustom(k.substring(4))) return v instanceof Boolean ? v : null;
+        if (k.startsWith(CUSTOM_PREFIX)) return Shops.isCustom(k.substring(CUSTOM_PREFIX.length())) ? checkCustomDef(v) : null;
         if (k.startsWith(BRANCH_PREFIX)) return checkBranch(k, v);
         if (!k.startsWith("shop:") || !(v instanceof JSONObject) || !(((JSONObject) v).opt("on") instanceof Boolean)) return null;
         JSONObject o = (JSONObject) v;
@@ -310,6 +338,7 @@ final class SharedSettings {
         if (k == null) return null;
         // 0.10.3: Baby and Pets rows are shared with Groceries (rowTab).
         if (k.startsWith("tab:")) return rowTab(k.substring(4));
+        if (k.startsWith(CUSTOM_PREFIX)) return "pantry";
         // 0.9.4: a default branch is about its shop's tab (a shop someone added: left alone).
         if (k.startsWith(BRANCH_PREFIX)) {
             String b = k.substring(BRANCH_PREFIX.length());
@@ -370,10 +399,20 @@ final class SharedSettings {
                     JSONObject next = new JSONObject();
                     next.put("keg", sec != null && Boolean.TRUE.equals(sec.opt("keg")));
                     next.put("pharmacy", sec != null && Boolean.TRUE.equals(sec.opt("pharmacy")));
-                    if (sec != null && Boolean.TRUE.equals(sec.opt("baby"))) next.put("baby", true);
-                    if (sec != null && Boolean.TRUE.equals(sec.opt("pets"))) next.put("pets", true);
+                    for (String c : Shops.CUSTOM_SECTIONS) if (sec != null && Boolean.TRUE.equals(sec.opt(c))) next.put(c, true);
                     next.put(name, val);
                     s.put("sections", next);
+                    changed = true;
+                }
+            } else if (k.startsWith(CUSTOM_PREFIX)) {
+                // 0.10.7: a custom section's name, colour and icon
+                String id = k.substring(CUSTOM_PREFIX.length());
+                JSONObject cs = s.optJSONObject("customSections");
+                Object had = cs == null ? null : cs.opt(id);
+                if (had == null || !had.toString().equals(val.toString())) {
+                    JSONObject next = cs == null ? new JSONObject() : new JSONObject(cs.toString());
+                    next.put(id, val);
+                    s.put("customSections", next);
                     changed = true;
                 }
             } else if (k.startsWith(BRANCH_PREFIX)) {
@@ -539,6 +578,10 @@ final class SharedSettings {
             JSONObject sec = s.optJSONObject("sections");
             return sec != null && Boolean.TRUE.equals(sec.opt(k.substring(4)));
         }
+        if (k.startsWith(CUSTOM_PREFIX)) {
+            JSONObject cs = s.optJSONObject("customSections");
+            return cs == null ? null : checkCustomDef(cs.opt(k.substring(CUSTOM_PREFIX.length())));
+        }
         String id = k.substring(5);
         JSONArray chains = s.optJSONArray("enabledChains");
         boolean on = false;
@@ -562,7 +605,12 @@ final class SharedSettings {
     /** Every household setting this phone's settings have, for the tabs it syncs. */
     static List<String> keysFor(JSONObject s, Set<String> tabs) {
         List<String> out = new ArrayList<>(Arrays.asList(SCALARS));
-        for (String t : new String[] { "keg", "pharmacy", "baby", "pets" }) if (tabs.contains(rowTab(t))) out.add("tab:" + t);
+        List<String> named = new ArrayList<>(Arrays.asList("keg", "pharmacy"));
+        named.addAll(Arrays.asList(Shops.CUSTOM_SECTIONS));
+        for (String t : named) if (tabs.contains(rowTab(t))) out.add("tab:" + t);
+        // 0.10.7: the custom sections that have a name of their own
+        JSONObject cs = s.optJSONObject("customSections");
+        if (tabs.contains("pantry") && cs != null) for (String c : Shops.CUSTOM_SECTIONS) if (checkCustomDef(cs.opt(c)) != null) out.add(CUSTOM_PREFIX + c);
         for (String t : SyncEngine.ALL_TABS) if (tabs.contains(t)) for (String id : builtInsOn(t)) out.add("shop:" + id);
         JSONArray list = s.optJSONArray("customShops");
         if (list != null) for (int i = 0; i < list.length(); i++) {

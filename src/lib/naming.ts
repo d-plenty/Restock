@@ -374,6 +374,9 @@ export function nameHasSize(name: string, size?: string): boolean {
       .replace(/litres?|ltr/g, 'l');
   // "Sprite 10×375ml" already says how much, so "3.75L" after it would say it twice.
   if (/\d\s*[x×]\s*\d+(?:\.\d+)?\s*(?:ml|l|g|kg)\b|\d(?:ml|l|g|kg)\s*[x×]\s*\d/i.test(name)) return true;
+  // 0.10.7: "Lager Can 375mL · Case of 24" already says "24 x 375ML".
+  const packed = size.match(/^\s*(\d+)\s*[x×]\s*(.+)$/);
+  if (packed && squash(name).includes(squash(packed[2])) && new RegExp(`\\b(${packed[1]}\\s*pack|case of ${packed[1]})\\b`, 'i').test(name)) return true;
   return squash(name).includes(squash(size));
 }
 

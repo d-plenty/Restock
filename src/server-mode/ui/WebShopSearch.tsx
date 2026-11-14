@@ -16,9 +16,10 @@ import type { StoreProduct } from '../../stores/types';
 import { chainName, type ListEntry } from '../../types';
 import { ChainDot, ChainName, Icon, LoadingBar, MemberTag, Sheet, Thumb } from '../../ui/components';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from '../../ui/screens/addPicks';
-import { AddPair, addButtonsNote, AlwaysTick, pickButtonsNote, toPantryNote } from '../../ui/screens/addPickWords';
+import { AddBtn, AddPair, addButtonsNote, AlwaysTick, pickButtonsNote, toPantryNote } from '../../ui/screens/addPickWords';
 import { useNav } from '../../ui/nav';
 import { ScanButton } from '../pwa/WebScanner';
+import { PackReader } from '../../ui/PackReader';
 import { syncNow } from '../live';
 import { act } from '../../lib/undo';
 import { offerUndo, productIdsHere } from './searchUndo';
@@ -121,6 +122,8 @@ export function WebShopSearch({
   const [listPick, setListPick] = useState<ListSection>(list === 'general' ? 'general' : tab);
   const [categoryId, setCategoryId] = useState('');
   const [saving, setSaving] = useState(false);
+  /** 0.10.7: which Add button is saving, so only that one shows it (as on the phone). */
+  const [busyAs, setBusyAs] = useState<Target>();
   const [saveError, setSaveError] = useState<string>();
   const cats = useLive(async () => (await allCategories()).filter((c) => c.section === tab), [tab]);
   const asked = useRef('');
@@ -194,8 +197,9 @@ export function WebShopSearch({
   const trackedPick = [...picks.values()].map((p) => p as FoundProduct).find((p) => p.itemId);
 
   const save = async (target: Target) => {
-    if (!answer || !picks.size) return;
+    if (!answer || !picks.size || saving) return;
     setSaving(true);
+    setBusyAs(target);
     setSaveError(undefined);
     try {
       const itemName = name.trim() || suggestedName(picks.values(), forLine?.word);
@@ -223,6 +227,7 @@ export function WebShopSearch({
       if (isGone(e)) setAnswer(undefined);
     } finally {
       setSaving(false);
+      setBusyAs(undefined);
     }
   };
 
@@ -500,19 +505,19 @@ export function WebShopSearch({
               {forLine.toPantry ? (
                 // 0.10.2: from the line's "Add to pantry", as on the phone: one button.
                 <>
-                  <button className="btn primary" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
+                  <AddBtn target="both" busy={busyAs} blocked={picks.size > 6} className="btn primary" onClick={() => void save('both')}>
                     <Icon name={tab} size={18} /> Add to {SECTION_NAMES[tab].toLowerCase()}
-                  </button>
+                  </AddBtn>
                   <p className="small" style={{ margin: 0 }}>
                     {toPantryNote(SECTION_PLACE[tab])}
                   </p>
                 </>
               ) : (
               <>
-              <button className="btn primary" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
+              <AddBtn target="both" busy={busyAs} blocked={picks.size > 6} className="btn primary" onClick={() => void save('both')}>
                 <Icon name="cart" size={18} /> Add to both
-              </button>
-              <AddPair section={tab} disabled={saving || picks.size > 6} onPantry={() => void save('pantry')} onList={() => void save('list')} />
+              </AddBtn>
+              <AddPair section={tab} disabled={picks.size > 6} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
               <p className="small" style={{ margin: 0 }}>
                 {pickButtonsNote(SECTION_PLACE[tab])}
               </p>
@@ -540,19 +545,19 @@ export function WebShopSearch({
               {/* 0.9.12: the phone's words and layout: Add to both first, then list or pantry on their own. */}
               {listPick === 'general' ? (
                 <div className="two">
-                  <button className="btn primary" onClick={() => void save('list')} disabled={saving || picks.size > 6}>
+                  <AddBtn target="list" busy={busyAs} blocked={picks.size > 6} className="btn primary" onClick={() => void save('list')}>
                     <Icon name="cart" size={18} /> Add to list
-                  </button>
-                  <button className="btn" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
+                  </AddBtn>
+                  <AddBtn target="both" busy={busyAs} blocked={picks.size > 6} className="btn" onClick={() => void save('both')}>
                     <Icon name={tab} size={18} /> Add to both
-                  </button>
+                  </AddBtn>
                 </div>
               ) : (
                 <>
-                  <button className="btn primary" onClick={() => void save('both')} disabled={saving || picks.size > 6}>
+                  <AddBtn target="both" busy={busyAs} blocked={picks.size > 6} className="btn primary" onClick={() => void save('both')}>
                     <Icon name="cart" size={18} /> Add to both
-                  </button>
-                  <AddPair section={tab} disabled={saving || picks.size > 6} onPantry={() => void save('pantry')} onList={() => void save('list')} />
+                  </AddBtn>
+                  <AddPair section={tab} disabled={picks.size > 6} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
                 </>
               )}
               <p className="small" style={{ margin: 0 }}>
@@ -765,10 +770,47 @@ export function PickSearchResults({
   return <WebShopSearch query={query} tab={section} wantId={wantId} forLine={{ entry, word, always, onAlways, toPantry }} onDone={(said) => onDone(said)} />;
 }
 
-/** The phone layout's Shopping list on the web: Scan, as on the desktop list's add box. */
+/** The phone layout's Shopping list on the web: Scan, as on the desktop list's add box (0.10.7: and Find from a photo). */
 export function ListScan({ section }: { section: Section }) {
   const nav = useNav();
-  return <ScanButton section={section} onSaid={(t) => nav.toast(t)} className="btn scan-btn" />;
+  return (
+    <>
+      <ScanButton section={section} onSaid={(t) => nav.toast(t)} className="btn scan-btn" />
+      <PhotoFindButton section={section} className="btn scan-btn" />
+    </>
+  );
+}
+
+/**
+ * 0.10.7: Find from a photo on the web page, as on the phone: Restock reads the pack's words in this
+ * browser (nothing is sent anywhere), then the shops are searched for them. Google Lens is the
+ * backup, only when tapped.
+ */
+export function PhotoFindButton({ section, className = 'btn' }: { section: Section; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const [words, setWords] = useState('');
+  return (
+    <>
+      <button type="button" className={className} aria-label="Find from a photo" title="Find from a photo" onClick={() => setOpen(true)}>
+        <Icon name="camera" size={20} />
+      </button>
+      {open && (
+        <Sheet title="Find from a photo" onClose={() => setOpen(false)}>
+          <p className="small" style={{ margin: 0 }}>
+            Take a photo of the front of the pack. Restock reads the name in this browser, then you can search the shops for it.
+          </p>
+          <PackReader label="Take a photo of the pack" onName={(n) => setWords(n)} />
+          <label className="field">
+            <span>Words to search for</span>
+            <input className="input" value={words} onChange={(e) => setWords(e.target.value)} placeholder="Brand and product" />
+          </label>
+          <span onClickCapture={() => words.trim() && setOpen(false)}>
+            <ShopSearchButton text={words} list={section} className="btn primary block" />
+          </span>
+        </Sheet>
+      )}
+    </>
+  );
 }
 
 /** For main.tsx: what the phone layout and the Pick sheet are handed (flag.ts serverUi.webSearch). */

@@ -4,6 +4,7 @@ import { allReceipts, getReceipt, getSettings, nowIso, photosOnServer, saveRecei
 import { serverPhoto } from '../../lib/sync';
 import { dataUrl, photoPath, photosSize, readPhoto, writePhoto } from '../../lib/receiptFiles';
 import { readerInstalled, readText, removeOldDownload } from '../../lib/receiptReader';
+import { useLeaveGuard } from '../leaveGuard';
 import { deleteOn, expired, itemLines, joinPages, KEEP_MONTHS, keepLabel, parseReceipt, removeReceipts, removeReceiptsUndoable } from '../../lib/receipts';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import * as draft from '../../lib/settingsDraft'; // 0.9.5 (save)
@@ -449,6 +450,9 @@ export function ReceiptScreen({ id }: { id?: string }) {
   const camera = useRef<HTMLInputElement>(null);
   const gallery = useRef<HTMLInputElement>(null);
   const reader = useReader();
+  // 0.10.7: a new receipt taken but not saved yet: leaving asks first.
+  const savedReceipt = useRef(false);
+  useLeaveGuard(() => !id && !savedReceipt.current && (!!src || pages.length > 0), 'adding a receipt');
 
   useEffect(() => {
     if (!id) return;
@@ -588,6 +592,7 @@ export function ReceiptScreen({ id }: { id?: string }) {
         pages: extra,
         pinned: fields.pinned,
       }));
+      savedReceipt.current = true;
       nav.pop();
     } catch (e) {
       setError(`Couldn't save it: ${e instanceof Error ? e.message : e}`);

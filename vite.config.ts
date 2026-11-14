@@ -10,6 +10,8 @@ export default defineConfig({
   // The app's version, shown in Settings and Diagnostics.
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   base: './',
+  // 0.10.7: the text reader's engine loads its own files; the dev server mustn't repack it.
+  optimizeDeps: { exclude: ['onnxruntime-web'] },
   build: {
     outDir: 'dist',
     sourcemap: true,

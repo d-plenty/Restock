@@ -19,7 +19,7 @@ import {
 import { haPhone } from '../../lib/listPicks';
 import { PRODUCT_ORDERS } from '../../lib/productOrder';
 import { useLive } from '../../lib/useLive';
-import { activeSections, BETA_SHOPS, chainName, SECTION_NAMES, SECTIONS, searchChainsIn, shopsByGroup, type Section, type StoreChain } from '../../shops';
+import { activeSections, BETA_SHOPS, chainName, isCustomSection, SECTION_NAMES, SECTIONS, searchChainsIn, shopsByGroup, type Section, type StoreChain, withCustom } from '../../shops';
 import { historyLabel, type Category, type ProductOrder, type Settings } from '../../types';
 import { PROGRAMS } from '../../ui/screens/Cards';
 import { api, api3, isV3, serverInfo, type Device } from '../api';
@@ -87,15 +87,13 @@ export const SHOP_AROUND_MINS = [0, 0.5, 1, 2, 5, 10];
 export const NEW_ITEM_PCTS = [10, 15, 20, 30, 40, 50];
 export { PRODUCT_ORDERS };
 
-const TAB_TITLE: Record<Section, string> = { pantry: 'Groceries', keg: 'Keg (bottle shops)', pharmacy: 'Health', baby: 'Baby', pets: 'Pets' };
+const TAB_TITLE: Record<Section, string> = withCustom({ pantry: 'Groceries', keg: 'Keg (bottle shops)', pharmacy: 'Health' }, (n) => n);
 /** 0.10.0: the shop rows, named as on the phone's Settings → Your shops (Keg and Health are beta). */
-const SHOPS_TITLE: Record<Section, string> = {
+const SHOPS_TITLE: Record<Section, string> = withCustom({
   pantry: 'Supermarkets (Pantry tab)',
   keg: 'Bottle shops (Keg tab) · Beta',
   pharmacy: 'Chemists (Health tab) · Beta',
-  baby: 'Baby tab · Beta',
-  pets: 'Pets tab · Beta',
-};
+}, (n) => `${n} tab`);
 
 function sharesText(tabs: string[], receipts: boolean): string {
   const names = tabs.map((t) => (t === 'pantry' ? 'Groceries' : (SECTION_NAMES[t as Section] ?? t)));
@@ -111,7 +109,8 @@ async function readHousehold(): Promise<HouseholdSettings> {
   const nameOf = (id: string) => (custom as Map<string, string>).get(id) ?? chainName(id as StoreChain);
   // The household's shared tabs (with their shops), or, before the first sync, what this browser shows.
   const shops: ShopsForTab[] = hs
-    ? SECTIONS.filter((t) => hs.tabs[t]).map((t) => {
+    ? // 0.10.7: a custom section only while it's in use (a deleted one, or a slot never used, isn't listed).
+      SECTIONS.filter((t) => hs.tabs[t] && (!isCustomSection(t) || hs.tabs[t]!.on)).map((t) => {
         const tab = hs.tabs[t]!;
         // 0.10.3: every shop, under its heading, as on the phone (a shop can be on more than one tab).
         const mine = new Set(tab.customShops.map((c) => c.id as string));

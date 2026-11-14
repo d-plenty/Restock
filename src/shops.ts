@@ -10,11 +10,27 @@
 // for household sync they go with Groceries, as the General list does, so phones and servers
 // still share three tabs.
 
-export type Section = 'pantry' | 'keg' | 'pharmacy' | 'baby' | 'pets';
-export const SECTIONS: Section[] = ['pantry', 'keg', 'pharmacy', 'baby', 'pets'];
+/**
+ * 0.10.7: custom sections. Baby and Pets stopped being built-in tabs: they're two of up to eight
+ * sections people make themselves (a name, a colour, an icon and the shops to compare), and their
+ * ids stay 'baby' and 'pets' so nothing anyone already has moves. The other six are c1–c6. Like
+ * Baby and Pets, they're shared with Groceries for household sync (shareTab).
+ */
+export const CUSTOM_SLOTS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'] as const;
+export type CustomSlot = (typeof CUSTOM_SLOTS)[number];
+export type CustomSection = 'baby' | 'pets' | CustomSlot;
+export const CUSTOM_SECTIONS: CustomSection[] = ['baby', 'pets', ...CUSTOM_SLOTS];
+export const MAX_CUSTOM = CUSTOM_SECTIONS.length;
+export const isCustomSection = (s: unknown): s is CustomSection => typeof s === 'string' && (CUSTOM_SECTIONS as string[]).includes(s);
+/** The same value for each of c1–c6 (for the tables below, filled in from each one's own name). */
+export const slots = <T,>(v: T): Record<CustomSlot, T> => Object.fromEntries(CUSTOM_SLOTS.map((c) => [c, v])) as Record<CustomSlot, T>;
+
+export type Section = 'pantry' | 'keg' | 'pharmacy' | 'baby' | 'pets' | CustomSlot;
+export const SECTIONS: Section[] = ['pantry', 'keg', 'pharmacy', 'baby', 'pets', ...CUSTOM_SLOTS];
 /** The tabs besides Pantry, in the order they're set up and shown in More. */
-export const EXTRA_SECTIONS: Exclude<Section, 'pantry'>[] = ['keg', 'pharmacy', 'baby', 'pets'];
-export const SECTION_NAMES: Record<Section, string> = { pantry: 'Pantry', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets' };
+export const EXTRA_SECTIONS: Exclude<Section, 'pantry'>[] = ['keg', 'pharmacy', 'baby', 'pets', ...CUSTOM_SLOTS];
+/** A section's name. Custom ones are filled in from settings (applyCustomSections). */
+export const SECTION_NAMES: Record<Section, string> = { pantry: 'Pantry', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets', ...slots('Custom') };
 /** "Added to your pantry / keg / Health list". */
 export const SECTION_PLACE: Record<Section, string> = {
   pantry: 'your pantry',
@@ -22,9 +38,80 @@ export const SECTION_PLACE: Record<Section, string> = {
   pharmacy: 'your Health list',
   baby: 'your Baby list',
   pets: 'your Pets list',
+  ...slots('your list'),
 };
 /** What the shops in each section are called in sentences. */
-export const SECTION_SHOPS: Record<Section, string> = { pantry: 'supermarkets', keg: 'bottle shops', pharmacy: 'chemists', baby: 'shops', pets: 'shops' };
+export const SECTION_SHOPS: Record<Section, string> = { pantry: 'supermarkets', keg: 'bottle shops', pharmacy: 'chemists', baby: 'shops', pets: 'shops', ...slots('shops') };
+
+/**
+ * A table by section whose custom sections' entries are worked out from each one's current name
+ * ("Shops for Car stuff"): they follow a rename without the table being made again.
+ */
+export function withCustom<T, K extends string = Section>(base: Omit<Record<K, T>, CustomSection> & Partial<Record<CustomSection, T>>, fn: (name: string, id: CustomSection) => T): Record<K, T> {
+  const out = { ...base } as Record<string, T>;
+  for (const id of CUSTOM_SECTIONS) Object.defineProperty(out, id, { get: () => fn(SECTION_NAMES[id], id), enumerable: true, configurable: true });
+  return out as Record<K, T>;
+}
+
+/** 0.10.7: the colours a custom section can be (tokens.css --tile-<colour>-bg / -ink, checked for contrast). */
+export const CUSTOM_COLOURS = ['pink', 'blue', 'teal', 'purple', 'orange', 'amber', 'green', 'slate'] as const;
+export type CustomColour = (typeof CUSTOM_COLOURS)[number];
+export interface CustomDef {
+  name: string;
+  colour: CustomColour;
+  /** An icon from Restock's pack ("pack:car"), or an emoji. */
+  icon: string;
+}
+/**
+ * An emoji (or a short run of them, like a flag) can stand in for a pack icon: kept simple, and the
+ * same in SharedSettings.java: up to 16 characters, none of them plain letters, digits or spaces.
+ */
+const EMOJI = /^[^\u0000-\u007f \t\n\r\f\v\u00a0]+$/;
+/** The pack's icons (components.tsx PACK_ICONS has the drawings). */
+export const PACK_ICON_IDS = [
+  'bottle', 'paw', 'car', 'tools', 'papers', 'office', 'plant', 'roller', 'bulb', 'gift', 'shirt', 'book',
+  'gamepad', 'dumbbell', 'tent', 'fishing', 'couch', 'phone', 'spray', 'scissors', 'ball', 'coffee', 'wine', 'star',
+] as const;
+/**
+ * A custom section's name, colour and icon as it may be kept, or undefined (0.10.7). Used for
+ * settings and for the household's shared rows (sharedSettings.ts custom:<id>; SharedSettings.java).
+ */
+export function checkCustomDef(v: unknown): CustomDef | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const o = v as Record<string, unknown>;
+  const name = typeof o.name === 'string' ? o.name.replace(/[ \t\n\r\f\v]+/g, ' ').trim() : '';
+  if (!name || name.length > 30 || /[\u0000-\u001f\u007f<>]/.test(name)) return undefined;
+  if (!(CUSTOM_COLOURS as readonly string[]).includes(o.colour as string)) return undefined;
+  const icon = typeof o.icon === 'string' ? o.icon.trim() : '';
+  const okIcon = (icon.startsWith('pack:') && (PACK_ICON_IDS as readonly string[]).includes(icon.slice(5))) || (icon.length <= 16 && EMOJI.test(icon));
+  if (!okIcon) return undefined;
+  return { name, colour: o.colour as CustomColour, icon };
+}
+
+/** What Baby and Pets look like until someone changes them. */
+export const CUSTOM_DEFAULTS: Partial<Record<CustomSection, CustomDef>> = {
+  baby: { name: 'Baby', colour: 'pink', icon: 'pack:bottle' },
+  pets: { name: 'Pets', colour: 'blue', icon: 'pack:paw' },
+};
+/** A custom section's name, colour and icon. */
+export function customDef(s: { customSections?: Partial<Record<CustomSection, CustomDef>> } | undefined, id: CustomSection): CustomDef {
+  return s?.customSections?.[id] ?? CUSTOM_DEFAULTS[id] ?? { name: 'Custom', colour: 'slate', icon: 'pack:star' };
+}
+/** Puts each custom section's own name into the tables above (called whenever settings load or change). */
+export function applyCustomSections(s: { customSections?: Partial<Record<CustomSection, CustomDef>> } | undefined) {
+  const icons: Partial<Record<string, string>> = {};
+  for (const id of CUSTOM_SECTIONS) {
+    const d = customDef(s, id);
+    SECTION_NAMES[id] = d.name;
+    SECTION_PLACE[id] = `your ${d.name} list`;
+    LIST_NAMES[id] = d.name;
+    icons[id] = d.icon;
+  }
+  for (const fn of iconListeners) fn(icons);
+}
+/** Told each custom section's icon when settings change (components.tsx setSectionIcons). */
+const iconListeners = new Set<(icons: Partial<Record<string, string>>) => void>();
+export const onSectionIcons = (fn: (icons: Partial<Record<string, string>>) => void) => void iconListeners.add(fn);
 /** 0.10.3: the tab a section's records are shared with (household sync): Baby and Pets go with Groceries. */
 export type ShareTab = 'pantry' | 'keg' | 'pharmacy';
 export const SHARE_TABS: ShareTab[] = ['pantry', 'keg', 'pharmacy'];
@@ -37,14 +124,14 @@ export const shareTab = (s: string | null | undefined): ShareTab => (s === 'keg'
  * with Groceries (listShareTab), so a phone that shares Groceries shares General too.
  */
 export type ListSection = Section | 'general';
-export const LIST_SECTIONS: ListSection[] = ['pantry', 'keg', 'pharmacy', 'baby', 'pets', 'general'];
+export const LIST_SECTIONS: ListSection[] = ['pantry', 'keg', 'pharmacy', 'baby', 'pets', ...CUSTOM_SLOTS, 'general'];
 /** The tab names on the list (phone and web). */
-export const LIST_NAMES: Record<ListSection, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets', general: 'General' };
+export const LIST_NAMES: Record<ListSection, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets', ...slots('Custom'), general: 'General' };
 /** "Nothing on your General list", "tap the cart next to anything in your pantry". */
 export const LIST_PLACE: Record<ListSection, string> = { ...SECTION_PLACE, general: 'your pantry' };
 /** A list_entries section as stored: anything this version doesn't know is the grocery list. */
 export const asListSection = (v: unknown): ListSection =>
-  v === 'keg' || v === 'pharmacy' || v === 'baby' || v === 'pets' || v === 'general' ? v : 'pantry';
+  v === 'keg' || v === 'pharmacy' || v === 'general' || isCustomSection(v) ? v : 'pantry';
 /** The tab a list's lines are shared with (household sync, the server, What this phone shares): General goes with Groceries. */
 export const listShareTab = (s: ListSection | null | undefined): ShareTab => shareTab(s);
 
@@ -124,7 +211,7 @@ export const SHOP_GROUPS: { id: ShopGroup; name: string }[] = [
   { id: 'bigbox', name: 'Big box stores' },
   { id: 'other', name: 'Other shops' },
 ];
-const GROUP_OF: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bottle', pharmacy: 'pharmacy', baby: 'baby', pets: 'pet' };
+const GROUP_OF: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bottle', pharmacy: 'pharmacy', baby: 'baby', pets: 'pet', ...slots('other' as ShopGroup) };
 export const groupOf = (d: ShopDef): ShopGroup => d.group ?? GROUP_OF[d.section];
 
 const G = (d: Omit<ShopDef, 'section'>): ShopDef => ({ ...d, section: 'pantry' });
@@ -588,4 +675,5 @@ export const DEFAULT_SECTION_CATEGORIES: Record<Section, string[]> = {
   pharmacy: ['Medicine', 'First aid', 'Vitamins', 'Personal care'],
   baby: ['Nappies & wipes', 'Feeding', 'Bath & skin care', 'Health'],
   pets: ['Food', 'Treats', 'Litter & cleaning', 'Health & care'],
+  ...slots(['Things']),
 };

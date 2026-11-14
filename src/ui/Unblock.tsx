@@ -45,7 +45,8 @@ export function UnblockSheet({ chain, onClose, onWorked }: { chain: StoreChain; 
   return (
     <Sheet title={`Unblock ${name}`} onClose={onClose}>
       <p style={{ margin: 0 }}>
-        {name} isn’t letting Restock in. Its website is most likely checking for bots. That’s its check, not Restock’s. Pass it once yourself and prices carry on.
+        {name}’s website wants to check you’re a person. Pass its check once and prices carry on. It’s {name}’s own check: nothing’s wrong
+        with Restock or your phone.
       </p>
       <ol className="unblock-steps">
         <li>The shop’s own page opens.</li>
@@ -54,7 +55,8 @@ export function UnblockSheet({ chain, onClose, onWorked }: { chain: StoreChain; 
         <li>Tap Done.</li>
       </ol>
       <p className="small" style={{ margin: 0 }}>
-        Restock then reads {name} through that visit until the shop asks again. Nothing you type on the shop’s page goes to Restock.
+        If a shop changes its website or blocks Restock, its prices stop until that’s sorted. That’s on the shop’s side, not something you did.
+        Nothing you type on the shop’s page goes to Restock.
       </p>
       {stage === 'checking' && (
         <div className="banner grey" role="status">

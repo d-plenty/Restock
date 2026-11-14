@@ -1,4 +1,4 @@
-import type { Section } from '../shops';
+import { slots, type Section } from '../shops';
 
 // The words the search tests use (0.8.6): the big search test on a computer, and the search test
 // in Settings → Advanced → Diagnostics on the phone. What's right for each is in searchExpect.ts.
@@ -181,6 +181,7 @@ export const SEARCH_WORDS: Record<Section, string[]> = {
   ],
   baby: ['nappies', 'huggies nappies size 4', 'baby wipes', 'formula', 'nappy pants', 'baby food pouch'],
   pets: ['dog food', 'dry dog food 15kg', 'cat food', 'cat litter', 'dog treats', 'flea treatment'],
+  ...slots([] as string[]),
 };
 
 /** A shorter list for the phone: the everyday ones, brand ones and a typo, about a quarter. */
@@ -258,4 +259,5 @@ export const PHONE_WORDS: Record<Section, string[]> = {
   ],
   baby: ['nappies', 'baby wipes', 'formula'],
   pets: ['dog food', 'cat food', 'cat litter'],
+  ...slots([] as string[]),
 };

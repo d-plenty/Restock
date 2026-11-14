@@ -412,7 +412,7 @@ final class SyncEngine {
 
     /** 0.10.3: Baby and Pets records are shared with Groceries (shops.ts shareTab): the three tabs stay as they were. */
     static String shared(String tab) {
-        return "baby".equals(tab) || "pets".equals(tab) ? "pantry" : tab;
+        return Shops.isCustom(tab) ? "pantry" : tab;
     }
 
     private String takeBackTabRaw(String tbl, JSONObject r) throws Exception {

@@ -34,6 +34,8 @@ const parts = new Set<DraftPart>();
 export type DraftState = { open: boolean; dirty: boolean; saving: boolean; savedAt?: number; error?: string; epoch: number };
 
 let draft: Draft | undefined;
+/** 0.10.7: the screens underneath's drafts (Settings → a section's page): back to theirs when it closes. */
+const below: Draft[] = [];
 let nextId = 1;
 let saving = false;
 let savedAt: number | undefined;
@@ -56,13 +58,18 @@ export function draftState(): DraftState {
 /** Opens a draft for the screen showing now. Returns the function that closes it (leaving unsaved changes behind). */
 export function openDraft(): () => void {
   const d: Draft = { id: nextId++, patch: {}, after: new Map(), staged: new Map() };
+  if (draft) below.push(draft);
   draft = d;
   savedAt = undefined;
   error = undefined;
   emit();
   return () => {
+    // 0.10.7: back on the screen underneath, its own draft (and its Save) carry on. Before, closing
+    // a page left no draft at all, so the page underneath saved straight away, or not at all.
+    const at = below.indexOf(d);
+    if (at >= 0) below.splice(at, 1);
     if (draft !== d) return;
-    draft = undefined;
+    draft = below.pop();
     changed();
     emit();
   };
@@ -172,7 +179,10 @@ export async function saveDraft(): Promise<boolean> {
     const staging = [...d.staged];
     const afterNow = [...d.after];
     const s = Object.keys(patch).length ? await saveSettings(patch) : await savedSettings();
-    for (const k of Object.keys(d.patch) as (keyof Settings)[]) if (same(d.patch[k], s[k])) delete d.patch[k];
+    // 0.10.7: what was saved leaves the draft, even when the saved settings tidy it (an emptied
+    // field, a list put in order). Before, those stayed "Unsaved changes", so Save seemed to do
+    // nothing. A change made while saving (not what was sent) stays for the next Save.
+    for (const k of Object.keys(patch) as (keyof Settings)[]) if (same(d.patch[k], patch[k])) delete d.patch[k];
     for (const [k, x] of staging) {
       await x.apply();
       if (d.staged.get(k) === x) d.staged.delete(k);

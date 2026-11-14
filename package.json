@@ -1,7 +1,7 @@
 {
   "name": "restock",
   "private": true,
-  "version": "0.10.6",
+  "version": "0.10.7",
   "type": "module",
   "description": "Restock: a local-first price tracker for supermarkets, bottle shops and chemists in Australia. Works fully on your phone, with no account and no ads. Your own Restock server is optional.",
   "scripts": {
@@ -27,14 +27,14 @@
     "@noble/ciphers": "1.3.0",
     "@noble/curves": "1.9.7",
     "@noble/hashes": "1.8.0",
-    "@tesseract.js-data/eng": "1.0.0",
     "fflate": "0.8.3",
     "jsbarcode": "3.12.3",
+    "maplibre-gl": "4.7.1",
+    "onnxruntime-web": "1.22.0",
+    "paddleocr": "1.2.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "sql.js": "^1.15.2",
-    "tesseract.js": "7.0.0",
-    "tesseract.js-core": "7.0.0",
     "zxing-wasm": "^3.1.6"
   },
   "devDependencies": {

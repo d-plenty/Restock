@@ -1,0 +1,2 @@
+# 0.10.7: the text reader's letter list is kept exactly as PaddleOCR ships it (Windows line endings), so it travels as a binary file
+src/assets/reader/ppocrv5-dict.txt binary
