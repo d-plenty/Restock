@@ -45,7 +45,7 @@ describe('last week’s specials and old prices', () => {
     const v = judge(computeStats(weekly(8, r(1.8, 5, { isSpecial: true, wasPrice: 10 })), NOW));
     expect(v.kind).toBe('normal');
     expect(v.stale).toBe('ended');
-    expect(v.headline).toBe('Sale may have ended');
+    expect(v.headline).toBe('Special may have ended');
     expect(v.detail).toContain('$5.00');
   });
 

@@ -80,8 +80,8 @@ export function RecallSettings({ settings, inSetup }: { settings: Settings; inSe
             Recall alerts
           </span>
           <span className="small">
-            Once a day, Restock checks the official Australian recall lists (food, products and medicines) against what's in your Pantry, Keg,
-            Health, shopping list and kept receipts.{inSetup ? ' On by default.' : ''}
+            Once a day, Restock checks the official Australian recall lists (food, products and medicines) against what's in your Pantry, Bottle shop,
+            Chemist, shopping list and kept receipts.{inSetup ? ' On by default.' : ''}
           </span>
         </span>
         <input

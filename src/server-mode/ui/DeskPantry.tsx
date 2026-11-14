@@ -33,7 +33,7 @@ import type { PriceReading } from '../../types';
 type Filter = 'all' | 'sale' | string;
 type Sort = 'az' | 'sale' | 'recent';
 const SORTS: { id: Sort; label: string }[] = [
-  { id: 'az', label: 'A to Z' },
+  { id: 'az', label: 'A–Z' },
   { id: 'sale', label: 'Deals first' },
   { id: 'recent', label: 'Recently added' },
 ];
@@ -68,7 +68,7 @@ function alertText(r: Recommendation): string {
   if (r.group.targetPrice !== undefined) return `Under ${money(r.group.targetPrice)}`;
   if (r.group.alertLevel === 'never') return 'Off';
   if (r.group.alertLevel === 'custom') return `${r.group.alertPct ?? 30}% off`;
-  // "Good sale (15%+)" → "Good sale": the table's column is narrow; the panel has the whole choice.
+  // "On special (15%+)" → "On special": the table's column is narrow; the panel has the whole choice.
   return (ALERT_LEVELS.find((a) => a.id === r.group.alertLevel)?.label ?? '').replace(/\s*\(.*\)$/, '');
 }
 
@@ -308,7 +308,7 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
   const size = chartOpt?.product.sizing?.size ? sizeLabel(chartOpt.product) : chartOpt?.product.size ? tidySize(chartOpt.product.size, chartOpt.product.name) : undefined;
   const usual = rec.options.find((o) => o.product.id === group.usualProductId);
   const alts = rec.options.filter((o) => o.role === 'alt');
-  const sub = [size, usual ? `My pick: ${usual.product.name}` : undefined, alts.length ? `Would also take ${alts.length} other${alts.length === 1 ? '' : 's'}` : undefined]
+  const sub = [size, usual ? `My pick: ${usual.product.name}` : undefined, alts.length ? `Also happy with ${alts.length} other${alts.length === 1 ? '' : 's'}` : undefined]
     .filter(Boolean)
     .join(' · ');
 

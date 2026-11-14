@@ -17,7 +17,7 @@ import { confirmAction } from '../../lib/confirm';
 type Filter = 'all' | 'sale' | string; // string = category id
 type Sort = 'sale' | 'az' | 'recent';
 const SORTS: { id: Sort; label: string }[] = [
-  { id: 'az', label: 'A to Z' },
+  { id: 'az', label: 'A–Z' },
   { id: 'sale', label: 'Deals first' },
   { id: 'recent', label: 'Recently added' },
 ];
@@ -52,7 +52,7 @@ function markSwiped() {
 
 const EMPTY: Record<Section, string> = {
   pantry: 'Your pantry is empty. Add the things you buy so Restock can watch their prices.',
-  keg: 'Nothing in the keg yet. Add the beer, wine or spirits you buy, and Restock watches the bottle shops you picked.',
+  keg: 'Nothing here yet. Add the beer, wine or spirits you buy, and Restock watches the bottle shops you picked.',
   pharmacy: 'Nothing here yet. Add the medicine, first aid and personal care things you buy, and Restock watches the chemists you picked.',
   baby: 'Nothing here yet. Add the nappies, wipes and baby things you buy, and Restock watches the shops you picked for Baby.',
   pets: 'Nothing here yet. Add the pet food, litter and treats you buy, and Restock watches the shops you picked for Pets.',
@@ -214,8 +214,9 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
               Done
             </button>
           ) : (
-            <button className="icon-btn" aria-label="Edit" onClick={() => setEditing(true)}>
-              <Icon name="pencil" size={18} />
+            // 0.10.10: Edit says Edit, as on an item's page (it was a bare pencil here)
+            <button className="btn small edit-btn" aria-label="Edit: pick items to move or delete" onClick={() => setEditing(true)}>
+              <Icon name="pencil" size={16} /> Edit
             </button>
           )
         )}
@@ -237,7 +238,8 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
             Deals {recs.filter(onSale).length}
           </button>
           <button className="chip" aria-pressed={filter !== 'all' && filter !== 'sale'} onClick={() => setFilterSheet(true)}>
-            {categories.find((c) => c.id === filter)?.name ?? 'Category'} ▾
+            {categories.find((c) => c.id === filter)?.name ?? 'Category'}{' '}
+            <span className="turn-down"><Icon name="chevron" size={12} /></span>
           </button>
           <button className="chip" onClick={() => setFilterSheet(true)} aria-label={`Sort: ${SORTS.find((x) => x.id === sort)?.label}`}>
             <Icon name="sliders" size={14} /> {SORTS.find((x) => x.id === sort)?.label}
@@ -248,8 +250,8 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
         <p className="small" style={{ margin: 0 }}>
           {/* 0.10.8: with No swiping on, the tip doesn't talk about swiping */}
           {cachedSettings()?.a11y?.noSwipe
-            ? 'Tip: tap the cart to add an item to your shopping list, or press and hold it for a bigger look and product details.'
-            : 'Tip: swipe an item right to add it to your shopping list, left to delete it, or press and hold it for a bigger look and product details.'}
+            ? 'Tip: tap the cart to add an item to your list. Press and hold it for details.'
+            : 'Tip: swipe right to add an item to your list, left to delete it. Press and hold it for details.'}
         </p>
       )}
 
@@ -286,9 +288,11 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                 Math.max(...mains.map((o) => o.stats.spanDays)) < LEARNING_DAYS
                   ? 'still learning prices'
                   : '',
-                altCount ? `${altCount} would also take` : '',
+                altCount ? `${altCount} also happy with` : '',
               ]
                 .filter(Boolean)
+                // 0.10.10: each part stays whole when the line wraps ("Cheapest: Woolworths · 2" / "shops" before)
+                .map((part) => String(part).replace(/ /g, '\u00a0'))
                 .join(' · ');
               return (
                 <Hold key={r.group.id} onLong={() => !editing && setPreview(r)}>

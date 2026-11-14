@@ -91,7 +91,7 @@ const LEGEND = (
       <span className="tag wait">WAIT</span> on special, but it's been at least 5% cheaper recently (never at half price or better)
     </div>
     <div>
-      <span className="tag fake">FAKE SALE</span> tagged as a special or promotion on the shop's website, but no cheaper than its usual price
+      <span className="tag fake">FAKE SPECIAL</span> tagged as a special or promotion on the shop's website, but no cheaper than its usual price
     </div>
     <div>
       <span className="tag fake">ALWAYS ON SPECIAL</span> on special at least 14 of the last 21 days and never seen at its "was" price, so the
@@ -111,7 +111,7 @@ function basisText(o: Option): string {
 }
 
 /**
- * "Fake sale", explained: what the shop's website said, why Restock disagrees, and that it isn't
+ * "Fake special", explained: what the shop's website said, why Restock disagrees, and that it isn't
  * necessarily the shop being misleading. Shops tag products for lots of reasons that aren't a
  * discount (an ongoing low-price program, a price lock), and Restock only sees the website's tags.
  */
@@ -146,7 +146,7 @@ function FakeWhy({ o }: { o: Option }) {
   return (
     <div className="fake-why">
       <div className="title" style={{ fontSize: 15 }}>
-        Why "fake sale"?
+        Why "fake special"?
       </div>
       {was !== undefined ? (
         <p className="small">
@@ -163,7 +163,7 @@ function FakeWhy({ o }: { o: Option }) {
       <p className="small">
         It doesn't necessarily mean {shop} is misleading anyone. Shops tag products for reasons that aren't a short-term discount, like an ongoing
         lower-price program or a price lock{o.product.chain === 'coles' ? ' (Coles does this a lot)' : ''}. Restock can only see the website's tag,
-        not the shelf ticket. "Fake sale" here just means: <strong>no cheaper than it normally is.</strong>
+        not the shelf ticket. "Fake special" here just means: <strong>no cheaper than its usual price.</strong>
       </p>
     </div>
   );
@@ -226,10 +226,10 @@ export function VerdictInfoTag({ o }: { o: Option }) {
 export function ActionInfoTag({ rec, action, great }: { rec: Recommendation; action: ActionKind; great?: boolean }) {
   const map: Record<ActionKind, [string, string]> = {
     buy: ['good', great ? 'GREAT DEAL' : 'ON SPECIAL'],
-    alt: ['alt', 'SWAP & SAVE'],
+    alt: ['alt', 'CHEAPER SWAP'],
     small: ['small', 'SMALL SAVING'],
     wait: ['wait', 'WAIT'],
-    skip: ['fake', rec.best?.verdict.always ? 'ALWAYS ON SPECIAL' : 'FAKE SALE'],
+    skip: ['fake', rec.best?.verdict.always ? 'ALWAYS ON SPECIAL' : 'FAKE SPECIAL'],
     none: ['normal', 'USUAL PRICE'],
   };
   const [cls, label] = map[action];
@@ -300,16 +300,17 @@ export function MultiInfoTag({ o }: { o?: Option }) {
   );
 }
 
-export function MemberInfoTag({ chain, hasCard }: { chain: Chain; hasCard?: boolean }) {
+/** `short`: just "MEMBER PRICE" (a shopping list line has no room for the program's name; tapping it says which). */
+export function MemberInfoTag({ chain, hasCard, short }: { chain: Chain; hasCard?: boolean; short?: boolean }) {
   // The same program names as MemberTag (0.9.0: one list, components.tsx memberProgram).
   const { name, cls } = memberProgram(chain);
   const program = name ?? 'membership';
   return (
-    <InfoTag className={cls} label={program === 'membership' ? 'MEMBER PRICE' : `MEMBER PRICE · ${program.toUpperCase()}`} title="Member price">
+    <InfoTag className={cls} label={short || program === 'membership' ? 'MEMBER PRICE' : `MEMBER PRICE · ${program.toUpperCase()}`} title="Member price">
       <p style={{ margin: 0 }}>This price is only for {program} members.</p>
       <p className="small" style={{ fontSize: 15 }}>
         {hasCard === false
-          ? `You haven't added a ${program} card, so Restock uses the usual price for you. Add your card under Cards on Home to count it.`
+          ? `You haven't added a ${program} card, so Restock uses the usual price for you. Add your card under More → Cards to count it.`
           : `Restock counts it because you've added your ${program} card. Remember to scan it at the checkout.`}
       </p>
     </InfoTag>

@@ -297,7 +297,7 @@ export function WebShopSearch({
         {/* 0.10.9: the same tags, words and layout as the phone's search (Add.tsx): their own line */}
         <span className="tags pick-tags">
           {barcode && sp.barcode === barcode && <span className="tag good">EXACT MATCH</span>}
-          {!barcode && top.has(sp.storeProductId) && <span className="tag good">RECOMMENDED</span>}
+          {!barcode && top.has(sp.storeProductId) && <span className="tag good">GOOD MATCH</span>}
           {sp.itemId && <span className="tag normal">IN YOUR PANTRY</span>}
           {sp.isSpecial && !sp.memberOnly && <span className="tag wait">{specialTag(sp.price, sp.wasPrice, sp.halfPrice)}</span>}
           {sp.isSpecial && promoLabel(sp.promo) && <span className="tag normal">{promoLabel(sp.promo)}</span>}

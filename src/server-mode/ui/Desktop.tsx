@@ -187,7 +187,7 @@ function SideNav({ tabs, place, go }: { tabs: Tab[]; place: Place; go: (p: Place
       {item('cards', 'Cards', 'card')}
       <div className="dk-nav-rule" role="separator" />
       {item('household', 'Server and phones', 'phone')}
-      {isV3() && item('data', 'Data', 'chart')}
+      {isV3() && item('data', 'Your data', 'chart')}
       {item('settings', 'Settings', 'settings')}
       <div className="dk-nav-foot">
         {/* 0.9.5 (undo): the big white Undo, for a few seconds after each change. */}
@@ -251,7 +251,8 @@ export function Desktop({ tabs, tab, stack, overlay }: DesktopProps) {
   };
 
   let page: ReactNode;
-  if (top) page = deskScreen(top) ?? <div className="dk-phone-page">{overlay}</div>;
+  // 0.10.10: a page opened straight from the menu (Receipts) has no Back arrow: there's nothing to go back to.
+  if (top) page = deskScreen(top) ?? <div className={`dk-phone-page${stack.length === 1 ? ' dk-top' : ''}`}>{overlay}</div>;
   else if (tab === 'home') page = <DeskHome />;
   else if (isSectionTab(tab)) page = <DeskPantry key={tab} section={tab} />;
   else if (tab === 'list') page = <DeskList />;

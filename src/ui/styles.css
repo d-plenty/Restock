@@ -4812,18 +4812,20 @@ html.on-welcome #root {
 .list-switch-menu button.on .count {
   color: var(--green-ink);
 }
-/* The summary card: total, shopping around, Compare. */
+/* The summary card: total, shopping around, Compare. 0.10.10: the words on top, then Compare shops
+   (big, green) and Check stock (smaller) side by side along the bottom. */
 .card.list-sum {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
   width: 100%;
-  padding: 14px 16px;
-  text-align: left;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
+  padding: 16px;
+}
+.list-sum-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 .list-sum-total {
   font-size: var(--fs-2xl);
@@ -4834,14 +4836,50 @@ html.on-welcome #root {
   font-weight: 600;
   color: var(--green-ink);
 }
-.list-sum-go {
-  flex: none;
-  display: inline-flex;
+.list-sum-btns {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 2px;
-  font-size: var(--fs-md);
+  gap: 10px;
+}
+.btn.list-sum-go {
+  /* Takes the room Check stock leaves; the two only go one under the other when the words
+     can't fit side by side (a very large text size). */
+  flex: 1 1 0;
+  min-width: min-content;
+  height: 54px;
+  padding: 0 10px;
+  gap: 6px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  white-space: nowrap;
+}
+@media (max-width: 379px) {
+  .btn.list-sum-go svg {
+    display: none;
+  }
+}
+.btn.small.stock-btn {
+  flex: none;
+  height: auto;
+  min-height: 44px;
+  padding: 4px 10px;
+  gap: 6px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-sm);
   font-weight: 700;
-  color: var(--green);
+}
+.stock-btn-words {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+  text-align: left;
+}
+.stock-btn-where {
+  font-size: var(--fs-xs);
+  font-weight: 600;
 }
 /* A line on the list: tick, photo, name and one quiet line, price with at most one tag. */
 .list-row {
@@ -4980,15 +5018,14 @@ html.on-welcome #root {
 :root[data-text='1.5'] .tab-switch > svg {
   display: none;
 }
-/* 0.10.5: a row's one tag stays on one line. */
+/* 0.10.5: a row's one tag stays on one line. 0.10.10: unless it can't fit: then it wraps between
+   words ("MEMBER PRICE · EVERYDAY REWARDS" was cut off at the card's edge, with no "…"). */
 .list-row-text > .tags {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   min-width: 0;
 }
 .list-row-text > .tags > * {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
   max-width: 100%;
 }
 
@@ -5601,4 +5638,46 @@ svg.icon-info {
 .flavour-note {
   margin: 0;
   padding: 4px 14px 8px;
+}
+
+/* ---------- 0.10.10 ---------- */
+/* Edit says Edit (Pantry and the list had a bare pencil; the item page had the word). */
+.btn.small.edit-btn {
+  flex: none;
+  height: 44px;
+  border-radius: var(--r-full);
+  color: var(--ink);
+}
+/* The item page: the chart and history open from one button under today's price. */
+.btn.small.ph-more {
+  align-self: flex-start;
+  min-height: 44px;
+}
+/* Add: the other ways in (Scan several, Photo, Receipt) open from one line under Scan a barcode. */
+.btn.add-more {
+  justify-self: center;
+  min-height: 44px;
+}
+/* Picking items: the actions are plainly off until something is ticked. */
+.selectbar .btn:disabled {
+  opacity: 0.45;
+}
+/* The list's top row: the list's name keeps its room beside Edit. */
+.list-top-row .btn.small.edit-btn {
+  padding: 0 10px;
+  gap: 4px;
+}
+.list-top-row {
+  gap: 6px;
+}
+@media (max-width: 379px) {
+  .list-top-row .list-switch > svg {
+    display: none;
+  }
+}
+/* A choice that isn't there yet (a longer history than you keep) is grey, but still readable
+   (it was faded to under 4.5:1). */
+.seg button.dim {
+  opacity: 1;
+  color: var(--muted);
 }

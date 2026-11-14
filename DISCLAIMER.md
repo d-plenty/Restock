@@ -30,7 +30,7 @@ Restock is not medical advice. For medicines, read the label and ask a pharmacis
 
 ## Alcohol
 
-The Keg tab is for adults 18 and over. Restock only compares prices; please drink responsibly. For help, call the National Alcohol and Other Drug Hotline on 1800 250 015.
+The Bottle shop tab is for adults 18 and over. Restock only compares prices; please drink responsibly. For help, call the National Alcohol and Other Drug Hotline on 1800 250 015.
 
 ## Fair use of shop websites
 
@@ -52,7 +52,7 @@ Restock is free, open-source software provided "as is", without warranty of any 
 
 ## Beta software
 
-Restock 0.10.9 is a release candidate: everything is in, and it's being tested before 1.0, so things can still change between versions. The Keg and Health tabs, and Costco, IGA and the shops added in 0.10.3, are marked Beta: they work the same way as the rest, they just haven't been tested as thoroughly yet, and they'll keep being tested before they come out of beta. Features under Settings → Advanced are for testing and can change or disappear. If something goes wrong, Settings → Send feedback tells us. Keep a backup of anything you'd hate to lose.
+Restock 0.10.10 is a release candidate: everything is in, and it's being tested before 1.0, so things can still change between versions. The Bottle shop and Chemist tabs, and Costco, IGA and the shops added in 0.10.3, are marked Beta: they work the same way as the rest, they just haven't been tested as thoroughly yet, and they'll keep being tested before they come out of beta. Features under Settings → Advanced are for testing and can change or disappear. If something goes wrong, Settings → Send feedback tells us. Keep a backup of anything you'd hate to lose.
 
 ---
 

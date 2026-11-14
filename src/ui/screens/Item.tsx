@@ -130,7 +130,7 @@ export function AlertPicker({ level, pct, onChange }: { level: AlertLevel; pct: 
           <strong>Small saving</strong>: any price drop under {GOOD_SALE * 100}%, even 5c.
         </p>
         <p>
-          <strong>Wait</strong> means it's on special, but it's been at least 5% cheaper than this in the last 6 months, so a better sale is likely.
+          <strong>Wait</strong> means it's on special, but it's been at least 5% cheaper than this in the last 6 months, so a better special is likely.
         </p>
         <p>
           Alerts arrive after a price check (in the background, or when you tap Check prices &amp; stock), once per deal. Alternatives (swap &amp;
@@ -394,7 +394,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
               {tag === 'cheapest' && <CheapestInfoTag o={o} options={rec.options.filter((x) => x.role === o.role)} />}
               {tag === 'swap' && (
                 <SwapInfoTag
-                  label="SWAP & SAVE"
+                  label="CHEAPER SWAP"
                   line={{ item: group.name, groupId: group.id, pick: o, outOfStock: false, qty: 1, yours: rec.best, fair: 0 }}
                 />
               )}
@@ -535,12 +535,11 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       )}
       <div className="chips" style={{ marginTop: -4 }}>
         {/* 0.9.12: these open the alerts on their own ("Price alerts"), not the whole Edit item sheet. */}
+        {/* 0.10.10: one Alerts button (there were two that opened the same sheet) */}
         <button className="chip" onClick={() => setSheet('alerts')} aria-label="Change price alerts">
-          <Icon name="bell" size={14} /> Alert: {ALERT_LEVELS.find((a) => a.id === group.alertLevel)?.label}
+          <Icon name="bell" size={14} /> Alerts: {ALERT_LEVELS.find((a) => a.id === group.alertLevel)?.label}
           {group.alertLevel === 'custom' ? ` (${group.alertPct ?? 30}%+)` : ''}
-        </button>
-        <button className="chip" onClick={() => setSheet('alerts')} aria-label="Set a target price">
-          <Icon name="tag" size={14} /> {group.targetPrice !== undefined ? `Under ${money(group.targetPrice)}` : 'Alert at a price'}
+          {group.targetPrice !== undefined ? ` · under ${money(group.targetPrice)}` : ''}
         </button>
       </div>
       {/* Not for a price that may not be today's any more (0.9.0): it says "right now". */}
@@ -562,45 +561,10 @@ export function ItemScreen({ groupId }: { groupId: string }) {
         This item stays in {SECTION_PLACE[group.section ?? 'pantry']} so Restock keeps watching its price. The shopping list is just for this trip.
       </p>
 
-      {chartOption && stats && (
-        <PriceHistory
-          options={ordered}
-          option={chartOption}
-          onPick={setSelected}
-          stats={stats}
-          allReadings={allReadings}
-          chartReadings={chartReadings}
-          allowMulti={group.allowMulti !== false}
-          onEnterPrice={() => setSheet('price')}
-          range={
-            allReadings.length >= 2 ? (
-              <div className="seg range-seg" role="group" aria-label="How far back">
-                {HISTORY_WEEKS.map((w) => (
-                  <button
-                    key={w}
-                    aria-pressed={w === weeks}
-                    aria-label={historyLabel(w)}
-                    className={w > keepWeeks ? 'dim' : undefined}
-                    onClick={() =>
-                      w > keepWeeks
-                        ? nav.toast(`You keep ${historyLabel(keepWeeks)} of prices. Keep more in Settings → Prices and deals.`)
-                        : setRangeWeeks(w)
-                    }
-                  >
-                    {/* 0.9.1: five choices; 0.9.5 (look): the number over its unit, so all five fit a phone at any text size. */}
-                    <RangeLabel text={RANGE_SHORT[w] ?? historyLabel(w)} />
-                  </button>
-                ))}
-              </div>
-            ) : undefined
-          }
-        />
-      )}
-
       <div className="card flush">
         <div className="section-head">
           <span className="title">
-            My picks <HowItWorks />
+            What I buy <HowItWorks />
           </span>
           {mains.length > 2 ? (
             <select
@@ -642,7 +606,6 @@ export function ItemScreen({ groupId }: { groupId: string }) {
                   key={String(any)}
                   role="radio"
                   aria-checked={!!group.anySize === any}
-                  aria-pressed={!!group.anySize === any}
                   onClick={() => void act(`${group.name}: ${any ? 'any size' : 'this size'}`, () => updateGroup(group.id, { anySize: any }))}
                 >
                   {any ? 'Any size' : 'This size'}
@@ -738,31 +701,62 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       <div className="card flush">
         <div className="section-head">
           <span className="title">
-            Would also take <HowItWorks />
+            Also happy with <HowItWorks />
           </span>
           <span className="small">{alts.length || 'None yet'}</span>
         </div>
         <p className="small" style={{ padding: '0 14px 6px' }}>
-          Only for Swap &amp; save: Restock tells you when one of these is on special for less than your pick. They don't count when shops are compared.
+          Only for Cheaper swap: Restock tells you when one of these is on special for less than your pick. They don't count when shops are compared.
         </p>
         {alts.map((o) => row(o, rec.alt === o ? 'swap' : undefined))}
         <button className="row" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'alt', query: group.name })}>
           <Icon name="swap" size={18} />
           <span className="grow">
             <span className="title" style={{ fontSize: 15, color: 'var(--green)' }}>
-              Find one you'd also take
+              Find another you'd be happy with
             </span>
             <span className="small">Another brand or size you'd happily buy instead, when it's cheaper</span>
           </span>
         </button>
       </div>
 
-      <button className="btn primary block" onClick={() => nav.pop()}>
-        <Icon name="check" size={18} /> Done
-      </button>
-      <p className="small" style={{ textAlign: 'center', marginTop: -6 }}>
-        Changes are saved as you make them.
-      </p>
+      {/* 0.10.10: after what you buy and where (it was above them, three charts deep) */}
+      {chartOption && stats && (
+        <PriceHistory
+          options={ordered}
+          option={chartOption}
+          onPick={setSelected}
+          stats={stats}
+          allReadings={allReadings}
+          chartReadings={chartReadings}
+          allowMulti={group.allowMulti !== false}
+          onEnterPrice={() => setSheet('price')}
+          range={
+            allReadings.length >= 2 ? (
+              <div className="seg range-seg" role="group" aria-label="How far back">
+                {HISTORY_WEEKS.map((w) => (
+                  <button
+                    key={w}
+                    aria-pressed={w === weeks}
+                    aria-label={historyLabel(w)}
+                    className={w > keepWeeks ? 'dim' : undefined}
+                    onClick={() =>
+                      w > keepWeeks
+                        ? nav.toast(`You keep ${historyLabel(keepWeeks)} of prices. Keep more in Settings → Prices and deals.`)
+                        : setRangeWeeks(w)
+                    }
+                  >
+                    {/* 0.9.1: five choices; 0.9.5 (look): the number over its unit, so all five fit a phone at any text size. */}
+                    <RangeLabel text={RANGE_SHORT[w] ?? historyLabel(w)} />
+                  </button>
+                ))}
+              </div>
+            ) : undefined
+          }
+        />
+      )}
+
+      {/* 0.10.10: no Done button here: changes save as you make them, and Back is at the top */}
 
       {(sheet === 'edit' || sheet === 'alerts') && (
         <EditSheet
@@ -1087,13 +1081,13 @@ function OptionSheet({ group, option, options, onClose }: { group: Group; option
   const isAlt = option.role === 'alt';
   const lastAtShop = !isAlt && options.filter((o) => o.role === 'main' && o.product.chain === option.product.chain).length === 1;
 
-  /** Move between My picks and Would also take. */
+  /** Move between What I buy and Also happy with. */
   const move = async () => {
     const mains = [group.usualProductId, ...group.sameProductIds].filter((x): x is string => !!x && x !== id);
     const alts = group.altProductIds.filter((x) => x !== id);
     if (isAlt) mains.push(id);
     else alts.push(id);
-    await act(isAlt ? `${option.product.name} is one of your picks` : `${option.product.name} moved to Would also take`, () =>
+    await act(isAlt ? `${option.product.name} is one of your picks` : `${option.product.name} moved to Also happy with`, () =>
       updateGroup(group.id, { usualProductId: mains[0], sameProductIds: mains.slice(1), altProductIds: alts }),
     ); // 0.9.5 (undo)
     onClose();
@@ -1118,7 +1112,7 @@ function OptionSheet({ group, option, options, onClose }: { group: Group; option
         <Icon name="info" size={18} /> Photo and product details
       </button>
       <p className="small">
-        {isAlt ? 'Would also take' : 'My pick'} at {chainName(option.product.chain)}
+        {isAlt ? 'Also happy with' : 'My pick'} at {chainName(option.product.chain)}
         {` · ${line.size}`}
         {option.product.barcode ? ` · barcode ${option.product.barcode}` : ''}
       </p>
@@ -1160,7 +1154,7 @@ function OptionSheet({ group, option, options, onClose }: { group: Group; option
         </button>
       </div>
       <button className="btn" onClick={move}>
-        <Icon name="swap" size={18} /> {isAlt ? 'Make this one of my picks' : 'Move to Would also take'}
+        <Icon name="swap" size={18} /> {isAlt ? 'Make this one of my picks' : 'Move to Also happy with'}
       </button>
       {!isAlt && lastAtShop && (
         <p className="small" style={{ marginTop: -6 }}>
@@ -1187,22 +1181,22 @@ const isSample = (o: Option) => /\(sample\)/i.test(o.product.name);
  * A picture of the statistics: where today's price sits between the lowest, the usual sale
  * and the normal price, and how much of the time it's on sale.
  */
-/** The "how My picks and Would also take work" explanation, from a small ⓘ by the section titles. */
+/** The "how What I buy and Also happy with work" explanation, from a small ⓘ by the section titles. */
 function HowItWorks() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className="icon-btn inline-info" aria-label="How My picks and Would also take work" onClick={() => setOpen(true)}>
+      <button className="icon-btn inline-info" aria-label="How What I buy and Also happy with work" onClick={() => setOpen(true)}>
         <Icon name="info" size={16} />
       </button>
       {open && (
-        <Sheet title="My picks and Would also take" onClose={() => setOpen(false)}>
+        <Sheet title="What I buy and Also happy with" onClose={() => setOpen(false)}>
           <p>
-            <strong>My picks</strong> are what you buy at each shop. They can be different at each one: Heinz at Coles and Woolworths, Aldi's own
+            <strong>What I buy</strong> are what you buy at each shop. They can be different at each one: Heinz at Coles and Woolworths, Aldi's own
             at Aldi. Shops are compared using your picks only, so a shop with none of them counts as not having it.
           </p>
           <p>
-            <strong>Would also take</strong> are others you'd happily buy when they're cheaper, like another home brand. They're only for Swap
+            <strong>Also happy with</strong> are others you'd happily buy when they're cheaper, like another home brand. They're only for Swap
             &amp; save: when one is on special for less than your pick (per 100 g, per litre or per item), it shows up next to yours.
           </p>
           <p>
@@ -1412,7 +1406,7 @@ function PriceHistory({
       : v.kind === 'wait'
         ? { cls: 'amber', text: off ? `${off} · WAIT` : 'WAIT' }
         : v.kind === 'fake'
-          ? { cls: 'red', text: v.always ? 'ALWAYS ON SPECIAL' : 'FAKE SALE' }
+          ? { cls: 'red', text: v.always ? 'ALWAYS ON SPECIAL' : 'FAKE SPECIAL' }
           : v.kind === 'normal'
             ? { cls: 'grey', text: v.headline.toUpperCase() }
             : undefined;
@@ -1420,28 +1414,22 @@ function PriceHistory({
   // One plain tip: is it a good time to buy?
   const cycle = stats.cycleWeeks ? ` about every ${stats.cycleWeeks} weeks` : '';
   const saleOff = stats.usualSale !== undefined && stats.typical ? 1 - stats.usualSale / stats.typical : 0;
+  // 0.10.10: only the tip the verdict at the top doesn't already give ("Wait for a better special" up
+  // there and "Worth waiting" here said the same sentence twice).
   const tip =
-    v.kind === 'great'
-      ? { cls: 'green', title: 'A great deal', body: v.detail }
-      : v.kind === 'good'
-        ? { cls: 'green', title: 'A good sale', body: v.detail }
-        : v.kind === 'small'
-          ? { cls: 'green', title: 'A small saving', body: v.detail }
-          : v.kind === 'wait'
-            ? { cls: 'amber', title: 'Worth waiting', body: v.detail }
-            : v.kind === 'normal' && stats.usualSale !== undefined && saleOff >= 0.1
+    v.kind === 'normal' && stats.usualSale !== undefined && saleOff >= 0.1
               ? {
                   cls: 'amber',
                   title: 'Worth waiting',
                   body: `${saleOff >= 0.45 && saleOff <= 0.55 ? `It's half price (${money(stats.usualSale)})` : `It's usually ${money(stats.usualSale)} on special (${Math.round(saleOff * 100)}% off)`}${cycle}.`,
                 }
-              : undefined;
+      : undefined;
 
   // Where today's price sits, between the lowest and the normal price.
   const marks = [
     { key: 'low', label: 'Lowest', value: stats.low },
     { key: 'sale', label: 'Usual sale', value: stats.usualSale },
-    { key: 'normal', label: 'Normal', value: stats.typical },
+    { key: 'normal', label: 'Usual', value: stats.typical },
   ]
     .filter((m): m is { key: string; label: string; value: number } => m.value !== undefined)
     // A "usual sale" at the normal price (multi-buys keep the shelf price) says nothing.
@@ -1507,6 +1495,22 @@ function PriceHistory({
       ? `Your prices · ${ownWeeks >= 9 ? `${Math.round(ownWeeks / 4.3)} months` : `${ownWeeks} week${ownWeeks === 1 ? '' : 's'}`}`
       : 'No prices yet';
 
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem('restock.historyOpen') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleOpen = () =>
+    setOpen((x) => {
+      try {
+        localStorage.setItem('restock.historyOpen', x ? '0' : '1');
+      } catch {
+        // just for this visit
+      }
+      return !x;
+    });
   return (
     <div className="card ph">
       <div className="ph-head" style={{ flexWrap: 'wrap' }}>
@@ -1540,6 +1544,15 @@ function PriceHistory({
         </div>
       )}
 
+      {/* 0.10.10: today's price stays; the chart and the rest open when asked (and stay how you left them) */}
+      <button className="btn small ph-more" aria-expanded={open} onClick={toggleOpen}>
+        {open ? 'Hide the chart and history' : 'Show the chart and history'}{' '}
+        <span className={open ? 'turn-up' : 'turn-down'}>
+          <Icon name="chevron" size={14} />
+        </span>
+      </button>
+      {open && (
+        <>
       {range}
       {allReadings.length >= 2 ? (
         <div className="ph-chart">
@@ -1631,6 +1644,8 @@ function PriceHistory({
 
       {/* "Stock up" or "next sale due": not when the tip above already says to wait, or that it's not a real sale. */}
       {v.kind !== 'wait' && v.kind !== 'fake' && <StockUpTip stats={stats} readings={chartReadings} />}
+        </>
+      )}
 
       {onEnterPrice && (
         <button className="btn small" style={{ alignSelf: 'flex-start', minHeight: 44 }} onClick={onEnterPrice}>

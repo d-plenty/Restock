@@ -351,7 +351,7 @@ export function readImport(bytes: Uint8Array, fileName = ''): ReadFile {
       throw new ImportRefused("Spreadsheets (.xlsx) can't be imported. Use the Full export file (.json) or the CSV files (.zip) instead.");
     const tables: Record<string, unknown> = {};
     for (const [path, data] of Object.entries(files)) tables[baseName(path).replace(/\.csv$/, '')] = csvRows(strFromU8(data));
-    if (!tables.products) throw new ImportRefused('That zip has no Products.csv in it. Use the CSV files (.zip) the Data tab downloads, or a full export file (.json).');
+    if (!tables.products) throw new ImportRefused('That zip has no Products.csv in it. Use the CSV files (.zip) the Your data page downloads, or a full export file (.json).');
     if (!tables.prices) tables.prices = [];
     const r = productsOf(tables, 'csv');
     r.notTaken = names.filter((x) => /\.csv$/.test(x) && !['products.csv', 'prices.csv'].includes(x)).map((x) => x.replace(/\.csv$/, '').replace(/[-_]+/g, ' '));

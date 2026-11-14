@@ -1,5 +1,5 @@
 // The shopping list's "where to shop" card and the explanations behind it: the price at each shop,
-// how the picks were made, the shop-around plan, and "swap & save" (moved out of components.tsx in 0.9.0).
+// how the picks were made, the shop-around plan, and "cheaper swap" (moved out of components.tsx in 0.9.0).
 
 import { useState } from 'react';
 import { nameHasSize } from '../lib/naming';
@@ -10,7 +10,7 @@ import type { StoreChain } from '../shops';
 import { chainName } from '../types';
 import { ChainDot, Hold, Icon, previewFromOption, ProductPreview, Sheet, stockWhere, SwapBox, unitLabel } from './components';
 
-/** Swap & save: one you'd also take instead of your pick, side by side. */
+/** Cheaper swap: one you'd also take instead of your pick, side by side. */
 export function SwapWhy({
   line,
   chainName: storeLabel,
@@ -70,8 +70,8 @@ type ShopLineT = import('../lib/shopTotals').ShopLine;
 export const bothWays = (same: number, till: number, approx = false) =>
   // 0.10.8: once when they're the same ("Same shopping $21.80 · at the till $21.80" said it twice)
   Math.abs(same - till) < 0.25
-    ? `${approx ? '≈' : ''}${money(till)} either way`
-    : `Same shopping ${approx ? '≈' : ''}${money(same)} · at the till ${approx ? '≈' : ''}${money(till)}`;
+    ? `${approx ? 'about ' : ''}${money(till)} either way`
+    : `Like for like ${approx ? 'about ' : ''}${money(same)} · at the till ${approx ? 'about ' : ''}${money(till)}`;
 
 /** A line whose like-for-like cost isn't what you'd pay for the pack (a bigger or smaller pack): say both. */
 const lineNote = (l: ShopLineT) =>
@@ -137,7 +137,7 @@ function PickRow({
         {pick && (pick.role === 'alt' || note) && (
           <span className="tags" style={{ marginTop: 2 }}>
             {note && <span className="tag normal">{note}</span>}
-            {pick.role === 'alt' && <span className="tag alt">WOULD ALSO TAKE</span>}
+            {pick.role === 'alt' && <span className="tag alt">ALSO HAPPY WITH</span>}
           </span>
         )}
       </span>
@@ -243,7 +243,7 @@ function StoreDetail({
               <span className="small">{bothWays(s.fair + s.elsewhereFair, s.totalWithElsewhere, true)}</span>
             </span>
             <span className="num" style={{ fontWeight: 700 }}>
-              ≈{money(withElsewhere(s, by))}
+              about {money(withElsewhere(s, by))}
             </span>
           </div>
         </div>
@@ -292,7 +292,7 @@ function HowPicked({ totals, min, onClose }: { totals: Totals; min: number; onCl
   const low = r.cheapest;
   const n = totals.linked;
   const count = (s: StoreTotal) => (by === 'unit' ? s.cheapestFor : s.cheapestForTill);
-  const how = by === 'unit' ? 'for the same shopping' : 'at the till';
+  const how = by === 'unit' ? 'like for like' : 'at the till';
   const gaps =
     rec && run
       ? rec.lines
@@ -308,7 +308,7 @@ function HowPicked({ totals, min, onClose }: { totals: Totals; min: number; onCl
     <Sheet title="How Restock picks a shop" onClose={onClose}>
       {by === 'unit' ? (
         <p className="small">
-          Your list is on <strong>Best value</strong>, so Restock prices <strong>the same shopping</strong> at each shop: every item at the size you
+          Your list is on <strong>Best value</strong>, so Restock prices <strong>like for like</strong> at each shop: every item at the size you
           usually buy, from your picks at each shop and its regular packs (Any size items: the cheapest way to get that amount). A bulk pack,
           or a shop only selling a bigger or smaller size, can't tip it. Ones you'd also take don't count here.
         </p>
@@ -443,8 +443,8 @@ export function ShopTotalsCard({
   const withLines = totals.stores.filter((s) => s.lines.length);
   const several = withLines.length > 1;
   const best = recommendedStores(totals).recommended;
-  const measureWord = by === 'unit' ? 'same shopping' : 'at the till';
-  const otherWord = by === 'unit' ? 'at the till' : 'same shopping';
+  const measureWord = by === 'unit' ? 'like for like' : 'at the till';
+  const otherWord = by === 'unit' ? 'at the till' : 'like for like';
   const storeWins = plan.pick !== 'around' ? plan.pick : undefined;
   const aroundOneShop = plan.stops.length === 1;
   // Nothing on the list has a price yet: no totals to compare.
@@ -506,10 +506,10 @@ export function ShopTotalsCard({
             ) : (
               <span className="tag good">{n === 1 ? 'HAS IT' : `HAS ALL ${n}`}</span>
             )}
-            {several && best === s && !storeWins && <span className="tag info">BEST ONE STORE</span>}
+            {several && best === s && !storeWins && <span className="tag info">BEST ONE SHOP</span>}
           </span>
           {has ? (
-            <span className={`have ${missing ? 'miss' : 'all'}`}>{missing ? `Has ${has} of ${n}` : '✓ Everything on your list'}</span>
+            <span className={`have ${missing ? 'miss' : 'all'}`}>{missing ? `Has ${has} of your ${n} priced items` : '✓ Everything on your list'}</span>
           ) : (
             <span className="have miss">None of your list</span>
           )}
@@ -532,7 +532,7 @@ export function ShopTotalsCard({
         </span>
         {/* A store missing things: its total with those bought elsewhere, so it isn't made to look cheap. */}
         <span className="num price-col">
-          {!has ? '—' : missing && s.missing.every((m) => m.elsewhere) ? `≈${money(withElsewhere(s, by))}` : money(storeMeasure(s, by))}
+          {!has ? '—' : missing && s.missing.every((m) => m.elsewhere) ? `about ${money(withElsewhere(s, by))}` : money(storeMeasure(s, by))}
         </span>
         <Icon name="chevron" size={16} />
       </button>

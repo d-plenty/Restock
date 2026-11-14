@@ -179,7 +179,7 @@ export function formatUnitPrice(perBase: number | undefined, unit?: BaseUnit, st
   if (unit === 'g') return style?.kg ? `${money(perBase * 1000)} / kg` : `${money(perBase * 100)} / 100g`;
   // Always per litre (0.9.0), so a 1 L and a 2 L milk read the same way.
   if (unit === 'ml') return `${money(perBase * 1000)} / L`;
-  return (style?.per100 ?? perBase < 0.1) ? `${money(perBase * 100)} per 100` : `${money(perBase)} each`;
+  return (style?.per100 ?? perBase < 0.1) ? `${money(perBase * 100)} / 100` : `${money(perBase)} each`;
 }
 
 /**

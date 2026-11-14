@@ -156,7 +156,7 @@ export function SpendingChart({ months, now = Date.now() }: { months: DataStats[
       </div>
       <NumbersTable
         caption="Spending each month"
-        head={['Month', 'Spent', 'Things ticked off']}
+        head={['Month', 'Spent', 'Items ticked off']}
         rows={months.map((m) => [`${longMonth(m.month)}${m.month === cur ? ' (so far)' : ''}`, money(m.total), m.count])}
       />
     </>

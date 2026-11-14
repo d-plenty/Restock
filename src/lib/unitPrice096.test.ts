@@ -145,7 +145,7 @@ describe('the comparison price decides, never the price each', () => {
   it('shows a counted thing by the item, and sheets by 100 sheets', () => {
     expect(priceLine(product('t', 'coles', 'Nappies 48 Pack'), 24).text).toBe('$0.50 each');
     const tp = product('t', 'coles', 'Toilet Tissue 12 Pack', { size: '2,400 sheets' });
-    expect(priceLine(tp, 12).text).toBe('$1.00 each · $0.50 per 100 sheets');
+    expect(priceLine(tp, 12).text).toBe('$1.00 each · $0.50 / 100 sheets');
   });
 
   it('uses per kg for big bags and per 100 g otherwise', () => {

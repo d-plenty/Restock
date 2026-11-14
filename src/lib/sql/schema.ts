@@ -283,7 +283,7 @@ export const SPEND_TABLE = `CREATE TABLE IF NOT EXISTS spend_log (
   PRIMARY KEY (entry_id, checked_at)
 )`;
 
-/** 0.8.9: "Any size" and "Not at this shop" (picks.ts); the move to My picks is in DATA_STEPS. */
+/** 0.8.9: "Any size" and "Not at this shop" (picks.ts); the move to What I buy is in DATA_STEPS. */
 const PICKS_089 = ['ALTER TABLE items ADD COLUMN any_size INTEGER NOT NULL DEFAULT 0', 'ALTER TABLE items ADD COLUMN not_at TEXT'];
 
 export const MIGRATIONS: string[][] = [
@@ -427,7 +427,7 @@ export const MIGRATIONS: string[][] = [
   HOUSEHOLD_MIGRATION,
   // 0.8.5: no ties between phones' changes, and products' stock stays on each phone.
   SYNC_TRIGGERS_085,
-  // 0.8.9: My picks and Would also take, "Any size" and "Not at this shop" (picks.ts). The data
+  // 0.8.9: What I buy and Also happy with, "Any size" and "Not at this shop" (picks.ts). The data
   // part is in DATA_STEPS.
   PICKS_089,
   // 0.9.0: sturdier sync (stamps, deletes, signed household changes, prices, ticks).

@@ -112,7 +112,7 @@ export function YourData() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemId, period, source]);
 
-  if (serverMode) return <p className="small">Your data is in the Data tab on this page.</p>;
+  if (serverMode) return <p className="small">Your data is on the Your data page here.</p>;
   const shown = find.trim() ? items.filter((g) => g.name.toLowerCase().includes(find.trim().toLowerCase())) : items;
   const sp = stats?.spending;
 
@@ -153,8 +153,8 @@ export function YourData() {
       {stats && sp && (
         <>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Tile label="Spent" big={money(sp.total)} sub={`${sp.count} thing${sp.count === 1 ? '' : 's'} ticked off${sp.unpriced ? `, ${sp.unpriced} without a price` : ''}`} />
-            <Tile label="Saved on specials" big={money(stats.saved.total)} sub={stats.saved.count ? `on ${stats.saved.count} thing${stats.saved.count === 1 ? '' : 's'}` : 'Nothing on special yet'} />
+            <Tile label="Spent" big={money(sp.total)} sub={`${sp.count} item${sp.count === 1 ? '' : 's'} ticked off${sp.unpriced ? `, ${sp.unpriced} without a price` : ''}`} />
+            <Tile label="Saved on specials" big={money(stats.saved.total)} sub={stats.saved.count ? `on ${stats.saved.count} item${stats.saved.count === 1 ? '' : 's'}` : 'Nothing on special yet'} />
           </div>
           {sp.count === 0 ? (
             <div className="card">
@@ -241,6 +241,8 @@ export function YourData() {
             {stored.listLines.toLocaleString()} list lines, {stored.purchases.toLocaleString()} purchases, {stored.receipts.toLocaleString()} receipts,{' '}
             {stored.cards.toLocaleString()} loyalty cards
             {stored.shared ? `, and shared prices for ${stored.shared.toLocaleString()} products` : ''}.
+            {/* 0.10.10: "0 items" with the sample items on screen looked wrong */}
+            {stored.samples ? ` The ${stored.samples} sample item${stored.samples === 1 ? " isn't" : "s aren't"} counted.` : ''}
           </p>
         ) : (
           <p className="small" style={{ margin: 0 }}>

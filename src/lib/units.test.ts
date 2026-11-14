@@ -51,7 +51,7 @@ describe('unit prices', () => {
   it('formats like shelf labels', () => {
     expect(formatUnitPrice(0.005, 'g')).toBe('$0.50 / 100g');
     expect(formatUnitPrice(0.0016, 'ml')).toBe('$1.60 / L');
-    expect(formatUnitPrice(0.0028, 'ea')).toBe('$0.28 per 100');
+    expect(formatUnitPrice(0.0028, 'ea')).toBe('$0.28 / 100');
     expect(formatUnitPrice(1.25, 'ea')).toBe('$1.25 each');
   });
 });

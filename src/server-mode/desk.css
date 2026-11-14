@@ -1118,13 +1118,17 @@ select.input.dk-select {
 
 /* ---------- a phone screen inside the desktop frame (Specials, Receipts, an item, …) ---------- */
 
+/* 0.10.10: starts at the left like every other page (Receipts and Cards sat in the middle of the window). */
 .dk-phone-page {
-  max-width: 720px;
-  margin: 0 auto;
+  max-width: 760px;
+  margin: 0;
 }
 .dk-phone-page > .screen {
   overflow: visible;
-  padding: 28px 24px 56px;
+  padding: 28px clamp(16px, 3vw, 40px) 56px;
+}
+.dk-phone-page.dk-top .topbar > .icon-btn[aria-label='Back'] {
+  display: none;
 }
 
 /* ---------- sheets and the toast: a dialog in the middle, not a sheet from the bottom ---------- */
@@ -1768,4 +1772,10 @@ html.server-mode .dk-money .input {
 .dk-fieldset .dk-shop-group {
   margin: 0;
   padding: 12px 14px 4px;
+}
+
+/* 0.10.10: a link that's drawn as a button isn't underlined as well (Catalogue, Specials, Website). */
+.dk-btns a.btn,
+.dk-btns a.btn:hover {
+  text-decoration: none;
 }

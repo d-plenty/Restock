@@ -271,7 +271,7 @@ export interface StoreChoice {
   primaryMap?: string;
   /**
    * Coles only: the store number of your branch (from the map, or the store's page link), used for
-   * its own prices and stock when "Prices and stock at my store" is on.
+   * its own prices and stock when "Prices and stock at my branch" is on.
    */
   branchStoreNo?: string;
   /** Coles only: your second branch's store number, for its stock. */
@@ -534,7 +534,7 @@ export const LEARNING_DAYS = 25;
 export const storeChoice = (s: Pick<Settings, 'stores'>, c: StoreChain): StoreChoice => s.stores[c] ?? {};
 
 /**
- * The store to search at a shop: your Coles branch when "Prices and stock at my store" is on and
+ * The store to search at a shop: your Coles branch when "Prices and stock at my branch" is on and
  * its number is known, else any store number typed by hand (Coles, or Aldi's service point).
  */
 export const searchStoreId = (s: Pick<Settings, 'stores' | 'localPrices'>, c: StoreChain): string | undefined => {

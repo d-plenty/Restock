@@ -36,7 +36,7 @@ export function csvFiles(all: Snapshot): { name: string; text: string }[] {
   for (const g of s.groups) {
     const kinds: [string, string][] = [
       ...[g.usualProductId, ...(g.sameProductIds ?? [])].filter((x): x is string => !!x).map((id) => [id, 'My pick'] as [string, string]),
-      ...(g.altProductIds ?? []).map((id) => [id, 'Would also take'] as [string, string]),
+      ...(g.altProductIds ?? []).map((id) => [id, 'Also happy with'] as [string, string]),
     ];
     if (!kinds.length) pantry.push([sectionName(g.section), g.name, cats.get(g.categoryId ?? '') ?? '', '', '', '', '', '', '', '', '', '', '']);
     for (const [id, kind] of kinds) {

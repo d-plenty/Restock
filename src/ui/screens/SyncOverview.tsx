@@ -176,7 +176,9 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
               </span>
               <span className="small">
                 Your shopping list in Home Assistant, both ways: tick things off on a dashboard, or say "add milk to the shopping list" to a voice
-                assistant and it shows up here. {haSummary}.
+                assistant and it shows up here.
+                {/* 0.10.10: not set up, the summary was this same sentence again */}
+                {haSummary && !haSummary.startsWith('Your shopping list') ? ` ${haSummary}.` : ''}
               </span>
             </button>
           )}

@@ -30,6 +30,9 @@ import { ConnectionsSheet } from './Settings';
 import { nextCheckWords } from '../../lib/checkSchedule';
 import { getCheckLog, missedSlot, missedWords, whenWords } from '../../lib/checkLog';
 
+import { startTour } from '../Tour';
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
 export function HomeScreen() {
   const nav = useNav();
   const allRecs = useLive(loadRecommendations, []);
@@ -72,7 +75,7 @@ export function HomeScreen() {
   // 0.10.2: the background checks' log (above the early return: hooks always run in the same order).
   const runs = useLive(getCheckLog, []) ?? [];
   if (!allRecs || !settings || !allEntries) return <div className="screen" />;
-  const { on, recs, totals, oneStop, listSaving, listed, dealChain, dealRecs, dealShops, showing, buys, altDeals, smalls, waits, skips, normal, worth, saving } =
+  const { on, recs, totals, openLines, oneStop, listSaving, listed, dealChain, dealRecs, dealShops, showing, buys, altDeals, smalls, waits, skips, normal, worth, saving } =
     weekDeals(allRecs, settings, allEntries, picked);
   // Only warn about shops you still use, on a tab that's switched on.
   const failing = failingAll.filter((f) => on.some((sec) => searchChainsIn(settings.enabledChains, sec).includes(f.chain)));
@@ -117,26 +120,7 @@ export function HomeScreen() {
             <Icon name="settings" size={20} />
           </button>
         </div>
-        {/* Fixed tiles, not a row that scrolls sideways (0.8.8): easier to hit, nothing to swipe. */}
-        {/* 0.9.12: all four, as on the web page; Receipts shows how to turn them on until they are. */}
-        <div className="home-links" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-          <button onClick={() => nav.push({ name: 'cards' })}>
-            <Icon name="card" size={22} />
-            <span>Cards</span>
-          </button>
-          <button onClick={() => nav.push({ name: 'catalogues' })}>
-            <Icon name="book" size={22} />
-            <span>Catalogues</span>
-          </button>
-          <button onClick={() => nav.push({ name: 'specials' })}>
-            <Icon name="flame" size={22} />
-            <span>Specials</span>
-          </button>
-          <button onClick={() => nav.push({ name: 'receipts' })}>
-            <Icon name="receipt" size={22} />
-            <span>Receipts</span>
-          </button>
-        </div>
+        {/* 0.10.10: Cards, Catalogues, Specials and Receipts live in More only (they were here as well), so Home is your deals. */}
         <div className="checkline">
           {refresh.stage && !progress ? (
             <>
@@ -183,7 +167,8 @@ export function HomeScreen() {
 
       <RecallBanner />
 
-      {!settings.tour.active && !serverMode && <SetupNudges settings={settings} />}
+      {/* 0.10.10: one next step at a time: with an empty pantry that's "Let's add your first item" (below) */}
+      {!settings.tour.active && !serverMode && allRecs.length > 0 && <SetupNudges settings={settings} />}
 
       {totals.linked > 0 && (
         <button
@@ -193,7 +178,8 @@ export function HomeScreen() {
         >
           <span className="home-list-top">
             <span className="home-list-lab">
-              <Icon name="cart" size={18} /> Shopping list · {totals.linked} item{totals.linked === 1 ? '' : 's'}
+              {/* 0.10.10: every open line, as the list counts them (it counted only the priced ones: "6 items" here, "8 items" on the list) */}
+              <Icon name="cart" size={18} /> Shopping list · {openLines} item{openLines === 1 ? '' : 's'}
             </span>
             <Icon name="chevron" size={18} />
           </span>
@@ -307,7 +293,7 @@ export function HomeScreen() {
           ),
         )}
 
-      {!recs.length && (
+      {!allRecs.length && (
         <div className="card guide">
           <Icon name="scan" size={32} />
           <h2 style={{ margin: 0 }}>Let's add your first item</h2>
@@ -333,6 +319,11 @@ export function HomeScreen() {
           >
             Or look around with sample items
           </button>
+          {!serverMode && !settings.tour.seen && (
+            <button className="btn ghost" onClick={() => void startTour()}>
+              Or take the two-minute tour
+            </button>
+          )}
         </div>
       )}
 
@@ -399,7 +390,7 @@ export function HomeScreen() {
 
       {altDeals.length > 0 && (
         <div className="eyebrow" style={{ color: 'var(--blue)' }}>
-          Swap &amp; save
+          Cheaper swap
         </div>
       )}
       {altDeals.map((r) => (
@@ -412,7 +403,7 @@ export function HomeScreen() {
         <DealCard key={r.group.id} rec={r} listed={listed.get(r.group.id)} />
       ))}
 
-      {waits.length > 0 && <div className="eyebrow amber">Wait for a better sale</div>}
+      {waits.length > 0 && <div className="eyebrow amber">Wait for a better special</div>}
       {waits.map((r) => (
         <DealCard key={r.group.id} rec={r} listed={listed.get(r.group.id)} />
       ))}
@@ -429,7 +420,7 @@ export function HomeScreen() {
           <span style={{ flex: 1, fontSize: 13, color: 'var(--ink-2)' }}>
             {r.best?.verdict.always
               ? `Always on special: ${r.group.name} has been "on special" nearly every day for 3 weeks. Skipped.`
-              : `Fake sale: ${r.group.name} is "on special" at its usual price. Skipped.`}
+              : `Fake special: ${r.group.name} is "on special" at its usual price. Skipped.`}
           </span>
         </button>
       ))}
@@ -456,6 +447,7 @@ export function weekDeals(allRecs: Recommendation[], settings: Settings, allEntr
   const entries = allEntries.filter((e) => (e.groupId ? pantryIds.has(e.groupId) : (e.section ?? 'pantry') === 'pantry'));
   // Items on the shopping list, by pantry item, with the list line (so the cart button can take it off again).
   const listed = new Map(allEntries.filter((e) => !e.checked && e.groupId).map((e) => [e.groupId!, e.id]));
+  const openLines = entries.filter((e) => !e.checked).length;
   const totals = shopTotals(
     entries,
     recs.filter((r) => pantryIds.has(r.group.id)),
@@ -475,7 +467,7 @@ export function weekDeals(allRecs: Recommendation[], settings: Settings, allEntr
   // Deals at one shop only, or all of them (0.7.4). The shop each deal is at: the swap's for a swap.
   const dealChain = (r: Recommendation) => (r.action === 'alt' ? r.alt : r.best)?.product.chain;
   const dealRecs = recs.filter((r) => r.action === 'buy' || r.action === 'alt' || r.action === 'small');
-  // Every section follows the shop picked (0.7.5): sales, small savings, wait, fake sales, normal price.
+  // Every section follows the shop picked (0.7.5): sales, small savings, wait, fake specials, normal price.
   const dealShops = [...new Set(recs.map(dealChain).filter((c): c is NonNullable<typeof c> => !!c))].sort((a, b) =>
     chainName(a).localeCompare(chainName(b)),
   );
@@ -489,7 +481,7 @@ export function weekDeals(allRecs: Recommendation[], settings: Settings, allEntr
   const normal = recs.filter((r) => r.action === 'none' && atShop(r));
   const worth = [...buys, ...altDeals];
   const saving = worth.reduce((sum, r) => sum + (r.saving ?? 0), 0);
-  return { on, recs, pantryIds, entries, listed, totals, oneStop, listSaving, dealChain, dealRecs, dealShops, showing, buys, altDeals, smalls, waits, skips, normal, worth, saving };
+  return { on, recs, pantryIds, entries, openLines, listed, totals, oneStop, listSaving, dealChain, dealRecs, dealShops, showing, buys, altDeals, smalls, waits, skips, normal, worth, saving };
 }
 
 function DealCard({ rec, listed }: { rec: Recommendation; listed?: string }) {
@@ -515,7 +507,8 @@ function DealCard({ rec, listed }: { rec: Recommendation; listed?: string }) {
             </span>
             <span className="sub">
               <ChainName chain={deal.product.chain} /> · {isAlt ? `swap to ${deal.product.name}` : rec.detail}
-              {!isAlt && flavourNoteFor(rec) ? ` · ${flavourNoteFor(rec)}` : ''}
+              {/* 0.10.10: "…its usual $4.80. · Ocean Breeze…" had a full stop and a dot together */}
+              {!isAlt && flavourNoteFor(rec) ? ` ${cap(flavourNoteFor(rec)!)}.` : ''}
             </span>
             <span className="tags">
               <ActionInfoTag rec={rec} action={rec.action} great={rec.best?.verdict.kind === 'great'} />

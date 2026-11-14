@@ -14,7 +14,7 @@ const DAY = 86_400_000;
 /** An untick within this long of the tick takes the purchase back (a mis-tap, or not bought). */
 export const UNDO_MS = 2 * DAY;
 const HISTORY_DAYS = 183;
-const LIST_NAMES: Record<string, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', general: 'General' };
+const LIST_NAMES: Record<string, string> = { pantry: 'Groceries', keg: 'Bottle shop', pharmacy: 'Chemist', general: 'General' };
 const CHAIN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 type Row = Record<string, unknown>;
@@ -362,6 +362,7 @@ export function makeSpending(q: Q, run: Run, now: () => number = Date.now) {
       prices: await one("SELECT COUNT(*) AS n FROM prices WHERE source <> 'demo'"),
       oldestPrice: ((await q("SELECT MIN(date) AS d FROM prices WHERE source <> 'demo'"))[0]?.d as string | null) ?? null,
       listLines: await one('SELECT COUNT(*) AS n FROM list_entries'),
+      samples: await one("SELECT COUNT(*) AS n FROM items WHERE id LIKE 'demo-%'"),
       receipts: await one("SELECT COUNT(*) AS n FROM receipts WHERE id NOT LIKE 'demo-%'"),
       cards: await one('SELECT COUNT(*) AS n FROM cards'),
       purchases: await one('SELECT COUNT(*) AS n FROM spend_log'),

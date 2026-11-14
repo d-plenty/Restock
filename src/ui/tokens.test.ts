@@ -49,7 +49,7 @@ describe('tokens: text contrast is at least 4.5:1 in every theme', () => {
   const TEXT = ['--ink', '--ink-2', '--muted', '--green', '--green-ink', '--blue', '--amber-ink', '--red-ink', '--good-ink'];
   const GROUNDS = ['--bg', '--surface', '--sunken'];
   const PAIRS: [string, string][] = [
-    // Tags and badges (GREAT DEAL, WAIT, FAKE SALE, SWAP & SAVE, USUAL PRICE).
+    // Tags and badges (GREAT DEAL, WAIT, FAKE SPECIAL, CHEAPER SWAP, USUAL PRICE).
     ['--good-ink', '--good-bg'],
     ['--green-ink', '--green-bg'],
     ['--amber-ink', '--amber-bg'],

@@ -223,7 +223,7 @@ export function addBody(
 
 /** What to say once it's added. */
 export function addedText(a: AddAnswer, name: string, tab: Section): string {
-  const place = tab === 'pantry' ? 'your pantry' : tab === 'keg' ? 'your keg' : 'your Health list';
+  const place = tab === 'pantry' ? 'your pantry' : tab === 'keg' ? 'your Bottle shop tab' : 'your Chemist list';
   const listName = a.line?.list === 'general' ? 'General' : 'your Shopping list';
   if (a.item && a.line) return `${name} added to ${place} and ${listName}`;
   if (a.item) return `${name} added to ${place}`;

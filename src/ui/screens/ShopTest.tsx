@@ -261,7 +261,7 @@ export function ShopTest() {
                   <Icon name="share" size={17} /> Copy the shop's answer
                 </button>
                 <span className="small">
-                  What the shop sent back, cut down, with details like your email, address or store number taken out. A shop's web page can still name
+                  What the shop sent back, cut down, with details like your email, address or branch number taken out. A shop's web page can still name
                   the branch it's set to.
                 </span>
               </>

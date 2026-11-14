@@ -35,7 +35,7 @@ import { ReceiptsSettings } from './Receipts';
 import { recallSummary } from './Recalls';
 import { ComingSoon } from './Soon';
 import { WidgetSettings } from './WidgetSettings';
-import { TILES, tileStatus } from './Setup';
+import { ESSENTIAL, TILES, isEssential, tileStatus } from './Setup';
 import { startTour } from '../Tour';
 import { getHealth, testConnections, type ConnectionTest, type StoreChain } from '../../lib/health';
 import { useNav } from '../nav';
@@ -291,7 +291,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       {on('hub') && (
         <>
           <div className="card flush">
-            {row('Setup', `${TILES.filter((t) => tileStatus(settings, t.id, syncShown).ok).length} of ${TILES.length} done`, () => nav.push({ name: 'setup' }))}
+            {row('Setup', ((n) => (n ? `${n} of ${ESSENTIAL.length} still to do to get started` : 'Ready to go · more to set up when you want it'))(TILES.filter((t) => isEssential(t.id) && !tileStatus(settings, t.id, syncShown).ok).length), () => nav.push({ name: 'setup' }))}
           </div>
           <div className="eyebrow" id="s-stores">
             Your shops
@@ -300,8 +300,8 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             {/* 0.9.8: one row per tab of My shops; sign-ins and stock are on each shop's own row there. 0.9.14: each says its tab. */}
             {row('Supermarkets (Pantry tab)', `${shopSummary(settings, 'pantry')} · ${shopAccountsSummary(settings)}`, () => nav.push({ name: 'stores', section: 'pantry' }))}
             {/* 0.10.0: Keg and Health are beta (BETA_NOTE): the same as Groceries, less tested. */}
-            {row('Bottle shops (Keg tab) · Beta', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
-            {row('Chemists (Health tab) · Beta', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
+            {row('Bottle shops · Beta', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
+            {row('Chemists · Beta', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
             {/* 0.10.7: each custom section (Baby and Pets are custom sections now), then making another */}
             {customsInUse(settings).map((c) => row(SECTION_NAMES[c], shopSummary(settings, c), () => nav.push({ name: 'stores', section: c })))}
             {customsInUse(settings).length < MAX_CUSTOM &&
@@ -363,7 +363,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             <label className="row field-row">
               <span className="grow">
                 <span className="title">In shopping mode, start with</span>
-                <span className="small">How each shop's things are sorted when you start shopping. Aisle numbers come from your Coles branch.</span>
+                <span className="small">How each shop's items are sorted when you start shopping. Aisle numbers come from your Coles branch.</span>
                 <select
                   className="input"
                   value={settings.shopSort ? `${settings.shopSort.by}${settings.shopSort.down ? '-down' : ''}` : 'aisle'}
@@ -398,7 +398,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             Price history
           </div>
           <PriceHistorySettings settings={settings} />
-          <Explain title="How Restock judges a sale">
+          <Explain title="How Restock judges a special">
             {/* 0.9.0: says what the code does (verdict.ts computeStats and judge). */}
             <p>
               Each product's <strong>usual price</strong> is the middle of the regular prices Restock has seen for it over the history you keep (
@@ -535,7 +535,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
               <div className="row" aria-disabled="true" style={{ opacity: 0.55 }}>
                 <span className="grow">
                   <span className="title">Import data</span>
-                  <span className="small">On your Restock server's web page (Data tab): adds products and prices from a file.</span>
+                  <span className="small">On your Restock server's web page (Your data): adds products and prices from a file.</span>
                 </span>
               </div>
             )}
@@ -845,7 +845,7 @@ function BetaGate({ settings, searching, children }: { settings: Settings; searc
 }
 
 /** Try each store and show whether it works, how long it took, or what went wrong. */
-const GROUP_LABEL: Record<Section, string> = withCustom({ pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health' }, (n) => n);
+const GROUP_LABEL: Record<Section, string> = withCustom({ pantry: 'Groceries', keg: 'Bottle shop', pharmacy: 'Chemist' }, (n) => n);
 
 /** The shops you use, by tab (one per website, so Liquorland's three shops show once). Tabs that are off are left out. */
 function shopGroups(settings: Settings): { section: Section; chains: StoreChain[] }[] {

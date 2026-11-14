@@ -67,7 +67,7 @@ export { TEST_WORD };
 
 /**
  * "Find near me": every supermarket, bottle shop or pharmacy Restock knows within about 25 km,
- * grouped by shop (closest shop first), whether or not you've picked that shop yet. Choosing one as your store also
+ * grouped by shop (closest shop first), whether or not you've picked that shop yet. Choosing one as your branch also
  * picks the shop, so you can set up from the list instead of ticking shops first.
  */
 /**
@@ -453,7 +453,7 @@ async function setShopFor(chain: StoreChain, section: Section, on: boolean) {
 }
 
 /** What the tab's shops are called in the picker's heading. */
-const TAB_SHOPS_TITLE: Record<Section, string> = withCustom({ pantry: 'Shops for Pantry', keg: 'Shops for Keg', pharmacy: 'Shops for Health' }, (n) => `Shops for ${n}`);
+const TAB_SHOPS_TITLE: Record<Section, string> = withCustom({ pantry: 'Shops for Pantry', keg: 'Shops for Bottle shop', pharmacy: 'Shops for Chemist' }, (n) => `Shops for ${n}`);
 /** The heading each tab opens with (the rest start folded away). */
 const TAB_GROUP: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bottle', pharmacy: 'pharmacy', baby: 'baby', pets: 'pet', ...slots('other' as ShopGroup) };
 
@@ -580,7 +580,7 @@ function PickOnSite({ chain }: { chain: StoreChain }) {
       <span className="small" role="status">
         {saved
           ? `Your ${chainName(chain)}: ${saved}. Restock uses its own prices.`
-          : `${chainName(chain)}'s prices are each store's own: pick yours on its website, once.`}
+          : `${chainName(chain)}'s prices are each branch's own: pick yours on its website, once.`}
       </span>
       <button
         className="btn small"
@@ -597,7 +597,7 @@ function PickOnSite({ chain }: { chain: StoreChain }) {
           }
         }}
       >
-        {isNative() ? (busy ? 'Reading your store…' : `Choose your ${chainName(chain)} store`) : 'Works in the Android app'}
+        {isNative() ? (busy ? 'Reading your branch…' : `Choose your ${chainName(chain)} branch`) : 'Works in the Android app'}
       </button>
       {ask !== undefined && (
         <form
@@ -777,12 +777,12 @@ const TAB_ABOUT: Record<Exclude<Section, 'pantry'>, { title: string; text: strin
 >(
   {
     keg: {
-      title: 'Bottle shops (Keg tab)',
+      title: 'Bottle shops',
       text: 'Track beer, wine and spirits prices at the shops you pick. Kept separate from groceries.',
       seldom: 'a drink',
     },
     pharmacy: {
-      title: 'Chemists (Health tab)',
+      title: 'Chemists',
       text: 'Track medicine, first aid and personal care prices at the shops you pick. Kept separate from groceries.',
       seldom: 'from a chemist',
     },
@@ -840,7 +840,7 @@ export function SectionSwitch({ settings, section }: { settings: Settings; secti
       </div>
       {askAge && (
         <Sheet title="Bottle shops are 18+" onClose={() => setAskAge(false)}>
-          <p>The Keg tab tracks alcohol prices. Please confirm you're 18 or over.</p>
+          <p>The Bottle shop tab tracks alcohol prices. Please confirm you're 18 or over.</p>
           <div className="two">
             <button className="btn" onClick={() => setAskAge(false)}>
               Not yet
@@ -953,7 +953,7 @@ export function StoreFields({ settings, section = 'pantry' }: { settings: Settin
                 : section === 'keg'
                   ? ' Some bottle shops set prices per branch, so your local one can differ.'
                   : ' Some shops set prices per branch, so your local one can differ.'}{' '}
-              In shopping mode their things show Aisle: unknown unless the shop gives aisle numbers.
+              In shopping mode their items only show an aisle when the shop gives aisle numbers.
             </p>
           )}
         </>
@@ -968,7 +968,7 @@ export function StoreFields({ settings, section = 'pantry' }: { settings: Settin
  */
 const NO_BRANCH_YET = (chain: StoreChain) => (chain === 'aldi' ? 'Branch optional: it only names where you go in Start shopping' : 'No branch picked yet');
 
-/** "Your store: Kirwan · 2nd: Upper Ross", or that no branch is picked yet. */
+/** "Your branch: Kirwan · 2nd: Upper Ross", or that no branch is picked yet. */
 function branchText(st: StoreChoice, chain: StoreChain): string {
   const primary = cleanStoreName(st.primary);
   const second = cleanStoreName(st.secondary);
@@ -1014,7 +1014,7 @@ export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
 
 /**
  * 0.10.2: where aisle numbers come from (setup and Settings → Supermarkets), with the disclaimer.
- * Only Coles gives them, at your branch, with Prices and stock at my store on.
+ * Only Coles gives them, at your branch, with Prices and stock at my branch on.
  */
 function AisleCard({ settings }: { settings: Settings }) {
   const coles = settings.enabledChains.includes('coles');
@@ -1026,8 +1026,8 @@ function AisleCard({ settings }: { settings: Settings }) {
       </div>
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <p className="small" style={{ margin: 0 }}>
-          When you start shopping, each thing shows its aisle at your branch, and you can sort each shop by aisle, category or A–Z. Where a shop
-          doesn't say, it shows Aisle: unknown.
+          When you start shopping, each item shows its aisle at your branch, and you can sort each shop by aisle, category or A–Z. Where a shop
+          doesn't say, the line just has no aisle.
         </p>
         <p className="small" style={{ margin: 0, fontWeight: 600 }}>
           {AISLE_NOTE}
@@ -1036,14 +1036,14 @@ function AisleCard({ settings }: { settings: Settings }) {
           <li>
             Coles:{' '}
             {!coles
-              ? 'gives aisle numbers for most things, once you pick it.'
+              ? 'gives aisle numbers for most items, once you pick it.'
               : branch
                 ? `yes, at ${storeChoice(settings, 'coles').primary ?? 'your branch'}${secondBranch(settings) ? ` and ${secondBranch(settings)}` : ''}, from the next price check.`
-                : 'turn on Prices and stock at my store (under Coles, above) and set your branch.'}
+                : 'turn on Prices and stock at my branch (under Coles, above) and set your branch.'}
           </li>
           <li>Woolworths: its website gives an online category, not an aisle number.</li>
           <li>Aldi and Costco: they don't publish aisle numbers.</li>
-          <li>IGA and the other shops: Aisle: unknown for now.</li>
+          <li>IGA and the other shops: no aisle numbers for now.</li>
         </ul>
       </div>
     </>
@@ -1144,7 +1144,7 @@ function WoolworthsAccount({ settings, inline }: { settings: Settings; inline?: 
         setNote(
           a.signedIn
             ? a.storeId
-              ? { ok: true, text: `Signed in. Your store: ${a.storeName ?? `Woolworths store ${a.storeId}`}.` }
+              ? { ok: true, text: `Signed in. Your branch: ${a.storeName ?? `Woolworths branch ${a.storeId}`}.` }
               : { ok: false, text: 'Signed in, but no branch is picked yet. Tap "Change branch", choose Pick up and your local shop, then tap Done.' }
             : { ok: false, text: "Woolworths says you're not signed in. Try again, and tap Done once you're in." },
         );
@@ -1163,7 +1163,7 @@ function WoolworthsAccount({ settings, inline }: { settings: Settings; inline?: 
       status={
         on
           ? acct?.storeId
-            ? `Signed in · prices and stock at ${acct.storeName ?? `store ${acct.storeId}`}`
+            ? `Signed in · prices and stock at ${acct.storeName ?? `branch ${acct.storeId}`}`
             : 'Signed in · no branch picked yet'
           : 'Not signed in · online prices only, no stock'
       }
@@ -1442,7 +1442,7 @@ function ColesStore({ settings, inline }: { settings: Settings; inline?: boolean
 /** 0.9.9: what a shop tells Restock about stock at your branch, in one line. */
 function stockLine(settings: Settings, chain: string): string {
   if (chain === 'woolworths')
-    return settings.accounts?.woolworths?.signedIn ? 'Stock at your signed-in Woolworths, at each price check.' : 'Sign in to see stock at your Woolworths. Woolworths only says it for the store on your account, so there\'s no second Woolworths for stock.';
+    return settings.accounts?.woolworths?.signedIn ? 'Stock at your signed-in Woolworths, at each price check.' : 'Sign in to see stock at your Woolworths. Woolworths only says it for the branch on your account, so there\'s no second Woolworths for stock.';
   if (chain === 'coles') return settings.localPrices && storeChoice(settings, 'coles').branchStoreNo ? 'Stock at your Coles, and at a second Coles if you add one.' : 'Pick your Coles branch (above) to see its stock.';
   if (chain === 'aldi') return 'Aldi doesn\'t say what\'s in stock.';
   if (chain === 'costco') return 'Costco doesn\'t say what\'s in stock at a warehouse.';
@@ -1453,7 +1453,7 @@ function stockLine(settings: Settings, chain: string): string {
 function shopStatus(settings: Settings, chain: string): string {
   if (chain === 'woolworths') {
     const a = settings.accounts?.woolworths;
-    return a?.signedIn ? `Signed in · prices and stock at ${a.storeName ?? 'your store'}` : 'Not signed in · online prices, no stock';
+    return a?.signedIn ? `Signed in · prices and stock at ${a.storeName ?? 'your branch'}` : 'Not signed in · online prices, no stock';
   }
   if (chain === 'coles') {
     const no = settings.localPrices ? storeChoice(settings, 'coles').branchStoreNo : undefined;
@@ -1554,7 +1554,7 @@ function ShopEditSheet({ settings, chain, onClose }: { settings: Settings; chain
       {shopDef(chain)?.pickOnSite ? <PickOnSite chain={chain} /> : <NearbyFinder settings={settings} section={sectionOf(chain)} only={chain} />}
       <BranchByHand chain={chain} choice={s} onSet={setStore} />
 
-      <div className="eyebrow">Sign in and your store</div>
+      <div className="eyebrow">Sign in and your branch</div>
       {chain === 'woolworths' && <WoolworthsAccount settings={settings} inline />}
       {chain === 'coles' && <ColesStore settings={settings} inline />}
       {chain === 'costco' && <CostcoAccount settings={settings} />}
@@ -1674,7 +1674,7 @@ function CostcoAccount({ settings }: { settings: Settings }) {
                 <strong>Signed in:</strong> your member prices.
               </p>
               <p className="small">
-                <strong>Not signed in:</strong> Costco's public prices. Member-only things show without a price.
+                <strong>Not signed in:</strong> Costco's public prices. Member-only items show without a price.
               </p>
               <p className="small">You sign in on Costco's own page. Your password goes to Costco, not Restock.</p>
               {notice}

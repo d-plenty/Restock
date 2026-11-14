@@ -30,12 +30,12 @@ export const SECTIONS: Section[] = ['pantry', 'keg', 'pharmacy', 'baby', 'pets',
 /** The tabs besides Pantry, in the order they're set up and shown in More. */
 export const EXTRA_SECTIONS: Exclude<Section, 'pantry'>[] = ['keg', 'pharmacy', 'baby', 'pets', ...CUSTOM_SLOTS];
 /** A section's name. Custom ones are filled in from settings (applyCustomSections). */
-export const SECTION_NAMES: Record<Section, string> = { pantry: 'Pantry', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets', ...slots('Custom') };
+export const SECTION_NAMES: Record<Section, string> = { pantry: 'Pantry', keg: 'Bottle shop', pharmacy: 'Chemist', baby: 'Baby', pets: 'Pets', ...slots('Custom') };
 /** "Added to your pantry / keg / Health list". */
 export const SECTION_PLACE: Record<Section, string> = {
   pantry: 'your pantry',
-  keg: 'your keg',
-  pharmacy: 'your Health list',
+  keg: 'your Bottle shop tab',
+  pharmacy: 'your Chemist list',
   baby: 'your Baby list',
   pets: 'your Pets list',
   ...slots('your list'),
@@ -149,7 +149,7 @@ export const shareTab = (s: string | null | undefined): ShareTab => (s === 'keg'
 export type ListSection = Section | 'general';
 export const LIST_SECTIONS: ListSection[] = ['pantry', 'keg', 'pharmacy', 'baby', 'pets', ...CUSTOM_SLOTS, 'general'];
 /** The tab names on the list (phone and web). */
-export const LIST_NAMES: Record<ListSection, string> = { pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health', baby: 'Baby', pets: 'Pets', ...slots('Custom'), general: 'General' };
+export const LIST_NAMES: Record<ListSection, string> = { pantry: 'Groceries', keg: 'Bottle shop', pharmacy: 'Chemist', baby: 'Baby', pets: 'Pets', ...slots('Custom'), general: 'General' };
 /** "Nothing on your General list", "tap the cart next to anything in your pantry". */
 export const LIST_PLACE: Record<ListSection, string> = { ...SECTION_PLACE, general: 'your pantry' };
 /** A list_entries section as stored: anything this version doesn't know is the grocery list. */
@@ -219,7 +219,7 @@ export interface ShopDef {
   catalogue?: { url: string; note: string };
   /** 0.10.3: the heading it's under in the shop picker (otherwise its tab's). */
   group?: ShopGroup;
-  /** 0.10.3: "Choose your store" opens the shop's website to pick it there (IGA: prices are each store's own). */
+  /** 0.10.3: "Choose your store" opens the shop's website to pick it there (IGA: prices are each branch's own). */
   pickOnSite?: string;
 }
 
@@ -231,7 +231,7 @@ export const SHOP_GROUPS: { id: ShopGroup; name: string }[] = [
   { id: 'bottle', name: 'Bottle shops' },
   { id: 'baby', name: 'Baby shops' },
   { id: 'pet', name: 'Pet shops' },
-  { id: 'bigbox', name: 'Big box stores' },
+  { id: 'bigbox', name: 'Big box shops' },
   { id: 'other', name: 'Other shops' },
 ];
 const GROUP_OF: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bottle', pharmacy: 'pharmacy', baby: 'baby', pets: 'pet', ...slots('other' as ShopGroup) };
@@ -293,9 +293,9 @@ export const SHOPS: ShopDef[] = [
     color: '#e3001b',
     website: 'https://www.igashop.com.au',
     map: /\biga\b/i,
-    note: "Your store's own prices, from IGA's shopping website",
-    pickOnSite: 'Enter your postcode and choose your IGA store at the top of the page (sign in if you like). Then tap Done.',
-    catalogue: { url: 'https://www.igashop.com.au/specials/1', note: 'Specials at the store you picked.' },
+    note: "Your branch's own prices, from IGA's shopping website",
+    pickOnSite: 'Enter your postcode and choose your IGA branch at the top of the page (sign in if you like). Then tap Done.',
+    catalogue: { url: 'https://www.igashop.com.au/specials/1', note: 'Specials at the branch you picked.' },
   }),
 
   L({

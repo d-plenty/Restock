@@ -88,7 +88,7 @@ import {
 const SEARCH_PLACEHOLDER: Record<Section, string> = {
   pantry: 'Search products',
   keg: 'Search drinks',
-  pharmacy: 'Search Health',
+  pharmacy: 'Search Chemist',
   baby: 'Search Baby',
   pets: 'Search Pets',
   ...slots('Search products'),
@@ -262,6 +262,22 @@ export function AddScreen({
 
   const [term, setTerm] = useState(query ?? '');
   // 0.10.8: Find it from a photo, in a sheet (it used to open in the page, pushing everything down)
+  const [moreWays, setMoreWays] = useState(() => {
+    try {
+      return localStorage.getItem('restock.addMoreWays') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleMoreWays = () =>
+    setMoreWays((x) => {
+      try {
+        localStorage.setItem('restock.addMoreWays', x ? '0' : '1');
+      } catch {
+        // just for this visit
+      }
+      return !x;
+    });
   const [photoFind, setPhotoFind] = useState(false);
   const [rankQ, setRankQ] = useState<RankQuery>({ text: query ?? '' });
   const [scanned, setScanned] = useState<BarcodeInfo>();
@@ -621,7 +637,7 @@ export function AddScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barcode]);
 
-  // Coming from an item's "Find at another store": search straight away.
+  // Coming from an item's "Find at another shop": search straight away.
   const ready = !attachTo || attach !== undefined;
   useEffect(() => {
     if (query && ready && settings) {
@@ -922,14 +938,14 @@ export function AddScreen({
     setSaving(true);
     try {
       // 0.9.5 (undo): the whole attach is one Undo.
-      await act(as === 'alt' ? `Added to Would also take for ${attachGroup.name}` : `Added to My picks for ${attachGroup.name}`, async () => {
+      await act(as === 'alt' ? `Added to Also happy with for ${attachGroup.name}` : `Added to What I buy for ${attachGroup.name}`, async () => {
       const ids = await saveProducts();
       const all = new Set([attachGroup.usualProductId, ...attachGroup.sameProductIds, ...attachGroup.altProductIds]);
       if (as === 'alt') {
         const fresh = ids.filter((id) => !all.has(id));
         await updateGroup(attachGroup.id, { altProductIds: [...attachGroup.altProductIds, ...fresh] });
       } else {
-        // One you'd also take, ticked as a pick, moves to My picks (0.8.9).
+        // One you'd also take, ticked as a pick, moves to What I buy (0.8.9).
         const mains = new Set([attachGroup.usualProductId, ...attachGroup.sameProductIds]);
         const fresh = ids.filter((id) => !mains.has(id));
         // A pick ticked at a shop marked "Not at this shop" puts the shop back in (0.8.9).
@@ -1081,7 +1097,7 @@ export function AddScreen({
     ? as === 'alt'
       ? onlyChain
         ? `Find one at ${chainName(onlyChain)}`
-        : 'Would also take'
+        : 'Also happy with'
       : another
         ? 'Add another pick'
         : onlyChain
@@ -1100,7 +1116,7 @@ export function AddScreen({
       ? `Tick what you'd buy as "${forLine.word}" at each shop, then tap the bar at the bottom to add it to your pantry.`
       : forList
         ? 'Tick the ones you’d buy, at any shop. The cheapest of them goes on your Shopping list for this trip only. Then tap the bar at the bottom.'
-        : 'Tick what you buy at each shop (it can be a different product at each one), so Restock can tell you where it’s cheapest. Then tap the bar at the bottom to add it. You can add ones you’d also take later, from the item’s page.';
+        : 'Tick what you buy at each shop, so Restock can tell you where it’s cheapest. Then tap the bar at the bottom. Tap a photo for a closer look.';
 
   // A ticked product that's already a pantry item: from the Pick sheet, the line can just be that item.
   const trackedPick = forLine ? [...picks.keys()].map((k) => pantry?.get(k)).find((g): g is Group => !!g) : undefined;
@@ -1119,7 +1135,7 @@ export function AddScreen({
     ? 'Add to your pantry'
     : attachGroup
       ? as === 'alt'
-        ? 'Would also take'
+        ? 'Also happy with'
         : `Add to ${attachGroup.name}`
       : forList
         ? 'Add to your shopping list'
@@ -1216,48 +1232,6 @@ export function AddScreen({
         </div>
       )}
 
-      {/* 0.10.8: one tidy block: Scan a barcode, then the other ways in as equal tiles (Scan several,
-          Photo, Receipt), and the scanned barcodes still to match as one line. */}
-      {!forLine && (
-        <div className="add-ways">
-          <button className="btn primary block" onClick={doScan}>
-            <Icon name="scan" /> Scan a barcode
-          </button>
-          {toolCount > 0 && (
-            <div className={`add-tools${toolCount === 1 ? ' one' : ''}`}>
-              {!attachTo && (
-                <button
-                  className="add-tool"
-                  onClick={() => nav.push({ name: 'scanned', section, start: true })}
-                  aria-label="Scan several things in a row"
-                >
-                  <Icon name="scan" size={22} />
-                  <span>Scan several</span>
-                </button>
-              )}
-              {!scanned && (
-                <button className="add-tool" onClick={() => setPhotoFind(true)} aria-label="Find it from a photo of the pack">
-                  <Icon name="camera" size={22} />
-                  <span>{toolCount === 1 ? 'Find it from a photo' : 'Photo'}</span>
-                </button>
-              )}
-              {!attachTo && !overlay && settings?.receipts.enabled && (
-                <button className="add-tool" onClick={() => nav.push({ name: 'receipt' })} aria-label="Add a receipt">
-                  <Icon name="receipt" size={22} />
-                  <span>Receipt</span>
-                </button>
-              )}
-            </div>
-          )}
-          {!attachTo && scansLeft > 0 && (
-            <button className="card add-scans" onClick={() => nav.push({ name: 'scanned', section })}>
-              <Icon name="scan" size={18} />
-              <span className="grow">{scansLeft === 1 ? '1 scanned barcode to match' : `${scansLeft} scanned barcodes to match`}</span>
-              <Icon name="chevron" size={16} />
-            </button>
-          )}
-        </div>
-      )}
       {photoFind && (
         <Sheet title="Find it from a photo" onClose={() => setPhotoFind(false)}>
           <p className="small" style={{ margin: 0 }}>
@@ -1295,6 +1269,58 @@ export function AddScreen({
           <Icon name="search" />
         </button>
       </form>
+
+      {/* 0.10.10: after the search box, which now comes first. 0.10.8: one tidy block: Scan a barcode, then the other ways in as equal tiles (Scan several,
+          Photo, Receipt), and the scanned barcodes still to match as one line. */}
+      {!forLine && (
+        <div className="add-ways">
+          <button className="btn primary block" onClick={doScan}>
+            <Icon name="scan" /> Scan a barcode
+          </button>
+          {/* 0.10.10: one Scan button; the other ways in open from "More ways to add" (and stay open once you use them) */}
+          {toolCount > 0 && (
+            <button className="btn ghost small add-more" aria-expanded={moreWays} onClick={toggleMoreWays}>
+              More ways to add{' '}
+              <span className={moreWays ? 'turn-up' : 'turn-down'}>
+                <Icon name="chevron" size={14} />
+              </span>
+            </button>
+          )}
+          {toolCount > 0 && moreWays && (
+            <div className={`add-tools${toolCount === 1 ? ' one' : ''}`}>
+              {!attachTo && (
+                <button
+                  className="add-tool"
+                  onClick={() => nav.push({ name: 'scanned', section, start: true })}
+                  aria-label="Scan several items in a row"
+                >
+                  <Icon name="scan" size={22} />
+                  <span>Scan several</span>
+                </button>
+              )}
+              {!scanned && (
+                <button className="add-tool" onClick={() => setPhotoFind(true)} aria-label="Find it from a photo of the pack">
+                  <Icon name="camera" size={22} />
+                  <span>{toolCount === 1 ? 'Find it from a photo' : 'Photo'}</span>
+                </button>
+              )}
+              {!attachTo && !overlay && settings?.receipts.enabled && (
+                <button className="add-tool" onClick={() => nav.push({ name: 'receipt' })} aria-label="Add a receipt">
+                  <Icon name="receipt" size={22} />
+                  <span>Receipt</span>
+                </button>
+              )}
+            </div>
+          )}
+          {!attachTo && scansLeft > 0 && (
+            <button className="card add-scans" onClick={() => nav.push({ name: 'scanned', section })}>
+              <Icon name="scan" size={18} />
+              <span className="grow">{scansLeft === 1 ? '1 scanned barcode to match' : `${scansLeft} scanned barcodes to match`}</span>
+              <Icon name="chevron" size={16} />
+            </button>
+          )}
+        </div>
+      )}
 
       {!anyResults && !scanned && !term && recent.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1843,7 +1869,7 @@ export function AddScreen({
                                 {isExactBarcode(rankQ, sp) && <span className="tag good">EXACT MATCH</span>}
                                 {!isExactBarcode(rankQ, sp) && k === sureKey && <span className="tag good">BEST MATCH · TICKED FOR YOU</span>}
                                 {!isExactBarcode(rankQ, sp) && k !== sureKey && !rankQ.barcode && top.has(k) && (
-                                  <span className="tag good">RECOMMENDED</span>
+                                  <span className="tag good">GOOD MATCH</span>
                                 )}
                                 {tracked && <span className="tag normal">IN YOUR PANTRY</span>}
                                 {sp.isSpecial && !sp.memberOnly && (
@@ -2006,7 +2032,7 @@ export function AddScreen({
               </>
             ) : attachGroup ? (
               <AddBtn target="pantry" busy={saving ? 'pantry' : undefined} className="btn primary" onClick={() => void saveAttach()}>
-                {as === 'alt' ? 'Add to Would also take' : `Add to ${attachGroup.name}`}
+                {as === 'alt' ? 'Add to Also happy with' : `Add to ${attachGroup.name}`}
               </AddBtn>
             ) : (
               <>
@@ -2293,7 +2319,7 @@ export function ManualSheet({
         </>
       ) : attachTo ? (
         <button className="btn primary" disabled={!name.trim() || saving} onClick={() => save('pantry')}>
-          {as === 'alt' ? 'Add to Would also take' : `Add to ${attachTo.name}`}
+          {as === 'alt' ? 'Add to Also happy with' : `Add to ${attachTo.name}`}
         </button>
       ) : (
         <>

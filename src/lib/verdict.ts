@@ -41,7 +41,7 @@ export const VERDICT_LABEL: Record<VerdictKind, string> = {
   good: 'ON SPECIAL',
   small: 'SMALL SAVING',
   wait: 'WAIT',
-  fake: 'FAKE SALE',
+  fake: 'FAKE SPECIAL',
   normal: 'USUAL PRICE',
   nodata: 'NO PRICE YET',
 };
@@ -150,7 +150,7 @@ export function normaliseReadings(readings: PriceReading[], now = Date.now(), da
 /**
  * A product's normal price, usual sale, lowest price and sale cycle. `hasCard`: whether you have
  * the shop's loyalty card. Without it (0.9.0), member prices aren't prices you can pay, so they don't
- * set the normal price, the usual sale, the lowest price ("wait for a better sale") or the sale
+ * set the normal price, the usual sale, the lowest price ("wait for a better special") or the sale
  * cycle; only their "was" price still counts, as the store's. Mirrored in Deals.java.
  */
 export function computeStats(raw: PriceReading[], now = Date.now(), hasCard = true, days = HISTORY_DAYS): PriceStats {
@@ -315,7 +315,7 @@ export const HALF_PRICE = 0.45;
  *    (or the store's "was" price until there's history).
  *  - Great deal: 30%+ off normal. On sale (good sale): 15%+. Small saving: any price drop below that, even 5c.
  *  - Wait: it's been at least 5% cheaper than this in the last 6 months.
- *  - Fake sale: marked as a special, but not even a cent below normal.
+ *  - Fake special: marked as a special, but not even a cent below normal.
  *  - Not a deal at all (0.9.0): a sale price from before this week's specials started (Wednesday),
  *    or a lower price last seen over STALE_DAYS ago. They may not be today's prices.
  * Mirrored in Deals.java.
@@ -340,7 +340,7 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
   if (isSpecial && stats.asOf !== undefined && seen < specialsWeekStart(stats.asOf)) {
     return {
       kind: 'normal',
-      headline: 'Sale may have ended',
+      headline: 'Special may have ended',
       detail: `It was ${multi ? multiText(multi) : `on special for ${money(p)}`} on ${shortDate(cur.date)}, before this week's specials started. Check prices to see this week's price.`,
       basis,
       stale: 'ended',
@@ -371,7 +371,7 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
 
   if (ref - p < 0.005) {
     if (isSpecial) {
-      return { kind: 'fake', headline: 'Fake sale', detail: 'Marked as a special, but this is its usual price.', discount, basis };
+      return { kind: 'fake', headline: 'Fake special', detail: 'Marked as a special, but this is its usual price.', discount, basis };
     }
     if (p > ref * 1.03) return { kind: 'normal', headline: 'Pricier than usual', detail: `Usually ${money(ref)}.`, discount, basis };
     return { kind: 'normal', headline: 'Usual price', detail: `Usually ${money(ref)}.`, discount, basis };
@@ -395,7 +395,7 @@ export function judge(stats: PriceStats, hasCard = true, allowMulti = true): Ver
     const when = stats.lowDate ? ` on ${shortDate(stats.lowDate)}` : stats.fromMarket ? ' in shared prices' : '';
     return {
       kind: 'wait',
-      headline: 'Wait for a better sale',
+      headline: 'Wait for a better special',
       detail: `${deal}It's been as low as ${money(stats.low)}${when}.${cycle}`,
       saving,
       discount,
@@ -440,7 +440,7 @@ export interface Option {
  * buy   — your product is on a good or great sale
  * alt   — your product isn't on sale, but an alternative is, and it's cheaper
  * small — your product has a small saving
- * wait / skip / none — hold off, fake sale, normal price
+ * wait / skip / none — hold off, fake special, normal price
  */
 export type ActionKind = 'buy' | 'alt' | 'small' | 'wait' | 'skip' | 'none';
 
@@ -599,7 +599,7 @@ export function recommend(
       best,
       alt,
       action: 'alt',
-      headline: `Swap & save at ${chainLabel(alt.product.chain)}`,
+      headline: `Cheaper swap at ${chainLabel(alt.product.chain)}`,
       detail: outOfStock
         ? `Yours (${describe(best!)}) is out of stock at ${chainLabel(best!.product.chain)}. Get ${describe(alt)} at ${chainLabel(alt.product.chain)} instead: it's in stock and on special for ${money(alt.price!)}.`
         : best
@@ -627,8 +627,8 @@ export function recommend(
   const v = best.verdict;
   const where = chainLabel(best.product.chain);
   if (v.kind === 'small') return { ...base, best, action: 'small', headline: `Small saving at ${where}`, detail: v.detail, saving: v.saving };
-  if (v.kind === 'wait') return { ...base, best, action: 'wait', headline: 'Wait for a better sale', detail: v.detail };
-  if (v.kind === 'fake') return { ...base, best, action: 'skip', headline: 'Fake sale', detail: v.detail };
+  if (v.kind === 'wait') return { ...base, best, action: 'wait', headline: 'Wait for a better special', detail: v.detail };
+  if (v.kind === 'fake') return { ...base, best, action: 'skip', headline: 'Fake special', detail: v.detail };
   if (v.kind === 'nodata') return { ...base, best, headline: 'No price yet', detail: v.detail };
   return { ...base, best, action: 'none', headline: `Cheapest at ${where}`, detail: v.detail };
 }
@@ -703,7 +703,7 @@ export function worthAlerting(rec: Recommendation): boolean {
 
 export const ALERT_LEVELS: { id: Group['alertLevel']; label: string; explain: string }[] = [
   { id: 'any', label: 'Any price drop', explain: 'Any price drop at all, even 5c below its usual price.' },
-  { id: 'good', label: 'Good sale (15%+)', explain: `At least ${GOOD_SALE * 100}% below its usual price.` },
+  { id: 'good', label: 'On special (15%+)', explain: `At least ${GOOD_SALE * 100}% below its usual price.` },
   { id: 'great', label: 'Great deal (30%+)', explain: `At least ${GREAT_SALE * 100}% below its usual price.` },
   { id: 'custom', label: 'Custom', explain: 'Pick how much off it needs to be.' },
   { id: 'never', label: 'Never', explain: 'Keep tracking the price, but no alerts.' },

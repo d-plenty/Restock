@@ -88,7 +88,7 @@ describe('Move to: the rules', () => {
     expect(p.line.id).not.toBe('a');
     expect(p.line).toMatchObject({ text: 'Ice', groupId: 'k-ice', categoryId: 'c-kegx', qty: 2, section: 'keg', createdAt: e.createdAt });
     expect(p.canPick).toBe(false);
-    expect(moveNote(p, chainName)).toBe('Becomes your Keg item Ice.');
+    expect(moveNote(p, chainName)).toBe('Becomes your Bottle shop item Ice.');
   });
 
   it('"2 ice" as words becomes two of the item', () => {
@@ -101,7 +101,7 @@ describe('Move to: the rules', () => {
     expect(p.canPick).toBe(true);
     expect(p.line).toMatchObject({ text: 'Chopsticks', section: 'pharmacy' });
     expect(p.line.groupId).toBeUndefined();
-    expect(moveNote(p, chainName)).toBe('Then pick which Health item it is, or keep the words.');
+    expect(moveNote(p, chainName)).toBe('Then pick which Chemist item it is, or keep the words.');
     expect(pickableFor('pharmacy', f.groups).map((g) => g.id)).toEqual(['h-band']);
     expect(pickableFor('general', f.groups)).toEqual([]);
   });
@@ -162,7 +162,7 @@ describe('Move to: on the list, with Undo', () => {
     await addListEntry(line('l1', 'ice', { section: 'general', qty: 3 }));
     const before = listTable();
     const m = await moveToFromListActions('l1', 'keg', 'ice');
-    expect(lastStep()?.label).toBe('ice moved to Keg as Ice');
+    expect(lastStep()?.label).toBe('ice moved to Bottle shop as Ice');
     const now = await allListEntries();
     expect(now.map((e) => e.id)).toEqual([m!.id]);
     expect(now[0]).toMatchObject({ text: 'Ice', groupId: 'k-ice', section: 'keg', qty: 3, checked: false, createdAt: '2026-11-10T00:00:00.000Z' });
@@ -175,7 +175,7 @@ describe('Move to: on the list, with Undo', () => {
     await addListEntry(line('l1', 'ice', { section: 'general', qty: 3 }));
     const before = listTable();
     await moveTo('l1', 'keg', 'ice');
-    expect(lastStep()?.label).toBe('ice moved to Keg, added to the Ice already there');
+    expect(lastStep()?.label).toBe('ice moved to Bottle shop, added to the Ice already there');
     expect((await allListEntries()).map((e) => [e.id, e.qty])).toEqual([['k1', 5]]);
     await undo();
     expect(listTable()).toEqual(before);

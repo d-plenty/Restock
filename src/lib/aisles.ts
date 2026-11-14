@@ -1,7 +1,7 @@
 import { getKV } from './db';
 
 // 0.10.2: aisle numbers in shopping mode. The phone's price check (PriceChecker.java) notes where
-// each product is at your Coles branches, when "Prices and stock at my store" is on, in the "aisles"
+// each product is at your Coles branches, when "Prices and stock at my branch" is on, in the "aisles"
 // store entry (on this phone only, never synced: phones can shop at different branches):
 //   { "<product id>": { "1": { s: store number, a: aisle, side, o: order, at }, "2": … } }
 // Slot 1 is your branch, slot 2 your second. Only Coles gives aisles: Woolworths' website gives an

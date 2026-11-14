@@ -8,7 +8,7 @@ import { storeChoice, type Settings } from '../../types';
 import { ChainDot, Icon, TopBar } from '../components';
 import { useNav } from '../nav';
 
-const GROUP: Record<Section, string> = withCustom({ pantry: 'Groceries', keg: 'Keg', pharmacy: 'Health' }, (n) => n);
+const GROUP: Record<Section, string> = withCustom({ pantry: 'Groceries', keg: 'Bottle shop', pharmacy: 'Chemist' }, (n) => n);
 
 /**
  * Your shops, by tab: every shop you've ticked, or made a store your primary or second one, on a

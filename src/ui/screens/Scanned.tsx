@@ -3,7 +3,8 @@ import { lookupBarcode, scanSeveral } from '../../lib/barcode';
 import { allGroups, findProductByBarcode, groupProductIds } from '../../lib/db';
 import { addToList } from '../../lib/listActions';
 import { genericName } from '../../lib/naming';
-import { addScanLine, clearDone, onScanLines, scanLines, toMatch, type ScanLine } from '../../lib/scanQueue';
+import { confirmAction } from '../../lib/confirm';
+import { addScanLine, clearDone, onScanLines, putBack, removeWaiting, scanLines, toMatch, type ScanLine } from '../../lib/scanQueue';
 import { SECTION_NAMES, type Section } from '../../shops';
 import { Icon, TopBar } from '../components';
 import { useNav } from '../nav';
@@ -45,7 +46,7 @@ export function ScannedScreen({ section, start }: { section: Section; start?: bo
     setScanning(true);
     const before = scanLines().length;
     try {
-      await scanSeveral('Scan the next thing', (code) => takeOne(code));
+      await scanSeveral('Scan the next item', (code) => takeOne(code));
     } finally {
       setScanning(false);
       const n = scanLines().length - before;
@@ -57,6 +58,24 @@ export function ScannedScreen({ section, start }: { section: Section; start?: bo
     if (start) void scan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 0.10.10: a barcode you don't need any more can go without matching it, one at a time or all
+  // at once. Nothing else changes: they were never on your shopping list or in your pantry.
+  const removeOne = (l: ScanLine) => {
+    const gone = removeWaiting([l.code]);
+    if (gone.length) nav.toast(`Removed ${l.name}`, () => putBack(gone));
+  };
+  const removeAll = async () => {
+    const n = waiting.length;
+    const ok = await confirmAction(n === 1 ? 'Remove the barcode left to match?' : `Remove all ${n} barcodes left to match?`, {
+      detail: 'They come off this list without being matched. Nothing on your shopping list or in your pantry changes. You can undo it straight after.',
+      action: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    const gone = removeWaiting();
+    if (gone.length) nav.toast(gone.length === 1 ? 'Removed 1 barcode' : `Removed ${gone.length} barcodes`, () => putBack(gone));
+  };
 
   const row = (l: ScanLine, i: number) => (
     <div key={`${l.code}-${i}`} className="row">
@@ -82,6 +101,11 @@ export function ScannedScreen({ section, start }: { section: Section; start?: bo
           Match it
         </button>
       )}
+      {l.status === 'new' && (
+        <button className="icon-btn" aria-label={`Remove ${l.name}`} title="Remove" onClick={() => removeOne(l)}>
+          <Icon name="trash" size={18} />
+        </button>
+      )}
     </div>
   );
 
@@ -101,12 +125,16 @@ export function ScannedScreen({ section, start }: { section: Section; start?: bo
             {left === 1 ? '1 left to match' : `${left} left to match`}
           </h2>
           <div className="card flush">{waiting.map(row)}</div>
+          <button className="btn ghost block" onClick={() => void removeAll()}>
+            <Icon name="trash" size={18} /> {waiting.length === 1 ? 'Remove it' : `Remove all ${waiting.length}`}
+          </button>
         </>
       )}
       {waiting.length === 0 && finished.length > 0 && (
         <div className="banner green" role="status">
-          <strong>{finished.length === 1 ? 'All matched' : `All ${finished.length} matched`}</strong>
-          <span style={{ fontSize: 13 }}>Nothing left to match.</span>
+          {/* 0.10.10: not "All matched": some may have been removed instead. */}
+          <strong>Nothing left to match</strong>
+          <span style={{ fontSize: 13 }}>Everything you scanned is sorted.</span>
         </div>
       )}
       {finished.length > 0 && (

@@ -938,3 +938,7 @@ Nothing. Fixes only (the Shopping list's buttons, search boxes, big text, Dan Mu
 ## 0.10.9: what changed on the wire
 
 - Nothing between phones and the server. Shopping mode's shop-by-shop view is on the screen only (which shops are done isn't saved or synced).
+
+## 0.10.10: what changed on the wire
+
+- Nothing between phones and the server. The Keg and Health tabs are now called Bottle shop and Chemist on the screen; their ids (`keg`, `pharmacy`) are the same, and the server's list names (`data.mjs` LIST_NAMES) follow.

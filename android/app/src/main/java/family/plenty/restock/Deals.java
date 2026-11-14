@@ -810,7 +810,7 @@ public final class Deals {
         }
         if (alt != null) {
             rec.action = Action.ALT;
-            rec.headline = "Swap & save at " + chainName(alt.product.chain);
+            rec.headline = "Cheaper swap at " + chainName(alt.product.chain);
             return rec;
         }
         if (best == null) return rec;
@@ -827,11 +827,11 @@ public final class Deals {
                 break;
             case WAIT:
                 rec.action = Action.WAIT;
-                rec.headline = "Wait for a better sale";
+                rec.headline = "Wait for a better special";
                 break;
             case FAKE:
                 rec.action = Action.SKIP;
-                rec.headline = "Fake sale";
+                rec.headline = "Fake special";
                 break;
             default:
                 rec.action = Action.NONE;

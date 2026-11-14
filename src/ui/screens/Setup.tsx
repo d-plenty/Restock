@@ -83,18 +83,18 @@ const ALL_TILES: Tile[] = [
   {
     id: 'keg',
     title: 'Bottle shops',
-    sub: 'Keg tab · 18+ · Beta',
+    sub: 'Beer, wine and spirits · 18+ · Beta',
     icon: 'keg',
     heading: 'Track bottle shops too?',
-    intro: `Beer, wine and spirits on a Keg tab of their own, kept apart from groceries, so a search for chips never goes to a bottle shop. ${BETA_NOTE}`,
+    intro: `Beer, wine and spirits on a Bottle shop tab of their own, kept apart from groceries, so a search for chips never goes to a bottle shop. ${BETA_NOTE}`,
   },
   {
     id: 'pharmacy',
     title: 'Chemists',
-    sub: 'Health tab · Beta',
+    sub: 'Medicine and personal care · Beta',
     icon: 'pharmacy',
     heading: 'Track chemists too?',
-    intro: `Medicine, first aid and personal care on a Health tab of its own, kept apart from groceries. ${BETA_NOTE}`,
+    intro: `Medicine, first aid and personal care on a Chemist tab of its own, kept apart from groceries. ${BETA_NOTE}`,
   },
   {
     id: 'custom',
@@ -237,6 +237,13 @@ const TILE_ORDER: TileId[] = ['a11y', 'pantry', 'history', 'alerts', 'accounts',
 const TAB_TILES: readonly string[] = ['keg', 'pharmacy'];
 const isTabTile = (id: TileId): id is 'keg' | 'pharmacy' => TAB_TILES.includes(id);
 // The Updates tile only where Restock updates itself from GitHub (not F-Droid builds).
+/**
+ * 0.10.10: the three that matter on day one: your shops (and branch), which deals tell you, and
+ * what Restock may use (camera, location, alerts). Setup asks for these; the other ten are
+ * "More, when you want it", and Home only reminds you about these three.
+ */
+export const ESSENTIAL: readonly TileId[] = ['pantry', 'alerts', 'permissions'];
+export const isEssential = (id: TileId) => ESSENTIAL.includes(id);
 export const TILES: Tile[] = TILE_ORDER.filter((id) => SELF_UPDATE || id !== 'updates').map((id) => ALL_TILES.find((t) => t.id === id)!);
 
 /** 0.9.3: what this phone syncs with, for the Backups tile (any of backup, phone sync or server counts). */
@@ -744,7 +751,7 @@ export function SetupTiles({
   inSettings?: boolean;
 }) {
   const cover = useLive(syncInfo, []);
-  const doneCount = TILES.filter((t) => tileStatus(settings, t.id, cover).ok).length;
+  const essDone = TILES.filter((t) => isEssential(t.id) && tileStatus(settings, t.id, cover).ok).length;
   useEffect(() => {
     void noticeSetUpTiles();
   }, []);
@@ -754,15 +761,15 @@ export function SetupTiles({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div className="eyebrow green">Setup</div>
           <h1>Set up Restock</h1>
-          <p className="sub">Tap any tile, or press Continue to go through them in order. You can change all of it later in Settings.</p>
+          <p className="sub">Three things to start with. Continue goes through them; the rest can wait, and it's all in Settings later.</p>
         </div>
       )}
-      <div className="setup-progress" aria-label={`${doneCount} of ${TILES.length} done`}>
+      <div className="setup-progress" aria-label={`${essDone} of ${ESSENTIAL.length} to get started`}>
         <div className="loading-bar">
-          <span style={{ width: `${(doneCount / TILES.length) * 100}%` }} />
+          <span style={{ width: `${(essDone / ESSENTIAL.length) * 100}%` }} />
         </div>
         <span className="small">
-          {doneCount} of {TILES.length} done
+          {essDone === ESSENTIAL.length ? 'Ready to go' : `${essDone} of ${ESSENTIAL.length} to get started`}
         </span>
       </div>
       {settings.privacyAccepted && (
@@ -770,21 +777,30 @@ export function SetupTiles({
           <Icon name="check" size={18} stroke={3} /> Privacy and security · done
         </div>
       )}
-      <div className="setup-grid">
-        {TILES.map((t) => {
-          const st = tileStatus(settings, t.id, cover);
-          return (
-            <button key={t.id} className={`setup-tile${st.ok ? ' done' : ''}`} onClick={() => onOpen(t.id)} aria-label={`${t.title}: ${st.text}`}>
-              <span className="setup-ic">
-                <Icon name={t.icon} size={20} />
-              </span>
-              <span className="setup-tt">{t.title}</span>
-              <span className="setup-td">{t.sub}</span>
-              <span className={`setup-st${st.ok ? ' ok' : ''}`}>{st.text}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* 0.10.10: three to start with, then the rest (it was thirteen tiles in one grid) */}
+      {[
+        { label: 'Start here', tiles: TILES.filter((t) => isEssential(t.id)) },
+        { label: 'More, when you want it', tiles: TILES.filter((t) => !isEssential(t.id)) },
+      ].map((g) => (
+        <div key={g.label} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <h2 className="eyebrow">{g.label}</h2>
+          <div className="setup-grid">
+            {g.tiles.map((t) => {
+              const st = tileStatus(settings, t.id, cover);
+              return (
+                <button key={t.id} className={`setup-tile${st.ok ? ' done' : ''}`} onClick={() => onOpen(t.id)} aria-label={`${t.title}: ${st.text}`}>
+                  <span className="setup-ic">
+                    <Icon name={t.icon} size={20} />
+                  </span>
+                  <span className="setup-tt">{t.title}</span>
+                  <span className="setup-td">{t.sub}</span>
+                  <span className={`setup-st${st.ok ? ' ok' : ''}`}>{st.text}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
       <div className="setup-foot sticky">
         {onLater && (
           <button className="btn" onClick={onLater}>
@@ -804,6 +820,7 @@ function useTileWalk(onFinished: () => void) {
   const [open, setOpenState] = useState<TileId>();
   // Opened one tile from the page of tiles: Next or Skip goes back there. Continue goes through the rest.
   const [single, setSingle] = useState(false);
+  const essentialsOnly = useRef(false);
   const setOpen = (id: TileId | undefined) => {
     setSingle(!!id);
     setOpenState(id);
@@ -816,7 +833,10 @@ function useTileWalk(onFinished: () => void) {
       return;
     }
     const s = await getSettings();
-    const left = tilesLeft(s, await syncInfo().catch(() => undefined));
+    const every = tilesLeft(s, await syncInfo().catch(() => undefined));
+    // 0.10.10: Continue goes through the three to start with; once they're done, through the rest.
+    if (!from) essentialsOnly.current = every.some((t) => isEssential(t.id));
+    const left = essentialsOnly.current ? every.filter((t) => isEssential(t.id)) : every;
     const after = from ? TILES.findIndex((t) => t.id === from) : -1;
     const upcoming = left.find((t) => TILES.findIndex((x) => x.id === t.id) > after) ?? (from ? undefined : left[0]);
     if (upcoming) setOpenState(upcoming.id);

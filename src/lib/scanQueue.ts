@@ -67,6 +67,25 @@ export function removeScanLine(code: string) {
   store(scanLines().filter((l) => l.code !== code));
 }
 
+/**
+ * 0.10.10: barcodes you don't need any more (an old scan, a mistake) can go without matching.
+ * Takes the ones still to match with these codes (all of them when none are given) and returns
+ * them, so Undo can put them back.
+ */
+export function removeWaiting(codes?: string[]): ScanLine[] {
+  const pick = (l: ScanLine) => l.status === 'new' && (!codes || codes.includes(l.code));
+  const gone = scanLines().filter(pick);
+  if (gone.length) store(scanLines().filter((l) => !pick(l)));
+  return gone;
+}
+
+/** Undo for removeWaiting: puts them back where they were (newest first), skipping any scanned again since. */
+export function putBack(lines: ScanLine[]) {
+  const have = new Set(scanLines().map((l) => `${l.code}|${l.status}`));
+  const back = lines.filter((l) => !have.has(`${l.code}|${l.status}`));
+  if (back.length) store([...scanLines(), ...back].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)));
+}
+
 export const toMatch = (lines = scanLines()) => lines.filter((l) => l.status === 'new').length;
 
 export function onScanLines(fn: () => void): () => void {

@@ -187,7 +187,7 @@ function stockNote(c: Ctx, e: ListEntry): { kind: 'second' | 'out'; text: string
 }
 
 export const LIST_TITLE: Record<ListSection, string> = withCustom<string, ListSection>(
-  { pantry: 'Shopping list', keg: 'Bottle shop list', pharmacy: 'Health list', general: 'General list' },
+  { pantry: 'Shopping list', keg: 'Bottle shop list', pharmacy: 'Chemist list', general: 'General list' },
   (n) => `${n} list`,
 );
 /** What to type in the add box, for each list. */
@@ -411,7 +411,7 @@ export function ListScreen() {
 
   /**
    * 0.10.5: what moved off the row into its sheet: how many, both prices, the multi-buy, every tag,
-   * swap & save explained, and stock at your other branch.
+   * cheaper swap explained, and stock at your other branch.
    */
   const entryDetails = (e: ListEntry): ReactNode => {
     const latest = entries.find((x) => x.id === e.id) ?? e;
@@ -441,14 +441,14 @@ export function ListScreen() {
         {deal && (swap || line?.outOfStock || onSale || member || deal.multi) && (
           <span className="tags">
             {line?.outOfStock ? <StockInfoTag o={deal} /> : onSale ? <VerdictInfoTag o={deal} /> : null}
-            {swap && line && <SwapInfoTag label="SWAP & SAVE" line={{ ...line, pick: swap, yours: deal, packs: undefined, qty: qtyOf(latest) }} />}
+            {swap && line && <SwapInfoTag label="CHEAPER SWAP" line={{ ...line, pick: swap, yours: deal, packs: undefined, qty: qtyOf(latest) }} />}
             <MultiInfoTag o={deal} />
-            {member && <MemberInfoTag chain={deal.product.chain} hasCard={!deal.locked} />}
+            {member && <MemberInfoTag chain={deal.product.chain} hasCard={!deal.locked} short />}
           </span>
         )}
         {swap && deal && (
           <div className="banner blue" style={{ fontSize: 14 }}>
-            <strong>Swap &amp; save</strong>
+            <strong>Cheaper swap</strong>
             <span>
               {swap.product.name} at {chainName(swap.product.chain)} is {money(swap.price)}, one you said you'd also take. Tap SWAP &amp; SAVE to see why.
             </span>
@@ -476,10 +476,10 @@ export function ListScreen() {
       deal?.product.size && !nameHasSize(deal.product.name, deal.product.size) ? ` · ${tidySize(deal.product.size, deal.product.name)}` : '';
     const onSale = deal && (deal.verdict.kind === 'great' || deal.verdict.kind === 'good' || deal.verdict.kind === 'small');
     const line = lineFor(c, e);
-    // Swap & save (0.8.9): one you'd also take is on sale for less than your pick. Your pick stays on the list.
+    // Cheaper swap (0.8.9): one you'd also take is on sale for less than your pick. Your pick stays on the list.
     const swap =
       rec?.alt && deal && rec.alt.product.id !== deal.product.id && cheaperThan(rec.alt, deal, c.totals.by, qtyOf(e)) ? rec.alt : undefined;
-    // 0.10.5: a line opens its sheet (how many, both prices, swap & save, move, remove); the pantry
+    // 0.10.5: a line opens its sheet (how many, both prices, cheaper swap, move, remove); the pantry
     // item's page is one tap further, from the sheet.
     const openRow = () => {
       if (selecting) pick(e.id);
@@ -490,7 +490,7 @@ export function ListScreen() {
     const tag = !deal ? null : line?.outOfStock ? (
       <StockInfoTag o={deal} />
     ) : swap && line ? (
-      <SwapInfoTag label="SWAP & SAVE" line={{ ...line, pick: swap, yours: deal, packs: undefined, qty: qtyOf(e) }} />
+      <SwapInfoTag label="CHEAPER SWAP" line={{ ...line, pick: swap, yours: deal, packs: undefined, qty: qtyOf(e) }} />
     ) : onSale ? (
       <VerdictInfoTag o={deal} />
     ) : deal.multi ? (
@@ -560,6 +560,18 @@ export function ListScreen() {
   };
 
 
+  // 0.10.10: Start shopping goes straight in, at the shops the list is split across now (the one
+  // shop when it wins, else the shops shopping around uses). Before, it asked "Where are you
+  // shopping today?" and then "Where are you first?": the same question twice. Shopping somewhere
+  // else today is Change shops, in shopping mode.
+  const startShopping = () => {
+    const pick = aroundPlan(totals, totals.by, settings.shopAroundMin ?? 1).pick;
+    const start = (pick === 'around' ? totals.around.chains : [pick.chain]).filter((x) => shops.includes(x as StoreChain)) as StoreChain[];
+    setSkipToday(new Set());
+    setChangingFrom(undefined);
+    setShopping(start.length ? start : shops);
+  };
+
   return (
     <div className="screen" {...full.props}>
       {full.indicator}
@@ -595,8 +607,8 @@ export function ListScreen() {
               // 0.10.6: Edit (pick items to move, delete or tick) out where it's seen, and the view
               // options behind the sliders.
               <>
-                <button className="icon-btn" aria-label="Edit the list: pick items" onClick={() => setSelecting(true)}>
-                  <Icon name="pencil" size={20} />
+                <button className="btn small edit-btn" aria-label="Edit the list: pick items" onClick={() => setSelecting(true)}>
+                  <Icon name="pencil" size={16} /> Edit
                 </button>
                 <button className="icon-btn" aria-label="View options: by shop, aisle group, one list" onClick={() => setMenu(true)}>
                   <Icon name="sliders" size={20} />
@@ -629,11 +641,13 @@ export function ListScreen() {
         )}
       </div>
 
-      {/* 0.10.5: one summary card: the total, what shopping around saves, and Compare. */}
+      {/* 0.10.5: one summary card: the total, what shopping around saves, and Compare. 0.10.10: Compare
+          shops is a big green button in the card (it was green words off to one side), with Check
+          stock beside it, smaller (it sat on its own under the card, with nothing beside it). */}
       {open.length > 0 &&
         (totals.linked > 0 && plan.priced && !selecting ? (
-          <button className="card list-sum" onClick={() => setComparing(true)} aria-label="Compare shops">
-            <span className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <section className="card list-sum" aria-label="Your list's total">
+            <span className="list-sum-text">
               <span className="small">
                 {open.length} item{open.length === 1 ? '' : 's'}
                 {stopCount > 0 ? ` · ${stopCount} shop${stopCount === 1 ? '' : 's'}` : ''} · {settings.listCompare === 'unit' ? 'Best value' : 'Lowest price'}
@@ -645,18 +659,21 @@ export function ListScreen() {
                 <span className="list-sum-note">Cheapest in one trip: {chainName(plan.pick.chain)}</span>
               ) : null}
             </span>
-            <span className="list-sum-go">
-              Compare <Icon name="chevron" size={16} />
+            <span className="list-sum-btns">
+              <button className="btn primary list-sum-go" onClick={() => setComparing(true)}>
+                <Icon name="chart" size={18} /> Compare shops
+              </button>
+              <CheckStockButton items={stockItems} compact />
             </span>
-          </button>
+          </section>
         ) : (
           <span className="sub num">
             {open.length} item{open.length === 1 ? '' : 's'}
             {total > 0 ? ` · about ${money(total)}` : ''}
           </span>
         ))}
-      {/* 0.10.7: stock, only when asked (under the summary, so the list's own buttons keep one row) */}
-      {open.length > 0 && !selecting && (
+      {/* 0.10.7: stock, only when asked. 0.10.10: in the summary card when there is one. */}
+      {open.length > 0 && !selecting && !(totals.linked > 0 && plan.priced) && (
         <div className="list-stock-row">
           <CheckStockButton items={stockItems} />
         </div>
@@ -665,9 +682,9 @@ export function ListScreen() {
       {firstTime && (
         <div className="card hint">
           <span style={{ flex: 1 }}>
-            <strong>How this list works.</strong> Your pantry is everything Restock watches; this list is just this trip. Each line shows the cheapest
-            of your picks to get, and where. <strong>Best value</strong> picks the cheapest per 100 g, litre or item (for Any size items, as many
-            packs as it takes). <strong>Lowest price</strong> picks the cheapest on the shelf. Tap any tag to see why.
+            {/* 0.10.10: three short sentences (it was a paragraph; Best value and Lowest price are explained in Compare shops) */}
+            <strong>How this list works.</strong> This list is just this trip; your pantry is everything Restock watches. Each line shows the cheapest
+            of your picks, and where. Tap any tag to see why.
           </span>
           <button className="icon-btn" aria-label="Got it" onClick={() => updateSettings({ seenHints: [...settings.seenHints, 'list'] })}>
             <Icon name="close" size={16} />
@@ -927,7 +944,7 @@ export function ListScreen() {
 
       {open.length > 0 && !selecting && (
         <div className="sticky-cta">
-          <button className="btn primary block" onClick={() => setChoosingShops(true)}>
+          <button className="btn primary block" onClick={startShopping}>
             <Icon name="cart" size={18} /> Start shopping{total > 0 ? ` · about ${money(total)}` : ''}
           </button>
         </div>
@@ -962,7 +979,7 @@ export function ListScreen() {
             className="btn primary block"
             onClick={() => {
               setComparing(false);
-              setChoosingShops(true);
+              startShopping();
             }}
           >
             <Icon name="cart" size={18} /> Start shopping{total > 0 ? ` · about ${money(total)}` : ''}
@@ -986,19 +1003,7 @@ export function ListScreen() {
               </button>
             </div>
           </div>
-          {totals.linked > 0 && (
-            <div className="field">
-              <span>Pick the cheapest by</span>
-              <div className="seg" role="group" aria-label="Pick the cheapest by">
-                <button aria-pressed={settings.listCompare === 'unit'} onClick={() => updateSettings({ listCompare: 'unit' })}>
-                  Best value
-                </button>
-                <button aria-pressed={settings.listCompare === 'price'} onClick={() => updateSettings({ listCompare: 'price' })}>
-                  Lowest price
-                </button>
-              </div>
-            </div>
-          )}
+          {/* 0.10.10: Best value or Lowest price is set in one place, Compare shops (it was here too) */}
           <button
             className="btn"
             onClick={async () => {
@@ -1206,7 +1211,7 @@ function ShopPicker({
           <span className="small num">
             {isDone
               ? `Done · ${st.got} of ${st.n} · ${money(st.spent)} · tap to go back in`
-              : `${st.left === 1 ? '1 thing' : `${st.left} things`}${st.total > 0 ? ` · about ${money(st.total - st.spent)}` : ''}`}
+              : `${st.left === 1 ? '1 item' : `${st.left} items`}${st.total > 0 ? ` · about ${money(st.total - st.spent)}` : ''}`}
           </span>
           {s === most && <span className="tag good shop-pick-tag">MOST ON YOUR LIST</span>}
         </span>
@@ -1233,7 +1238,7 @@ function ShopPicker({
       </div>
       {anyCount > 0 && (
         <p className="small" style={{ margin: 0 }}>
-          {anyCount === 1 ? '1 thing has' : `${anyCount} things have`} no shop picked, so {anyCount === 1 ? 'it shows' : 'they show'} at every shop.
+          {anyCount === 1 ? '1 item has' : `${anyCount} items have`} no shop picked, so {anyCount === 1 ? 'it shows' : 'they show'} at every shop.
         </p>
       )}
       {!toDo.length && (
@@ -1412,9 +1417,9 @@ function PickShops({
                 <span className="title" style={{ fontSize: 15 }}>
                   {branchName(cachedSettings(), x)}{' '}
                   {x === oneWins ? (
-                    <span className="badge">RECOMMENDED</span>
+                    <span className="tag rec">RECOMMENDED</span>
                   ) : (
-                    x === recommended && !oneWins && <span className="tag info">BEST ONE STORE</span>
+                    x === recommended && !oneWins && <span className="tag info">BEST ONE SHOP</span>
                   )}
                 </span>
                 {st && n > 0 && (
@@ -1957,7 +1962,7 @@ export function EditEntry({
   onAddToPantry,
   details,
 }: {
-  /** 0.10.5: the line's how many, prices, tags and swap & save (worked out by the list). */
+  /** 0.10.5: the line's how many, prices, tags and cheaper swap (worked out by the list). */
   details?: ReactNode;
   /** 0.9.11: "Pick my cordial" opens the Pick sheet, as the line's search button does. */
   onPick?: (e: ListEntry) => void;

@@ -286,7 +286,7 @@ export function DeskList() {
         title={section === 'pantry' ? 'Shopping list' : `${LIST_NAMES[section]} list`}
         sub={
           <span className="num">
-            {open.length} to buy{total > 0 ? ` · about ${money(total)}` : ''}
+            {open.length} to buy on this list{total > 0 ? ` · about ${money(total)}` : ''}
           </span>
         }
       >

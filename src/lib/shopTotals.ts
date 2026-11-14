@@ -8,8 +8,8 @@ import { isBulk, lineCost, productQty, type Option, type Recommendation } from '
 // one store?".
 //
 // Each pantry item has its picks at each shop (picks.ts, 0.8.9). At each store we take the cheapest
-// of your picks there, so a store counts for an item when it has one of them. "Would also take"
-// products never count here: they're for Swap & save. With "Any size", any of your picks there in
+// of your picks there, so a store counts for an item when it has one of them. "Also happy with"
+// products never count here: they're for Cheaper swap. With "Any size", any of your picks there in
 // any number will do, and we take the cheapest way to get the amount you usually buy. Out-of-stock
 // products are used only when the store has nothing else. "Cheapest" is either best value (per 100 g / per
 // litre / per item) or lowest shelf price, as picked at the top of the shopping list.
@@ -353,7 +353,7 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], allChai
   // 0.9.6: Costco counts as a shop to buy at only when "I buy from Costco online" is ticked.
   const chains = allChains.filter((c) => c !== 'costco' || costcoDecides());
   const open = entries.filter((e) => !e.checked);
-  // My picks only (0.8.9), at shops you buy it at. Would also take is for Swap & save.
+  // What I buy only (0.8.9), at shops you buy it at. Also happy with is for Cheaper swap.
   const usable = (rec: Recommendation) => {
     const notAt = new Set(notAtChains(rec.group, (id) => rec.options.find((o) => o.product.id === id)?.product.chain));
     return rec.options.filter((o) => o.role === 'main' && !notAt.has(o.product.chain) && (o.product.chain !== 'costco' || costcoDecides()));

@@ -42,7 +42,7 @@ export const autoCutoff = (months: number, now = Date.now()) => new Date(now - m
 const KIND_SUB: Partial<Record<DataKind, string>> = {
   prices: 'Older prices. The newest price of each product always stays.',
   receipts: 'Pinned receipts stay.',
-  stats: 'Each thing ticked off, behind the spending charts.',
+  stats: 'Each item ticked off, behind the spending charts.',
   backups: 'Photos and price files the server deleted or replaced, in case you need them back. Not a backup: that is the one you download.',
 };
 

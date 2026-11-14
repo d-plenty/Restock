@@ -97,12 +97,12 @@ export function InstallSheet({ onClose }: { onClose: () => void }) {
       {/* 0.9.6 (iPhone offline): everything this phone last saved, and edits wait for signal. */}
       <ul className="pwa-steps">
         <li>Open Restock once with signal first, and sign in with Keep me signed in ticked.</li>
-        <li>Your Pantry, Keg and Health tabs open, and all four lists (Groceries, Keg, Health, General). Tick, add, edit, Move to and Undo all work.</li>
+        <li>Your Pantry, Bottle shop and Chemist tabs open, and all four lists (Groceries, Bottle shop, Chemist, General). Tick, add, edit, Move to and Undo all work.</li>
         <li>Your cards open, with their barcodes.</li>
         <li>Specials, catalogues and price history show as this phone last saved them.</li>
         <li>Scanning a barcode adds things you already have in your pantry.</li>
         <li>Your changes go to the server when you're back online. A notice says when this phone last saved.</li>
-        <li>Searching the shops, the Data tab (and Import), Server and phones, and Activity need signal.</li>
+        <li>Searching the shops, Your data (and Import), Server and phones, and Activity need signal.</li>
       </ul>
       <p className="small" style={{ margin: 0 }}>
         It needs the https address: iPhones only keep a web app for offline, and only let it use the camera, on https. If the iPhone runs low on space, iOS

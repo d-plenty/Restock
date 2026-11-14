@@ -7,7 +7,7 @@ import { createSqlJsDriver } from './sql/sqljs';
 import { migrate, MIGRATIONS } from './sql/schema';
 import { recommend } from './verdict';
 
-// My picks, Would also take, Any size and Not at this shop (0.8.9).
+// What I buy, Also happy with, Any size and Not at this shop (0.8.9).
 const NOW = Date.parse('2026-11-09T00:00:00Z');
 const reading = (productId: string, price: number, promo?: string): PriceReading => ({
   productId,
@@ -41,7 +41,7 @@ const totals = (
 };
 const p = (id: string, chain: Product['chain'], size: string, name = id): Product => ({ id, chain, name, size, createdAt: '' });
 
-describe('moving to My picks', () => {
+describe('moving to What I buy', () => {
   const chain: Record<string, string> = { heinz: 'coles', heinzW: 'woolworths', aldiBeans: 'aldi', coles: 'coles', ww: 'woolworths' };
   it('makes an alternative a pick at a shop that had none of your picks', () => {
     const g = toPicks({ usualProductId: 'heinz', sameProductIds: ['heinzW'], altProductIds: ['aldiBeans', 'coles'] }, (id) => chain[id]);
@@ -59,7 +59,7 @@ describe('moving to My picks', () => {
     });
   });
 
-  it("leaves a bulk pack as Would also take when the item doesn't want bulk packs", () => {
+  it("leaves a bulk pack as Also happy with when the item doesn't want bulk packs", () => {
     const sizes: Record<string, { name: string; size: string }> = { r500: { name: 'Rice', size: '500g' }, r5k: { name: 'Rice', size: '5kg' } };
     const c: Record<string, string> = { r500: 'coles', r5k: 'aldi' };
     const g = { usualProductId: 'r500', sameProductIds: [], altProductIds: ['r5k'], allowBulk: false };
@@ -89,9 +89,9 @@ describe('moving to My picks', () => {
   });
 });
 
-describe('store comparisons use My picks only', () => {
-  it("doesn't count a Would also take, even when it's cheaper there", () => {
-    // Woolworths home-brand sauce is the pick at Woolworths; Coles' home brand is only "would also take".
+describe('store comparisons use What I buy only', () => {
+  it("doesn't count a Also happy with, even when it's cheaper there", () => {
+    // Woolworths home-brand sauce is the pick at Woolworths; Coles' home brand is only "also happy with".
     const products = [p('ww-sauce', 'woolworths', '500ml'), p('coles-sauce', 'coles', '500ml'), p('heinz-coles', 'coles', '500ml')];
     const g = item({ usualProductId: 'ww-sauce', sameProductIds: ['heinz-coles'], altProductIds: ['coles-sauce'] });
     const t = totals(

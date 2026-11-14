@@ -39,5 +39,5 @@ export function orderOptions<T extends Option>(list: T[], order: ProductOrder = 
 export const PRODUCT_ORDERS: { id: ProductOrder; label: string }[] = [
   { id: 'size', label: 'Shop, then size' },
   { id: 'cheapest', label: 'Cheapest first' },
-  { id: 'name', label: 'Shop, then A to Z' },
+  { id: 'name', label: 'Shop, then A–Z' },
 ];

@@ -57,13 +57,13 @@ type Kind = 'pantry' | 'keg' | 'pharmacy' | 'receipts' | 'cards';
 
 const ROWS: { kind: Kind; title: string; sub: string }[] = [
   { kind: 'pantry', title: 'Groceries', sub: 'Pantry and shopping list (General, Baby and Pets too), ticks too, with their prices and alerts' },
-  { kind: 'keg', title: 'Keg', sub: 'Bottle shops. Off unless you want the house to see it' },
-  { kind: 'pharmacy', title: 'Health', sub: 'Off unless you want the house to see it' },
+  { kind: 'keg', title: 'Bottle shop', sub: 'Off unless you want the house to see it' },
+  { kind: 'pharmacy', title: 'Chemist', sub: 'Off unless you want the house to see it' },
   { kind: 'receipts', title: 'Receipts', sub: 'What you spent, and the photos. Off unless you want the house to see them' },
   { kind: 'cards', title: 'Loyalty cards', sub: 'Best kept on your phone. Turn on only to share cards with the house.' },
 ];
 
-const THINGS: Record<Kind, string> = { pantry: 'groceries', keg: 'Keg', pharmacy: 'Health', receipts: 'receipts', cards: 'loyalty cards' };
+const THINGS: Record<Kind, string> = { pantry: 'groceries', keg: 'Bottle shop', pharmacy: 'Chemist', receipts: 'receipts', cards: 'loyalty cards' };
 
 const isOn = (v: Shares, k: Kind) => (k === 'receipts' ? v.receipts : k === 'cards' ? v.cards : v.tabs.includes(k));
 

@@ -91,8 +91,8 @@ export function specialsWeek(now: Date): { from: Date; to: Date } {
 }
 
 /**
- * The catalogue for these shops, from your items. Only your picks count (Would also take is for
- * Swap & save), at the shops you use. Sales are sorted by how much they save.
+ * The catalogue for these shops, from your items. Only your picks count (Also happy with is for
+ * Cheaper swap), at the shops you use. Sales are sorted by how much they save.
  */
 export function buildCatalogue(recs: Recommendation[], chains: string[], now = new Date()): MyCatalogue {
   const pages: CataloguePage[] = [];

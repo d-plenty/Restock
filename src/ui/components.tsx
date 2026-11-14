@@ -832,7 +832,8 @@ export function SelectBar({
   return (
     <div className="selectbar" role="region" aria-label="Selected items">
       <div className="selectbar-top">
-        <strong className="num">{count} selected</strong>
+        {/* 0.10.10: says what to do while nothing is ticked (it said "0 selected" over buttons that looked ready) */}
+        <strong className="num">{count ? `${count} selected` : 'Tick the ones you want'}</strong>
         <button className="chip" onClick={count === total ? onNone : onAll}>
           {count === total ? 'Select none' : 'Select all'}
         </button>
@@ -1262,7 +1263,7 @@ export function ProductPreview({ product: p, onClose, action }: { product: Previ
         </div>
       )}
       <div className="tags">
-        {p.role && <span className={`tag ${p.role === 'alt' ? 'alt' : 'normal'}`}>{p.role === 'alt' ? 'WOULD ALSO TAKE' : 'MY PICK'}</span>}
+        {p.role && <span className={`tag ${p.role === 'alt' ? 'alt' : 'normal'}`}>{p.role === 'alt' ? 'ALSO HAPPY WITH' : 'MY PICK'}</span>}
         {/* A member-only special is still a special (0.9.0): both tags show. */}
         {p.isSpecial && <span className="tag good">SPECIAL</span>}
         {promoLabel(p.promo) && <span className="tag normal">{promoLabel(p.promo)}</span>}

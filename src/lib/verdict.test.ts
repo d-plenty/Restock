@@ -253,7 +253,7 @@ describe('shared price history', () => {
     const shared = withMarket(own, market);
     expect(shared.fromMarket).toBe(true);
     expect(shared.typical).toBe(10);
-    // It's been $5, so the shared history says wait for a better sale.
+    // It's been $5, so the shared history says wait for a better special.
     expect(judge(shared).kind).toBe('wait');
     expect(judge(withMarket(own, { ...market, low: 7.9 })).kind).toBe('good');
   });
@@ -330,7 +330,7 @@ describe('multi-buys and half price', () => {
     expect(multiBuy('2 x 150g')).toBeUndefined();
     expect(multiBuy('Half price')).toBeUndefined();
   });
-  it("a 2-for deal at the normal shelf price isn't a fake sale", () => {
+  it("a 2-for deal at the normal shelf price isn't a fake special", () => {
     const hist = [r(60, 3), r(45, 3), r(30, 3), r(15, 3)];
     const v = judge(computeStats([...hist, r(0, 3, true, '2 for $5')], NOW));
     expect(v.kind).toBe('good');

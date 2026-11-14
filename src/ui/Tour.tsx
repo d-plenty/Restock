@@ -30,7 +30,7 @@ const STEPS: Step[] = [
     tab: 'home',
     find: '.tag',
     title: 'Every deal is checked',
-    text: 'Tags like GREAT DEAL, WAIT and FAKE SALE come from each item’s price history. Tap any tag to see why.',
+    text: 'Tags like GREAT DEAL, WAIT and FAKE SPECIAL come from each item’s price history. Tap any tag to see why.',
   },
   {
     tab: 'pantry',
@@ -54,7 +54,7 @@ const STEPS: Step[] = [
     tab: 'keg',
     find: '.screen h1',
     title: 'Bottle shops',
-    text: 'Drinks live on their own Keg tab, so a search for chips never goes to a bottle shop.',
+    text: 'Drinks live on their own Bottle shop tab, so a search for chips never goes to a bottle shop.',
     // Only when the Keg tab is really there: switched on, a bottle shop picked, and not hidden.
     when: (s) => sectionOn(s, 'keg') && !s.hiddenTabs?.includes('keg'),
   },

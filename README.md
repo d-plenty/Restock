@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.9" src="https://img.shields.io/badge/status-release%20candidate%200.10.9-ffcd00">
+  <img alt="Release candidate 0.10.10" src="https://img.shields.io/badge/status-release%20candidate%200.10.10-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0109">New in 0.10.9</a> ·
+  <a href="#new-in-01010">New in 0.10.10</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -66,7 +66,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 ## Highlights
 
-- **Your shops, your items.** Coles, Woolworths and Aldi, plus Costco (marked Beta), bottle shops (Keg tab, 18+) and chemists (Health tab, both marked Beta) if you want them, and any other shop's website.
+- **Your shops, your items.** Coles, Woolworths and Aldi, plus Costco (marked Beta), bottle shops (Bottle shop tab, 18+) and chemists (Chemist tab, both marked Beta) if you want them, and any other shop's website.
 - **Four shopping lists.** Groceries, Keg, Health and **General**. General is a list only, for things that aren't in your pantry: Home Assistant puts anything there that matches nothing you track, or you add to it yourself.
 - **Scan to add.** An open-source barcode scanner built in, with Open Food Facts lookup. Restock finds the same product at each of your shops and ticks it for you.
 - **Undo.** After most changes (Add to list, a tick, a delete, an edit, "Add all to my list"), a small **Undo** shows for a few seconds. One tap puts it all back, however many things changed.
@@ -131,6 +131,21 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.10.10
+
+Release candidate 11: a tidy-up of the whole app, from an outside review of every screen.
+
+- **One word for each thing.** *Shop* is the chain and *branch* is your local one (no more "store"); *items*, not "things"; **Bottle shop** and **Chemist** instead of Keg and Health; *usual* price, not "normal"; **A–Z** everywhere; unit prices all written "$0.90 / 100 sheets". Verdicts and alerts use the same names ("On special (15%+)", "Fake special", "Wait for a better special"). **What I buy**, **Also happy with** and **Cheaper swap** replace My picks, Would also take and Swap & save. In search, a close match says **GOOD MATCH**; RECOMMENDED is only ever a shop.
+- **Asked once.** Start shopping goes straight in (it asked where you were shopping, then where you were first). Best value or Lowest price is set in Compare shops only. Cards, Catalogues, Specials and Receipts live in More; Home is your deals. The item page says its verdict once, has one Alerts button, and no Done button (it saves as you go).
+- **Less to read.** Shorter tips on the list, the Pantry and Add. Setup starts with three things (your shops, notifications, permissions) with the rest under "More, when you want it", and Home shows one next step at a time.
+- **The shopping list's total** has a big green **Compare shops** button, with **Check stock** beside it.
+- **Add** starts with search, then Scan a barcode; Scan several, Photo and Receipt open from "More ways to add".
+- **The item page** shows what you buy and where before the price history; the chart opens from "Show the chart and history".
+- **Scan several:** remove a barcode you don't need, or all of them, with Undo.
+- **Edit says Edit** on the Pantry and the list, and the buttons for picked items are greyed until something is ticked.
+- **On the web page and iPhone:** an Add button in the middle of the iPhone web app's bar; "Your data" (was "Data"); Receipts and Cards line up with the other pages; one count of what's to buy.
+- **Fixed:** a full stop and a dot together on Home ("$4.80. · Ocean Breeze"); a sentence said twice under Home Assistant; "Aisle: unknown" still promised in settings; a member-price tag cut off on the list; Home's "6 items" against the list's 8; "0 items" in Your data with sample items showing.
 
 ## New in 0.10.9
 
@@ -413,7 +428,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.9.apk` (on macOS, `shasum -a 256 restock-0.10.9.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.10.apk` (on macOS, `shasum -a 256 restock-0.10.10.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -599,7 +614,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is at its **tenth release candidate** (0.10.9): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock is at its **eleventh release candidate** (0.10.10): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.

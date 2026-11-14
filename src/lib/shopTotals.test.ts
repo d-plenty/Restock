@@ -121,7 +121,7 @@ describe('one-shop totals: value, price and stock', () => {
 });
 
 describe('bulk packs', () => {
-  it('never counts a Would also take for a store, even a cheaper bigger pack (0.8.9)', async () => {
+  it('never counts a Also happy with for a store, even a cheaper bigger pack (0.8.9)', async () => {
     const { shopTotals } = await import('./shopTotals');
     const { recommend } = await import('./verdict');
     const NOW2 = Date.parse('2026-11-05T09:00:00+10:00');

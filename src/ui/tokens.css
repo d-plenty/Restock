@@ -9,8 +9,8 @@
      --line          border                                   --line-2       border-strong (controls)
      --green         accent text/links                        --green-solid  accent fill (primary buttons)
      --navy, --gold  the flag colours (bars, sidebar, savings banner)
-     --good-*        success (GREAT DEAL)   --amber-*  warning (WAIT)   --red-*  danger (FAKE SALE)
-     --blue-*        info (SWAP & SAVE)     --focus    focus ring
+     --good-*        success (GREAT DEAL)   --amber-*  warning (WAIT)   --red-*  danger (FAKE SPECIAL)
+     --blue-*        info (CHEAPER SWAP)     --focus    focus ring
    Brand: navy #012169, gold #ffcd00, green #007a38, cream #f6f4ea. They never change.
    Themes: light (default), dark (data-theme=dark, or system + the phone's dark mode), true black
    (data-black=1, while dark), and the Plain style (data-style=plain). Accent colours picked in

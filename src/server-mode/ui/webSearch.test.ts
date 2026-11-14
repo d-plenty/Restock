@@ -198,7 +198,7 @@ describe('Track, Add to list, or both', () => {
     expect(ws.addedText({ item: { id: 'i', name: 'Milk', section: 'pantry' }, products: ['p'], line: { id: 'l' } }, 'Milk', 'pantry')).toBe(
       'Milk added to your pantry and your Shopping list',
     );
-    expect(ws.addedText({ item: { id: 'i', name: 'Ale', section: 'keg' }, products: ['p'], line: null }, 'Ale', 'keg')).toBe('Ale added to your keg');
+    expect(ws.addedText({ item: { id: 'i', name: 'Ale', section: 'keg' }, products: ['p'], line: null }, 'Ale', 'keg')).toBe('Ale added to your Bottle shop tab');
     expect(ws.addedText({ item: null, products: [], line: { id: 'l', list: 'pantry' } }, 'Milk', 'pantry')).toBe('Milk added to your Shopping list');
   });
 

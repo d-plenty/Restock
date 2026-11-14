@@ -269,8 +269,8 @@ export function compareText(
   if (perBase === undefined || !unit || !Number.isFinite(perBase)) return '';
   if (unit === 'g') return (opts.style?.kg ?? (!!opts.total && opts.total >= 5000)) ? `${money(perBase * 1000)} / kg` : `${money(perBase * 100)} / 100g`;
   if (unit === 'ml') return `${money(perBase * 1000)} / L`;
-  if (opts.sheets) return `${money(perBase * 100)} per 100 sheets`;
-  return (opts.style?.per100 ?? perBase < 0.1) ? `${money(perBase * 100)} per 100` : `${money(perBase)} each`;
+  if (opts.sheets) return `${money(perBase * 100)} / 100 sheets`;
+  return (opts.style?.per100 ?? perBase < 0.1) ? `${money(perBase * 100)} / 100` : `${money(perBase)} each`;
 }
 
 /**

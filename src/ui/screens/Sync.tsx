@@ -273,8 +273,8 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
 /** The tabs a household can share, in plain words. */
 export const SHARE_TABS: { tab: Section; title: string; sub: string }[] = [
   { tab: 'pantry', title: 'Groceries', sub: 'Pantry, its shopping list (and General, Baby and Pets) and prices' },
-  { tab: 'keg', title: 'Bottle shops', sub: 'Keg tab · 18+' },
-  { tab: 'pharmacy', title: 'Health', sub: 'Health tab' },
+  { tab: 'keg', title: 'Bottle shop', sub: '18+' },
+  { tab: 'pharmacy', title: 'Chemist', sub: 'Medicine and personal care' },
 ];
 
 /** 0.9.5 (save): changes to this phone's sync settings, held until Save (SyncScreen). */
@@ -294,7 +294,7 @@ export async function askAdult(): Promise<boolean> {
   const s = await getSettings();
   if (s.adultConfirmed) return true;
   const yes = await confirmAction('Are you 18 or over?', {
-    detail: 'The Keg tab tracks bottle shops, so it is only for adults.',
+    detail: 'The Bottle shop tab tracks alcohol prices, so it is only for adults.',
     action: "Yes, I'm 18 or over",
     danger: false,
   });
@@ -484,7 +484,7 @@ export function JoinSheet({
         <div className="card" style={{ gap: 10 }}>
           <strong>Are you 18 or over?</strong>
           <span className="small">
-            {peek?.ownerName ?? 'The owner phone'} shares bottle shops (the Keg tab), which is only for adults. If not, this phone joins without it.
+            {peek?.ownerName ?? 'The owner phone'} shares the Bottle shop tab, which is only for adults. If not, this phone joins without it.
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn primary" style={{ flex: 1 }} onClick={() => void answerAge(true)}>
@@ -1133,7 +1133,7 @@ export function ServerCard({ info, busy, onInfo }: { info: SyncInfo; busy: boole
             the server has them. Receipts stay here.
           </span>
           {!!info.serverWaiting && !info.serverError && (
-            <span className="small">{plural(info.serverWaiting, 'thing')} saved on the server, waiting for it to confirm before they come off this phone.</span>
+            <span className="small">{plural(info.serverWaiting, 'item')} saved on the server, waiting for it to confirm before they come off this phone.</span>
           )}
           {!!info.serverUnread && !info.serverError && (
             <span className="small">
@@ -1297,8 +1297,8 @@ export function AddPhoneSheet({ info, onClose, onWifi }: { info: SyncInfo; onClo
 
 /** The personal things a phone can take back off a v3 server (never groceries). */
 export const PERSONAL: { kind: TakeBack; title: string }[] = [
-  { kind: 'keg', title: 'Keg' },
-  { kind: 'pharmacy', title: 'Health' },
+  { kind: 'keg', title: 'Bottle shop' },
+  { kind: 'pharmacy', title: 'Chemist' },
   { kind: 'receipts', title: 'Receipts' },
   { kind: 'cards', title: 'Loyalty cards' },
 ];
@@ -1386,7 +1386,7 @@ export function LeaveServerSheet({ info, onClose, onDone }: { info: SyncInfo; on
               {andList(PERSONAL.filter((p) => personal.includes(p.kind)).map((p) => (p.kind === 'cards' ? 'loyalty cards' : p.kind === 'receipts' ? 'receipts' : p.title)))}.
             </>
           ) : info.house || info.serverApi === 3 ? (
-            "This phone didn't share anything personal (Keg, Health, receipts or loyalty cards)."
+            "This phone didn't share anything personal (Bottle shop, Chemist, receipts or loyalty cards)."
           ) : (
             <>
               <strong style={{ color: 'var(--ink)' }}>On the server, nothing is deleted.</strong> What this phone shared stays there for the house: prices,
@@ -2148,7 +2148,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                   <span className="title" style={{ fontSize: 15 }}>
                     What this phone shares with {serverName(info)}
                   </span>
-                  <span className="small">Groceries, Keg, Health, receipts and loyalty cards: each on or off for this phone.</span>
+                  <span className="small">Groceries, Bottle shop, Chemist, receipts and loyalty cards: each on or off for this phone.</span>
                 </span>
                 <Icon name="chevron" size={18} />
               </button>

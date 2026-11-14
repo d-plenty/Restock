@@ -87,12 +87,12 @@ export const SHOP_AROUND_MINS = [0, 0.5, 1, 2, 5, 10];
 export const NEW_ITEM_PCTS = [10, 15, 20, 30, 40, 50];
 export { PRODUCT_ORDERS };
 
-const TAB_TITLE: Record<Section, string> = withCustom({ pantry: 'Groceries', keg: 'Keg (bottle shops)', pharmacy: 'Health' }, (n) => n);
+const TAB_TITLE: Record<Section, string> = withCustom({ pantry: 'Groceries', keg: 'Bottle shop', pharmacy: 'Chemist' }, (n) => n);
 /** 0.10.0: the shop rows, named as on the phone's Settings → Your shops (Keg and Health are beta). */
 const SHOPS_TITLE: Record<Section, string> = withCustom({
   pantry: 'Supermarkets (Pantry tab)',
-  keg: 'Bottle shops (Keg tab) · Beta',
-  pharmacy: 'Chemists (Health tab) · Beta',
+  keg: 'Bottle shops · Beta',
+  pharmacy: 'Chemists · Beta',
 }, (n) => `${n} tab`);
 
 function sharesText(tabs: string[], receipts: boolean): string {

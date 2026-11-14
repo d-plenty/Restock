@@ -84,7 +84,7 @@ export function MoreTop({ children }: { children?: ReactNode }) {
                     {SECTION_NAMES[s]} {!isCustomSection(s) && <BetaTag />}
                   </span>
                   <span className="more-tile-count">
-                    {t.things ? `${t.things} ${t.things === 1 ? 'thing' : 'things'} · ${t.onSpecial} on special` : 'Nothing yet'}
+                    {t.things ? `${t.things} ${t.things === 1 ? 'item' : 'items'} · ${t.onSpecial} on special` : 'Nothing yet'}
                   </span>
                   <span className="more-tile-shop">
                     {t.cheapest ? `Cheapest at ${chainName(t.cheapest)}` : shops.length ? shops.map(chainName).join(' · ') : 'No shops picked yet'}

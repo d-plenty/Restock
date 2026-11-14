@@ -125,16 +125,16 @@ export function CardsScreen({
   const say = (m: string) => (store.undoable ? nav.toast(m) : setMsg(m));
 
   const removeLoyalty = async (c: LoyaltyCard) => {
-    if (!store.undoable && !(await confirmAction(`Remove ${loyaltyName(c)}?`, { detail: 'It goes from this browser.', action: 'Remove' }))) return;
+    if (!store.undoable && !(await confirmAction(`Delete ${loyaltyName(c)}?`, { detail: 'It goes from this browser.', action: 'Delete' }))) return;
     setPicked(undefined);
     await store.removeLoyalty(c.id);
   };
   const removeGift = async (g: GiftCard) => {
-    const ok = await confirmAction(`Remove ${g.name}?`, {
+    const ok = await confirmAction(`Delete ${g.name}?`, {
       detail: store.undoable
         ? 'Its number, PIN, balance history and photos go from this phone. Undo brings it back for a while.'
         : 'Its number, PIN, balance history and photos go from this browser.',
-      action: 'Remove',
+      action: 'Delete',
     });
     if (!ok) return;
     setPicked(undefined);
@@ -232,7 +232,7 @@ export function CardsScreen({
             {shownGift.usedUp ? 'Put back' : 'Used up'}
           </button>
           <button className="btn danger" onClick={() => void removeGift(shownGift)}>
-            <Icon name="trash" size={18} /> Remove
+            <Icon name="trash" size={18} /> Delete
           </button>
         </div>
       )}
@@ -251,7 +251,7 @@ export function CardsScreen({
 
       {shownLoyalty && (
         <button className="btn danger" onClick={() => void removeLoyalty(shownLoyalty)}>
-          <Icon name="trash" size={18} /> Remove this card
+          <Icon name="trash" size={18} /> Delete this card
         </button>
       )}
 

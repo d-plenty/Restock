@@ -60,7 +60,7 @@ export function useServer<T>(load: () => Promise<T>, deps: unknown[] = []): { da
 
 // ---------- phones ----------
 
-const TAB_WORD: Record<string, string> = { pantry: 'Pantry, Baby, Pets, Shopping list', keg: 'Keg', pharmacy: 'Health' };
+const TAB_WORD: Record<string, string> = { pantry: 'Pantry, Baby, Pets, Shopping list', keg: 'Bottle shop', pharmacy: 'Chemist' };
 
 /** "Shares Pantry, Shopping list, Keg · receipts" (what the phone said it shares, D9). */
 export function sharesText(p: Phone): string {
@@ -477,7 +477,7 @@ export const PERIODS: { value: Period; label: string }[] = [
 
 const q = encodeURIComponent;
 /** A 0.9.4 server has no Data paths: say so, not "404". */
-export const OLD_SERVER = 'This server needs Restock server 0.9.5 or newer for the Data tab. Update it, then reload this page.';
+export const OLD_SERVER = 'This server needs Restock server 0.9.5 or newer for the Your data page. Update it, then reload this page.';
 async function newer<T>(p: Promise<T>): Promise<T> {
   try {
     return await p;

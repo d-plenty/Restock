@@ -10,17 +10,27 @@ import { ChainDot, Icon, LoadingBar, Sheet } from './components';
  * background), and says what's not in stock where. Your second store is only suggested when it has
  * everything on your list for that shop.
  */
-export function CheckStockButton({ items }: { items: StockItem[] }) {
+export function CheckStockButton({ items, compact }: { items: StockItem[]; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <button
-        className="btn small"
+        className={compact ? 'btn small stock-btn' : 'btn small'}
         disabled={!items.length || !isNative()}
         title={isNative() ? undefined : 'Only in the Android app'}
         onClick={() => setOpen(true)}
       >
-        <Icon name="box" size={16} /> {isNative() ? 'Check stock' : 'Check stock (in the Android app)'}
+        <Icon name="box" size={16} />
+        {/* 0.10.10: beside Compare shops, where it works goes under the words, so it stays small. */}
+        {isNative() ? (
+          ' Check stock'
+        ) : compact ? (
+          <span className="stock-btn-words">
+            Check stock <span className="stock-btn-where">Android app</span>
+          </span>
+        ) : (
+          ' Check stock (in the Android app)'
+        )}
       </button>
       {open && <CheckStockSheet items={items} onClose={() => setOpen(false)} />}
     </>
@@ -48,7 +58,7 @@ function CheckStockSheet({ items, onClose }: { items: StockItem[]; onClose: () =
   return (
     <Sheet title="Check stock" onClose={onClose}>
       <p className="small" style={{ margin: 0 }}>
-        Restock asks your shops now what’s in stock at your stores, for the {items.length === 1 ? 'one thing' : `${items.length} things`} on this list. Stock
+        Restock asks your shops now what’s in stock at your branches, for the {items.length === 1 ? 'one item' : `${items.length} items`} on this list. Stock
         can change during the day.
       </p>
       {!isNative() && <p className="small" style={{ margin: 0 }}>Checking stock works in the Android app: shops are asked from your phone.</p>}

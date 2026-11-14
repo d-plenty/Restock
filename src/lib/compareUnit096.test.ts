@@ -20,9 +20,9 @@ describe('comparison unit for one list (0.9.6)', () => {
     expect(compareText(0.0045, 'g', { total: 4000, style: { kg: true } })).toBe('$4.50 / kg');
     expect(compareText(0.0042, 'g', { total: 5000, style: { kg: false } })).toBe('$0.42 / 100g');
     expect(compareText(0.05, 'ea', { style: { per100: false } })).toBe('$0.05 each');
-    expect(compareText(0.5, 'ea', { style: { per100: true } })).toBe('$50.00 per 100');
+    expect(compareText(0.5, 'ea', { style: { per100: true } })).toBe('$50.00 / 100');
     expect(formatUnitPrice(0.0045, 'g', { kg: true })).toBe('$4.50 / kg');
-    expect(formatUnitPrice(0.5, 'ea', { per100: true })).toBe('$50.00 per 100');
+    expect(formatUnitPrice(0.5, 'ea', { per100: true })).toBe('$50.00 / 100');
     expect(formatUnitPrice(0.0045, 'g')).toBe('$0.45 / 100g');
   });
   it('per kg when any row is 5 kg or more, else per 100 g', () => {

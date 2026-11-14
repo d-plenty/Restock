@@ -486,7 +486,7 @@ export function HomeAssistantScreen() {
           list, and your other phones, even with Restock closed.
         </span>
         <span className="small">
-          <strong>Only the groceries list.</strong> Keg and Health lists stay in Restock. Something new goes across
+          <strong>Only the groceries list.</strong> Bottle shop and Chemist lists stay in Restock. Something new goes across
           while it's still to buy, and ticking off works both ways.
         </span>
         <span className="small">

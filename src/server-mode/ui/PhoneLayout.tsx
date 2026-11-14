@@ -7,7 +7,7 @@
 //   Specials and catalogues, Cards and Receipts, the way the phone keeps them off the bar.
 // - the notices (new version, offline, home screen) at the top, below the notch.
 // Wide windows (from 1000 px) keep the desktop layout (Desktop.tsx); nothing here shows there.
-import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { getSettings } from '../../lib/db';
 import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
@@ -67,20 +67,31 @@ function PhoneTabs() {
   const tabs = BAR;
   const shown: Tab = isSectionTab(nav.tab) && !on.includes(nav.tab) ? 'pantry' : nav.tab;
   const inMore = more || isMoreTab(shown);
-  const n = tabs.length + 1;
+  // 0.10.10: Add in the middle, as on the Android app (it was only a small + on the Pantry page).
+  const n = tabs.length + 2;
+  const adding = !inMore && nav.tab === 'add';
   return (
     <nav ref={bar} className="tabs pt-tabs" aria-label="Main" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
       {tabs.map((t) => (
-        <button
-          key={t.id}
-          className={`tab${t.id === 'pharmacy' ? ' pharm' : ''}`}
-          aria-current={!inMore && shown === t.id ? 'page' : undefined}
-          onClick={() => nav.setTab(t.id)}
-        >
-          <Icon name={t.icon} />
-          {t.label}
-          {betaFor(t.id, true)}
-        </button>
+        <Fragment key={t.id}>
+          {t.id === 'list' && (
+            <button className="tab centre-add" aria-current={adding ? 'page' : undefined} onClick={() => nav.setTab('add')}>
+              <span className="bubble">
+                <Icon name="plus" size={26} stroke={2.4} />
+              </span>
+              Add
+            </button>
+          )}
+          <button
+            className={`tab${t.id === 'pharmacy' ? ' pharm' : ''}`}
+            aria-current={!inMore && shown === t.id ? 'page' : undefined}
+            onClick={() => nav.setTab(t.id)}
+          >
+            <Icon name={t.icon} />
+            {t.label}
+            {betaFor(t.id, true)}
+          </button>
+        </Fragment>
       ))}
       <button
         className="tab"
@@ -222,7 +233,7 @@ export function MorePage() {
       <div className="eyebrow">Your household</div>
       <div className="card flush">
         <Row icon="server" title={house ? 'Server and phones' : 'Phones'} sub={signal('The phones using this server')} warn={offline} onClick={() => go({ name: 'server', page: 'phones' })} />
-        {house && <Row icon="chart" title="Data" sub={signal('Spending, prices, export and import')} warn={offline} onClick={() => go({ name: 'server', page: 'data' })} />}
+        {house && <Row icon="chart" title="Your data" sub={signal('Spending, prices, export and import')} warn={offline} onClick={() => go({ name: 'server', page: 'data' })} />}
         <Row icon="list" title="Activity" sub={signal("What's been sent and fetched")} warn={offline} onClick={() => go({ name: 'server', page: 'activity' })} />
       </div>
       <div className="eyebrow">This phone</div>

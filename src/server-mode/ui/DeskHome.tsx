@@ -45,7 +45,7 @@ export function DeskHome() {
   const { groceries, general, w } = sums;
   const today = todayText();
 
-  // On special this week: the same deals Home counts (on sale, swap & save, small savings), by shop.
+  // On special this week: the same deals Home counts (on sale, cheaper swap, small savings), by shop.
   const byShop = new Map<string, number>();
   for (const r of w.dealRecs) {
     const c = w.dealChain(r);
@@ -56,7 +56,8 @@ export function DeskHome() {
     .map(([c, n]) => `${chainName(c)} ${n}`)
     .join(' · ');
   const open = w.entries.filter((e) => !e.checked);
-  const toBuy = open.length + general;
+  // 0.10.10: every list, as the menu's count does (it left Keg and the other tabs out: "3 to buy" here, 4 on the menu).
+  const toBuy = Math.max(open.length + general, (allEntries ?? []).filter((e) => !e.checked).length);
   const shops = w.totals.around.chains.length;
   const under = w.recs.filter(underTarget);
   const hits = w.recs.filter((r) => underTarget(r) || worthAlerting(r));
@@ -97,7 +98,7 @@ export function DeskHome() {
           <span className="dk-tile-sub num">
             {w.totals.around.total > 0
               ? `About ${money(w.totals.around.total)}${shops > 1 ? ` across ${shops} shops` : shops === 1 ? ` at ${chainName(w.totals.around.chains[0])}` : ''}`
-              : 'Add things on the list page'}
+              : 'Add items on the list page'}
           </span>
         </button>
         <button className="dk-tile" onClick={() => nav.setTab('pantry')}>

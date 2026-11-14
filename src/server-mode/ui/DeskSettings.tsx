@@ -356,7 +356,7 @@ function HouseholdPart() {
       {v3 ? (
         <Group id="dk-s-household" title="Household">
           <HouseName fallback={h.name} />
-          <Line title="What each phone shares" sub="Each phone chooses: Groceries (pantry and shopping list), Keg, Health, receipts, loyalty cards." greyed>
+          <Line title="What each phone shares" sub="Each phone chooses: Groceries (pantry and shopping list), Bottle shop, Chemist, receipts, loyalty cards." greyed>
             <WhereNote>Change this on each phone</WhereNote>
           </Line>
           <Line title="Adding and removing phones" sub="This server is the household's owner.">

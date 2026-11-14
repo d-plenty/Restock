@@ -1005,7 +1005,7 @@ export async function snapshot(): Promise<Snapshot> {
 
 /**
  * An item from a backup. One from before 0.8.9 (it has no "Any size" setting) gets the same move to
- * My picks as an update does (picks.ts), so restoring an old backup gives the same results.
+ * What I buy as an update does (picks.ts), so restoring an old backup gives the same results.
  */
 function fromBackup(g: Group, s: Snapshot): Group {
   const full = { ...g, sameProductIds: g.sameProductIds ?? [], altProductIds: g.altProductIds ?? [] };
