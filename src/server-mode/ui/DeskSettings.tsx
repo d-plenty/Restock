@@ -629,10 +629,7 @@ function HouseholdPart() {
       </Group>
 
       <Group id="dk-s-privacy" title="Privacy and sharing">
-        {/* 0.10.0: one switch on each phone, as Settings → Privacy and sharing → Shared prices. */}
-        <Line title={'Shared prices'} sub={'Each phone gets the shared price history (new items judged from day one) and shares the shelf prices it reads from the shops. Never anything typed in, and nothing from this server.'} greyed>
-          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
-        </Line>
+        {/* 0.11.1: the policy and fine print first, as on the phone */}
         <Line title="Privacy policy and fine print" sub="What Restock keeps, where, and what it shares">
           <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn small" onClick={() => setReading('privacy')}>
@@ -642,6 +639,17 @@ function HouseholdPart() {
               Fine print
             </button>
           </span>
+        </Line>
+        {/* 0.10.0: one switch on each phone, as Settings → Privacy and sharing → Shared prices. */}
+        <Line title={'Shared prices'} sub={'Each phone gets the shared price history (new items judged from day one) and shares the shelf prices it reads from the shops. Never anything typed in, and nothing from this server.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
+        </Line>
+      </Group>
+
+      {/* 0.11.1: Permissions has its own place, as on the phone (it was inside Privacy and sharing there) */}
+      <Group id="dk-s-permissions" title="Permissions">
+        <Line title={'Permissions'} sub={'Notifications, alarms, camera and location are asked for by the Android app, only for the feature that needs them.'} greyed>
+          <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
       </Group>
 

@@ -530,17 +530,19 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const CHECK_INTERVALS = [6, 12, 24, 48, 168];
 /** Price history to keep: 1 month, 8 weeks (default), 3 months, 6 months, 12 months (0.9.1). */
-export const HISTORY_WEEKS = [4, 8, 13, 26, 52];
+export const HISTORY_WEEKS = [4, 8, 13, 26, 39, 52];
 /**
  * 0.9.14: how far back Restock looks, one setting (Settings → Prices and deals → Price history):
  * the prices this phone keeps, and the shared price history it gets for day one.
  */
-export const KEEP_WEEKS = [8, 26, 52] as const;
+// 0.11.1: 9 months (39 weeks). The shared history comes in 8-week, 6-month and 12-month files, so a
+// phone on 9 months gets the 12-month one (keepDays).
+export const KEEP_WEEKS = [8, 26, 39, 52] as const;
 /** An older choice (1 or 3 months) becomes the next one up, so no prices are lost. */
 export const keepWeeks = (w: unknown): (typeof KEEP_WEEKS)[number] => KEEP_WEEKS.find((k) => typeof w === 'number' && w <= k) ?? (typeof w === 'number' && w > 52 ? 52 : 8);
-export const keepDays = (w: number): 56 | 182 | 365 => (w >= 52 ? 365 : w >= 26 ? 182 : 56);
+export const keepDays = (w: number): 56 | 182 | 365 => (w >= 39 ? 365 : w >= 26 ? 182 : 56);
 export const historyLabel = (w: number) =>
-  w === 4 ? '1 month' : w === 13 ? '3 months' : w === 26 ? '6 months' : w === 52 ? '12 months' : `${w} weeks`;
+  w === 4 ? '1 month' : w === 13 ? '3 months' : w === 26 ? '6 months' : w === 39 ? '9 months' : w === 52 ? '12 months' : `${w} weeks`;
 /**
  * Under this much history, an item is still "learning" what its normal price is. A little under
  * four weeks, so items don't flicker back to "learning" when only 1 month of history is kept.

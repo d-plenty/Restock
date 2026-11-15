@@ -38,6 +38,15 @@ public class PriceCheckWorker extends Worker {
     /** 0.9.6: the one catch-up job for a set time that was missed (phone off, restart, update, clock change). */
     static final String UNIQUE_NAME_CATCHUP = "restock-price-check-catchup";
     private static final long CATCHUP_DELAY_MS = 60_000L;
+    /**
+     * 0.11.1: "Check now" is run by the app itself, which Android can stop if the app is swiped away
+     * or the phone needs the memory. This is its safety net: one job, queued when a Check now starts
+     * and cancelled when it finishes. If the check never finished, the job runs it again in the
+     * background (two runs never overlap: PriceChecker.run) and says so in a notification.
+     */
+    static final String UNIQUE_NAME_MANUAL = "restock-price-check-manual";
+    private static final long MANUAL_NET_DELAY_MS = 15 * 60_000L;
+    private static final String MANUAL_KEY = "manualCheck";
     private static final String TAG = "RestockCheck";
     private static final String KEY = "checkSlot";
 
@@ -80,6 +89,50 @@ public class PriceCheckWorker extends Worker {
         }
     }
 
+    /** 0.11.1: a Check now has started: note it, and queue the safety net. */
+    static void manualStarted(Context ctx) {
+        try {
+            SQLiteDatabase db = RestockDatabase.get(ctx);
+            PriceChecker.writeKv(db, MANUAL_KEY, new JSONObject().put("started", Instant.now().toString()));
+            OneTimeWorkRequest req = new OneTimeWorkRequest.Builder(PriceCheckWorker.class)
+                .setConstraints(new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setInitialDelay(MANUAL_NET_DELAY_MS, TimeUnit.MILLISECONDS)
+                .setInputData(new Data.Builder().putString("name", UNIQUE_NAME_MANUAL).build())
+                .build();
+            WorkManager.getInstance(ctx).enqueueUniqueWork(UNIQUE_NAME_MANUAL, ExistingWorkPolicy.REPLACE, req);
+        } catch (Exception e) {
+            Log.w(TAG, "check now safety net not queued", e);
+        }
+    }
+
+    /** 0.11.1: that Check now finished: nothing left for the safety net to do. */
+    static void manualFinished(Context ctx) {
+        try {
+            PriceChecker.writeKv(RestockDatabase.get(ctx), MANUAL_KEY, new JSONObject());
+            WorkManager.getInstance(ctx).cancelUniqueWork(UNIQUE_NAME_MANUAL);
+        } catch (Exception e) {
+            Log.w(TAG, "check now safety net not cleared", e);
+        }
+    }
+
+    /** 0.11.1: the safety net's own run: only when a Check now started and never finished. */
+    private Result finishManual(Context ctx, SQLiteDatabase db) {
+        try {
+            JSONObject m = PriceChecker.readKv(db, MANUAL_KEY);
+            if (m == null || m.optString("started", "").isEmpty()) return Result.success();
+            PriceChecker.Result r = PriceChecker.run(ctx, null, false);
+            PriceChecker.writeKv(db, MANUAL_KEY, new JSONObject());
+            PriceChecker.checkedNotice(ctx, r);
+            Log.i(TAG, "check now finished in the background: " + r.checked + " checked, " + r.updated + " updated");
+            return Result.success();
+        } catch (Exception e) {
+            Log.w(TAG, "check now safety net failed", e);
+            return getRunAttemptCount() < 3 ? Result.retry() : Result.failure();
+        } finally {
+            StoreWeb.blankAll();
+        }
+    }
+
     @Override
     public Result doWork() {
         Context ctx = getApplicationContext();
@@ -88,6 +141,10 @@ public class PriceCheckWorker extends Worker {
             if (!RestockDatabase.ready(db)) return Result.success();
             JSONObject settings = PriceChecker.readKv(db, "settings");
             if (settings == null) return Result.success();
+            // 0.11.1: the safety net for a Check now that never finished (asked for by hand, so it
+            // doesn't depend on background activity being on, and it never touches the schedule).
+            Data named = getInputData();
+            if (named != null && UNIQUE_NAME_MANUAL.equals(named.getString("name"))) return finishManual(ctx, db);
             JSONObject sync = settings.optJSONObject("sync");
             if (sync != null && !sync.optBoolean("backgroundActivity", true)) return Result.success();
 

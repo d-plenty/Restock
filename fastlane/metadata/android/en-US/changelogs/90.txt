@@ -1,0 +1,1 @@
+Release candidate (0.11.1): a price check keeps showing its progress when you leave Home, finishes in the background if Android stops the app, and tells you when it's done; Permissions and Send feedback have their own rows in Settings; 9 months of price history.

@@ -226,7 +226,7 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     // 0.9.14: 8 weeks, 6 months or 12 months (1 and 3 months become the next one up).
     historyWeeks: weeks,
     // 0.11.0: only one of the real choices; anything else follows the price history
-    ...(typeof s.searchKeepWeeks === 'number' && [8, 26, 52].includes(s.searchKeepWeeks) ? { searchKeepWeeks: s.searchKeepWeeks } : {}),
+    ...(typeof s.searchKeepWeeks === 'number' && [8, 26, 39, 52].includes(s.searchKeepWeeks) ? { searchKeepWeeks: s.searchKeepWeeks } : {}),
     checkWeekday: weekday(s.checkWeekday, D.checkWeekday),
     // 0.9.6: HH:MM; anything else is 5:00 am. A 0.9.5 phone's file has none, which is the same.
     checkTime: moved ? (isCheckTime(s.checkTime) ? s.checkTime : D.checkTime) : '04:00',

@@ -5,7 +5,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from 'react-dom';
 import { openDatabase } from '../lib/boot';
 import { wireSync } from '../lib/sync';
-import { checkPrices, syncBackgroundSchedule } from '../lib/check';
+import { syncBackgroundSchedule } from '../lib/check';
+import { CheckStrip, trackCheck } from './refresh';
 import { cachedSettings, getKV, getSettings, pruneHistory, putKV, refresh, updateSettings } from '../lib/db';
 import { checkForUpdate, SELF_UPDATE, weeklyCheckDue } from '../lib/updates';
 import { version as appVersion } from '../../package.json';
@@ -419,7 +420,7 @@ function RestockApp() {
       const stored = await getKV<{ checkMoved0110?: boolean; onboarded?: boolean }>('settings');
       if (stored && stored.checkMoved0110 !== true) {
         s = await updateSettings({ checkMoved0110: true, checkDays: s.checkDays, checkTime: s.checkTime, sync: s.sync });
-        toast('Prices are now checked on Wednesday and Saturday at 4:00 am. Change it in Settings → Price checks.');
+        toast('Prices are now checked on Wednesday and Saturday at 4:00 am. Change it in Settings → Prices and deals.');
       }
       // 0.9.6: checks run at a set time of day (default 5:00 am). If that time passed while the phone
       // was off, check now, once. A check made by hand in between never moves the schedule.
@@ -429,7 +430,8 @@ function RestockApp() {
       });
       const recent = !!s.lastCheck && Date.now() - Date.parse(s.lastCheck) < 30 * 60_000;
       if (!s.lastCheck || (due && !recent)) {
-        const r = await checkPrices(undefined, { slot: due });
+        // 0.11.1: with its progress showing, like a Check now
+        const r = await trackCheck({ slot: due });
         if (r.updated) toast(`Updated ${r.updated} price${r.updated === 1 ? '' : 's'}`);
       }
     };
@@ -672,6 +674,8 @@ function RestockApp() {
         {/* Covers the status bar, so pages don't scroll up underneath the clock and battery. */}
         <div className="status-shade" aria-hidden />
         {serverMode && serverUi.current && <serverUi.current.Strip />}
+        {/* 0.11.1: a running price check shows on every tab (Home, Pantry and the list show their own line) */}
+        {(shownTab === 'add' || shownTab === 'more') && !serverMode && <CheckStrip />}
         {shownTab === 'home' && <HomeScreen />}
         {isSectionTab(shownTab) && <PantryScreen key={shownTab} section={shownTab} />}
         {shownTab === 'add' && (serverMode && serverUi.current ? <serverUi.current.Tab /> : <AddScreen key={`add-tab-${addSection}`} section={addSection} />)}

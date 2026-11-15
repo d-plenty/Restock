@@ -20,6 +20,7 @@ import { useNav } from '../nav';
 const LENGTH_HELP: Record<number, string> = {
   8: 'Enough to know an everyday price.',
   26: 'Sees a few rounds of specials, so it knows a real one.',
+  39: 'Most of a year of specials. Shared prices come as the 12-month set.',
   52: 'Catches once-a-year sales like Christmas and Easter.',
 };
 

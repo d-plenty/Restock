@@ -61,7 +61,7 @@ final class ServerOffload {
     static final String OFF = "photo_off:";
     static final int PHOTOS_PER_ROUND = 20;
     static final int PRICES_PER_ROUND = 20_000;
-    static final int[] HISTORY_WEEKS = { 4, 8, 13, 26, 52 };
+    static final int[] HISTORY_WEEKS = { 4, 8, 13, 26, 39, 52 }; // 0.11.1: 9 months
     /** Prices pruneHistory (db.ts) would delete: older than the cut-off, not the sample items', not an item's latest. */
     private static final String PRICE_OLD = "p.date < ? AND p.source <> 'demo' AND p.date < (SELECT MAX(q.date) FROM prices q WHERE q.product_id = p.product_id)";
     /** The same, for a DELETE (no table alias there on older Android SQLite). */

@@ -704,6 +704,19 @@ final class PriceChecker {
         notify(context, title, lines, id, null);
     }
 
+    /** 0.11.1: a Check now has finished: "Prices checked", with how many and any shop that didn't answer. */
+    static void checkedNotice(Context context, Result r) {
+        try {
+            List<String> lines = new ArrayList<>();
+            if (r.checked == 0 && r.errors.isEmpty()) return; // nothing was checked (another check had just run)
+            lines.add(r.checked + (r.checked == 1 ? " price checked" : " prices checked") + " · " + r.updated + " updated");
+            if (!r.errors.isEmpty()) lines.add(r.errors.size() == 1 ? "One shop didn't answer. Open Restock to see which." : r.errors.size() + " shops didn't answer. Open Restock to see which.");
+            notify(context, "Prices checked", lines, NOTIFICATION_ID + 7, null);
+        } catch (Exception e) {
+            Log.w(TAG, "checked notice failed", e);
+        }
+    }
+
     /** 0.9.8: `action` says which screen a tap opens (App.tsx launch actions): "deals", "item:<id>", "catalogue", ... */
     static void notify(Context context, String title, List<String> lines, int id, String action) {
         if (Build.VERSION.SDK_INT >= 33

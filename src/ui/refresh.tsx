@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useSyncExternalStore } from 'react';
 import { checkPrices, type CheckResult } from '../lib/check';
 import { useLive } from '../lib/useLive';
 import { RestockNative } from '../lib/sql/native';
@@ -16,6 +16,57 @@ import { serverMode, serverUi } from '../server-mode/flag';
 export type RefreshStage = 'sync' | 'prices' | 'share';
 
 let running: Promise<void> | undefined;
+
+// 0.11.1: what a refresh is doing is kept here, not in the screen that started it. Before, it was
+// Home's own: leaving Home threw it away, and coming back showed "Prices updated Wednesday" while
+// the check was still going, as if it had been cancelled. Now every screen that shows it (Home,
+// Pantry, the list, and the strip on Add and More) reads the same thing, for as long as it runs.
+interface RefreshLive {
+  stage?: RefreshStage;
+  progress?: [number, number];
+}
+let live: RefreshLive = {};
+const watchers = new Set<() => void>();
+function setLive(patch: RefreshLive): void {
+  live = { ...live, ...patch };
+  for (const w of watchers) w();
+}
+const watch = (fn: () => void) => {
+  watchers.add(fn);
+  return () => watchers.delete(fn);
+};
+/** What a refresh is doing right now, on any screen. */
+export const useRefreshLive = (): RefreshLive => useSyncExternalStore(watch, () => live);
+
+/**
+ * A price check started somewhere other than Check now (the catch-up when Restock opens): shows
+ * its progress like any other. Does nothing extra when a refresh is already showing.
+ */
+export async function trackCheck(opts?: { slot?: boolean }): Promise<CheckResult> {
+  const mine = !live.stage;
+  if (mine) setLive({ stage: 'prices', progress: undefined });
+  try {
+    return await checkPrices((d, t) => mine && setLive({ progress: [d, t] }), opts);
+  } finally {
+    if (mine) setLive({ stage: undefined, progress: undefined });
+  }
+}
+
+/** 0.11.1: the same line on the tabs that have no refresh of their own (Add, More), while a check runs. */
+export function CheckStrip() {
+  const { stage, progress } = useRefreshLive();
+  if (!stage) return null;
+  return (
+    <div className="check-strip" role="status">
+      <span className="small">{refreshText(stage, progress)}</span>
+      {stage === 'prices' && progress && (
+        <div className="progress">
+          <div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** What's happening, for the line under the pull (Home shows it in its own spot). */
 export function refreshText(stage: RefreshStage, progress?: [number, number]): string {
@@ -36,8 +87,9 @@ async function serverRefresh(setStage: (s: RefreshStage | undefined) => void, to
 /** `onChecked` gets the price check's result (Home uses it to show shops that didn't work). */
 export function useFullRefresh(onChecked?: (res: CheckResult) => void) {
   const nav = useNav();
-  const [stage, setStage] = useState<RefreshStage>();
-  const [progress, setProgress] = useState<[number, number]>();
+  const { stage, progress } = useRefreshLive();
+  const setStage = (s: RefreshStage | undefined) => setLive({ stage: s });
+  const setProgress = (p: [number, number] | undefined) => setLive({ progress: p });
   // Only mention sync when this phone is in a household.
   const paired = !!useLive(() => syncInfo().catch(() => undefined), [])?.paired || serverMode;
   const checkedRef = useRef(onChecked);

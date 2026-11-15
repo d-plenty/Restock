@@ -179,10 +179,11 @@ export const SETTINGS_PAGES: Record<SettingsPage, { title: string }> = {
   advanced: { title: 'Advanced' },
 };
 /** The main list's groups of rows, in order (Feedback sits in Help; Advanced is last). */
-const GROUPS: { title: string; pages: (SettingsPage | 'cards' | 'feedback')[] }[] = [
+// 0.11.1: Permissions is a row of its own under Your phone (it was inside Privacy and sharing).
+const GROUPS: { title: string; pages: (SettingsPage | 'cards' | 'feedback' | 'permissions')[] }[] = [
   { title: 'Accessibility', pages: ['a11y'] },
   { title: 'Everyday', pages: ['list', 'prices', 'alerts', 'cards'] },
-  { title: 'Your phone', pages: ['data', 'sync', 'privacy', 'look'] },
+  { title: 'Your phone', pages: ['data', 'sync', 'privacy', 'permissions', 'look'] },
   { title: 'Help', pages: ['help', 'feedback', 'about'] },
 ];
 
@@ -228,7 +229,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
   // 0.9.13: searching the main list looks through every page (Advanced's testing features only once they're on).
   const all = !page && !!query.trim();
   const on = (p: SettingsPage | 'hub') => (p === 'hub' ? !page : page === p || all);
-  const pageSub = (p: SettingsPage | 'cards' | 'feedback'): string => {
+  const pageSub = (p: SettingsPage | 'cards' | 'feedback' | 'permissions'): string => {
     switch (p) {
       case 'list':
         return `Shop around, receipts${settings.receipts.enabled ? ' (on)' : ''}`;
@@ -247,7 +248,9 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       case 'look':
         return 'Colours, dark mode, app icon, widgets';
       case 'privacy':
-        return `What stays on this phone · Shared prices ${sharedOn(settings) ? 'on' : 'off'} · permissions`;
+        return `Privacy policy · what stays on this phone · Shared prices ${sharedOn(settings) ? 'on' : 'off'}`;
+      case 'permissions':
+        return 'Notifications, alarms, camera, location';
       case 'help':
         return 'Tour, sample items, check your shops are working';
       case 'feedback':
@@ -258,9 +261,10 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
         return '';
     }
   };
-  const open = (p: SettingsPage | 'cards' | 'feedback') =>
-    p === 'cards' ? nav.push({ name: 'cards' }) : p === 'feedback' ? nav.push({ name: 'feedback' }) : nav.push({ name: 'settings', page: p });
-  const titleOf = (p: SettingsPage | 'cards' | 'feedback') => (p === 'cards' ? 'Cards' : p === 'feedback' ? 'Send feedback' : SETTINGS_PAGES[p].title);
+  const open = (p: SettingsPage | 'cards' | 'feedback' | 'permissions') =>
+    p === 'cards' ? nav.push({ name: 'cards' }) : p === 'feedback' ? nav.push({ name: 'feedback' }) : p === 'permissions' ? nav.push({ name: 'permissions' }) : nav.push({ name: 'settings', page: p });
+  const titleOf = (p: SettingsPage | 'cards' | 'feedback' | 'permissions') =>
+    p === 'cards' ? 'Cards' : p === 'feedback' ? 'Send feedback' : p === 'permissions' ? 'Permissions' : SETTINGS_PAGES[p].title;
 
   const row = (title: string, sub: string, onClick: () => void) => (
     <button className="row" onClick={onClick}>
@@ -559,12 +563,12 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       )}
       {on('privacy') && (
         <>
-          <PrivacySharing settings={settings} />
+          {/* 0.11.1: the policy and fine print first; Permissions and Feedback have rows of their own in Settings now */}
           <div className="card flush">
-            {row('Permissions', 'Notifications, alarms, camera, location', () => nav.push({ name: 'permissions' }))}
             {row('Privacy policy', `Updated ${legal.updated}`, () => setReading('privacy'))}
             {row('Fine print', 'Not affiliated with the shops, no warranty', () => setReading('disclaimer'))}
           </div>
+          <PrivacySharing settings={settings} />
         </>
       )}
       {on('help') && (
@@ -781,7 +785,6 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
  * Shared prices (SharedPrices.tsx): one switch for Judge new items from day one and Send prices back.
  */
 function PrivacySharing({ settings }: { settings: Settings }) {
-  const nav = useNav();
   return (
     <>
       <div className="eyebrow" id="s-privacy">
@@ -795,16 +798,6 @@ function PrivacySharing({ settings }: { settings: Settings }) {
       </div>
       {/* 0.10.0: one switch for getting and sending shared prices (SharedPrices.tsx). */}
       <SharedPricesSection settings={settings} />
-      <div className="eyebrow">Feedback</div>
-      <div className="card flush">
-        <button className="row" onClick={() => nav.push({ name: 'feedback' })}>
-          <span className="grow">
-            <span className="title">Feedback</span>
-            <span className="small">Only what you send, when you send it, to Restock's own server (restock-prices.plenty.family)</span>
-          </span>
-          <Icon name="chevron" size={18} />
-        </button>
-      </div>
     </>
   );
 }

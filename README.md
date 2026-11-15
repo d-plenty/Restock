@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.11.0" src="https://img.shields.io/badge/status-release%20candidate%200.11.0-ffcd00">
+  <img alt="Release candidate 0.11.1" src="https://img.shields.io/badge/status-release%20candidate%200.11.1-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0110">New in 0.11.0</a> ·
+  <a href="#new-in-0111">New in 0.11.1</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -131,6 +131,13 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.11.1
+
+- **A price check keeps showing.** Check now's progress line stays when you leave Home and come back, and shows on Pantry, the list, Add and More while it runs. Before, leaving Home made it look cancelled (it wasn't: the line belonged to Home).
+- **It finishes even if the app is closed.** If Android stops Restock before a Check now is done, a background job runs it again, and a notification says "Prices checked" when a Check now finishes.
+- **Settings:** **Permissions** has its own row under Your phone, and **Send feedback** is only under Help (both were also inside Privacy and sharing). Privacy and sharing starts with the privacy policy and fine print.
+- **9 months** of price history, between 6 and 12 months (it uses the 12-month shared history).
 
 ## New in 0.11.0
 
@@ -463,7 +470,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.11.0.apk` (on macOS, `shasum -a 256 restock-0.11.0.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.11.1.apk` (on macOS, `shasum -a 256 restock-0.11.1.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

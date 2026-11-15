@@ -5801,3 +5801,14 @@ svg.icon-info {
   margin: 4px 0 0;
   font-weight: 600;
 }
+
+/* 0.11.1: a running price check, on the tabs with no refresh line of their own (Add, More) */
+.check-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 16px 0;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  background: var(--card);
+}

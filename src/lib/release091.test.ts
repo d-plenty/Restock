@@ -22,9 +22,9 @@ const now = Date.parse('2026-11-09T00:00:00Z');
 
 describe('12 months of price history', () => {
   it('is one of the choices, called 12 months', () => {
-    expect(HISTORY_WEEKS).toEqual([4, 8, 13, 26, 52]);
+    expect(HISTORY_WEEKS).toEqual([4, 8, 13, 26, 39, 52]); // 0.11.1: and 9 months
     expect(historyLabel(52)).toBe('12 months');
-    expect(HISTORY_WEEKS.map(historyLabel)).toEqual(['1 month', '8 weeks', '3 months', '6 months', '12 months']);
+    expect(HISTORY_WEEKS.map(historyLabel)).toEqual(['1 month', '8 weeks', '3 months', '6 months', '9 months', '12 months']);
   });
   it('survives settings checks, from this phone, a backup or another phone', () => {
     expect(checkSettings({ historyWeeks: 52 }).historyWeeks).toBe(52);

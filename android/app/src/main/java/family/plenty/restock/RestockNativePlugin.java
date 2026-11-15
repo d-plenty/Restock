@@ -282,6 +282,8 @@ public class RestockNativePlugin extends Plugin {
         checkThread.execute(() -> {
             try {
                 final java.time.Instant owed = slot ? PriceCheckWorker.owedSlot(getContext()) : null;
+                // 0.11.1: if Android stops the app before this finishes, a background job finishes it.
+                PriceCheckWorker.manualStarted(getContext());
                 PriceChecker.Result r = PriceChecker.run(getContext(), (done, total) -> {
                     JSObject e = new JSObject();
                     e.put("done", done);
@@ -289,6 +291,10 @@ public class RestockNativePlugin extends Plugin {
                     notifyListeners("checkProgress", e);
                 }, false);
                 if (owed != null) PriceCheckWorker.markServedNow(getContext(), owed);
+                // 0.11.1: done here, so the safety net has nothing to do; and say so with a notification.
+                PriceCheckWorker.manualFinished(getContext());
+                // (not for the catch-up Restock runs by itself when it opens: nobody asked for that one)
+                if (!slot) PriceChecker.checkedNotice(getContext(), r);
                 JSObject errors = new JSObject();
                 for (Map.Entry<String, String> e : r.errors.entrySet()) errors.put(e.getKey(), e.getValue());
                 JSObject ret = new JSObject();
