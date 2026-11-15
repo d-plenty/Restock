@@ -35,13 +35,21 @@
   <a href="PRIVACY.md">Privacy</a>
 </p>
 
-<p align="center"><img src="docs/screenshots/showcase-095.png" alt="Restock 0.9.5: Home and the Shopping list on a phone, and the Restock server's web page on a computer"></p>
+<p align="center"><img src="docs/screenshots/showcase-0111.png" alt="Restock 0.11.1: Home and the Shopping list on a phone, and the Restock server's web page on a computer"></p>
 
 | | | | |
-|---|---|---|---|
-| ![Home: a greeting and the date, your Shopping list total, and this week's deals](docs/screenshots/home-095.png) | ![Pantry: everything you buy, with where it's cheapest and today's verdict](docs/screenshots/pantry-095.png) | ![An item: the verdict, its usual price, and your product at each shop](docs/screenshots/item-095.png) | ![Add: tap results to tick them into the bar at the bottom, then tap to add](docs/screenshots/add-095.png) |
-| ![Shopping list by shop, with Shop around and what it saves](docs/screenshots/list-by-shop-095.png) | ![The General list: things Home Assistant added that match nothing in your pantry](docs/screenshots/list-general-095.png) | ![The Health tab: your chemist items and their prices](docs/screenshots/health-095.png) | ![My catalogue: specials on the things you buy, a page for each shop](docs/screenshots/catalogue-095.png) |
-| ![Undo: a small Undo appears for a few seconds after a change](docs/screenshots/undo-095.png) | ![Restock on iPhone: the server's web app on the home screen, with the Shopping list](docs/screenshots/iphone-list-095.png) | ![The server's Data tab: spending each month, from what you ticked off](docs/screenshots/web-data-095.png) | ![Dark mode in true black: Home](docs/screenshots/dark-home-095.png) |
+|:---:|:---:|:---:|:---:|
+| ![Home: a greeting and the date, your Shopping list total, and what's on special now](docs/screenshots/home-0111.png) | ![Pantry: everything you buy, with where it's cheapest](docs/screenshots/pantry-0111.png) | ![An item: the verdict, its usual price, and your product at each shop](docs/screenshots/item-0111.png) | ![Add: search results at a shop, ready to tick](docs/screenshots/add-0111.png) |
+| ![Shopping list by shop, with one shop open](docs/screenshots/list-by-shop-0111.png) | ![Compare shops: Shop around, and what it costs if you only go to one shop](docs/screenshots/compare-shops-0111.png) | ![My specials: what's on special at each shop you use](docs/screenshots/my-specials-0111.png) | ![My catalogue: specials on the things you buy, a page for each shop](docs/screenshots/my-catalogue-0111.png) |
+| ![Price history: the chart, where today's price sits, and how often it's on special](docs/screenshots/price-chart-0111.png) | ![Shopping at one shop, in dark mode: tick things off as they go in the trolley](docs/screenshots/shopping-dark-0111.png) | ![Dark mode in true black: Home](docs/screenshots/dark-home-0111.png) | |
+
+The phone pictures are real screenshots from a phone running Restock.
+
+| | |
+|:---:|:---:|
+| ![The server's web page on a computer: Pantry](docs/screenshots/web-pantry-0111.png) | ![The server's Your data page: spending each month, from what you ticked off](docs/screenshots/web-data-0111.png) |
+
+The two web pictures use sample data: real products and prices, with a made-up year of price history and spending.
 
 > **Local first. Works without signal.** Your list, pantry and prices live on your phone, not in a cloud. In a shopping centre with no reception, your list still opens straight away, and you can tick things off, add items from your pantry or type new ones. It all syncs when you're back online. Only searching the shops for new products and live prices needs the internet. **A server is optional:** Restock works fully on its own, and your own Restock server adds things on top.
 
