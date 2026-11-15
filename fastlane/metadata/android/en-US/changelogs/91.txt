@@ -1,0 +1,1 @@
+Release candidate (0.11.2): picks measured differently (mL and g) are said to be, with a way to type the pack's other size; Pantry sorts items into categories; clearer special wording for sizes; My specials' options no longer cut off; the right product is marked Cheapest in Price history; a short chart says why.

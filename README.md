@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.11.1" src="https://img.shields.io/badge/status-release%20candidate%200.11.1-ffcd00">
+  <img alt="Release candidate 0.11.2" src="https://img.shields.io/badge/status-release%20candidate%200.11.2-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0111">New in 0.11.1</a> ·
+  <a href="#new-in-0112">New in 0.11.2</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -139,6 +139,15 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.11.2
+
+- **Measured differently.** When your picks for one item are in different measures (two cans in mL and one in grams), Restock can't compare them by size, so it compares the shelf price. It now says so on the item, and Pantry says "Lowest shelf price" in place of "Cheapest". If the pack also prints its size in the other measure, **Set the amount** lets you type it (200 mL from the can), and the shops are then compared properly.
+- **Pantry sorts itself into categories.** A new item you add without choosing a category goes where its name fits (Shampoo to Bathroom, Milk to Fridge & freezer). For the ones already under Other, Pantry offers **Sort them into categories**, with Undo. It only uses the four categories Pantry starts with, matched to yours by name; anything that fits none stays under Other.
+- **Sizes aren't flavours.** A 420 g can and a 3 pack of the same beans read "on special in 1 of your 2 sizes", not "x 3 pack on special, not Heinz Baked Beans 420g". A pack size or a number is never used as a name.
+- **My specials:** the options under the search box wrap onto a second line. Before, the shops drop-down was squashed to an empty box and Refresh was cut off.
+- **Price history:** "Cheapest" is on the right product when your picks are measured differently (it compared dollars per 100 g with dollars each). When the chart only has a few days, a line says why: it is drawn from this phone's own checks, and the usual price comes from shared prices.
+- **Aldi sizes:** when Aldi's size is a gram off what its own name says (121 g for a 120 g can), the name's size is used.
 
 ## New in 0.11.1
 
@@ -478,7 +487,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.11.1.apk` (on macOS, `shasum -a 256 restock-0.11.1.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.11.2.apk` (on macOS, `shasum -a 256 restock-0.11.2.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

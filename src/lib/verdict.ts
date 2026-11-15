@@ -463,7 +463,17 @@ export interface Recommendation {
   byUnit: boolean;
   /** 0.9.6: priced lines left out of the comparison because their size is unknown. */
   sizeUnknown?: Option[];
+  /**
+   * 0.11.2: your picks are measured differently (millilitres and grams, say), so they can't be compared by
+   * size and the shelf price decides. `odd` are the picks not in the most common measure: the ones to
+   * give an amount in the other measure, from the pack.
+   */
+  mixedUnits?: { units: BaseUnitWord[]; odd: Option[] };
 }
+
+export type BaseUnitWord = 'g' | 'ml' | 'ea' | 'sheet';
+/** "in grams", "in millilitres", "by count" or "in sheets": how a pick is measured. */
+export const unitWord = (u: BaseUnitWord): string => ({ g: 'in grams', ml: 'in millilitres', ea: 'by count', sheet: 'in sheets' })[u];
 
 /**
  * How much is in a product, from what you typed in, or its size and name. A "30 Pack" of
@@ -560,7 +570,17 @@ export function recommend(
   const cheapest = (list: Option[]) => list.filter(comparable).reduce<Option | undefined>((b, o) => (!b || cost(o) < cost(b) ? o : b), undefined);
 
   const unsized = byUnit ? priced.filter((o) => !comparable(o)) : [];
-  const base: Recommendation = { group, options, action: 'none', headline: 'Usual prices', detail: '', byUnit, sizeUnknown: unsized.length ? unsized : undefined };
+  // 0.11.2: picks in different measures. Only your picks count (an alternative in another measure changes nothing).
+  let mixedUnits: Recommendation['mixedUnits'];
+  const measuredMains = priced.filter((o) => o.role === 'main' && o.unitPrice !== undefined && unitOf(o) !== undefined);
+  const mainUnits = [...new Set(measuredMains.map((o) => unitOf(o) as BaseUnitWord))];
+  if (mainUnits.length > 1) {
+    const count = (u: BaseUnitWord) => measuredMains.filter((o) => unitOf(o) === u).length;
+    const usualUnit = measuredMains.find((o) => o.product.id === group.usualProductId);
+    const most = [...mainUnits].sort((a, b) => count(b) - count(a) || (usualUnit && unitOf(usualUnit) === a ? -1 : usualUnit && unitOf(usualUnit) === b ? 1 : 0))[0];
+    mixedUnits = { units: [most, ...mainUnits.filter((u) => u !== most)], odd: measuredMains.filter((o) => unitOf(o) !== most) };
+  }
+  const base: Recommendation = { group, options, action: 'none', headline: 'Usual prices', detail: '', byUnit, sizeUnknown: unsized.length ? unsized : undefined, mixedUnits };
   if (!priced.length)
     return options.some((o) => o.price !== undefined)
       ? { ...base, headline: 'Costco prices only', detail: "Costco's online prices, which include delivery." }

@@ -6,16 +6,34 @@
 import type { Recommendation } from './verdict';
 
 const SCENTS =
-  /\b(body ?wash|shower|shampoo|conditioner|soap|hand ?wash|deodorant|antiperspirant|detergent|laundry|washing|dishwash|cleaner|spray|candle|softener|freshener|wipe|lotion|moisturiser)s?\b/i;
+  /\b(body ?wash|shower|shampoo|conditioner|soap|hand ?wash|deodorant|antiperspirant|detergent|laundry|washing|dishwash(?:ing|er)?|cleaner|spray|candle|softener|freshener|wipe|lotion|moisturiser)s?\b/i;
 const COLOURS = /\b(paper|towel|tissue|serviette|napkin|pen|marker|highlighter|paint|nail|dye|colour|color|crayon|balloon|ribbon)s?\b/i;
 
-/** "flavours", "scents" or "colours", from what the things are. */
-export function flavourWord(names: string[]): 'flavours' | 'scents' | 'colours' {
+const words = (s: string) => s.split(/\s+/).filter(Boolean);
+
+/** A word that only says how much is in the pack: "420g", "3", "x", "pack", "3x420g", "10pk". */
+const SIZE_WORD = /^(?:\d+(?:[.,]\d+)?(?:x\d+(?:[.,]\d+)?)?(?:kg|g|ml|l|pk|pack|ea)?|x|pack|packs|pk|multipack|each|ea)$/i;
+/** What's left of each name once the words they all share are gone ('' when nothing is). */
+function leftovers(names: string[]): string[] {
+  const ws = names.map(words);
+  const shared = ws.map((w) => new Set(w.map((x) => x.toLowerCase()))).reduce((acc, set) => new Set([...acc].filter((x) => set.has(x))));
+  return ws.map((w) => w.filter((x) => !shared.has(x.toLowerCase())).join(' '));
+}
+/**
+ * 0.11.2: the same thing in different sizes, not flavours: their names differ only in pack words
+ * ("Heinz Baked Beans 420g" and "Heinz Baked Beans 420g x 3 pack"), or not at all.
+ */
+export function sizesOnly(names: string[]): boolean {
+  if (names.length < 2) return false;
+  return leftovers(names).every((l) => words(l).every((w) => SIZE_WORD.test(w)));
+}
+
+/** "flavours", "scents" or "colours", from what the things are ("sizes" when only the pack differs). */
+export function flavourWord(names: string[]): 'flavours' | 'scents' | 'colours' | 'sizes' {
+  if (sizesOnly(names)) return 'sizes';
   const all = names.join(' ');
   return SCENTS.test(all) ? 'scents' : COLOURS.test(all) ? 'colours' : 'flavours';
 }
-
-const words = (s: string) => s.split(/\s+/).filter(Boolean);
 
 /**
  * What tells them apart: their names without the words they all share ("Coles Simply Milk & Honey
@@ -50,7 +68,11 @@ export function flavourNote(names: string[], special: boolean[]): string | undef
   const labels = flavourLabels(names);
   const on = labels.filter((_, i) => special[i]);
   const off = labels.filter((_, i) => !special[i]);
-  if (n > 4 || [...on, ...off].some((l) => l.length > 28)) return `on special in ${k} of your ${n} ${word}`;
+  // 0.11.2: names are only used when each one says something: not a bare pack size ("x 3 pack"), not
+  // a whole product name standing in for nothing, not a number ("Self 1"), and no two the same.
+  const left = leftovers(names);
+  const plain = left.every((l) => l && !/\d/.test(l)) && new Set(left.map((l) => l.toLowerCase())).size === n;
+  if (!plain || n > 4 || [...on, ...off].some((l) => l.length > 28)) return `on special in ${k} of your ${n} ${word}`;
   return `${list(on)} on special, not ${list(off)}`;
 }
 

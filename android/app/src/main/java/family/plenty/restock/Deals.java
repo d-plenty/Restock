@@ -861,13 +861,50 @@ public final class Deals {
     /** The option a deal is about: the alternative for ALT, your product for BUY / SMALL. */
     // ---------- flavours, scents and colours (flavours.ts, 0.10.9) ----------
 
-    private static final Pattern SCENTS = Pattern.compile("\\b(body ?wash|shower|shampoo|conditioner|soap|hand ?wash|deodorant|antiperspirant|detergent|laundry|washing|dishwash|cleaner|spray|candle|softener|freshener|wipe|lotion|moisturiser)s?\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SCENTS = Pattern.compile("\\b(body ?wash|shower|shampoo|conditioner|soap|hand ?wash|deodorant|antiperspirant|detergent|laundry|washing|dishwash(?:ing|er)?|cleaner|spray|candle|softener|freshener|wipe|lotion|moisturiser)s?\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern COLOURS = Pattern.compile("\\b(paper|towel|tissue|serviette|napkin|pen|marker|highlighter|paint|nail|dye|colour|color|crayon|balloon|ribbon)s?\\b", Pattern.CASE_INSENSITIVE);
 
     /** "flavours", "scents" or "colours", from what the things are (flavours.ts flavourWord). */
     public static String flavourWord(List<String> names) {
+        if (sizesOnly(names)) return "sizes";
         String all = String.join(" ", names);
         return SCENTS.matcher(all).find() ? "scents" : COLOURS.matcher(all).find() ? "colours" : "flavours";
+    }
+
+    private static final Pattern SIZE_WORD = Pattern.compile("^(?:\\d+(?:[.,]\\d+)?(?:x\\d+(?:[.,]\\d+)?)?(?:kg|g|ml|l|pk|pack|ea)?|x|pack|packs|pk|multipack|each|ea)$", Pattern.CASE_INSENSITIVE);
+
+    /** What's left of each name once the words they all share are gone, "" when nothing is (flavours.ts leftovers). */
+    static List<String> leftovers(List<String> names) {
+        List<String[]> ws = new ArrayList<>();
+        for (String n : names) ws.add(n.trim().isEmpty() ? new String[0] : n.trim().split("\\s+"));
+        Set<String> shared = null;
+        for (String[] w : ws) {
+            Set<String> set = new HashSet<>();
+            for (String x : w) set.add(x.toLowerCase(java.util.Locale.ROOT));
+            if (shared == null) shared = set;
+            else shared.retainAll(set);
+        }
+        List<String> out = new ArrayList<>();
+        for (String[] w : ws) {
+            StringBuilder b = new StringBuilder();
+            for (String x : w) {
+                if (shared != null && shared.contains(x.toLowerCase(java.util.Locale.ROOT))) continue;
+                if (b.length() > 0) b.append(' ');
+                b.append(x);
+            }
+            out.add(b.toString());
+        }
+        return out;
+    }
+
+    /** 0.11.2: the same thing in different sizes, not flavours (flavours.ts sizesOnly). */
+    public static boolean sizesOnly(List<String> names) {
+        if (names.size() < 2) return false;
+        for (String l : leftovers(names)) {
+            if (l.isEmpty()) continue;
+            for (String w : l.split("\\s+")) if (!SIZE_WORD.matcher(w).matches()) return false;
+        }
+        return true;
     }
 
     /** Their names without the words they all share (flavours.ts flavourLabels). */
@@ -917,7 +954,16 @@ public final class Deals {
             (Boolean.TRUE.equals(special.get(i)) ? on : off).add(labels.get(i));
             if (labels.get(i).length() > 28) longOne = true;
         }
-        if (n > 4 || longOne) return "on special in " + k + " of your " + n + " " + word;
+        // 0.11.2: names only when each says something (flavours.ts flavourNote).
+        List<String> left = leftovers(names);
+        Set<String> distinct = new HashSet<>();
+        boolean plain = true;
+        for (String l : left) {
+            if (l.isEmpty() || l.matches(".*\\d.*")) plain = false;
+            distinct.add(l.toLowerCase(java.util.Locale.ROOT));
+        }
+        if (distinct.size() != n) plain = false;
+        if (!plain || n > 4 || longOne) return "on special in " + k + " of your " + n + " " + word;
         return andList(on) + " on special, not " + andList(off);
     }
 

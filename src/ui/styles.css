@@ -5639,6 +5639,42 @@ svg.icon-info {
   margin: 0;
   padding: 4px 14px 8px;
 }
+/* 0.11.2: My specials' options wrap onto a second line (the row used to scroll sideways, which squashed
+   the shops drop-down to nothing and cut Refresh off at the edge). */
+.chips.specials-opts {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+.chips.specials-opts .chip {
+  height: 40px;
+  flex: none;
+}
+/* 0.11.2: Pantry's offer to sort "Other" into categories */
+.sort-other {
+  gap: 10px;
+  font-size: var(--fs-sm);
+}
+.sort-other .btn {
+  align-self: flex-start;
+}
+.ph-short {
+  margin: 0;
+}
+/* 0.11.2: picks measured differently (mL and g): the note under What I buy */
+.mixed-units {
+  margin: 4px 14px 12px;
+  gap: 8px;
+  font-size: var(--fs-sm);
+}
+.mixed-units .btn {
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+  height: auto;
+  min-height: 44px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
 
 /* ---------- 0.10.10 ---------- */
 /* Edit says Edit (Pantry and the list had a bare pencil; the item page had the word). */

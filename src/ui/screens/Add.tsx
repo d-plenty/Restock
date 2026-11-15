@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { seenBefore, type SeenBefore } from '../../lib/seen';
+import { guessCategoryId } from '../../lib/categoryGuess';
 import { flavourBarNote, flavourWord, otherFlavours } from '../../lib/flavours';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { productCode, scanBarcode, type BarcodeInfo } from '../../lib/barcode';
@@ -2278,7 +2279,8 @@ export function ManualSheet({
         await addGroup({
           id: groupId,
           name: n,
-          categoryId: categoryId || undefined,
+          // 0.11.2: no category chosen: the one its name fits, else none ("Other").
+          categoryId: categoryId || guessCategoryId([n], categories.map((c) => ({ ...c, section })), section) || undefined,
           usualProductId: id,
           sameProductIds: [],
           altProductIds: [],

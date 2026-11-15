@@ -3,7 +3,8 @@
 // prices and pantry item either way; from the Pick sheet the list line is then linked to the new
 // item, and "Always use this for chopsticks" saved for it.
 
-import { addGroup, addProduct, addReading, findProductByStore, nowIso, uid, updateProduct } from '../../lib/db';
+import { guessCategoryId } from '../../lib/categoryGuess';
+import { addGroup, addProduct, addReading, allCategories, findProductByStore, nowIso, uid, updateProduct } from '../../lib/db';
 import { pickItemFor, pickItemOffList } from '../../lib/listPicks';
 import { act } from '../../lib/undo';
 import type { StoreProduct } from '../../stores';
@@ -65,12 +66,15 @@ export interface NewItem {
 
 /** A new pantry (or Keg, or Health) item whose picks are the ticked products: the first is the usual one. */
 export async function addItemFromPicks(picks: Iterable<StoreProduct>, item: NewItem, barcodeFor?: (sp: StoreProduct) => string | undefined): Promise<Group> {
-  const ids = await saveStoreProducts(picks, barcodeFor);
+  const list = [...picks];
+  const ids = await saveStoreProducts(list, barcodeFor);
   const alertLevel = item.alertLevel ?? 'good';
+  // 0.11.2: no category chosen: the one its name fits (Shampoo → Bathroom), else none ("Other").
+  const categoryId = item.categoryId || guessCategoryId([item.name, ...list.map((p) => p.name)], await allCategories().catch(() => []), item.section);
   const group: Group = {
     id: uid(),
     name: item.name,
-    categoryId: item.categoryId || undefined,
+    categoryId: categoryId || undefined,
     usualProductId: ids[0],
     sameProductIds: ids.slice(1),
     altProductIds: [],

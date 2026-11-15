@@ -960,3 +960,7 @@ Nothing. Fixes only (the Shopping list's buttons, search boxes, big text, Dan Mu
 ## 0.11.1: what changed on the wire
 
 - Nothing between phones and the server.
+
+## 0.11.2: what changed on the wire
+
+- Nothing between phones and the server.

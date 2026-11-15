@@ -1,5 +1,6 @@
 import { useFullRefresh } from '../refresh';
 import { useRef, useState } from 'react';
+import { itemsToSort, sortTargets } from '../../lib/categoryGuess';
 import { allCategories, allListEntries, cachedSettings, deleteGroup, updateGroup } from '../../lib/db';
 import { addAllToList, addToList, buzz, takeOffList } from '../../lib/listActions';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
@@ -190,6 +191,15 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
     stopEditing();
   };
 
+  // 0.11.2: the items in "Other" whose names fit one of your categories, and where each would go.
+  const toSort = itemsToSort(recs, categories, section);
+  const sortOther = async () => {
+    const n = toSort.length;
+    await act(`${n} item${n === 1 ? '' : 's'} sorted into categories`, async () => {
+      for (const x of toSort) await updateGroup(x.r.group.id, { categoryId: x.to });
+    });
+  };
+
   const moveSelected = async (categoryId: string) => {
     const n = selected.length;
     await act(`Category changed for ${n} item${n === 1 ? '' : 's'}`, async () => {
@@ -270,6 +280,20 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       {sections.map((s) => (
         <section key={s.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="eyebrow">{s.name}</div>
+          {s.id === 'none' && !editing && toSort.length >= 3 && (
+            <div className="banner grey sort-other">
+              <span>
+                <strong>
+                  {toSort.length} of these fit a category
+                </strong>{' '}
+                ({sortTargets(toSort, categories)}). You can move any of them
+                afterwards with Edit.
+              </span>
+              <button className="btn small" onClick={() => void sortOther()}>
+                Sort them into categories
+              </button>
+            </div>
+          )}
           <div className="card flush">
             {s.items.map((r) => {
               const mains = r.options.filter((o) => o.role === 'main');
@@ -282,7 +306,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                   : r.best?.price !== undefined && mains.length > 1 && tiedWithBest(r).length + 1 >= mains.length
                     ? 'Same price everywhere'
                     : r.best?.price !== undefined
-                      ? `Cheapest: ${chainName(r.best.product.chain)}`
+                      ? `${r.mixedUnits ? 'Lowest shelf price' : 'Cheapest'}: ${chainName(r.best.product.chain)}`
                       : 'No price yet',
                 mains.length > 1 ? `${mains.length} shops` : '',
                 mains.length &&

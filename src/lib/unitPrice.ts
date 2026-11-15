@@ -90,7 +90,14 @@ export function readSize(p: SizeSource & { price?: number }): Read {
   }
   // Every field, in turn: size and name together, the name alone, the size alone, then the shop's unit price.
   const tries = [packSize(p.size, p.name), packSize(undefined, p.name), packSize(p.size, undefined), fromUnitPrice(p.unitPriceText, p.price)];
-  const measured = tries.find((t) => t && t.unit !== 'ea');
+  let measured = tries.find((t) => t && t.unit !== 'ea');
+  // 0.11.2: the shop's size field a hair off what its own name says (Aldi: "121 g" for "Deodorant 120g"):
+  // the name is what's printed on the pack, so it wins when the two are within 3% of each other.
+  const named = tries[1];
+  if (measured && named && measured !== named && named.unit === measured.unit && !(measured.count && measured.count > 1) && !(named.count && named.count > 1)) {
+    const gap = Math.abs(measured.qty - named.qty) / named.qty;
+    if (gap > 0 && gap <= 0.03) measured = named;
+  }
   if (measured) {
     const count = measured.count ?? (pc && measured.unit !== 'ea' ? pc : undefined);
     return { size: { qty: measured.qty, unit: measured.unit, count: count && count > 1 ? count : undefined, basis: 'shop' }, packCount: count ?? pc };
@@ -324,7 +331,10 @@ export function sizeLabel(p: SizeSource & { sizing?: Sizing }): string {
   if (s.unit === 'ea') return `${tidySize(p.size, p.name) ?? `${n2(s.qty)}`}${note}`;
   if (s.count && s.count > 1) return `${s.count} × ${measureText(s.qty / s.count, s.unit)}, ${measureText(s.qty, s.unit)} in total${note}`;
   // The shop's own words for a single one: "375mL", "1.25L".
-  return s.basis === 'shop' && p.size && !/pack|pk|each|ea\b/i.test(p.size) ? (tidySize(p.size, p.name) ?? measureText(s.qty, s.unit)) : `${measureText(s.qty, s.unit)}${note}`;
+  // 0.11.2: unless the size used isn't the one in those words (the name's 120 g over the size field's 121 g).
+  const own = p.size ? packSize(p.size, undefined) : undefined;
+  const sameAsWords = !own || own.unit !== s.unit || Math.abs(own.qty - s.qty) < 1e-6;
+  return s.basis === 'shop' && p.size && sameAsWords && !/pack|pk|each|ea\b/i.test(p.size) ? (tidySize(p.size, p.name) ?? measureText(s.qty, s.unit)) : `${measureText(s.qty, s.unit)}${note}`;
 }
 
 export interface PriceLine {

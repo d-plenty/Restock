@@ -236,6 +236,14 @@ public class SyncTest093 {
                 && Deals.flavourNote(wash, java.util.Arrays.asList(false, false, false)) == null
                 && "colours".equals(Deals.flavourWord(java.util.Arrays.asList("Kleenex Tissues White", "Kleenex Tissues Pink")));
             check(ok, "flavours: which are on special, as on the web");
+            // 0.11.2: sizes of one thing aren't flavours, and a pack size or a number is never used as a name
+            java.util.List<String> beans = java.util.Arrays.asList("Heinz Baked Beans 420g x 3 pack", "Heinz Baked Beans 420g");
+            java.util.List<String> blocks = java.util.Arrays.asList("Bref Toilet Cleaner Rim Block Self 1", "Bref Toilet Cleaner Rim Block Self 3", "Bref Toilet Cleaner Rim Block Blue 2");
+            boolean ok2 = "on special in 1 of your 2 sizes".equals(Deals.flavourNote(beans, java.util.Arrays.asList(true, false)))
+                && "on special in 1 of your 2 sizes".equals(Deals.flavourNote(java.util.Arrays.asList("Vegemite Spread", "Vegemite Spread"), java.util.Arrays.asList(true, false)))
+                && "on special in 1 of your 3 scents".equals(Deals.flavourNote(blocks, java.util.Arrays.asList(true, false, false)))
+                && "on special in all 2 sizes".equals(Deals.flavourNote(beans, java.util.Arrays.asList(true, true)));
+            check(ok2, "flavours 0.11.2: sizes, and no pack size or number as a name");
         }
         // 0.10.8: custom sections' icons are emoji only and names have no hidden marks (the same as shops.ts)
         {

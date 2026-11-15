@@ -11,6 +11,7 @@ import {
   readingsFor,
   updateGroup,
 } from '../../lib/db';
+import { itemsToSort, sortTargets } from '../../lib/categoryGuess';
 import { addToList, takeOffList } from '../../lib/listActions'; // 0.9.5 (undo)
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { loadRecommendations } from '../../lib/recs';
@@ -102,6 +103,14 @@ export function DeskPantry({ section }: { section: Section }) {
       return (DEAL_RANK[a.action] ?? 9) - (DEAL_RANK[b.action] ?? 9) || a.group.name.localeCompare(b.group.name);
     });
   const usedCats = categories.filter((c) => recs.some((r) => r.group.categoryId === c.id));
+  // 0.11.2: as on the phone's Pantry: items with no category whose names fit one of yours.
+  const toSort = itemsToSort(recs, categories, section);
+  const sortOther = async () => {
+    const n = toSort.length;
+    await act(`${n} item${n === 1 ? '' : 's'} sorted into categories`, async () => {
+      for (const x of toSort) await updateGroup(x.r.group.id, { categoryId: x.to });
+    });
+  };
 
   return (
     <div className="dk-page">
@@ -140,6 +149,17 @@ export function DeskPantry({ section }: { section: Section }) {
                   ))}
                 </select>
               </label>
+            </div>
+          )}
+          {toSort.length >= 3 && (
+            <div className="banner grey sort-other">
+              <span>
+                <strong>{toSort.length} items with no category fit one</strong> ({sortTargets(toSort, categories)}). You can change any of them afterwards
+                with Edit.
+              </span>
+              <button className="btn small" onClick={() => void sortOther()}>
+                Sort them into categories
+              </button>
             </div>
           )}
           {!recs.length && (

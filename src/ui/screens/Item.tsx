@@ -42,7 +42,10 @@ import {
   type Option,
   type PriceStats,
   type Recommendation,
+  unitWord,
 } from '../../lib/verdict';
+
+const wordList = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 import {
   chainName,
   GOOD_SALE,
@@ -258,7 +261,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
     };
   }, [groupId]);
   const [selected, setSelected] = useState<string>();
-  const [sheet, setSheet] = useState<'edit' | 'alerts' | 'price' | 'menu' | { option: Option }>();
+  const [sheet, setSheet] = useState<'edit' | 'alerts' | 'price' | 'menu' | { option: Option; wantUnit?: 'g' | 'ml' | 'ea' }>();
   const appSettings = useLive(getSettings, []);
   const [preview, setPreview] = useState<Option>();
   const [rangeWeeks, setRangeWeeks] = useState<number>();
@@ -620,6 +623,34 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           </div>
         )}
         {mains.map((o) => row(o, mains.length > 1 && o === rec.best && !tiedWithBest(rec).length ? 'cheapest' : undefined))}
+        {/* 0.11.2: picks measured differently (mL and g) can't be compared by size: say so, and offer the fix */}
+        {rec.mixedUnits && (
+          <div className="banner amber mixed-units" role="note">
+            <strong>Measured differently</strong>
+            <span>
+              Your picks are measured {wordList(rec.mixedUnits.units.map(unitWord))}, so Restock can't compare them by size. "Cheapest" here is the lowest
+              price on the shelf, which may be a smaller pack.
+            </span>
+            {rec.mixedUnits.units[0] !== 'sheet' && (
+              <>
+                <span>
+                  {rec.mixedUnits.units[0] === 'ea' ? 'If the pack also says how many are in it' : `If the pack also says how much is in it ${unitWord(rec.mixedUnits.units[0])}`}, add it and Restock
+                  will compare them properly:
+                </span>
+                {rec.mixedUnits.odd.map((o) => (
+                  <button
+                    key={o.product.id}
+                    className="btn small"
+                    onClick={() => setSheet({ option: o, wantUnit: rec.mixedUnits!.units[0] as 'g' | 'ml' | 'ea' })}
+                  >
+                    Set the amount for {o.product.name}
+                    {rec.mixedUnits!.odd.filter((x) => x.product.name === o.product.name).length > 1 ? ` at ${chainName(o.product.chain)}` : ''}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )}
         {costcoHere.map((p) => (
           <div key={`costco-check-${p.id}`} style={{ padding: '0 14px 12px' }}>
             <button className="btn small" style={{ minHeight: 44 }} disabled={checkingCostco} onClick={() => void checkCostco(p)}>
@@ -799,7 +830,9 @@ export function ItemScreen({ groupId }: { groupId: string }) {
         </Sheet>
       )}
       {sheet === 'price' && <PriceSheet options={rec.options} productId={chartOption?.product.id} onClose={() => setSheet(undefined)} />}
-      {typeof sheet === 'object' && <OptionSheet group={group} option={sheet.option} options={rec.options} onClose={() => setSheet(undefined)} />}
+      {typeof sheet === 'object' && (
+        <OptionSheet group={group} option={sheet.option} options={rec.options} wantUnit={sheet.wantUnit} onClose={() => setSheet(undefined)} />
+      )}
     </div>
   );
 }
@@ -1083,13 +1116,26 @@ export function PriceSheet({ options, productId: first, onClose }: { options: Op
   );
 }
 
-function OptionSheet({ group, option, options, onClose }: { group: Group; option: Option; options: Option[]; onClose: () => void }) {
+function OptionSheet({
+  group,
+  option,
+  options,
+  wantUnit,
+  onClose,
+}: {
+  group: Group;
+  option: Option;
+  options: Option[];
+  /** 0.11.2: opened from "Measured differently": the measure your other picks use, with the amount left to type. */
+  wantUnit?: 'g' | 'ml' | 'ea';
+  onClose: () => void;
+}) {
   const id = option.product.id;
   const [looking, setLooking] = useState(false);
   // 0.9.6: nothing typed yet and Restock has a guess or an estimate: it fills the box, to check and save (confirmed).
-  const offer = option.product.qty ? undefined : amountToConfirm(option.product);
-  const [qty, setQty] = useState(option.product.qty?.toString() ?? (offer ? String(offer.qty) : ''));
-  const [unit, setUnit] = useState(option.product.qtyUnit ?? offer?.unit ?? productQty(option.product).unit ?? 'ea');
+  const offer = option.product.qty || wantUnit ? undefined : amountToConfirm(option.product);
+  const [qty, setQty] = useState(wantUnit ? '' : (option.product.qty?.toString() ?? (offer ? String(offer.qty) : '')));
+  const [unit, setUnit] = useState(wantUnit ?? option.product.qtyUnit ?? offer?.unit ?? productQty(option.product).unit ?? 'ea');
   const line = priceLine(option.product, option.price, optionStyle(options));
   const isAlt = option.role === 'alt';
   const lastAtShop = !isAlt && options.filter((o) => o.role === 'main' && o.product.chain === option.product.chain).length === 1;
@@ -1137,6 +1183,12 @@ function OptionSheet({ group, option, options, onClose }: { group: Group; option
           Amount for unit pricing
         </div>
         <p className="small">Lets Restock compare different pack sizes fairly. For toilet paper, use total sheets (rolls × sheets per roll).</p>
+        {wantUnit && (
+          <p className="small" role="note">
+            <strong>Your other picks are measured {unitWord(wantUnit)}.</strong>{' '}
+            {wantUnit === 'ea' ? 'Type how many are in this pack' : `Type how much is in this pack ${unitWord(wantUnit)}`}, as printed on the pack, and save it.
+          </p>
+        )}
         {/* 0.9.6: always say how sure Restock is: confirmed by you, estimated, or unknown. */}
         <p className="small" role="status">
           {option.product.qty
@@ -1151,7 +1203,7 @@ function OptionSheet({ group, option, options, onClose }: { group: Group; option
           <input
             className="input num"
             inputMode="decimal"
-            placeholder={String(productQty(option.product).qty ?? '')}
+            placeholder={wantUnit ? '' : String(productQty(option.product).qty ?? '')}
             value={qty}
             onChange={(e) => setQty(e.target.value)}
             aria-label="Amount"
@@ -1298,8 +1350,12 @@ function HistoryPicker({ options, picked, onPick }: { options: Option[]; picked:
   const [shop, setShop] = useState(picked.product.chain);
   useEffect(() => setShop(picked.product.chain), [picked.product.chain]);
   const rows = options.filter((x) => x.product.chain === shop);
-  const priced = options.filter((x) => x.unitPrice !== undefined && x.role !== 'alt');
-  const low = priced.length > 1 ? Math.min(...priced.map((x) => x.unitPrice!)) : undefined;
+  // 0.11.2: "Cheapest" is by the comparison price only when every pick is measured the same way (all per
+  // 100 g, say); grams against a count can't be compared, so the shelf price decides, as in What I buy.
+  const mains = options.filter((x) => x.role !== 'alt' && x.price !== undefined);
+  const sameMeasure = mains.every((x) => x.unitPrice !== undefined) && new Set(mains.map((x) => productQty(x.product).unit)).size === 1;
+  const costOf = (x: Option) => (sameMeasure ? x.unitPrice : x.price);
+  const low = mains.length > 1 ? Math.min(...mains.map((x) => costOf(x)!)) : undefined;
   const off = (x: Option) =>
     x.unitPrice !== undefined && x.normalUnitPrice && x.unitPrice < x.normalUnitPrice * 0.97
       ? Math.round((1 - x.unitPrice / x.normalUnitPrice) * 100)
@@ -1313,7 +1369,6 @@ function HistoryPicker({ options, picked, onPick }: { options: Option[]; picked:
               key={c}
               role="tab"
               aria-selected={c === shop}
-              aria-pressed={c === shop}
               onClick={() => {
                 setShop(c);
                 const first = options.find((x) => x.product.chain === c);
@@ -1343,7 +1398,7 @@ function HistoryPicker({ options, picked, onPick }: { options: Option[]; picked:
               <span className="ph-row-text">
                 <span className="ph-size">
                   {priceLine(x.product, x.price).unknown ? 'Size unknown' : sizeLabel(x.product)}
-                  {low !== undefined && x.unitPrice !== undefined && x.role !== 'alt' && Math.abs(x.unitPrice - low) < 1e-9 && (
+                  {low !== undefined && x.role !== 'alt' && costOf(x) !== undefined && Math.abs(costOf(x)! - low) < 1e-9 && (
                     <span className="tag great">Cheapest</span>
                   )}
                   {x.role === 'alt' && <span className="tag normal">Alternative</span>}
@@ -1501,6 +1556,7 @@ function PriceHistory({
           ? `Last on special ${weeksSinceSale === 1 ? 'a week' : `${weeksSinceSale} weeks`} ago. Sales usually come round every ~${stats.cycleWeeks} weeks.`
           : `Last on special ${weeksSinceSale === 1 ? 'a week' : `${weeksSinceSale} weeks`} ago.`;
 
+  const ownDays = allReadings.length ? Math.max(1, Math.round((now - Date.parse(allReadings[0].date)) / 86_400_000)) : 0;
   const ownWeeks = allReadings.length ? Math.max(1, Math.round((now - Date.parse(allReadings[0].date)) / WEEK)) : 0;
   const source = market
     ? `From shared prices · ${market.days} days`
@@ -1568,9 +1624,19 @@ function PriceHistory({
         <>
       {range}
       {allReadings.length >= 2 ? (
-        <div className="ph-chart">
-          <PriceChart readings={chartShown.slice(-400)} typical={stats.typical} />
-        </div>
+        <>
+          <div className="ph-chart">
+            <PriceChart readings={chartShown.slice(-400)} typical={stats.typical} />
+          </div>
+          {/* 0.11.2: a short chart under "1 year" looked broken: say why it's short, and where the rest comes from */}
+          {ownDays < 28 && (
+            <p className="small ph-short" role="note">
+              The chart is drawn from this phone's own price checks: {ownDays <= 1 ? 'a day' : `${ownDays} days`} so far, so that's all it can show yet. It
+              fills in as your phone keeps checking.
+              {market ? ` The usual price and how often it's on special come from shared prices (${market.days} days), which don't include a day-by-day chart.` : ''}
+            </p>
+          )}
+        </>
       ) : (
         <p className="small" style={{ margin: 0 }}>
           Your own price chart starts after a couple of price checks.

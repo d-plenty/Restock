@@ -121,8 +121,8 @@ export function SpecialsScreen() {
           />
         </label>
       </div>
-      <div className="chips" role="group" aria-label="Specials options">
-        <select className="input" style={{ width: 'auto', minWidth: 158, height: 40 }} value={sort} onChange={(e) => setSort(e.target.value as SpecialSort)} aria-label="Sort the specials">
+      <div className="chips specials-opts" role="group" aria-label="Specials options">
+        <select className="input" style={{ width: 'auto', minWidth: 158, height: 40, flex: 'none' }} value={sort} onChange={(e) => setSort(e.target.value as SpecialSort)} aria-label="Sort the specials">
           {SORTS.map((s) => (
             <option key={s.id} value={s.id}>
               {s.label}
@@ -130,7 +130,7 @@ export function SpecialsScreen() {
           ))}
         </select>
         {base.groups.length > 1 && (
-          <select className="input" style={{ width: 'auto', height: 40 }} value={only} onChange={(e) => setOnly(e.target.value as Section | 'all')} aria-label="Which shops to show">
+          <select className="input" style={{ width: 'auto', minWidth: 150, height: 40, flex: 'none' }} value={only} onChange={(e) => setOnly(e.target.value as Section | 'all')} aria-label="Which shops to show">
             <option value="all">All my shops</option>
             {base.groups.map((g) => (
               <option key={g.section} value={g.section}>
