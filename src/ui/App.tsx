@@ -13,7 +13,7 @@ import { setConnectionMode } from '../stores/http';
 import { applyTheme, syncInsets } from '../lib/theme';
 import { scheduleReminders } from '../lib/notify';
 import { useLive } from '../lib/useLive';
-import { Announcer, betaFor, closeTopLayer, Icon, layerHost, runBackHandlers } from './components';
+import { Announcer, closeTopLayer, Icon, layerHost, runBackHandlers } from './components';
 import { isMoreTab, isSectionTab, NavContext, type Nav, type Screen, type Tab } from './nav';
 import { MoreScreen } from './screens/More';
 import { activeSections, type Section } from '../shops';
@@ -127,7 +127,7 @@ function RestockApp() {
         const told = info?.newer && s.updates?.told !== info.version ? info.version : undefined;
         await updateSettings({ updates: { notify: true, ...s.updates, lastCheck: new Date().toISOString(), ...(told ? { told } : {}) } });
         if (!told) return;
-        const msg = `Restock ${told} is out. Update it in Settings → About and updates.`;
+        const msg = `Restock ${told} is out. Tap Update now on Home, or in Settings → About and updates.`;
         if (Capacitor.isNativePlatform())
           await RestockNative.notify({ id: 4390, title: 'A Restock update is ready', body: msg, action: 'updates' }).catch(() => undefined);
         else setToastMsg(msg);
@@ -683,7 +683,6 @@ function RestockApp() {
               >
                 <Icon name={t.icon} />
                 {t.label}
-                {betaFor(t.id, true)}
               </button>
             ),
           )}

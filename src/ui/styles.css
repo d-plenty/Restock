@@ -5702,3 +5702,37 @@ svg.icon-info {
   white-space: normal;
   text-align: left;
 }
+
+/* 0.10.12: Home's "Update available" card: the versions, and one big Update now button. */
+.card.update-banner {
+  gap: 12px;
+  border: 2px solid var(--green);
+  background: var(--green-bg);
+}
+.update-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.update-banner-head h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+}
+.update-banner-head p {
+  margin: 2px 0 0;
+  color: var(--ink);
+}
+.update-banner-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: var(--r-full);
+  background: var(--green-solid);
+  color: var(--on-accent);
+}
+.btn.update-banner-btn {
+  height: 56px;
+  font-size: var(--fs-lg);
+}

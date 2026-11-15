@@ -1213,7 +1213,7 @@ export function AddScreen({
   );
 
   // 0.10.8: how many of Add's small ways in show (one on its own is a plain button, not a lone tile)
-  const toolCount = [!attachTo, !scanned, !attachTo && !overlay && !!settings?.receipts.enabled].filter(Boolean).length;
+  const toolCount = [!attachTo, !scanned].filter(Boolean).length;
   return (
     // Inside the Pick sheet the sheet scrolls, so the bar at the bottom stays in view there too.
     <div className="screen" style={forLine ? { padding: 0, overflow: 'visible', flex: 'none' } : undefined}>
@@ -1274,9 +1274,15 @@ export function AddScreen({
           Photo, Receipt), and the scanned barcodes still to match as one line. */}
       {!forLine && (
         <div className="add-ways">
+          {/* 0.10.10: each button says what it adds; a receipt has its own button here (it was a tile under More ways) */}
           <button className="btn primary block" onClick={doScan}>
-            <Icon name="scan" /> Scan a barcode
+            <Icon name="scan" /> Scan a barcode to add an item
           </button>
+          {!attachTo && !overlay && !scanned && (
+            <button className="btn block" onClick={() => nav.push(settings?.receipts.enabled ? { name: 'receipt' } : { name: 'receipts' })}>
+              <Icon name="receipt" size={18} /> Scan a receipt to keep it
+            </button>
+          )}
           {/* 0.10.10: one Scan button; the other ways in open from "More ways to add" (and stay open once you use them) */}
           {toolCount > 0 && (
             <button className="btn ghost small add-more" aria-expanded={moreWays} onClick={toggleMoreWays}>
@@ -1295,19 +1301,13 @@ export function AddScreen({
                   aria-label="Scan several items in a row"
                 >
                   <Icon name="scan" size={22} />
-                  <span>Scan several</span>
+                  <span>Scan several barcodes</span>
                 </button>
               )}
               {!scanned && (
                 <button className="add-tool" onClick={() => setPhotoFind(true)} aria-label="Find it from a photo of the pack">
                   <Icon name="camera" size={22} />
-                  <span>{toolCount === 1 ? 'Find it from a photo' : 'Photo'}</span>
-                </button>
-              )}
-              {!attachTo && !overlay && settings?.receipts.enabled && (
-                <button className="add-tool" onClick={() => nav.push({ name: 'receipt' })} aria-label="Add a receipt">
-                  <Icon name="receipt" size={22} />
-                  <span>Receipt</span>
+                  <span>{toolCount === 1 ? 'Find it from a photo' : 'Take a photo'}</span>
                 </button>
               )}
             </div>

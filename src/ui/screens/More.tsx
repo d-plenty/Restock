@@ -12,7 +12,7 @@ import { chainName, customDef, EXTRA_SECTIONS, enabledIn, isCustomSection, MAX_C
 import { customsInUse, NewCustomSheet } from './CustomSections';
 import type { Chain } from '../../types';
 import { serverMode } from '../../server-mode/flag';
-import { BetaTag, Icon } from '../components';
+import { Icon } from '../components';
 import { useNav } from '../nav';
 
 /** What each tab is for, under its name when it isn't set up yet. */
@@ -81,7 +81,7 @@ export function MoreTop({ children }: { children?: ReactNode }) {
                     <Icon name={s} size={24} />
                   </span>
                   <span className="more-tile-name">
-                    {SECTION_NAMES[s]} {!isCustomSection(s) && <BetaTag />}
+                    {SECTION_NAMES[s]}
                   </span>
                   <span className="more-tile-count">
                     {t.things ? `${t.things} ${t.things === 1 ? 'item' : 'items'} · ${t.onSpecial} on special` : 'Nothing yet'}

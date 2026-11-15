@@ -350,6 +350,9 @@ export const COSTCO_BETA_NOTE = "Costco is in beta: it works the same way as the
 /** What the Beta means, wherever it's explained (setup, Settings, the tab itself, the web page). */
 export const BETA_NOTE =
   "Beta: it works the same way as Groceries, it just hasn't been tested as thoroughly yet. It'll keep being tested before it comes out of beta.";
+/** 0.10.12: custom sections are beta as a whole: said once, where one is made (not on each start, or on the tabs). */
+export const CUSTOM_BETA_NOTE =
+  "Custom sections are in beta. They haven't been fully tested yet, so searching can be patchy and there may be bugs.";
 export function BetaTag({ compact }: { compact?: boolean }) {
   return (
     <span className={compact ? 'beta-mark' : 'tag beta'} aria-label="(beta)">
@@ -605,7 +608,7 @@ export function useSheetGuard(dirty: boolean | (() => boolean)): void {
   }, [ctx]);
 }
 
-export function Sheet({ title, onClose, children, action, unsaved }: { title: string; onClose: () => void; children: ReactNode; /** 0.10.11: something's been changed and not saved: closing by X, Back or a tap outside asks first. */ unsaved?: boolean; /** 0.10.2: a button beside the title (a line's "Add to pantry"). */ action?: ReactNode }) {
+export function Sheet({ title, titleTag, onClose, children, action, unsaved }: { title: string; /** 0.10.12: a small tag beside the title (Beta). */ titleTag?: ReactNode; onClose: () => void; children: ReactNode; /** 0.10.11: something's been changed and not saved: closing by X, Back or a tap outside asks first. */ unsaved?: boolean; /** 0.10.2: a button beside the title (a line's "Add to pantry"). */ action?: ReactNode }) {
   const guard = useRef<(() => boolean) | undefined>(undefined);
   const asking = useRef(false);
   const close = useRef(onClose);
@@ -679,6 +682,7 @@ export function Sheet({ title, onClose, children, action, unsaved }: { title: st
           ) : (
             <h2 className="sheet-title" tabIndex={-1} style={{ flex: 1 }}>
               {title}
+              {titleTag}
             </h2>
           )}
           <button className="icon-btn" aria-label="Close" onClick={dismiss}>

@@ -812,7 +812,7 @@ export function SectionSwitch({ settings, section }: { settings: Settings; secti
           <Icon name={section} size={22} />
           <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
             <span className="title" style={{ fontSize: 15 }}>
-              {about.title} <BetaTag />
+              {about.title} {BETA_SECTIONS.includes(section) && <BetaTag />}
             </span>
             <span className="small">{about.text}</span>
           </span>

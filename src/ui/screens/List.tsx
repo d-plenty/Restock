@@ -560,13 +560,13 @@ export function ListScreen() {
   };
 
 
-  // 0.10.10: Start shopping goes straight in, at the shops the list is split across now (the one
-  // shop when it wins, else the shops shopping around uses). Before, it asked "Where are you
-  // shopping today?" and then "Where are you first?": the same question twice. Shopping somewhere
-  // else today is Change shops, in shopping mode.
+  // 0.10.10: Start shopping goes straight in, at the shops your list is split across (the same
+  // shops "Your list by shop" shows). Before, it asked "Where are you shopping today?" and then
+  // "Where are you first?": the same question twice. It doesn't narrow to the one recommended shop
+  // either: with rinse aid left for Aldi, starting again opened Woolworths only. Shopping at fewer
+  // shops today is Change shops, in shopping mode.
   const startShopping = () => {
-    const pick = aroundPlan(totals, totals.by, settings.shopAroundMin ?? 1).pick;
-    const start = (pick === 'around' ? totals.around.chains : [pick.chain]).filter((x) => shops.includes(x as StoreChain)) as StoreChain[];
+    const start = totals.around.chains.filter((x) => shops.includes(x as StoreChain)) as StoreChain[];
     setSkipToday(new Set());
     setChangingFrom(undefined);
     setShopping(start.length ? start : shops);

@@ -299,13 +299,13 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
           <div className="card flush">
             {/* 0.9.8: one row per tab of My shops; sign-ins and stock are on each shop's own row there. 0.9.14: each says its tab. */}
             {row('Supermarkets (Pantry tab)', `${shopSummary(settings, 'pantry')} · ${shopAccountsSummary(settings)}`, () => nav.push({ name: 'stores', section: 'pantry' }))}
-            {/* 0.10.0: Keg and Health are beta (BETA_NOTE): the same as Groceries, less tested. */}
-            {row('Bottle shops · Beta', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
-            {row('Chemists · Beta', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
+            {/* 0.10.12: Beta is said on each one's page (and in Setup), not on these rows. */}
+            {row('Bottle shops', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
+            {row('Chemists', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
             {/* 0.10.7: each custom section (Baby and Pets are custom sections now), then making another */}
             {customsInUse(settings).map((c) => row(SECTION_NAMES[c], shopSummary(settings, c), () => nav.push({ name: 'stores', section: c })))}
             {customsInUse(settings).length < MAX_CUSTOM &&
-              row('Make a custom section', 'Compare pet shops, tools, automotive, baby products and more', () => setNewCustom(true))}
+              row('Make a custom section', 'Compare pet shops, tools, automotive, baby products and more · Beta', () => setNewCustom(true))}
           </div>
           {newCustom && <NewCustomSheet onClose={() => setNewCustom(false)} />}
         </>
@@ -1174,7 +1174,8 @@ function UpdateRowsOn({ settings }: { settings: Settings }) {
       setFound(info);
       // 0.9.5 (save): when it last looked isn't a setting: kept at once.
       const was = (await savedSettings()).updates;
-      await saveNow({ updates: { notify: !!was?.notify, ...was, lastCheck: new Date().toISOString() } });
+      // 0.10.12: and the newer version it found, so Home's Update available card shows it.
+      await saveNow({ updates: { notify: !!was?.notify, ...was, lastCheck: new Date().toISOString(), ...(info.newer ? { told: info.version } : {}) } });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

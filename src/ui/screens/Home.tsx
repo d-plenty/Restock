@@ -25,6 +25,7 @@ import { confirmAction } from '../../lib/confirm';
 import { useNav } from '../nav';
 import { RecallBanner } from './Recalls';
 import { SetupNudges } from './SetupNudges';
+import { UpdateBanner } from '../UpdateBanner';
 import { serverMode } from '../../server-mode/flag';
 import { ConnectionsSheet } from './Settings';
 import { nextCheckWords } from '../../lib/checkSchedule';
@@ -165,6 +166,8 @@ export function HomeScreen() {
         </div>
       </div>
 
+      {/* 0.10.12: a newer Restock is out: first thing on Home, until it's installed */}
+      <UpdateBanner settings={settings} />
       <RecallBanner />
 
       {/* 0.10.10: one next step at a time: with an empty pantry that's "Let's add your first item" (below) */}

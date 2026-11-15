@@ -946,3 +946,7 @@ Nothing. Fixes only (the Shopping list's buttons, search boxes, big text, Dan Mu
 ## 0.10.11: what changed on the wire
 
 - Nothing between phones and the server.
+
+## 0.10.12: what changed on the wire
+
+- Nothing between phones and the server.

@@ -21,7 +21,7 @@ import {
   type Section,
 } from '../../shops';
 import type { Settings } from '../../types';
-import { Icon, Sheet } from '../components';
+import { BetaTag, CUSTOM_BETA_NOTE, Icon, Sheet } from '../components';
 import { useNav } from '../nav';
 
 /** Ready-made starts: a name, a colour and an icon (the shops are picked next). */
@@ -184,9 +184,12 @@ export function CustomStarts({ onMade }: { onMade: (id: CustomSection) => void }
 export function NewCustomSheet({ onClose }: { onClose: () => void }) {
   const nav = useNav();
   return (
-    <Sheet title="Make a custom section" onClose={onClose}>
+    <Sheet title="Make a custom section" titleTag={<BetaTag />} onClose={onClose}>
       <p className="small" style={{ margin: 0 }}>
         Compare any shops you like: pet shops, tools, automotive, baby things and more. Give it a name, a colour and an icon, then pick its shops.
+      </p>
+      <p className="small" role="note" style={{ margin: 0 }}>
+        {CUSTOM_BETA_NOTE}
       </p>
       <CustomStarts
         onMade={(id) => {

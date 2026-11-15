@@ -91,8 +91,8 @@ const TAB_TITLE: Record<Section, string> = withCustom({ pantry: 'Groceries', keg
 /** 0.10.0: the shop rows, named as on the phone's Settings → Your shops (Keg and Health are beta). */
 const SHOPS_TITLE: Record<Section, string> = withCustom({
   pantry: 'Supermarkets (Pantry tab)',
-  keg: 'Bottle shops · Beta',
-  pharmacy: 'Chemists · Beta',
+  keg: 'Bottle shops',
+  pharmacy: 'Chemists',
 }, (n) => `${n} tab`);
 
 function sharesText(tabs: string[], receipts: boolean): string {

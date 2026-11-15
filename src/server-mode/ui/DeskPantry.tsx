@@ -20,7 +20,7 @@ import { useLive } from '../../lib/useLive';
 import { ALERT_LEVELS, bothPrices, computeStats, HISTORY_DAYS, multiBuy, optionStyle, tiedWithBest, withMarket, type Option, type Recommendation } from '../../lib/verdict';
 import { SECTION_NAMES, type Section, slots } from '../../shops';
 import { chainName, type AlertLevel } from '../../types';
-import { BETA_NOTE, BETA_SECTIONS, ChainName, Icon, MoreInfo, PriceChart, previewFromOption, ProductPreview, Thumb, SearchField, type PreviewProduct } from '../../ui/components';
+import { ChainName, Icon, MoreInfo, PriceChart, previewFromOption, ProductPreview, Thumb, SearchField, type PreviewProduct } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { EditSheet, LastUpdated, PriceSheet } from '../../ui/screens/Item';
 import { DEAL_RANK, underTarget } from '../../ui/screens/Pantry';
@@ -107,8 +107,7 @@ export function DeskPantry({ section }: { section: Section }) {
     <div className="dk-page">
       <div className={`dk-with-panel${open ? ' has-panel' : ''}`}>
         <section className="dk-wide" aria-label={SECTION_NAMES[section]}>
-          {/* 0.10.0: Keg and Health are beta (components.tsx BETA_NOTE). */}
-          <DeskHead title={SECTION_NAMES[section]} sub={`${recs.length} item${recs.length === 1 ? '' : 's'}${BETA_SECTIONS.includes(section) ? ' · Beta' : ''}`}>
+          <DeskHead title={SECTION_NAMES[section]} sub={`${recs.length} item${recs.length === 1 ? '' : 's'}`}>
             <div className="dk-search">
               <label htmlFor="dk-pq" className="sr-only">
                 {SEARCH_HINT[section]}
@@ -116,7 +115,6 @@ export function DeskPantry({ section }: { section: Section }) {
               <SearchField id="dk-pq" placeholder={SEARCH_HINT[section]} value={q} onValue={setQ} />
             </div>
           </DeskHead>
-          {BETA_SECTIONS.includes(section) && <p className="small" style={{ margin: '0 0 12px' }}>{BETA_NOTE}</p>}
           {recs.length > 0 && (
             <div className="dk-toolbar">
               <div className="dk-chips" role="group" aria-label="Show">

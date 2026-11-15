@@ -17,7 +17,7 @@ import { SELF_UPDATE } from '../../lib/updates';
 import { DEFAULT_SETTINGS } from '../../types';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
-import { BETA_NOTE, Icon, Logo, TopBar, useBackHandler } from '../components';
+import { BETA_NOTE, CUSTOM_BETA_NOTE, Icon, Logo, TopBar, useBackHandler } from '../components';
 import { useNav } from '../nav';
 import { AutoBackupSettings, SuggestLocalBackup } from './Backups';
 import { protection, suggestLocalText } from '../../lib/protection';
@@ -99,11 +99,11 @@ const ALL_TILES: Tile[] = [
   {
     id: 'custom',
     title: 'Custom sections',
-    sub: 'Pets, tools, automotive, baby and more',
+    sub: 'Pets, tools, automotive, baby and more · Beta',
     icon: 'pack:star',
     heading: 'Compare other kinds of shops?',
     intro:
-      "Make a section for anything else you buy: pet shops, tools, automotive, baby things. Each gets its own name, colour, icon and shops. Skip it if it's not for you; you can make one later from More.",
+      "Make a section for anything else you buy: pet shops, tools, automotive, baby things. Each gets its own name, colour, icon and shops. Skip it if it's not for you; you can make one later from More. " + CUSTOM_BETA_NOTE,
   },
   {
     id: 'permissions',

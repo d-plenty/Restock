@@ -1,0 +1,1 @@
+Release candidate 13 (0.10.12): Home shows when an update is available, with one Update now button; Take a photo, under More ways to add, takes a new photo or picks one from your photo library; Beta is only shown where a section is set up, not on the tabs.

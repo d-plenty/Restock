@@ -12,7 +12,7 @@ import { getSettings } from '../../lib/db';
 import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { activeSections } from '../../shops';
-import { betaFor, Icon, TopBar } from '../../ui/components';
+import { Icon, TopBar } from '../../ui/components';
 import { isMoreTab, isSectionTab, useNav, type Screen, type Tab } from '../../ui/nav';
 import { MoreTop } from '../../ui/screens/More';
 import { isV3 } from '../api';
@@ -89,7 +89,6 @@ function PhoneTabs() {
           >
             <Icon name={t.icon} />
             {t.label}
-            {betaFor(t.id, true)}
           </button>
         </Fragment>
       ))}
