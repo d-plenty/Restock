@@ -483,6 +483,14 @@ function HouseholdPart() {
         <Line title="Price history" sub={h.historyText} greyed>
           {where('phone')}
         </Line>
+        {/* 0.11.0: what searches found (lib/seen.ts): remembered on each phone, and kept here when a phone sends it */}
+        <Line
+          title="Search results"
+          sub="Each phone remembers what its searches and scans find (product, price, barcode, stock) for as long as its price history, unless that phone keeps them for a different time. This server keeps what the phones send it, with the prices. A search always asks the shops again."
+          greyed
+        >
+          {where('phone')}
+        </Line>
       </Group>
       )}
 
@@ -549,7 +557,7 @@ function HouseholdPart() {
       </Group>
 
       <Group id="dk-s-checks" title="Prices and deals">
-        <Line title={'Check prices in the background'} sub={'Each phone checks at its own time (5:00 am unless changed).'} greyed>
+        <Line title={'Check prices automatically'} sub={'Each phone checks the items in its pantry and on its lists on its own days: Wednesday and Saturday at 4:00 am unless changed (every day, once a week, custom days, or off).'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
         <Line title={'Price check time'} sub={'Picked on each phone.'} greyed>

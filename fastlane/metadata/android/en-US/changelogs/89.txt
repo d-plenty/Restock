@@ -1,0 +1,1 @@
+Release candidate (0.11.0): automatic price checks only for what's in your pantry and on your lists, on set days (Wednesday and Saturday at 4:00 am unless you change it); Restock remembers what your searches find; Catalogues and specials in one place, with My specials for every shop you use; the cards file is locked with a passphrase.

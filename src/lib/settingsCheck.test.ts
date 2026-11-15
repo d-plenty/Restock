@@ -71,7 +71,7 @@ describe('checking settings', () => {
     expect(s.historyWeeks).toBe(8);
     expect(s.enabledChains).toEqual(['woolworths', 'coles', 'aldi']);
     expect(s.checkIntervalHours).toBe(24);
-    expect(s.checkTime).toBe('05:00');
+    expect(s.checkTime).toBe('04:00');
     expect(s.shopAroundMin).toBe(0);
     expect(s.defaultThresholdPct).toBe(90);
     expect(s.theme).toBe('system');

@@ -3,6 +3,9 @@ import { confirmAction } from '../../lib/confirm';
 import { pruneHistory, serverKeepsHistory } from '../../lib/db';
 import { downloadMarket, megabytes, windowCost, windowIndex, type MarketDays, type WindowIndex } from '../../lib/market';
 import { sharedOn } from '../../lib/priceShare';
+import { pruneSeen, seenCount, seenKeepWeeks } from '../../lib/seen';
+import { useLive } from '../../lib/useLive';
+import { serverMode } from '../../server-mode/flag';
 import { SHARED_TITLE } from './SharedPrices';
 import { afterSave, updateSettings } from '../../lib/settingsDraft';
 import { isNative } from '../../stores/http';
@@ -40,7 +43,7 @@ export function HistoryLengths({ settings, onPicked }: { settings: Settings; onP
       const ok = await confirmAction(`Keep only ${historyLabel(w)} of prices on this phone?`, {
         detail: onServer
           ? `Prices older than ${historyLabel(w)} move to your Restock server, and come off this phone once it has them. Each item keeps its latest price.`
-          : `Prices older than ${historyLabel(w)} are deleted from this phone once you save. Each item keeps its latest price, and sample items aren't touched.`,
+          : `Prices older than ${historyLabel(w)} are deleted from this phone once you save${settings.searchKeepWeeks === undefined ? ', and so are search results older than that' : ''}. Each item keeps its latest price, and sample items aren't touched.`,
         action: onServer ? 'Move older prices' : 'Delete older prices',
         danger: !onServer,
       });
@@ -49,6 +52,8 @@ export function HistoryLengths({ settings, onPicked }: { settings: Settings; onP
     await updateSettings({ historyWeeks: w, marketData: { ...settings.marketData, days: keepDays(w) } });
     await afterSave('history', async (s) => {
       await pruneHistory(s.historyWeeks);
+      // 0.11.0: what searches found follows (unless it has a time of its own)
+      await pruneSeen(s);
     });
     onPicked?.(w);
   };
@@ -78,6 +83,83 @@ export function HistoryLengths({ settings, onPicked }: { settings: Settings; onP
   );
 }
 
+/**
+ * 0.11.0: what searches found (lib/seen.ts): what it's for, how much is kept, and "Keep search
+ * results for a different time" (otherwise it follows the price history above). On the web page
+ * it's greyed: searching the shops and remembering it happens on the phones.
+ */
+export function SearchKeepSettings({ settings }: { settings: Settings }) {
+  const count = useLive(() => seenCount(), []);
+  const own = settings.searchKeepWeeks !== undefined;
+  const weeks = seenKeepWeeks(settings);
+  const save = async (w: number | undefined) => {
+    if (w !== undefined && w < weeks) {
+      const ok = await confirmAction(`Keep only ${historyLabel(w)} of search results?`, {
+        detail: `Search results older than ${historyLabel(w)} are deleted from this phone once you save. Your pantry's prices aren't touched.`,
+        action: 'Delete older search results',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    await updateSettings({ searchKeepWeeks: w });
+    await afterSave('search-keep', async (s) => {
+      await pruneSeen(s);
+    });
+  };
+  return (
+    <div className="card flush" id="s-searchkeep" aria-disabled={serverMode || undefined}>
+      <div style={{ padding: '12px 14px 4px' }}>
+        <span className="title" style={{ fontSize: 15 }}>
+          Search results
+        </span>
+        <p className="small" style={{ margin: '4px 0 0' }}>
+          Restock remembers what your searches and scans find: the product, its price that day, its barcode and whether it was in stock. That's how it can
+          tell you what something cost before, and judge a sale on something you don't track yet. A search always asks the shops again: a remembered
+          price is never shown as today's. They stay on this phone, and go to your own Restock server if you have one.
+        </p>
+        {serverMode ? (
+          <p className="small" style={{ margin: '6px 0 0' }}>
+            <strong>Set on each phone.</strong> Searching the shops and remembering what they said happens in the Android app.
+          </p>
+        ) : (
+          <p className="small" style={{ margin: '6px 0 0' }} role="status">
+            {count && count.rows > 0
+              ? `Remembering ${count.rows.toLocaleString('en-AU')} price${count.rows === 1 ? '' : 's'} of ${count.products.toLocaleString('en-AU')} product${count.products === 1 ? '' : 's'}. Kept for ${historyLabel(weeks)}${own ? '' : ', the same as your price history'}.`
+              : `Nothing remembered yet. Kept for ${historyLabel(weeks)}${own ? '' : ', the same as your price history'}.`}
+          </p>
+        )}
+      </div>
+      <label className="check" style={serverMode ? { opacity: 0.5 } : undefined}>
+        <input
+          type="checkbox"
+          className="switch"
+          checked={own}
+          disabled={serverMode}
+          onChange={(e) => void save(e.target.checked ? settings.historyWeeks : undefined)}
+        />
+        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <span className="title" style={{ fontSize: 15 }}>
+            Keep search results for a different time
+          </span>
+          <span className="small">Off: they're kept as long as your price history, and follow it when you change it.</span>
+        </span>
+      </label>
+      {own && !serverMode && (
+        <div role="radiogroup" aria-label="How long to keep search results" style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 14px 6px' }}>
+          {KEEP_WEEKS.map((w) => (
+            <label key={w} className="check" style={{ padding: '8px 0' }}>
+              <input type="radio" name="search-keep-weeks" checked={weeks === w} onChange={() => void save(w)} />
+              <span className="title" style={{ fontSize: 15 }}>
+                {historyLabel(w)}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Settings → Prices and deals → Price history: how far back, and where Shared prices is. */
 export function PriceHistorySettings({ settings }: { settings: Settings }) {
   const nav = useNav();
@@ -90,8 +172,8 @@ export function PriceHistorySettings({ settings }: { settings: Settings }) {
             How far back Restock looks
           </span>
           <p className="small" style={{ margin: '4px 0 0' }}>
-            Restock keeps the prices it reads for this long, and works out each item's usual price from them. With shared prices on, it's also how much
-            shared history this phone gets. Longer knows sales better; it's only a few megabytes either way.
+            Restock keeps the prices it reads, and what your searches find, for this long, and works out each item's usual price from them. With shared
+            prices on, it's also how much shared history this phone gets. Longer knows sales better; it's only a few megabytes either way.
           </p>
         </div>
         <div style={{ padding: '0 14px 6px' }}>
@@ -105,6 +187,7 @@ export function PriceHistorySettings({ settings }: { settings: Settings }) {
           />
         </div>
       </div>
+      <SearchKeepSettings settings={settings} />
       <div className="card flush" id="s-dayone">
         <button className="row" onClick={() => nav.push({ name: 'settings', page: 'privacy' })}>
           <span className="grow">

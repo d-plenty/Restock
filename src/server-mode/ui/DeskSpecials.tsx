@@ -129,8 +129,8 @@ function SpecialRow({ p, onAdd, onOpen, tracked, tracker }: { p: StoreProduct; o
       </button>
       {/* 0.9.5 (web search): Track it, as on the phone. */}
       {tracker?.on && !tracked && (
-        <button className="btn small" disabled={!!tracker.busy} onClick={() => void tracker.track(p)} aria-label={`Track ${p.name}`}>
-          <Icon name="pantry" size={16} /> {tracker.busy === trackKey(p) ? 'Tracking…' : 'Track'}
+        <button className="btn small" disabled={!!tracker.busy} onClick={() => void tracker.track(p)} aria-label={`Add ${p.name} to your pantry`}>
+          <Icon name="pantry" size={16} /> {tracker.busy === trackKey(p) ? 'Adding…' : 'Add to pantry'}
         </button>
       )}
       <button className="btn small primary" onClick={() => onAdd(p)} aria-label={`Add ${p.name} to your shopping list`}>
@@ -159,7 +159,7 @@ export function SpecialSheet({ p, onAdd, onClose, tracker }: { p: StoreProduct; 
       {unitTextOf(p) && <span className="small num">{unitTextOf(p)}</span>}
       <p className="small">
         On special at {chainName(p.chain)} this week. It isn't in your pantry, so Restock doesn't watch its price.{' '}
-        {tracker?.on ? 'Track it to put it in your pantry.' : 'Add it to your pantry on a phone to do that.'}
+        {tracker?.on ? 'Add it to your pantry to track it.' : 'Add it to your pantry on a phone to do that.'}
       </p>
       {/* 0.9.5 (web search): Track, from the server's own search of that shop. */}
       {tracker?.on && (
@@ -171,7 +171,7 @@ export function SpecialSheet({ p, onAdd, onClose, tracker }: { p: StoreProduct; 
             onClose();
           }}
         >
-          <Icon name="pantry" size={18} /> Track it
+          <Icon name="pantry" size={18} /> Add to pantry
         </button>
       )}
       <button
@@ -238,7 +238,7 @@ export function DeskSpecials({ narrow }: { narrow?: boolean }) {
   };
   const filter = mine && pantry.length > 0;
   return (
-    <HousePage narrow={narrow} title="Specials and catalogues">
+    <HousePage narrow={narrow} title="Catalogues and specials">
       <button className="banner green cat-entry dk-self-start house-cat" onClick={() => nav.push({ name: 'mycatalogue' })}>
         <span className="cat-kicker">YOUR RESTOCK CATALOGUE</span>
         <span className="cat-entry-title">Specials on the things you buy</span>
@@ -338,7 +338,7 @@ export function HomeSpecials() {
         <div className="dk-section-head">
           <h2 id="home-sp">This week's specials</h2>
           <button className="dk-linkish" onClick={() => nav.push({ name: 'specials' })}>
-            Specials and catalogues
+            Catalogues and specials
           </button>
         </div>
         {picks.length === 0 ? (

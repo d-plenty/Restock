@@ -153,6 +153,8 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
   const ab = obj(s.autoBackup);
   const w = obj(s.widgets);
   const md = obj(s.marketData);
+  // 0.11.0: false on a settings file from 0.10.x or before (see checkDays below)
+  const moved = s.checkMoved0110 === true;
   const weeks = keepWeeks(typeof s.historyWeeks === 'number' && HISTORY_WEEKS.includes(s.historyWeeks) ? s.historyWeeks : D.historyWeeks);
   const acc = obj(s.accounts);
   const accounts = isObj(s.accounts) ? compact({ woolworths: accountOf(acc.woolworths), coles: accountOf(acc.coles), costco: accountOf(acc.costco) }) : undefined;
@@ -209,7 +211,8 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
       serverUrl: webAddress(sy.serverUrl),
       schedule: oneOf(sy.schedule, ['background', 'daily', 'weekly'] as const, D.sync.schedule),
       weekday: weekday(sy.weekday, D.sync.weekday),
-      backgroundActivity: bool(sy.backgroundActivity, D.sync.backgroundActivity),
+      // 0.11.0: the one-time move turns automatic checks on for everyone (Off is a choice in Price checks now)
+      backgroundActivity: moved ? bool(sy.backgroundActivity, D.sync.backgroundActivity) : true,
     }),
     household: { name: name(obj(s.household).name, 80) ?? D.household.name },
     sharePrices: oneOf(s.sharePrices, ['unasked', 'yes', 'no'] as const, D.sharePrices),
@@ -222,9 +225,16 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     checkIntervalHours: oneOf(s.checkIntervalHours, CHECK_INTERVALS, D.checkIntervalHours),
     // 0.9.14: 8 weeks, 6 months or 12 months (1 and 3 months become the next one up).
     historyWeeks: weeks,
+    // 0.11.0: only one of the real choices; anything else follows the price history
+    ...(typeof s.searchKeepWeeks === 'number' && [8, 26, 52].includes(s.searchKeepWeeks) ? { searchKeepWeeks: s.searchKeepWeeks } : {}),
     checkWeekday: weekday(s.checkWeekday, D.checkWeekday),
     // 0.9.6: HH:MM; anything else is 5:00 am. A 0.9.5 phone's file has none, which is the same.
-    checkTime: isCheckTime(s.checkTime) ? s.checkTime : D.checkTime,
+    checkTime: moved ? (isCheckTime(s.checkTime) ? s.checkTime : D.checkTime) : '04:00',
+    // 0.11.0: checks run on set days. A phone from 0.10.x (no checkMoved0110) is moved once to
+    // Wednesday and Saturday at 4:00 am, whatever it had, on or off; after that it's the phone's own.
+    checkDays: moved && Array.isArray(s.checkDays) ? [...new Set((s.checkDays as unknown[]).filter((d): d is number => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6))].sort((a, b) => a - b) : [3, 6],
+    ...(moved && s.checkCustom === true ? { checkCustom: true } : {}),
+    checkMoved0110: true,
     connection: oneOf(s.connection, ['auto', 'browser'] as const, D.connection),
     localPrices: maybeBool(s.localPrices),
     accounts: accounts && Object.keys(accounts).length ? accounts : undefined,

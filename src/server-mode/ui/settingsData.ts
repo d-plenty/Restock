@@ -6,6 +6,7 @@
 // or each phone can change shown greyed. Settings → Phones shows each phone's own settings, read-only,
 // from the summaries the phones send (householdSettings.ts phoneSummaries, phoneSummary.ts).
 
+import { dayWords, timeWords } from '../../lib/checkSchedule';
 import { useEffect, useState } from 'react';
 import { addCategory, allCards, allCategories, deleteCategory, getSettings, renameCategory, swapCategories, updateSettings } from '../../lib/db';
 import {
@@ -272,7 +273,7 @@ export function phoneGroups(name: string, s: SentSummary | undefined, haPhone = 
     {
       title: 'Price checks',
       rows: [
-        { label: 'How often', value: every(s?.checks?.everyHours, s?.checks?.weekday) },
+        { label: 'How often', value: s?.checks?.days ? (s.checks.days.length ? `${dayWords(s.checks.days).replace(/^e/, 'E')} at ${timeWords(s.checks.time)}` : 'Off (only when you tap Check now)') : every(s?.checks?.everyHours, s?.checks?.weekday) },
         { label: 'In the background', value: onOff(s?.checks?.background) },
         { label: 'Last check', value: s?.checks?.lastAt ? `${when(s.checks.lastAt)}${s.checks.lastItems !== undefined ? ` · ${s.checks.lastItems} items` : ''}` : NOT_SENT },
       ],
@@ -303,6 +304,7 @@ export function phoneGroups(name: string, s: SentSummary | undefined, haPhone = 
         { label: 'Away from home', value: s?.away ? (AWAY[s.away] ?? s.away) : NOT_SENT },
         { label: 'Automatic backups', value: s?.backups ? (s.backups.on ? `Every ${s.backups.everyDays ?? 7} days, keep ${s.backups.keep ?? 5}` : 'Off') : NOT_SENT },
         { label: 'Keeps prices for', value: s?.historyWeeks ? historyLabel(s.historyWeeks) : NOT_SENT },
+        { label: 'Keeps search results for', value: s?.historyWeeks ? (s.searchKeepWeeks ? historyLabel(s.searchKeepWeeks) : `${historyLabel(s.historyWeeks)} (the same as its prices)`) : NOT_SENT },
       ],
       note: on,
     },

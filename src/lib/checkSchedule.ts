@@ -19,6 +19,18 @@ export interface CheckPlan {
   time?: string;
   /** 0 = Sunday. Only used when checking weekly. */
   weekday?: number;
+  /**
+   * 0.11.0: the days of the week a check runs on (0 = Sunday), once at the set time. When this is
+   * a list it is the whole plan (intervalHours and weekday aren't looked at): every day is all
+   * seven, twice a week is Wednesday and Saturday, and an empty list is off (manual only).
+   */
+  days?: number[];
+}
+
+/** 0.11.0: the plan's days as a clean list (0-6, no repeats, in order), or undefined on an older plan. */
+export function planDays(plan: Pick<CheckPlan, 'days'>): number[] | undefined {
+  if (!Array.isArray(plan.days)) return undefined;
+  return [...new Set(plan.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b);
 }
 
 const DAY = 86_400_000;
@@ -36,6 +48,7 @@ const intervalOf = (h: number) => (h === 6 || h === 12 || h === 48 || h === 168 
 /** Minutes after midnight of the check slots on a day that has checks. */
 function minutesInDay(plan: CheckPlan): number[] {
   const minute = parseCheckTime(plan.time);
+  if (planDays(plan)) return [minute];
   const h = intervalOf(plan.intervalHours);
   if (h === 6 || h === 12) {
     const out: number[] = [];
@@ -98,6 +111,8 @@ function wallToInstant(day: Day, minute: number, zone: string | undefined): numb
 const localDayOf = (ms: number, zone: string | undefined) => parts(ms, zone).day;
 
 function checksOn(plan: CheckPlan, day: Day): boolean {
+  const days = planDays(plan);
+  if (days) return days.includes((epochDay(day) + 4) % 7);
   const h = intervalOf(plan.intervalHours);
   if (h === 48) return epochDay(day) % 2 === 0;
   if (h === 168) return (epochDay(day) + 4) % 7 === (plan.weekday ?? 3);
@@ -133,7 +148,8 @@ export function latestSlot(plan: CheckPlan, now: number, zone?: string): number 
  * catalogue day summary can still go out on the days nothing is checked.
  */
 export function nextWake(plan: CheckPlan, after: number, zone?: string): number {
-  if (intervalOf(plan.intervalHours) !== 168) return nextSlot(plan, after, zone);
+  const days = planDays(plan);
+  if (days ? days.length === 7 : intervalOf(plan.intervalHours) !== 168) return nextSlot(plan, after, zone);
   const day = epochDay(localDayOf(after, zone));
   const today = wallToInstant(dayFromEpoch(day), parseCheckTime(plan.time), zone);
   return today > after ? today : wallToInstant(dayFromEpoch(day + 1), parseCheckTime(plan.time), zone);
@@ -159,12 +175,13 @@ export function timeWords(time: string | undefined): string {
 
 /** The other times of day a check runs when checking every 6 or 12 hours ("5:00 am, 11:00 am, ..."). */
 export function dailyTimes(plan: CheckPlan): string[] {
-  const h = intervalOf(plan.intervalHours);
+  const h = planDays(plan) ? 24 : intervalOf(plan.intervalHours);
   return (h === 6 || h === 12 ? minutesInDay(plan) : [parseCheckTime(plan.time)]).map((m) => timeWords(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`));
 }
 
 /** When the next check runs, in words ("today 5:00 am", "tomorrow 5:00 am", "Wednesday 5:00 am"). */
 export function nextCheckWords(plan: CheckPlan, now = Date.now(), zone?: string): string {
+  if (planDays(plan)?.length === 0) return 'off';
   const at = nextSlot(plan, now, zone);
   const p = parts(at, zone);
   const today = epochDay(localDayOf(now, zone));
@@ -175,3 +192,37 @@ export function nextCheckWords(plan: CheckPlan, now = Date.now(), zone?: string)
   const name = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][p.weekday];
   return `${name} ${time}`;
 }
+
+// ---------- 0.11.0: the five choices ----------
+
+export const CHECK_TIME_0110 = '04:00';
+export type CheckChoice = 'daily' | 'twice' | 'weekly' | 'custom' | 'off';
+const PRESET: Record<Exclude<CheckChoice, 'custom'>, number[]> = { daily: [0, 1, 2, 3, 4, 5, 6], twice: [3, 6], weekly: [3], off: [] };
+export const presetDays = (c: Exclude<CheckChoice, 'custom'>): number[] => [...PRESET[c]];
+
+/** Which of the five a phone's days and time are. The presets are at 4:00 am; anything else is custom. */
+export function checkChoice(days: number[] | undefined, time: string | undefined, custom?: boolean): CheckChoice {
+  const d = planDays({ days }) ?? PRESET.twice;
+  if (!d.length) return 'off';
+  if (custom || parseCheckTime(time) !== parseCheckTime(CHECK_TIME_0110)) return 'custom';
+  const same = (a: number[]) => a.length === d.length && a.every((x, i) => x === d[i]);
+  return same(PRESET.daily) ? 'daily' : same(PRESET.twice) ? 'twice' : same(PRESET.weekly) ? 'weekly' : 'custom';
+}
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/** "Wednesday and Saturday", "Monday, Tuesday and Friday", "every day". */
+export function dayWords(days: number[]): string {
+  const d = planDays({ days }) ?? [];
+  if (d.length === 7) return 'every day';
+  // Monday first, as people say a week
+  const names = [...d].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((x) => DAY_NAMES[x]);
+  return names.length <= 1 ? (names[0] ?? 'no days') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** The plan for a phone's settings (0.11.0: by days; an older settings file still by hours). */
+export const planOf = (s: { checkIntervalHours: number; checkTime?: string; checkWeekday?: number; checkDays?: number[] }): CheckPlan => ({
+  intervalHours: s.checkIntervalHours,
+  time: s.checkTime,
+  weekday: s.checkWeekday,
+  days: s.checkDays,
+});

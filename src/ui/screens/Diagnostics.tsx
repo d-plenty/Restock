@@ -20,6 +20,7 @@ import {
 } from '../../lib/searchTest';
 import { CheckedAgo, ChainDot, Icon, LoadingBar, TopBar } from '../components';
 import { useNav } from '../nav';
+import { planOf } from '../../lib/checkSchedule';
 import { getCheckLog, missedSlot, missedWords, OUTCOME_WORDS, whenWords } from '../../lib/checkLog';
 import { syncInfo } from '../../lib/sync';
 import { RestockNative } from '../../lib/sql/native';
@@ -361,7 +362,7 @@ function BackgroundChecks() {
   const runs = useLive(getCheckLog, []) ?? [];
   const info = useLive(syncInfo, []);
   if (!settings) return null;
-  const plan = { intervalHours: settings.checkIntervalHours, time: settings.checkTime, weekday: settings.checkWeekday };
+  const plan = planOf(settings);
   const missed = settings.sync.backgroundActivity ? missedSlot(plan, settings.lastCheck, runs) : undefined;
   const held = !!info?.backgroundRestricted || info?.batteryExempt === false;
   return (

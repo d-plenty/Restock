@@ -17,15 +17,15 @@ import { PriceHelperSettings } from './PriceHelperSettings';
 import { PriceHistorySettings } from './DayOne';
 import { YourData } from './YourData';
 import { Credits } from './Credits';
-import { dailyTimes, DEFAULT_CHECK_TIME, isCheckTime } from '../../lib/checkSchedule';
 import { SaveBar, useSettingsDraft } from '../SaveBar';
 import { loadDemo, removeDemo } from '../../lib/demo';
 import { syncBackgroundSchedule } from '../../lib/check';
+import { CHECK_TIME_0110, checkChoice, type CheckChoice, dayWords, isCheckTime, presetDays, timeWords } from '../../lib/checkSchedule';
 import { ensureNotificationPermission, scheduleReminders } from '../../lib/notify';
 import { useLive } from '../../lib/useLive';
 import { money } from '../../lib/units';
 import { STALE_DAYS } from '../../lib/verdict';
-import { chainName, CHECK_INTERVALS, GOOD_SALE, GREAT_SALE, historyLabel, WEEKDAYS, type Settings } from '../../types';
+import { chainName, GOOD_SALE, GREAT_SALE, historyLabel, WEEKDAYS, type Settings } from '../../types';
 import { ChainDot, Explain, Icon, Logo, Sheet, timeAgo, TopBar, SearchField } from '../components';
 import { UnblockButton } from '../Unblock';
 import { AccessibilitySettings, LookSettings } from './Look';
@@ -53,7 +53,6 @@ import { webLink } from '../../lib/site';
 /** Settings → Shopping list: how much shopping around has to save (0.9.0). */
 const SHOP_AROUND_MINS = [0, 0.5, 1, 2, 5, 10];
 
-const intervalLabel = (h: number) => (h === 24 ? 'Once a day' : h === 48 ? 'Every 2 days' : h === 168 ? 'Once a week' : `Every ${h} hours`);
 
 /**
  * Search: shows only the settings whose words match, by hiding the rest of the page (a heading
@@ -937,113 +936,122 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
   );
 }
 
-/** Background price checks: on or off, how often, which day (Settings, and the setup tile, 0.8.0). */
+/**
+ * Automatic price checks (Settings, and the setup tile). 0.11.0: five choices, on set days at one
+ * time: every day, twice a week (Wednesday and Saturday, the default), once a week (Wednesday),
+ * custom days and time, or off. The presets run at 4:00 am. Only what's in use is checked: the
+ * products on your pantry items and shopping lists.
+ */
+const CHECK_CHOICES: { id: CheckChoice; label: string }[] = [
+  // short, so the whole choice shows on a small phone; the line under it says the days and time
+  { id: 'daily', label: 'Every day' },
+  { id: 'twice', label: 'Twice a week (recommended)' },
+  { id: 'weekly', label: 'Once a week' },
+  { id: 'custom', label: 'Custom days and time' },
+  { id: 'off', label: 'Off (Check now only)' },
+];
+
 export function PriceCheckSettings({ settings }: { settings: Settings }) {
-  const setChecks = async (patch: { hours?: number; on?: boolean; weekday?: number; time?: string }) => {
-    const s = await updateSettings({
-      ...(patch.hours !== undefined ? { checkIntervalHours: patch.hours } : {}),
-      ...(patch.weekday !== undefined ? { checkWeekday: patch.weekday } : {}),
-      ...(patch.time !== undefined ? { checkTime: patch.time } : {}),
-      ...(patch.on !== undefined ? { sync: { ...settings.sync, backgroundActivity: patch.on } } : {}),
-    });
+  const days = settings.checkDays ?? [3, 6];
+  const choice = checkChoice(days, settings.checkTime, settings.checkCustom);
+  const save = async (patch: Partial<Pick<Settings, 'checkDays' | 'checkTime' | 'checkCustom'>> & { on?: boolean }) => {
+    const { on, ...rest } = patch;
+    const s = await updateSettings({ ...rest, ...(on !== undefined ? { sync: { ...settings.sync, backgroundActivity: on } } : {}) });
     // 0.9.5 (save): on a settings screen, once it's saved.
     await afterSave('checks', (saved) => syncBackgroundSchedule(saved).catch(() => undefined), s);
   };
+  const pick = (c: CheckChoice) => {
+    if (c === 'custom') {
+      // starts from what's set now (from Wednesday and Saturday when checks were off)
+      return save({ checkCustom: true, checkDays: days.length ? days : [3, 6], checkTime: settings.checkTime ?? CHECK_TIME_0110, on: true });
+    }
+    // every preset is at 4:00 am; picking one (other than Off) also turns background activity on
+    return save({ checkCustom: false, checkDays: presetDays(c), checkTime: CHECK_TIME_0110, ...(c !== 'off' ? { on: true } : {}) });
+  };
+  const toggleDay = (d: number) => {
+    const next = days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort((a, b) => a - b);
+    // the last day can't be unticked here: Off is its own choice
+    if (next.length) void save({ checkCustom: true, checkDays: next });
+  };
+  const blocked = choice !== 'off' && !settings.sync.backgroundActivity;
 
   return (
     <>
       <div className="card flush">
-        <label className="check">
-          <input type="checkbox" className="switch" checked={settings.sync.backgroundActivity} onChange={(e) => setChecks({ on: e.target.checked })} />
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div className="check" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+          <label htmlFor="check-how-often" style={{ display: 'flex', flexDirection: 'column' }}>
             <span className="title" style={{ fontSize: 15 }}>
-              Check prices in the background
+              Check prices automatically
             </span>
-            <span className="small">Only on a network connection and when the battery isn't low.</span>
-          </span>
-        </label>
-        <label
-          className="check"
-          style={settings.sync.backgroundActivity ? undefined : { opacity: 0.5 }}
-          aria-disabled={!settings.sync.backgroundActivity || undefined}
-        >
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 15 }}>
-              How often
+            <span className="small">
+              Only the items in your pantry and on your shopping lists. Only on a network connection and when the battery isn't low.
             </span>
-            <span className="small">Android may run it a few minutes late to save battery.</span>
-          </span>
-          <select
-            className="input"
-            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
-            value={settings.checkIntervalHours}
-            disabled={!settings.sync.backgroundActivity}
-            onChange={(e) => setChecks({ hours: parseInt(e.target.value, 10) })}
-            aria-label="How often to check prices"
-          >
-            {CHECK_INTERVALS.map((h) => (
-              <option key={h} value={h}>
-                {intervalLabel(h)}
-                {h === 24 ? ' (default)' : ''}
+          </label>
+          <select id="check-how-often" className="input" style={{ height: 48, flex: 'none', width: '100%', fontSize: 15 }} value={choice} onChange={(e) => void pick(e.target.value as CheckChoice)}>
+            {CHECK_CHOICES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
               </option>
             ))}
           </select>
-        </label>
-        <label
-          className="check"
-          style={settings.sync.backgroundActivity ? undefined : { opacity: 0.5 }}
-          aria-disabled={!settings.sync.backgroundActivity || undefined}
-        >
-          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 15 }}>
-              Price check time
-            </span>
-            <span className="small">
-              {settings.checkIntervalHours === 6 || settings.checkIntervalHours === 12
-                ? `Runs at ${dailyTimes({ intervalHours: settings.checkIntervalHours, time: settings.checkTime }).join(', ')}.`
-                : 'Your phone\'s own time. If the phone is off then, it checks soon after it is back.'}{' '}
-              Checking by hand doesn't change it.
-            </span>
+          <span className="small" role="status">
+            {choice === 'off'
+              ? 'Nothing is checked until you tap Check now on Home. We recommend leaving automatic checks on: without them, prices, specials and My catalogue go out of date.'
+              : `Runs ${dayWords(days)} at ${timeWords(settings.checkTime ?? CHECK_TIME_0110)}, your phone's own time. Android may run it a few minutes late; if the phone is off then, it checks soon after it's back. Checking by hand doesn't change it.`}
           </span>
-          <input
-            type="time"
-            className="input"
-            style={{ width: 'auto', height: 44, padding: '0 10px', fontSize: 15 }}
-            value={settings.checkTime ?? DEFAULT_CHECK_TIME}
-            disabled={!settings.sync.backgroundActivity}
-            onChange={(e) => {
-              if (isCheckTime(e.target.value)) void setChecks({ time: e.target.value });
-            }}
-            aria-label="Price check time"
-          />
-        </label>
-        {settings.checkIntervalHours >= 168 && (
-          <label
-            className="check"
-            style={settings.sync.backgroundActivity ? undefined : { opacity: 0.5 }}
-            aria-disabled={!settings.sync.backgroundActivity || undefined}
-          >
-            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <span className="title" style={{ fontSize: 15 }}>
-                Which day
+        </div>
+        {choice === 'custom' && (
+          <>
+            <div className="check" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+              <span className="title" style={{ fontSize: 15 }} id="check-days-label">
+                Which days
               </span>
-              <span className="small">Wednesday recommended: that's when new specials start.</span>
+              <div className="day-picks" role="group" aria-labelledby="check-days-label">
+                {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={`chip${days.includes(d) ? ' on' : ''}`}
+                    aria-pressed={days.includes(d)}
+                    aria-label={WEEKDAYS[d]}
+                    disabled={days.length === 1 && days.includes(d)}
+                    onClick={() => toggleDay(d)}
+                  >
+                    {WEEKDAYS[d].slice(0, 3)}
+                  </button>
+                ))}
+              </div>
+              <span className="small">Wednesday is when new specials start. To check on no days, choose Off.</span>
+            </div>
+            <label className="check">
+              <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <span className="title" style={{ fontSize: 15 }}>
+                  What time
+                </span>
+                <span className="small">One time, on each of those days.</span>
+              </span>
+              <input
+                type="time"
+                className="input"
+                style={{ width: 'auto', height: 44, padding: '0 10px', fontSize: 15 }}
+                value={settings.checkTime ?? CHECK_TIME_0110}
+                onChange={(e) => {
+                  if (isCheckTime(e.target.value)) void save({ checkCustom: true, checkTime: e.target.value });
+                }}
+                aria-label="Price check time"
+              />
+            </label>
+          </>
+        )}
+        {blocked && (
+          <div className="check" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }} role="note">
+            <span className="small">
+              <strong>Background activity is off</strong> (Settings → Sync and backups), so these checks can't run by themselves.
             </span>
-            <select
-              className="input"
-              style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
-              value={settings.checkWeekday}
-              disabled={!settings.sync.backgroundActivity}
-              onChange={(e) => setChecks({ weekday: parseInt(e.target.value, 10) })}
-              aria-label="Day for weekly price checks"
-            >
-              {WEEKDAYS.map((d, i) => (
-                <option key={d} value={i}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </label>
+            <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => void save({ on: true })}>
+              Turn it on
+            </button>
+          </div>
         )}
       </div>
     </>

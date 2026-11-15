@@ -85,13 +85,20 @@ export function CataloguesScreen() {
   const groups = catalogueShops(settings);
   return (
     <div className="screen">
-      <TopBar title="Catalogues" />
+      <TopBar title="Catalogues and specials" />
       {/* Your own catalogue first (0.9.0): this week's deals on the things you track. */}
       <button className="banner green cat-entry" onClick={() => nav.push({ name: 'mycatalogue' })}>
         <span className="cat-kicker">NEW · YOUR RESTOCK CATALOGUE</span>
         <span className="cat-entry-title">Specials on the things you buy</span>
         <span className="cat-lede">This week's specials on everything you track, a page for each shop.</span>
         <span className="btn small cat-open">Open my catalogue</span>
+      </button>
+      {/* 0.11.0: My specials, the same way in: a list for each shop you use (Specials.tsx) */}
+      <button className="banner cat-entry specials-entry" onClick={() => nav.push({ name: 'specials' })}>
+        <span className="cat-kicker">EVERY SHOP YOU USE</span>
+        <span className="cat-entry-title">What's on special at each shop</span>
+        <span className="cat-lede">Open a shop to see its specials: your items first, then what the shop and your searches show. Search and sort them.</span>
+        <span className="btn small cat-open">Open my specials</span>
       </button>
       <div className="eyebrow">The shops' own catalogues</div>
       <p className="sub">

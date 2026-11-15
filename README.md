@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.10.12" src="https://img.shields.io/badge/status-release%20candidate%200.10.12-ffcd00">
+  <img alt="Release candidate 0.11.0" src="https://img.shields.io/badge/status-release%20candidate%200.11.0-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-01012">New in 0.10.12</a> ·
+  <a href="#new-in-0110">New in 0.11.0</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -132,9 +132,23 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 </details>
 
+## New in 0.11.0
+
+The release candidate. The versions before it are now called betas.
+
+- **Price checks only for what you use.** The automatic check asks the shops about the products on your pantry items and shopping lists, in every tab, and nothing else. Before, it went through every product saved on the phone, used or not (one phone had 22,110 of them for 88 items).
+- **Checks on set days.** Five choices: every day, **twice a week (Wednesday and Saturday, the default)**, once a week (Wednesday), your own days and time, or off. The presets run at 4:00 am. **Every phone is moved to twice a week once**, whatever it had before, on or off; change it in Settings → Price checks. Check now still checks whenever you tap it.
+- **Restock remembers what your searches find.** Every product a search or scan turns up is kept on the phone with its price that day, its barcode and its stock, so a later search can say "You saw $7.00 on 25 Oct". It's history only: a search always asks the shops again. Kept as long as your price history, or for its own time (Settings → Prices and deals → Search results). With your own Restock server (0.11.0), it's kept there too.
+- **Catalogues and specials** is one row in More. It has **Open my catalogue**, **Open my specials** and the shops' own catalogues.
+- **My specials:** a list for each shop you use, in every tab, closed until you open it. Your items on special there come first, then the shop's half-price list where Restock can read one (Coles and Woolworths), then what your searches found on special this week. Search and sort them (biggest saving, lowest price, A–Z). The buttons are **Add to list** and **Add to pantry** (or the tab it belongs to) instead of Track.
+- **My catalogue has a page for every shop you use**, not only the ones with a few deals.
+- **The Pantry says how many items it has**, under the last one.
+- **The cards file is locked.** "Save cards to a file" asks for a passphrase and encrypts the file; opening it asks for the passphrase. Files saved before 0.11.0 still open.
+- **Back** on Bottle shop, Chemist and your own sections takes you to More, where they open from.
+
 ## New in 0.10.12
 
-Release candidate 13.
+Beta.
 
 - **Update available, on Home.** When a newer Restock is out, Home's first card says so: the version you have, the version you'd get, and one **Update now** button. It stays until you've updated. It shows what the last check found (the daily check behind "Tell me when there's an update", or Check in Settings), so it asks GitHub nothing by itself; Android app only.
 - **Take a photo.** The Photo tile under More ways to add is named **Take a photo**; it opens the two choices: take a photo of the pack, or choose one from your photo library.
@@ -142,7 +156,7 @@ Release candidate 13.
 
 ## New in 0.10.11
 
-Release candidate 12.
+Beta.
 
 - **Costco can be unticked.** Its tick came back on its own: an old setting from 0.9.6 stayed on and put Costco back with your shops. Costco is under Other shops, on every tab's shop page, ticked and unticked like any shop.
 - **A new custom section is only kept when you tap Save section.** Tapping a start (Office, say) opens its page marked "Not saved yet"; going Back asks **You haven't saved**, and leaving takes the section away again.
@@ -155,7 +169,7 @@ Release candidate 12.
 
 ## New in 0.10.10
 
-Release candidate 11: a tidy-up of the whole app, from an outside review of every screen.
+Beta: a tidy-up of the whole app, from an outside review of every screen.
 
 - **One word for each thing.** *Shop* is the chain and *branch* is your local one (no more "store"); *items*, not "things"; **Bottle shop** and **Chemist** instead of Keg and Health; *usual* price, not "normal"; **A–Z** everywhere; unit prices all written "$0.90 / 100 sheets". Verdicts and alerts use the same names ("On special (15%+)", "Fake special", "Wait for a better special"). **What I buy**, **Also happy with** and **Cheaper swap** replace My picks, Would also take and Swap & save. In search, a close match says **GOOD MATCH**; RECOMMENDED is only ever a shop.
 - **Asked once.** Start shopping goes straight in, at every shop your list is split across (it asked where you were shopping, then where you were first). Best value or Lowest price is set in Compare shops only. Cards, Catalogues, Specials and Receipts live in More; Home is your deals. The item page says its verdict once, has one Alerts button, and no Done button (it saves as you go).
@@ -170,7 +184,7 @@ Release candidate 11: a tidy-up of the whole app, from an outside review of ever
 
 ## New in 0.10.9
 
-Release candidate 10.
+Beta.
 
 - **Shopping, one shop at a time.** With things at two or more shops, Start shopping asks **Where are you first?**: each shop with how many things and about how much, the one with the most marked. Tap one and only its things show (and the ones with no shop). **Done at Coles** takes you back, with Coles greyed and ticked (tap it to go back in), to **Where to next?** When every shop's done, **Finish shopping**. "See everything in one list" is still there.
 - **See what you're looking for.** Every line in shopping mode has the product's photo with the blue ⓘ: tap it for the product in full (a big photo, size, ingredients). On the web page, the shopping list's and the Pantry's photos open it too.
@@ -181,7 +195,7 @@ Release candidate 10.
 
 ## New in 0.10.8
 
-Release candidate 9: a tidy-up after a full review of 0.10.7.
+Beta: a tidy-up after a full review of 0.10.7.
 
 - **A tidier Add screen.** Scan a barcode, then equal tiles for **Scan several**, **Photo** and **Receipt**, and the barcodes still to match as one line.
 - **Find it from a photo** opens in its own sheet: at most 8 of the words it read (the biggest short ones; the rest behind "more"), then **Search for "…"**. A photo of the back of a pack no longer fills the screen with sentences.
@@ -195,7 +209,7 @@ Release candidate 9: a tidy-up after a full review of 0.10.7.
 
 ## New in 0.10.7
 
-Release candidate 8.
+Beta.
 
 - **A much better text reader.** Receipts and photos of packs are read by PaddleOCR now, not Tesseract: far better on real photos (shiny or curved packs, crumpled receipts, a crooked photo). It's built into the app, works offline, and the photo never leaves your phone.
 - **Find it from a photo.** Scan a barcode Restock doesn't know and tap **Take a photo**: Restock reads the name off the pack and searches your shops. The words it read are buttons, to add or take away. **Not right? Search with Google Lens** sends that one photo to Google, only when you tap it. Pick the right product and Restock remembers the barcode. Also in Add (**Find from a photo**) and on the web page.
@@ -217,7 +231,7 @@ Release candidate 8.
 
 ## New in 0.10.6
 
-Release candidate 7: fixes only, no new features.
+Beta: fixes only, no new features.
 
 - **Shopping list, easier to use:**
   - **Edit** (the pencil next to the list's name) is back where you can see it. It was *Select items*, hidden in the ⋯ menu.
@@ -235,7 +249,7 @@ Release candidate 7: fixes only, no new features.
 
 ## New in 0.10.5
 
-Release candidate 6: a redesigned Shopping list, faster shop tests, and Unblock for shops that never answer.
+Beta: a redesigned Shopping list, faster shop tests, and Unblock for shops that never answer.
 
 - **Shopping list, redesigned:** the list's name is now the list picker: tap **Groceries ▾ Switch** to go to Keg, Health, Baby, Pets or General, each with how many things are on it. One **⋯** button holds the view (by shop, aisle group, one list), Best value / Lowest price, Open or fold all shops, Select items, Share (the whole list or one shop's) and Send to the Woolworths or Coles app.
 - **One summary card** under it: how many things, how many shops, about how much, and what shopping around saves. Tap **Compare** for every shop's total and *if you only go to one shop*, with Start shopping at the bottom.
@@ -248,7 +262,7 @@ Release candidate 6: a redesigned Shopping list, faster shop tests, and Unblock 
 
 ## New in 0.10.4
 
-Release candidate 5: a nicer More, Unblock for shops that check for bots, and a tidier Shopping list.
+Beta: a nicer More, Unblock for shops that check for bots, and a tidier Shopping list.
 
 - **More, redone:** a navy top with your tabs as colour tiles (Keg, Health, Baby, Pets): how many things are in each, how many are on special, and which shop is cheapest most often. Tabs you haven't set up are small add buttons under them. Settings, Cards, Catalogues, Specials and Receipts are below. The same on the web page and the iPhone web app.
 - **"<shop> is blocking Restock":** when a shop's website checks that visitors aren't bots and turns Restock away, Restock now says so plainly (it's the shop's check, not Restock's), instead of "found nothing". It shows on Home, in Test connections, in Advanced → Diagnostics → Shop test, on the shop's Edit sheet in My shops ("Blocked") and in Add's results.
@@ -262,7 +276,7 @@ Release candidate 5: a nicer More, Unblock for shops that check for bots, and a 
 
 ## New in 0.10.3
 
-Release candidate 4: Baby and Pets tabs, any shop on any tab, a new bottom bar, IGA, and spotting specials that never end.
+Beta: Baby and Pets tabs, any shop on any tab, a new bottom bar, IGA, and spotting specials that never end.
 
 - **A new bottom bar: Home, Pantry, Add, List and More.** More holds Keg, Health, Baby and Pets (once they're set up), Settings, Cards, Catalogues, Specials and Receipts, so the bar never gets crowded. The same on the web page and the iPhone web app.
 - **Baby and Pets tabs (Beta)**, working the same as Pantry: nappies, wipes and formula; pet food, litter and treats. Set them up in setup or from More, or skip them and they don't show.
@@ -276,7 +290,7 @@ Release candidate 4: Baby and Pets tabs, any shop on any tab, a new bottom bar, 
 
 ## New in 0.10.2
 
-Release candidate 3: aisle numbers, and knowing when a price check didn't happen.
+Beta: aisle numbers, and knowing when a price check didn't happen.
 
 - **Aisle numbers in shopping mode:** each thing shows where it is at your branch, like *Aisle 9 · Left*. Coles gives them, at your branch and your second one, with *Prices and stock at my store* on; Woolworths' website gives an online category instead of an aisle, and Aldi and Costco don't publish them, so those say **Aisle: unknown**. They only show once you start shopping, and they stay on your phone.
 - **Sort each shop** by **Aisle** (the default; tap **1→50** to go **50→1**), **Category** (your aisle groups) or **A–Z**. Things with an aisle come first, in aisle order; the ones without follow, A–Z. Restock remembers what you picked, and *Settings → Shopping list and receipts → In shopping mode, start with* sets it.
@@ -292,7 +306,7 @@ Release candidate 3: aisle numbers, and knowing when a price check didn't happen
 
 ## New in 0.10.1
 
-Release candidate 2: the shopping list's totals, made clear and made right.
+Beta: the shopping list's totals, made clear and made right.
 
 - **Both numbers, everywhere:** every shop on the shopping list, and its sheet when you tap it, shows **Same shopping $X · at the till $Y**. *Same shopping* prices every item at the size you usually buy, so a big pack can't look dear just for being big; *at the till* is what you'd hand over for the packs Restock picked. A line whose pack is bigger or smaller than usual says its same-shopping price too.
 - **Shop around is always the cheapest:** it now picks each item the same way it adds them up, so a shop plus the rest from other shops can never come to less. (Before, Aldi plus the rest could come out a dollar under "every item at its cheapest shop".)
@@ -449,7 +463,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.10.12.apk` (on macOS, `shasum -a 256 restock-0.10.12.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.11.0.apk` (on macOS, `shasum -a 256 restock-0.11.0.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
@@ -635,7 +649,7 @@ Interested? Say hello in [Discussions](../../discussions) or on the [iPhone issu
 
 ## Roadmap
 
-Restock is at its **thirteenth release candidate** (0.10.12): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
+Restock 0.11.0 is the **release candidate** (the versions before it were betas): everything planned for 1.0 is in, and it's being tested. After 1.0 there are no dates and no version numbers for what's next: each feature comes out when it's ready, and fixes come out in small updates in between, as soon as they're done. Found something? [Report a problem](../../issues/new/choose).
 
 **✅ Out now**
 - **Your own Restock server, as the house:** name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs Home Assistant for everyone, and gives you Restock on your computer.

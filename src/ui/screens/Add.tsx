@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { seenBefore, type SeenBefore } from '../../lib/seen';
 import { flavourBarNote, flavourWord, otherFlavours } from '../../lib/flavours';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { productCode, scanBarcode, type BarcodeInfo } from '../../lib/barcode';
@@ -206,6 +207,12 @@ async function matchByDetails(
   return undefined;
 }
 
+/** "25 Oct" (and the year when it isn't this one) for a remembered day, YYYY-MM-DD. */
+const seenDay = (day: string) => {
+  const d = new Date(`${day}T12:00:00`);
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) });
+};
+
 export function AddScreen({
   barcode,
   attachTo,
@@ -283,6 +290,8 @@ export function AddScreen({
   const [scanned, setScanned] = useState<BarcodeInfo>();
   const [lookingUp, setLookingUp] = useState(false);
   const [results, setResults] = useState<Partial<Record<Chain, ChainResult>>>({});
+  // 0.11.0: what an earlier search saw each result at, when it was a different price (lib/seen.ts)
+  const [before, setBefore] = useState<Map<string, SeenBefore>>(new Map());
   const [showing, setShowing] = useState<Partial<Record<Chain, number>>>({});
   const [sortBy, setSortBy] = useState<Partial<Record<Chain, SortKey>>>({});
   const [picks, setPicks] = useState<Map<string, StoreProduct>>(new Map());
@@ -390,6 +399,9 @@ export function AddScreen({
       const seen = new Set(exact.map(keyOf));
       const items = [...exact, ...found.filter((p) => !seen.has(keyOf(p)))];
       const scored = scoreAll(rq, items);
+      void seenBefore(items)
+        .then((m) => m.size && setBefore((b) => new Map([...b, ...m])))
+        .catch(() => undefined);
       setResults((r) => ({
         ...r,
         [chain]: {
@@ -1883,6 +1895,12 @@ export function AddScreen({
                                   ) : (
                                     'special price'
                                   )}
+                                </span>
+                              )}
+                              {/* 0.11.0: what an earlier search of yours saw it at (history, never today's price) */}
+                              {before.get(`${sp.chain}|${sp.storeProductId}`) && (
+                                <span className="small seen-before" style={{ display: 'block' }}>
+                                  You saw {money(before.get(`${sp.chain}|${sp.storeProductId}`)!.price)} on {seenDay(before.get(`${sp.chain}|${sp.storeProductId}`)!.day)}
                                 </span>
                               )}
                             </span>

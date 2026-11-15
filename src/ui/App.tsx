@@ -403,13 +403,24 @@ function RestockApp() {
     // On a Restock server the web keeps the whole history (the phones tidy their own).
     if (!onboarded || serverMode) return;
     void getSettings()
-      .then((s) => pruneHistory(s.historyWeeks))
+      .then(async (s) => {
+        await pruneHistory(s.historyWeeks);
+        // 0.11.0: and what searches found, kept as long (or for its own time)
+        await import('../lib/seen').then((f) => f.pruneSeen(s));
+      })
       .catch((e) => console.error('history tidy-up failed', e));
   }, [onboarded]);
   useEffect(() => {
     if (!onboarded || !Capacitor.isNativePlatform()) return;
     const maybeCheck = async () => {
-      const s = await getSettings();
+      let s = await getSettings();
+      // 0.11.0: once, on the update from 0.10.x: automatic checks move to Wednesday and Saturday at
+      // 4:00 am (settingsCheck.ts works it out; this saves it, so the phone's background job reads it).
+      const stored = await getKV<{ checkMoved0110?: boolean; onboarded?: boolean }>('settings');
+      if (stored && stored.checkMoved0110 !== true) {
+        s = await updateSettings({ checkMoved0110: true, checkDays: s.checkDays, checkTime: s.checkTime, sync: s.sync });
+        toast('Prices are now checked on Wednesday and Saturday at 4:00 am. Change it in Settings → Price checks.');
+      }
       // 0.9.6: checks run at a set time of day (default 5:00 am). If that time passed while the phone
       // was off, check now, once. A check made by hand in between never moves the schedule.
       const { due } = await syncBackgroundSchedule(s).catch((e) => {
@@ -468,6 +479,8 @@ function RestockApp() {
     }).catch(() => undefined);
     // 0.9.14: Send prices back: what earlier searches and price checks read, if it didn't go yet.
     if (!serverMode) void import('../lib/priceShare').then((f) => f.sendPricesNow()).catch(() => undefined);
+    // 0.11.0: what searches found also goes to a household's own Restock server (lib/seen.ts)
+    if (!serverMode) void import('../lib/seen').then((f) => f.sendSeenToServer()).catch(() => undefined);
     const stopWidgets = watchWidgets();
     // 0.9.3: the shopping list with Home Assistant, if it's on for this phone (homeAssistant.ts).
     const stopHa = serverMode

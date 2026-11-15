@@ -180,7 +180,7 @@ function SideNav({ tabs, place, go }: { tabs: Tab[]; place: Place; go: (p: Place
           </span>
         ) : undefined,
       )}
-      {item('specials', 'Specials and catalogues', 'flame')}
+      {item('specials', 'Catalogues and specials', 'book')}
       {settings?.receipts.enabled && item('receipts', 'Receipts', 'receipt')}
       {/* 0.9.6 (cards): Cards, kept in this browser only (DeskCards.tsx). */}
       {item('cards', 'Cards', 'card')}

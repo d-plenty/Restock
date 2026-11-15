@@ -28,7 +28,7 @@ import { SetupNudges } from './SetupNudges';
 import { UpdateBanner } from '../UpdateBanner';
 import { serverMode } from '../../server-mode/flag';
 import { ConnectionsSheet } from './Settings';
-import { nextCheckWords } from '../../lib/checkSchedule';
+import { nextCheckWords, planOf } from '../../lib/checkSchedule';
 import { getCheckLog, missedSlot, missedWords, whenWords } from '../../lib/checkLog';
 
 import { startTour } from '../Tour';
@@ -99,7 +99,7 @@ export function HomeScreen() {
   // 0.10.2: a scheduled check that didn't happen says so (Advanced → Diagnostics says why).
   const missed =
     isNative() && !serverMode && settings.sync.backgroundActivity
-      ? missedSlot({ intervalHours: settings.checkIntervalHours, time: settings.checkTime, weekday: settings.checkWeekday }, settings.lastCheck, runs)
+      ? missedSlot(planOf(settings), settings.lastCheck, runs)
       : undefined;
 
   const runCheck = () => {
@@ -555,11 +555,12 @@ function DealCard({ rec, listed }: { rec: Recommendation; listed?: string }) {
 
 /** When the next background check should run, in words ("tonight 5:00 pm", "tomorrow 5:00 am"). 0.9.6: the set time of day. */
 export function nextCheck(
-  s: { checkIntervalHours: number; checkTime?: string; checkWeekday?: number; sync: { backgroundActivity: boolean } },
+  s: { checkIntervalHours: number; checkTime?: string; checkWeekday?: number; checkDays?: number[]; sync: { backgroundActivity: boolean } },
   now = Date.now(),
 ): string | undefined {
-  if (!s.sync.backgroundActivity) return undefined;
-  return nextCheckWords({ intervalHours: s.checkIntervalHours, time: s.checkTime, weekday: s.checkWeekday }, now);
+  // 0.11.0: Off (no days) says nothing here, like background activity off
+  if (!s.sync.backgroundActivity || (Array.isArray(s.checkDays) && !s.checkDays.length)) return undefined;
+  return nextCheckWords(planOf(s), now);
 }
 
 /**

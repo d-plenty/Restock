@@ -1177,6 +1177,13 @@ final class SyncHub {
         return s.open().postSealed("/data/spend", body, s.sealKey(), s.fileKeys());
     }
 
+    /** 0.11.0: what this phone's searches found, to the server (sealed like the spending; an older server answers 404). */
+    org.json.JSONObject serverSeen(org.json.JSONObject body) throws Exception {
+        ServerSync s = server();
+        if (!s.on() || !s.v3()) throw new IllegalStateException("This phone isn't in a household on a Restock server.");
+        return s.open().postSealed("/data/seen", body, s.sealKey(), s.fileKeys());
+    }
+
     /** 0.9.14: the server's statistics for Your data (only a v3 household's server has them). */
     org.json.JSONObject serverRead(String pathAndQuery) throws Exception {
         ServerSync s = server();

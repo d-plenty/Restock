@@ -94,6 +94,39 @@ final class PriceChecker {
         Set<String> enabled = enabledShops(settings);
         JSONObject stores = settings.optJSONObject("stores");
 
+        // 0.11.0: only what's in use: a product on a pantry item (the usual one, the same thing at
+        // another shop, an alternative), in any tab, or a one-off buy still on a shopping list.
+        // Before, every saved product was checked, in use or not: one phone had 22,110 of them
+        // for 88 items. The others stay on the phone with their prices; a search or a scan
+        // refreshes them.
+        Set<String> inUse = new HashSet<>();
+        Set<String> onList = new HashSet<>();
+        try (Cursor c = db.rawQuery("SELECT usual_product_id, same_product_ids, alt_product_ids FROM items", null)) {
+            while (c.moveToNext()) {
+                if (!c.isNull(0)) inUse.add(c.getString(0));
+                for (int col = 1; col <= 2; col++) {
+                    try {
+                        JSONArray ids = new JSONArray(c.isNull(col) ? "[]" : c.getString(col));
+                        for (int i = 0; i < ids.length(); i++) inUse.add(ids.optString(i));
+                    } catch (Exception e) {
+                        // not a list: nothing from it
+                    }
+                }
+            }
+        }
+        try (Cursor c = db.rawQuery("SELECT product, chain FROM list_entries WHERE checked = 0 AND product IS NOT NULL", null)) {
+            while (c.moveToNext()) {
+                try {
+                    JSONObject lp = new JSONObject(c.getString(0));
+                    String spid = lp.optString("storeProductId", "");
+                    String chain = lp.optString("chain", c.isNull(1) ? "" : c.getString(1));
+                    if (!spid.isEmpty() && !chain.isEmpty()) onList.add(chain + "|" + spid);
+                } catch (Exception e) {
+                    // not a product: a plain line
+                }
+            }
+        }
+
         // Tracked products, grouped by chain.
         Map<String, List<String[]>> byChain = new LinkedHashMap<>();
         int total = 0;
@@ -107,6 +140,7 @@ final class PriceChecker {
                 if ("costco".equals(chain)) continue;
                 if (!enabled.contains(chain)) continue;
                 if (StoreClient.pageless(chain, c.getString(3))) continue;
+                if (!inUse.contains(c.getString(0)) && !onList.contains(chain + "|" + c.getString(3))) continue;
                 List<String[]> list = byChain.get(chain);
                 if (list == null) {
                     list = new ArrayList<>();

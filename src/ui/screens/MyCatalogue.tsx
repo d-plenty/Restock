@@ -152,7 +152,14 @@ export function MyCatalogueScreen() {
                     ))}
                   </div>
                 </div>
-                {p.kind === 'cheapest' && (
+                {/* 0.11.0: every shop you use has a page, with something on it or not */}
+                {!p.deals.length && (
+                  <p className="small">
+                    None of your items are on special at {chainName(p.chain)} this week, and it isn't the cheapest for any of them. Items you track there show
+                    up here when they are.
+                  </p>
+                )}
+                {p.kind === 'cheapest' && p.deals.length > 0 && (
                   <p className="small">
                     {chainName(p.chain)} has no sales on your items this week, so its page shows where it beats your other shops.
                   </p>
@@ -180,6 +187,7 @@ export function MyCatalogueScreen() {
 
 function pageLine(p: CataloguePage): string {
   const n = p.deals.length;
+  if (!n) return 'Nothing of yours on special this week';
   return p.kind === 'sales' ? `${n} deal${n === 1 ? '' : 's'} on your items` : `Cheapest for ${n} of your items`;
 }
 

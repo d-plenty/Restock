@@ -17,7 +17,8 @@ public class CheckScheduleTest096 {
     static int failures = 0;
 
     static CheckSchedule plan(JSONObject c) {
-        return new CheckSchedule(c.getInt("interval"), CheckSchedule.parseTime(c.getString("time")), c.optInt("weekday", 3));
+        // 0.11.0: "days" ([3, 6]) is the whole plan when a case has it.
+        return new CheckSchedule(c.getInt("interval"), CheckSchedule.parseTime(c.getString("time")), c.optInt("weekday", 3), CheckSchedule.daysOf(c.optJSONArray("days")));
     }
 
     static String iso(Instant i) {
@@ -43,12 +44,12 @@ public class CheckScheduleTest096 {
             String latest = iso(cs.latestSlot(now, zone));
             String wake = iso(cs.nextWake(now, zone));
             if (gen) {
-                c.put("next", next).put("latest", latest).put("wake", wake);
+                c.put("next", next).put("latest", latest == null ? JSONObject.NULL : latest).put("wake", wake);
                 continue;
             }
             String name = c.getString("name");
             eq(name + " next", c.getString("next"), next);
-            eq(name + " latest", c.getString("latest"), latest);
+            eq(name + " latest", c.isNull("latest") ? null : c.getString("latest"), latest);
             eq(name + " wake", c.getString("wake"), wake);
         }
         JSONArray dues = f.getJSONArray("due");
@@ -70,6 +71,12 @@ public class CheckScheduleTest096 {
         eq("signature zone", false, new CheckSchedule(24, 300, 3).signature(ZoneId.of("UTC")).equals(new CheckSchedule(24, 300, 3).signature(ZoneId.of("Australia/Brisbane"))));
         eq("signature weekday only weekly", true, new CheckSchedule(24, 300, 1).signature(ZoneId.of("UTC")).equals(new CheckSchedule(24, 300, 5).signature(ZoneId.of("UTC"))));
         // A time that isn't one, and settings with nothing in them, mean 5:00 am once a day.
+        // 0.11.0: a plan by days: the days and time are the signature; no day ticked is off.
+        eq("signature days", false, new CheckSchedule(24, 240, 3, CheckSchedule.daysOf(new JSONArray("[3,6]"))).signature(ZoneId.of("UTC")).equals(new CheckSchedule(24, 240, 3, CheckSchedule.daysOf(new JSONArray("[3]"))).signature(ZoneId.of("UTC"))));
+        eq("off", true, new CheckSchedule(24, 240, 3, CheckSchedule.daysOf(new JSONArray("[]"))).off());
+        eq("not off", false, new CheckSchedule(24, 240, 3, CheckSchedule.daysOf(new JSONArray("[3,6]"))).off());
+        eq("older plan not off", false, new CheckSchedule(24, 240, 3).off());
+        eq("days from settings", true, CheckSchedule.fromSettings(new JSONObject("{\"checkDays\":[3,6],\"checkTime\":\"04:00\"}")).checksOn(java.time.LocalDate.of(2026, 11, 18)));
         eq("bad time", 300, CheckSchedule.parseTime("25:99"));
         eq("no settings", 300, CheckSchedule.fromSettings(new JSONObject()).minuteOfDay);
         eq("no settings interval", 24, CheckSchedule.fromSettings(new JSONObject()).intervalHours);
@@ -81,6 +88,6 @@ public class CheckScheduleTest096 {
             System.out.println(failures + " failed");
             System.exit(1);
         }
-        System.out.println("CheckSchedule096: all " + (cases.length() * 3 + dues.length() + 6) + " checks pass");
+        System.out.println("CheckSchedule096: all " + (cases.length() * 3 + dues.length() + 11) + " checks pass");
     }
 }

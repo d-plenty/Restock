@@ -1,11 +1,12 @@
 // The Cards screen (0.9.6: was "Loyalty cards"): loyalty cards and gift cards, with each card's
 // barcode drawn big for the till. The same screen on the phone and the web; `store` says where the
 // cards live (lib/cardStore.ts: the phone's database, or on the web this browser only).
+import { isLocked, lockBackup, unlockBackup } from '../../lib/backupLock';
 import JsBarcode from 'jsbarcode';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { scheduleCardReminders } from '../../lib/cardReminders';
 import { phoneCards, type CardStore } from '../../lib/cardStore';
-import { confirmAction } from '../../lib/confirm';
+import { askPassword, confirmAction } from '../../lib/confirm';
 import {
   cardsCount,
   cardsFileName,
@@ -148,12 +149,17 @@ export function CardsScreen({
   // ---------- the cards file ----------
   const saveFile = async () => {
     if (!loyalty.length && !gifts.length) return say('No cards to save yet.');
-    const ok = await confirmAction('This file has your card numbers and PINs', {
-      detail: `${CARDS_FILE_PRIVATE} It isn't a backup of anything else.`,
-      action: 'Save the file',
-      danger: false,
+    // 0.11.0: the file is locked with a passphrase (it was plain text: anyone who got the file had
+    // every card number and PIN). The same lock as a backup's (backupLock.ts).
+    const pw = await askPassword('Passphrase for this cards file', {
+      detail: `${CARDS_FILE_PRIVATE} You'll need this passphrase to open the file, here or on another phone. At least 8 characters.`,
+      action: 'Next',
     });
-    if (!ok) return;
+    if (pw === undefined) return;
+    if (pw.length < 8) return say('Use at least 8 characters. Nothing was saved.');
+    const again = await askPassword('Type it again', { action: 'Save the file' });
+    if (again === undefined) return;
+    if (again !== pw) return say("Those didn't match. Nothing was saved.");
     const photos: Record<string, string> = {};
     for (const g of gifts)
       for (const side of ['front', 'back'] as const) {
@@ -161,14 +167,25 @@ export function CardsScreen({
         if (data) photos[`${g.id}:${side}`] = data;
       }
     const name = cardsFileName(localDay(new Date().toISOString()));
-    await shareTextFile(name, makeCardsFile(loyalty, gifts, photos), 'application/json', 'Restock cards (private)');
-    say(`Saved ${cardsCount(loyalty.length, gifts.length)}: ${name}. Keep it private.`);
+    await shareTextFile(name, await lockBackup(makeCardsFile(loyalty, gifts, photos), pw), 'application/json', 'Restock cards (private)');
+    say(`Saved ${cardsCount(loyalty.length, gifts.length)}: ${name}, locked with your passphrase.`);
   };
   const openFile = async (file?: File) => {
     if (fileInput.current) fileInput.current.value = '';
     if (!file) return;
     try {
-      const got = readCardsFile(await file.text());
+      let text = await file.text();
+      // 0.11.0: a locked file asks for its passphrase (a file saved before 0.11.0 isn't locked, and still opens)
+      if (isLocked(text)) {
+        const pw = await askPassword('Passphrase for this cards file', { detail: 'The one typed in when the file was saved.', action: 'Open the file' });
+        if (pw === undefined) return;
+        try {
+          text = await unlockBackup(text, pw);
+        } catch (e) {
+          return say(e instanceof Error && /isn.t one Restock made/.test(e.message) ? e.message : "That passphrase didn't open the file.");
+        }
+      }
+      const got = readCardsFile(text);
       // Already here (same card, or the same loyalty number): passed over.
       const haveL = new Set(loyalty.flatMap((c) => [c.id, `${c.program}|${c.number}`]));
       const newL = got.loyalty.filter((c) => !haveL.has(c.id) && !haveL.has(`${c.program}|${c.number}`));
@@ -274,7 +291,7 @@ export function CardsScreen({
           {store.where === 'browser'
             ? 'Save them to a private file, then open it in Restock on your phone (Cards → Open a cards file), or the other way round.'
             : 'Save them to a private file, then open it in the Restock web page or on another phone, or the other way round.'}{' '}
-          The file has your card numbers and PINs, not encrypted.
+          The file has your card numbers and PINs, so it's locked with a passphrase you choose.
         </p>
         <div className="two">
           <button className="btn" onClick={() => void saveFile()}>

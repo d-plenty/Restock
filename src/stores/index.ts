@@ -7,7 +7,8 @@ import { costco } from './costco';
 import { endeavourAdapter } from './endeavour';
 import { connectionMode, NativeOnlyError } from './http';
 import type { StoreAdapter, StoreProduct } from './types';
-import { noteSearch, SHARE_SHOPS } from '../lib/priceShare';
+import { noteSearch } from '../lib/priceShare';
+import { noteSeen } from '../lib/seen';
 import { webAdapter } from './web';
 import { woolworths } from './woolworths';
 
@@ -16,7 +17,9 @@ export const ADAPTERS = { woolworths, coles, aldi };
 export function adapterFor(chain: StoreChain | 'other'): StoreAdapter | undefined {
   const a = pickAdapter(chain);
   // 0.9.14: Send prices back: what Coles, Woolworths, Aldi and Costco searches show (lib/priceShare.ts).
-  return a && (SHARE_SHOPS as readonly string[]).includes(a.chain) ? noting(a) : a;
+  // 0.11.0: and every shop's results are remembered on this phone (lib/seen.ts); noteSearch still
+  // only takes those four shops' results for the shared price service.
+  return a && noting(a);
 }
 
 function noting(a: StoreAdapter): StoreAdapter {
@@ -25,6 +28,7 @@ function noting(a: StoreAdapter): StoreAdapter {
     (async (...args: T) => {
       const out = await fn(...args);
       noteSearch(out);
+      void noteSeen(out);
       return out;
     });
   return { ...a, search: seen(a.search.bind(a))!, searchBrowser: seen(a.searchBrowser?.bind(a)), searchAnonymous: seen(a.searchAnonymous?.bind(a)) };

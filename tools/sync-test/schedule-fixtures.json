@@ -297,6 +297,144 @@
    "interval": 24,
    "time": "05:00",
    "latest": "2028-02-28T19:00:00Z"
+  },
+  {
+   "next": "2026-11-17T18:00:00Z",
+   "wake": "2026-11-17T18:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-17T10:00:00Z",
+   "name": "0.11.0 twice a week, Tuesday night",
+   "weekday": 3,
+   "days": [
+    3,
+    6
+   ],
+   "interval": 24,
+   "time": "04:00",
+   "latest": "2026-11-13T18:00:00Z"
+  },
+  {
+   "next": "2026-11-20T18:00:00Z",
+   "wake": "2026-11-18T18:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-17T19:00:00Z",
+   "name": "0.11.0 twice a week, Wednesday after 4 am",
+   "weekday": 3,
+   "days": [
+    3,
+    6
+   ],
+   "interval": 24,
+   "time": "04:00",
+   "latest": "2026-11-17T18:00:00Z"
+  },
+  {
+   "next": "2026-11-20T18:00:00Z",
+   "wake": "2026-11-20T18:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-20T02:00:00Z",
+   "name": "0.11.0 twice a week, Friday",
+   "weekday": 3,
+   "days": [
+    3,
+    6
+   ],
+   "interval": 24,
+   "time": "04:00",
+   "latest": "2026-11-17T18:00:00Z"
+  },
+  {
+   "next": "2026-11-24T18:00:00Z",
+   "wake": "2026-11-22T18:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-22T02:00:00Z",
+   "name": "0.11.0 twice a week, Sunday",
+   "weekday": 3,
+   "days": [
+    3,
+    6
+   ],
+   "interval": 24,
+   "time": "04:00",
+   "latest": "2026-11-20T18:00:00Z"
+  },
+  {
+   "next": "2026-11-24T18:00:00Z",
+   "wake": "2026-11-19T18:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-19T02:00:00Z",
+   "name": "0.11.0 once a week",
+   "weekday": 3,
+   "days": [
+    3
+   ],
+   "interval": 24,
+   "time": "04:00",
+   "latest": "2026-11-17T18:00:00Z"
+  },
+  {
+   "next": "2026-11-19T18:00:00Z",
+   "wake": "2026-11-19T18:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-19T02:00:00Z",
+   "name": "0.11.0 every day",
+   "weekday": 3,
+   "days": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "interval": 24,
+   "time": "04:00",
+   "latest": "2026-11-18T18:00:00Z"
+  },
+  {
+   "next": "2026-11-20T11:30:00Z",
+   "wake": "2026-11-19T11:30:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-19T02:00:00Z",
+   "name": "0.11.0 custom days and time",
+   "weekday": 3,
+   "days": [
+    1,
+    2,
+    5,
+    0
+   ],
+   "interval": 24,
+   "time": "21:30",
+   "latest": "2026-11-17T11:30:00Z"
+  },
+  {
+   "next": "2026-11-20T02:00:00Z",
+   "wake": "2026-11-19T18:00:00Z",
+   "zone": "Australia/Brisbane",
+   "now": "2026-11-19T02:00:00Z",
+   "name": "0.11.0 off",
+   "weekday": 3,
+   "days": [],
+   "interval": 24,
+   "time": "04:00",
+   "latest": null
+  },
+  {
+   "next": "2026-10-06T15:30:00Z",
+   "wake": "2026-10-03T16:30:00Z",
+   "zone": "Australia/Melbourne",
+   "now": "2026-10-03T12:00:00Z",
+   "name": "0.11.0 twice a week over a daylight saving change",
+   "weekday": 3,
+   "days": [
+    3,
+    6
+   ],
+   "interval": 24,
+   "time": "02:30",
+   "latest": "2026-10-02T16:30:00Z"
   }
  ],
  "due": [
@@ -429,6 +567,59 @@
    "weekday": 3,
    "interval": 168,
    "time": "05:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": true,
+   "now": "2026-11-17T19:00:00Z",
+   "served": null,
+   "name": "0.11.0 twice a week: Wednesday slot not served",
+   "weekday": 3,
+   "days": [
+    3,
+    6
+   ],
+   "interval": 24,
+   "time": "04:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": false,
+   "now": "2026-11-19T02:00:00Z",
+   "served": "2026-11-17T18:00:00Z",
+   "name": "0.11.0 twice a week: Wednesday slot served",
+   "weekday": 3,
+   "days": [
+    3,
+    6
+   ],
+   "interval": 24,
+   "time": "04:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": true,
+   "now": "2026-11-21T02:00:00Z",
+   "served": "2026-11-17T18:00:00Z",
+   "name": "0.11.0 twice a week: Saturday slot owed after Wednesday",
+   "weekday": 3,
+   "days": [
+    3,
+    6
+   ],
+   "interval": 24,
+   "time": "04:00"
+  },
+  {
+   "zone": "Australia/Brisbane",
+   "due": false,
+   "now": "2026-11-21T02:00:00Z",
+   "served": null,
+   "name": "0.11.0 off is never due",
+   "weekday": 3,
+   "days": [],
+   "interval": 24,
+   "time": "04:00"
   }
  ]
 }

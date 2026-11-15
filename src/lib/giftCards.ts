@@ -238,7 +238,7 @@ export function cleanLoyaltyCard(raw: unknown, now = new Date().toISOString()): 
 
 export const CARDS_FILE_FORMAT = 'restock-cards';
 export const CARDS_FILE_PRIVATE =
-  'PRIVATE. This file has your card numbers, barcodes and gift card PINs, not encrypted. Keep it to yourself, open it only in Restock, and delete it once your cards are moved.';
+  'PRIVATE. This file has your card numbers, barcodes and gift card PINs. Keep it to yourself, open it only in Restock, and delete it once your cards are moved.';
 /** At most this much in a cards file (photos take most of it). */
 export const CARDS_FILE_MAX_BYTES = 25 * 1024 * 1024;
 const MAX_CARDS = 500;

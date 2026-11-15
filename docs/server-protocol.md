@@ -950,3 +950,9 @@ Nothing. Fixes only (the Shopping list's buttons, search boxes, big text, Dan Mu
 ## 0.10.12: what changed on the wire
 
 - Nothing between phones and the server.
+
+## 0.11.0: what changed on the wire
+
+- **POST /api/v3/data/seen** (new): a phone sends what its searches and scans found, sealed like `/data/spend`, up to 500 rows a request: `{ rows: [{ chain, store_product_id, day (YYYY-MM-DD), name, brand, size, barcode, image_url, price, was_price, is_special, member_only, promo, in_stock }] }`. The server checks each row, keeps one a product and day in `srv_seen` (a later reading of the same day replaces it), and answers `{ added, skipped }`. Only phones may send it. A server before 0.11.0 answers 404 and the phone keeps the rows to send later.
+- A phone's summary may carry `checks.days` (the weekdays it checks on, `[]` when off), `checks.time` ("04:00") and `searchKeepWeeks`. Older servers and web pages pass over them.
+- Nothing else: phones on 0.9.4 to 0.10.12 sync as before.

@@ -13,7 +13,8 @@ export interface PhoneSummary {
   /** Restock version on that phone ("0.9.3"). */
   version?: string;
   /** Price checks: every N hours (168 = weekly, on `weekday` 0–6), in the background or not, and the last one. */
-  checks?: { everyHours?: number; weekday?: number; background?: boolean; lastAt?: string; lastItems?: number };
+  /** 0.11.0: days ([3, 6]; [] is off) and time ("04:00") are the plan when a phone sends them. */
+  checks?: { everyHours?: number; weekday?: number; days?: number[]; time?: string; background?: boolean; lastAt?: string; lastItems?: number };
   /** Notifications on or off (and the daily one's time, the catalogue day). Restock has no quiet hours. */
   notifications?: {
     catalogueDay?: boolean;
@@ -33,6 +34,8 @@ export interface PhoneSummary {
   backups?: { on?: boolean; everyDays?: number; keep?: number; lastAt?: string; photos?: boolean };
   /** Keep price history for N weeks. */
   historyWeeks?: number;
+  /** 0.11.0: only when the phone keeps search results for a time of their own. */
+  searchKeepWeeks?: number;
   /** The tabs this phone takes. */
   tabs?: ('pantry' | 'keg' | 'pharmacy')[];
   /** Away from home: through a folder, WebDAV, Nextcloud, only the Restock server, or none (never where). */
@@ -83,6 +86,8 @@ export function cleanSummary(raw: unknown): PhoneSummary | null {
     checks: compact({
       everyHours: int(c.everyHours, 1, 24 * 31),
       weekday: int(c.weekday, 0, 6),
+      days: Array.isArray(c.days) ? [...new Set((c.days as unknown[]).filter((d): d is number => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6))].slice(0, 7) : undefined,
+      time: str(c.time, /^([01]\d|2[0-3]):[0-5]\d$/),
       background: bool(c.background),
       lastAt: str(c.lastAt, ISO),
       lastItems: int(c.lastItems, 0, 1_000_000),
@@ -101,6 +106,7 @@ export function cleanSummary(raw: unknown): PhoneSummary | null {
     cards: int(raw.cards, 0, 10_000),
     backups: compact({ on: bool(b.on), everyDays: int(b.everyDays, 1, 366), keep: int(b.keep, 1, 1000), lastAt: str(b.lastAt, ISO), photos: bool(b.photos) }),
     historyWeeks: int(raw.historyWeeks, 1, 520),
+    searchKeepWeeks: int(raw.searchKeepWeeks, 1, 520),
     tabs: Array.isArray(raw.tabs) ? (['pantry', 'keg', 'pharmacy'] as const).filter((t) => (raw.tabs as unknown[]).includes(t)) : undefined,
     away: oneOf(raw.away, ['none', 'folder', 'webdav', 'nextcloud', 'server'] as const),
     homeAssistant: compact({ on: bool(h.on), entity: str(h.entity, ENTITY) }),
@@ -119,12 +125,12 @@ export function cleanSummary(raw: unknown): PhoneSummary | null {
  */
 export const PER_PHONE: readonly { field: keyof PhoneSummary; title: string; settings: string[] }[] = [
   { field: 'version', title: 'Restock version', settings: [] },
-  { field: 'checks', title: 'Price checks', settings: ['checkIntervalHours', 'checkTime', 'checkWeekday', 'sync.backgroundActivity', 'lastCheck'] },
+  { field: 'checks', title: 'Price checks', settings: ['checkIntervalHours', 'checkTime', 'checkWeekday', 'checkDays', 'sync.backgroundActivity', 'lastCheck'] },
   { field: 'notifications', title: 'Notifications', settings: ['alerts'] },
   { field: 'accounts', title: 'Shop accounts', settings: ['accounts'] },
   { field: 'cards', title: 'Loyalty cards', settings: [] },
   { field: 'backups', title: 'Automatic backups', settings: ['autoBackup'] },
-  { field: 'historyWeeks', title: 'Keep price history for', settings: ['historyWeeks'] },
+  { field: 'historyWeeks', title: 'Keep price history for', settings: ['historyWeeks', 'searchKeepWeeks'] },
   { field: 'tabs', title: 'Tabs this phone takes', settings: [] },
   { field: 'away', title: 'Sync away from home', settings: [] },
   { field: 'homeAssistant', title: 'Home Assistant', settings: [] },

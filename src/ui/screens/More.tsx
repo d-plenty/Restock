@@ -157,8 +157,8 @@ export function MoreScreen() {
       <div className="card flush">
         <MoreRow icon="settings" title="Settings" sub="Shops, lists, look, sync and more" onClick={() => nav.push({ name: 'settings' })} />
         <MoreRow icon="card" title="Cards" sub="Loyalty, membership and gift cards" onClick={() => nav.push({ name: 'cards' })} />
-        <MoreRow icon="book" title="Catalogues" sub="Your shops' catalogues" onClick={() => nav.push({ name: 'catalogues' })} />
-        <MoreRow icon="flame" title="Specials" sub="What your shops have on special" onClick={() => nav.push({ name: 'specials' })} />
+        {/* 0.11.0: one way in to both (Specials was its own row); My catalogue and My specials open from it */}
+        <MoreRow icon="book" title="Catalogues and specials" sub="My catalogue, my specials and your shops' catalogues" onClick={() => nav.push({ name: 'catalogues' })} />
         <MoreRow
           icon="receipt"
           title="Receipts"

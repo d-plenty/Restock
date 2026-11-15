@@ -266,6 +266,32 @@ export const GIFT_CARDS_TABLE = `CREATE TABLE IF NOT EXISTS gift_cards (
  * server's srv_spend (spending.ts). This phone's own record: not in SYNCED, not in backups, not a
  * MIGRATIONS entry (a Restock server keeps its own, srv_spend). Erase everything empties it.
  */
+/**
+ * 0.11.0: what searches found (lib/seen.ts): one row for each product and day, on this phone only.
+ * Like spend_log it's made when the database opens, not as a migration: it isn't synced between
+ * phones, isn't in backups, and the Java side never reads it. `at` is when the row was written
+ * (ms), for sending new rows to a household's own Restock server.
+ */
+export const SEEN_TABLE = `CREATE TABLE IF NOT EXISTS seen_prices (
+  chain TEXT NOT NULL,
+  store_product_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  name TEXT NOT NULL,
+  brand TEXT,
+  size TEXT,
+  barcode TEXT,
+  image_url TEXT,
+  price REAL NOT NULL,
+  was_price REAL,
+  is_special INTEGER NOT NULL DEFAULT 0,
+  member_only INTEGER NOT NULL DEFAULT 0,
+  promo TEXT,
+  in_stock INTEGER,
+  at INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (chain, store_product_id, day)
+)`;
+export const SEEN_INDEX = 'CREATE INDEX IF NOT EXISTS seen_prices_at ON seen_prices(at)';
+
 export const SPEND_TABLE = `CREATE TABLE IF NOT EXISTS spend_log (
   entry_id TEXT NOT NULL,
   checked_at INTEGER NOT NULL,

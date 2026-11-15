@@ -57,11 +57,14 @@ function Tile({ label, big, sub }: { label: string; big: string; sub: string }) 
 const EMPTY_SPEND = 'Tick things off your shopping list and your spending shows up here.';
 
 /** "since March 2025", and 0.9.6's "90,000 imported" (a 0.9.5 server doesn't say). */
-function pricesSub(s: { prices: { first: string | null; imported?: number } } | undefined): string {
+function pricesSub(s: { prices: { first: string | null; imported?: number; searched?: number } } | undefined): string {
   if (!s) return '';
   const since = s.prices.first ? `since ${monthYear(s.prices.first)}` : 'none yet';
   const imported = Number(s.prices.imported) || 0;
-  return imported > 0 ? `${since}, ${imported.toLocaleString('en-AU')} imported` : since;
+  // 0.11.0: and what the phones' searches found (a server before 0.11.0 doesn't say)
+  const searched = Number(s.prices.searched) || 0;
+  const more = [imported > 0 ? `${imported.toLocaleString('en-AU')} imported` : '', searched > 0 ? `${searched.toLocaleString('en-AU')} from searches` : ''].filter(Boolean);
+  return more.length ? `${since}, ${more.join(', ')}` : since;
 }
 
 // ---------- price over time ----------

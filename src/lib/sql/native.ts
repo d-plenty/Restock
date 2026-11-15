@@ -28,6 +28,8 @@ export interface RestockNativePlugin {
   addListener(event: 'checkProgress', fn: (e: { done: number; total: number }) => void): Promise<PluginListenerHandle>;
   /** 0.10.0: this phone's earlier spending (spend_log rows) to the server, which adds the ones it hasn't got. */
   serverSpend(opts: { rows: Record<string, unknown>[] }): Promise<{ added: number; skipped: number }>;
+  /** 0.11.0: POST /api/v3/data/seen: what this phone's searches found, to the household's own server. */
+  serverSeen(opts: { rows: Record<string, unknown>[] }): Promise<{ added: number; skipped: number }>;
   /** 0.9.14: the Restock server's statistics, read as this phone (Your data): "/data/stats?period=3" and the like. */
   serverData(opts: { path: string }): Promise<Record<string, unknown>>;
   /** 0.9.14: Send prices back now (PriceShare.java): what this phone read from the shops since the last send. */

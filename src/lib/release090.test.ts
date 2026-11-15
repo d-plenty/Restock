@@ -115,7 +115,8 @@ describe('My catalogue', () => {
     // Coles' beans are on sale at $2.10, so that's the one Aldi beats.
     expect(aldi.deals.find((d) => d.rec.group.id === 'beans')?.note).toBe('$0.11 less than Coles');
     expect(aldi.deals.map((d) => d.rec.group.id).sort()).toEqual(['beans', 'oil', 'rice']);
-    expect(c.pages.find((x) => x.chain === 'woolworths')).toBeUndefined();
+    // 0.11.0: every shop you use has a page, even with little or nothing on it (it had none before).
+    expect(c.pages.find((x) => x.chain === 'woolworths')).toBeDefined();
   });
   it('runs Wednesday to Tuesday', () => {
     const w = specialsWeek(new Date(2026, 10, 9));

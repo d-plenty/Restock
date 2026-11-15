@@ -5736,3 +5736,68 @@ svg.icon-info {
   height: 56px;
   font-size: var(--fs-lg);
 }
+
+/* 0.11.0: Price checks → Custom: the days of the week as chips */
+.day-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.day-picks .chip {
+  min-width: 56px;
+  justify-content: center;
+}
+
+/* 0.11.0: Catalogues and specials: the way in to My specials, beside My catalogue's */
+.banner.specials-entry {
+  background: var(--surface);
+  border: 2px solid var(--green);
+  color: var(--ink);
+}
+/* 0.11.0: My specials: search and sort on one line, a shop's list closed until it's opened */
+.specials-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.specials-tools select.input {
+  height: 48px;
+}
+.shop-head > .specials-head + svg {
+  flex: none;
+  color: var(--ink-2);
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+}
+.shop-head.open > .specials-head + svg {
+  transform: rotate(-90deg);
+}
+.specials-head:disabled {
+  opacity: 1;
+}
+.specials-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--line);
+}
+@media (prefers-reduced-motion: reduce) {
+  .shop-head > .specials-head + svg {
+    transition: none;
+  }
+}
+.specials-entry .cat-kicker {
+  color: var(--green-ink);
+}
+.specials-entry .cat-entry-title {
+  color: var(--ink);
+}
+
+/* 0.11.0: the Pantry's count, under the last item */
+.pantry-count {
+  text-align: center;
+  margin: 4px 0 0;
+  font-weight: 600;
+}

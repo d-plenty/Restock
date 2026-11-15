@@ -9,8 +9,9 @@ interface Plan {
   time: string;
   weekday: number;
   now: string;
+  days?: number[];
 }
-const plan = (c: Plan) => ({ intervalHours: c.interval, time: c.time, weekday: c.weekday });
+const plan = (c: Plan) => ({ intervalHours: c.interval, time: c.time, weekday: c.weekday, days: c.days });
 const ms = (s: string | null) => (s === null ? undefined : Date.parse(s));
 const iso = (n: number | undefined) => (n === undefined ? null : new Date(n).toISOString());
 const same = (n: number | undefined, s: string | null) => expect(n === undefined ? null : n).toBe(s === null ? null : Date.parse(s));

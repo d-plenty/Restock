@@ -30,8 +30,19 @@ final class CheckSchedule {
     final int minuteOfDay;
     /** 0 = Sunday, as in the app. Only used when checking weekly. */
     final int weekday;
+    /**
+     * 0.11.0: the days of the week a check runs on, once at the set time (index 0 = Sunday), or
+     * null on a plan from before 0.11.0. When it's there it is the whole plan: intervalHours and
+     * weekday aren't looked at. No day ticked is off (manual only).
+     */
+    final boolean[] days;
 
     CheckSchedule(int intervalHours, int minuteOfDay, int weekday) {
+        this(intervalHours, minuteOfDay, weekday, null);
+    }
+
+    CheckSchedule(int intervalHours, int minuteOfDay, int weekday, boolean[] days) {
+        this.days = days != null && days.length == 7 ? days.clone() : null;
         this.intervalHours = intervalHours == 6 || intervalHours == 12 || intervalHours == 48 || intervalHours == 168 ? intervalHours : 24;
         this.minuteOfDay = minuteOfDay >= 0 && minuteOfDay < 1440 ? minuteOfDay : DEFAULT_MINUTE;
         this.weekday = weekday >= 0 && weekday <= 6 ? weekday : 3;
@@ -40,7 +51,36 @@ final class CheckSchedule {
     /** From the phone's settings JSON (a missing or unreadable time means 5:00 am). */
     static CheckSchedule fromSettings(JSONObject settings) {
         if (settings == null) return new CheckSchedule(24, DEFAULT_MINUTE, 3);
-        return new CheckSchedule(settings.optInt("checkIntervalHours", 24), parseTime(settings.optString("checkTime", "")), settings.optInt("checkWeekday", 3));
+        return new CheckSchedule(
+            settings.optInt("checkIntervalHours", 24),
+            parseTime(settings.optString("checkTime", "")),
+            settings.optInt("checkWeekday", 3),
+            daysOf(settings.optJSONArray("checkDays")));
+    }
+
+    /** 0.11.0: checkDays ([3, 6]) as seven flags, or null when the settings have none. */
+    static boolean[] daysOf(org.json.JSONArray a) {
+        if (a == null) return null;
+        boolean[] out = new boolean[7];
+        for (int i = 0; i < a.length(); i++) {
+            Object v = a.opt(i);
+            if (v instanceof Integer || v instanceof Long) {
+                long d = ((Number) v).longValue();
+                if (d >= 0 && d <= 6) out[(int) d] = true;
+            }
+        }
+        return out;
+    }
+
+    private int dayCount() {
+        int n = 0;
+        if (days != null) for (boolean b : days) if (b) n++;
+        return n;
+    }
+
+    /** 0.11.0: automatic checks are off (no day ticked): only Check now checks. */
+    boolean off() {
+        return days != null && dayCount() == 0;
     }
 
     /** "05:00" to minutes after midnight, or 5:00 am when it isn't a time. */
@@ -52,7 +92,9 @@ final class CheckSchedule {
     /** Minutes after midnight of the check slots on a day when this schedule checks (not looking at which day). */
     private List<Integer> minutesInDay() {
         List<Integer> out = new ArrayList<>();
-        if (intervalHours == 6 || intervalHours == 12) {
+        if (days != null) {
+            out.add(minuteOfDay);
+        } else if (intervalHours == 6 || intervalHours == 12) {
             int step = intervalHours * 60;
             for (int m = minuteOfDay % step; m < 1440; m += step) out.add(m);
         } else {
@@ -63,6 +105,7 @@ final class CheckSchedule {
 
     /** Does a check happen on this calendar day? */
     boolean checksOn(LocalDate d) {
+        if (days != null) return days[d.getDayOfWeek().getValue() % 7];
         if (intervalHours == 48) return Math.floorMod(d.toEpochDay(), 2L) == 0;
         if (intervalHours == 168) return d.getDayOfWeek().getValue() % 7 == weekday;
         return true;
@@ -106,7 +149,7 @@ final class CheckSchedule {
      * day so the catalogue day summary can still go out on the days nothing is checked.
      */
     Instant nextWake(Instant after, ZoneId zone) {
-        if (intervalHours != 168) return nextSlot(after, zone);
+        if (days != null ? dayCount() == 7 : intervalHours != 168) return nextSlot(after, zone);
         Instant day = at(after.atZone(zone).toLocalDate(), minuteOfDay, zone);
         if (!day.isAfter(after)) day = at(after.atZone(zone).toLocalDate().plusDays(1), minuteOfDay, zone);
         return day;
@@ -123,6 +166,11 @@ final class CheckSchedule {
 
     /** What the schedule is, so a change of settings or time zone can start from a clean slate. */
     String signature(ZoneId zone) {
+        if (days != null) {
+            StringBuilder b = new StringBuilder("days");
+            for (boolean d : days) b.append(d ? '1' : '0');
+            return b + "|" + minuteOfDay + "|" + zone.getId();
+        }
         return intervalHours + "|" + minuteOfDay + "|" + (intervalHours == 168 ? weekday : 0) + "|" + zone.getId();
     }
 }

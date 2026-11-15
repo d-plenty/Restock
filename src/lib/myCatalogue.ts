@@ -168,8 +168,10 @@ export function buildCatalogue(recs: Recommendation[], chains: string[], now = n
   return {
     from,
     to,
-    // A "cheapest here" page needs a few things on it to be worth a page.
-    pages: pages.filter((p) => (p.kind === 'sales' ? p.deals.length > 0 : p.deals.length >= 3)),
+    // 0.11.0: a page for every shop you use (before, a shop with no sales on your items and fewer
+    // than three things it's cheapest for had no page, so only the big three ever showed). A shop
+    // with nothing to show says so on its page.
+    pages,
     saving: [...bestSaving.values()].reduce((s, x) => s + x, 0),
     items: bestSaving.size,
     deals: sales.length,

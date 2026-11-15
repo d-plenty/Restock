@@ -362,9 +362,24 @@ export interface Settings {
    * With every 12 hours, this and 12 hours later. This phone's own: never shared with the household.
    */
   checkTime?: string;
-  /** How long price history is kept on the phone, in weeks. */
+  /** How long price history is kept on the phone, in weeks. 0.11.0: and what searches found (lib/seen.ts). */
   historyWeeks: number;
+  /**
+   * 0.11.0: "Keep search results for a different time": 8, 26 or 52 weeks of their own. Not set
+   * (the usual): the same as historyWeeks, and it follows when that changes.
+   */
+  searchKeepWeeks?: number;
   checkWeekday: number; // 0=Sun … 6=Sat, default 3 (Wed)
+  /**
+   * 0.11.0: the days automatic price checks run on (0 = Sunday), once at checkTime. Every day is all
+   * seven, twice a week is [3, 6] (Wednesday and Saturday, the default), and [] is off: only Check
+   * now checks. This phone's own. When it's set, checkIntervalHours and checkWeekday aren't used.
+   */
+  checkDays?: number[];
+  /** 0.11.0: "Custom" is picked, so its days and time show even when they match a preset. */
+  checkCustom?: boolean;
+  /** 0.11.0: moved to twice a week at 4:00 am once (the update from 0.10.x). */
+  checkMoved0110?: boolean;
   /** How the phone talks to the stores: direct with a hidden-browser backup, or always the browser. */
   connection: 'auto' | 'browser';
   /** Testing: ask Coles for your branch's prices and stock instead of its online store's. */
@@ -488,7 +503,9 @@ export const DEFAULT_SETTINGS: Settings = {
   sharePrices: 'yes',
   defaultThresholdPct: 10,
   checkIntervalHours: 24,
-  checkTime: '05:00',
+  checkTime: '04:00',
+  checkDays: [3, 6],
+  checkMoved0110: true,
   historyWeeks: 8,
   checkWeekday: 3,
   connection: 'auto',

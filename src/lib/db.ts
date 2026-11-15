@@ -16,7 +16,7 @@ import { changed } from './live';
 import { listLineWithoutCostco } from './costcoLocal';
 import { applyCustomSections, asListSection, isCustomSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, setShopTabs, shareTab, shopDef, type ListSection, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
-import { GIFT_CARDS_TABLE, migrate, SPEND_TABLE } from './sql/schema';
+import { GIFT_CARDS_TABLE, migrate, SEEN_INDEX, SEEN_TABLE, SPEND_TABLE } from './sql/schema';
 import { cleanGiftCard } from './giftCards'; // 0.9.6 (cards)
 import { toPicks } from './picks';
 import { checkSettings } from './settingsCheck';
@@ -35,6 +35,9 @@ export async function initDb(d: SqlDriver): Promise<void> {
   await d.run(GIFT_CARDS_TABLE);
   // 0.9.14: spending from ticks, this phone's own (schema.ts SPEND_TABLE).
   await d.run(SPEND_TABLE);
+  // 0.11.0: what searches found, this phone's own (schema.ts SEEN_TABLE).
+  await d.run(SEEN_TABLE);
+  await d.run(SEEN_INDEX);
 }
 
 /** Use a database without upgrading it yet (to back it up first, 0.8.0). */

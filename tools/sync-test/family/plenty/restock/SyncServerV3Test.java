@@ -651,6 +651,15 @@ public class SyncServerV3Test {
             report("D1 Your data sealed both ways: the stats open with the household's key, the spending goes in once",
                 st.optJSONObject("spending") == null || st.has("reqN") || spent.optInt("added", -1) != 1 || again.optInt("added", -1) != 0,
                 "stats " + (st.optJSONObject("spending") != null) + ", added " + spent.optInt("added", -1) + " then " + again.optInt("added", -1));
+            // 0.11.0: what a phone's searches found goes to the household's own server the same way (SyncHub.serverSeen).
+            String today = java.time.LocalDate.now().toString();
+            JSONObject seenRow = new JSONObject().put("chain", "coles").put("store_product_id", "123").put("day", today).put("name", "Wheat biscuits 1.2kg").put("price", 7).put("is_special", 1).put("barcode", "9300652010374");
+            JSONObject bad = new JSONObject().put("chain", "coles").put("store_product_id", "demo-1").put("day", today).put("name", "Sample").put("price", 1);
+            JSONObject took = s(v).open().postSealed("/data/seen", new JSONObject().put("rows", new org.json.JSONArray().put(seenRow).put(bad)), s(v).sealKey(), s(v).fileKeys());
+            JSONObject after = s(v).open().readSealed("/data/stats?period=3", s(v).sealKey(), s(v).fileKeys());
+            report("D2 what searches found, sealed to the household's server: one kept, the sample passed over, and counted with the prices",
+                took.optInt("added") != 1 || took.optInt("skipped") != 1 || after.optJSONObject("prices") == null || after.optJSONObject("prices").optInt("searched") != 1,
+                "added " + took.optInt("added") + ", skipped " + took.optInt("skipped") + ", counted " + (after.optJSONObject("prices") == null ? "?" : after.optJSONObject("prices").optInt("searched")));
         }
         String other = null;
         try {

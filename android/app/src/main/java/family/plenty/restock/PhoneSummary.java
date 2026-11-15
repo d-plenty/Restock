@@ -103,6 +103,16 @@ final class PhoneSummary {
         int every = whole(s, "checkIntervalHours", 1, 24 * 31, 12);
         checks.put("everyHours", every);
         if (every >= 168) checks.put("weekday", whole(s, "checkWeekday", 0, 6, 3));
+        // 0.11.0: checks run on set days at a set time ([] is off)
+        org.json.JSONArray checkDays = s.optJSONArray("checkDays");
+        if (checkDays != null) {
+            org.json.JSONArray days = new org.json.JSONArray();
+            boolean[] on = CheckSchedule.daysOf(checkDays);
+            for (int i = 0; i < 7; i++) if (on[i]) days.put(i);
+            checks.put("days", days);
+            int minute = CheckSchedule.parseTime(s.optString("checkTime", ""));
+            checks.put("time", String.format(java.util.Locale.ROOT, "%02d:%02d", minute / 60, minute % 60));
+        }
         checks.put("background", bool(o(s, "sync"), "backgroundActivity", true));
         String lastAt = text(s, "lastCheck", ISO);
         if (lastAt != null) checks.put("lastAt", lastAt);
@@ -138,6 +148,9 @@ final class PhoneSummary {
         out.put("backups", backups);
 
         out.put("historyWeeks", whole(s, "historyWeeks", 1, 520, 8));
+        // 0.11.0: search results kept for a time of their own (not set: as long as the price history)
+        Integer searchKeep = whole(s, "searchKeepWeeks", 1, 520, null);
+        if (searchKeep != null) out.put("searchKeepWeeks", searchKeep);
         JSONArray t = new JSONArray();
         for (String x : SyncEngine.ALL_TABS) if (tabs != null && tabs.contains(x)) t.put(x);
         out.put("tabs", t);

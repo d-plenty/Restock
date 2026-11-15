@@ -10,7 +10,7 @@ import { bothPrices, tiedWithBest, type Recommendation } from '../../lib/verdict
 import { chainName, LEARNING_DAYS } from '../../types';
 import { Hold, Icon, MoreInfo, stockWhere, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, Thumb, SearchField } from '../components';
 import { ActionInfoTag } from '../tagInfo';
-import { useNav } from '../nav';
+import { isMoreTab, useNav } from '../nav';
 import { SECTION_NAMES, type Section, slots } from '../../shops';
 import { confirmAction } from '../../lib/confirm';
 
@@ -204,7 +204,13 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       {full.indicator}
       {full.status}
       <div className="topbar">
-        <h1>{SECTION_NAMES[section]}</h1>
+        {/* 0.11.0: Bottle shop, Chemist and your own sections open from More, so they have a way back to it */}
+        {isMoreTab(section) && (
+          <button className="icon-btn" aria-label="Back" onClick={() => nav.setTab('more')}>
+            <Icon name="back" size={20} />
+          </button>
+        )}
+        <h1 style={isMoreTab(section) ? { fontSize: 24 } : undefined}>{SECTION_NAMES[section]}</h1>
         {recs.length > 0 && (
           editing ? (
             <button className="btn small primary" onClick={stopEditing}>
@@ -355,6 +361,15 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           </div>
         </section>
       ))}
+
+      {/* 0.11.0: how many items there are (before, ticking them all in Edit was the only way to count) */}
+      {recs.length > 0 && (
+        <p className="small pantry-count" role="status">
+          {shown.length === recs.length
+            ? `${recs.length.toLocaleString('en-AU')} item${recs.length === 1 ? '' : 's'}`
+            : `Showing ${shown.length.toLocaleString('en-AU')} of ${recs.length.toLocaleString('en-AU')} item${recs.length === 1 ? '' : 's'}`}
+        </p>
+      )}
 
       {editing && (
         <SelectBar
