@@ -296,6 +296,8 @@ export type ProductOrder = 'size' | 'cheapest' | 'name';
 
 export interface Settings {
   onboarded: boolean;
+  /** 0.12.0: false on a phone set up with the short setup, until its first search has asked "Where do you shop?". Unset: not asked (older phones, restores). */
+  shopsAsked?: boolean;
   /** Your store at each shop, by shop id. Look up with storeChoice(). */
   stores: Partial<Record<StoreChain, StoreChoice>>;
   /** The shops you use, in every section. */

@@ -28,9 +28,9 @@ const STEPS: Step[] = [
   },
   {
     tab: 'home',
-    find: '.tag',
+    find: '.irow-i',
     title: 'Every deal is checked',
-    text: 'Tags like GREAT DEAL, WAIT and FAKE SPECIAL come from each item’s price history. Tap any tag to see why.',
+    text: 'Each row shows one price and a word, like On special or Wait. Tap the i for the usual price, what you save and why.',
   },
   {
     tab: 'pantry',
@@ -39,10 +39,10 @@ const STEPS: Step[] = [
     text: 'Everything Restock watches for you. Swipe right to put it on your shopping list, or tap it for its prices at every shop.',
   },
   {
-    tab: 'add',
-    find: { text: 'Scan a barcode' },
+    tab: 'pantry',
+    find: '.big-add',
     title: 'Adding things',
-    text: 'Scan a barcode or search, tick what you buy at each shop that sells it, and Restock does the rest.',
+    text: 'Add to pantry searches your shops, or scan the barcode beside it. Pick the one you buy and Restock finds the same thing at your other shops.',
   },
   {
     tab: 'list',

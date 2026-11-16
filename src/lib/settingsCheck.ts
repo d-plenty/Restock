@@ -161,6 +161,8 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
 
   return compact<Settings>({
     onboarded: bool(s.onboarded, D.onboarded),
+    // 0.12.0: only ever false (a new phone, until its first search asks where you shop) or true
+    shopsAsked: maybeBool(s.shopsAsked),
     stores,
     // 0.9.7: Costco switched on in 0.9.6's own setting becomes one of the picked shops.
     enabledChains: (() => {

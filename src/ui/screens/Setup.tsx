@@ -13,6 +13,7 @@ import { useLive } from '../../lib/useLive';
 import { enabledIn, SECTION_NAMES, sectionOn, type CustomSection } from '../../shops';
 import { CustomStarts, customsInUse } from './CustomSections';
 import { checkAll } from '../../lib/permissions';
+import { ensureNotificationPermission } from '../../lib/notify';
 import { SELF_UPDATE } from '../../lib/updates';
 import { DEFAULT_SETTINGS } from '../../types';
 import { isNative } from '../../stores/http';
@@ -272,10 +273,13 @@ export function tileStatus(s: Settings, id: TileId, cover?: Cover): { text: stri
   return { text: id === 'backups' ? 'Off' : 'Not set up', ok: false };
 }
 
+/** 0.12.0: Bottle shop and Chemist have a tile only once they're switched on (they're starts under "Make a custom section" before that). */
+export const tilesFor = (s: Settings) => TILES.filter((t) => !isTabTile(t.id) || !!s.sections[t.id]);
+
 /** Tiles that still need a look: not done and not skipped. (Recall alerts are on by default, so they count as done.) */
 // Tiles still to go: not done, skipped, or already showing as set up (Keg on after a restore, say).
 export const tilesLeft = (s: Settings, cover?: Cover) =>
-  TILES.filter((t) => t.id !== 'recalls' && !s.setup.done.includes(t.id) && !s.setup.skipped.includes(t.id) && !tileStatus(s, t.id, cover).ok);
+  tilesFor(s).filter((t) => t.id !== 'recalls' && !s.setup.done.includes(t.id) && !s.setup.skipped.includes(t.id) && !tileStatus(s, t.id, cover).ok);
 
 /**
  * 0.8.5: tiles that are set up, whether or not anyone tapped Next on them: every permission
@@ -395,14 +399,9 @@ function Welcome({ onSetUp, onRestore, onJoin, onA11y }: { onSetUp: () => void; 
           <br />
           Prove it.
         </p>
-        <p className="welcome-desc">
-          Restock watches prices at the shops you choose, and tells you when a special is real, when to wait, and when to swap.
-        </p>
-        <p className="welcome-tag2">Find out if the special is really special.</p>
-        <p className="welcome-made">Made in Australia, for Australian shoppers</p>
+        {/* 0.12.0: three short lines; the rest is in Settings and Help. */}
+        <p className="welcome-desc">See if a special is really special, at the shops you use.</p>
         <p className="welcome-free">Free · no ads · no account</p>
-        {/* 0.9.4: local first, said up front. */}
-        <p className="welcome-made">Works without signal. Your list and pantry live on your phone. Only searching shops needs internet.</p>
         <div className="welcome-actions">
           <button className="welcome-go" onClick={onSetUp}>
             Set up
@@ -768,12 +767,12 @@ export function SetupTiles({
           <p className="sub">Three things to start with. Continue goes through them; the rest can wait, and it's all in Settings later.</p>
         </div>
       )}
-      <div className="setup-progress" aria-label={`${essDone} of ${ESSENTIAL.length} to get started`}>
+      <div className="setup-progress" aria-label={`${essDone} of ${ESSENTIAL.length} of the main three looked at`}>
         <div className="loading-bar">
           <span style={{ width: `${(essDone / ESSENTIAL.length) * 100}%` }} />
         </div>
         <span className="small">
-          {essDone === ESSENTIAL.length ? 'Ready to go' : `${essDone} of ${ESSENTIAL.length} to get started`}
+          {essDone === ESSENTIAL.length ? 'All set' : `${essDone} of ${ESSENTIAL.length} looked at`}
         </span>
       </div>
       {settings.privacyAccepted && (
@@ -783,8 +782,8 @@ export function SetupTiles({
       )}
       {/* 0.10.10: three to start with, then the rest (it was thirteen tiles in one grid) */}
       {[
-        { label: 'Start here', tiles: TILES.filter((t) => isEssential(t.id)) },
-        { label: 'More, when you want it', tiles: TILES.filter((t) => !isEssential(t.id)) },
+        { label: 'The main three', tiles: tilesFor(settings).filter((t) => isEssential(t.id)) },
+        { label: 'More, when you want it', tiles: tilesFor(settings).filter((t) => !isEssential(t.id)) },
       ].map((g) => (
         <div key={g.label} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <h2 className="eyebrow">{g.label}</h2>
@@ -861,18 +860,29 @@ function useTileWalk(onFinished: () => void) {
 
 // ---------- setup (first run) ----------
 
+/** 0.12.0: the agreement in three lines. Shared prices are on to start with, so it says so here. */
+const AGREE_POINTS: { icon: string; tone: string; title: string; text: string }[] = [
+  { icon: 'phone', tone: 'green', title: 'Your stuff stays on your phone', text: 'Your list, pantry and anything you type in. No account.' },
+  {
+    icon: 'swap',
+    tone: 'blue',
+    title: 'Shop prices are shared',
+    text: 'Shelf prices Restock reads from Coles, Woolworths and Aldi are sent on to help other shoppers. Nothing about you. You can turn it off in Settings.',
+  },
+  { icon: 'info', tone: 'amber', title: 'Prices can be wrong', text: "They come from the shops' websites. Check the shelf before you rely on one." },
+];
+
 export function Onboarding() {
   const settings = useLive(getSettings, []);
   // 0.10.7: accessibility comes straight after the welcome, before anything else is asked
-  const [stage, setStage] = useState<'welcome' | 'a11y' | 'privacy' | 'tiles' | 'restored'>('welcome');
-  /** Where Continue goes from the accessibility step: on through setup, or back to the welcome. */
-  const [a11yThen, setA11yThen] = useState<'privacy' | 'welcome'>('privacy');
+  const [stage, setStage] = useState<'welcome' | 'a11y' | 'privacy' | 'notify' | 'restored'>('welcome');
   // 0.8.2: joining a household from the first screen: privacy, then scan the owner phone's code.
   const [joiningHousehold, setJoiningHousehold] = useState(false);
   const [joinCode, setJoinCode] = useState<string>();
   const [joinedMsg, setJoinedMsg] = useState<string>();
   const [reading, setReading] = useState<'privacy' | 'disclaimer'>();
   const [picking, setPicking] = useState<BackupSummary>();
+  const [asking, setAsking] = useState(false);
   const nav = useNav();
   const fileRef = useRef<HTMLInputElement>(null);
   const finish = async () => {
@@ -893,12 +903,15 @@ export function Onboarding() {
         .catch((e) => nav.toast(e instanceof Error ? e.message : String(e)));
     }
   };
-  const walk = useTileWalk(() => void finish());
+  /** 0.12.0: the short setup's end: the rest is asked when it's first needed (your shops, on the first search). */
+  const firstFinish = async () => {
+    await updateSettings({ shopsAsked: false });
+    await finish();
+  };
   // Android's back button steps back through setup instead of closing Restock.
   useBackHandler(() => {
-    if (walk.open) return false; // the tile page handles it
-    if (stage === 'a11y' || stage === 'privacy' || stage === 'tiles') {
-      setStage(stage === 'tiles' ? 'privacy' : stage === 'privacy' ? 'a11y' : 'welcome');
+    if (stage === 'a11y' || stage === 'privacy' || stage === 'notify') {
+      setStage(stage === 'notify' ? 'privacy' : 'welcome');
       return true;
     }
     return false;
@@ -964,117 +977,137 @@ export function Onboarding() {
       <>
         <Welcome
           onSetUp={() => {
+            // 0.12.0: straight to the short agreement; accessibility is the button at the top.
             setJoiningHousehold(false);
-            setA11yThen('privacy');
-            setStage('a11y');
+            setStage('privacy');
           }}
           onRestore={() => fileRef.current?.click()}
           onJoin={() => {
             setJoiningHousehold(true);
-            setA11yThen('privacy');
-            setStage('a11y');
+            setStage('privacy');
           }}
-          onA11y={() => {
-            setA11yThen('welcome');
-            setStage('a11y');
-          }}
+          onA11y={() => setStage('a11y')}
         />
         {fileInput}
         {sheets}
       </>
     );
 
-  const tile = walk.open && TILES.find((t) => t.id === walk.open);
   return (
     <div className="screen" style={{ gap: 16 }}>
       {stage === 'a11y' && (
+        // 0.12.0: not a setup step any more: opened from the button on the welcome, and back to it.
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className="eyebrow green">Step 1</div>
             <h1>Make Restock easier to see and use</h1>
-            <p className="sub">Set these first, so the rest of setup is easy to read. You can change them any time in Settings → Accessibility.</p>
+            <p className="sub">You can change these any time in Settings → Accessibility.</p>
           </div>
           <AccessibilitySettings settings={settings} />
           <div className="spacer" />
-          <div className="two">
-            <button className="btn" onClick={() => setStage('welcome')}>
-              Back
-            </button>
-            <button
-              className="btn primary"
-              onClick={async () => {
-                const s = await getSettings();
-                if (!s.setup.done.includes('a11y')) await updateSettings({ setup: { ...s.setup, done: [...s.setup.done, 'a11y'] } });
-                setStage(a11yThen);
-              }}
-            >
-              {a11yThen === 'welcome' ? 'Done' : 'Continue'}
-            </button>
-          </div>
+          <button
+            className="btn primary block"
+            onClick={async () => {
+              const s = await getSettings();
+              if (!s.setup.done.includes('a11y')) await updateSettings({ setup: { ...s.setup, done: [...s.setup.done, 'a11y'] } });
+              setStage('welcome');
+            }}
+          >
+            Done
+          </button>
         </>
       )}
       {stage === 'privacy' && (
+        // 0.12.0: the short version and one button; the full documents open from the two rows.
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className="eyebrow green">Privacy and security</div>
-            <h1>Your data stays yours</h1>
-            <p style={{ fontWeight: 600, margin: 0 }}>{legal.privacy.tagline}</p>
-            <p className="sub">{legal.privacy.intro}</p>
+            <h1>Before you start</h1>
+            <p className="sub">The short version. The full documents are one tap away.</p>
           </div>
-          <div className="card">
-            <div className="title">In short</div>
-            <ul className="ticks">
-              {legal.privacy.summary.map((s) => (
-                <li key={s}>
-                  <Icon name="check" size={16} />
-                  <span>{s}</span>
-                </li>
-              ))}
-            </ul>
-            <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => setReading('privacy')}>
-              Read the full privacy policy
+          <ul className="agree-points">
+            {AGREE_POINTS.map((pt) => (
+              <li key={pt.title}>
+                <span className={`agree-ic ${pt.tone}`} aria-hidden="true">
+                  <Icon name={pt.icon} size={22} />
+                </span>
+                <span>
+                  <strong>{pt.title}</strong>
+                  <span className="small">{pt.text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="card flush">
+            <button className="row" onClick={() => setReading('disclaimer')}>
+              <span className="grow title">User agreement</span>
+              <Icon name="chevron" size={18} />
             </button>
-          </div>
-          <div className="card">
-            <div className="title">The fine print</div>
-            <ul className="ticks">
-              {legal.disclaimer.summary.map((s) => (
-                <li key={s}>
-                  <Icon name="info" size={16} />
-                  <span>{s}</span>
-                </li>
-              ))}
-            </ul>
-            <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => setReading('disclaimer')}>
-              Read the fine print
+            <button className="row" onClick={() => setReading('privacy')}>
+              <span className="grow title">Privacy policy</span>
+              <Icon name="chevron" size={18} />
             </button>
           </div>
           <div className="spacer" />
-          <div className="two">
-            <button className="btn" onClick={() => setStage('a11y')}>
-              Back
-            </button>
-            <button
-              className="btn primary"
-              onClick={async () => {
-                await updateSettings({ privacyAccepted: legal.updated });
-                if (!joiningHousehold) return setStage('tiles');
-                if (!isNative()) return nav.toast('Joining a household works in the Android app.');
-                const code = await scanPairingCode();
-                if (code) setJoinCode(code);
-              }}
-            >
-              I understand
-            </button>
-          </div>
+          <button
+            className="btn primary block agree-go"
+            onClick={async () => {
+              await updateSettings({ privacyAccepted: legal.updated });
+              if (!joiningHousehold) return setStage('notify');
+              if (!isNative()) return nav.toast('Joining a household works in the Android app.');
+              const code = await scanPairingCode();
+              if (code) setJoinCode(code);
+            }}
+          >
+            I agree
+          </button>
+          <p className="small" style={{ textAlign: 'center', margin: 0 }}>
+            By tapping I agree, you accept the user agreement and privacy policy.
+          </p>
         </>
       )}
 
-      {stage === 'tiles' && !tile && (
-        <SetupTiles settings={settings} onOpen={walk.setOpen} onLater={() => void finish()} onContinue={() => void walk.next(undefined)} onFinish={() => void finish()} />
-      )}
-      {stage === 'tiles' && tile && (
-        <TilePage tile={tile} settings={settings} onBack={() => walk.setOpen(undefined)} onNext={(how) => void walk.next(tile.id, how)} />
+      {stage === 'notify' && (
+        // 0.12.0: the one permission asked up front. Camera and location are asked when first used.
+        <>
+          <div className="notify-ask">
+            <span className="notify-bell" aria-hidden="true">
+              <Icon name="bell" size={44} />
+            </span>
+            <h1>Want a heads-up on real specials?</h1>
+            <p className="sub">Restock tells you when something you buy drops to a good price. Nothing else.</p>
+            <div className="card notify-eg" aria-label="Example notification">
+              <Logo size={40} />
+              <span>
+                <span className="eyebrow">Example</span>
+                <strong>Coffee beans 1kg is $18</strong>
+                <span className="small">Lowest in 8 weeks at Coles</span>
+              </span>
+            </div>
+          </div>
+          <div className="spacer" />
+          <button
+            className="btn primary block agree-go"
+            disabled={asking}
+            onClick={async () => {
+              setAsking(true);
+              try {
+                if (isNative()) await ensureNotificationPermission();
+                const s = await getSettings();
+                await updateSettings({ setup: { ...s.setup, done: [...new Set([...s.setup.done, 'alerts'])] } });
+              } finally {
+                setAsking(false);
+              }
+              await firstFinish();
+            }}
+          >
+            Turn on notifications
+          </button>
+          <button className="btn ghost block" disabled={asking} onClick={() => void firstFinish()}>
+            Not now
+          </button>
+          <p className="small" style={{ textAlign: 'center', margin: 0 }}>
+            Change this any time in Settings.
+          </p>
+        </>
       )}
 
       {stage === 'restored' && (
@@ -1136,7 +1169,7 @@ export function SetupScreen() {
       {!tile && (
         <>
           <TopBar title="Setup" />
-          <p className="sub">Everything from first setup, in one place. Tap a tile to change it.</p>
+          <p className="sub">Nothing here has to be done first: Restock asks for each thing when it's needed. Tap a tile to set it now.</p>
           <SetupTiles
             settings={settings}
             inSettings

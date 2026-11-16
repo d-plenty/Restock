@@ -971,3 +971,8 @@ Nothing. Fixes only (the Shopping list's buttons, search boxes, big text, Dan Mu
 - **New shops** (chains), all read from their websites: `foodworks`, `drakes`, `harrisfarm`, `spudshed`, `foodland`, `nqr`, `supabarn` (Pantry); `liquorlegends`, `bottlemart` (Bottle shop); `babykingdom`, `babyland`, `babyvillage` (Baby); `bestfriendspets`, `peto`, `budgetpet`, `petquarters` (Pets); and, with Pets as the tab their products are shared with unless `shopTabs` says otherwise, `supercheap`, `repco`, `autobarn`, `autopro`, `burson`, `mitre10`, `totaltools`, `sydneytools`, `homehardware`, `bcf`, `anaconda`, `kings`, `tentworld`, `kathmandu`, `rebel`, `decathlon`, `jbhifi`, `officeworks`, `goodguys`, `harveynorman`, `binglee`, `spotlight`, `lincraft`, `ikea`, `adairs`, `pillowtalk`, `mecca`, `adorebeauty`, `rejectshop`, `cheapaschips`, `reddot`. A phone or server before 0.11.3 doesn't know them: it keeps their products and prices, and shows the shop as "Other shop".
 - **Shared prices** (restock-prices, not this server): `costco` is no longer sent or downloaded. What searches find still goes to the household's own server for every shop, Costco included.
 - **Kept on a phone only** (not synced, not sent): kv `shelfWatch`, what that phone's price checks noticed about a product besides its price (a pack that changed size, a product its shop no longer lists).
+
+## 0.12.0: what changed on the wire
+
+- Nothing in how phones and the server talk. 0.12.0 is a change to the screens.
+- **Kept on a phone only** (not synced, not sent): the setting `shopsAsked` (`false` on a phone set up with the short setup, until its first search has asked "Where do you shop?"; unset on older phones and restores).

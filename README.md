@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.11.3" src="https://img.shields.io/badge/status-release%20candidate%200.11.3-ffcd00">
+  <img alt="Release candidate 0.12.0" src="https://img.shields.io/badge/status-release%20candidate%200.12.0-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0113">New in 0.11.3</a> ·
+  <a href="#new-in-0120">New in 0.12.0</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -101,8 +101,8 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Costco** (off until you pick it with your supermarkets): everything Costco sells online, next to Woolworths, Coles and Aldi, shared with your household and server like any shop. Sign in to Costco in the app for member prices (optional). Restock only checks Costco when you search, one page at a time, like you browsing its website. Costco's website terms don't allow automated collection, so it's your choice to switch it on. Prices are Costco's online prices, which include delivery, so the warehouse can differ. If Costco changes or blocks its website, its prices stop until that's sorted. The shelf price in the warehouse can be typed in by hand.
 - **Any other shop**: add its website and Restock finds its search page and reads the products and prices, with Save and test to check it works.
 - **Pantry**: each item has My picks (what you buy at each shop, which can differ shop to shop) and Would also take (others you'd buy when they're cheaper, for Swap & save), on This size or Any size, and shops marked Not at this shop. Listed by shop then size, cheapest first, or A to Z. Swipe to add to your list or delete.
-- **Add**: search all your shops at once. Tap a result to tick it into the bar at the bottom ("1 ticked · tap to add"); nothing jumps up in your way. The green arrow opens the details (name, and Picked for you at your other shops) when you're ready.
-- **Picked for you**: tick a product from a search and Restock searches your other shops again for the same product, or the ones most like it in kind, size and price, ready to tick.
+- **Add**: from Home's search box, a tab's **Add to pantry**, or the barcode button beside either. It searches the shops of the tab you're on. Tap the one you buy and a sheet shows your pick at each shop, ready to add.
+- **Picked for you**: pick a product and Restock searches your other shops again for the same product, or the one closest to it in name, kind, size and price. Each says how sure it is, and has Change.
 - **Search**: ranked by what you most likely mean: type "butter" and butter comes first, with peanut butter and butter chicken sauce further down; children's medicines only when you ask for them. Unit prices worked out the same way everywhere, a best-value sort, "On special only", recent searches, and fixes for Aussie names (snags, loo paper).
 - **Scanning**: zxing-cpp inside the app. Normal barcodes, GS1 QR codes, Data Matrix and DataBar, from the camera or a photo, or type the number. **Scan several** walks your cupboard and fills your shopping list. Unknown barcodes fall back to the supermarkets' own data, a general search (an ingredient and strength for medicines) or reading the front of the pack.
 - **Best match**: after a scan, the same product (brand, variant and size) is ticked at each shop. If the barcode only names the brand, you pick which one it is once and Restock ticks it everywhere and remembers.
@@ -139,6 +139,21 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.12.0
+
+A simpler look, from what people said after trying it: too much to set up, too much writing, too many numbers.
+
+- **Setup is three taps.** Welcome, a short "Before you start" with **I agree**, then notifications. Then Home. The full user agreement and privacy policy open from two rows on that screen. Everything else is asked the first time it's needed, or is in **Settings → Setup**.
+- **Accessibility** is the orange button at the top of the welcome screen, any time, not a setup step.
+- **"Where do you shop?"** is asked once, by a new phone's first search: Woolworths, Coles and Aldi to tick, and a link to every other shop. None is ticked for you.
+- **Four tabs: Home, Pantry, List and More.** The Add button in the middle is gone. Home has a search box and a barcode button; Pantry (and each of your other tabs) has **Add to pantry** with the barcode beside it; the shopping list's box says **Add to shopping list**.
+- **Simpler rows.** Home, Pantry and search results show the photo, the name, the shop, one price and a word about it ("On special", "Wait for a better special", "Smaller pack"). The **i** on each row opens the rest: the usual price, what you save, the unit price, the lowest Restock has seen, and the price at your other shops.
+- **Pick one, then check.** Tap a search result and Restock finds the same thing at your other shops. The sheet shows your pick at each shop: **Good match**, **Closest found · check it**, or **Nothing close**, each with **Change** (that shop's own results, with "… doesn't sell it"). One button adds it. A shop that didn't answer says so, and isn't counted as not selling it.
+- **Search results** start with a few from each shop together, with a chip for each shop to see only its results, sorted your way as before.
+- **A new phone's Home** shows this week's half-price lists from Woolworths and Coles, so there's something to tap straight away; **+** searches your shops for it.
+- **Bottle shop and Chemist** are no longer offered in setup or as their own rows in Settings on a phone that hasn't switched them on: they're two of the starts under **Settings → Make a custom section**. If you have them on, nothing changes.
+- **After adding from a search you stay on the search**, ready for the next thing, with Undo on the message. It used to open the new item's page.
 
 ## New in 0.11.3
 
@@ -501,7 +516,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.11.3.apk` (on macOS, `shasum -a 256 restock-0.11.3.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.0.apk` (on macOS, `shasum -a 256 restock-0.12.0.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

@@ -30,6 +30,12 @@ export type Screen =
       replaceEntry?: string;
       /** 0.10.7: matching a barcode from Scan several: after saving, back to that list. */
       fromScans?: boolean;
+      /** 0.12.0: opened from a tab's "Add to pantry": one button at the end, no pantry-or-list question. */
+      toPantry?: boolean;
+      /** 0.12.0: opened from a barcode button: the scanner starts straight away. */
+      scan?: boolean;
+      /** 0.12.0: opened from a special: this product is picked once its shop answers. */
+      preTick?: { chain: StoreChain; storeProductId: string; product?: import('../stores').StoreProduct };
     }
   /** 0.10.7: Scan several, and the barcodes still to match. */
   | { name: 'scanned'; section?: Section; start?: boolean }

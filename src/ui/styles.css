@@ -1791,7 +1791,8 @@ table.nutrition td.num {
   position: fixed;
   inset: 0;
   background:
-    linear-gradient(to bottom, transparent 0, transparent 58%, rgba(1, 24, 80, 0.55) 66%, rgba(1, 24, 80, 0.55) 88%, transparent 100%),
+    /* 0.12.0: the wash starts just under the Union Jack, where the words now sit */
+    linear-gradient(to bottom, transparent 0, transparent 49%, rgba(1, 24, 80, 0.55) 56%, rgba(1, 24, 80, 0.55) 88%, transparent 100%),
     radial-gradient(ellipse at 50% 48%, rgba(1, 24, 80, 0.88) 0, rgba(1, 24, 80, 0.72) 45%, rgba(1, 24, 80, 0.45) 100%);
 }
 .welcome-body {
@@ -1805,7 +1806,7 @@ table.nutrition td.num {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: calc(var(--top) + clamp(16px, 5vh, 56px)) 22px calc(var(--bottom) + 20px);
+  padding: calc(var(--top) + clamp(68px, 10vh, 104px)) 22px calc(var(--bottom) + 20px);
 }
 .welcome-body svg {
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
@@ -1833,7 +1834,8 @@ table.nutrition td.num {
   color: var(--gold);
 }
 .welcome-desc {
-  margin: 14px 0 0;
+  /* 0.12.0: below the Union Jack (the top half of the screen), where it reads against plain navy */
+  margin: clamp(20px, calc(52vh - 372px), 110px) 0 0;
   font-size: var(--fs-lg);
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.86);
@@ -1862,7 +1864,7 @@ table.nutrition td.num {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 6px;
 }
 .welcome-go {
   width: 100%;
@@ -1885,6 +1887,8 @@ table.nutrition td.num {
   text-decoration: underline;
   text-underline-offset: 3px;
   padding: 6px;
+  /* 0.12.0: a full finger's height (they were 31 px) */
+  min-height: var(--hit);
 }
 
 /* ---------- setup tiles ---------- */
@@ -4458,15 +4462,16 @@ button.sync-choice:disabled {
   .welcome-hello { margin-top: 14px; font-size: var(--fs-body); }
   .welcome-brand { font-size: calc(var(--fs-display) * 0.85); }
   .welcome-tag { margin-top: 10px; font-size: var(--fs-2xl); }
-  .welcome-desc { margin-top: 10px; font-size: var(--fs-body); }
+  .welcome-desc { margin-top: clamp(10px, calc(52vh - 300px), 90px); font-size: var(--fs-body); }
   .welcome-tag2 { margin-top: 10px; font-size: var(--fs-lg); }
   .welcome-made { margin-top: 14px; font-size: var(--fs-md); }
   .welcome-free { font-size: var(--fs-md); }
-  .welcome-actions { padding-top: 18px; gap: 8px; }
+  .welcome-actions { padding-top: 18px; gap: 4px; }
   .welcome-go { padding: 15px; }
 }
 @media (max-height: 680px) {
   .welcome-body svg { width: 64px; height: 64px; }
+  .welcome-desc { margin-top: calc(52vh - 268px); }
   .welcome-tag2 { display: none; }
 }
 html.on-welcome,
@@ -5335,16 +5340,18 @@ html.on-welcome #root {
   top: calc(var(--top, 0px) + 12px);
   right: 16px;
   min-height: var(--hit);
-  padding: 0 14px;
+  padding: 0 16px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   border-radius: var(--r-full);
-  border: 1.5px solid var(--on-navy-line);
-  background: var(--brand-navy);
-  color: var(--white);
+  border: none;
+  /* 0.12.0: orange, so it's seen first, and the logo starts below it (welcome-body's padding) */
+  background: var(--a11y-orange);
+  color: var(--brand-navy);
   font: inherit;
   font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* 0.10.7: shops on a map */
@@ -5883,4 +5890,501 @@ svg.icon-info {
   padding: 10px 14px;
   border-radius: var(--r-md);
   background: var(--card);
+}
+
+/* ================= 0.12.0: the simpler look ================= */
+
+/* One row everywhere: photo, name, shop, one price and a word; "i" and one button at the end. */
+.irow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 12px;
+  min-height: 76px;
+  min-width: 0;
+}
+.card.flush > .irow ~ .irow,
+.card.flush > .holdable ~ .holdable > .irow {
+  border-top: 1px solid var(--line-soft);
+}
+.irow.picked {
+  background: var(--green-bg);
+}
+.irow-hit {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: none;
+  padding: 0;
+}
+.irow > .thumb {
+  width: 56px;
+  height: 56px;
+  position: relative;
+  pointer-events: none;
+}
+.irow > .pick {
+  position: relative;
+  pointer-events: none;
+  flex: none;
+}
+.irow-text {
+  position: relative;
+  pointer-events: none;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.irow-name {
+  font-size: var(--fs-body);
+  font-weight: 700;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.irow-shop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  min-width: 0;
+}
+.irow-price {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 8px;
+}
+.irow-price .num {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+.irow-note {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.irow-note.good {
+  color: var(--green-ink);
+}
+.irow-note.warn {
+  color: var(--amber-ink);
+}
+.irow-note.plain {
+  color: var(--muted);
+  font-weight: 600;
+}
+.irow-i {
+  position: relative;
+  flex: none;
+  width: var(--hit);
+  height: var(--hit);
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--blue);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-full);
+}
+.irow > .cart-btn,
+.irow > .btn {
+  position: relative;
+}
+.plus-btn {
+  position: relative;
+  flex: none;
+  width: var(--hit);
+  min-width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border-radius: var(--r-md);
+  background: var(--green-solid);
+  color: var(--on-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+span.plus-btn {
+  pointer-events: none;
+}
+.plus-btn.on {
+  background: var(--green-ink);
+}
+/* A swipeable row (Pantry) holds one: the swipe keeps its own edge-to-edge box. */
+.swipe > .row.irow-swipe {
+  padding: 0;
+  gap: 0;
+  align-items: stretch;
+}
+.irow-swipe > .irow {
+  flex: 1;
+}
+
+/* Home's search and barcode; a tab's one add button. */
+.add-bar {
+  display: flex;
+  gap: 8px;
+}
+.add-bar > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.add-bar-scan,
+.btn.add-bar-scan {
+  flex: none;
+  width: 52px;
+  min-width: 52px;
+  padding: 0;
+}
+.big-add {
+  display: flex;
+  gap: 8px;
+}
+.big-add > .btn.primary {
+  flex: 1;
+  min-width: 0;
+  height: 56px;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+.btn.big-add-scan {
+  flex: none;
+  width: 56px;
+  min-width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 2px solid var(--green);
+  color: var(--green);
+}
+.home-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.home-group > h2 {
+  margin: 0;
+}
+.eyebrow.blue {
+  color: var(--blue);
+}
+.card.home-list-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  min-height: 64px;
+}
+.home-list-row .grow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.banner.first-banner {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.banner.first-banner .big {
+  font-size: var(--fs-xl);
+}
+
+/* What the "i" opens. */
+.pinfo-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pinfo-head .grow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pinfo-shop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+.pinfo-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  background: var(--sunken);
+  font-size: var(--fs-md);
+}
+.pinfo-verdict strong {
+  font-size: var(--fs-lg);
+}
+.pinfo-verdict.good {
+  background: var(--green-bg);
+}
+.pinfo-verdict.good strong {
+  color: var(--green-ink);
+}
+.pinfo-verdict.warn {
+  background: var(--amber-bg);
+}
+.pinfo-verdict.warn strong {
+  color: var(--amber-ink);
+}
+.pinfo-rows {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+.pinfo-rows > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 14px;
+}
+.pinfo-rows > div + div {
+  border-top: 1px solid var(--line-soft);
+}
+.pinfo-rows dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+}
+.pinfo-rows dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+.pinfo-rows dd.big {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+
+/* The short setup: agree, then notifications. */
+.agree-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.agree-points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.agree-points li > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.agree-points strong {
+  font-size: var(--fs-lg);
+}
+.agree-ic {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.agree-ic.green {
+  background: var(--green-bg);
+  color: var(--green-ink);
+}
+.agree-ic.blue {
+  background: var(--blue-bg);
+  color: var(--blue);
+}
+.agree-ic.amber {
+  background: var(--amber-bg);
+  color: var(--amber-ink);
+}
+.btn.agree-go {
+  height: 58px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+.notify-ask {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding-top: clamp(8px, 6vh, 56px);
+}
+.notify-ask h1 {
+  margin: 8px 0 0;
+}
+.notify-bell {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--r-full);
+  background: var(--green-bg);
+  color: var(--green-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.card.notify-eg {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  width: 100%;
+  margin-top: 8px;
+}
+.notify-eg > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Adding: your pick at each shop. */
+.search-shops {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  margin: 0;
+}
+.banner.shop-miss {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-sm);
+}
+.card.change-head {
+  gap: 8px;
+}
+.match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.match-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.match-card.anchor {
+  border: 2px solid var(--green);
+}
+.match-card.none {
+  border-style: dashed;
+  border-color: var(--dash);
+}
+.match-card .grow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.match-card .thumb {
+  width: 56px;
+  height: 56px;
+}
+.match-lab {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.match-lab.good {
+  color: var(--green-ink);
+}
+.match-lab.warn {
+  color: var(--amber-ink);
+}
+.match-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.match-price {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+.match-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.where-shops {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.where-shop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 0 16px;
+  border: 2px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+.where-shop.on {
+  border-color: var(--green);
+}
+.where-shop .grow {
+  flex: 1;
+}
+.where-shop input {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--green-solid);
+}
+
+.match-lab .dot {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+
+/* 0.12.0: the edit bar (Pantry and the list) in the same family as everything else: a white card
+   with the green outline, like the bar that says what you've picked. It was a dark navy slab. */
+.selectbar {
+  bottom: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 2px solid var(--green);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+}
+.selectbar .chip {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line-2);
 }

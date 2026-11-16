@@ -58,6 +58,8 @@
   --brand-gold: #ffcd00;
   --brand-green: #007a38;
   --brand-cream: #f6f4ea;
+  /* 0.12.0: the Accessibility button on the welcome screen (navy text on it: 6.9 to 1). */
+  --a11y-orange: #ff9f1c;
   --white: #ffffff;
   --black: #000000;
   /* Text on white panels that stay white in dark mode (the web's Undo, photo boxes). */

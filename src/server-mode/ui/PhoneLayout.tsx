@@ -67,21 +67,12 @@ function PhoneTabs() {
   const tabs = BAR;
   const shown: Tab = isSectionTab(nav.tab) && !on.includes(nav.tab) ? 'pantry' : nav.tab;
   const inMore = more || isMoreTab(shown);
-  // 0.10.10: Add in the middle, as on the Android app (it was only a small + on the Pantry page).
-  const n = tabs.length + 2;
-  const adding = !inMore && nav.tab === 'add';
+  // 0.12.0: no Add in the middle, as on the Android app: each page has its own add button.
+  const n = tabs.length + 1;
   return (
     <nav ref={bar} className="tabs pt-tabs" aria-label="Main" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
       {tabs.map((t) => (
         <Fragment key={t.id}>
-          {t.id === 'list' && (
-            <button className="tab centre-add" aria-current={adding ? 'page' : undefined} onClick={() => nav.setTab('add')}>
-              <span className="bubble">
-                <Icon name="plus" size={26} stroke={2.4} />
-              </span>
-              Add
-            </button>
-          )}
           <button
             className={`tab${t.id === 'pharmacy' ? ' pharm' : ''}`}
             aria-current={!inMore && shown === t.id ? 'page' : undefined}

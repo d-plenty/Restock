@@ -14,7 +14,7 @@ import { SHARE_TABS, shareTab } from './Sync';
  * 0.8.5: the household started sharing a tab this phone doesn't (the owner turned on Pharmacy,
  * say): ask once whether to share it here too.
  */
-function TabOffer({ settings }: { settings: Settings }) {
+export function TabOffer({ settings }: { settings: Settings }) {
   const nav = useNav();
   const [info, setInfo] = useState<SyncInfo>();
   useEffect(() => {

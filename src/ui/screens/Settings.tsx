@@ -35,7 +35,7 @@ import { ReceiptsSettings } from './Receipts';
 import { recallSummary } from './Recalls';
 import { ComingSoon } from './Soon';
 import { WidgetSettings } from './WidgetSettings';
-import { ESSENTIAL, TILES, isEssential, tileStatus } from './Setup';
+import { TILES, isEssential, tileStatus } from './Setup';
 import { startTour } from '../Tour';
 import { getHealth, testConnections, type ConnectionTest, type StoreChain } from '../../lib/health';
 import { useNav } from '../nav';
@@ -294,7 +294,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       {on('hub') && (
         <>
           <div className="card flush">
-            {row('Setup', ((n) => (n ? `${n} of ${ESSENTIAL.length} still to do to get started` : 'Ready to go · more to set up when you want it'))(TILES.filter((t) => isEssential(t.id) && !tileStatus(settings, t.id, syncShown).ok).length), () => nav.push({ name: 'setup' }))}
+            {row('Setup', ((n) => (n ? 'Your shops, alerts and permissions, when you want them' : 'All set · more to set up when you want it'))(TILES.filter((t) => isEssential(t.id) && !tileStatus(settings, t.id, syncShown).ok).length), () => nav.push({ name: 'setup' }))}
           </div>
           <div className="eyebrow" id="s-stores">
             Your shops
@@ -303,12 +303,13 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             {/* 0.9.8: one row per tab of My shops; sign-ins and stock are on each shop's own row there. 0.9.14: each says its tab. */}
             {row('Supermarkets (Pantry tab)', `${shopSummary(settings, 'pantry')} · ${shopAccountsSummary(settings)}`, () => nav.push({ name: 'stores', section: 'pantry' }))}
             {/* 0.10.12: Beta is said on each one's page (and in Setup), not on these rows. */}
-            {row('Bottle shops', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
-            {row('Chemists', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
+            {/* 0.12.0: Bottle shops and Chemists show once they're switched on; before that they're two of the starts under "Make a custom section" */}
+            {settings.sections.keg && row('Bottle shops', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
+            {settings.sections.pharmacy && row('Chemists', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
             {/* 0.10.7: each custom section (Baby and Pets are custom sections now), then making another */}
             {customsInUse(settings).map((c) => row(SECTION_NAMES[c], shopSummary(settings, c), () => nav.push({ name: 'stores', section: c })))}
             {customsInUse(settings).length < MAX_CUSTOM &&
-              row('Make a custom section', 'Compare pet shops, tools, automotive, baby products and more · Beta', () => setNewCustom(true))}
+              row('Make a custom section', 'Bottle shops, chemists, pet shops, tools, automotive and more · Beta', () => setNewCustom(true))}
           </div>
           {newCustom && <NewCustomSheet onClose={() => setNewCustom(false)} />}
         </>

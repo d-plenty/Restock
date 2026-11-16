@@ -124,7 +124,13 @@ export async function makeCustomSection(def: CustomDef, want?: CustomSection): P
 }
 
 /** The starts to pick from (and "Your own"): makes the section, then onMade (More, Settings, setup). */
-export function CustomStarts({ onMade }: { onMade: (id: CustomSection) => void }) {
+/** 0.12.0: the two tabs Restock has always had besides Pantry, offered beside the custom starts. */
+const BUILT_IN: { id: 'keg' | 'pharmacy'; name: string; about: string; colour: string }[] = [
+  { id: 'keg', name: 'Bottle shop', about: 'Beer, wine and spirits at the bottle shops you pick', colour: 'amber' },
+  { id: 'pharmacy', name: 'Chemist', about: 'Medicine, first aid and personal care at the chemists you pick', colour: 'green' },
+];
+
+export function CustomStarts({ onMade, onBuiltIn }: { onMade: (id: CustomSection) => void; /** Bottle shop or Chemist: open its shops page. Left out: they aren't offered. */ onBuiltIn?: (id: 'keg' | 'pharmacy') => void }) {
   const [busy, setBusy] = useState(false);
   const [full, setFull] = useState(false);
   const saved = useLive(getSaved, []);
@@ -149,6 +155,21 @@ export function CustomStarts({ onMade }: { onMade: (id: CustomSection) => void }
         </p>
       )}
       <div className="card flush">
+        {/* 0.12.0: Bottle shop and Chemist are offered here, with the other sections you can add (they were their own rows in Settings and tiles in setup) */}
+        {(onBuiltIn ? BUILT_IN : []).filter((b) => saved && !saved.sections?.[b.id]).map((b) => (
+          <button key={b.id} className="row" disabled={busy} onClick={() => onBuiltIn?.(b.id)}>
+            <span className={`custom-mark tile-colour-${b.colour}`}>
+              <Icon name={b.id} size={22} />
+            </span>
+            <span className="grow">
+              <span className="title" style={{ fontSize: 15 }}>
+                {b.name}
+              </span>
+              <span className="small">{b.about}</span>
+            </span>
+            <Icon name="plus" size={18} />
+          </button>
+        ))}
         {presets.map((p) => (
           <button key={p.def.name} className="row" disabled={busy} onClick={() => void make(p.def, p.slot)}>
             <span className={`custom-mark tile-colour-${p.def.colour}`}>
@@ -186,13 +207,18 @@ export function NewCustomSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet title="Make a custom section" titleTag={<BetaTag />} onClose={onClose}>
       <p className="small" style={{ margin: 0 }}>
-        Compare any shops you like: pet shops, tools, automotive, baby things and more. Give it a name, a colour and an icon, then pick its shops.
+        Compare any shops you like: bottle shops, chemists, pet shops, tools, automotive and more. Pick a start, then its shops.
       </p>
       <p className="small" role="note" style={{ margin: 0 }}>
         {CUSTOM_BETA_NOTE}
       </p>
       <CustomStarts
         onMade={(id) => {
+          onClose();
+          nav.push({ name: 'settings' });
+          nav.push({ name: 'stores', section: id });
+        }}
+        onBuiltIn={(id) => {
           onClose();
           nav.push({ name: 'settings' });
           nav.push({ name: 'stores', section: id });

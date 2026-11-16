@@ -1,10 +1,8 @@
 import { greeting, todayText } from '../../lib/greeting';
-import { flavourNoteFor } from '../../lib/flavours';
 import { useState } from 'react';
 import { refreshText, useFullRefresh } from '../refresh';
 import { allCards, allListEntries, getSettings, updateSettings } from '../../lib/db';
 import { loadDemo } from '../../lib/demo';
-import { addToList, takeOffList } from '../../lib/listActions'; // 0.9.5 (undo)
 import { aroundPlan, shopTotals } from '../../lib/shopTotals';
 import { loadRecommendations } from '../../lib/recs';
 import { money } from '../../lib/units';
@@ -13,9 +11,8 @@ import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
 import { chainName, stockKnown, type ListEntry, type Settings } from '../../types';
-import { ChainDot, ChainName, Icon, LoadingBar, Price, SectionMark, SwapBox, Thumb } from '../components';
+import { ChainDot, Icon, LoadingBar, Sheet } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
-import { ActionInfoTag, MemberInfoTag, MultiInfoTag } from '../tagInfo';
 import { failingStores, getHealth, getHiddenWarnings, isBlockedError, isHidden, offerUnblock } from '../../lib/health';
 import { HideForADay, UnblockButton } from '../Unblock';
 import { exportBackup, needsBackupNudge } from '../../lib/backup';
@@ -24,7 +21,10 @@ import { protection } from '../../lib/protection';
 import { confirmAction } from '../../lib/confirm';
 import { useNav } from '../nav';
 import { RecallBanner } from './Recalls';
-import { SetupNudges } from './SetupNudges';
+import { AddBar, ItemRow, RecRow } from '../simple';
+import { TabOffer } from './SetupNudges';
+import { loadSpecials } from '../../lib/specials';
+import type { StoreProduct } from '../../stores';
 import { UpdateBanner } from '../UpdateBanner';
 import { serverMode } from '../../server-mode/flag';
 import { ConnectionsSheet } from './Settings';
@@ -32,7 +32,6 @@ import { nextCheckWords, planOf } from '../../lib/checkSchedule';
 import { getCheckLog, missedSlot, missedWords, whenWords } from '../../lib/checkLog';
 
 import { startTour } from '../Tour';
-const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 export function HomeScreen() {
   const nav = useNav();
@@ -76,7 +75,7 @@ export function HomeScreen() {
   // 0.10.2: the background checks' log (above the early return: hooks always run in the same order).
   const runs = useLive(getCheckLog, []) ?? [];
   if (!allRecs || !settings || !allEntries) return <div className="screen" />;
-  const { on, recs, totals, openLines, oneStop, listSaving, listed, dealChain, dealRecs, dealShops, showing, buys, altDeals, smalls, waits, skips, normal, worth, saving } =
+  const { on, recs, totals, openLines, listed, dealChain, dealRecs, dealShops, showing, buys, altDeals, smalls, waits, skips, normal, worth, saving } =
     weekDeals(allRecs, settings, allEntries, picked);
   // Only warn about shops you still use, on a tab that's switched on.
   const failing = failingAll.filter((f) => on.some((sec) => searchChainsIn(settings.enabledChains, sec).includes(f.chain)));
@@ -166,73 +165,25 @@ export function HomeScreen() {
         </div>
       </div>
 
+      {/* 0.12.0: adding starts here: search, or the barcode button (Add was a tab in the middle of the bar) */}
+      {/* On a Restock server's web page there's no shop search (shops turn web pages away), so no search box here: Pantry says where adding is done. */}
+      {!serverMode && <AddBar />}
+
       {/* 0.10.12: a newer Restock is out: first thing on Home, until it's installed */}
       <UpdateBanner settings={settings} />
       <RecallBanner />
 
-      {/* 0.10.10: one next step at a time: with an empty pantry that's "Let's add your first item" (below) */}
-      {!settings.tour.active && !serverMode && allRecs.length > 0 && <SetupNudges settings={settings} />}
-
-      {totals.linked > 0 && (
-        <button
-          className="card home-list"
-          onClick={() => nav.setTab('list', 'pantry')}
-          aria-label={`Shopping list, about ${money(totals.around.total)}. Open it`}
-        >
-          <span className="home-list-top">
-            <span className="home-list-lab">
-              {/* 0.10.10: every open line, as the list counts them (it counted only the priced ones: "6 items" here, "8 items" on the list) */}
-              <Icon name="cart" size={18} /> Shopping list · {openLines} item{openLines === 1 ? '' : 's'}
-            </span>
-            <Icon name="chevron" size={18} />
-          </span>
-          <span className="home-list-total">
-            <span className="num">{money(totals.around.total)}</span>
-            <span className="home-list-how">
-              at the till, shopping around
-              {totals.around.chains.length > 1
-                ? ` · ${totals.around.chains.length} shops`
-                : totals.around.chains.length === 1
-                  ? ` · ${chainName(totals.around.chains[0])}`
-                  : ''}
-            </span>
-          </span>
-          {oneStop && totals.around.chains.length > 1 ? (
-            <span className="home-list-alt">
-              <ChainDot chain={oneStop.chain} />
-              <span className="grow">
-                All at {chainName(oneStop.chain)}, one trip
-                {oneStop.lines.filter((l) => l.outOfStock).length > 0 && (
-                  <span className="small" style={{ display: 'block', color: 'var(--amber-ink)' }}>
-                    {oneStop.lines.filter((l) => l.outOfStock).length} out of stock there
-                  </span>
-                )}
-              </span>
-              <span className="num">{money(oneStop.total)}</span>
-              {oneStop.total - totals.around.total > 0.004 && (
-                <span className="home-list-more num">+{money(oneStop.total - totals.around.total)}</span>
-              )}
-            </span>
-          ) : (
-            !oneStop && <span className="small">No single shop has everything. Tap to compare shops.</span>
-          )}
-          {listSaving > 0.5 && <span className="home-list-save">About {money(listSaving)} less than buying it all at usual prices</span>}
-        </button>
-      )}
+      {/* 0.12.0: the "finish setting up" and tour cards are gone from Home (each thing is asked when it's first needed; both are in Settings). The household's offer of a tab it now shares stays. */}
+      {!serverMode && <TabOffer settings={settings} />}
 
       {worth.length > 0 && (
         <div className="banner green" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 13, opacity: 0.92 }}>
-              {worth.length} item{worth.length === 1 ? '' : 's'} worth grabbing
+            <span style={{ fontSize: 14 }}>
+              {worth.length} of your items {worth.length === 1 ? 'is' : 'are'} on special
             </span>
             <span className="big num">{saving > 0 ? `Save about ${money(saving)}` : 'Worth a look'}</span>
           </div>
-          <span style={{ fontSize: 12, textAlign: 'right', opacity: 0.92 }}>
-            vs usual
-            <br />
-            prices
-          </span>
         </div>
       )}
 
@@ -255,10 +206,8 @@ export function HomeScreen() {
       {!serverMode && sync && recs.length > 0 && needsBackupNudge(settings, recs.length, oldest, Date.now(), protection(false, sync).covered) && (
         <div className="card hint" style={{ flexDirection: 'column', gap: 8 }}>
           <strong>Back up your pantry</strong>
-          <span>
-            Restock keeps everything on this phone. If it's lost, broken or reset, a backup is the only way to get your pantry, list and price history
-            back. It's one small file you can save to Drive, email to yourself or keep on your computer.
-          </span>
+          {/* 0.12.0: two lines (it was a paragraph) */}
+          <span>Everything is kept on this phone. A backup is the only way to get it back if the phone is lost or reset.</span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn small primary" onClick={backupNow}>
               Back up now
@@ -296,39 +245,7 @@ export function HomeScreen() {
           ),
         )}
 
-      {!allRecs.length && (
-        <div className="card guide">
-          <Icon name="scan" size={32} />
-          <h2 style={{ margin: 0 }}>Let's add your first item</h2>
-          <ol>
-            <li>Grab something you buy often, like a jar of peanut butter.</li>
-            <li>Tap Add and scan its barcode, or type its name.</li>
-            <li>Tick it at each shop that sells it. Restock then watches the prices for you.</li>
-          </ol>
-          <button className="btn primary" onClick={() => nav.setTab('add')}>
-            <Icon name="scan" size={18} /> Add my first item
-          </button>
-          <button
-            className="btn ghost"
-            onClick={async () => {
-              await loadDemo();
-              // 0.9.12: on the web page they stay in this browser (they never sync), so it says so.
-              nav.toast(
-                serverMode
-                  ? "Sample items added, in this browser only: they never go to your phones. Remove them any time in Settings."
-                  : 'Sample items added. Remove them any time in Settings.',
-              );
-            }}
-          >
-            Or look around with sample items
-          </button>
-          {!serverMode && !settings.tour.seen && (
-            <button className="btn ghost" onClick={() => void startTour()}>
-              Or take the two-minute tour
-            </button>
-          )}
-        </div>
-      )}
+      {!allRecs.length && <FirstHome tourSeen={settings.tour.seen} />}
 
       {dealShops.length > 1 && (
         <>
@@ -386,47 +303,39 @@ export function HomeScreen() {
           )}
         </>
       )}
-      {buys.length > 0 && <div className="eyebrow green">On special now</div>}
-      {buys.map((r) => (
-        <DealCard key={r.group.id} rec={r} listed={listed.get(r.group.id)} />
-      ))}
+      {/* 0.12.0: one row each: photo, shop, one price and a word. The "i" has the rest. */}
+      {[
+        { label: 'Your items on special', tone: 'green', items: buys },
+        { label: 'Cheaper swap', tone: 'blue', items: altDeals },
+        { label: 'Small savings', tone: 'green', items: smalls },
+        { label: 'Wait for a better special', tone: 'amber', items: waits },
+        { label: 'Not real specials', tone: '', items: skips },
+      ]
+        .filter((g) => g.items.length > 0)
+        .map((g) => (
+          <section key={g.label} className="home-group">
+            <h2 className={`eyebrow${g.tone ? ` ${g.tone}` : ''}`}>{g.label}</h2>
+            <div className="card flush">
+              {g.items.map((r) => (
+                <RecRow key={r.group.id} rec={r} listed={listed.get(r.group.id)} />
+              ))}
+            </div>
+          </section>
+        ))}
 
-      {altDeals.length > 0 && (
-        <div className="eyebrow" style={{ color: 'var(--blue)' }}>
-          Cheaper swap
-        </div>
-      )}
-      {altDeals.map((r) => (
-        <DealCard key={r.group.id} rec={r} listed={listed.get(r.group.id)} />
-      ))}
-
-      {smalls.length > 0 && <div className="eyebrow green">Small savings</div>}
-      {/* 0.10.7: the same cards as every other deal (photo, shop, tags); they were plain lines. */}
-      {smalls.map((r) => (
-        <DealCard key={r.group.id} rec={r} listed={listed.get(r.group.id)} />
-      ))}
-
-      {waits.length > 0 && <div className="eyebrow amber">Wait for a better special</div>}
-      {waits.map((r) => (
-        <DealCard key={r.group.id} rec={r} listed={listed.get(r.group.id)} />
-      ))}
-
-      {skips.map((r) => (
-        <button
-          key={r.group.id}
-          className="card note-card"
-          style={{ flexDirection: 'row', alignItems: 'center', textAlign: 'left' }}
-          onClick={() => nav.push({ name: 'item', groupId: r.group.id })}
-        >
-          {/* 0.10.7: its photo, like every other card here */}
-          <Thumb src={r.best?.product.imageUrl} icon={r.group.section ?? "pantry"} />
-          <span style={{ flex: 1, fontSize: 13, color: 'var(--ink-2)' }}>
-            {r.best?.verdict.always
-              ? `Always on special: ${r.group.name} has been "on special" nearly every day for 3 weeks. Skipped.`
-              : `Fake special: ${r.group.name} is "on special" at its usual price. Skipped.`}
+      {/* 0.12.0: one line (the shop-by-shop totals are on the list itself) */}
+      {openLines > 0 && (
+        <button className="card home-list-row" onClick={() => nav.setTab('list', 'pantry')} aria-label={`Shopping list, ${openLines} to buy. Open it`}>
+          <Icon name="cart" size={24} />
+          <span className="grow">
+            <span className="title">Shopping list</span>
+            <span className="small">
+              {openLines} to buy{totals.linked > 0 ? ` · about ${money(totals.around.total)}` : ''}
+            </span>
           </span>
+          <Icon name="chevron" size={18} />
         </button>
-      ))}
+      )}
 
       {normal.length > 0 && recs.length > 0 && (
         <button className="btn ghost" onClick={() => nav.setTab('pantry')}>
@@ -487,69 +396,125 @@ export function weekDeals(allRecs: Recommendation[], settings: Settings, allEntr
   return { on, recs, pantryIds, entries, openLines, listed, totals, oneStop, listSaving, dealChain, dealRecs, dealShops, showing, buys, altDeals, smalls, waits, skips, normal, worth, saving };
 }
 
-function DealCard({ rec, listed }: { rec: Recommendation; listed?: string }) {
+/**
+ * 0.12.0: Home before anything's been added. This week's half-price lists from Woolworths and Coles
+ * (the shops' own lists, as More → Catalogues and specials reads them; kept 12 hours), so there's
+ * something to tap straight away: + searches your shops for it. Where the lists can't be read
+ * (no signal, the web page, a shop turning Restock away) it's the plain first step instead.
+ */
+function FirstHome({ tourSeen }: { tourSeen?: boolean }) {
   const nav = useNav();
-  const isAlt = rec.action === 'alt';
-  const deal = (isAlt ? rec.alt : rec.best)!;
-  const cur = deal.stats.current;
-  const open = () => nav.push({ name: 'item', groupId: rec.group.id });
-  const mine = rec.best;
-
+  const lists = useLive(() => loadSpecials().catch(() => []), []);
+  const [shop, setShop] = useState<string>();
+  const [info, setInfo] = useState<StoreProduct>();
+  const all = (lists ?? []).filter((l) => l.items.length);
+  // A few from each shop in turn, so one shop's list doesn't fill the page.
+  const mixed: StoreProduct[] = [];
+  for (let i = 0; i < 6; i++) for (const l of all) if (l.items[i]) mixed.push(l.items[i]);
+  const items = (shop ? (all.find((l) => l.chain === shop)?.items ?? []) : mixed).slice(0, 8);
+  const half = (p: StoreProduct) => (p.wasPrice && p.price !== undefined && p.price <= p.wasPrice * 0.55 ? 'Half price' : 'Special');
   return (
-    <div className="card deal">
-      <div className="deal-top">
-        {/* 0.10.7: the row's button sits behind its content (not around it), so the tags you can tap
-            aren't buttons inside a button (WCAG 4.1.2). */}
-        <div className="row-main row-stretch">
-          <button className="row-hit" onClick={open} aria-label={`${rec.group.name}: ${rec.headline}`} />
-          <Thumb src={deal.product.imageUrl ?? mine?.product.imageUrl} />
-          <span className="grow">
-            <span className="title clip">
-              <SectionMark section={rec.group.section} />
-              {rec.group.name}
-            </span>
-            <span className="sub">
-              <ChainName chain={deal.product.chain} /> · {isAlt ? `swap to ${deal.product.name}` : rec.detail}
-              {/* 0.10.10: "…its usual $4.80. · Ocean Breeze…" had a full stop and a dot together */}
-              {!isAlt && flavourNoteFor(rec) ? ` ${cap(flavourNoteFor(rec)!)}.` : ''}
-            </span>
-            <span className="tags">
-              <ActionInfoTag rec={rec} action={rec.action} great={rec.best?.verdict.kind === 'great'} />
-              <MultiInfoTag o={deal} />
-              {cur?.memberOnly && <MemberInfoTag chain={deal.product.chain} hasCard={!deal.locked} />}
-            </span>
-          </span>
-          {!isAlt && <Price value={deal.multi ? deal.shelfPrice : deal.price} was={cur?.wasPrice} />}
-        </div>
-        <button
-          className={`cart-btn${listed ? ' on' : ''}`}
-          aria-label={listed ? `${rec.group.name} is on your shopping list. Tap to take it off` : `Add ${rec.group.name} to shopping list`}
-          aria-pressed={!!listed}
-          onClick={async () => {
-            // Tap again to take it off, the same as on the Pantry tab.
-            if (listed) {
-              await takeOffList([listed], rec.group.name); // 0.9.5 (undo)
-              return;
-            }
-            const added = await addToList(rec.group); // 0.9.5 (undo)
-            if (!added) nav.toast(`${rec.group.name} is already on your list`);
-          }}
-        >
-          <Icon name={listed ? 'cartCheck' : 'cartPlus'} size={22} />
-        </button>
+    <>
+      <div className="banner green first-banner">
+        <span className="big">{items.length ? "This week's specials" : serverMode ? 'Nothing here yet' : 'Add what you buy'}</span>
+        <span>
+          {items.length
+            ? 'Tap + on anything you buy. Restock keeps watching its price for you.'
+            : serverMode
+              ? 'Add what you buy on a phone: adding is by shop search, which only phones can do. This page then shows what your phones found.'
+              : 'Search for it or scan its barcode. Restock watches the price and tells you when it is a real special.'}
+        </span>
       </div>
-      {isAlt && (
-        <button className="two" style={{ border: 'none', background: 'none', padding: 0, textAlign: 'left' }} onClick={open}>
-          <SwapBox label="Instead of yours" option={mine} />
-          <SwapBox label="Get this" option={deal} hi />
-        </button>
-      )}
-      {!isAlt && rec.alt && (
-        <div className="small">
-          Also on special: {rec.alt.product.name} at {chainName(rec.alt.product.chain)}, {money(rec.alt.price)}
+      {lists === undefined && (
+        <div role="status" className="small">
+          Getting this week's specials…
+          <LoadingBar seconds={12} />
         </div>
       )}
-    </div>
+      {all.length > 1 && (
+        <div className="chips" role="group" aria-label="Specials at">
+          <button className="chip" aria-pressed={!shop} onClick={() => setShop(undefined)}>
+            All
+          </button>
+          {all.map((l) => (
+            <button key={l.chain} className="chip" aria-pressed={shop === l.chain} onClick={() => setShop(l.chain)}>
+              {chainName(l.chain)}
+            </button>
+          ))}
+        </div>
+      )}
+      {items.length > 0 && (
+        <div className="card flush">
+          {items.map((p) => (
+            <ItemRow
+              key={`${p.chain}:${p.storeProductId}`}
+              photo={p.imageUrl}
+              name={p.name}
+              chain={p.chain}
+              price={p.price}
+              note={{ text: half(p), tone: 'good' }}
+              onInfo={() => setInfo(p)}
+              action={
+                <button
+                  className="btn primary plus-btn"
+                  aria-label={`Add ${p.name}`}
+                  onClick={() => nav.push({ name: 'add', query: p.name, preTick: { chain: p.chain as StoreChain, storeProductId: String(p.storeProductId), product: p } })}
+                >
+                  <Icon name="plus" size={22} />
+                </button>
+              }
+            />
+          ))}
+        </div>
+      )}
+      <button
+        className="btn ghost"
+        onClick={async () => {
+          await loadDemo();
+          // 0.9.12: on the web page they stay in this browser (they never sync), so it says so.
+          nav.toast(
+            serverMode
+              ? 'Sample items added, in this browser only: they never go to your phones. Remove them any time in Settings.'
+              : 'Sample items added. Remove them any time in Settings.',
+          );
+        }}
+      >
+        Look around with sample items
+      </button>
+      {!serverMode && !tourSeen && (
+        <button className="btn ghost" onClick={() => void startTour()}>
+          Take the two-minute tour
+        </button>
+      )}
+      {info && (
+        <Sheet title={info.name} onClose={() => setInfo(undefined)}>
+          <dl className="pinfo-rows">
+            <div>
+              <dt>
+                <ChainDot chain={info.chain} /> Now at {chainName(info.chain)}
+              </dt>
+              <dd className="num big">{money(info.price)}</dd>
+            </div>
+            {info.wasPrice !== undefined && (
+              <div>
+                <dt>Was</dt>
+                <dd className="num">{money(info.wasPrice)}</dd>
+              </div>
+            )}
+            {info.wasPrice !== undefined && info.price !== undefined && info.wasPrice > info.price && (
+              <div>
+                <dt>You save</dt>
+                <dd className="num">{money(info.wasPrice - info.price)}</dd>
+              </div>
+            )}
+          </dl>
+          <p className="small" style={{ margin: 0 }}>
+            This is what {chainName(info.chain)} says. Add it and Restock starts its own price history, so next time it can tell you whether the
+            special is a real one.
+          </p>
+        </Sheet>
+      )}
+    </>
   );
 }
 

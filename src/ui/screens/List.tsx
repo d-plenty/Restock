@@ -700,9 +700,13 @@ export function ListScreen() {
         }}
         style={{ display: 'flex', gap: 8 }}
       >
-        <input className="input" placeholder={(settings.a11y?.text ?? 1) >= 1.3 ? 'Add anything' : ADD_HINT[section]} aria-label="Add an item" value={text} onChange={(e) => setText(e.target.value)} />
+        {/* 0.12.0: it says what it does: "Add to shopping list", with its own Add button */}
+        <input className="input" placeholder={(settings.a11y?.text ?? 1) >= 1.3 || serverMode ? 'Add to list' : 'Add to shopping list'} aria-label="Add to shopping list" value={text} onChange={(e) => setText(e.target.value)} />
+        <button type="submit" className="btn primary" aria-label="Add to shopping list" disabled={!text.trim()} style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }}>
+          <Icon name="plus" />
+        </button>
         {!serverMode && (
-          <button type="button" className="btn" aria-label="Scan a barcode to add" style={{ width: 52, padding: 0 }} onClick={scanToList}>
+          <button type="button" className="btn" aria-label="Scan a barcode to add" style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }} onClick={scanToList}>
             <Icon name="scan" />
           </button>
         )}

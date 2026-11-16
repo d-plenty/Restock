@@ -5,12 +5,11 @@ import { allCategories, allListEntries, cachedSettings, deleteGroup, updateGroup
 import { addAllToList, addToList, buzz, takeOffList } from '../../lib/listActions';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { loadRecommendations } from '../../lib/recs';
-import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
-import { bothPrices, tiedWithBest, type Recommendation } from '../../lib/verdict';
-import { chainName, LEARNING_DAYS } from '../../types';
-import { BetaTag, Hold, Icon, MoreInfo, stockWhere, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, Thumb, SearchField } from '../components';
-import { ActionInfoTag } from '../tagInfo';
+import { type Recommendation } from '../../lib/verdict';
+import { BetaTag, Hold, Icon, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, SearchField } from '../components';
+import { BigAdd, RecRow } from '../simple';
+import { serverMode } from '../../server-mode/flag';
 import { isMoreTab, useNav } from '../nav';
 import { isCustomSection, SECTION_NAMES, type Section, slots } from '../../shops';
 import { confirmAction } from '../../lib/confirm';
@@ -51,6 +50,8 @@ function markSwiped() {
   }
 }
 
+/** "Add to pantry", "Add to Bottle shop", "Add to Pets". */
+const ADD_LABEL = (s: Section) => (s === 'pantry' ? 'Add to pantry' : `Add to ${SECTION_NAMES[s]}`);
 const EMPTY: Record<Section, string> = {
   pantry: 'Your pantry is empty. Add the things you buy so Restock can watch their prices.',
   keg: 'Nothing here yet. Add the beer, wine or spirits you buy, and Restock watches the bottle shops you picked.',
@@ -237,11 +238,6 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
             </button>
           )
         )}
-        {!editing && (
-          <button className="icon-btn" aria-label="Add an item" onClick={() => nav.setTab('add')}>
-            <Icon name="plus" size={20} />
-          </button>
-        )}
       </div>
       {/* 0.11.3: Edit also opens this tab's categories (add, rename, reorder, delete) */}
       {editing && (
@@ -249,21 +245,32 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           <Icon name="pencil" size={16} /> Edit categories
         </button>
       )}
-      <SearchField placeholder={SEARCH_HINT[section]} aria-label={SEARCH_HINT[section]} value={q} onValue={setQ} />
+      {/* 0.12.0: this tab's one add button, with the barcode beside it (it was a small + at the top and a tab in the bar) */}
+      {!editing && (
+        <BigAdd
+          label={ADD_LABEL(section)}
+          onAdd={() => nav.push({ name: 'add', section, toPantry: true })}
+          onScan={serverMode ? undefined : () => nav.push({ name: 'add', section, toPantry: true, scan: true })}
+        />
+      )}
+      {/* The web page: said before the tap, not after it (phone-only parts say where they work). */}
+      {!editing && serverMode && (
+        <p className="small" style={{ margin: 0 }}>
+          Adding by shop search is done on a phone. Here you can look up a barcode among your household's products.
+        </p>
+      )}
+      {recs.length > 0 && <SearchField placeholder={SEARCH_HINT[section]} aria-label={SEARCH_HINT[section]} value={q} onValue={setQ} />}
       {recs.length > 0 && (
         <div className="chips" role="group" aria-label="Filter and sort">
           <button className="chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
             All {recs.length}
           </button>
           <button className="chip" aria-pressed={filter === 'sale'} onClick={() => setFilter('sale')}>
-            Deals {recs.filter(onSale).length}
+            On special {recs.filter(onSale).length}
           </button>
           <button className="chip" aria-pressed={filter !== 'all' && filter !== 'sale'} onClick={() => setFilterSheet(true)}>
             {categories.find((c) => c.id === filter)?.name ?? 'Category'}{' '}
             <span className="turn-down"><Icon name="chevron" size={12} /></span>
-          </button>
-          <button className="chip" onClick={() => setFilterSheet(true)} aria-label={`Sort: ${SORTS.find((x) => x.id === sort)?.label}`}>
-            <Icon name="sliders" size={14} /> {SORTS.find((x) => x.id === sort)?.label}
           </button>
         </div>
       )}
@@ -279,9 +286,6 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       {!recs.length && (
         <div className="empty">
           <p>{EMPTY[section]}</p>
-          <button className="btn primary" onClick={() => nav.setTab('add')}>
-            <Icon name="plus" size={18} /> Add an item
-          </button>
         </div>
       )}
       {recs.length > 0 && !shown.length && <p className="small">Nothing matches.</p>}
@@ -305,36 +309,13 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           )}
           <div className="card flush">
             {s.items.map((r) => {
-              const mains = r.options.filter((o) => o.role === 'main');
-              const altCount = r.group.altProductIds.length;
               const isPicked = picked.has(r.group.id);
               const listed = onList.has(r.group.id);
-              const detail = [
-                r.outOfStock && r.best
-                  ? `Out of stock ${stockWhere(r.best.product.chain, true)}`
-                  : r.best?.price !== undefined && mains.length > 1 && tiedWithBest(r).length + 1 >= mains.length
-                    ? 'Same price everywhere'
-                    : r.best?.price !== undefined
-                      ? `${r.mixedUnits ? 'Lowest shelf price' : 'Cheapest'}: ${chainName(r.best.product.chain)}`
-                      : 'No price yet',
-                mains.length > 1 ? `${mains.length} shops` : '',
-                mains.length &&
-                mains.every((o) => !/\(sample\)/i.test(o.product.name)) &&
-                Math.max(...mains.map((o) => o.stats.spanDays)) < LEARNING_DAYS
-                  ? 'still learning prices'
-                  : '',
-                altCount ? `${altCount} also happy with` : '',
-              ]
-                .filter(Boolean)
-                // 0.10.10: each part stays whole when the line wraps ("Cheapest: Woolworths · 2" / "shops" before)
-                .map((part) => String(part).replace(/ /g, '\u00a0'))
-                .join(' · ');
               return (
                 <Hold key={r.group.id} onLong={() => !editing && setPreview(r)}>
                   <SwipeRow
                     disabled={editing}
-                    className={`row${isPicked ? ' selected' : ''}`}
-                    style={{ paddingRight: 8 }}
+                    className={`row irow-swipe${isPicked ? ' selected' : ''}`}
                     rightLabel={listed ? 'On your list' : 'Add to list'}
                     leftLabel="Delete"
                     onRight={() => {
@@ -347,49 +328,21 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                       void deleteOne(r);
                     }}
                   >
-                    {!editing && <MoreInfo src={(r.best ?? mains[0])?.product.imageUrl} name={r.group.name} onOpen={() => setPreview(r)} />}
-                    <div className="row-main row-stretch">
-                      <button
-                        className="row-hit"
-                        onClick={() => (editing ? pick(r.group.id) : nav.push({ name: 'item', groupId: r.group.id }))}
-                        aria-pressed={editing ? isPicked : undefined}
-                        aria-label={editing ? `Select ${r.group.name}` : r.group.name}
-                      />
-                      {editing && (
-                        <span className={`pick${isPicked ? ' on' : ''}`} aria-hidden>
-                          {isPicked && <Icon name="check" size={16} />}
-                        </span>
-                      )}
-                      {editing && <Thumb src={(r.best ?? mains[0])?.product.imageUrl} />}
-                      <span className="grow">
-                        <span className="title clip">{r.group.name}</span>
-                        <span className="small clip">{detail}</span>
-                        {/* 0.9.6: both prices: per item, then the comparison price (per litre, per 100 g). */}
-                        {bothPrices(r.action === 'alt' ? r.alt : r.best) && (
-                          <span className="small clip num">{bothPrices(r.action === 'alt' ? r.alt : r.best)}</span>
-                        )}
-                        <span className="tags" style={{ marginTop: 3 }}>
-                          {r.action !== 'none' && <ActionInfoTag rec={r} action={r.action} great={r.best?.verdict.kind === 'great'} />}
-                          {underTarget(r) && <span className="tag good">UNDER {money(r.group.targetPrice)}</span>}
-                          {/* 0.11.3: a pick whose pack got smaller, or that its shop no longer lists (the item's page says more) */}
-                          {r.shelf?.changed.some((c) => c.change.toQty < c.change.fromQty) && <span className="tag wait">SMALLER PACK</span>}
-                          {!!r.shelf?.gone.length && <span className="tag nodata">NO LONGER SOLD?</span>}
-                        </span>
-                      </span>
-                      <span className="num small" style={{ fontWeight: 600 }}>
-                        {money((r.action === 'alt' ? r.alt : r.best)?.price)}
-                      </span>
-                    </div>
-                    {!editing && (
-                      <button
-                        className={`cart-btn${listed ? ' on' : ''}`}
-                        aria-label={listed ? `${r.group.name} is on your shopping list. Tap to take it off` : `Add ${r.group.name} to shopping list`}
-                        aria-pressed={listed}
-                        onClick={() => toggleList(r)}
-                      >
-                        <Icon name={listed ? 'cartCheck' : 'cartPlus'} size={22} />
-                      </button>
-                    )}
+                    {/* 0.12.0: the photo, the shop, one price and a word; the "i" has the rest (lib ../simple) */}
+                    <RecRow
+                      rec={r}
+                      listed={onList.get(r.group.id)}
+                      hideActions={editing}
+                      openLabel={editing ? `Select ${r.group.name}` : r.group.name}
+                      onOpen={editing ? () => pick(r.group.id) : undefined}
+                      lead={
+                        editing ? (
+                          <span className={`pick${isPicked ? ' on' : ''}`} aria-hidden>
+                            {isPicked && <Icon name="check" size={16} />}
+                          </span>
+                        ) : undefined
+                      }
+                    />
                   </SwipeRow>
                 </Hold>
               );

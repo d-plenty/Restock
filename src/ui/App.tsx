@@ -64,12 +64,11 @@ import { onUndo, undo as undoStep, undoneText } from '../lib/undo'; // 0.9.5 (un
 import { canLeave, getSettings as shownSettings, hasUnsaved } from '../lib/settingsDraft'; // 0.9.5 (save)
 import { askChoice, askLeave } from '../lib/confirm'; // 0.9.5 (save), 0.10.0
 
-// 0.10.3: Home, Pantry, Add, List and More. Keg, Health, Baby and Pets are in More, so the bar
-// never gets crowded however many tabs are set up.
+// 0.12.0: Home, Pantry, List and More. Adding is a button on each of them (it was a fifth tab in
+// the middle, 0.10.3). Keg, Health, Baby and Pets are in More, so the bar never gets crowded.
 const ALL_TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'pantry', label: 'Pantry', icon: 'pantry' },
-  { id: 'add', label: 'Add', icon: 'plus' },
   { id: 'list', label: 'List', icon: 'cart' },
   { id: 'more', label: 'More', icon: 'moretabs' },
 ];
@@ -290,13 +289,16 @@ function RestockApp() {
       tab,
       section,
       setTab: (t, sec) =>
-        leaveBack(() => {
-          setStack([]);
-          scrolls.current.length = 0;
-          setTab(t);
-          if (isSectionTab(t)) setSection(t);
-          else if (sec) setSection(sec);
-        }),
+        // 0.12.0: Add isn't a tab any more: it opens on top of the tab you're on.
+        t === 'add'
+          ? leave(() => pushScreen({ name: 'add', section: sec }))
+          : leaveBack(() => {
+            setStack([]);
+            scrolls.current.length = 0;
+            setTab(t);
+            if (isSectionTab(t)) setSection(t);
+            else if (sec) setSection(sec);
+          }),
       push: (s) => leave(() => pushScreen(s)),
       pop: () => leaveBack(() => popScreen()),
       toast,
@@ -563,8 +565,7 @@ function RestockApp() {
   const on = activeSections(settings);
   // A tab can also be left out of the bar while its shops stay in use (Add, shopping list).
   const inBar = on.filter((sec) => sec === 'pantry' || !settings.hiddenTabs?.includes(sec));
-  // On a Restock server there's no Add tab: adding is by shop search, which only phones can do.
-  const tabs = ALL_TABS.filter((t) => !(serverMode && t.id === 'add'));
+  const tabs = ALL_TABS;
   // A tab that's off shows Pantry instead (0.10.3: a hidden one still opens, from Add or a link).
   const shownTab: Tab = isSectionTab(tab) && !on.includes(tab) ? 'pantry' : tab;
   const addSection: Section = on.includes(section) ? section : 'pantry';
@@ -587,6 +588,9 @@ function RestockApp() {
             forList={top.forList}
             replaceEntry={top.replaceEntry}
             fromScans={top.fromScans}
+            toPantry={top.toPantry}
+            scan={top.scan}
+            preTick={top.preTick}
             overlay
           />
         )}
@@ -678,34 +682,24 @@ function RestockApp() {
         <div className="status-shade" aria-hidden />
         {serverMode && serverUi.current && <serverUi.current.Strip />}
         {/* 0.11.1: a running price check shows on every tab (Home, Pantry and the list show their own line) */}
-        {(shownTab === 'add' || shownTab === 'more') && !serverMode && <CheckStrip />}
+        {shownTab === 'more' && !serverMode && <CheckStrip />}
         {shownTab === 'home' && <HomeScreen />}
         {isSectionTab(shownTab) && <PantryScreen key={shownTab} section={shownTab} />}
-        {shownTab === 'add' && (serverMode && serverUi.current ? <serverUi.current.Tab /> : <AddScreen key={`add-tab-${addSection}`} section={addSection} />)}
         {shownTab === 'list' && <ListScreen />}
         {shownTab === 'more' && <MoreScreen />}
 
         <nav className="tabs" aria-label="Main" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
-          {tabs.map((t) =>
-            t.id === 'add' ? (
-              <button key={t.id} className="tab centre-add" aria-current={shownTab === 'add' ? 'page' : undefined} onClick={() => nav.setTab('add')}>
-                <span className="bubble">
-                  <Icon name="scan" size={26} stroke={2.4} />
-                </span>
-                {t.label}
-              </button>
-            ) : (
-              <button
-                key={t.id}
-                className={`tab${t.id === 'pharmacy' ? ' pharm' : ''}`}
-                aria-current={shownTab === t.id || (t.id === 'more' && isMoreTab(shownTab)) ? 'page' : undefined}
-                onClick={() => nav.setTab(t.id)}
-              >
-                <Icon name={t.icon} />
-                {t.label}
-              </button>
-            ),
-          )}
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              className="tab"
+              aria-current={shownTab === t.id || (t.id === 'more' && isMoreTab(shownTab)) ? 'page' : undefined}
+              onClick={() => nav.setTab(t.id)}
+            >
+              <Icon name={t.icon} />
+              {t.label}
+            </button>
+          ))}
         </nav>
 
         {top && <div className="overlay">{overlay}</div>}

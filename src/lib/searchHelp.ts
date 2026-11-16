@@ -510,6 +510,26 @@ export function likeThis(anchor: StoreProduct, pool: StoreProduct[], kind: strin
     .map((x) => x.sp);
 }
 
+/**
+ * 0.12.0: of the products most like the one you picked (likeThis), the one whose name is closest:
+ * "Diced Tomatoes 400g" before "Diced Tomatoes With Basil 400g", even when the second is nearer in
+ * price. This is the one picked for you at a shop that doesn't sell the very same product, so
+ * extra words in a name count against it. Ties keep likeThis's order.
+ */
+export function closestTo(anchor: StoreProduct, like: StoreProduct[]): StoreProduct | undefined {
+  const words = (p: StoreProduct) => {
+    const brand = new Set(tokens(p.brand ?? ''));
+    return new Set(tokens(p.name).filter((w) => !brand.has(w) && !/^\d/.test(w)));
+  };
+  const a = words(anchor);
+  const sim = (p: StoreProduct) => {
+    const b = words(p);
+    const both = [...a].filter((w) => b.has(w)).length;
+    return both / (a.size + b.size - both || 1);
+  };
+  return like.map((sp, i) => ({ sp, s: sim(sp), i })).sort((x, y) => y.s - x.s || x.i - y.i)[0]?.sp;
+}
+
 // ---------- recommended results and sure picks for a typed search (0.8.5) ----------
 
 export interface Scored {
