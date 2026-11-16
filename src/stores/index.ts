@@ -5,10 +5,11 @@ import { aldi } from './aldi';
 import { coles } from './coles';
 import { costco } from './costco';
 import { endeavourAdapter } from './endeavour';
-import { connectionMode, NativeOnlyError } from './http';
+import { connectionMode, isNative, NativeOnlyError } from './http';
 import type { StoreAdapter, StoreProduct } from './types';
 import { noteSearch } from '../lib/priceShare';
 import { noteSeen } from '../lib/seen';
+import { noteSearchSizes } from '../lib/shelfWatch';
 import { webAdapter } from './web';
 import { woolworths } from './woolworths';
 
@@ -16,7 +17,7 @@ export const ADAPTERS = { woolworths, coles, aldi };
 
 export function adapterFor(chain: StoreChain | 'other'): StoreAdapter | undefined {
   const a = pickAdapter(chain);
-  // 0.9.14: Send prices back: what Coles, Woolworths, Aldi and Costco searches show (lib/priceShare.ts).
+  // 0.9.14: Send prices back: what Coles, Woolworths and Aldi searches show (lib/priceShare.ts).
   // 0.11.0: and every shop's results are remembered on this phone (lib/seen.ts); noteSearch still
   // only takes those four shops' results for the shared price service.
   return a && noting(a);
@@ -29,6 +30,8 @@ function noting(a: StoreAdapter): StoreAdapter {
       const out = await fn(...args);
       noteSearch(out);
       void noteSeen(out);
+      // 0.11.3: a product Restock keeps, shown with another size: a pack that changed (lib/shelfWatch.ts).
+      if (isNative()) void noteSearchSizes(out).catch(() => undefined);
       return out;
     });
   return { ...a, search: seen(a.search.bind(a))!, searchBrowser: seen(a.searchBrowser?.bind(a)), searchAnonymous: seen(a.searchAnonymous?.bind(a)) };

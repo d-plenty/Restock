@@ -9,10 +9,10 @@ import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
 import { bothPrices, tiedWithBest, type Recommendation } from '../../lib/verdict';
 import { chainName, LEARNING_DAYS } from '../../types';
-import { Hold, Icon, MoreInfo, stockWhere, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, Thumb, SearchField } from '../components';
+import { BetaTag, Hold, Icon, MoreInfo, stockWhere, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, Thumb, SearchField } from '../components';
 import { ActionInfoTag } from '../tagInfo';
 import { isMoreTab, useNav } from '../nav';
-import { SECTION_NAMES, type Section, slots } from '../../shops';
+import { isCustomSection, SECTION_NAMES, type Section, slots } from '../../shops';
 import { confirmAction } from '../../lib/confirm';
 
 type Filter = 'all' | 'sale' | string; // string = category id
@@ -61,7 +61,7 @@ const EMPTY: Record<Section, string> = {
 };
 const SEARCH_HINT: Record<Section, string> = {
   pantry: 'Search your pantry',
-  keg: 'Search your keg',
+  keg: 'Search your bottle shop items',
   pharmacy: 'Search your health items',
   baby: 'Search your baby things',
   pets: 'Search your pet things',
@@ -220,7 +220,11 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
             <Icon name="back" size={20} />
           </button>
         )}
-        <h1 style={isMoreTab(section) ? { fontSize: 24 } : undefined}>{SECTION_NAMES[section]}</h1>
+        <h1 style={isMoreTab(section) ? { fontSize: 24 } : undefined}>
+          {SECTION_NAMES[section]}
+          {/* 0.11.3: a custom tab says Beta at the top */}
+          {isCustomSection(section) && <> <BetaTag /></>}
+        </h1>
         {recs.length > 0 && (
           editing ? (
             <button className="btn small primary" onClick={stopEditing}>
@@ -239,7 +243,12 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           </button>
         )}
       </div>
-      {/* 0.10.12: Beta is said where a section is set up (Setup, its shops page), not on the tab itself. */}
+      {/* 0.11.3: Edit also opens this tab's categories (add, rename, reorder, delete) */}
+      {editing && (
+        <button className="btn small block edit-cats" onClick={() => nav.push({ name: 'categories', section })}>
+          <Icon name="pencil" size={16} /> Edit categories
+        </button>
+      )}
       <SearchField placeholder={SEARCH_HINT[section]} aria-label={SEARCH_HINT[section]} value={q} onValue={setQ} />
       {recs.length > 0 && (
         <div className="chips" role="group" aria-label="Filter and sort">
@@ -362,6 +371,9 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                         <span className="tags" style={{ marginTop: 3 }}>
                           {r.action !== 'none' && <ActionInfoTag rec={r} action={r.action} great={r.best?.verdict.kind === 'great'} />}
                           {underTarget(r) && <span className="tag good">UNDER {money(r.group.targetPrice)}</span>}
+                          {/* 0.11.3: a pick whose pack got smaller, or that its shop no longer lists (the item's page says more) */}
+                          {r.shelf?.changed.some((c) => c.change.toQty < c.change.fromQty) && <span className="tag wait">SMALLER PACK</span>}
+                          {!!r.shelf?.gone.length && <span className="tag nodata">NO LONGER SOLD?</span>}
                         </span>
                       </span>
                       <span className="num small" style={{ fontWeight: 600 }}>
@@ -463,6 +475,15 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
               ))}
             </div>
           </div>
+          <button
+            className="btn small"
+            onClick={() => {
+              setFilterSheet(false);
+              nav.push({ name: 'categories', section });
+            }}
+          >
+            <Icon name="pencil" size={16} /> Edit categories
+          </button>
         </Sheet>
       )}
 
@@ -478,6 +499,15 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
               <span className="grow title">No category</span>
             </button>
           </div>
+          <button
+            className="btn small"
+            onClick={() => {
+              setCategorySheet(false);
+              nav.push({ name: 'categories', section });
+            }}
+          >
+            <Icon name="plus" size={16} /> New category
+          </button>
         </Sheet>
       )}
     </div>

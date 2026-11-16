@@ -233,6 +233,15 @@ const GROUP_TAGS: Record<ShopGroup, string[]> = {
   baby: ['["shop"="baby_goods"]'],
   pet: ['["shop"="pet"]'],
   bigbox: ['["shop"~"^(department_store|variety_store)$"]'],
+  // 0.11.3
+  auto: ['["shop"~"^(car_parts|car_repair|tyres)$"]'],
+  hardware: ['["shop"~"^(doityourself|hardware|garden_centre|trade)$"]'],
+  outdoors: ['["shop"~"^(outdoor|fishing|hunting|camping)$"]'],
+  sport: ['["shop"="sports"]'],
+  electronics: ['["shop"~"^(electronics|computer|stationery|appliance|hifi)$"]'],
+  home: ['["shop"~"^(furniture|fabric|craft|houseware|bed|interior_decoration)$"]'],
+  beauty: ['["shop"~"^(cosmetics|beauty|perfumery)$"]'],
+  variety: ['["shop"="variety_store"]'],
   other: ['["shop"~"^(doityourself|hardware|wholesale)$"]'],
 };
 const TAB_GROUP: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bottle', pharmacy: 'pharmacy', baby: 'baby', pets: 'pet', ...slots('other' as ShopGroup) };

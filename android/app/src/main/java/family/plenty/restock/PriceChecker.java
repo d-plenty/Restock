@@ -131,7 +131,7 @@ final class PriceChecker {
         Map<String, List<String[]>> byChain = new LinkedHashMap<>();
         int total = 0;
         try (Cursor c = db.rawQuery(
-            "SELECT id, chain, name, store_product_id, image_url FROM products WHERE store_product_id IS NOT NULL AND id NOT LIKE 'demo-%'",
+            "SELECT id, chain, name, store_product_id, image_url, size FROM products WHERE store_product_id IS NOT NULL AND id NOT LIKE 'demo-%'",
             null)) {
             while (c.moveToNext()) {
                 String chain = c.getString(1);
@@ -146,7 +146,7 @@ final class PriceChecker {
                     list = new ArrayList<>();
                     byChain.put(chain, list);
                 }
-                list.add(new String[] {c.getString(0), chain, c.getString(2), c.getString(3), c.isNull(4) ? null : c.getString(4)});
+                list.add(new String[] {c.getString(0), chain, c.getString(2), c.getString(3), c.isNull(4) ? null : c.getString(4), c.isNull(5) ? null : c.getString(5)});
                 total++;
             }
         }
@@ -164,6 +164,10 @@ final class PriceChecker {
         JSONObject aisles = readKv(db, "aisles");
         if (aisles == null) aisles = new JSONObject();
         boolean aislesChanged = false;
+        // 0.11.3: a pack that changed size, and a product the shop says it doesn't have (ShelfWatch). This phone only.
+        JSONObject shelf = readKv(db, ShelfWatch.KV);
+        if (shelf == null) shelf = new JSONObject();
+        boolean shelfChanged = false;
         for (Map.Entry<String, List<String[]>> entry : byChain.entrySet()) {
             String chain = entry.getKey();
             String storeId = null;
@@ -196,6 +200,8 @@ final class PriceChecker {
                     if (ownBranch && q != null && noteAisle(aisles, p[0], "1", storeId, q.aisle)) aislesChanged = true;
                     // Your branch didn't have it, or didn't answer: the online store's price instead.
                     if (q == null && ownBranch) q = client.refresh(chain, p[3], p[2], null);
+                    // 0.11.3: why it wasn't there, before the second branch is asked (which answers for itself).
+                    final String missWhy = client.miss;
                     if (second != null) {
                         try {
                             StoreClient.Quote q2 = client.refresh(chain, p[3], p[2], second);
@@ -207,6 +213,7 @@ final class PriceChecker {
                         }
                     }
                     result.checked++;
+                    if (ShelfWatch.watched(chain) && ShelfWatch.note(shelf, p[0], p[5], q != null ? q.size : null, q != null ? q.name : null, q != null, missWhy, today)) shelfChanged = true;
                     if (q != null) {
                         if (saveIfChanged(db, p[0], q, today)) result.updated++;
                         if (p[4] == null && q.imageUrl != null) {
@@ -232,6 +239,7 @@ final class PriceChecker {
             }
         }
 
+        if (shelfChanged) writeKv(db, ShelfWatch.KV, shelf);
         if (aislesChanged) {
             tidyAisles(aisles);
             writeKv(db, "aisles", aisles);

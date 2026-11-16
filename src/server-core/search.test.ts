@@ -53,7 +53,9 @@ describe('the hosts the server may ask', () => {
     for (const c of ['danmurphys', 'bws'] as const) expect(SHOP_HOSTS.get(new URL(ENDEAVOUR[c].api).host)).toBe(c);
     // Liquorland Warehouse's prices are Liquorland's.
     expect(SHOP_HOSTS.get('www.liquorland.com.au')).toBe('liquorland');
-    expect([...SHOP_HOSTS.keys()].every((h) => /\.com\.au$/.test(h))).toBe(true);
+    // 0.11.3: four of the new shops' Australian sites aren't on .com.au; every other host is.
+    const NOT_COM_AU = ['www.anacondastores.com', 'www.spotlightstores.com', 'www.ikea.com', 'www.mecca.com'];
+    expect([...SHOP_HOSTS.keys()].filter((h) => !/\.com\.au$/.test(h)).sort()).toEqual([...NOT_COM_AU].sort());
   });
 
   it('refuses another host, plain http, a port, and any request outside a search', async () => {

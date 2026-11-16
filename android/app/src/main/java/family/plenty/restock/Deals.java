@@ -167,6 +167,8 @@ public final class Deals {
         public Double unitPrice;
         public Double normalUnitPrice;
         public String unit;
+        /** 0.11.3: the price of one of what's in the pack, when the pack says how many (verdict.ts eachPriceOf). */
+        public Double eachPrice;
         /** 0.9.0: "ended" (last week's sale) or "old" (a price drop over STALE_DAYS old): not a deal. Verdict.stale in verdict.ts. */
         public String stale;
     }
@@ -756,6 +758,18 @@ public final class Deals {
                 if (o.price != null) o.unitPrice = o.price / size.qty;
                 if (o.stats.typical != null) o.normalUnitPrice = o.stats.typical / size.qty;
             }
+            // 0.11.3 (verdict.ts eachPriceOf): the price of one, for a pack that says how many are in it.
+            boolean inSheets = product.qty == null && product.size != null && SHEETS.matcher(product.size).find();
+            if (o.price != null && size != null && !inSheets) {
+                if ("ea".equals(size.unit)) {
+                    if (size.qty > 0) o.eachPrice = o.price / size.qty;
+                } else {
+                    // The count the size works out, else one written in the size or the name ("4 pack 360g").
+                    Integer count = size.count != null && size.count > 1 ? size.count : packCountIn(product.size);
+                    if (count == null) count = packCountIn(product.name);
+                    if (count != null && count > 1) o.eachPrice = o.price / count;
+                }
+            }
             options.add(o);
         }
 
@@ -777,26 +791,32 @@ public final class Deals {
         // 0.9.6 (same rule as verdict.ts): a product with an unknown size is left out of the cheapest
         // comparison while one of the picks has a size to compare by. With none, shelf prices decide.
         final boolean byUnit = sizedMain && units.size() == 1 && !units.contains(null);
+        // 0.11.3 (verdict.ts byEach): picks measured differently, one by count and the rest by weight or
+        // volume, where every one says how many are in it: compared by the price of one.
+        boolean allEach = true;
+        for (Option o : priced) if (o.unitPrice != null && o.eachPrice == null) allEach = false;
+        final boolean byEach = !byUnit && sizedMain && units.size() > 1 && units.contains("ea") && !units.contains(null) && allEach;
+        final int by = byUnit ? BY_UNIT : byEach ? BY_EACH : BY_SHELF;
 
         // Out-of-stock products only count when nothing else is available.
         Option best = null;
         Option bestAny = null;
         for (Option o : priced) {
-            if (!"main".equals(o.role) || !comparable(o, byUnit)) continue;
-            if (bestAny == null || cost(o, byUnit) < cost(bestAny, byUnit)) bestAny = o;
-            if (!gone(o) && (best == null || cost(o, byUnit) < cost(best, byUnit))) best = o;
+            if (!"main".equals(o.role) || !comparable(o, by)) continue;
+            if (bestAny == null || cost(o, by) < cost(bestAny, by)) bestAny = o;
+            if (!gone(o) && (best == null || cost(o, by) < cost(best, by))) best = o;
         }
         if (best == null) best = bestAny;
         boolean outOfStock = best != null && gone(best);
         Option alt = null;
         Option stockAlt = null;
         for (Option o : priced) {
-            if (!"alt".equals(o.role) || gone(o) || !comparable(o, byUnit)) continue;
+            if (!"alt".equals(o.role) || gone(o) || !comparable(o, by)) continue;
             if (!item.allowBulk && isBulk(o, options, item)) continue;
-            if (outOfStock && (stockAlt == null || cost(o, byUnit) < cost(stockAlt, byUnit))) stockAlt = o;
+            if (outOfStock && (stockAlt == null || cost(o, by) < cost(stockAlt, by))) stockAlt = o;
             if (!onSale(o)) continue;
-            if (best != null && !outOfStock && !(cost(o, byUnit) < cost(best, byUnit))) continue;
-            if (alt == null || cost(o, byUnit) < cost(alt, byUnit)) alt = o;
+            if (best != null && !outOfStock && !(cost(o, by) < cost(best, by))) continue;
+            if (alt == null || cost(o, by) < cost(alt, by)) alt = o;
         }
         rec.best = best;
         rec.alt = alt;
@@ -841,12 +861,15 @@ public final class Deals {
     }
 
     /** A product whose size is unknown has no unit price: it sits out of a by-unit comparison (verdict.ts). */
-    private static boolean comparable(Option o, boolean byUnit) {
-        return !byUnit || o.unitPrice != null;
+    private static boolean comparable(Option o, int by) {
+        return by == BY_UNIT ? o.unitPrice != null : by == BY_EACH ? o.eachPrice != null : true;
     }
 
-    private static double cost(Option o, boolean byUnit) {
-        return byUnit ? o.unitPrice : o.price;
+    /** What decides the cheapest: the shelf price, the unit price, or (0.11.3) the price of one. */
+    private static final int BY_SHELF = 0, BY_UNIT = 1, BY_EACH = 2;
+
+    private static double cost(Option o, int by) {
+        return by == BY_UNIT ? o.unitPrice : by == BY_EACH ? o.eachPrice : o.price;
     }
 
     static String chainName(String chain) {

@@ -116,7 +116,7 @@ export const SOON: Soon[] = [
         <p>
           It's here now: <strong>Shared prices</strong> in Settings → Privacy and sharing, on unless you turn it off. New items get a fair verdict
           from day one, from prices everyone's phones and Restock's own collection have seen, and in return your phone shares the shelf prices it
-          reads from Coles, Woolworths, Aldi and Costco.
+          reads from Coles, Woolworths and Aldi.
         </p>
         <p>It only ever shares prices and products:</p>
         <ul>

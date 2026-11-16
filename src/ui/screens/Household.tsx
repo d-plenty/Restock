@@ -1,15 +1,13 @@
 import { useState } from 'react';
-import { confirmAction } from '../../lib/confirm';
-import { addCategory as addCategoryRow, allCategories, deleteCategory, renameCategory, swapCategories } from '../../lib/db';
 // 0.9.5 (save): the household's name waits for Save settings; categories change at once, with Undo.
 import { afterSave, getSettings, updateSettings } from '../../lib/settingsDraft';
-import { act } from '../../lib/undo';
 import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar';
 import { useLive } from '../../lib/useLive';
 import { RestockNative } from '../../lib/sql/native';
 import { MAX_SYNC_PHONES, syncInfo } from '../../lib/sync';
 import { Icon, TopBar } from '../components';
 import { useNav } from '../nav';
+import { CategoryEditor } from './Categories';
 import { activeSections, SECTION_NAMES, type Section } from '../../shops';
 
 export function HouseholdScreen() {
@@ -18,32 +16,9 @@ export function HouseholdScreen() {
   const nav = useNav();
   const settings = useLive(getSettings, []);
   const sync = useLive(syncInfo, []);
-  const allCats = useLive(allCategories, []);
-  const [newCat, setNewCat] = useState('');
   const [section, setSection] = useState<Section>('pantry');
-  if (!settings || !allCats) return <div className="screen" />;
+  if (!settings) return <div className="screen" />;
   const sectionsOn = activeSections(settings);
-  const categories = allCats.filter((c) => c.section === section);
-
-  const move = async (index: number, dir: -1 | 1) => {
-    const a = categories[index];
-    const b = categories[index + dir];
-    if (!a || !b) return;
-    await act(`Moved ${a.name} ${dir < 0 ? 'up' : 'down'}`, () => swapCategories(a, b)); // 0.9.5 (undo)
-  };
-
-  const addCategory = async () => {
-    const name = newCat.trim();
-    if (!name) return;
-    await act(`Category ${name} added`, () => addCategoryRow(name, section)); // 0.9.5 (undo)
-    setNewCat('');
-  };
-
-  const remove = async (id: string, name: string) => {
-    const ok = await confirmAction(`Delete the "${name}" category?`, { detail: 'Items in it move to "Other". You can undo it straight after.', action: 'Delete category' });
-    if (!ok) return;
-    await act(`Category ${name} deleted`, () => deleteCategory(id)); // 0.9.5 (undo)
-  };
 
   return (
     <div className="screen">
@@ -140,61 +115,7 @@ export function HouseholdScreen() {
           ))}
         </div>
       )}
-      <div className="card flush">
-        {categories.map((c, i) => (
-          <div className="row" key={c.id}>
-            <input
-              className="input"
-              style={{ height: 44 }}
-              defaultValue={c.name}
-              aria-label={`Category ${i + 1} name`}
-              onBlur={(e) => {
-                const to = e.target.value.trim();
-                if (to && to !== c.name) void act(`${c.name} renamed ${to}`, () => renameCategory(c.id, to)); // 0.9.5 (undo)
-              }}
-            />
-            <button
-              className="icon-btn"
-              style={{ width: 36, height: 36 }}
-              aria-label={`Move ${c.name} up`}
-              disabled={i === 0}
-              onClick={() => move(i, -1)}
-            >
-              <Icon name="up" size={16} />
-            </button>
-            <button
-              className="icon-btn"
-              style={{ width: 36, height: 36 }}
-              aria-label={`Move ${c.name} down`}
-              disabled={i === categories.length - 1}
-              onClick={() => move(i, 1)}
-            >
-              <Icon name="down" size={16} />
-            </button>
-            <button className="icon-btn" style={{ width: 36, height: 36 }} aria-label={`Delete ${c.name}`} onClick={() => remove(c.id, c.name)}>
-              <Icon name="trash" size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
-      <form
-        style={{ display: 'flex', gap: 8 }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void addCategory();
-        }}
-      >
-        <input
-          className="input"
-          placeholder="New category"
-          aria-label="New category name"
-          value={newCat}
-          onChange={(e) => setNewCat(e.target.value)}
-        />
-        <button className="btn" type="submit" disabled={!newCat.trim()}>
-          Add
-        </button>
-      </form>
+      <CategoryEditor section={section} />
       <SaveBar />
     </div>
   );

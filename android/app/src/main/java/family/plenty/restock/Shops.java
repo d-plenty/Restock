@@ -76,6 +76,54 @@ final class Shops {
         add("kmart", "baby", "web", "https://www.kmart.com.au", null);
         add("target", "baby", "web", "https://www.target.com.au", null);
         add("bunnings", "pets", "web", "https://www.bunnings.com.au", null);
+        // 0.11.3 (beta): more shops (shops.ts).
+        add("foodworks", "pantry", "web", "https://www.foodworks.com.au", null);
+        add("drakes", "pantry", "web", "https://www.drakes.com.au", null);
+        add("harrisfarm", "pantry", "web", "https://www.harrisfarm.com.au", null);
+        add("spudshed", "pantry", "web", "https://www.spudshed.com.au", null);
+        add("foodland", "pantry", "web", "https://www.foodlandsa.com.au", null);
+        add("nqr", "pantry", "web", "https://www.nqr.com.au", null);
+        add("supabarn", "pantry", "web", "https://www.supabarn.com.au", null);
+        add("liquorlegends", "keg", "web", "https://liquorlegends.com.au", null);
+        add("bottlemart", "keg", "web", "https://www.bottlemart.com.au", null);
+        add("babykingdom", "baby", "web", "https://www.babykingdom.com.au", null);
+        add("babyland", "baby", "web", "https://www.babyland.com.au", null);
+        add("babyvillage", "baby", "web", "https://www.babyvillage.com.au", null);
+        add("bestfriendspets", "pets", "web", "https://www.bestfriendspets.com.au", null);
+        add("peto", "pets", "web", "https://peto.com.au", null);
+        add("budgetpet", "pets", "web", "https://www.budgetpetproducts.com.au", null);
+        add("petquarters", "pets", "web", "https://www.petquarters.com.au", null);
+        add("supercheap", "pets", "web", "https://www.supercheapauto.com.au", null);
+        add("repco", "pets", "web", "https://www.repco.com.au", null);
+        add("autobarn", "pets", "web", "https://www.autobarn.com.au", null);
+        add("autopro", "pets", "web", "https://autopro.com.au", null);
+        add("burson", "pets", "web", "https://www.burson.com.au", null);
+        add("mitre10", "pets", "web", "https://www.mitre10.com.au", null);
+        add("totaltools", "pets", "web", "https://www.totaltools.com.au", null);
+        add("sydneytools", "pets", "web", "https://sydneytools.com.au", null);
+        add("homehardware", "pets", "web", "https://www.homehardware.com.au", null);
+        add("bcf", "pets", "web", "https://www.bcf.com.au", null);
+        add("anaconda", "pets", "web", "https://www.anacondastores.com", null);
+        add("kings", "pets", "web", "https://www.4wdsupacentre.com.au", null);
+        add("tentworld", "pets", "web", "https://www.tentworld.com.au", null);
+        add("kathmandu", "pets", "web", "https://www.kathmandu.com.au", null);
+        add("rebel", "pets", "web", "https://www.rebelsport.com.au", null);
+        add("decathlon", "pets", "web", "https://www.decathlon.com.au", null);
+        add("jbhifi", "pets", "web", "https://www.jbhifi.com.au", null);
+        add("officeworks", "pets", "web", "https://www.officeworks.com.au", null);
+        add("goodguys", "pets", "web", "https://www.thegoodguys.com.au", null);
+        add("harveynorman", "pets", "web", "https://www.harveynorman.com.au", null);
+        add("binglee", "pets", "web", "https://www.binglee.com.au", null);
+        add("spotlight", "pets", "web", "https://www.spotlightstores.com", null);
+        add("lincraft", "pets", "web", "https://www.lincraft.com.au", null);
+        add("ikea", "pets", "web", "https://www.ikea.com/au/en/", null);
+        add("adairs", "pets", "web", "https://www.adairs.com.au", null);
+        add("pillowtalk", "pets", "web", "https://www.pillowtalk.com.au", null);
+        add("mecca", "pets", "web", "https://www.mecca.com/en-au/", null);
+        add("adorebeauty", "pets", "web", "https://www.adorebeauty.com.au", null);
+        add("rejectshop", "pets", "web", "https://www.rejectshop.com.au", null);
+        add("cheapaschips", "pets", "web", "https://www.cheapaschips.com.au", null);
+        add("reddot", "pets", "web", "https://www.reddot.com.au", null);
     }
 
     /** 0.10.3: every tab, in order (shops.ts SECTIONS). */

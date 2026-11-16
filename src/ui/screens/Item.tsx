@@ -1,3 +1,5 @@
+import { tidyItemName } from '../../lib/itemName';
+import { ShelfNotices } from './ShelfNotices';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { flavourNoteFor, flavourSets } from '../../lib/flavours';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
@@ -31,6 +33,7 @@ import { money, parseMoney, tidySize } from '../../lib/units';
 import { amountToConfirm, basisWord, lastUpdatedText, newestReading, priceLine, productLine, sizeLabel, type CompareStyle } from '../../lib/unitPrice';
 import { useLive } from '../../lib/useLive';
 import {
+  eachPriceOf,
   ALERT_LEVELS,
   computeStats,
   HISTORY_DAYS,
@@ -651,6 +654,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             )}
           </div>
         )}
+        {/* 0.11.3: a pick whose pack changed size, or that its shop no longer lists */}
+        <ShelfNotices rec={rec} />
         {costcoHere.map((p) => (
           <div key={`costco-check-${p.id}`} style={{ padding: '0 14px 12px' }}>
             <button className="btn small" style={{ minHeight: 44 }} disabled={checkingCostco} onClick={() => void checkCostco(p)}>
@@ -864,7 +869,7 @@ export function EditSheet({
     const t = parseFloat(target.replace(/[^0-9.]/g, ''));
     // 0.9.5 (undo)
     await act(`Saved ${name.trim() || group.name}`, () => updateGroup(group.id, {
-      name: name.trim() || group.name,
+      name: tidyItemName(name) || group.name, // 0.11.3: starts with a capital
       categoryId: categoryId || undefined,
       alertLevel,
       alertPct: alertLevel === 'custom' ? alertPct : undefined,
@@ -1354,7 +1359,9 @@ function HistoryPicker({ options, picked, onPick }: { options: Option[]; picked:
   // 100 g, say); grams against a count can't be compared, so the shelf price decides, as in What I buy.
   const mains = options.filter((x) => x.role !== 'alt' && x.price !== undefined);
   const sameMeasure = mains.every((x) => x.unitPrice !== undefined) && new Set(mains.map((x) => productQty(x.product).unit)).size === 1;
-  const costOf = (x: Option) => (sameMeasure ? x.unitPrice : x.price);
+  // 0.11.3: different measures, but each says how many are in it: the price of one (as recommend does).
+  const byEach = !sameMeasure && mains.length > 1 && mains.every((x) => eachPriceOf(x) !== undefined);
+  const costOf = (x: Option) => (sameMeasure ? x.unitPrice : byEach ? eachPriceOf(x) : x.price);
   const low = mains.length > 1 ? Math.min(...mains.map((x) => costOf(x)!)) : undefined;
   const off = (x: Option) =>
     x.unitPrice !== undefined && x.normalUnitPrice && x.unitPrice < x.normalUnitPrice * 0.97

@@ -27,7 +27,9 @@ describe('nearby stores', () => {
     expect(chainOf({ name: 'Coles Express' })).toBeUndefined();
     // 0.10.3: IGA is one of Restock's supermarkets now.
     expect(chainOf({ name: 'IGA Kirwan' })).toBe('iga');
-    expect(chainOf({ name: 'Foodworks' })).toBeUndefined();
+    // 0.11.3: Foodworks is one too.
+    expect(chainOf({ name: 'Foodworks' })).toBe('foodworks');
+    expect(chainOf({ name: 'Corner Mart' })).toBeUndefined();
   });
 
   it('reads Overpass results, nearest first, with a suburb in the name', () => {
@@ -40,7 +42,7 @@ describe('nearby stores', () => {
             tags: { shop: 'supermarket', brand: 'Coles', name: 'Coles', 'addr:suburb': 'Kirwan' },
           },
           { type: 'node', lat: -19.3, lon: 146.7, tags: { shop: 'supermarket', brand: 'ALDI', name: 'ALDI Burdell' } },
-          { type: 'node', lat: -19.3, lon: 146.7, tags: { shop: 'supermarket', name: 'Foodworks' } },
+          { type: 'node', lat: -19.3, lon: 146.7, tags: { shop: 'supermarket', name: 'Corner Mart' } },
         ],
       },
       { lat: -19.31, lon: 146.69 },

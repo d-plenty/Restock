@@ -85,7 +85,7 @@ export interface PackSize extends ParsedSize {
 const PACK_WORD = /^(packs?|pk|cans?|bottles?)$/;
 
 /** "24 Pack", "30 cans" or "6pk" anywhere in a name: how many in the pack (more than one). */
-function packCountIn(name: string | undefined | null): number | undefined {
+export function packCountIn(name: string | undefined | null): number | undefined {
   const m = name?.toLowerCase().match(/(\d+)\s*(packs?|pk|cans?|bottles?)\b/);
   const n = m ? parseInt(m[1], 10) : 0;
   return n > 1 ? n : undefined;

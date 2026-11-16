@@ -33,6 +33,7 @@ describe('0.9.14 Send prices back', () => {
     expect(shareShape(p({ storeProductId: 'demo-1' }))).toBeUndefined();
     expect(shareShape(p({ storeProductId: '../x' }))).toBeUndefined();
     expect(shareShape(p({ price: undefined }))).toBeUndefined();
-    expect(shareShape(p({ chain: 'costco', storeProductId: '51210' }))?.chain).toBe('costco');
+    // 0.11.3: Costco is no longer shared.
+    expect(shareShape(p({ chain: 'costco', storeProductId: '51210' }))).toBeUndefined();
   });
 });

@@ -5,6 +5,7 @@
 // bar's green arrow opens the details sheet (name, which list incl. General, Picked for you at your
 // other shops, category), then Track, Add to list, or both. The server saves it all (the price the
 // shop gave it), and this browser's copy gets it at the sync that follows.
+import { tidyItemName } from '../../lib/itemName';
 import { flavourBarNote } from '../../lib/flavours';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { allCategories, deleteListEntries } from '../../lib/db';
@@ -18,6 +19,7 @@ import { chainName, type ListEntry } from '../../types';
 import { ChainDot, ChainName, Icon, LoadingBar, MemberTag, Sheet, specialTag, Thumb } from '../../ui/components';
 import { promoLabel } from '../../stores/http';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from '../../ui/screens/addPicks';
+import { CategoryPick } from '../../ui/screens/Categories';
 import { AddBtn, AddPair, addButtonsNote, AlwaysTick, pickButtonsNote, toPantryNote } from '../../ui/screens/addPickWords';
 import { useNav } from '../../ui/nav';
 import { ScanButton } from '../pwa/WebScanner';
@@ -204,7 +206,7 @@ export function WebShopSearch({
     setBusyAs(target);
     setSaveError(undefined);
     try {
-      const itemName = name.trim() || suggestedName(picks.values(), forLine?.word);
+      const itemName = tidyItemName(name) || suggestedName(picks.values(), forLine?.word); // 0.11.3: starts with a capital
       // 0.9.11: from the Pick sheet "both" makes the item and the line becomes it, so the server only makes the item.
       const sent: Target = forLine && target === 'both' ? 'pantry' : target;
       const body = addBody(answer.search, picks.values(), { target: sent, tab, list: forLine || target === 'pantry' ? tab : listPick, name: itemName, categoryId });
@@ -345,19 +347,14 @@ export function WebShopSearch({
     </div>
   );
 
-  const categorySelect = listPick !== 'general' && (cats?.length ?? 0) > 0 && (
-    <label className="field">
+  // 0.11.3: with "New category…" at the bottom, as on a phone (so it shows with no categories yet too).
+  const categorySelect = listPick !== 'general' && (
+    <div className="field">
       <span>Category</span>
-      <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-        <option value="">No category</option>
-        {cats!.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-    </label>
+      <CategoryPick section={tab} categories={cats ?? []} value={categoryId} onChange={setCategoryId} />
+    </div>
   );
+  const categoryName = cats?.find((c) => c.id === categoryId)?.name;
 
   return (
     <div className="web-shop-search" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
@@ -519,7 +516,7 @@ export function WebShopSearch({
               <AddBtn target="both" busy={busyAs} blocked={picks.size > 6} className="btn primary" onClick={() => void save('both')}>
                 <Icon name="cart" size={18} /> Add to both
               </AddBtn>
-              <AddPair section={tab} disabled={picks.size > 6} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
+              <AddPair section={tab} category={categoryName} disabled={picks.size > 6} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
               <p className="small" style={{ margin: 0 }}>
                 {pickButtonsNote(SECTION_PLACE[tab])}
               </p>
@@ -559,13 +556,13 @@ export function WebShopSearch({
                   <AddBtn target="both" busy={busyAs} blocked={picks.size > 6} className="btn primary" onClick={() => void save('both')}>
                     <Icon name="cart" size={18} /> Add to both
                   </AddBtn>
-                  <AddPair section={tab} disabled={picks.size > 6} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
+                  <AddPair section={tab} category={categoryName} disabled={picks.size > 6} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
                 </>
               )}
               <p className="small" style={{ margin: 0 }}>
                 {listPick === 'general'
                   ? `Add to list puts it on the list for this trip only, at the price shown. General is a list only: Add to both also puts it in ${SECTION_PLACE[tab]}.`
-                  : addButtonsNote(SECTION_PLACE[tab])}
+                  : addButtonsNote(SECTION_PLACE[tab], categoryName)}
               </p>
             </>
           )}

@@ -3,14 +3,16 @@ import type { StoreProduct } from '../stores/types';
 import { RestockNative } from './sql/native';
 import { cachedSettings, getKV, putKV, queryRows } from './db';
 import type { Settings } from '../types';
+import { SHARED_PRICE_SHOPS } from '../shops';
 
 // 0.9.14: "Send prices back" (Settings → Privacy and sharing, on unless turned off). What a search
-// shows from Coles, Woolworths, Aldi and Costco waits in the "priceShareOutbox" store entry, and
+// shows from Coles, Woolworths and Aldi waits in the "priceShareOutbox" store entry, and
 // PriceShare.java sends it, with the prices price checks read, to Restock's shared price service
 // (restock-prices.plenty.family/share/prices). Only what the shop's website said: a price typed in
 // by hand is never in a search result or a price check, so it never goes. Android app only.
 
-export const SHARE_SHOPS = ['coles', 'woolworths', 'aldi', 'costco'] as const;
+// 0.11.3: one list (shops.ts SHARED_PRICE_SHOPS) for what is sent and what is downloaded. Costco is no longer shared.
+export const SHARE_SHOPS = SHARED_PRICE_SHOPS;
 export const SHARE_URL = 'https://restock-prices.plenty.family/share/prices';
 const OUTBOX = 'priceShareOutbox';
 const MAX_WAITING = 4000;

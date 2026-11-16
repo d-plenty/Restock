@@ -29,6 +29,7 @@ import { MyCatalogueScreen } from './screens/MyCatalogue';
 import { PermissionsScreen } from './screens/Permissions';
 import { HomeScreen } from './screens/Home';
 import { HouseholdScreen } from './screens/Household';
+import { CategoriesScreen } from './screens/Categories';
 import { ItemScreen } from './screens/Item';
 import { ListScreen } from './screens/List';
 import { Onboarding } from './screens/Onboarding';
@@ -533,6 +534,7 @@ function RestockApp() {
               {stack[stack.length - 1].name === 'restockServer' && <RestockServerScreen />}
               {stack[stack.length - 1].name === 'homeAssistant' && <HomeAssistantScreen />}
               {stack[stack.length - 1].name === 'household' && <HouseholdScreen />}
+              {stack[stack.length - 1].name === 'categories' && <CategoriesScreen section={(stack[stack.length - 1] as { section: Section }).section} />}
               {stack[stack.length - 1].name === 'diagnostics' && <DiagnosticsScreen />}
               {stack[stack.length - 1].name === 'soon' && <SoonScreen id={(stack[stack.length - 1] as { id: string }).id} />}
             </div>
@@ -600,6 +602,7 @@ function RestockApp() {
         {top.name === 'restockServer' && <RestockServerScreen />}
         {top.name === 'homeAssistant' && <HomeAssistantScreen />}
         {top.name === 'household' && <HouseholdScreen />}
+        {top.name === 'categories' && <CategoriesScreen section={top.section} />}
         {top.name === 'setup' && <SetupScreen />}
         {top.name === 'diagnostics' && <DiagnosticsScreen />}
         {top.name === 'specials' && <SpecialsScreen />}

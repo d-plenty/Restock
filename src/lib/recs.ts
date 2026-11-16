@@ -4,6 +4,7 @@ import { customShop, priceSource, sectionOn, shopDef, tabsOf } from '../shops';
 import { allGroups, cardChains, getProducts, getProductsByBarcode, getSettings, groupProductIds, readingsFor } from './db';
 import { hasSize } from './unitPrice';
 import { recommend, type Recommendation } from './verdict';
+import { processShelf, shelfNotes, type ShelfWatch } from './shelfWatch';
 
 /**
  * The shops whose prices count (0.9.0): the ones switched on, on a tab that's switched on, and the
@@ -42,5 +43,12 @@ export async function loadRecommendations(): Promise<Recommendation[]> {
   // 0.9.6: a product with no size can copy it from the same barcode anywhere in the catalogue.
   const codes = productRows.filter((p) => p.barcode && !hasSize(p)).map((p) => p.barcode!);
   const same = codes.length ? (await getProductsByBarcode(codes)).filter((p) => !products.has(p.id)) : [];
-  return groups.map((g) => recommend(g, products, readings, cards, now, on, same));
+  // 0.11.3: packs that changed size and products a shop no longer lists (this phone's price checks).
+  const watch = await processShelf().catch(() => ({}) as ShelfWatch);
+  const watching = Object.keys(watch).length > 0;
+  return groups.map((g) => {
+    const rec = recommend(g, products, readings, cards, now, on, same);
+    if (watching) rec.shelf = shelfNotes(rec.options.map((o) => o.product), watch);
+    return rec;
+  });
 }

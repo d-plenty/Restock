@@ -180,7 +180,56 @@ export type PharmacyChain =
   | 'chempro';
 /** 0.10.3 (beta): IGA, and the baby, pet and big box shops. Read from their websites ('web'). */
 export type MoreChain = 'iga' | 'babybunting' | 'bigw' | 'kmart' | 'target' | 'petbarn' | 'petstock' | 'petcircle' | 'bunnings';
-export type BuiltinChain = GroceryChain | LiquorChain | PharmacyChain | MoreChain;
+/** 0.11.3 (beta): more shops to pick from, all read from their websites ('web') and none tried on a phone before release. */
+export type Chain0113 =
+  | 'foodworks'
+  | 'drakes'
+  | 'harrisfarm'
+  | 'spudshed'
+  | 'foodland'
+  | 'nqr'
+  | 'supabarn'
+  | 'liquorlegends'
+  | 'bottlemart'
+  | 'babykingdom'
+  | 'babyland'
+  | 'babyvillage'
+  | 'bestfriendspets'
+  | 'peto'
+  | 'budgetpet'
+  | 'petquarters'
+  | 'supercheap'
+  | 'repco'
+  | 'autobarn'
+  | 'autopro'
+  | 'burson'
+  | 'mitre10'
+  | 'totaltools'
+  | 'sydneytools'
+  | 'homehardware'
+  | 'bcf'
+  | 'anaconda'
+  | 'kings'
+  | 'tentworld'
+  | 'kathmandu'
+  | 'rebel'
+  | 'decathlon'
+  | 'jbhifi'
+  | 'officeworks'
+  | 'goodguys'
+  | 'harveynorman'
+  | 'binglee'
+  | 'spotlight'
+  | 'lincraft'
+  | 'ikea'
+  | 'adairs'
+  | 'pillowtalk'
+  | 'mecca'
+  | 'adorebeauty'
+  | 'rejectshop'
+  | 'cheapaschips'
+  | 'reddot';
+export type BuiltinChain = GroceryChain | LiquorChain | PharmacyChain | MoreChain | Chain0113;
 /** A shop the person added themselves (a website and a name). */
 export type CustomChain = `custom-${string}`;
 export type Chain = BuiltinChain | CustomChain | 'other';
@@ -224,7 +273,11 @@ export interface ShopDef {
 }
 
 /** 0.10.3: the headings in the shop picker, every tab's picker listing every shop under them. */
-export type ShopGroup = 'supermarket' | 'pharmacy' | 'bottle' | 'baby' | 'pet' | 'bigbox' | 'other';
+export type ShopGroup =
+  | 'supermarket' | 'pharmacy' | 'bottle' | 'baby' | 'pet' | 'bigbox'
+  // 0.11.3
+  | 'auto' | 'hardware' | 'outdoors' | 'sport' | 'electronics' | 'home' | 'beauty' | 'variety'
+  | 'other';
 export const SHOP_GROUPS: { id: ShopGroup; name: string }[] = [
   { id: 'supermarket', name: 'Supermarkets' },
   { id: 'pharmacy', name: 'Chemists' },
@@ -232,6 +285,14 @@ export const SHOP_GROUPS: { id: ShopGroup; name: string }[] = [
   { id: 'baby', name: 'Baby shops' },
   { id: 'pet', name: 'Pet shops' },
   { id: 'bigbox', name: 'Big box shops' },
+  { id: 'auto', name: 'Automotive' },
+  { id: 'hardware', name: 'Hardware and garden' },
+  { id: 'outdoors', name: 'Outdoors and camping' },
+  { id: 'sport', name: 'Sport' },
+  { id: 'electronics', name: 'Electronics and office' },
+  { id: 'home', name: 'Home and craft' },
+  { id: 'beauty', name: 'Health and beauty' },
+  { id: 'variety', name: 'Discount variety' },
   { id: 'other', name: 'Other shops' },
 ];
 const GROUP_OF: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bottle', pharmacy: 'pharmacy', baby: 'baby', pets: 'pet', ...slots('other' as ShopGroup) };
@@ -492,12 +553,73 @@ export const SHOPS: ShopDef[] = [
     website: 'https://www.bunnings.com.au',
     search: 'https://www.bunnings.com.au/search/products?q={q}',
     map: /bunnings/i,
-    group: 'other',
+    group: 'hardware',
   }),
+
+  // 0.11.3 (beta): more shops under each heading, and eight new headings. Each is read from its
+  // website like the chemists, with its search page found from its home page (no saved address), and
+  // none was tried on a phone before release: the shop test (Settings) says how each one goes.
+  W('pantry', { id: 'foodworks', name: 'Foodworks', color: '#e31837', website: 'https://www.foodworks.com.au', map: /food\s?works/i }),
+  W('pantry', { id: 'drakes', name: 'Drakes', color: '#d71920', website: 'https://www.drakes.com.au', map: /\bdrakes\b/i, note: 'SA and Queensland' }),
+  W('pantry', { id: 'harrisfarm', name: 'Harris Farm Markets', color: '#00704a', website: 'https://www.harrisfarm.com.au', map: /harris farm/i }),
+  W('pantry', { id: 'spudshed', name: 'Spudshed', color: '#f58220', website: 'https://www.spudshed.com.au', map: /spud\s?shed/i, note: 'Western Australia' }),
+  W('pantry', { id: 'foodland', name: 'Foodland', color: '#e2001a', website: 'https://www.foodlandsa.com.au', map: /\bfoodland\b/i, note: 'South Australia' }),
+  W('pantry', { id: 'nqr', name: 'NQR', color: '#ed1c24', website: 'https://www.nqr.com.au', map: /\bnqr\b/i, note: 'Victoria' }),
+  W('pantry', { id: 'supabarn', name: 'Supabarn', color: '#007a33', website: 'https://www.supabarn.com.au', map: /supabarn/i }),
+  L({ id: 'liquorlegends', name: 'Liquor Legends', color: '#f7941d', website: 'https://liquorlegends.com.au', map: /liquor legends/i }),
+  L({ id: 'bottlemart', name: 'Bottlemart', color: '#c8102e', website: 'https://www.bottlemart.com.au', map: /bottlemart/i }),
+  W('baby', { id: 'babykingdom', name: 'Baby Kingdom', color: '#5b2d8e', website: 'https://www.babykingdom.com.au', map: /baby kingdom/i }),
+  W('baby', { id: 'babyland', name: 'Babyland', color: '#00a0df', website: 'https://www.babyland.com.au', map: /\bbabyland\b/i }),
+  W('baby', { id: 'babyvillage', name: 'Baby Village', color: '#6fbe44', website: 'https://www.babyvillage.com.au', map: /baby village/i }),
+  W('pets', { id: 'bestfriendspets', name: 'Best Friends Pets', color: '#f15a29', website: 'https://www.bestfriendspets.com.au', map: /best friends/i }),
+  W('pets', { id: 'peto', name: 'PETO (My Pet Warehouse)', color: '#00a3ad', website: 'https://peto.com.au', map: /\bpeto\b|my pet warehouse/i }),
+  W('pets', { id: 'budgetpet', name: 'Budget Pet Products', color: '#e31b23', website: 'https://www.budgetpetproducts.com.au', map: /budget pet/i, note: 'Online only, delivered' }),
+  W('pets', { id: 'petquarters', name: 'PETQuarters', color: '#0072ce', website: 'https://www.petquarters.com.au', map: /pet\s?quarters/i }),
+  W('pets', { id: 'supercheap', name: 'Supercheap Auto', color: '#e2231a', website: 'https://www.supercheapauto.com.au', map: /super\s?cheap/i, group: 'auto' }),
+  W('pets', { id: 'repco', name: 'Repco', color: '#d0021b', website: 'https://www.repco.com.au', map: /\brepco\b/i, group: 'auto' }),
+  W('pets', { id: 'autobarn', name: 'Autobarn', color: '#ffcb05', website: 'https://www.autobarn.com.au', map: /autobarn/i, group: 'auto' }),
+  W('pets', { id: 'autopro', name: 'Autopro', color: '#0054a6', website: 'https://autopro.com.au', map: /\bautopro\b/i, group: 'auto' }),
+  W('pets', { id: 'burson', name: 'Burson Auto Parts', color: '#00529b', website: 'https://www.burson.com.au', map: /\bburson/i, group: 'auto' }),
+  W('pets', { id: 'mitre10', name: 'Mitre 10', color: '#0055a4', website: 'https://www.mitre10.com.au', map: /mitre\s?10/i, group: 'hardware' }),
+  W('pets', { id: 'totaltools', name: 'Total Tools', color: '#e4002b', website: 'https://www.totaltools.com.au', map: /total tools/i, group: 'hardware' }),
+  W('pets', { id: 'sydneytools', name: 'Sydney Tools', color: '#ffd100', website: 'https://sydneytools.com.au', map: /sydney tools/i, group: 'hardware' }),
+  W('pets', { id: 'homehardware', name: 'Home Timber & Hardware', color: '#00843d', website: 'https://www.homehardware.com.au', map: /home (timber|hardware)/i, group: 'hardware' }),
+  W('pets', { id: 'bcf', name: 'BCF', color: '#f47b20', website: 'https://www.bcf.com.au', map: /\bbcf\b|boating camping fishing/i, group: 'outdoors' }),
+  W('pets', { id: 'anaconda', name: 'Anaconda', color: '#00693c', website: 'https://www.anacondastores.com', map: /\banaconda\b/i, group: 'outdoors' }),
+  W('pets', { id: 'kings', name: 'Kings (4WD Supacentre)', color: '#f26522', website: 'https://www.4wdsupacentre.com.au', map: /4wd supa\s?centre|adventure kings/i, group: 'outdoors' }),
+  W('pets', { id: 'tentworld', name: 'Tentworld', color: '#00a651', website: 'https://www.tentworld.com.au', map: /tentworld/i, group: 'outdoors' }),
+  W('pets', { id: 'kathmandu', name: 'Kathmandu', color: '#231f20', website: 'https://www.kathmandu.com.au', map: /kathmandu/i, group: 'outdoors' }),
+  W('pets', { id: 'rebel', name: 'Rebel', color: '#e4002b', website: 'https://www.rebelsport.com.au', map: /\brebel\b/i, group: 'sport' }),
+  W('pets', { id: 'decathlon', name: 'Decathlon', color: '#0082c3', website: 'https://www.decathlon.com.au', map: /decathlon/i, group: 'sport' }),
+  W('pets', { id: 'jbhifi', name: 'JB Hi-Fi', color: '#ffe600', website: 'https://www.jbhifi.com.au', map: /jb hi-?fi/i, group: 'electronics' }),
+  W('pets', { id: 'officeworks', name: 'Officeworks', color: '#0061a8', website: 'https://www.officeworks.com.au', map: /officeworks/i, group: 'electronics' }),
+  W('pets', { id: 'goodguys', name: 'The Good Guys', color: '#0072bc', website: 'https://www.thegoodguys.com.au', map: /good guys/i, group: 'electronics' }),
+  W('pets', { id: 'harveynorman', name: 'Harvey Norman', color: '#0054a6', website: 'https://www.harveynorman.com.au', map: /harvey norman/i, group: 'electronics' }),
+  W('pets', { id: 'binglee', name: 'Bing Lee', color: '#e30613', website: 'https://www.binglee.com.au', map: /bing lee/i, group: 'electronics' }),
+  W('pets', { id: 'spotlight', name: 'Spotlight', color: '#e4002b', website: 'https://www.spotlightstores.com', map: /\bspotlight\b/i, group: 'home' }),
+  W('pets', { id: 'lincraft', name: 'Lincraft', color: '#d6006e', website: 'https://www.lincraft.com.au', map: /lincraft/i, group: 'home' }),
+  W('pets', { id: 'ikea', name: 'IKEA', color: '#0058a3', website: 'https://www.ikea.com/au/en/', map: /\bikea\b/i, group: 'home' }),
+  W('pets', { id: 'adairs', name: 'Adairs', color: '#1d1d1b', website: 'https://www.adairs.com.au', map: /\badairs\b/i, group: 'home' }),
+  W('pets', { id: 'pillowtalk', name: 'Pillow Talk', color: '#6d6e71', website: 'https://www.pillowtalk.com.au', map: /pillow talk/i, group: 'home' }),
+  W('pets', { id: 'mecca', name: 'Mecca', color: '#c8102e', website: 'https://www.mecca.com/en-au/', map: /\bmecca\b/i, group: 'beauty' }),
+  W('pets', { id: 'adorebeauty', name: 'Adore Beauty', color: '#f4a6b7', website: 'https://www.adorebeauty.com.au', map: /adore beauty/i, group: 'beauty', note: 'Online only, delivered' }),
+  W('pets', { id: 'rejectshop', name: 'The Reject Shop', color: '#e2231a', website: 'https://www.rejectshop.com.au', map: /reject shop/i, group: 'variety' }),
+  W('pets', { id: 'cheapaschips', name: 'Cheap as Chips', color: '#ed1c24', website: 'https://www.cheapaschips.com.au', map: /cheap as chips/i, group: 'variety' }),
+  W('pets', { id: 'reddot', name: 'Red Dot', color: '#e30613', website: 'https://www.reddot.com.au', map: /\bred dot\b/i, group: 'variety', note: 'Western Australia' }),
 ];
 
 /** 0.10.3: the shops marked Beta in the picker (besides every shop on a Beta tab). */
-export const BETA_SHOPS: readonly string[] = ['costco', 'iga', 'babybunting', 'petbarn', 'petstock', 'petcircle', 'bigw', 'kmart', 'target', 'bunnings'];
+export const BETA_SHOPS: readonly string[] = ['costco', 'iga', 'babybunting', 'petbarn', 'petstock', 'petcircle', 'bigw', 'kmart', 'target', 'bunnings',
+  // 0.11.3
+  'foodworks', 'drakes', 'harrisfarm', 'spudshed', 'foodland', 'nqr', 'supabarn', 'liquorlegends', 'bottlemart', 'babykingdom', 'babyland', 'babyvillage', 'bestfriendspets', 'peto', 'budgetpet', 'petquarters', 'supercheap', 'repco', 'autobarn', 'autopro', 'burson', 'mitre10', 'totaltools', 'sydneytools', 'homehardware', 'bcf', 'anaconda', 'kings', 'tentworld', 'kathmandu', 'rebel', 'decathlon', 'jbhifi', 'officeworks', 'goodguys', 'harveynorman', 'binglee', 'spotlight', 'lincraft', 'ikea', 'adairs', 'pillowtalk', 'mecca', 'adorebeauty', 'rejectshop', 'cheapaschips', 'reddot',
+];
+
+/**
+ * 0.11.3: the shops whose prices are shared: sent to restock-prices and downloaded as shared history
+ * (lib/priceShare.ts, lib/market.ts, PriceShare.java SHOPS). Costco was one until 0.11.3. A phone
+ * keeps the Costco history it already downloaded; nothing new is fetched or sent.
+ */
+export const SHARED_PRICE_SHOPS = ['coles', 'woolworths', 'aldi'] as const;
 
 const BY_ID = new Map<string, ShopDef>(SHOPS.map((s) => [s.id, s]));
 export const GROCERY: GroceryChain[] = ['woolworths', 'coles', 'aldi'];

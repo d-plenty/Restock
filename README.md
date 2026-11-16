@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.11.2" src="https://img.shields.io/badge/status-release%20candidate%200.11.2-ffcd00">
+  <img alt="Release candidate 0.11.3" src="https://img.shields.io/badge/status-release%20candidate%200.11.3-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0112">New in 0.11.2</a> ·
+  <a href="#new-in-0113">New in 0.11.3</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -134,11 +134,25 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Look and colours**: Light, Dark or System, with true black for OLED screens; Australian or Plain; 24 accent colours; 16 app icon colours.
 - **Accessibility**: the first step of setup and its own page in Settings: text size, bold text, high contrast, easier reading spacing, bigger buttons, no swiping, less motion and more. See [Accessibility](#accessibility).
 - **Updates**: Settings → About → Check for updates, or turn on **Tell me when there's an update** to check every 24 hours (or every 7 days) when you open Restock. Or install through [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium and let them handle updates.
-- **Shared prices**: one switch, on unless you turn it off (Settings → Privacy and sharing, or setup). Your phone downloads 8 weeks, 6 months or 12 months of shared history for your shops from [restock-prices](https://github.com/d-plenty/restock-prices) (Restock's own collection of Coles, Woolworths, Aldi and Costco prices, from its collector and from phones), weekly or every day, so new items get a fair verdict from day one. In return it shares the shelf prices it reads from those shops (shop, product, size, barcode, the price and the day). Prices you type in yourself never go, nothing about you is ever included, and the data is free on GitHub and will never be sold. See [Shared prices](#shared-prices).
+- **Shared prices**: one switch, on unless you turn it off (Settings → Privacy and sharing, or setup). Your phone downloads 8 weeks, 6 months or 12 months of shared history for your shops from [restock-prices](https://github.com/d-plenty/restock-prices) (Restock's own collection of Coles, Woolworths and Aldi prices, from its collector and from phones), weekly or every day, so new items get a fair verdict from day one. In return it shares the shelf prices it reads from those shops (shop, product, size, barcode, the price and the day). Prices you type in yourself never go, nothing about you is ever included, and the data is free on GitHub and will never be sold. See [Shared prices](#shared-prices).
 - **Your data**: Settings → Your data shows what you spent (from what you tick off), where, what specials saved, and any item's price over time, on the phone alone or, with **Share my spending with the server** (on unless you turn it off), your household's figures from your Restock server.
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.11.3
+
+- **Smaller pack.** When a price check finds that a product you track now comes in another size under the same product number (500 g became 450 g), the item says so, with how much dearer that makes it per 100 g, per litre or each at the same price. Restock compares it by the new size from then on. Woolworths, Coles and Aldi.
+- **No longer sold.** When a shop's website keeps answering that a product isn't there, the item says so, with the date it was last found. It is never worked out from "out of stock", and one failed check is never enough: Woolworths is asked for the product by its number and is believed after two price checks on separate days; Coles and Aldi are looked up by searching for the product's name, so Restock waits for three and says "may not sell this any more". Found again, the notice clears by itself.
+- **Find a replacement.** On that notice, one search of that shop, only when you press it, with how each result compares ("450g, was 500g · 11% more per 100 g"). **Use this** swaps it into your item after you confirm, with Undo. If the search turns up the old product after all, the notice goes.
+- **Edit categories on the phone.** Each tab's categories have a screen of their own, opened from **Settings → Your shops → a tab → Edit categories**, and from **Edit** at the top of Pantry, Bottle shop, Chemist and your own sections. A phone on a Restock server had no way to them before. When adding something, the category box has **New category…** at the bottom.
+- **"Add to Whiskers".** With a category picked when adding, the left button is named after it instead of the tab.
+- **Sorting knows your own categories.** A category named for the thing ("Coffee") takes items with that word, and common ones know what belongs in them ("Snacks": chips and biscuits). Pantry only, as before.
+- **More shops to pick from (Beta).** Eight new headings in every tab's shop picker: Automotive, Hardware and garden, Outdoors and camping, Sport, Electronics and office, Home and craft, Health and beauty, and Discount variety, plus more supermarkets, bottle shops, baby shops and pet shops. They are read from their websites like the chemists, and **none was tried on a phone before release**: Settings → Help → Test your shops says how each one goes on yours. A shop that asks "are you a robot?" shows you its own page to pass yourself (Unblock, as before); Restock never tries to get past one.
+- **Custom sections say Beta** at the top of the tab and its page in Settings, in more words.
+- **The price of one.** Picks measured differently that all say how many are in the pack (a "4 pack 360g" and a "6 pack") are compared by the price of one, instead of saying "Measured differently".
+- **Shared prices are Coles, Woolworths and Aldi.** Costco's prices are no longer sent to the shared price service or downloaded from it. Costco is still a shop you can pick, and its prices stay on your phone and your own Restock server.
+- **Small things:** an item's name typed all in small letters gets a capital; "Search your keg" reads "Search your bottle shop items".
 
 ## New in 0.11.2
 
@@ -342,7 +356,7 @@ Beta: the shopping list's totals, made clear and made right.
 
 The first release candidate for Restock 1.0: everything is in, and now it's being tested.
 
-- **Shared prices, one switch:** *Judge new items from day one* and *Send prices back* are now one setting, **Shared prices**, on by default (Settings → Privacy and sharing, and in setup). New items get a fair verdict from day one, and in return your phone shares the shelf prices it reads from Coles, Woolworths, Aldi and Costco. The page spells out what goes, what never goes, and where it goes: public on GitHub ([restock-prices](https://github.com/d-plenty/restock-prices)), free, never sold. Turning it off asks you first, then works straight away.
+- **Shared prices, one switch:** *Judge new items from day one* and *Send prices back* are now one setting, **Shared prices**, on by default (Settings → Privacy and sharing, and in setup). New items get a fair verdict from day one, and in return your phone shares the shelf prices it reads from Coles, Woolworths and Aldi. The page spells out what goes, what never goes, and where it goes: public on GitHub ([restock-prices](https://github.com/d-plenty/restock-prices)), free, never sold. Turning it off asks you first, then works straight away.
 - **Had sharing off?** It stays off. Restock asks once whether to turn Shared prices on, and if you do, it starts from then: nothing read while it was off is sent.
 - **Your data with a server:** with a Restock server, Your data shows your household's figures from the server, the same on every phone. **Share my spending with the server** (Settings → Sync and backups, on unless you turn it off) sends the spending your phone worked out before it joined, once.
 - **Keg and Health are marked Beta.** They work exactly the same way and are set up in the same place; they just haven't been tested as thoroughly as Groceries yet, and they'll keep being tested before they come out of beta.
@@ -356,7 +370,7 @@ Settings sorted out for everyone, your spending on the phone, and shared prices 
 - **Settings, simpler:** Setup, then **Your shops** (Supermarkets for the Pantry tab, Bottle shops for Keg, Chemists for Health), **Everyday** (Shopping list and receipts, Prices and deals, Notifications, Cards), **Your phone** (Your data, Sync and backups, Privacy and sharing, Look and accessibility), **Help** (Help, Feedback, About) and **Advanced**. The web page's Settings has the same groups in the same order.
 - **Your data (new):** what you spent from what you tick off, where you shop, what specials saved, what you buy most, and any item's price over time, like the server's Data tab. Without a server it's worked out on the phone (counting starts with this version). With a Restock server it shows the server's figures.
 - **One price history setting:** *How far back Restock looks* (8 weeks, 6 months or 12 months) covers both the prices your phone keeps and the shared history it downloads. Get new shared prices **weekly** (after the Thursday collection) or **every day**, and Download now says plainly when nothing's published yet.
-- **Send prices back works:** the shelf prices your searches and price checks read from Coles, Woolworths, Aldi and Costco go to restock-prices, which adds them each night for everyone's day-one prices. Prices you type in never go. Turn it off in Privacy and sharing.
+- **Send prices back works:** the shelf prices your searches and price checks read from Coles, Woolworths and Aldi go to restock-prices, which adds them each night for everyone's day-one prices. Prices you type in never go. Turn it off in Privacy and sharing.
 - **Help and About are separate.** Help has the tour, sample items, **Check my shops are working** and Feedback; About has updates, the fine print and **Credits** for the open data and code Restock uses.
 - **Advanced** (was Beta and development) holds diagnostics, shop connections and the price helper phone, with **Erase everything** at the bottom.
 - **Specials:** "Things I buy" is now **Suggested**. Feedback links straight to GitHub.
@@ -394,7 +408,7 @@ Fixes and tidy-ups, mostly for the price helper phone.
 - **Local backups** make a **Documents/Restock backups** folder for you. Change folder picks another.
 - **Cards:** the card scanner reads any barcode or QR code on a loyalty or gift card and fills in the number. The highlighted choices sit properly in their boxes.
 - **Pick my coconut cream:** the line's search button and "Pick my …" open the same search, which ends with **Add to both**, **Add to list** or **Add to pantry** (the line then comes off your list). "Next time "coconut cream" is added to your list, use this item" is ticked to start with. The same on the web page.
-- **Judge deals from day one** now reads [restock-prices](https://github.com/d-plenty/restock-prices), Restock's own weekly collection of Coles, Woolworths, Aldi and Costco prices, with hotprices.org filling in Coles and Woolworths while it gets going.
+- **Judge deals from day one** now reads [restock-prices](https://github.com/d-plenty/restock-prices), Restock's own weekly collection of Coles, Woolworths and Aldi prices, with hotprices.org filling in Coles and Woolworths while it gets going.
 - **Price helper phone:** Settings → Shared prices → Price helper phone. A spare Android phone left on its charger searches Coles and Woolworths for about 500 everyday things through the week (the first page of results each time, about one search every 10 minutes) and sends the products and prices to your restock-prices collector, for everyone's shared price history.
 
 ## New in 0.9.10
@@ -470,7 +484,7 @@ Restock is meant for everyone. Accessibility is the first step of setup (there's
 - If you run your own Restock server, it holds your household's data (what each phone chooses to share) so it can work around the clock. It's yours, at home; keep its data folder private. Card numbers and shop sign-ins stay on your phones unless you choose to share cards.
 - No Google Play services, Firebase or ML Kit, so it runs on de-Googled phones (GrapheneOS, CalyxOS, /e/OS).
 - Every permission is optional and explained, and asked for only when a feature needs it.
-- The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists, and GitHub for updates and the shared price history), and to your own Home Assistant and Restock server if you connect them. **Nothing about you goes to the people who make Restock.** They get feedback only if you send it, and, with Shared prices on (the default), the shelf prices your phone reads from Coles, Woolworths, Aldi and Costco, which are published for everyone. Turn it off in Settings → Privacy and sharing.
+- The app talks directly to the shops and a few open services (Open Food Facts, OpenStreetMap, the official recall lists, and GitHub for updates and the shared price history), and to your own Home Assistant and Restock server if you connect them. **Nothing about you goes to the people who make Restock.** They get feedback only if you send it, and, with Shared prices on (the default), the shelf prices your phone reads from Coles, Woolworths and Aldi, which are published for everyone. Turn it off in Settings → Privacy and sharing.
 - **Your server only contacts the shops if you turn on Let the web page search the shops**, and then only when someone presses Search on its web page. Nothing runs in the background, and no shop sign-ins are kept.
 - **Erase everything** (at the bottom of Settings) deletes your data, signs you out of the shops inside Restock and clears what the app saved, files it shared included. Backups can be locked with a password.
 
@@ -487,7 +501,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.11.2.apk` (on macOS, `shasum -a 256 restock-0.11.2.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.11.3.apk` (on macOS, `shasum -a 256 restock-0.11.3.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

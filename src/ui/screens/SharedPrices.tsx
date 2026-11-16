@@ -19,7 +19,7 @@ export const SHARED_TITLE = 'Shared prices';
 export const SHARED_ONE_LINE =
   "New items get a fair verdict from day one, from prices everyone's phones and Restock's own collection have seen. In return, your phone shares the shelf prices it reads from the shops.";
 export const SHARED_GOES =
-  "What a search or price check reads straight from Coles, Woolworths, Aldi and Costco's websites: each product's shop, product number, name, brand, size, barcode and picture link, the price with any special, member price or multi-buy, and the day.";
+  "What a search or price check reads straight from Coles, Woolworths and Aldi's websites: each product's shop, product number, name, brand, size, barcode and picture link, the price with any special, member price or multi-buy, and the day.";
 export const SHARED_NEVER =
   'Anything you type in or change yourself, who you are, your account, cards, branch or location, your lists, pantry or what you tick off, receipts, or the words you search. Prices from shops you added yourself and sample items stay here too.';
 export const SHARED_WHERE =
@@ -138,7 +138,7 @@ export function SharedPricesSection({ settings }: { settings: Settings }) {
           <p className="small" style={{ margin: 0 }}>
             <strong>What you get:</strong> {SHARED_GET}
             {covered.length ? ` For ${covered.map(chainName).join(', ')}.` : ''}
-            {notCovered.length ? ` ${notCovered.map(chainName).join(', ')} ${notCovered.length === 1 ? "isn't" : "aren't"} collected yet.` : ''}
+            {notCovered.length ? ` ${notCovered.map(chainName).join(', ')} ${notCovered.length === 1 ? "isn't" : "aren't"} part of shared prices.` : ''}
           </p>
           <p className="small" style={{ margin: 0 }}>
             {SHARED_INSTALL}

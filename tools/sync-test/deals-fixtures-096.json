@@ -32,6 +32,21 @@
      {"id": "a", "chain": "aldi", "name": "Cola 6 Pack", "size": "6 Pack", "price": 5},
      {"id": "c", "chain": "coles", "name": "Cola 1.25L", "size": "1.25L", "price": 3},
      {"id": "w", "chain": "woolworths", "name": "Cola 2L", "size": "2L", "price": 4}],
-   "main": ["a", "c", "w"], "alts": [], "best": "w", "action": "none"}
+   "main": ["a", "c", "w"], "alts": [], "best": "w", "action": "none"},
+  {"name": "0.11.3 the price of one: a 6 pack at $5 ($0.83 each) beats a 4 pack 360g at $3.70 ($0.93 each)",
+   "products": [
+     {"id": "c", "chain": "coles", "name": "Coles Bakery Bagels Plain 4 pack 360g", "size": "4 pack 360g", "price": 3.7},
+     {"id": "w", "chain": "woolworths", "name": "Woolworths Plain Bagels 6 pack", "size": "6 pack", "price": 5}],
+   "main": ["c", "w"], "alts": [], "best": "w", "action": "none"},
+  {"name": "0.11.3 a single 420g can and a 3 pack: no count for the single, so the shelf price decides",
+   "products": [
+     {"id": "a", "chain": "aldi", "name": "Baked Beans 420g", "size": "420g", "price": 2},
+     {"id": "w", "chain": "woolworths", "name": "Baked Beans 3 pack", "size": "3 pack", "price": 4}],
+   "main": ["a", "w"], "alts": [], "best": "a", "action": "none"},
+  {"name": "0.11.3 grams and millilitres are never set against each other by count",
+   "products": [
+     {"id": "a", "chain": "aldi", "name": "Deodorant 2 pack 240g", "size": "2 x 120g", "price": 8},
+     {"id": "b", "chain": "coles", "name": "Deodorant 2 pack 500mL", "size": "2 x 250mL", "price": 10}],
+   "main": ["a", "b"], "alts": [], "best": "a", "action": "none"}
  ]
 }

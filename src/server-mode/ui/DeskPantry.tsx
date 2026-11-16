@@ -19,14 +19,15 @@ import { money, parseMoney, tidySize } from '../../lib/units';
 import { productLine, sizeLabel, type CompareStyle } from '../../lib/unitPrice';
 import { useLive } from '../../lib/useLive';
 import { ALERT_LEVELS, bothPrices, computeStats, HISTORY_DAYS, multiBuy, optionStyle, tiedWithBest, withMarket, type Option, type Recommendation } from '../../lib/verdict';
-import { SECTION_NAMES, type Section, slots } from '../../shops';
+import { isCustomSection, SECTION_NAMES, type Section, slots } from '../../shops';
 import { chainName, type AlertLevel } from '../../types';
-import { ChainName, Icon, MoreInfo, PriceChart, previewFromOption, ProductPreview, Thumb, SearchField, type PreviewProduct } from '../../ui/components';
+import { BetaTag, ChainName, Icon, MoreInfo, PriceChart, previewFromOption, ProductPreview, Thumb, SearchField, type PreviewProduct } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { EditSheet, LastUpdated, PriceSheet } from '../../ui/screens/Item';
 import { DEAL_RANK, underTarget } from '../../ui/screens/Pantry';
 import { ActionInfoTag } from '../../ui/tagInfo';
 import { PhoneOnlyNote } from './PhoneOnly';
+import { CategoriesSheet } from './DeskSettings';
 import { DeskHead, firstPhoto, ItemPhoto, takeOpenItem } from './deskShared';
 import { serverHistory } from '../live';
 import type { PriceReading } from '../../types';
@@ -40,7 +41,7 @@ const SORTS: { id: Sort; label: string }[] = [
 ];
 const SEARCH_HINT: Record<Section, string> = {
   pantry: 'Search the pantry',
-  keg: 'Search the keg',
+  keg: 'Search your bottle shop items',
   pharmacy: 'Search your pharmacy items',
   baby: 'Search your baby things',
   pets: 'Search your pet things',
@@ -48,7 +49,7 @@ const SEARCH_HINT: Record<Section, string> = {
 };
 const EMPTY: Record<Section, string> = {
   pantry: 'Your pantry is empty. Add the things you buy on a phone, and Restock watches their prices.',
-  keg: 'Nothing in the keg yet. Add the beer, wine or spirits you buy on a phone.',
+  keg: 'Nothing here yet. Add the beer, wine or spirits you buy on a phone.',
   pharmacy: 'Nothing here yet. Add the medicine, first aid and personal care things you buy on a phone.',
   baby: 'Nothing here yet. Add the nappies, wipes and baby things you buy on a phone.',
   pets: 'Nothing here yet. Add the pet food, litter and treats you buy on a phone.',
@@ -80,6 +81,7 @@ export function DeskPantry({ section }: { section: Section }) {
   const entries = useLive(allListEntries, []);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [catsOpen, setCatsOpen] = useState(false);
   const [sort, setSort] = useState<Sort>('az');
   const [open, setOpen] = useState<string | undefined>(takeOpenItem);
   // 0.10.9: an item's photo, with the blue ⓘ, opens the product in full, as on the phone
@@ -117,6 +119,11 @@ export function DeskPantry({ section }: { section: Section }) {
       <div className={`dk-with-panel${open ? ' has-panel' : ''}`}>
         <section className="dk-wide" aria-label={SECTION_NAMES[section]}>
           <DeskHead title={SECTION_NAMES[section]} sub={`${recs.length} item${recs.length === 1 ? '' : 's'}`}>
+            {/* 0.11.3: a custom tab says Beta at the top, and every tab opens its categories from here */}
+            {isCustomSection(section) && <BetaTag />}
+            <button className="btn small" onClick={() => setCatsOpen(true)}>
+              <Icon name="pencil" size={16} /> Categories
+            </button>
             <div className="dk-search">
               <label htmlFor="dk-pq" className="sr-only">
                 {SEARCH_HINT[section]}
@@ -251,6 +258,7 @@ export function DeskPantry({ section }: { section: Section }) {
           <p className="small">Adding items and checking prices happen on your phones. Everything else about an item can be changed here.</p>
         </section>
         {looking && <ProductPreview product={looking} onClose={() => setLooking(undefined)} />}
+        {catsOpen && <CategoriesSheet sections={[{ section, title: SECTION_NAMES[section] }]} onClose={() => setCatsOpen(false)} />}
         {open && <ItemPanel key={open} groupId={open} listed={onList.get(open)} onClose={() => setOpen(undefined)} nav={nav} />}
       </div>
     </div>
@@ -468,6 +476,8 @@ function ItemPanel({ groupId, listed, onClose, nav }: { groupId: string; listed?
       </section>
 
       <PhoneOnlyNote compact text="Checking prices now happens on your phones." />
+      {/* 0.11.3: greyed here, and says where it works */}
+      <PhoneOnlyNote compact text="Pack-size changes, &quot;no longer sold&quot; notices and Find a replacement show on your phones, on the phone that checked the price." />
       {pricing && <PriceSheet options={rec.options} productId={chartOpt?.product.id} onClose={() => setPricing(false)} />}
       {editing && <EditSheet group={group} categories={categories} onClose={() => setEditing(false)} />}
     </aside>

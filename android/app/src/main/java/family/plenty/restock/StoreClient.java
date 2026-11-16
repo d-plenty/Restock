@@ -38,6 +38,9 @@ final class StoreClient {
          * {} when Coles says it doesn't know, null when it said nothing (its online store).
          */
         JSONObject aisle;
+        /** 0.11.3: the size and name the shop gives now (Woolworths, Coles, Aldi), for noticing a pack that changed (ShelfWatch). */
+        String size;
+        String name;
     }
 
     /** Makes a request from inside a store's own web page (StoreWeb on Android). Returns {status, body}. */
@@ -94,8 +97,16 @@ final class StoreClient {
     private boolean wooliesSession;
     private String colesKey;
 
+    /**
+     * 0.11.3: why the last refresh answered null, when the shop itself said the product isn't there:
+     * "gone" (its page for that product number: not found) or "unlisted" (a search for its name doesn't
+     * list that number). Null for anything else (no price, an answer Restock couldn't read).
+     */
+    String miss;
+
     /** Returns null when the product can't be found any more (discontinued, renamed). */
     Quote refresh(String chain, String storeProductId, String name, String storeId) throws Exception {
+        miss = null;
         switch (chain) {
             case "woolworths":
                 if (wooliesAccount && web != null) return woolworthsWeb(storeProductId);
@@ -355,14 +366,17 @@ final class StoreClient {
 
     private Quote woolworthsWeb(String stockcode) throws Exception {
         Resp r = viaWeb("woolworths", "GET", "/apis/ui/product/detail/" + enc(stockcode), null);
-        if (r.status == 404) return null;
+        if (r.status == 404) {
+            miss = "gone";
+            return null;
+        }
         JSONObject data = parse("Woolworths", r);
         JSONObject p = data.optJSONObject("Product");
         return mapWoolworths(p != null ? p : data);
     }
 
     private Quote aldiWeb(String sku, String name, String storeId) throws Exception {
-        return findAldi(parse("Aldi", viaWeb("aldi", "GET", aldiUrl(name, storeId), null)), sku);
+        return listedOrMiss(parse("Aldi", viaWeb("aldi", "GET", aldiUrl(name, storeId), null)), "data", sku, false);
     }
 
     // ---------- Woolworths ----------
@@ -375,7 +389,10 @@ final class StoreClient {
         Map<String, String> h = json(WOOLIES + "/shop/productdetails/" + stockcode);
         h.put("Origin", WOOLIES);
         Resp r = request("GET", WOOLIES + "/apis/ui/product/detail/" + enc(stockcode), h, null);
-        if (r.status == 404) return null;
+        if (r.status == 404) {
+            miss = "gone";
+            return null;
+        }
         JSONObject data = parse("Woolworths", r);
         JSONObject p = data.optJSONObject("Product");
         return mapWoolworths(p != null ? p : data);
@@ -405,6 +422,8 @@ final class StoreClient {
         String img = str(p, "MediumImageFile");
         q.imageUrl = img != null ? img : str(p, "SmallImageFile");
         q.inStock = Boolean.FALSE.equals(bool(p, "IsInStock")) || Boolean.FALSE.equals(bool(p, "IsAvailable")) ? Boolean.FALSE : first(bool(p, "IsInStock"), bool(p, "IsAvailable"));
+        q.size = str(p, "PackageSize");
+        q.name = str(p, "DisplayName") != null ? str(p, "DisplayName") : str(p, "Name");
         return q;
     }
 
@@ -439,7 +458,7 @@ final class StoreClient {
         if (web != null) {
             Resp resp = viaWeb("coles", "GET", colesSearchPath(name, storeId), null);
             if (resp.status <= 0) throw new BlockedException("Coles", COLES_UNBLOCK);
-            return findColes(parse("Coles", resp), id);
+            return listedOrMiss(parse("Coles", resp), "results", id, true);
         }
         if (colesKey == null) {
             Resp home = request("GET", COLES + "/", html(), null);
@@ -449,7 +468,30 @@ final class StoreClient {
         String url = COLES + "/api/bff/products/search?storeId=" + enc(storeId != null && !storeId.isEmpty() ? storeId : COLES_DEFAULT_STORE)
             + "&searchTerm=" + enc(name) + "&start=0&sortBy=salesDescending&excludeAds=true&authenticated=false&subscription-key=" + enc(colesKey);
         Resp r = request("GET", url, json(COLES + "/search/products?q=" + enc(name)), null);
-        return findColes(parse("Coles", r), id);
+        return listedOrMiss(parse("Coles", r), "results", id, true);
+    }
+
+    /**
+     * 0.11.3: the product from a search's answer, and when the answer is a proper list that doesn't have
+     * that product number, `miss` says so ("unlisted"). An answer with no list at all says nothing.
+     */
+    private Quote listedOrMiss(JSONObject data, String listKey, String id, boolean coles) {
+        Quote q = coles ? findColes(data, id) : findAldi(data, id);
+        if (q == null && !lists(data.optJSONArray(listKey), id)) miss = data.optJSONArray(listKey) != null ? "unlisted" : null;
+        return q;
+    }
+
+    /** Is this product number in the list (Coles "id"; Aldi "sku", or "id" when that's all there is)? */
+    static boolean lists(JSONArray items, String id) {
+        if (items == null) return false;
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject p = items.optJSONObject(i);
+            if (p == null) continue;
+            Object v = p.opt("sku");
+            if (v == null || v == JSONObject.NULL) v = p.opt("id");
+            if (id.equals(String.valueOf(v)) || id.equals(String.valueOf(p.opt("id")))) return true;
+        }
+        return false;
     }
 
     private static Quote findColes(JSONObject data, String id) {
@@ -492,6 +534,11 @@ final class StoreClient {
         }
         q.inStock = bool(p, "availability");
         q.aisle = Aisles.coles(p);
+        // The name as coles.ts makes it: the brand first, unless the name already starts with it.
+        q.size = str(p, "size");
+        String cn = str(p, "name");
+        String cb = str(p, "brand");
+        q.name = cn != null && cb != null && !cn.toLowerCase(java.util.Locale.ROOT).startsWith(cb.toLowerCase(java.util.Locale.ROOT)) ? cb + " " + cn : cn;
         return q;
     }
 
@@ -602,7 +649,7 @@ final class StoreClient {
             }
         }
         if (data == null) throw last;
-        return findAldi(data, sku);
+        return listedOrMiss(data, "data", sku, false);
     }
 
     private static Quote findAldi(JSONObject data, String sku) {
@@ -649,6 +696,8 @@ final class StoreClient {
         q.member = false; // Aldi has no loyalty program
         // Aldi Australia has no online grocery shopping, so "notForSale" is true for everything: stock unknown.
         q.inStock = null;
+        q.size = str(p, "sellingSize");
+        q.name = str(p, "name");
         return q;
     }
 

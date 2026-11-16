@@ -245,6 +245,41 @@ public class SyncTest093 {
                 && "on special in all 2 sizes".equals(Deals.flavourNote(beans, java.util.Arrays.asList(true, true)));
             check(ok2, "flavours 0.11.2: sizes, and no pack size or number as a name");
         }
+        // 0.11.3: what a price check notices besides the price (ShelfWatch), and what the shops' answers give it.
+        {
+            JSONObject w = new JSONObject();
+            boolean ok = true;
+            // Found, same size (written differently): nothing kept.
+            ok &= !ShelfWatch.note(w, "p1", "500g", "500 G", "Milo 500g", true, null, "2026-11-16") && w.length() == 0;
+            // The shop says "not found": counted once a day, whatever the number of checks that day.
+            ok &= ShelfWatch.note(w, "p1", "500g", null, null, false, "gone", "2026-11-16");
+            ok &= !ShelfWatch.note(w, "p1", "500g", null, null, false, "gone", "2026-11-16");
+            ok &= ShelfWatch.note(w, "p1", "500g", null, null, false, "gone", "2026-11-19");
+            JSONObject miss = w.getJSONObject("p1").getJSONObject("miss");
+            ok &= miss.getInt("n") == 2 && "2026-11-16".equals(miss.getString("since")) && "2026-11-19".equals(miss.getString("last")) && "gone".equals(miss.getString("why"));
+            // A block, a timeout, no price: not an answer, so nothing is counted.
+            ok &= !ShelfWatch.note(w, "p2", "1L", null, null, false, null, "2026-11-16") && !w.has("p2");
+            // Found again: the count is wiped.
+            ok &= ShelfWatch.note(w, "p1", "500g", "500g", "Milo 500g", true, null, "2026-11-21") && !w.has("p1");
+            // Another size for the same product number: remembered once, for the app to work out.
+            ok &= ShelfWatch.note(w, "p3", "500g", "450g", "Milo 450g", true, null, "2026-11-16");
+            ok &= !ShelfWatch.note(w, "p3", "500g", "450 g", "Milo 450g", true, null, "2026-11-19");
+            ok &= "450g".equals(w.getJSONObject("p3").getJSONObject("saw").getString("size")) && "2026-11-16".equals(w.getJSONObject("p3").getJSONObject("saw").getString("at"));
+            // Once the kept size is the new one, it's forgotten.
+            ok &= ShelfWatch.note(w, "p3", "450g", "450g", "Milo 450g", true, null, "2026-11-23") && !w.has("p3");
+            ok &= ShelfWatch.watched("coles") && ShelfWatch.watched("aldi") && ShelfWatch.watched("woolworths") && !ShelfWatch.watched("costco") && !ShelfWatch.watched("bws") && !ShelfWatch.watched("bunnings");
+            check(ok, "shelf watch 0.11.3: not found counted once a day, wiped when found, another size remembered");
+
+            StoreClient.Quote wq = StoreClient.mapWoolworths(new JSONObject().put("Price", 9.5).put("PackageSize", "450g").put("DisplayName", "Nestle Milo 450g").put("Name", "Milo"));
+            StoreClient.Quote cq = StoreClient.mapColes(new JSONObject().put("name", "Milo Choc Malt").put("brand", "Nestle").put("size", "450g").put("pricing", new JSONObject().put("now", 9.5)));
+            StoreClient.Quote aq = StoreClient.mapAldi(new JSONObject().put("name", "Choc Malt 450g").put("sellingSize", "0.45 kg").put("price", new JSONObject().put("amountRelevant", 499)));
+            boolean ok3 = "450g".equals(wq.size) && "Nestle Milo 450g".equals(wq.name)
+                && "450g".equals(cq.size) && "Nestle Milo Choc Malt".equals(cq.name)
+                && "0.45 kg".equals(aq.size) && "Choc Malt 450g".equals(aq.name);
+            org.json.JSONArray list = new org.json.JSONArray().put(new JSONObject().put("id", 123)).put(new JSONObject().put("sku", "000000000000456789"));
+            ok3 &= StoreClient.lists(list, "123") && StoreClient.lists(list, "000000000000456789") && !StoreClient.lists(list, "999") && !StoreClient.lists(null, "123");
+            check(ok3, "shelf watch 0.11.3: the shops' answers give the size and name, and whether a search lists a product");
+        }
         // 0.10.8: custom sections' icons are emoji only and names have no hidden marks (the same as shops.ts)
         {
             boolean ok = true;

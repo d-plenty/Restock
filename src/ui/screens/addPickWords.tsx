@@ -60,22 +60,34 @@ const placeWord = (place: string) => place.replace(/^your /, '').replace(/^./, (
 
 /** 0.10.4: under Add to both / Add to pantry / Add to list when adding something new, in the buttons' order. */
 // 0.10.7: shorter
-export const addButtonsNote = (place: string) =>
-  `${placeWord(place)}: Restock keeps watching its price. List: just for this trip. Both: the two together.`;
+// 0.11.3: with a category picked, the left button is named after it ("Add to Whiskers"), so the note is too.
+export const addButtonsNote = (place: string, category?: string) =>
+  category
+    ? `${addToWord(category)}: kept in ${place} under ${category}, and Restock keeps watching its price. List: just for this trip. Both: the two together.`
+    : `${placeWord(place)}: Restock keeps watching its price. List: just for this trip. Both: the two together.`;
+
+/** 0.11.3: a category's name on a button: kept short enough that "Add to …" fits beside "Add to list". */
+export const addToWord = (category: string) => {
+  const c = category.trim();
+  return c.length > 16 ? `${c.slice(0, 15).trimEnd()}…` : c;
+};
 
 /**
  * 0.10.4: the pair under the big green "Add to both": Add to pantry on the left (filled navy),
- * Add to list on the right (white). Keg and Health say "Add to keg" / "Add to health". The same
+ * Add to list on the right (white). Bottle shop and Chemist say "Add to bottle shop" / "Add to chemist"; 0.11.3: with a category picked, "Add to <category>". The same
  * on the phone's Add tab, the Pick sheet and the web page.
  */
 export function AddPair({
   section,
+  category,
   disabled,
   busy,
   onPantry,
   onList,
 }: {
   section: Section;
+  /** 0.11.3: the category picked for it: the button says "Add to <category>" instead of the tab's name. */
+  category?: string;
   /** Nothing to add yet: greyed. */
   disabled?: boolean;
   /** 0.10.7: which button is saving right now. */
@@ -86,7 +98,7 @@ export function AddPair({
   return (
     <div className="two add-pair">
       <AddBtn target="pantry" busy={busy} blocked={disabled} className="btn pantry" onClick={onPantry}>
-        <Icon name={section} size={18} /> Add to {SECTION_NAMES[section].toLowerCase()}
+        <Icon name={section} size={18} /> Add to {category ? addToWord(category) : SECTION_NAMES[section].toLowerCase()}
       </AddBtn>
       <AddBtn target="list" busy={busy} blocked={disabled} className="btn listbtn" onClick={onList}>
         <Icon name="cart" size={18} /> Add to list

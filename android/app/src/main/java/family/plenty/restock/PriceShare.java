@@ -16,7 +16,7 @@ import org.json.JSONObject;
 
 /**
  * 0.9.14: "Send prices back" (Settings → Privacy and sharing, on unless turned off). The shelf
- * prices this phone read from Coles, Woolworths, Aldi and Costco go to Restock's shared price
+ * prices this phone read from Coles, Woolworths and Aldi go to Restock's shared price
  * service (the restock-prices collector, lib/share.mjs there), for everyone's day-one prices:
  *  - prices a price check on this phone recorded from the shop (source "auto") since the last send,
  *    never ones another phone or the Restock server synced here (that phone sends its own);
@@ -29,7 +29,7 @@ import org.json.JSONObject;
 final class PriceShare {
     private static final String TAG = "RestockShare";
     static final String URL = "https://restock-prices.plenty.family/share/prices";
-    static final String[] SHOPS = {"coles", "woolworths", "aldi", "costco"};
+    static final String[] SHOPS = {"coles", "woolworths", "aldi"};
     private static final int BATCH = 2000;
     private static final int MAX_ROWS = 8000;
     private static final Object LOCK = new Object();
@@ -139,7 +139,7 @@ final class PriceShare {
         String sql = "SELECT r.id, p.chain, p.store_product_id, p.name, p.brand, p.size, p.barcode, p.image_url, r.price, r.was_price, r.is_special, r.member_only, r.promo, r.date"
             + " FROM prices r JOIN products p ON p.id = r.product_id"
             + " WHERE r.id > ? AND r.source = 'auto' AND r.date >= ?"
-            + " AND p.chain IN ('coles', 'woolworths', 'aldi', 'costco') AND p.store_product_id IS NOT NULL AND p.store_product_id != '' AND p.id NOT LIKE 'demo-%'"
+            + " AND p.chain IN ('coles', 'woolworths', 'aldi') AND p.store_product_id IS NOT NULL AND p.store_product_id != '' AND p.id NOT LIKE 'demo-%'"
             // Only what this phone read itself: a price another phone (or the Restock server) synced here
             // was sent by that phone already, so it isn't sent twice (and can't count as a second phone).
             + " AND NOT EXISTS (SELECT 1 FROM sync_log l WHERE l.tbl = 'prices' AND l.pk = r.product_id || '|' || r.date"

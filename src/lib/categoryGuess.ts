@@ -1,8 +1,9 @@
 // 0.11.2: a category for a new pantry item, from its name. Category was tucked away under "Category and
 // alerts" when adding, so nearly everything landed in "Other". Now an item you add without choosing one
 // goes where its name says (Shampoo → Bathroom), and Pantry offers to sort the ones already in "Other".
-// Only the four categories the Pantry tab starts with are guessed, matched to your own categories by
-// name; an item that fits none stays in "Other", and you can always move it.
+// The four categories the Pantry tab starts with are guessed, matched to your own categories by name
+// (0.11.3: and categories you made yourself, where an item's name plainly fits); an item that fits
+// none stays in "Other", and you can always move it.
 import type { Category, Section } from '../types';
 
 export type CategoryKind = 'pantry' | 'fridge' | 'cleaning' | 'bathroom';
@@ -45,13 +46,55 @@ const KIND_OF_CATEGORY: [CategoryKind, RegExp][] = [
   ['pantry', /pantry|cupboard|staples|dry goods/i],
 ];
 
+// 0.11.3: categories you made yourself. A category named for the thing ("Coffee", "Whiskers") takes
+// items with that word in their name, and a few common ones know what belongs in them ("Snacks":
+// chips, biscuits). Only where the name makes it plain: anything else is left for the four above.
+const OWN_KINDS: [RegExp, RegExp][] = [
+  [/snack|treat/i, has('chips|crisps|popcorn|biscuits?|cookies|crackers|chocolates?|lollies|muesli bars?|nut bars?|pretzels|corn chips|twisties|shapes|rice crackers')],
+  [/drink|beverage/i, has('soft drinks?|lemonade|cola|coke|pepsi|sodas?|cordial|juices?|mineral water|sparkling water|soda water|tonic water|energy drinks?|iced tea|kombucha|solo|creaming soda')],
+  [/breakfast|cereal/i, has('cereals?|oats|muesli|granola|weet-?bix|porridge|corn ?flakes')],
+  [/baking/i, has('flour|sugar|baking (?:powder|soda|paper)|cake mix|cake in a cup|yeast|cocoa|vanilla|icing')],
+  [/\b(?:pets?|dogs?|cats?)\b/i, has('dogs?|cats?|kittens?|pupp(?:y|ies)|pets?|cat litter|kitty litter')],
+  [/\b(?:baby|babies|bub)\b/i, has('napp(?:y|ies)|baby|wipes|formula')],
+  [/meat|butcher|deli/i, has('bacon|ham|salami|chicken|mince|sausages?|steaks?|beef|lamb|pork')],
+  [/fruit|veg|produce/i, has('apples?|bananas?|oranges?|mandarins?|grapes|berries|strawberries|blueberries|potato(?:es)?|onions?|carrots?|lettuce|tomato(?:es)?|avocados?|capsicums?|broccoli|mushrooms?|cucumbers?|spinach|lemons?|limes?|pumpkin')],
+  [/bakery|bread/i, has('bread|bagels?|bread rolls?|wraps|muffins|crumpets|buns|loaf|loaves')],
+  [/frozen|freezer/i, has('frozen|ice ?cream|icy poles?|wedges|potato gems|hash browns?|nuggets')],
+];
+/** Category words that say nothing about what goes in them. */
+const VAGUE = new Set(['other', 'others', 'misc', 'food', 'foods', 'item', 'items', 'thing', 'things', 'stuff', 'extra', 'extras', 'more', 'general', 'house', 'home', 'shop', 'shopping', 'weekly', 'and', 'the', 'for', 'our', 'your']);
+const stem = (w: string) => (w.length > 4 ? w.replace(/(?:ies)$/, 'y').replace(/(?:es|s)$/, '') : w.length > 3 ? w.replace(/s$/, '') : w);
+const wordsOf = (t: string) => t.toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter(Boolean);
+
+/** 0.11.3: one of your own categories this name plainly belongs in, or undefined. */
+export function ownCategoryId(name: string, mine: Pick<Category, 'id' | 'name'>[]): string | undefined {
+  const inName = new Set(wordsOf(name).map(stem));
+  if (!inName.size) return undefined;
+  // A category named for the thing itself: "Coffee" takes "Coffee pods".
+  for (const c of mine) {
+    if (KIND_OF_CATEGORY.some(([, rx]) => rx.test(c.name))) continue; // the four starting ones are worked out below
+    const words = wordsOf(c.name).filter((w) => w.length >= 3 && !VAGUE.has(w));
+    if (words.length && words.some((w) => inName.has(stem(w)))) return c.id;
+  }
+  // A category for a kind of thing: "Snacks" takes "Corn chips".
+  for (const [cat, things] of OWN_KINDS) {
+    if (!things.test(name)) continue;
+    const c = mine.find((x) => cat.test(x.name));
+    if (c) return c.id;
+  }
+  return undefined;
+}
+
 /**
  * The id of your category for this name, or undefined. `names` are the item's name first, then its
- * products' names (used when the item's own name says nothing: "Bickfords").
+ * products' names (used when the item's own name says nothing: "Bickfords"). 0.11.3: a category you
+ * made yourself comes first when the item's own name fits it (ownCategoryId).
  */
 export function guessCategoryId(names: string[], categories: Pick<Category, 'id' | 'name' | 'section'>[], section: Section): string | undefined {
   if (section !== 'pantry') return undefined;
   const mine = categories.filter((c) => c.section === section);
+  const own = names[0] ? ownCategoryId(names[0].replace(/[’']/g, ''), mine) : undefined;
+  if (own) return own;
   for (const name of names) {
     const kind = categoryKind(name);
     if (!kind) continue;

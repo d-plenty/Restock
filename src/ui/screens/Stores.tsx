@@ -45,7 +45,7 @@ import {
   stopUsingWoolworths,
 } from '../../lib/accounts';
 import { confirmAction } from '../../lib/confirm';
-import { BETA_NOTE, BETA_SECTIONS, BetaTag, ChainDot, Icon, LoadingBar, Sheet, TopBar, SearchField } from '../components';
+import { BETA_NOTE, BETA_SECTIONS, BetaTag, CUSTOM_BETA_NOTE, ChainDot, Icon, LoadingBar, Sheet, TopBar, SearchField } from '../components';
 import { useNav } from '../nav';
 import { money } from '../../lib/units';
 import {
@@ -999,14 +999,38 @@ export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
   });
   return (
     <div className="screen">
-      <TopBar title={sectionPageTitle(tab)} />
+      <TopBar title={sectionPageTitle(tab)} tag={isCustomSection(tab) ? <BetaTag /> : undefined} />
       {isNew && (
         <p className="small" role="note" style={{ margin: 0 }}>
           Not saved yet. Set it up, then tap <strong>Save section</strong> at the bottom. Going back without saving doesn't keep it.
         </p>
       )}
       {BETA_SECTIONS.includes(tab) && <p className="small" style={{ margin: 0 }}>{BETA_NOTE}</p>}
+      {/* 0.11.3: custom sections say they're in beta on their own page too */}
+      {isCustomSection(tab) && (
+        <p className="small" role="note" style={{ margin: 0 }}>
+          {CUSTOM_BETA_NOTE}
+        </p>
+      )}
       {settings && <StoreFields key={tab} settings={settings} section={tab} />}
+      {/* 0.11.3: this tab's categories (a phone on a Restock server had no way to them) */}
+      {settings && !isNew && (
+        <>
+          <div className="eyebrow">Categories</div>
+          <div className="card flush">
+            <button className="row" onClick={() => nav.push({ name: 'categories', section: tab })}>
+              <Icon name="pencil" size={18} />
+              <span className="grow">
+                <span className="title" style={{ fontSize: 15 }}>
+                  Edit categories
+                </span>
+                <span className="small">The groups your {SECTION_NAMES[tab]} tab is sorted into: add, rename, reorder or delete.</span>
+              </span>
+              <Icon name="chevron" size={18} />
+            </button>
+          </div>
+        </>
+      )}
       {settings && (
         <button
           className="btn primary block"

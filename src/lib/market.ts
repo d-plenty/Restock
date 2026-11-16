@@ -1,6 +1,7 @@
 import { isNative } from '../stores/http';
 import { clearMarket, getKV, marketStatus, refresh } from './db';
 import { RestockNative } from './sql/native';
+import { SHARED_PRICE_SHOPS } from '../shops';
 
 // Shared price history ("Judge new items from day one"): the phone downloads restock-prices'
 // day-one files (Restock's own weekly collection on GitHub) for the shops it uses, and keeps a short
@@ -21,15 +22,15 @@ export const MARKET_WINDOWS = [
 ] as const;
 export type MarketDays = (typeof MARKET_WINDOWS)[number]['days'];
 
-/** The shops restock-prices collects. Others (bottle shops, chemists) have no shared history yet. */
-export const MARKET_SHOPS = ['coles', 'woolworths', 'aldi', 'costco'] as const;
+/** The shops restock-prices collects (0.11.3: shops.ts SHARED_PRICE_SHOPS, the same list prices are sent back for; Costco no longer). Others (bottle shops, chemists) have no shared history yet. */
+export const MARKET_SHOPS = SHARED_PRICE_SHOPS;
 
 /**
  * Until the collector's window/index.json says (it lists each file's real size), a rough guide:
  * products per shop, and bytes per product in each download. A phone keeps one short summary per
  * product (about 120 bytes with its index) whichever length is chosen.
  */
-const GUESS_PRODUCTS: Record<string, number> = { coles: 25_000, woolworths: 24_000, aldi: 6_000, costco: 3_500 };
+const GUESS_PRODUCTS: Record<string, number> = { coles: 25_000, woolworths: 24_000, aldi: 6_000 };
 const GUESS_BYTES_EACH: Record<MarketDays, number> = { 56: 14, 182: 24, 365: 36 };
 const STORED_BYTES_EACH = 120;
 

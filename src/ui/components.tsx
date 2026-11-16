@@ -323,7 +323,7 @@ export function Icon({
 
 // ---------- small pieces ----------
 
-export function TopBar({ title, right, back = true }: { title: string; right?: ReactNode; back?: boolean }) {
+export function TopBar({ title, right, back = true, tag }: { title: string; right?: ReactNode; back?: boolean; /** 0.11.3: a Beta tag after the title. */ tag?: ReactNode }) {
   const nav = useNav();
   return (
     <div className="topbar">
@@ -332,7 +332,10 @@ export function TopBar({ title, right, back = true }: { title: string; right?: R
           <Icon name="back" size={20} />
         </button>
       )}
-      <h1 style={back ? { fontSize: 24 } : undefined}>{title}</h1>
+      <h1 style={back ? { fontSize: 24 } : undefined}>
+        {title}
+        {tag ? <> {tag}</> : null}
+      </h1>
       {right}
     </div>
   );
@@ -350,9 +353,12 @@ export const COSTCO_BETA_NOTE = "Costco is in beta: it works the same way as the
 /** What the Beta means, wherever it's explained (setup, Settings, the tab itself, the web page). */
 export const BETA_NOTE =
   "Beta: it works the same way as Groceries, it just hasn't been tested as thoroughly yet. It'll keep being tested before it comes out of beta.";
-/** 0.10.12: custom sections are beta as a whole: said once, where one is made (not on each start, or on the tabs). */
+/**
+ * 0.10.12: custom sections are beta as a whole. 0.11.3: said with a Beta tag at the top of every
+ * custom tab and its page in Settings as well as where one is made, and in more words.
+ */
 export const CUSTOM_BETA_NOTE =
-  "Custom sections are in beta. They haven't been fully tested yet, so searching can be patchy and there may be bugs.";
+  "Custom sections are still in beta. Not every shop has been fully tested, so a search may find nothing, miss products or show a price that's out of date. Check the price at the shop before you rely on it, and tell us what went wrong in Settings → Send feedback.";
 export function BetaTag({ compact }: { compact?: boolean }) {
   return (
     <span className={compact ? 'beta-mark' : 'tag beta'} aria-label="(beta)">

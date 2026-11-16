@@ -5660,6 +5660,42 @@ svg.icon-info {
 .ph-short {
   margin: 0;
 }
+.shoptest-log {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.shoptest-log .row {
+  padding-left: 0;
+  padding-right: 0;
+}
+/* 0.11.3: a pack that changed size, a pick its shop no longer lists (ShelfNotices.tsx), Edit's way to categories */
+.shelf-note {
+  margin: 4px 14px 12px;
+  gap: 8px;
+  font-size: var(--fs-sm);
+}
+.shelf-note .shelf-what {
+  font-weight: 600;
+}
+.shelf-note > .btn {
+  align-self: flex-start;
+}
+.shelf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.shelf-result {
+  align-items: center;
+}
+.shelf-result .shelf-line {
+  display: block;
+  font-weight: 600;
+}
+.edit-cats {
+  align-self: stretch;
+}
 /* 0.11.2: picks measured differently (mL and g): the note under What I buy */
 .mixed-units {
   margin: 4px 14px 12px;

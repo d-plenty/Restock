@@ -835,9 +835,11 @@ export async function allCategories(): Promise<Category[]> {
   return (await sql().query('SELECT * FROM categories ORDER BY ord')).map(toCategory);
 }
 
-export async function addCategory(name: string, section: Section = 'pantry'): Promise<void> {
+/** Adds a category at the end of its tab's. 0.11.3: answers its id (Add's "New category" picks it straight away). */
+export async function addCategory(name: string, section: Section = 'pantry', id: string = uid()): Promise<string> {
   const [{ m }] = await sql().query<{ m: number | null }>('SELECT MAX(ord) AS m FROM categories');
-  await write([insertCategoryOp({ id: uid(), name, order: (Number(m) || 0) + 1, section })]);
+  await write([insertCategoryOp({ id, name, order: (Number(m) || 0) + 1, section })]);
+  return id;
 }
 
 export async function renameCategory(id: string, name: string): Promise<void> {

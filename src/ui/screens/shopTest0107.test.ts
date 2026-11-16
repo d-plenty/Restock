@@ -57,3 +57,15 @@ describe("0.10.7 Copy the shop's answer", () => {
     expect(page).not.toContain('412 345 678');
   });
 });
+
+// 0.11.3: how a shop went, remembered for the list under the test.
+import { shopOutcome } from './ShopTest';
+describe('shop test outcomes (0.11.3)', () => {
+  it('worked, worked after a check, blocked, or did not work', () => {
+    expect(shopOutcome({ found: [1, 2] })).toBe('worked');
+    expect(shopOutcome({ found: [1], botCheck: true })).toBe('check');
+    expect(shopOutcome({ found: [], error: 'x', botCheck: true })).toBe('blocked');
+    expect(shopOutcome({ found: [], error: 'x', blocked: true })).toBe('blocked');
+    expect(shopOutcome({ found: [], error: 'The shop answered, but nothing came back for that word.' })).toBe('failed');
+  });
+});

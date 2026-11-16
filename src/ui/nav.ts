@@ -45,6 +45,8 @@ export type Screen =
   /** 0.9.3: Settings → Home Assistant (the shopping list both ways). */
   | { name: 'homeAssistant' }
   | { name: 'household' }
+  /** 0.11.3: one tab's categories. */
+  | { name: 'categories'; section: Section }
   | { name: 'setup' }
   | { name: 'receipts' }
   | { name: 'receipt'; id?: string }

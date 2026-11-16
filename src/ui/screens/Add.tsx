@@ -1,3 +1,4 @@
+import { tidyItemName } from '../../lib/itemName';
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { seenBefore, type SeenBefore } from '../../lib/seen';
 import { guessCategoryId } from '../../lib/categoryGuess';
@@ -103,6 +104,7 @@ import { OtherSizesCard } from '../OtherSizes';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from './addPicks';
 import { addItemForLineUndoable, addItemFromPicks, pickedWords, saveStoreProducts } from './addSave';
 import { AlertPicker } from './Item';
+import { CategoryPick } from './Categories';
 import { AddBtn, AddPair, addButtonsNote, AlwaysTick, pickButtonsNote, toPantryNote } from './addPickWords';
 
 /**
@@ -2039,14 +2041,7 @@ export function AddScreen({
                   <span>Category and alerts</span>
                 </summary>
                 <div className="explain-body">
-                  <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Category">
-                    <option value="">No category</option>
-                    {categories?.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                  <CategoryPick section={section} categories={categories ?? []} value={categoryId} onChange={setCategoryId} />
                   <AlertPicker level={alertLevel} pct={alertPct} onChange={(l, p) => (setAlertLevel(l), setAlertPct(p))} />
                 </div>
               </details>
@@ -2089,14 +2084,7 @@ export function AddScreen({
                     <span>Category and alerts</span>
                   </summary>
                   <div className="explain-body">
-                    <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Category">
-                      <option value="">No category</option>
-                      {categories?.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                    <CategoryPick section={section} categories={categories ?? []} value={categoryId} onChange={setCategoryId} />
                     <AlertPicker level={alertLevel} pct={alertPct} onChange={(l, p) => (setAlertLevel(l), setAlertPct(p))} />
                   </div>
                 </details>
@@ -2139,13 +2127,13 @@ export function AddScreen({
                     <AddBtn target="both" busy={busyAs} className="btn primary" onClick={() => void save('both')}>
                       <Icon name="cart" size={18} /> Add to both
                     </AddBtn>
-                    <AddPair section={section} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
+                    <AddPair section={section} category={categories?.find((c) => c.id === categoryId)?.name} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
                   </>
                 )}
                 <p className="small" style={{ margin: 0 }}>
                   {tabHidden
                     ? "Add to list puts it on your Shopping list for this trip only, at the price shown. Restock won't keep watching its price."
-                    : addButtonsNote(SECTION_PLACE[section])}
+                    : addButtonsNote(SECTION_PLACE[section], categories?.find((c) => c.id === categoryId)?.name)}
                 </p>
               </>
             )
@@ -2278,7 +2266,7 @@ export function ManualSheet({
         const groupId = uid();
         await addGroup({
           id: groupId,
-          name: n,
+          name: tidyItemName(n), // 0.11.3: starts with a capital
           // 0.11.2: no category chosen: the one its name fits, else none ("Other").
           categoryId: categoryId || guessCategoryId([n], categories.map((c) => ({ ...c, section })), section) || undefined,
           usualProductId: id,
@@ -2346,14 +2334,7 @@ export function ManualSheet({
       {!attachTo && (
         <label className="field">
           <span>Category</span>
-          <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="">None</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <CategoryPick section={section} categories={categories} value={categoryId} onChange={setCategoryId} none="None" />
         </label>
       )}
       {forLine ? (
@@ -2370,8 +2351,8 @@ export function ManualSheet({
           <AddBtn target="both" busy={busyAs} blocked={!name.trim()} className="btn primary" onClick={() => void save('both')}>
             Add to both
           </AddBtn>
-          <AddPair section={section} disabled={!name.trim()} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
-          <p className="small" style={{ margin: 0 }}>{addButtonsNote(SECTION_PLACE[section])}</p>
+          <AddPair section={section} category={categories.find((c) => c.id === categoryId)?.name} disabled={!name.trim()} busy={busyAs} onPantry={() => void save('pantry')} onList={() => void save('list')} />
+          <p className="small" style={{ margin: 0 }}>{addButtonsNote(SECTION_PLACE[section], categories.find((c) => c.id === categoryId)?.name)}</p>
         </>
       )}
     </Sheet>

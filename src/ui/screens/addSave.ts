@@ -3,6 +3,7 @@
 // prices and pantry item either way; from the Pick sheet the list line is then linked to the new
 // item, and "Always use this for chopsticks" saved for it.
 
+import { tidyItemName } from '../../lib/itemName';
 import { guessCategoryId } from '../../lib/categoryGuess';
 import { addGroup, addProduct, addReading, allCategories, findProductByStore, nowIso, uid, updateProduct } from '../../lib/db';
 import { pickItemFor, pickItemOffList } from '../../lib/listPicks';
@@ -73,7 +74,7 @@ export async function addItemFromPicks(picks: Iterable<StoreProduct>, item: NewI
   const categoryId = item.categoryId || guessCategoryId([item.name, ...list.map((p) => p.name)], await allCategories().catch(() => []), item.section);
   const group: Group = {
     id: uid(),
-    name: item.name,
+    name: tidyItemName(item.name), // 0.11.3: starts with a capital
     categoryId: categoryId || undefined,
     usualProductId: ids[0],
     sameProductIds: ids.slice(1),

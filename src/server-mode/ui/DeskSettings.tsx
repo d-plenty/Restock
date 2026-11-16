@@ -6,8 +6,8 @@ import { Fragment, useRef, useState, type KeyboardEvent, type ReactNode } from '
 import { confirmAction } from '../../lib/confirm';
 import { useLive } from '../../lib/useLive';
 import { money } from '../../lib/units';
-import { SECTION_NAMES, type Section } from '../../shops';
-import { BETA_NOTE, BETA_SECTIONS, Icon, Sheet, TopBar, timeAgo } from '../../ui/components';
+import { isCustomSection, SECTION_NAMES, type Section } from '../../shops';
+import { BETA_NOTE, BETA_SECTIONS, CUSTOM_BETA_NOTE, Icon, Sheet, TopBar, timeAgo } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { PassphraseForm } from './Gate';
 import { DeskHead, WhereNote } from './deskShared';
@@ -89,13 +89,15 @@ function Group({ id, title, children }: { id: string; title: string; children: R
   );
 }
 
-function CategoriesSheet({ sections, onClose }: { sections: HouseholdSettings['categories']; onClose: () => void }) {
+/** 0.11.3: also opened for one tab (`sections` of one): from that tab's shops, and from the tab's own page. */
+export function CategoriesSheet({ sections, onClose }: { sections: Pick<HouseholdSettings['categories'][number], 'section' | 'title'>[]; onClose: () => void }) {
+  const nav = useNav();
   const all = useLive(categoriesData.all, []);
   const [section, setSection] = useState<Section>(sections[0]?.section ?? 'pantry');
   const [name, setName] = useState('');
   const cats = (all ?? []).filter((c) => c.section === section);
   return (
-    <Sheet title="Categories" onClose={onClose}>
+    <Sheet title={sections.length === 1 ? `${sections[0].title.replace(/ · Beta$/, '')} categories` : 'Categories'} onClose={onClose}>
       <p className="small">In aisle order: the shopping list's Aisle group view follows it. Changes here reach every phone.</p>
       {sections.length > 1 && (
         <div className="seg" role="group" aria-label="Which tab">
@@ -143,6 +145,8 @@ function CategoriesSheet({ sections, onClose }: { sections: HouseholdSettings['c
         onSubmit={async (e) => {
           e.preventDefault();
           if (!name.trim()) return;
+          // 0.11.3: one of that name on this tab already: say so, don't make a second (as on a phone).
+          if (cats.some((c) => c.name.trim().toLowerCase() === name.trim().toLowerCase())) return nav.toast(`There's already a ${name.trim()} category`);
           await categoriesData.add(name.trim(), section);
           setName('');
         }}
@@ -157,7 +161,7 @@ function CategoriesSheet({ sections, onClose }: { sections: HouseholdSettings['c
 }
 
 /** Which shops a tab uses, for the whole household (and Keg or Pharmacy on or off). */
-function ShopsSheet({ tab, onClose }: { tab: ShopsForTab; onClose: () => void }) {
+function ShopsSheet({ tab, onClose, onCategories }: { tab: ShopsForTab; onClose: () => void; /** 0.11.3: this tab's categories. */ onCategories: () => void }) {
   const nav = useNav();
   const [picked, setPicked] = useState(() => new Set(tab.choices.filter((c) => c.picked).map((c) => c.id)));
   const [on, setOn] = useState(tab.on);
@@ -190,6 +194,23 @@ function ShopsSheet({ tab, onClose }: { tab: ShopsForTab; onClose: () => void })
     <Sheet title={tab.title} onClose={onClose}>
       <p className="small">The shops the household uses on this tab. Each phone keeps its own branch and shop sign-ins.</p>
       {BETA_SECTIONS.includes(tab.section) && <p className="small">{BETA_NOTE}</p>}
+      {/* 0.11.3: as on a phone: a custom section says it's in beta on its own page, and each tab's page opens its categories */}
+      {isCustomSection(tab.section) && (
+        <p className="small" role="note">
+          {CUSTOM_BETA_NOTE}
+        </p>
+      )}
+      <div className="row" style={{ padding: 0 }}>
+        <span className="grow">
+          <span className="title" style={{ fontSize: 15 }}>
+            Categories
+          </span>
+          <span className="small">The groups this tab is sorted into: add, rename, reorder or delete.</span>
+        </span>
+        <button type="button" className="btn small" onClick={onCategories}>
+          Edit categories
+        </button>
+      </div>
       {tab.section !== 'pantry' && (
         <label className="check card" style={{ flexDirection: 'row' }}>
           <input type="checkbox" className="switch" checked={on} onChange={(e) => setOn(e.target.checked)} />
@@ -270,6 +291,7 @@ function HouseholdPart() {
   const acct = serverAccount();
   const version = useServerVersion();
   const [cats, setCats] = useState(false);
+  const [catsFor, setCatsFor] = useState<{ section: Section; title: string }[]>();
   const [shopsFor, setShopsFor] = useState<ShopsForTab>();
   const [reading, setReading] = useState<'privacy' | 'disclaimer'>(); // 0.9.13
   const [credits, setCredits] = useState(false); // 0.9.14
@@ -771,7 +793,17 @@ function HouseholdPart() {
       {branches && <BranchSheet onClose={() => setBranches(false)} />}
       {backup && <BackupSheet onClose={() => setBackup(false)} />}
       {recovery && <RecoverySheet onClose={() => setRecovery(false)} />}
-      {shopsFor && <ShopsSheet tab={shopsFor} onClose={() => setShopsFor(undefined)} />}
+      {shopsFor && (
+        <ShopsSheet
+          tab={shopsFor}
+          onClose={() => setShopsFor(undefined)}
+          onCategories={() => {
+            setCatsFor([{ section: shopsFor.section, title: shopsFor.title }]);
+            setShopsFor(undefined);
+          }}
+        />
+      )}
+      {catsFor && <CategoriesSheet sections={catsFor} onClose={() => setCatsFor(undefined)} />}
       {reading && <LegalSheet doc={reading} onClose={() => setReading(undefined)} />}
       {credits && (
         <Sheet title="Credits" onClose={() => setCredits(false)}>

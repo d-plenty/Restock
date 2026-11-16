@@ -10,7 +10,7 @@ import {
   type Product,
 } from '../types';
 import { nameHasSize } from './naming';
-import { formatUnitPrice, inSheets, money, unitPrice } from './units';
+import { formatUnitPrice, inSheets, money, packCountIn, unitPrice } from './units';
 import { compareStyleOfProducts, priceLine, sizingOf, withSizes } from './unitPrice';
 import type { CompareStyle } from './units';
 import { chainName, costcoDecides } from '../shops';
@@ -469,11 +469,31 @@ export interface Recommendation {
    * give an amount in the other measure, from the pack.
    */
   mixedUnits?: { units: BaseUnitWord[]; odd: Option[] };
+  /** 0.11.3: a pick whose pack changed size, or that its shop no longer lists (lib/shelfWatch.ts). This phone only. */
+  shelf?: import('./shelfWatch').ShelfNotes;
+  /** 0.11.3: picks in different measures that all say how many are in the pack: compared by the price of one (eachPriceOf). */
+  byEach?: boolean;
 }
 
 export type BaseUnitWord = 'g' | 'ml' | 'ea' | 'sheet';
 /** "in grams", "in millilitres", "by count" or "in sheets": how a pick is measured. */
 export const unitWord = (u: BaseUnitWord): string => ({ g: 'in grams', ml: 'in millilitres', ea: 'by count', sheet: 'in sheets' })[u];
+
+/**
+ * 0.11.3: the price of one of what's in the pack, when the pack says how many: a pack measured by count
+ * ("4 pack": the price over 4), or a multi-pack measured by weight or volume that also gives its count
+ * ("4 pack 360g"). A single thing (one 420 g can) has none: it can't be set fairly against a pack whose
+ * cans might be another size. Sheets aren't items.
+ */
+export function eachPriceOf(o: Pick<Option, 'product' | 'price'>): number | undefined {
+  if (o.price === undefined) return undefined;
+  if (!o.product.qty && inSheets(o.product.size)) return undefined;
+  const q = productQty(o.product);
+  if (q.unit === 'ea') return q.qty && q.qty > 0 ? o.price / q.qty : undefined;
+  // The count the size works out, else one written in the size or the name ("4 pack 360g"): the same in Deals.java.
+  const count = q.count && q.count > 1 ? q.count : (packCountIn(o.product.size) ?? packCountIn(o.product.name));
+  return count && count > 1 ? o.price / count : undefined;
+}
 
 /**
  * How much is in a product, from what you typed in, or its size and name. A "30 Pack" of
@@ -565,22 +585,29 @@ export function recommend(
   const sizedMains = priced.filter((o) => o.role === 'main' && o.unitPrice !== undefined);
   const units = new Set(priced.filter((o) => o.unitPrice !== undefined).map(unitOf));
   const byUnit = sizedMains.length > 0 && units.size === 1 && !units.has(undefined);
-  const comparable = (o: Option) => !byUnit || o.unitPrice !== undefined;
-  const cost = (o: Option) => (byUnit ? o.unitPrice! : o.price!);
+  // 0.11.3: picks measured differently, one by count ("4 pack") and the rest by weight or volume, but
+  // every one of them says how many are in it ("4 pack 360g"): they're compared by the price of one.
+  // Before, the shelf price decided and it said "Measured differently" though each had "$0.93 each".
+  // Mirrored in Deals.java.
+  const measured = priced.filter((o) => o.unitPrice !== undefined);
+  const byEach =
+    !byUnit && sizedMains.length > 0 && units.size > 1 && units.has('ea') && !units.has(undefined) && measured.every((o) => eachPriceOf(o) !== undefined);
+  const comparable = (o: Option) => (byUnit ? o.unitPrice !== undefined : byEach ? eachPriceOf(o) !== undefined : true);
+  const cost = (o: Option) => (byUnit ? o.unitPrice! : byEach ? eachPriceOf(o)! : o.price!);
   const cheapest = (list: Option[]) => list.filter(comparable).reduce<Option | undefined>((b, o) => (!b || cost(o) < cost(b) ? o : b), undefined);
 
-  const unsized = byUnit ? priced.filter((o) => !comparable(o)) : [];
+  const unsized = byUnit || byEach ? priced.filter((o) => !comparable(o)) : [];
   // 0.11.2: picks in different measures. Only your picks count (an alternative in another measure changes nothing).
   let mixedUnits: Recommendation['mixedUnits'];
   const measuredMains = priced.filter((o) => o.role === 'main' && o.unitPrice !== undefined && unitOf(o) !== undefined);
   const mainUnits = [...new Set(measuredMains.map((o) => unitOf(o) as BaseUnitWord))];
-  if (mainUnits.length > 1) {
+  if (mainUnits.length > 1 && !byEach) {
     const count = (u: BaseUnitWord) => measuredMains.filter((o) => unitOf(o) === u).length;
     const usualUnit = measuredMains.find((o) => o.product.id === group.usualProductId);
     const most = [...mainUnits].sort((a, b) => count(b) - count(a) || (usualUnit && unitOf(usualUnit) === a ? -1 : usualUnit && unitOf(usualUnit) === b ? 1 : 0))[0];
     mixedUnits = { units: [most, ...mainUnits.filter((u) => u !== most)], odd: measuredMains.filter((o) => unitOf(o) !== most) };
   }
-  const base: Recommendation = { group, options, action: 'none', headline: 'Usual prices', detail: '', byUnit, sizeUnknown: unsized.length ? unsized : undefined, mixedUnits };
+  const base: Recommendation = { group, options, action: 'none', headline: 'Usual prices', detail: '', byUnit, byEach: byEach || undefined, sizeUnknown: unsized.length ? unsized : undefined, mixedUnits };
   if (!priced.length)
     return options.some((o) => o.price !== undefined)
       ? { ...base, headline: 'Costco prices only', detail: "Costco's online prices, which include delivery." }

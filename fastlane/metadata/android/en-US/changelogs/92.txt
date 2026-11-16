@@ -1,0 +1,1 @@
+Release candidate (0.11.3): notices when a pack changes size or a shop stops listing something you buy, with Find a replacement; categories can be edited on the phone, from Settings and each tab's Edit; add buttons use your category's name; eight new groups of shops (beta); Costco is no longer part of shared prices.

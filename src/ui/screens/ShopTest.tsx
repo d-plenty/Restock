@@ -13,7 +13,9 @@ import { adapterFor } from '../../stores';
 import { isNative } from '../../stores/http';
 import type { StoreProduct } from '../../stores/types';
 import { looksLikeBotCheck, searchInfo } from '../../stores/web';
-import { BETA_SHOPS, BetaTag, Icon, LoadingBar } from '../components';
+import { getKV, putKV } from '../../lib/db';
+import { useLive } from '../../lib/useLive';
+import { BETA_SHOPS, BetaTag, Icon, LoadingBar, timeAgo } from '../components';
 import { useNav } from '../nav';
 import { UnblockButton } from '../Unblock';
 
@@ -110,6 +112,24 @@ export function shopTestReport(r: Result, version: string): string {
   return lines.join('\n');
 }
 
+// 0.11.3: how each shop went the last time it was tested here, kept on this phone (kv "shopTestLog"),
+// so the new shops (none tried on a phone before release) can be gone through and seen at a glance.
+export type ShopOutcome = 'worked' | 'check' | 'blocked' | 'failed';
+export interface ShopTestLog {
+  [shop: string]: { at: string; outcome: ShopOutcome; found: number };
+}
+/** Worked; worked after a bot check; blocked (a check Restock won't pass for you); or didn't work. */
+export function shopOutcome(r: { found: unknown[]; error?: string; botCheck?: boolean; blocked?: boolean }): ShopOutcome {
+  if (!r.error && r.found.length) return r.botCheck ? 'check' : 'worked';
+  return r.botCheck || r.blocked || isBlockedError(r.error) ? 'blocked' : 'failed';
+}
+export const OUTCOME_WORDS: Record<ShopOutcome, string> = {
+  worked: 'Worked',
+  check: 'Worked, after a bot check',
+  blocked: 'Blocked: needs Unblock',
+  failed: "Didn't work",
+};
+
 export function ShopTest() {
   const nav = useNav();
   const groups = shopsByGroup();
@@ -118,6 +138,7 @@ export function ShopTest() {
   const [term, setTerm] = useState('');
   const [busy, setBusy] = useState(false);
   const [r, setR] = useState<Result>();
+  const log = useLive(() => getKV<ShopTestLog>('shopTestLog'), []);
   const word = term.trim() || TEST_WORD[sectionOf(shop)];
   // 0.10.4: a 403, or a "checking your browser" page, is the shop blocking Restock.
   const blocked = !!r?.error && (r.botCheck || r.blocked || isBlockedError(r.error));
@@ -163,6 +184,14 @@ export function ShopTest() {
       answers,
       raw: out.captured.filter((c) => c.status >= 200 && c.status < 300 && c.body.length > 0).sort((a, b) => b.body.length - a.body.length)[0],
     });
+    // 0.11.3: remembered, for the list under the test.
+    const botCheck = out.captured.some((c) => looksLikeBotCheck(c.body));
+    const wasBlocked = !out.result?.length && (isBlockedError(out.error) || out.captured.some((c) => c.status === 403 || c.status === 429));
+    const error = out.error ?? (out.result && !out.result.length ? 'nothing' : undefined);
+    const was = (await getKV<ShopTestLog>('shopTestLog').catch(() => undefined)) ?? {};
+    await putKV('shopTestLog', { ...was, [shop]: { at: new Date().toISOString(), outcome: shopOutcome({ found: out.result ?? [], error, botCheck, blocked: wasBlocked }), found: out.result?.length ?? 0 } }).catch(
+      () => undefined,
+    );
     setBusy(false);
   };
 
@@ -266,6 +295,30 @@ export function ShopTest() {
                 </span>
               </>
             )}
+          </div>
+        )}
+        {/* 0.11.3: how each shop went the last time it was tested on this phone */}
+        {log && Object.keys(log).length > 0 && (
+          <div className="shoptest-log">
+            <div className="eyebrow">Shops tested on this phone</div>
+            {all
+              .filter((id) => log[id])
+              .map((id) => (
+                <button key={id} className="row" onClick={() => (setShop(id), setR(undefined))} aria-label={`${chainName(id)}: ${OUTCOME_WORDS[log[id].outcome]}. Pick it to test again`}>
+                  <span className="grow">
+                    <span className="title" style={{ fontSize: 15 }}>
+                      {chainName(id)}
+                    </span>
+                    <span className="small">
+                      {OUTCOME_WORDS[log[id].outcome]}
+                      {log[id].found ? ` · ${log[id].found} found` : ''} · {timeAgo(log[id].at)}
+                    </span>
+                  </span>
+                  <span className={`tag ${log[id].outcome === 'worked' || log[id].outcome === 'check' ? 'good' : log[id].outcome === 'blocked' ? 'wait' : 'nodata'}`}>
+                    {log[id].outcome === 'worked' || log[id].outcome === 'check' ? 'WORKS' : log[id].outcome === 'blocked' ? 'BLOCKED' : 'NO'}
+                  </span>
+                </button>
+              ))}
           </div>
         )}
       </div>
