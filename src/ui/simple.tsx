@@ -200,7 +200,8 @@ export function PriceInfoSheet({ rec, listed, onClose }: { rec: Recommendation; 
             nav.push({ name: 'item', groupId: rec.group.id });
           }}
         >
-          Price history
+          {/* 0.12.1: says where it goes (it read "Price history") */}
+          Open item
         </button>
         <button
           className="btn primary"

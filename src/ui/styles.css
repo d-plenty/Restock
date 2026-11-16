@@ -6015,8 +6015,10 @@ svg.icon-info {
 span.plus-btn {
   pointer-events: none;
 }
+/* 0.12.1: the same solid green picked or not (the tick says it's picked): in dark mode the old
+   "picked" green was a pale one, with a white tick that was hard to see on it. */
 .plus-btn.on {
-  background: var(--green-ink);
+  background: var(--green-solid);
 }
 /* A swipeable row (Pantry) holds one: the swipe keeps its own edge-to-edge box. */
 .swipe > .row.irow-swipe {
@@ -6387,4 +6389,47 @@ span.plus-btn {
   background: var(--surface);
   color: var(--ink);
   border-color: var(--line-2);
+}
+
+/* ================= 0.12.1 ================= */
+/* The add screen's top steps aside as one while a single shop's pick is being changed. */
+.add-top {
+  display: contents;
+}
+.add-top[hidden] {
+  display: none;
+}
+.change-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* The add screen's title as the section switcher: Back, then the same button the list uses. */
+.list-top-row.add-top-row {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+}
+.add-switch .list-switch-name {
+  font-size: var(--fs-xl);
+}
+/* Your pick at each shop: the shop on one line, how sure on the next; the buttons on a row of their own. */
+.match-card {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+.match-how {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--muted);
+}
+.match-how.good {
+  color: var(--green-ink);
+}
+.match-how.warn {
+  color: var(--amber-ink);
+}
+.match-card > .match-actions {
+  flex-basis: 100%;
+  justify-content: flex-end;
+  margin-top: 0;
 }

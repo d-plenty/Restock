@@ -1,0 +1,1 @@
+Release candidate (0.12.1): tidier adding. "Pick one at Woolworths" is a page of its own with only that shop's results. "Not sold here" is on the pick sheet, beside Change and Pick one myself. The add screen's title switches between your tabs (the row of tab buttons is gone). The i on a row has an Open item button.

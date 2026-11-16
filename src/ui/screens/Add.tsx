@@ -449,6 +449,8 @@ export function AddScreen({
   const [autoFrom, setAutoFrom] = useState<Map<string, 'same' | 'like'>>(new Map());
   const autoDone = useRef<Set<string>>(new Set());
   // 0.12.0: a new phone's first search asks where you shop, once (in place of the setup step).
+  // 0.12.1: the title is the section switcher (as on the shopping list); this is its menu.
+  const [switching, setSwitching] = useState(false);
   const [askShops, setAskShops] = useState<{ q: string; rq: RankQuery; sec: Section; pressed: boolean }>();
   // 0.9.5: ticking only ever puts it in the bar at the bottom. The sheet to name it and add it opens
   // from the bar's green arrow, never by itself (0.9.4 popped it up for a second on every tick).
@@ -1218,6 +1220,13 @@ export function AddScreen({
     const shared = have.filter((t) => want.has(t)).length;
     return want.size && shared / want.size >= 0.7 ? scanned.imageUrl : undefined;
   };
+  // 0.12.1: Android's back button on "Pick one at Woolworths" goes back to your picks.
+  useBackHandler(() => {
+    if (!changing) return false;
+    backToPicks();
+    return true;
+  }, !!changing);
+
   const title = attachGroup
     ? as === 'alt'
       ? onlyChain
@@ -1232,7 +1241,10 @@ export function AddScreen({
       ? 'Add to shopping list'
       : toPantry
         ? `Add to ${section === 'pantry' ? 'pantry' : SECTION_NAMES[section]}`
-        : 'Add an item';
+        : // 0.12.1: from Home: it says which tab's shops it searches, and the title switches it
+          sectionsOn.length > 1
+          ? `Add · ${SECTION_NAMES[section]}`
+          : 'Add an item';
   // A ticked product that's already a pantry item: from the Pick sheet, the line can just be that item.
   const trackedPick = forLine ? [...picks.keys()].map((k) => pantry?.get(k)).find((g): g is Group => !!g) : undefined;
   const useTracked = async (g: Group) => {
@@ -1326,6 +1338,17 @@ export function AddScreen({
   const mixed: StoreProduct[] = [];
   for (let i = 0; i < PER_SHOP; i++) for (const c of searched as Chain[]) if (shownItems(c)[i]) mixed.push(shownItems(c)[i]);
   const view: 'all' | Chain = changing ?? (searched.length > 1 ? shopView : ((searched[0] as Chain | undefined) ?? 'all'));
+  const backToPicks = () => {
+    setChanging(undefined);
+    setShopView('all');
+    setPanelOpen(true);
+  };
+  /** 0.12.1: said on the sheet itself: this shop doesn't sell it (so nothing is picked there, and it isn't picked for you again). */
+  const notSoldAt = (c: Chain) => {
+    setPicks((prev) => new Map([...prev].filter(([, x]) => x.chain !== c)));
+    setAutoFrom((m) => new Map([...m].filter(([key]) => !key.startsWith(`${c}:`))));
+    setDeclined((d) => new Set([...d, c]));
+  };
   const startChange = (c: Chain) => {
     setChanging(c);
     setPanelOpen(false);
@@ -1362,49 +1385,59 @@ export function AddScreen({
               <div key={keyOf(sp)} role="listitem" className={`match-card${c === anchorChain ? ' anchor' : ''}`}>
                 <Thumb src={sp.imageUrl ?? photoFor(sp)} />
                 <span className="grow">
-                  <span className={`match-lab ${lab.tone}`}>
+                  <span className="match-lab">
                     <ChainDot chain={c} />
-                    {chainName(c)} · {lab.text}
+                    {chainName(c)}
                   </span>
+                  <span className={`match-how ${lab.tone}`}>{lab.text}</span>
                   <span className="match-name">{sp.name}</span>
                   <span className="num match-price">{money(sp.price)}</span>
                 </span>
-                {attachTo || forLine ? (
-                  // Adding to an item you have: several picks can stand, so each has its own Remove.
-                  <button className="btn small" style={TAP} onClick={() => toggle(sp)} aria-label={`Remove ${sp.name} at ${chainName(c)}`}>
-                    Remove
-                  </button>
-                ) : c === anchorChain ? (
-                  // The product itself: back to the results to pick another, which starts over from it.
-                  <button
-                    className="btn small"
-                    style={TAP}
-                    onClick={() => {
-                      setChanging(undefined);
-                      setShopView('all');
-                      setPanelOpen(false);
-                    }}
-                    aria-label={`Pick a different product (now ${sp.name})`}
-                  >
-                    Change
-                  </button>
-                ) : (
-                  canChange && (
-                    <button className="btn small" style={TAP} onClick={() => startChange(c)} aria-label={`Change the ${chainName(c)} pick`}>
+                <span className="match-actions">
+                  {attachTo || forLine ? (
+                    // Adding to an item you have: several picks can stand, so each has its own Remove.
+                    <button className="btn small" style={TAP} onClick={() => toggle(sp)} aria-label={`Remove ${sp.name} at ${chainName(c)}`}>
+                      Remove
+                    </button>
+                  ) : c === anchorChain ? (
+                    // The product itself: back to the results to pick another, which starts over from it.
+                    <button
+                      className="btn small"
+                      style={TAP}
+                      onClick={() => {
+                        setChanging(undefined);
+                        setShopView('all');
+                        setPanelOpen(false);
+                      }}
+                      aria-label={`Pick a different product (now ${sp.name})`}
+                    >
                       Change
                     </button>
-                  )
-                )}
+                  ) : (
+                    <>
+                      {/* 0.12.1: beside Change, for when the match is wrong and that shop has nothing right */}
+                      <button className="btn small" style={TAP} onClick={() => notSoldAt(c)} aria-label={`Not sold at ${chainName(c)}`}>
+                        Not sold here
+                      </button>
+                      {canChange && (
+                        <button className="btn small" style={TAP} onClick={() => startChange(c)} aria-label={`Change the ${chainName(c)} pick`}>
+                          Change
+                        </button>
+                      )}
+                    </>
+                  )}
+                </span>
               </div>
             );
           });
         return (
           <div key={c} role="listitem" className="match-card none">
             <span className="grow">
-              <span className="match-lab plain">
-                <ChainDot chain={c} /> {chainName(c)} ·{' '}
-                {busy ? 'searching' : r?.status === 'error' ? "couldn't check" : declined.has(c) ? 'not sold here' : 'nothing close'}
+              <span className="match-lab">
+                <ChainDot chain={c} />
+                {chainName(c)}
               </span>
+              <span className="match-how plain">{busy ? 'Searching' : r?.status === 'error' ? "Couldn't check" : declined.has(c) ? 'Not sold here' : 'Nothing close'}</span>
               {busy ? (
                 <span className="small" role="status">
                   Looking for it at {chainName(c)}…
@@ -1416,7 +1449,7 @@ export function AddScreen({
                   find it there later from the item's page.
                 </span>
               ) : declined.has(c) ? (
-                <span className="small">Left out: you said {chainName(c)} doesn't sell it.</span>
+                <span className="small">Left out of this item: you said {chainName(c)} doesn't sell it.</span>
               ) : (
                 <span className="small">Restock couldn't find this at {chainName(c)}. It may not sell it.</span>
               )}
@@ -1426,12 +1459,22 @@ export function AddScreen({
                     <button className="btn small" style={TAP} onClick={() => void searchChain(c as StoreChain, lastText, rankQ, searchStoreId(settings, c as StoreChain))}>
                       <Icon name="refresh" size={16} /> Try again
                     </button>
+                  ) : declined.has(c) ? (
+                    <button className="btn small" style={TAP} onClick={() => setDeclined((d) => new Set([...d].filter((x) => x !== c)))} aria-label={`Undo: ${chainName(c)} not sold here`}>
+                      Undo
+                    </button>
                   ) : (
-                    canChange && (
-                      <button className="btn small" style={TAP} onClick={() => startChange(c)}>
-                        Pick one myself
+                    <>
+                      {/* 0.12.1: both answers on the sheet (Not sold here was a button on the next screen) */}
+                      <button className="btn small" style={TAP} onClick={() => notSoldAt(c)} aria-label={`Not sold at ${chainName(c)}`}>
+                        Not sold here
                       </button>
-                    )
+                      {canChange && (
+                        <button className="btn small" style={TAP} onClick={() => startChange(c)} aria-label={`Pick one myself at ${chainName(c)}`}>
+                          Pick one myself
+                        </button>
+                      )}
+                    </>
                   )}
                 </span>
               )}
@@ -1449,21 +1492,71 @@ export function AddScreen({
   return (
     // Inside the Pick sheet the sheet scrolls, so the bar at the bottom stays in view there too.
     <div className="screen" style={forLine ? { padding: 0, overflow: 'visible', flex: 'none' } : undefined}>
-      {forLine ? null : overlay ? <TopBar title={title} /> : <h1>{title}</h1>}
+      {forLine ? null : changing ? (
+        // 0.12.1: "Pick one at Woolworths" is a page of its own: this title, one line, that shop's results.
+        <div className="topbar">
+          <button className="icon-btn" aria-label="Back" onClick={backToPicks}>
+            <Icon name="back" size={20} />
+          </button>
+          <h1 style={{ fontSize: 24 }}>Pick one at {chainName(changing)}</h1>
+        </div>
+      ) : !attachGroup && !onlyChain && sectionsOn.length > 1 ? (
+        // 0.12.1: the title is the switcher, as on the shopping list (it was a row of buttons under the title)
+        <div className="list-top">
+          <div className="list-top-row add-top-row">
+            {overlay && (
+              <button className="icon-btn" aria-label="Back" onClick={nav.pop}>
+                <Icon name="back" size={20} />
+              </button>
+            )}
+            <button
+              className="list-switch add-switch"
+              aria-haspopup="menu"
+              aria-expanded={switching}
+              aria-label={`${title}. Tap to switch to another of your tabs`}
+              onClick={() => setSwitching((x) => !x)}
+            >
+              <Icon name={section} size={22} />
+              <span className="list-switch-name">{title}</span>
+              <span className="list-switch-pill">
+                <span className={switching ? 'turn-up' : 'turn-down'}>
+                  <Icon name="chevron" size={16} />
+                </span>
+              </span>
+            </button>
+          </div>
+          {switching && (
+            <div className="list-switch-menu" role="menu" aria-label="Add to">
+              {sectionsOn.map((sec) => (
+                <button
+                  key={sec}
+                  role="menuitemradio"
+                  aria-checked={sec === section}
+                  className={sec === section ? 'on' : ''}
+                  onClick={() => {
+                    setSwitching(false);
+                    switchSection(sec);
+                  }}
+                >
+                  <Icon name={sec} size={20} />
+                  <span className="grow">{SECTION_NAMES[sec]}</span>
+                  {sec === section && <Icon name="check" size={18} />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : overlay ? (
+        <TopBar title={title} />
+      ) : (
+        <h1>{title}</h1>
+      )}
       {/* Read out when something's ticked or unticked (the bar at the bottom shows it). */}
       <div className="sr-only" role="status" aria-live="polite">
         {said}
       </div>
-      {!forLine && !attachGroup && !onlyChain && sectionsOn.length > 1 && (
-        <div className="seg" role="tablist" aria-label="Which shops to search">
-          {sectionsOn.map((sec) => (
-            <button key={sec} role="tab" aria-selected={sec === section} className={sec === section ? 'on' : ''} onClick={() => switchSection(sec)}>
-              <Icon name={sec} size={17} /> {SECTION_NAMES[sec]}
-            </button>
-          ))}
-        </div>
-      )}
-
+      {/* 0.12.1: everything between the title and the results steps aside while one shop's pick is being changed */}
+      <div className="add-top" hidden={!!changing}>
       {photoFind && (
         <Sheet title="Find it from a photo" onClose={() => setPhotoFind(false)}>
           <p className="small" style={{ margin: 0 }}>
@@ -1815,37 +1908,18 @@ export function AddScreen({
         />
       )}
 
-      {/* 0.12.0: changing one shop's pick: that shop's results only, and a way to say it isn't sold there */}
+      </div>
+      {/* 0.12.1: changing one shop's pick: one line on what it's compared with, and that shop's results only */}
       {changing && (
-        <div className="card change-head">
-          <strong>Pick one at {chainName(changing)}</strong>
+        <div className="change-head">
           {anchorChain && anchorChain !== changing && [...picks.values()].find((x) => x.chain === anchorChain) && (
-            <span className="small">
+            <p className="small" style={{ margin: 0 }}>
               To compare with {[...picks.values()].find((x) => x.chain === anchorChain)!.name} from {chainName(anchorChain)}.
-            </span>
+            </p>
           )}
-          <div className="two">
-            <button
-              className="btn"
-              onClick={() => {
-                setPicks((prev) => new Map([...prev].filter(([, x]) => x.chain !== changing)));
-                setDeclined((d) => new Set([...d, changing]));
-                setChanging(undefined);
-                setPanelOpen(true);
-              }}
-            >
-              {chainName(changing)} doesn't sell it
-            </button>
-            <button
-              className="btn"
-              onClick={() => {
-                setChanging(undefined);
-                setPanelOpen(true);
-              }}
-            >
-              Back to your picks
-            </button>
-          </div>
+          <button className="btn block" onClick={backToPicks}>
+            Back to your picks
+          </button>
         </div>
       )}
 
@@ -2052,6 +2126,7 @@ export function AddScreen({
                   const more = otherFlavours(mine, pool, (a, b) => keyOf(a) === keyOf(b));
                   if (!more.length) return null;
                   const word = flavourWord([...mine, ...more].map((x) => x.name));
+                  if (changing) return null; // 0.12.1: one choice at a time on "Pick one at …"
                   return (
                     <button
                       className="btn small flavour-all"

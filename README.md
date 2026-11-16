@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.12.0" src="https://img.shields.io/badge/status-release%20candidate%200.12.0-ffcd00">
+  <img alt="Release candidate 0.12.1" src="https://img.shields.io/badge/status-release%20candidate%200.12.1-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0120">New in 0.12.0</a> ·
+  <a href="#new-in-0121">New in 0.12.1</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -139,6 +139,16 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.12.1
+
+Tidier adding, from the first day of 0.12.0 on a phone.
+
+- **"Pick one at Woolworths" is a page of its own.** After **Change** or **Pick one myself**, the search box, the tab buttons, "More ways to add" and the scanned-barcode card step aside: you see the title, what it's being compared with, **Back to your picks**, and that shop's results.
+- **Not sold here** is on the pick sheet itself, beside **Pick one myself** where Restock found nothing and beside **Change** where it found something. One tap, with **Undo**. It was a button on the next screen.
+- **On the pick sheet** each shop's name is on one line and how sure Restock is ("Good match", "Closest match · check it") is on the next, with the buttons on a row of their own.
+- **The add screen's title is the switcher**, like the shopping list's: "Add to pantry" with an arrow, to change to Bottle shop, Chemist or one of your sections. The row of tab buttons under the title is gone.
+- **The i on a row** has an **Open item** button (it read "Price history").
 
 ## New in 0.12.0
 
@@ -516,7 +526,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.0.apk` (on macOS, `shasum -a 256 restock-0.12.0.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.1.apk` (on macOS, `shasum -a 256 restock-0.12.1.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
