@@ -576,9 +576,11 @@ export function ListScreen() {
     <div className="screen" {...full.props}>
       {full.indicator}
       {full.status}
+      {/* 0.12.4: the navy top every screen has: which list (Change), the add box, then Edit and the view options */}
+      <div className="navy-top">
       {/* 0.10.5: the list's name is the list picker (a dropdown). 0.10.6: then Edit, and the view options. */}
       <div className="list-top">
-        {sectionsOn.length > 1 && !selecting && <span className="eyebrow list-top-eyebrow">Shopping list · tap to switch</span>}
+        {sectionsOn.length > 1 && !selecting && <span className="navy-kicker">Shopping list</span>}
         <div className="list-top-row">
           {sectionsOn.length > 1 && !selecting ? (
             <button
@@ -591,30 +593,13 @@ export function ListScreen() {
               <Icon name={section} size={22} />
               <span className="list-switch-name">{LIST_NAMES[section]}</span>
               <span className="list-switch-pill">
-                {/* 0.10.6: just the arrow (the word made room for "Groce…" only, beside Edit). */}
-                <span className={switching ? 'turn-up' : 'turn-down'}><Icon name="chevron" size={16} /></span>
+                {/* 0.12.4: "Change" with its arrow, so it reads as the way to another list (Edit moved to the row below) */}
+                Change <span className={switching ? 'turn-up' : 'turn-down'}><Icon name="chevron" size={16} /></span>
               </span>
             </button>
           ) : (
             <h1 style={{ flex: 1, margin: 0 }}>{LIST_TITLE[section]}</h1>
           )}
-          {entries.length > 0 &&
-            (selecting ? (
-              <button className="btn small primary" onClick={stopSelecting}>
-                Done
-              </button>
-            ) : (
-              // 0.10.6: Edit (pick items to move, delete or tick) out where it's seen, and the view
-              // options behind the sliders.
-              <>
-                <button className="btn small edit-btn" aria-label="Edit the list: pick items" onClick={() => setSelecting(true)}>
-                  <Icon name="pencil" size={16} /> Edit
-                </button>
-                <button className="icon-btn" aria-label="View options: by shop, aisle group, one list" onClick={() => setMenu(true)}>
-                  <Icon name="sliders" size={20} />
-                </button>
-              </>
-            ))}
         </div>
         {switching && !selecting && (
           <div className="list-switch-menu" role="menu" aria-label="Pick a list">
@@ -641,6 +626,96 @@ export function ListScreen() {
         )}
       </div>
 
+      <form
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          // A name you already track adds that item, not a blank copy of it.
+          void (exactPantry ? addFromPantry(exactPantry) : add(text));
+        }}
+        style={{ display: 'flex', gap: 8 }}
+      >
+        {/* 0.12.0: it says what it does: "Add to shopping list", with its own Add button */}
+        <input className="input" placeholder={(settings.a11y?.text ?? 1) >= 1.3 || serverMode ? 'Add to list' : 'Add to shopping list'} aria-label="Add to shopping list" value={text} onChange={(e) => setText(e.target.value)} />
+        <button type="submit" className="btn primary" aria-label="Add to shopping list" disabled={!text.trim()} style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }}>
+          <Icon name="plus" />
+        </button>
+        {!serverMode && (
+          <button type="button" className="btn" aria-label="Scan a barcode to add" style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }} onClick={scanToList}>
+            <Icon name="scan" />
+          </button>
+        )}
+        {/* 0.9.5 (web search): on a Restock server's web page (an iPhone), its camera Scan, by the add box. */}
+        {serverMode && webSearch && <webSearch.Scan section={searchTabOf(section) ?? 'pantry'} />}
+      </form>
+      {entries.length > 0 && (
+        <div className="navy-tools">
+          <span className="num">
+            {selecting ? 'Pick items' : `${open.length} to get`}
+          </span>
+          {selecting ? (
+              <button className="btn small primary" onClick={stopSelecting}>
+                Done
+              </button>
+            ) : (
+              // 0.10.6: Edit (pick items to move, delete or tick) out where it's seen, and the view
+              // options behind the sliders.
+              <>
+                <button className="btn small edit-btn" aria-label="Edit the list: pick items" onClick={() => setSelecting(true)}>
+                  <Icon name="pencil" size={16} /> Edit
+                </button>
+                <button className="icon-btn" aria-label="View options: by shop, aisle group, one list" onClick={() => setMenu(true)}>
+                  <Icon name="sliders" size={20} />
+                </button>
+              </>
+            )}
+        </div>
+      )}
+      </div>
+      {/* Typed something: add just the name, or look it up at your shops for this trip (0.7.3). */}
+      {pantryMatches.length > 0 && (
+        <div className="card flush pantry-matches" role="list" aria-label="In your pantry">
+          {pantryMatches.map((r) => (
+            <button key={r.group.id} role="listitem" className="row" onClick={() => void addFromPantry(r)}>
+              <Thumb src={(r.best ?? r.options[0])?.product.imageUrl} />
+              <span className="grow">
+                <span className="title clip" style={{ fontSize: 15 }}>
+                  {r.group.name}
+                </span>
+                <span className="small clip">
+                  In your pantry
+                  {(r.best ?? r.options[0])
+                    ? ` · ${chainName((r.best ?? r.options[0])!.product.chain)} ${money((r.best ?? r.options[0])!.price)}`
+                    : ''}
+                </span>
+              </span>
+              <span className="btn small primary" aria-hidden>
+                <Icon name="plus" size={16} /> Add
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {text.trim() && (
+        <div className="two add-choices">
+          <button className="btn" onClick={() => void add(text)}>
+            <Icon name="plus" size={18} /> <span className="clip">Add "{text.trim()}"</span>
+          </button>
+          {serverMode ? (
+            // 0.9.5 (web search): Search the shops (when the household turned it on), or a link to Settings.
+            webSearch ? <webSearch.ListButton text={text} list={section} /> : <PhoneOnlyNote compact />
+          ) : (
+            <button
+              className="btn primary"
+              onClick={() => {
+                nav.push({ name: 'add', query: text.trim(), forList: true, section: searchTabOf(section) });
+                setText('');
+              }}
+            >
+              <Icon name="search" size={18} /> Search the shops
+            </button>
+          )}
+        </div>
+      )}
       {/* 0.10.5: one summary card: the total, what shopping around saves, and Compare. 0.10.10: Compare
           shops is a big green button in the card (it was green words off to one side), with Check
           stock beside it, smaller (it sat on its own under the card, with nothing beside it). */}
@@ -692,72 +767,6 @@ export function ListScreen() {
         </div>
       )}
 
-      <form
-        onSubmit={(ev) => {
-          ev.preventDefault();
-          // A name you already track adds that item, not a blank copy of it.
-          void (exactPantry ? addFromPantry(exactPantry) : add(text));
-        }}
-        style={{ display: 'flex', gap: 8 }}
-      >
-        {/* 0.12.0: it says what it does: "Add to shopping list", with its own Add button */}
-        <input className="input" placeholder={(settings.a11y?.text ?? 1) >= 1.3 || serverMode ? 'Add to list' : 'Add to shopping list'} aria-label="Add to shopping list" value={text} onChange={(e) => setText(e.target.value)} />
-        <button type="submit" className="btn primary" aria-label="Add to shopping list" disabled={!text.trim()} style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }}>
-          <Icon name="plus" />
-        </button>
-        {!serverMode && (
-          <button type="button" className="btn" aria-label="Scan a barcode to add" style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }} onClick={scanToList}>
-            <Icon name="scan" />
-          </button>
-        )}
-        {/* 0.9.5 (web search): on a Restock server's web page (an iPhone), its camera Scan, by the add box. */}
-        {serverMode && webSearch && <webSearch.Scan section={searchTabOf(section) ?? 'pantry'} />}
-      </form>
-      {/* Typed something: add just the name, or look it up at your shops for this trip (0.7.3). */}
-      {pantryMatches.length > 0 && (
-        <div className="card flush pantry-matches" role="list" aria-label="In your pantry">
-          {pantryMatches.map((r) => (
-            <button key={r.group.id} role="listitem" className="row" onClick={() => void addFromPantry(r)}>
-              <Thumb src={(r.best ?? r.options[0])?.product.imageUrl} />
-              <span className="grow">
-                <span className="title clip" style={{ fontSize: 15 }}>
-                  {r.group.name}
-                </span>
-                <span className="small clip">
-                  In your pantry
-                  {(r.best ?? r.options[0])
-                    ? ` · ${chainName((r.best ?? r.options[0])!.product.chain)} ${money((r.best ?? r.options[0])!.price)}`
-                    : ''}
-                </span>
-              </span>
-              <span className="btn small primary" aria-hidden>
-                <Icon name="plus" size={16} /> Add
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-      {text.trim() && (
-        <div className="two add-choices">
-          <button className="btn" onClick={() => void add(text)}>
-            <Icon name="plus" size={18} /> <span className="clip">Add "{text.trim()}"</span>
-          </button>
-          {serverMode ? (
-            // 0.9.5 (web search): Search the shops (when the household turned it on), or a link to Settings.
-            webSearch ? <webSearch.ListButton text={text} list={section} /> : <PhoneOnlyNote compact />
-          ) : (
-            <button
-              className="btn primary"
-              onClick={() => {
-                nav.push({ name: 'add', query: text.trim(), forList: true, section: searchTabOf(section) });
-                setText('');
-              }}
-            >
-              <Icon name="search" size={18} /> Search the shops
-            </button>
-          )}
-        </div>
-      )}
 
       {/* 0.9.5 (web search): what the shops have for what was typed or scanned. */}
       {webSearch && <webSearch.ListPanel list={section} onAdded={() => setText('')} />}

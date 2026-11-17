@@ -13,7 +13,14 @@ export const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 type MapLib = typeof import('maplibre-gl');
 let lib: Promise<MapLib> | undefined;
 const load = () => {
-  lib ??= Promise.all([import('maplibre-gl'), import('maplibre-gl/dist/maplibre-gl.css')]).then(([m]) => (m as unknown as { default?: MapLib }).default ?? m);
+  // 0.12.4 (maplibre-gl 6): the library's worker is a file of its own now. It's bundled into one
+  // script here and the library is told where it is (left alone, it looks for a file beside itself
+  // that the build doesn't make).
+  lib ??= Promise.all([import('maplibre-gl'), import('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'), import('maplibre-gl/dist/maplibre-gl.css')]).then(([m, w]) => {
+    const ml = (m as unknown as { default?: MapLib }).default ?? m;
+    ml.setWorkerUrl(new URL(w.default, document.baseURI).href);
+    return ml;
+  });
   lib.catch(() => (lib = undefined));
   return lib;
 };

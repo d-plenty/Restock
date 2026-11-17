@@ -406,6 +406,8 @@ async function javaRound(opts: { manual?: boolean }): Promise<boolean> {
     if (unimplemented(e)) return false;
     throw e;
   }
+  // No answer at all (an older build of the app's native side, or a test double): nothing ran.
+  if (!r) return false;
   if (r.came > 0) changed();
   if (r.ran || r.house) lastPrint = await listPrint();
   if (r.ran && !r.status?.error) await tidyKeeps().catch(() => 0);

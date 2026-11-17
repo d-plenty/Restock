@@ -3390,221 +3390,17 @@ input[type='checkbox'].switch:focus-visible {
 }
 
 /* ---------- 0.9.0: My catalogue ---------- */
-.cat-entry,
-.cat-cover {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 18px 18px 16px;
-  border: none;
-  border-radius: var(--r-lg);
-  text-align: left;
-  font: inherit;
-}
 .cat-kicker {
   font-size: var(--fs-xs);
   font-weight: 800;
   letter-spacing: 0.08em;
   color: var(--gold);
 }
-.cat-entry-title,
-.cat-cover h2 {
-  font-size: var(--fs-2xl);
-  font-weight: 800;
-  line-height: 1.1;
-  max-width: 78%;
-  color: var(--white);
-}
-.cat-cover h2 {
-  font-size: var(--fs-3xl);
-}
-.cat-lede {
-  font-size: var(--fs-body);
-  opacity: 0.9;
-  max-width: 80%;
-}
-.cat-open {
-  margin-top: 10px;
-  background: var(--gold);
-  border-color: var(--gold);
-  color: var(--navy);
-}
-.cat-stats {
-  display: flex;
-  gap: 20px;
-  margin-top: 14px;
-}
-.cat-stats span {
-  display: flex;
-  flex-direction: column;
-}
-.cat-stats b {
-  font-size: var(--fs-2xl);
-}
-.cat-stats small {
-  font-size: var(--fs-xs);
-  opacity: 0.85;
-}
-.cat-pages {
-  display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  margin: 0 -18px;
-}
-.cat-pages::-webkit-scrollbar {
-  display: none;
-}
-.cat-page {
-  flex: 0 0 100%;
-  scroll-snap-align: start;
-  padding: 0 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  box-sizing: border-box;
-}
-.cat-num {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--r-md);
-  color: var(--white);
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.cat-shop {
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  background: var(--surface);
-}
-.cat-band {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  color: var(--white);
-}
-.cat-band-name {
-  font-size: var(--fs-lg);
-  font-weight: 800;
-  flex: 1;
-}
-.cat-band-sub {
-  font-size: var(--fs-sm);
-  font-weight: 700;
-}
-.cat-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  padding: 10px;
-}
-.cat-deal {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  min-width: 0;
-}
-.cat-photo {
-  height: 96px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--line-soft);
-  background: var(--white);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  padding: 4px;
-}
-.cat-photo img {
-  max-height: 86px;
-  max-width: 100%;
-  object-fit: contain;
-}
-.cat-burst {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: var(--r-full);
-  font-size: var(--fs-xs);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-  background: var(--gold);
-  color: var(--navy);
-}
-.cat-burst.multi {
-  background: var(--navy);
-  color: var(--gold);
-}
-.cat-burst.plain {
-  background: var(--good-bg);
-  color: var(--good-ink);
-}
-.cat-name {
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  line-height: 1.25;
-  min-height: 33px;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.cat-price {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  column-gap: 6px;
-  /* Keep the crossed-out price clear of the + button: it wraps under instead. */
-  padding-right: 38px;
-}
-.cat-price b {
-  font-size: var(--fs-2xl);
-  font-weight: 800;
-  letter-spacing: -0.4px;
-}
-.cat-price s {
-  font-size: var(--fs-xs);
-  color: var(--muted);
-}
 .cat-note {
   font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--good-ink);
   padding-right: 38px;
-}
-.cat-add {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--r-full);
-  border: none;
-  background: var(--green-solid);
-  color: var(--on-accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.cat-add.on {
-  background: var(--good-bg);
-  color: var(--good-ink);
 }
 /* Page dots: a finger-sized button around each small dot. */
 .pagedots {
@@ -3646,15 +3442,6 @@ input[type='checkbox'].switch:focus-visible {
   gap: 4px;
 }
 /* The Southern Cross sits in the top corner of the taller catalogue cards, clear of the words. */
-:root:not([data-style='plain']) .cat-entry,
-:root:not([data-style='plain']) .cat-cover {
-  background-size:
-    auto 92px,
-    auto;
-  background-position:
-    right 16px top 16px,
-    0 0;
-}
 /* A switch stays top right when its row also has a dropdown under the words. */
 .check:has(> input.switch) > select,
 .check:has(> input.switch) > .input {
@@ -3666,7 +3453,7 @@ input[type='checkbox'].switch:focus-visible {
   width: 100% !important;
 }
 /* Keep words clear of the Southern Cross on the navy banners. */
-:root:not([data-style='plain']) .banner.green:not(.cat-entry):not(.cat-cover) {
+:root:not([data-style='plain']) .banner.green {
   padding-right: 68px;
 }
 /* A long tag (a branch name in "OUT OF STOCK AT …") wraps rather than running off the screen. */
@@ -4181,10 +3968,10 @@ button.sync-choice:disabled {
 /* Tap areas: anything small (chips, small buttons, segments, round icon buttons, tags you tap)
    keeps its look but takes a 44 px tap. :where() keeps this from beating a rule that places
    the control itself. */
-:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .ph-src, .dk-name, .dk-line-open, .dk-linkish, .linkish, .cat-name-open, .cat-add, .shoprow-open) {
+:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .ph-src, .dk-name, .dk-line-open, .dk-linkish, .linkish, .shoprow-open) {
   position: relative;
 }
-:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .dk-name, .dk-line-open, .dk-linkish, .linkish, .cat-name-open, .cat-add)::after {
+:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .dk-name, .dk-line-open, .dk-linkish, .linkish)::after {
   /* 0.9.12: .linkish too ("Expand all", "Change" in a sentence). */
   content: '';
   position: absolute;
@@ -5869,9 +5656,6 @@ svg.icon-info {
 .specials-entry .cat-kicker {
   color: var(--green-ink);
 }
-.specials-entry .cat-entry-title {
-  color: var(--ink);
-}
 
 /* 0.11.0: the Pantry's count, under the last item */
 .pantry-count {
@@ -6018,6 +5802,13 @@ span.plus-btn {
    "picked" green was a pale one, with a white tick that was hard to see on it. */
 .plus-btn.on {
   background: var(--green-solid);
+}
+/* 0.12.4: on a search result the + is green on white until it's ticked, then a white tick on
+   green, so what's picked shows at a glance. (A real button, .btn.primary, stays solid.) */
+span.plus-btn:not(.on) {
+  background: var(--surface);
+  color: var(--green-ink);
+  box-shadow: inset 0 0 0 2px var(--green);
 }
 /* A swipeable row (Pantry) holds one: the swipe keeps its own edge-to-edge box. */
 .swipe > .row.irow-swipe {
@@ -6478,9 +6269,9 @@ span.plus-btn {
   font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* 0.12.4: "None this week" wraps on a narrow button (it ran off the edge) */
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 /* 0.12.3: a shop with your things on special says how many, in the deal green; the rest stay grey. */
 .shop-tile.has-deals .shop-tile-note {
@@ -6493,6 +6284,14 @@ span.plus-btn {
   }
   .shop-tile-name {
     font-size: var(--fs-sm);
+  }
+  .shop-tile-note {
+    font-size: var(--fs-xs);
+  }
+  /* 0.12.4: tall enough for a two-line name over a two-line note (the words ran out of the square) */
+  .shop-tile {
+    aspect-ratio: auto;
+    min-height: 116px;
   }
 }
 @media (max-width: 340px) {
@@ -6646,4 +6445,252 @@ span.plus-btn {
 .more-from-n {
   color: var(--muted);
   font-weight: 700;
+}
+
+/* ---------- 0.12.4: one navy top on every screen ----------
+   The flag colours everywhere: a navy top with curved bottom corners that holds the screen's title
+   and its main action, gold for the main button and the number that matters, and green for ticks,
+   savings and the buttons on the page below. More had this already (.more-top); now every screen's
+   title bar is one (.screen > .topbar), and Home, Pantry, the list and Add put their search and
+   add boxes inside it (.navy-top; Add's second half is .navy-cont). */
+.navy-top,
+.navy-cont,
+.screen > .topbar {
+  margin: calc(-1 * (var(--top) + 20px)) -18px 0;
+  padding: calc(var(--top) + 20px) 18px 18px;
+  border-radius: 0 0 var(--r-xl) var(--r-xl);
+  background: var(--more-top);
+  color: var(--on-navy);
+}
+.navy-top,
+.navy-cont {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Add: the title is the top half and the search box the bottom half of one navy block. */
+.navy-top.navy-open {
+  border-radius: 0;
+  padding-bottom: 0;
+}
+.navy-cont {
+  margin-top: -15px;
+  padding-top: 13px;
+}
+/* While the page is being pulled down to refresh, the words above the navy top stay in view. */
+.pull + .navy-top,
+.pull + .topbar {
+  margin-top: 0;
+  padding-top: 18px;
+  border-radius: var(--r-xl);
+}
+:is(.navy-top, .navy-cont, .screen > .topbar) h1 {
+  color: var(--on-navy);
+}
+:is(.navy-top, .navy-cont) :is(.sub, .small, .checkline, .eyebrow) {
+  color: var(--on-navy-muted);
+}
+.navy-top .search-shops,
+.navy-cont .search-shops {
+  margin: 0;
+}
+.navy-kicker {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+/* Buttons on navy: outlined in white; the main one is gold. */
+:is(.navy-top, .navy-cont, .screen > .topbar) :is(.icon-btn, .btn:not(.primary)) {
+  background: transparent;
+  border-color: var(--on-navy-line);
+  color: var(--on-navy);
+}
+:is(.navy-top, .navy-cont, .screen > .topbar) :is(.icon-btn, .btn:not(.primary)):active {
+  background: var(--on-navy-hover);
+}
+:is(.navy-top, .navy-cont, .screen > .topbar) .btn.primary {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--navy);
+}
+:is(.navy-top, .navy-cont) .linkish {
+  color: var(--gold);
+}
+:is(.navy-top, .navy-cont) :is(.icon-btn, .btn, .linkish, .list-switch):focus-visible {
+  outline-color: var(--gold);
+}
+/* Home: this week's saving, in the navy top (it was a banner of its own). */
+.navy-sum {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-md);
+}
+.navy-sum-big {
+  font-size: var(--fs-2xl);
+  font-weight: 800;
+  color: var(--gold);
+}
+/* The list's and Add's title as the switcher: the name, then "Change" with its arrow. */
+:is(.navy-top, .navy-cont) .list-switch {
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--on-navy);
+}
+:is(.navy-top, .navy-cont) .list-switch > svg {
+  color: var(--gold);
+}
+:is(.navy-top, .navy-cont) .list-switch-pill {
+  min-height: 40px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--on-navy-line);
+  background: transparent;
+  color: var(--on-navy);
+}
+:is(.navy-top, .navy-cont) .list-switch-menu {
+  color: var(--ink);
+}
+/* The list: how many to get, then Edit and the view options. */
+.navy-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+  color: var(--on-navy-muted);
+}
+.navy-tools > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+/* Add: "Add manually", under the results once you've searched. */
+.add-manual {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-2);
+  text-align: center;
+}
+.btn.add-manual-btn {
+  min-height: 56px;
+  border: 2px solid var(--green);
+  color: var(--green-ink);
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+.add-manual-more {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px var(--sp-4);
+}
+/* What you type in a box on the navy top is dark on white, as anywhere else. */
+:is(.navy-top, .navy-cont) :is(input, select, textarea, .search-field) {
+  color: var(--ink);
+}
+:is(.navy-top, .navy-cont) .list-switch-pill {
+  width: auto;
+  white-space: nowrap;
+  font-size: var(--fs-md);
+}
+/* Shopping mode's top bar is the same navy top. */
+.shopmode-top {
+  background: var(--more-top);
+  color: var(--on-navy);
+  border-bottom: 0;
+  border-radius: 0 0 var(--r-xl) var(--r-xl);
+}
+.shopmode-top .title {
+  color: var(--on-navy);
+}
+.shopmode-top .small {
+  color: var(--on-navy-muted);
+}
+.shopmode-top .small strong {
+  color: var(--gold);
+}
+.shopmode-top .shop-progress {
+  background: var(--on-navy-line);
+}
+.shopmode-top .shop-progress span {
+  background: var(--gold);
+}
+.shopmode-top :is(.icon-btn, .btn:not(.primary)) {
+  background: transparent;
+  border-color: var(--on-navy-line);
+  color: var(--on-navy);
+}
+.shopmode-top .btn.primary {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--navy);
+}
+.shopmode-top {
+  margin-bottom: 6px;
+}
+/* A paragraph in the navy top has no margins of its own. */
+:is(.navy-top, .navy-cont) > p {
+  margin: 0;
+}
+/* A small label above a title on navy is the gold kicker. */
+:is(.navy-top, .navy-cont) .eyebrow {
+  color: var(--gold);
+}
+/* The web page on a computer has its navy down the side (the sidebar), so a page's title there
+   stays a plain title: everything the navy top changes is put back. */
+.dk-main :is(.navy-top, .navy-cont, .screen > .topbar) {
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+}
+.dk-main :is(.navy-top, .navy-cont, .screen > .topbar) h1 {
+  color: var(--ink);
+}
+.dk-main :is(.navy-top, .navy-cont) :is(.sub, .small, .checkline, .eyebrow),
+.dk-main .navy-kicker,
+.dk-main .navy-tools {
+  color: var(--muted);
+}
+.dk-main :is(.navy-top, .navy-cont, .screen > .topbar) :is(.icon-btn, .btn:not(.primary)) {
+  background: var(--surface);
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+.dk-main :is(.navy-top, .navy-cont, .screen > .topbar) .btn.primary {
+  background: var(--green-solid);
+  border-color: var(--green-solid);
+  color: var(--on-accent);
+}
+.dk-main :is(.navy-top, .navy-cont) .linkish {
+  color: var(--green);
+}
+.dk-main :is(.navy-top, .navy-cont) .list-switch {
+  color: var(--ink);
+}
+.dk-main :is(.navy-top, .navy-cont) .list-switch-pill {
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+.dk-main .navy-sum-big {
+  color: var(--green-ink);
+}
+/* Add: the end of one shop's results. */
+.shop-done {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.btn.shop-done-btn {
+  min-height: 56px;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  flex-wrap: wrap;
+}
+.shop-done-next {
+  font-weight: 600;
 }

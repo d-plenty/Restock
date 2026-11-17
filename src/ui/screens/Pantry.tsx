@@ -214,6 +214,8 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
     <div className="screen" {...full.props}>
       {full.indicator}
       {full.status}
+      {/* 0.12.4: the navy top every screen has: the title, the add button and the search box */}
+      <div className="navy-top">
       <div className="topbar">
         {/* 0.11.0: Bottle shop, Chemist and your own sections open from More, so they have a way back to it */}
         {isMoreTab(section) && (
@@ -260,6 +262,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
         </p>
       )}
       {recs.length > 0 && <SearchField placeholder={SEARCH_HINT[section]} aria-label={SEARCH_HINT[section]} value={q} onValue={setQ} />}
+      </div>
       {recs.length > 0 && (
         <div className="chips" role="group" aria-label="Filter and sort">
           <button className="chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>

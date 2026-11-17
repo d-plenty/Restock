@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.12.3" src="https://img.shields.io/badge/status-release%20candidate%200.12.3-ffcd00">
+  <img alt="Release candidate 0.12.4" src="https://img.shields.io/badge/status-release%20candidate%200.12.4-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0123">New in 0.12.3</a> ·
+  <a href="#new-in-0124">New in 0.12.4</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -122,8 +122,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Receipts** (optional): finds the receipt's edges, straightens it, makes it crisp black and white, and reads the shop, date and total with PaddleOCR on the phone. The reader is built in and works offline. Photos stay inside Restock, not in your gallery.
 - **Recall alerts**: on by default, checked every 24 hours separately from price checks, matched against your Pantry, Keg, Health, lists and kept receipts, with the official notice one tap away.
 - **Cards**: loyalty cards (member prices only count if you've added the card) and gift cards, with the barcode, card number, a PIN that stays hidden until you tap it, the balance and what you spent, an expiry reminder and photos. Cards stay on your phone.
-- **My catalogue**: specials on the things you buy, a page per shop, Wednesday to Tuesday, with what you could save, half prices and multi-buys on the cover. **Add all to my list** says how many, and Undo takes them all back off.
-- **Catalogues**: a link to the catalogue of every shop you use.
+- **Your shops**: a button on Home for every shop you use. Each opens your own things on special there this week (items you track, and one-off lines on your list), with the shop's whole catalogue and its website one tap away.
 - **Home screen widgets**: Deals, Shopping list and Quick actions, with your choice of background, transparency and text colour.
 - **App icon shortcuts** (Scan, List, Receipt) and **Share to Restock** from any app.
 - **Local sync**: up to 6 phones in a household pair by scanning a one-time QR code from the owner phone (it works once, for 10 minutes, and never contains the household's key), then sync straight to each other on the same Wi-Fi: when you open Restock, shortly after a change, and every 15 minutes or so in the background. Pantry, lists (ticks too), prices, categories and alerts, plus loyalty cards if you choose. The owner picks what the household shares (groceries, Keg, Health) and each phone picks what it takes. Encrypted with a key only your phones have; no server and no account needed. If two phones change the same thing, the later change wins, except that a tick and a new amount on the same line both survive, and deleting something beats an edit made without knowing about it. **Sync away from home** (optional): Nextcloud, another WebDAV server, or the same folder on each phone (one Syncthing keeps in sync), sealed with the household's key, prices and photos aside. **Recovery key**: if the owner phone is ever lost, another phone takes over as owner with it.
@@ -139,6 +138,23 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.12.4
+
+One look everywhere: navy, gold and a little green.
+
+- **Every screen has the same navy top**, with curved bottom corners. It holds the screen's title and its main action. The main button on it is gold; ticks, savings and the buttons on the page below are green. More had this already; now Home, Pantry, the shopping list, Add, every page with a Back arrow, Shopping mode and the setup pages match it.
+- **Home**: the greeting, the price check, the search box and this week's saving are all in the navy top (the saving was a banner of its own).
+- **Pantry**: the title, Add to pantry, the barcode button and the search box are in the navy top.
+- **Shopping list**: the list's name with a **Change** button and its arrow to switch lists, the add box, then how many to get with Edit and the view options. Each shop on the list still folds and opens with its arrow.
+- **Tick as many as you buy as one item.** On the search results, **+** ticks a product and tapping it again unticks it, so you can tick several at the same shop (two flavours, two sizes). A second + used to start over, and the sheet opened after the first one, so it looked like one per shop. An unticked + is green on white; ticked, it's a white tick on green.
+- **Finished at Woolworths** sits at the end of one shop's results and takes you to the next shop, then to your picks. **Not sold at** a shop is there too when you've ticked nothing at it. On the sheet, each pick has **Remove** and each shop has **More**.
+- **Add** is search or scan. The title has the same **Change** button for which tab it goes to. "Change shops" and "More ways to add" are gone from it; shops are picked in Settings.
+- **Add manually** shows once you've searched or scanned, as a big button under the results (it sat on the empty screen as "Can't find it? Add it by hand"). **Find it from a photo of the pack** and **Scan several barcodes** are two small links under it.
+- **A new phone's Home** has one card, **Add what you buy**, with Search and Scan. It no longer fetches and lists Woolworths' and Coles' half-price specials. Your shops' buttons show as soon as you've picked shops.
+- **The shop map** uses maplibre-gl 6.18.0 (it was 4.7.1), which fixes advisory GHSA-jrc7-96c5-q579. Its credit stays as plain words under the map.
+- **The web page on a computer** keeps its navy sidebar and plain page titles.
+- Tidied: unused My catalogue styles removed, and two build and test warnings cleared.
 
 ## New in 0.12.3
 
@@ -551,7 +567,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.3.apk` (on macOS, `shasum -a 256 restock-0.12.3.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.4.apk` (on macOS, `shasum -a 256 restock-0.12.4.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

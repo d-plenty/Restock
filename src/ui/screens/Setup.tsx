@@ -761,7 +761,7 @@ export function SetupTiles({
   return (
     <>
       {!inSettings && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="navy-top">
           <div className="eyebrow green">Setup</div>
           <h1>Set up Restock</h1>
           <p className="sub">Three things to start with. Continue goes through them; the rest can wait, and it's all in Settings later.</p>
@@ -998,7 +998,7 @@ export function Onboarding() {
       {stage === 'a11y' && (
         // 0.12.0: not a setup step any more: opened from the button on the welcome, and back to it.
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="navy-top">
             <h1>Make Restock easier to see and use</h1>
             <p className="sub">You can change these any time in Settings → Accessibility.</p>
           </div>
@@ -1019,7 +1019,8 @@ export function Onboarding() {
       {stage === 'privacy' && (
         // 0.12.0: the short version and one button; the full documents open from the two rows.
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* 0.12.4: the navy top every screen has */}
+          <div className="navy-top">
             <h1>Before you start</h1>
             <p className="sub">The short version. The full documents are one tap away.</p>
           </div>
@@ -1068,12 +1069,15 @@ export function Onboarding() {
       {stage === 'notify' && (
         // 0.12.0: the one permission asked up front. Camera and location are asked when first used.
         <>
+          {/* 0.12.4: the navy top every screen has (the question was under the bell) */}
+          <div className="navy-top">
+            <h1>Want a heads-up on real specials?</h1>
+            <p className="sub">Restock tells you when something you buy drops to a good price. Nothing else.</p>
+          </div>
           <div className="notify-ask">
             <span className="notify-bell" aria-hidden="true">
               <Icon name="bell" size={44} />
             </span>
-            <h1>Want a heads-up on real specials?</h1>
-            <p className="sub">Restock tells you when something you buy drops to a good price. Nothing else.</p>
             <div className="card notify-eg" aria-label="Example notification">
               <Logo size={40} />
               <span>
@@ -1112,7 +1116,7 @@ export function Onboarding() {
 
       {stage === 'restored' && (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="navy-top">
             <div className="eyebrow green">Nearly there</div>
             <h1>Allow what Restock needs</h1>
             <p className="sub">

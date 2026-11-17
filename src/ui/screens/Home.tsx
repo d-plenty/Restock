@@ -11,7 +11,7 @@ import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
 import { chainName, stockKnown, type ListEntry, type Settings } from '../../types';
-import { ChainDot, Icon, LoadingBar, Sheet } from '../components';
+import { ChainDot, Icon, LoadingBar } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { failingStores, getHealth, getHiddenWarnings, isBlockedError, isHidden, offerUnblock } from '../../lib/health';
 import { HideForADay, UnblockButton } from '../Unblock';
@@ -21,13 +21,11 @@ import { protection } from '../../lib/protection';
 import { confirmAction } from '../../lib/confirm';
 import { useNav } from '../nav';
 import { RecallBanner } from './Recalls';
-import { AddBar, ItemRow } from '../simple';
+import { AddBar } from '../simple';
 import { yourShops } from './Catalogues';
 import { shopTileNote } from '../../lib/ownSpecials';
 import { ownCounts } from '../../lib/ownSpecialsLive';
 import { TabOffer } from './SetupNudges';
-import { loadSpecials } from '../../lib/specials';
-import type { StoreProduct } from '../../stores';
 import { UpdateBanner } from '../UpdateBanner';
 import { serverMode } from '../../server-mode/flag';
 import { ConnectionsSheet } from './Settings';
@@ -99,6 +97,8 @@ export function HomeScreen() {
   return (
     <div className="screen" {...refresh.props}>
       {refresh.indicator}
+      {/* 0.12.4: the navy top every screen has: the greeting, the price check, the search box and this week's saving */}
+      <div className="navy-top">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div className="sub">{today}</div>
         <div className="topbar">
@@ -136,7 +136,7 @@ export function HomeScreen() {
                 {missed !== undefined && (
                   <>
                     <br />
-                    <button className="linkish small" style={{ padding: 0, color: 'var(--amber-ink)', fontWeight: 600 }} onClick={() => nav.push({ name: 'diagnostics' })}>
+                    <button className="linkish small" style={{ padding: 0, fontWeight: 600 }} onClick={() => nav.push({ name: 'diagnostics' })}>
                       {missedWords(missed, runs)}. Why?
                     </button>
                   </>
@@ -155,6 +155,15 @@ export function HomeScreen() {
       {/* 0.12.0: adding starts here: search, or the barcode button (Add was a tab in the middle of the bar) */}
       {/* On a Restock server's web page there's no shop search (shops turn web pages away), so no search box here: Pantry says where adding is done. */}
       {!serverMode && <AddBar />}
+      {worth.length > 0 && (
+        <div className="navy-sum">
+          <span>
+            {worth.length} of your items {worth.length === 1 ? 'is' : 'are'} on special
+          </span>
+          <span className="navy-sum-big num">{saving > 0 ? `Save about ${money(saving)}` : 'Worth a look'}</span>
+        </div>
+      )}
+      </div>
 
       {/* 0.10.12: a newer Restock is out: first thing on Home, until it's installed */}
       <UpdateBanner settings={settings} />
@@ -162,17 +171,6 @@ export function HomeScreen() {
 
       {/* 0.12.0: the "finish setting up" and tour cards are gone from Home (each thing is asked when it's first needed; both are in Settings). The household's offer of a tab it now shares stays. */}
       {!serverMode && <TabOffer settings={settings} />}
-
-      {worth.length > 0 && (
-        <div className="banner green" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 14 }}>
-              {worth.length} of your items {worth.length === 1 ? 'is' : 'are'} on special
-            </span>
-            <span className="big num">{saving > 0 ? `Save about ${money(saving)}` : 'Worth a look'}</span>
-          </div>
-        </div>
-      )}
 
       {Object.entries(refresh.busy ? {} : errors).map(([chain, msg]) =>
         offerUnblock(chain, msg) && chain !== 'other' ? (
@@ -330,76 +328,32 @@ export function weekDeals(allRecs: Recommendation[], settings: Settings, allEntr
 }
 
 /**
- * 0.12.0: Home before anything's been added. This week's half-price lists from Woolworths and Coles
- * (the shops' own lists, kept 12 hours), so there's
- * something to tap straight away: + searches your shops for it. Where the lists can't be read
- * (no signal, the web page, a shop turning Restock away) it's the plain first step instead.
+ * Home before anything's been added. 0.12.4: one card, "Add what you buy", with Search and Scan
+ * (it listed Woolworths' and Coles' half-price specials; a new phone asks the shops for nothing now
+ * until you search). Your shops' buttons show under it as soon as you've picked shops.
  */
 function FirstHome({ tourSeen }: { tourSeen?: boolean }) {
   const nav = useNav();
-  const lists = useLive(() => loadSpecials().catch(() => []), []);
-  const [shop, setShop] = useState<string>();
-  const [info, setInfo] = useState<StoreProduct>();
-  const all = (lists ?? []).filter((l) => l.items.length);
-  // A few from each shop in turn, so one shop's list doesn't fill the page.
-  const mixed: StoreProduct[] = [];
-  for (let i = 0; i < 6; i++) for (const l of all) if (l.items[i]) mixed.push(l.items[i]);
-  const items = (shop ? (all.find((l) => l.chain === shop)?.items ?? []) : mixed).slice(0, 8);
-  const half = (p: StoreProduct) => (p.wasPrice && p.price !== undefined && p.price <= p.wasPrice * 0.55 ? 'Half price' : 'Special');
   return (
     <>
-      <div className="banner green first-banner">
-        <span className="big">{items.length ? "This week's specials" : serverMode ? 'Nothing here yet' : 'Add what you buy'}</span>
-        <span>
-          {items.length
-            ? 'Tap + on anything you buy. Restock keeps watching its price for you.'
-            : serverMode
-              ? 'Add what you buy on a phone: adding is by shop search, which only phones can do. This page then shows what your phones found.'
-              : 'Search for it or scan its barcode. Restock watches the price and tells you when it is a real special.'}
+      <div className="card first-card">
+        <strong className="first-card-title">{serverMode ? 'Nothing here yet' : 'Add what you buy'}</strong>
+        <span className="small">
+          {serverMode
+            ? 'Add what you buy on a phone: adding is by shop search, which only phones can do. This page then shows what your phones found.'
+            : 'Search for it or scan its barcode. Restock watches the price and tells you when it is a real special.'}
         </span>
-      </div>
-      {lists === undefined && (
-        <div role="status" className="small">
-          Getting this week's specials…
-          <LoadingBar seconds={12} />
-        </div>
-      )}
-      {all.length > 1 && (
-        <div className="chips" role="group" aria-label="Specials at">
-          <button className="chip" aria-pressed={!shop} onClick={() => setShop(undefined)}>
-            All
-          </button>
-          {all.map((l) => (
-            <button key={l.chain} className="chip" aria-pressed={shop === l.chain} onClick={() => setShop(l.chain)}>
-              {chainName(l.chain)}
+        {!serverMode && (
+          <div className="two">
+            <button className="btn primary" onClick={() => nav.push({ name: 'add' })}>
+              <Icon name="search" size={18} /> Search
             </button>
-          ))}
-        </div>
-      )}
-      {items.length > 0 && (
-        <div className="card flush">
-          {items.map((p) => (
-            <ItemRow
-              key={`${p.chain}:${p.storeProductId}`}
-              photo={p.imageUrl}
-              name={p.name}
-              chain={p.chain}
-              price={p.price}
-              note={{ text: half(p), tone: 'good' }}
-              onInfo={() => setInfo(p)}
-              action={
-                <button
-                  className="btn primary plus-btn"
-                  aria-label={`Add ${p.name}`}
-                  onClick={() => nav.push({ name: 'add', query: p.name, preTick: { chain: p.chain as StoreChain, storeProductId: String(p.storeProductId), product: p } })}
-                >
-                  <Icon name="plus" size={22} />
-                </button>
-              }
-            />
-          ))}
-        </div>
-      )}
+            <button className="btn" onClick={() => nav.push({ name: 'add', scan: true })}>
+              <Icon name="scan" size={18} /> Scan
+            </button>
+          </div>
+        )}
+      </div>
       <button
         className="btn ghost"
         onClick={async () => {
@@ -418,34 +372,6 @@ function FirstHome({ tourSeen }: { tourSeen?: boolean }) {
         <button className="btn ghost" onClick={() => void startTour()}>
           Take the two-minute tour
         </button>
-      )}
-      {info && (
-        <Sheet title={info.name} onClose={() => setInfo(undefined)}>
-          <dl className="pinfo-rows">
-            <div>
-              <dt>
-                <ChainDot chain={info.chain} /> Now at {chainName(info.chain)}
-              </dt>
-              <dd className="num big">{money(info.price)}</dd>
-            </div>
-            {info.wasPrice !== undefined && (
-              <div>
-                <dt>Was</dt>
-                <dd className="num">{money(info.wasPrice)}</dd>
-              </div>
-            )}
-            {info.wasPrice !== undefined && info.price !== undefined && info.wasPrice > info.price && (
-              <div>
-                <dt>You save</dt>
-                <dd className="num">{money(info.wasPrice - info.price)}</dd>
-              </div>
-            )}
-          </dl>
-          <p className="small" style={{ margin: 0 }}>
-            This is what {chainName(info.chain)} says. Add it and Restock starts its own price history, so next time it can tell you whether the
-            special is a real one.
-          </p>
-        </Sheet>
       )}
     </>
   );
