@@ -1973,8 +1973,12 @@ export function AddScreen({
                 </p>
               );
             return left > 0 ? (
-              <button key={c} className="btn ghost small" style={TAP} onClick={() => setShopView(c)}>
-                More from {chainName(c)} ({left})
+              // 0.12.2: a full-width button at the usual height (it was a small grey one)
+              <button key={c} className="btn more-from" onClick={() => setShopView(c)}>
+                <ChainDot chain={c} />
+                <span className="grow">More from {chainName(c)}</span>
+                <span className="num more-from-n">{left}</span>
+                <Icon name="chevron" size={18} />
               </button>
             ) : null;
           })}

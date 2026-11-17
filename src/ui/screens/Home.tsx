@@ -21,7 +21,8 @@ import { protection } from '../../lib/protection';
 import { confirmAction } from '../../lib/confirm';
 import { useNav } from '../nav';
 import { RecallBanner } from './Recalls';
-import { AddBar, ItemRow, RecRow } from '../simple';
+import { AddBar, ItemRow } from '../simple';
+import { yourShops } from './Catalogues';
 import { TabOffer } from './SetupNudges';
 import { loadSpecials } from '../../lib/specials';
 import type { StoreProduct } from '../../stores';
@@ -44,27 +45,6 @@ export function HomeScreen() {
   const hidden = useLive(getHiddenWarnings, []);
   const failingAll = health ? failingStores(health).filter((f) => !isHidden(hidden, f.chain)) : [];
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // The shops whose deals show (0.8.8: pick several, from a menu). None picked: every shop.
-  const [picked, setPickedState] = useState<string[]>(() => {
-    try {
-      const many = localStorage.getItem('homeDealShops');
-      if (many) return JSON.parse(many) as string[];
-      const one = localStorage.getItem('homeDealShop');
-      return one ? [one] : [];
-    } catch {
-      return [];
-    }
-  });
-  const [shopMenu, setShopMenu] = useState(false);
-  const setPicked = (list: string[]) => {
-    setPickedState(list);
-    try {
-      localStorage.setItem('homeDealShops', JSON.stringify(list));
-      localStorage.removeItem('homeDealShop');
-    } catch {
-      // storage can be unavailable
-    }
-  };
   // Check now syncs with the household first, then checks prices, then shares the new prices with
   // the household. Pulling down only syncs (0.8.8). One run at a time, across every tab.
   const refresh = useFullRefresh((res) => setErrors(res.errors as Record<string, string>));
@@ -75,8 +55,8 @@ export function HomeScreen() {
   // 0.10.2: the background checks' log (above the early return: hooks always run in the same order).
   const runs = useLive(getCheckLog, []) ?? [];
   if (!allRecs || !settings || !allEntries) return <div className="screen" />;
-  const { on, recs, totals, openLines, listed, dealChain, dealRecs, dealShops, showing, buys, altDeals, smalls, waits, skips, normal, worth, saving } =
-    weekDeals(allRecs, settings, allEntries, picked);
+  const { on, recs, totals, openLines, worth, saving } = weekDeals(allRecs, settings, allEntries);
+  const shops = yourShops(settings);
   // Only warn about shops you still use, on a tab that's switched on.
   const failing = failingAll.filter((f) => on.some((sec) => searchChainsIn(settings.enabledChains, sec).includes(f.chain)));
   const oldest = recs.map((r) => r.group.createdAt).sort()[0];
@@ -120,7 +100,7 @@ export function HomeScreen() {
             <Icon name="settings" size={20} />
           </button>
         </div>
-        {/* 0.10.10: Cards, Catalogues, Specials and Receipts live in More only (they were here as well), so Home is your deals. */}
+        {/* 0.10.10: Cards and Receipts live in More only. 0.12.2: the catalogues are here again, as buttons. */}
         <div className="checkline">
           {refresh.stage && !progress ? (
             <>
@@ -247,81 +227,34 @@ export function HomeScreen() {
 
       {!allRecs.length && <FirstHome tourSeen={settings.tour.seen} />}
 
-      {dealShops.length > 1 && (
-        <>
-          {/* All shops, or the ones you pick from a menu (0.8.8: was a row of every shop). */}
-          <div className="deal-shops" role="group" aria-label="Deals at">
-            <button
-              className="chip"
-              aria-pressed={!showing.length}
-              onClick={() => {
-                setPicked([]);
-                setShopMenu(false);
-              }}
-            >
-              All shops
-            </button>
-            <button className="chip" aria-pressed={showing.length > 0} aria-expanded={shopMenu} onClick={() => setShopMenu(!shopMenu)}>
-              {showing.length === 1 ? (
-                <>
-                  <ChainDot chain={showing[0] as StoreChain} /> {chainName(showing[0] as StoreChain)}
-                </>
-              ) : showing.length > 1 ? (
-                `${showing.length} shops`
-              ) : (
-                'Choose shops'
-              )}
-              <span className={`deal-caret${shopMenu ? ' open' : ''}`} aria-hidden>
-                <Icon name="chevron" size={14} />
-              </span>
-            </button>
-          </div>
-          {shopMenu && (
-            <div className="card flush deal-menu">
-              {dealShops.map((c) => {
-                const n = dealRecs.filter((r) => dealChain(r) === c).length;
-                const on = showing.includes(c);
-                return (
-                  <label key={c} className="row">
-                    <input type="checkbox" checked={on} onChange={() => setPicked(on ? showing.filter((x) => x !== c) : [...showing, c])} />
-                    <ChainDot chain={c} />
-                    <span className="grow">{chainName(c)}</span>
-                    {n > 0 && <span className="small">{n === 1 ? '1 deal' : `${n} deals`}</span>}
-                  </label>
-                );
-              })}
-              <div className="row">
-                <button className="btn small" onClick={() => setPicked([])}>
-                  Show all
-                </button>
-                <span className="grow" />
-                <button className="btn primary small" onClick={() => setShopMenu(false)}>
-                  Done
-                </button>
-              </div>
-            </div>
-          )}
-        </>
+      {/* 0.12.2: Home is the way in to the catalogues (it listed every deal, group by group): your own
+          catalogue, made from your pantry, then a square button for each shop's catalogue. */}
+      {allRecs.length > 0 && (
+        <button className="btn primary home-cat" onClick={() => nav.push({ name: 'mycatalogue' })}>
+          <Icon name="book" size={24} />
+          <span className="grow">Open my catalogue</span>
+          <Icon name="chevron" size={20} />
+        </button>
       )}
-      {/* 0.12.0: one row each: photo, shop, one price and a word. The "i" has the rest. */}
-      {[
-        { label: 'Your items on special', tone: 'green', items: buys },
-        { label: 'Cheaper swap', tone: 'blue', items: altDeals },
-        { label: 'Small savings', tone: 'green', items: smalls },
-        { label: 'Wait for a better special', tone: 'amber', items: waits },
-        { label: 'Not real specials', tone: '', items: skips },
-      ]
-        .filter((g) => g.items.length > 0)
-        .map((g) => (
-          <section key={g.label} className="home-group">
-            <h2 className={`eyebrow${g.tone ? ` ${g.tone}` : ''}`}>{g.label}</h2>
-            <div className="card flush">
-              {g.items.map((r) => (
-                <RecRow key={r.group.id} rec={r} listed={listed.get(r.group.id)} />
-              ))}
-            </div>
-          </section>
-        ))}
+      {shops.length > 0 && (
+        <section className="home-group" aria-labelledby="home-shops">
+          <h2 className="eyebrow" id="home-shops">
+            Your shops
+          </h2>
+          <div className="shop-tiles">
+            {shops.map((c) => (
+              <button key={c} className="shop-tile" onClick={() => nav.push({ name: 'shopcatalogue', chain: c })} aria-label={`${chainName(c)} catalogue`}>
+                <span className="shop-tile-icon">
+                  <Icon name="shop" size={24} />
+                  <ChainDot chain={c} />
+                </span>
+                <span className="shop-tile-name">{chainName(c)}</span>
+                <span className="shop-tile-note">Catalogue</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 0.12.0: one line (the shop-by-shop totals are on the list itself) */}
       {openLines > 0 && (
@@ -337,11 +270,6 @@ export function HomeScreen() {
         </button>
       )}
 
-      {normal.length > 0 && recs.length > 0 && (
-        <button className="btn ghost" onClick={() => nav.setTab('pantry')}>
-          {normal.length} other item{normal.length === 1 ? '' : 's'} at the usual price
-        </button>
-      )}
       {testing && <ConnectionsSheet settings={settings} onClose={() => setTesting(false)} />}
     </div>
   );

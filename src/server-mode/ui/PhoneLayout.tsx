@@ -206,12 +206,13 @@ export function MorePage() {
       {/* 0.10.4: the phone's navy top: Keg, Health, Baby and Pets as tiles, the others to add. */}
       <MoreTop />
       <SyncCard />
-      {/* 0.10.4: the same rows as the phone's More, in the same order (0.11.0: Catalogues and specials is one row). */}
+      {/* 0.10.4: the same rows as the phone's More, in the same order (0.12.2: Open my catalogue and Your shops). */}
       <div className="eyebrow">Everything else</div>
       <div className="card flush">
         <Row icon="settings" title="Settings" sub="Shops, lists, look and colours" onClick={() => go({ name: 'settings' })} />
         <Row icon="card" title="Cards" sub="Loyalty and gift cards, on this phone" onClick={() => go({ name: 'cards' })} />
-        <Row icon="book" title="Catalogues and specials" sub={offline ? 'As last saved on this phone' : "My catalogue, and what your phones found on special"} onClick={() => go({ name: 'catalogues' })} />
+        <Row icon="book" title="Open my catalogue" sub={offline ? 'As last saved on this phone' : "This week's specials on your own items"} onClick={() => go({ name: 'mycatalogue' })} />
+        <Row icon="shop" title="Your shops" sub={offline ? 'As last saved on this phone' : "Each shop's catalogue and website"} onClick={() => go({ name: 'catalogues' })} />
         <Row
           icon="receipt"
           title="Receipts"

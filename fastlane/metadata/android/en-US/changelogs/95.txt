@@ -1,0 +1,1 @@
+Release candidate (0.12.2): Home is the way in to the catalogues. Open my catalogue is one big button, and each of your shops has a square button that opens its specials as tiles. More has two rows, Open my catalogue and Your shops (each shop's catalogue and website). Bigger More from buttons in search results. The shop map's credit is plain text.

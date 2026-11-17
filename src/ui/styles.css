@@ -3497,7 +3497,6 @@ input[type='checkbox'].switch:focus-visible {
 .cat-band-sub {
   font-size: var(--fs-sm);
   font-weight: 700;
-  opacity: 0.92;
 }
 .cat-grid {
   display: grid;
@@ -6432,4 +6431,223 @@ span.plus-btn {
   flex-basis: 100%;
   justify-content: flex-end;
   margin-top: 0;
+}
+
+/* ---------- 0.12.2: Home's catalogue buttons, Your shops, one shop's catalogue ---------- */
+/* Open my catalogue: the one big button on Home. */
+.btn.home-cat {
+  height: 64px;
+  padding: 0 var(--sp-5);
+  border-radius: var(--r-lg);
+  justify-content: flex-start;
+  gap: var(--sp-3);
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  text-align: left;
+}
+.btn.home-cat .grow {
+  flex: 1;
+  min-width: 0;
+}
+/* A square button for each shop, three across (two when the text is set very large). */
+.shop-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.shop-tile {
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+  min-height: 96px;
+  padding: var(--sp-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  text-align: left;
+}
+.shop-tile:active {
+  background: var(--sunken);
+}
+.shop-tile-icon {
+  color: var(--ink-2);
+  margin-bottom: auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.shop-tile-name {
+  max-width: 100%;
+  font-size: var(--fs-md);
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.shop-tile-note {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--green-ink);
+}
+/* Narrower phones: a little less padding and smaller names, so "Woolworths" stays on one line. */
+@media (max-width: 379px) {
+  .shop-tile {
+    padding: 10px;
+  }
+  .shop-tile-name {
+    font-size: var(--fs-sm);
+  }
+}
+@media (max-width: 340px) {
+  .shop-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .shop-tile {
+    aspect-ratio: auto;
+  }
+}
+/* Your shops: the two buttons drop under a long shop name instead of squeezing it. */
+.row.shop-row {
+  flex-wrap: wrap;
+}
+/* The two buttons sit on their own line, side by side and the same width. */
+.shop-row-btns {
+  flex: 1 1 100%;
+  display: flex;
+  gap: var(--sp-2);
+}
+.shop-row-btns .btn.small {
+  flex: 1 1 0;
+  height: var(--hit);
+}
+/* One shop's catalogue. */
+.shopcat-kicker {
+  font-size: var(--fs-md);
+}
+.shopcat-note {
+  font-size: var(--fs-sm);
+}
+.shopcat-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.shopcat-tools .search-field {
+  flex: 1 1 100%;
+}
+.shopcat-tools select.input {
+  height: 48px;
+  width: auto;
+  min-width: 158px;
+}
+.cat-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+.cat-tile {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.cat-tile-open {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  flex: 1;
+}
+.cat-tile-photo {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.cat-tile-photo .thumb {
+  width: 100%;
+  height: 104px;
+}
+.cat-tile-badge {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
+  background: var(--navy);
+  color: var(--gold);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+.cat-tile-badge.mine {
+  background: var(--green-solid);
+  color: var(--on-accent);
+}
+.cat-tile-name {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cat-tile-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+}
+.cat-tile-prices {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cat-tile-price {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  line-height: 1.1;
+}
+.cat-tile-save {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--green-ink);
+}
+.card.shopcat-foot {
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.shopcat-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+/* Search results: "More from <shop>", a full-width button. */
+.btn.more-from {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+.more-from .grow {
+  flex: 1;
+  min-width: 0;
+}
+.more-from-n {
+  color: var(--muted);
+  font-weight: 700;
 }

@@ -23,7 +23,6 @@ import { DeskDataManage } from './DeskDataManage';
 import { PassphraseV3, SignOutChoices } from './DeskHouseSettings';
 import { HandoverCard, ServerAndPhones } from './DeskServer';
 import { DeskSettings, Line } from './DeskSettings';
-import { DeskSpecials } from './DeskSpecials';
 import { ServerHomeAssistant } from './ServerHomeAssistant';
 import { peekStartOn } from './deskShared';
 import { AddOnServer, PhoneOnlyNote, PhoneOnlyScreen } from './PhoneOnly';
@@ -117,8 +116,6 @@ export function serverScreen(top: Screen): ReactNode | undefined {
       return isV3() ? <DeskSettings narrow /> : <ServerSettings />;
     case 'homeAssistant':
       return isV3() ? <ServerHomeAssistant narrow /> : undefined;
-    case 'specials':
-      return <DeskSpecials narrow />;
     case 'cards':
       // 0.9.6 (cards): the Cards tab, kept in this browser only (was the phones' loyalty cards, greyed).
       return <DeskCards back />;
@@ -126,8 +123,7 @@ export function serverScreen(top: Screen): ReactNode | undefined {
       return <AddOnServer back />;
     case 'stores':
       return <PhoneOnlyScreen title="Shops" />;
-    case 'catalogues':
-      return <DeskSpecials narrow />;
+    // 0.12.2: Your shops and each shop's catalogue are the phone's own screens here too (they show what the phones shared)
     case 'sync':
       return <PhoneOnlyScreen title="Local sync" text="Do this on a phone: phones pair with each other on the Wi-Fi. Add phones to this server on the Phones page." />;
     case 'permissions':

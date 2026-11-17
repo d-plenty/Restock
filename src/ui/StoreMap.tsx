@@ -45,7 +45,9 @@ export function StoreMap({
           style: MAP_STYLE,
           center: [centre.lon, centre.lat],
           zoom: 11,
-          attributionControl: { compact: true },
+          // 0.12.2: the map library's own credit box writes the map server's credit text into the page as
+          // HTML (npm advisory GHSA-jrc7-96c5-q579). It's off: the credit is plain words under the map.
+          attributionControl: false,
           cooperativeGestures: true,
         });
         map.addControl(new m.NavigationControl({ showCompass: false }), 'top-right');
@@ -80,6 +82,7 @@ export function StoreMap({
   return (
     <div className="store-map-wrap">
       <div ref={box} className="store-map" role="region" aria-label="Map of the shops near you" />
+      <p className="small map-credit">Map: OpenFreeMap, © OpenMapTiles. Data © OpenStreetMap contributors.</p>
       {error && (
         <p className="small" role="status" style={{ margin: 0 }}>
           {error}

@@ -45,7 +45,7 @@ type Place = Tab | 'specials' | 'receipts' | 'cards' | 'household' | 'data' | 's
 
 /** Which sidebar entry a screen belongs to (by the first screen opened over the tab). */
 function placeOfScreen(s: Screen): Place | undefined {
-  if (s.name === 'specials' || s.name === 'catalogues' || s.name === 'mycatalogue') return 'specials';
+  if (s.name === 'specials' || s.name === 'catalogues' || s.name === 'mycatalogue' || s.name === 'shopcatalogue') return 'specials';
   if (s.name === 'receipts' || s.name === 'receipt') return 'receipts';
   if (s.name === 'server' && (s.page === 'data' || s.page === 'data-manage')) return 'data';
   if (s.name === 'cards') return 'cards'; // 0.9.6 (cards)

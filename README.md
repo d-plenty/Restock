@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.12.1" src="https://img.shields.io/badge/status-release%20candidate%200.12.1-ffcd00">
+  <img alt="Release candidate 0.12.2" src="https://img.shields.io/badge/status-release%20candidate%200.12.2-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0121">New in 0.12.1</a> ·
+  <a href="#new-in-0122">New in 0.12.2</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -139,6 +139,19 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.12.2
+
+Home is the way in to the catalogues.
+
+- **Open my catalogue** is one big button on Home, under the savings banner. It opens your own catalogue: this week's specials on the things in your pantry, and only those.
+- **Your shops** on Home: a square button for every shop you use, three across. Each opens that shop's specials as tiles with a photo, the price and what it saves. Tap a tile for the details, or the cart to put it on your shopping list.
+- **What a shop's page holds:** the shop's own half-price list (Coles and Woolworths), your items on special there, and what your searches found on special there this week. Restock doesn't read a shop's whole catalogue; **Open the catalogue** on the page opens it on the shop's own site.
+- **Home no longer lists every deal group by group.** They're in My catalogue, and each item's verdict is on its Pantry row.
+- **More** has two rows where Catalogues and specials was: **Open my catalogue** and **Your shops**. Your shops lists every shop you use with a **Catalogue** button and a **Website** button.
+- **My specials is gone as a page of its own.** Each shop's list is its Catalogue button now.
+- **More from Coles / Woolworths / Aldi** in search results are full-width buttons at the usual height (they were small grey ones).
+- **The shop map** shows its credit as plain words under the map. The map library's own credit box, which writes the map server's text into the page, is off.
 
 ## New in 0.12.1
 
@@ -526,7 +539,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.1.apk` (on macOS, `shasum -a 256 restock-0.12.1.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.2.apk` (on macOS, `shasum -a 256 restock-0.12.2.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

@@ -43,6 +43,8 @@ export type Screen =
   | { name: 'feedback' }
   | { name: 'catalogues' }
   | { name: 'mycatalogue' }
+  /** 0.12.2: one shop's catalogue (Home's square buttons; More → Your shops). */
+  | { name: 'shopcatalogue'; chain: StoreChain }
   | { name: 'permissions' }
   | { name: 'stores'; section?: Section }
   | { name: 'cards' }

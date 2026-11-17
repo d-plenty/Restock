@@ -43,7 +43,7 @@ import { rescueOldScans } from '../lib/scanQueue';
 import { scanBarcode } from '../lib/barcode';
 import { RestockNative } from '../lib/sql/native';
 import { DiagnosticsScreen } from './screens/Diagnostics';
-import { SpecialsScreen } from './screens/Specials';
+import { ShopCatalogueScreen } from './screens/ShopCatalogue';
 import { ReceiptScreen, ReceiptsScreen } from './screens/Receipts';
 import { RecallsScreen } from './screens/Recalls';
 import { SoonScreen } from './screens/Soon';
@@ -609,7 +609,9 @@ function RestockApp() {
         {top.name === 'categories' && <CategoriesScreen section={top.section} />}
         {top.name === 'setup' && <SetupScreen />}
         {top.name === 'diagnostics' && <DiagnosticsScreen />}
-        {top.name === 'specials' && <SpecialsScreen />}
+        {/* 0.12.2: My specials is each shop's Catalogue now; an old link to it lands on Your shops */}
+        {top.name === 'specials' && <CataloguesScreen />}
+        {top.name === 'shopcatalogue' && <ShopCatalogueScreen key={top.chain} chain={top.chain} />}
         {top.name === 'receipts' && <ReceiptsScreen />}
         {top.name === 'receipt' && <ReceiptScreen key={top.id ?? 'new'} id={top.id} />}
         {top.name === 'recalls' && <RecallsScreen />}

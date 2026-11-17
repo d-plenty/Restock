@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react';
-import { findCatalogue, type CatalogueLink } from '../../lib/catalogues';
 import { getSettings } from '../../lib/db';
 import { useLive } from '../../lib/useLive';
-import { activeSections, chainName, enabledIn, hostOf, shopOnTab, websiteOf, type Section, type StoreChain, withCustom } from '../../shops';
-import { isNative } from '../../stores/http';
+import { activeSections, chainName, enabledIn, hostOf, shopDef, shopOnTab, websiteOf, type Section, type StoreChain, withCustom } from '../../shops';
+import { serverMode } from '../../server-mode/flag';
 import { storeChoice, type Settings } from '../../types';
 import { ChainDot, Icon, TopBar } from '../components';
 import { useNav } from '../nav';
@@ -36,40 +34,30 @@ export function httpsLink(url: string | undefined): string | undefined {
   }
 }
 
-function CatalogueRow({ chain }: { chain: StoreChain }) {
-  const [found, setLink] = useState<CatalogueLink>();
-  useEffect(() => {
-    void findCatalogue(chain).then(setLink, () => setLink({ missing: 'unchecked' }));
-  }, [chain]);
-  // A catalogue address that isn't https counts as no catalogue found.
-  const link: CatalogueLink | undefined = found?.url && !httpsLink(found.url) ? { missing: 'none' } : found;
+/** One of your shops: its catalogue (in Restock) and its website (in your browser). */
+function ShopRow({ chain }: { chain: StoreChain }) {
+  const nav = useNav();
   const site = httpsLink(websiteOf(chain));
-  // Plain links: the app hands outside web addresses to the phone's browser.
+  const note = shopDef(chain)?.catalogue?.note ?? (site ? hostOf(site) : undefined);
   return (
-    <div className="row" style={{ flexWrap: 'wrap' }}>
+    <div className="row shop-row">
       <ChainDot chain={chain} />
-      <span className="grow" style={{ minWidth: 150 }}>
+      <span className="grow" style={{ minWidth: 0 }}>
         <span className="title">{chainName(chain)}</span>
-        <span className="small">
-          {!link
-            ? 'Looking for a catalogue…'
-            : link.url
-              ? (link.note ?? hostOf(link.url))
-              : link.missing === 'unchecked'
-                ? isNative()
-                  ? "Couldn't check for a catalogue just now."
-                  : 'Checking for a catalogue works in the Android app.'
-                : `No catalogue found on ${site ? hostOf(site) : 'its website'}.`}
-        </span>
+        {note && <span className="small">{note}</span>}
       </span>
-      <span style={{ display: 'flex', gap: 6 }}>
-        {link?.url && (
-          <a className="btn small primary" href={link.url} style={{ textDecoration: 'none' }} aria-label={`${chainName(chain)} catalogue`}>
-            <Icon name="book" size={16} /> Catalogue
-          </a>
-        )}
+      <span className="shop-row-btns">
+        <button className="btn small primary" onClick={() => nav.push({ name: 'shopcatalogue', chain })} aria-label={`${chainName(chain)} catalogue`}>
+          <Icon name="book" size={16} /> Catalogue
+        </button>
         {site && (
-          <a className="btn small" href={site} style={{ textDecoration: 'none' }} aria-label={`${chainName(chain)} website`}>
+          <a
+            className="btn small"
+            href={site}
+            {...(serverMode ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+            style={{ textDecoration: 'none' }}
+            aria-label={`${chainName(chain)} website${serverMode ? ' (opens a new tab)' : ''}`}
+          >
             <Icon name="external" size={16} /> Website
           </a>
         )}
@@ -78,6 +66,13 @@ function CatalogueRow({ chain }: { chain: StoreChain }) {
   );
 }
 
+/** Every shop you use, once, in the order of your tabs (Home's square buttons). */
+export function yourShops(settings: Settings): StoreChain[] {
+  return [...new Set(catalogueShops(settings).flatMap((g) => g.chains))];
+}
+
+// 0.12.2: More → Your shops (it was Catalogues and specials: My catalogue has its own row in More
+// now, and each shop's specials are its Catalogue button here).
 export function CataloguesScreen() {
   const nav = useNav();
   const settings = useLive(getSettings, []);
@@ -85,41 +80,26 @@ export function CataloguesScreen() {
   const groups = catalogueShops(settings);
   return (
     <div className="screen">
-      <TopBar title="Catalogues and specials" />
-      {/* Your own catalogue first (0.9.0): this week's deals on the things you track. */}
-      <button className="banner green cat-entry" onClick={() => nav.push({ name: 'mycatalogue' })}>
-        <span className="cat-kicker">NEW · YOUR RESTOCK CATALOGUE</span>
-        <span className="cat-entry-title">Specials on the things you buy</span>
-        <span className="cat-lede">This week's specials on everything you track, a page for each shop.</span>
-        <span className="btn small cat-open">Open my catalogue</span>
-      </button>
-      {/* 0.11.0: My specials, the same way in: a list for each shop you use (Specials.tsx) */}
-      <button className="banner cat-entry specials-entry" onClick={() => nav.push({ name: 'specials' })}>
-        <span className="cat-kicker">EVERY SHOP YOU USE</span>
-        <span className="cat-entry-title">What's on special at each shop</span>
-        <span className="cat-lede">Open a shop to see its specials: your items first, then what the shop and your searches show. Search and sort them.</span>
-        <span className="btn small cat-open">Open my specials</span>
-      </button>
-      <div className="eyebrow">The shops' own catalogues</div>
-      <p className="sub">
-        The catalogue for each shop you use. Catalogue opens the shop's own catalogue, Website opens its site, both in your web browser.
-      </p>
+      <TopBar title="Your shops" />
+      <p className="sub">Catalogue shows a shop's specials here in Restock. Website opens the shop's own site in your web browser.</p>
       {groups.map(({ section, chains }) => (
         <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Icon name={section} size={15} /> {GROUP[section]}
-          </div>
+          {groups.length > 1 && (
+            <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name={section} size={15} /> {GROUP[section]}
+            </div>
+          )}
           <div className="card flush">
             {chains.map((c) => (
-              <CatalogueRow key={c} chain={c} />
+              <ShopRow key={c} chain={c} />
             ))}
           </div>
         </div>
       ))}
-      {!groups.length && <p className="small">Pick your shops in Settings → My shops to see their catalogues here.</p>}
-      <p className="small">
-        Catalogue prices can differ by state and branch. Your items' prices are checked automatically, so you don't need to hunt for them here.
-      </p>
+      {!groups.length && <p className="small">You haven't picked any shops yet.</p>}
+      <button className="btn" onClick={() => nav.push({ name: 'settings' })}>
+        {groups.length ? 'Add or remove shops in Settings' : 'Pick your shops in Settings'}
+      </button>
     </div>
   );
 }
