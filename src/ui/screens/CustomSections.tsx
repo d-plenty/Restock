@@ -126,8 +126,8 @@ export async function makeCustomSection(def: CustomDef, want?: CustomSection): P
 /** The starts to pick from (and "Your own"): makes the section, then onMade (More, Settings, setup). */
 /** 0.12.0: the two tabs Restock has always had besides Pantry, offered beside the custom starts. */
 const BUILT_IN: { id: 'keg' | 'pharmacy'; name: string; about: string; colour: string }[] = [
-  { id: 'keg', name: 'Bottle shop', about: 'Beer, wine and spirits at the bottle shops you pick', colour: 'amber' },
   { id: 'pharmacy', name: 'Chemist', about: 'Medicine, first aid and personal care at the chemists you pick', colour: 'green' },
+  { id: 'keg', name: 'Bottle shop', about: 'Beer, wine and spirits at the bottle shops you pick (18+)', colour: 'amber' },
 ];
 
 export function CustomStarts({ onMade, onBuiltIn }: { onMade: (id: CustomSection) => void; /** Bottle shop or Chemist: open its shops page. Left out: they aren't offered. */ onBuiltIn?: (id: 'keg' | 'pharmacy') => void }) {
@@ -205,7 +205,7 @@ export function CustomStarts({ onMade, onBuiltIn }: { onMade: (id: CustomSection
 export function NewCustomSheet({ onClose }: { onClose: () => void }) {
   const nav = useNav();
   return (
-    <Sheet title="Make a custom section" titleTag={<BetaTag />} onClose={onClose}>
+    <Sheet title="Create a custom tab" titleTag={<BetaTag />} onClose={onClose}>
       <p className="small" style={{ margin: 0 }}>
         Compare any shops you like: bottle shops, chemists, pet shops, tools, automotive and more. Pick a start, then its shops.
       </p>

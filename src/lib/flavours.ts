@@ -35,6 +35,19 @@ export function flavourWord(names: string[]): 'flavours' | 'scents' | 'colours' 
   return SCENTS.test(all) ? 'scents' : COLOURS.test(all) ? 'colours' : 'flavours';
 }
 
+// 0.12.5: fresh fruit and veg come in kinds (washed, brushed, red), not flavours.
+const PRODUCE =
+  /\b(potato(?:es)?|onions?|tomato(?:es)?|apples?|bananas?|carrots?|pumpkins?|capsicums?|mushrooms?|lettuces?|cucumbers?|zucchinis?|avocados?|oranges?|mandarins?|lemons?|limes?|pears?|grapes?|strawberr(?:y|ies)|blueberr(?:y|ies)|melons?|watermelons?|mango(?:es)?|broccoli|cauliflowers?|cabbages?|spinach|celery|garlic|ginger|kiwifruit|peach(?:es)?|plums?|nectarines?|cherr(?:y|ies)|pineapples?|sweet ?corn|beetroots?|eggplants?|leeks?|kale)\b/i;
+const MADE = /\b(juice|sauce|chips?|crisps|soup|paste|flavou?r(?:ed)?|drink|cordial|yoghurt|yogurt|jam|pie|cake|bar|bars|tea|lollies|gum|vinegar|oil|cider|powder|tinned|canned|frozen|dried|puree|salad|mash|wedges|fries|gems|noodles?)\b/i;
+/**
+ * The word for the button and notes people read in the app: as flavourWord, but "kinds" for fresh fruit and veg
+ * ("Add the other 3 kinds too", never "3 flavours" of potato). Not used for alerts (Deals.java has flavourWord's four).
+ */
+export function varietyWord(names: string[]): ReturnType<typeof flavourWord> | 'kinds' {
+  const w = flavourWord(names);
+  return w === 'flavours' && names.length > 0 && names.every((n) => PRODUCE.test(n) && !MADE.test(n)) ? 'kinds' : w;
+}
+
 /**
  * What tells them apart: their names without the words they all share ("Coles Simply Milk & Honey
  * Body Wash 1L" → "Simply Milk & Honey", beside "Revitalising Ocean Breeze" and "Guava & Peach").

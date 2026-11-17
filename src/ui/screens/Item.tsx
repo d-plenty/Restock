@@ -76,7 +76,7 @@ import {
 } from '../components';
 import { CheapestInfoTag, MemberInfoTag, MultiInfoTag, StockInfoTag, SwapInfoTag, VerdictInfoTag } from '../tagInfo';
 import { useNav } from '../nav';
-import { SECTION_PLACE, costcoIsOn, isLocalOnlyShop, searchChainsIn, type StoreChain } from '../../shops';
+import { costcoIsOn, isLocalOnlyShop, searchChainsIn, type StoreChain } from '../../shops';
 import { checkAtCostco, costcoCheckable } from '../../lib/costcoCheck'; // 0.9.6 (review L1)
 import { notAtChains } from '../../lib/picks';
 
@@ -265,6 +265,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   }, [groupId]);
   const [selected, setSelected] = useState<string>();
   const [sheet, setSheet] = useState<'edit' | 'alerts' | 'price' | 'menu' | { option: Option; wantUnit?: 'g' | 'ml' | 'ea' }>();
+  const [learnOpen, setLearnOpen] = useState(false);
   const appSettings = useLive(getSettings, []);
   const [preview, setPreview] = useState<Option>();
   const [rangeWeeks, setRangeWeeks] = useState<number>();
@@ -393,8 +394,6 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             <span className="small">
               <ChainDot chain={o.product.chain} /> {chainName(o.product.chain)}
               {productLine(o.product, o.price, cstyle) ? ` · ${productLine(o.product, o.price, cstyle)}` : ''}
-              {o.stats.current && ' · '}
-              <CheckedAgo date={o.stats.current?.date} source={o.stats.current?.source} />
             </span>
             <span className="tags" style={{ marginTop: 2 }}>
               {tag === 'cheapest' && <CheapestInfoTag o={o} options={rec.options.filter((x) => x.role === o.role)} />}
@@ -447,6 +446,16 @@ export function ItemScreen({ groupId }: { groupId: string }) {
     </Hold>
   );
 
+  // 0.12.5: the best of your picks at each shop (the same measure the verdict compares on), for the card under the verdict.
+  const costOf = (o: Option) => (rec.byUnit ? o.unitPrice : o.price) ?? Infinity;
+  const shopBest = [...new Set(mains.map((o) => o.product.chain))].map((c) => {
+    const at = mains.filter((o) => o.product.chain === c);
+    if (rec.best && at.includes(rec.best)) return rec.best;
+    const inStock = at.filter((o) => o.product.inStock !== false);
+    return [...(inStock.length ? inStock : at)].sort((a, b) => costOf(a) - costOf(b))[0];
+  });
+  // What I buy opens by itself when something in it needs you: nothing linked yet, picks measured differently, or a shelf notice.
+  const whatOpen = !mains.length || !!rec.mixedUnits || !!rec.shelf;
   // New items: say plainly that the verdict gets better once there's a few weeks of history.
   const learning = learningDays(rec.options.filter((o) => o.role === 'main'));
   const usingShared = rec.options.some((o) => o.stats.fromMarket);
@@ -495,59 +504,6 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           <SwapBox label="Get this" option={rec.alt} hi />
         </div>
       )}
-      {learning !== undefined && usingShared && (
-        <div className="card hint" style={{ flexDirection: 'column', gap: 4 }}>
-          <strong>
-            Judged with shared prices
-          </strong>
-          <span>
-            Restock has only {learning} day{learning === 1 ? '' : 's'} of its own prices for this, so the verdict uses months of shared
-            prices. After about 4 weeks it switches to the prices this phone has seen.
-          </span>
-        </div>
-      )}
-      {learning !== undefined && !usingShared && (
-        <div className="card hint" style={{ flexDirection: 'column', gap: 4 }}>
-          <strong>Still learning this item's prices</strong>
-          <span>
-            {learning === 0
-              ? 'Restock has only just started watching it.'
-              : `Restock has ${learning} day${learning === 1 ? '' : 's'} of prices so far.`}{' '}
-            It still tells you about specials, but until it knows the usual price it compares against the shop's "was" price, which can flatter a
-            sale. It takes about 4 to 8 weeks.
-          </span>
-          {appSettings &&
-            !sharedOn(appSettings) &&
-            rec.options.some((o) => (MARKET_SHOPS as readonly string[]).includes(o.product.chain)) && (
-              <button
-                className="linkish small"
-                style={{ alignSelf: 'flex-start' }}
-                onClick={() => {
-                  // 0.10.0: Settings → Privacy and sharing, at Shared prices, once it has drawn.
-                  nav.push({ name: 'settings', page: 'privacy' });
-                  let tries = 0;
-                  const t = window.setInterval(() => {
-                    const el = document.getElementById('s-shared');
-                    if (!el && ++tries < 30) return;
-                    window.clearInterval(t);
-                    el?.scrollIntoView({ block: 'start' });
-                  }, 50);
-                }}
-              >
-                Judge it from day one: turn on Shared prices
-              </button>
-            )}
-        </div>
-      )}
-      <div className="chips" style={{ marginTop: -4 }}>
-        {/* 0.9.12: these open the alerts on their own ("Price alerts"), not the whole Edit item sheet. */}
-        {/* 0.10.10: one Alerts button (there were two that opened the same sheet) */}
-        <button className="chip" onClick={() => setSheet('alerts')} aria-label="Change price alerts">
-          <Icon name="bell" size={14} /> Alerts: {ALERT_LEVELS.find((a) => a.id === group.alertLevel)?.label}
-          {group.alertLevel === 'custom' ? ` (${group.alertPct ?? 30}%+)` : ''}
-          {group.targetPrice !== undefined ? ` · under ${money(group.targetPrice)}` : ''}
-        </button>
-      </div>
       {/* Not for a price that may not be today's any more (0.9.0): it says "right now". */}
       {group.targetPrice !== undefined && rec.best?.price !== undefined && rec.best.price <= group.targetPrice + 0.004 && !rec.best.verdict.stale && (
         <div className="banner green">
@@ -563,14 +519,58 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       <button className={`btn block ${onList ? '' : 'primary'}`} onClick={addToList}>
         <Icon name={onList ? 'cartCheck' : 'cartPlus'} size={18} /> {onList ? 'On your shopping list' : 'Add to shopping list'}
       </button>
-      <p className="small" style={{ marginTop: -6 }}>
-        This item stays in {SECTION_PLACE[group.section ?? 'pantry']} so Restock keeps watching its price. The shopping list is just for this trip.
-      </p>
 
-      <div className="card flush">
+      {/* 0.12.5: the answer first: the best of your picks at each shop, one line each. Everything else on this page is folded under it. */}
+      {(shopBest.length > 0 || missingChains.length > 0) && (
+        <div className="card flush shop-best">
+          <div className="eyebrow shop-best-head">Best price at each shop</div>
+          {shopBest.map((o) => (
+            <button key={o.product.id} className="row" onClick={() => setSheet({ option: o })} aria-label={`${chainName(o.product.chain)}: ${o.product.name}, ${money(o.price)}`}>
+              <ChainDot chain={o.product.chain} />
+              <span className="grow">
+                <span className="title" style={{ fontSize: 15 }}>
+                  {chainName(o.product.chain)}
+                  {shopBest.length > 1 && o === rec.best && !tiedWithBest(rec).length && <span className="shop-best-tag"> · Cheapest</span>}
+                </span>
+                <span className="small clip">{o.product.name}</span>
+              </span>
+              <span className="num" style={{ fontWeight: 700 }}>
+                {o.price !== undefined ? money(o.multi ? o.shelfPrice : o.price) : 'No price yet'}
+              </span>
+            </button>
+          ))}
+          {missingChains.map((c) => (
+            <div className="row" key={c}>
+              <ChainDot chain={c} />
+              <span className="grow">
+                <span className="title" style={{ fontSize: 15 }}>
+                  {chainName(c)}
+                </span>
+                <span className="small">Not added yet</span>
+              </span>
+              <button className="btn small" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'main', chain: c, query: searchName })} aria-label={`Find it at ${chainName(c)}`}>
+                <Icon name="search" size={16} /> Find it
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <details className="card flush fold" open={whatOpen}>
+        <summary className="fold-head">
+          <span className="grow">
+            <span className="title">What I buy</span>
+            <span className="small">
+              {mains.length ? `${productsAndShops(mains)} · ${group.anySize ? 'any size' : 'this size'}` : 'Not linked to a shop yet'}
+            </span>
+          </span>
+          <span className="fold-arrow" aria-hidden>
+            <Icon name="chevron" size={18} />
+          </span>
+        </summary>
         <div className="section-head">
-          <span className="title">
-            What I buy <HowItWorks />
+          <span className="small" style={{ flex: 1 }}>
+            How this works <HowItWorks />
           </span>
           {mains.length > 2 ? (
             <select
@@ -586,22 +586,15 @@ export function ItemScreen({ groupId }: { groupId: string }) {
                 </option>
               ))}
             </select>
-          ) : (
-            <span className="small">{productsAndShops(mains)}</span>
-          )}
+          ) : null}
         </div>
-        {mains.length > 2 && (
-          <p className="small" style={{ padding: '0 14px 4px' }}>
-            {productsAndShops(mains)}
-          </p>
-        )}
         {/* 0.10.9: several of the same thing at one shop are flavours (scents, colours) of it */}
         {flavourSets(rec).map((f) => (
           <p key={f.chain} className="small flavour-note">
             <strong>
               Any of your {f.n} {f.word} at {chainName(f.chain)}
             </strong>{' '}
-            will do: Restock watches them all, and a special on any of them counts. Tick only the one you want if it has to be that one.
+            will do: a special on any of them counts.
           </p>
         ))}
         {mains.length > 0 && (
@@ -620,8 +613,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             </div>
             <p className="small">
               {group.anySize
-                ? `Any of your picks, any size and as many as it takes: at each shop Restock works out the cheapest way to get ${amountOf(rec)}.`
-                : `Amount: from ${amountFrom(rec)}. Shops are compared on that amount, buying one of your picks for each on your list.`}
+                ? `At each shop Restock works out the cheapest way to get ${amountOf(rec)}.`
+                : `Shops are compared on the amount in ${amountFrom(rec)}.`}
             </p>
           </div>
         )}
@@ -732,18 +725,23 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             </span>
           </button>
         )}
-      </div>
+      </details>
 
-      <div className="card flush">
-        <div className="section-head">
-          <span className="title">
-            Also happy with <HowItWorks />
+      <details className="card flush fold">
+        <summary className="fold-head">
+          <span className="grow">
+            <span className="title">Also happy with (alternative product)</span>
+            <span className="small">{alts.length ? `${alts.length} added · cheaper swaps you'd also accept` : "Cheaper swaps you'd also accept"}</span>
           </span>
-          <span className="small">{alts.length || 'None yet'}</span>
+          <span className="fold-arrow" aria-hidden>
+            <Icon name="chevron" size={18} />
+          </span>
+        </summary>
+        <div className="section-head">
+          <span className="small" style={{ flex: 1 }}>
+            How this works <HowItWorks />
+          </span>
         </div>
-        <p className="small" style={{ padding: '0 14px 6px' }}>
-          Only for Cheaper swap: Restock tells you when one of these is on special for less than your pick. They don't count when shops are compared.
-        </p>
         {alts.map((o) => row(o, rec.alt === o ? 'swap' : undefined))}
         <button className="row" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'alt', query: group.name })}>
           <Icon name="swap" size={18} />
@@ -754,11 +752,24 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             <span className="small">Another brand or size you'd happily buy instead, when it's cheaper</span>
           </span>
         </button>
-      </div>
+      </details>
 
-      {/* 0.10.10: after what you buy and where (it was above them, three charts deep) */}
+      {/* 0.10.10: after what you buy and where (it was above them, three charts deep). 0.12.5: folded, like the rest. */}
       {chartOption && stats && (
+        <details className="card flush fold">
+          <summary className="fold-head">
+            <span className="grow">
+              <span className="title">Price history</span>
+              <span className="small">
+                {learning !== undefined ? `${learning} day${learning === 1 ? '' : 's'} of prices so far · chart and past prices` : 'Chart and past prices'}
+              </span>
+            </span>
+            <span className="fold-arrow" aria-hidden>
+              <Icon name="chevron" size={18} />
+            </span>
+          </summary>
         <PriceHistory
+          bare
           options={ordered}
           option={chartOption}
           onPick={setSelected}
@@ -790,8 +801,79 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             ) : undefined
           }
         />
+        </details>
       )}
 
+      {/* 0.12.5: Alerts is a row like the others (it was a chip under the verdict); it opens the alerts sheet */}
+      <button className="card flush fold fold-go" onClick={() => setSheet('alerts')} aria-label="Change price alerts">
+        <span className="fold-head">
+          <span className="grow">
+            <span className="title">Alerts</span>
+            <span className="small">
+              {ALERT_LEVELS.find((a) => a.id === group.alertLevel)?.label}
+              {group.alertLevel === 'custom' ? ` (${group.alertPct ?? 30}%+)` : ''}
+              {group.targetPrice !== undefined ? ` · under ${money(group.targetPrice)}` : ''}
+            </span>
+          </span>
+          <Icon name="chevron" size={18} />
+        </span>
+      </button>
+
+      {/* 0.12.5: "Still learning" is one line; the explanation opens from it */}
+      {learning !== undefined && (
+        <button className="linkish small learn-line" onClick={() => setLearnOpen(true)}>
+          <Icon name="info" size={16} />{' '}
+          {usingShared ? 'Judged with shared prices for now.' : "Still learning this item's usual price. It takes 4 to 8 weeks."}
+        </button>
+      )}
+      {learnOpen && learning !== undefined && usingShared && (
+        <Sheet title="Judged with shared prices" onClose={() => setLearnOpen(false)}>
+        <div className="card hint" style={{ flexDirection: 'column', gap: 4 }}>
+          <strong>
+            Judged with shared prices
+          </strong>
+          <span>
+            Restock has only {learning} day{learning === 1 ? '' : 's'} of its own prices for this, so the verdict uses months of shared
+            prices. After about 4 weeks it switches to the prices this phone has seen.
+          </span>
+        </div>
+        </Sheet>
+      )}
+      {learnOpen && learning !== undefined && !usingShared && (
+        <Sheet title="Still learning this item's prices" onClose={() => setLearnOpen(false)}>
+        <div className="card hint" style={{ flexDirection: 'column', gap: 4 }}>
+          <strong>Still learning this item's prices</strong>
+          <span>
+            {learning === 0
+              ? 'Restock has only just started watching it.'
+              : `Restock has ${learning} day${learning === 1 ? '' : 's'} of prices so far.`}{' '}
+            It still tells you about specials, but until it knows the usual price it compares against the shop's "was" price, which can flatter a
+            sale. It takes about 4 to 8 weeks.
+          </span>
+          {appSettings &&
+            !sharedOn(appSettings) &&
+            rec.options.some((o) => (MARKET_SHOPS as readonly string[]).includes(o.product.chain)) && (
+              <button
+                className="linkish small"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => {
+                  // 0.10.0: Settings → Privacy and sharing, at Shared prices, once it has drawn.
+                  nav.push({ name: 'settings', page: 'privacy' });
+                  let tries = 0;
+                  const t = window.setInterval(() => {
+                    const el = document.getElementById('s-shared');
+                    if (!el && ++tries < 30) return;
+                    window.clearInterval(t);
+                    el?.scrollIntoView({ block: 'start' });
+                  }, 50);
+                }}
+              >
+                Judge it from day one: turn on Shared prices
+              </button>
+            )}
+        </div>
+        </Sheet>
+      )}
       {/* 0.10.10: no Done button here: changes save as you make them, and Back is at the top */}
 
       {(sheet === 'edit' || sheet === 'alerts') && (
@@ -1179,6 +1261,8 @@ function OptionSheet({
         {isAlt ? 'Also happy with' : 'My pick'} at {chainName(option.product.chain)}
         {` · ${line.size}`}
         {option.product.barcode ? ` · barcode ${option.product.barcode}` : ''}
+        {option.stats.current && ' · '}
+        <CheckedAgo date={option.stats.current?.date} source={option.stats.current?.source} />
       </p>
       <p className="small">
         {option.verdict.headline}. {option.verdict.detail}
@@ -1277,6 +1361,13 @@ function HowItWorks() {
           <p>
             <strong>Not here</strong>, on a shop with none of your picks, tells Restock you don't buy it there. It stops asking you to find it, and
             that shop counts as not having it.
+          </p>
+          <p>
+            <strong>Add to shopping list</strong> is just for this trip. The item stays in your pantry, so Restock keeps watching its price.
+          </p>
+          <p>
+            <strong>Several sizes or flavours at one shop</strong> are all watched, and a special on any of them counts. Keep only the one you want
+            if it has to be that one.
           </p>
           <p>If a pick and one you'd also take are both on special, your pick comes first. Bigger packs only come up as swaps if you've said yes to bulk packs (Edit).</p>
         </Sheet>
@@ -1448,7 +1539,10 @@ function PriceHistory({
   allowMulti,
   range,
   onEnterPrice,
+  bare,
 }: {
+  /** 0.12.5: inside the item page's Price history fold: no card of its own and no second title. */
+  bare?: boolean;
   options: Option[];
   option: Option;
   onPick: (id: string) => void;
@@ -1588,11 +1682,13 @@ function PriceHistory({
       return !x;
     });
   return (
-    <div className="card ph">
+    <div className={bare ? 'ph ph-bare' : 'card ph'}>
       <div className="ph-head" style={{ flexWrap: 'wrap' }}>
-        <span className="title" style={{ fontSize: 17 }}>
-          Price history
-        </span>
+        {!bare && (
+          <span className="title" style={{ fontSize: 17 }}>
+            Price history
+          </span>
+        )}
         {/* 0.9.6: when this product's price was last checked (follows the size and shop picked). */}
         <LastUpdated readings={allReadings} />
       </div>

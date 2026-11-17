@@ -449,3 +449,24 @@ export function newestReading<T extends { date: string }>(readings: readonly T[]
 export function storePriceLine(sp: SizeSource & { price?: number }, pool: (SizeSource & { price?: number })[] = [], style?: CompareStyle): PriceLine {
   return priceLine({ ...sp, sizing: sizeUp(sp, pool) }, sp.price, style);
 }
+
+// ---------- 0.12.5: loose fruit and veg, priced each online, by the kilo in the shop ----------
+
+/**
+ * A shop's website sells loose produce "each" (one potato, about 150 g, $0.75), though at the register it's by
+ * the kilo. The per-kilo price for such a line, to show beside it: the shop's own ("$5.00 per 1kg") when it gives
+ * one, else worked out from the weight it gives ("approx. 150g": "about $5.00/kg"). Undefined when it isn't loose
+ * produce, or the shop gives neither (never a guess).
+ */
+export function perKiloNote(p: { name: string; size?: string; price?: number; unitPriceText?: string }): string | undefined {
+  const size = (p.size ?? '').trim();
+  const loose = /\bapprox\b/i.test(size) || /^(?:1\s*)?(?:each|ea)$/i.test(size) || /\b(?:each|loose)\s*$/i.test(p.name.trim());
+  if (!loose) return undefined;
+  const given = /\$\s*(\d+(?:\.\d+)?)\s*(?:\/|per)\s*(?:1\s*)?kg\b/i.exec(p.unitPriceText ?? '');
+  if (given) return `${money(Number(given[1]))}/kg`;
+  const w = /approx\.?\s*(\d+(?:\.\d+)?)\s*(kg|g)\b/i.exec(size);
+  if (!w || p.price === undefined) return undefined;
+  const kg = Number(w[1]) * (w[2].toLowerCase() === 'kg' ? 1 : 0.001);
+  if (!(kg > 0)) return undefined;
+  return `about ${money(p.price / kg)}/kg`;
+}

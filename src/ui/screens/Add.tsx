@@ -2,7 +2,8 @@ import { tidyItemName } from '../../lib/itemName';
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { seenBefore, type SeenBefore } from '../../lib/seen';
 import { guessCategoryId } from '../../lib/categoryGuess';
-import { flavourBarNote, flavourWord, otherFlavours } from '../../lib/flavours';
+import { perKiloNote } from '../../lib/unitPrice';
+import { flavourBarNote, otherFlavours, varietyWord } from '../../lib/flavours';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { productCode, scanBarcode, type BarcodeInfo } from '../../lib/barcode';
 import { displayName, identifyBarcode, QUICK_PICKS, searchTermFor, weakName } from '../../lib/lookup';
@@ -73,6 +74,7 @@ import { COSTCO_LIST_NOTE } from '../../lib/costcoLocal';
 import { isBlockedError, offerUnblock, recordHealth } from '../../lib/health';
 import { UnblockButton } from '../Unblock';
 import { isExactBarcode, rankAll, score, tokens, type RankQuery } from '../../stores/rank';
+import { mentions } from '../../stores/rank';
 import { chainName, mainProductIds, searchStoreId, type AlertLevel, type Chain, type Group, type ListEntry, type ListProduct } from '../../types';
 import {
   activeSections,
@@ -295,6 +297,8 @@ export function AddScreen({
   const [allowMulti, setAllowMulti] = useState(true);
   const [alertPct, setAlertPct] = useState<number>(30);
   const [manual, setManual] = useState(false);
+  // 0.12.5: the other ways to add, folded under one button
+  const [moreWays, setMoreWays] = useState(false);
   const [saving, setSaving] = useState(false);
   /** 0.10.7: which Add button is saving, so only that one shows it. */
   const [busyAs, setBusyAs] = useState<Target>();
@@ -431,7 +435,14 @@ export function AddScreen({
   const [shopView, setShopView] = useState<'all' | Chain>('all');
   const [changing, setChanging] = useState<Chain>();
   const [declined, setDeclined] = useState<Set<string>>(new Set());
+  // 0.12.5: shops you finished without looking at ("Finish: review and add"): nothing is picked for you there.
+  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  const visited = useRef<Set<string>>(new Set());
   const [autoFrom, setAutoFrom] = useState<Map<string, 'same' | 'like'>>(new Map());
+  useEffect(() => {
+    if (changing) visited.current.add(changing);
+    if (shopView !== 'all') visited.current.add(shopView);
+  }, [changing, shopView]);
   const autoDone = useRef<Set<string>>(new Set());
   // 0.12.0: a new phone's first search asks where you shop, once (in place of the setup step).
   // 0.12.1: the title is the section switcher (as on the shopping list); this is its menu.
@@ -480,6 +491,8 @@ export function AddScreen({
     setShopView('all');
     setChanging(undefined);
     setDeclined(new Set());
+    setSkipped(new Set());
+    visited.current = new Set();
     setAutoFrom(new Map());
     autoDone.current = new Set();
     // A new scan is a new product: ticks left from an earlier search would block "ticked for you".
@@ -1025,7 +1038,7 @@ export function AddScreen({
     for (const c of Object.keys(recs) as Chain[]) {
       if (autoDone.current.has(c)) continue;
       autoDone.current.add(c);
-      if (declined.has(c) || [...picks.values()].some((p) => p.chain === c)) continue;
+      if (declined.has(c) || skipped.has(c) || [...picks.values()].some((p) => p.chain === c)) continue;
       const r = recs[c]!;
       const best = r.same ?? closestTo(recAnchor, r.like);
       if (best) add.push([best, r.same ? 'same' : 'like']);
@@ -1296,7 +1309,8 @@ export function AddScreen({
           photo={sp.imageUrl ?? photoFor(sp)}
           name={sp.name}
           chain={sp.chain}
-          shopText={`${chainName(sp.chain)}${size ? ` · ${size}` : ''}`}
+          // 0.12.5: loose fruit and veg also say their price by the kilo
+          shopText={`${chainName(sp.chain)}${size ? ` · ${size}` : ''}${perKiloNote(sp) ? ` · ${perKiloNote(sp)}` : ''}`}
           price={sp.price}
           note={note}
           onOpen={() => pickOne(sp)}
@@ -1369,6 +1383,28 @@ export function AddScreen({
     toTop();
     if (picks.size > 0) setPanelOpen(true);
   };
+  /**
+   * 0.12.5: "Finish: review and add" on a shop's page: straight to your picks, without walking the
+   * other shops. A shop you haven't opened is left empty there (what Restock had guessed for it is
+   * dropped, and it isn't guessed again); your own ticks anywhere stay.
+   */
+  const finishEarly = (from: Chain) => {
+    // From "Find it" or "+ More" on the sheet you've already seen your picks: back to them as they are.
+    const skip = changing
+      ? []
+      : matchShops.filter(
+          (x) => x !== from && !visited.current.has(x) && !declined.has(x) && ![...picks.values()].some((sp) => sp.chain === x && !autoFrom.has(keyOf(sp))),
+        );
+    if (skip.length) {
+      setPicks((prev) => new Map([...prev].filter(([k, x]) => !(skip.includes(x.chain as Chain) && autoFrom.has(k)))));
+      setAutoFrom((m) => new Map([...m].filter(([key]) => !skip.some((x) => key.startsWith(`${x}:`)))));
+      setSkipped((prev) => new Set([...prev, ...skip]));
+    }
+    setChanging(undefined);
+    setShopView('all');
+    toTop();
+    setPanelOpen(true);
+  };
   const pickLabel = (sp: StoreProduct): { text: string; tone: NoteTone } => {
     const k = keyOf(sp);
     const how = autoFrom.get(k);
@@ -1440,8 +1476,12 @@ export function AddScreen({
                 <ChainDot chain={c} />
                 {chainName(c)}
               </span>
-              <span className="match-how plain">{busy ? 'Searching' : r?.status === 'error' ? "Couldn't check" : declined.has(c) ? 'Not sold here' : 'Nothing close'}</span>
-              {busy ? (
+              <span className="match-how plain">
+                {skipped.has(c) && !declined.has(c) ? 'Not added' : busy ? 'Searching' : r?.status === 'error' ? "Couldn't check" : declined.has(c) ? 'Not sold here' : 'Nothing close'}
+              </span>
+              {skipped.has(c) && !declined.has(c) ? (
+                <span className="small">You finished without looking at {chainName(c)}. Find it there if you buy it there too.</span>
+              ) : busy ? (
                 <span className="small" role="status">
                   Looking for it at {chainName(c)}…
                   <LoadingBar seconds={15} />
@@ -1456,9 +1496,18 @@ export function AddScreen({
               ) : (
                 <span className="small">Restock couldn't find this at {chainName(c)}. It may not sell it.</span>
               )}
-              {!busy && (
+              {(!busy || skipped.has(c)) && (
                 <span className="match-actions">
-                  {r?.status === 'error' && settings ? (
+                  {skipped.has(c) && !declined.has(c) && canChange ? (
+                    <>
+                      <button className="btn small" style={TAP} onClick={() => startChange(c)} aria-label={`Find it at ${chainName(c)}`}>
+                        <Icon name="search" size={16} /> Find it
+                      </button>
+                      <button className="btn small" style={TAP} onClick={() => notSoldAt(c)} aria-label={`Not sold at ${chainName(c)}`}>
+                        Not sold here
+                      </button>
+                    </>
+                  ) : r?.status === 'error' && settings ? (
                     <button className="btn small" style={TAP} onClick={() => void searchChain(c as StoreChain, lastText, rankQ, searchStoreId(settings, c as StoreChain))}>
                       <Icon name="refresh" size={16} /> Try again
                     </button>
@@ -1621,12 +1670,6 @@ export function AddScreen({
           Photo, Receipt), and the scanned barcodes still to match as one line. */}
       {!forLine && (
         <div className="add-ways">
-          {!attachTo && !overlay && !scanned && (
-            <button className="btn block" onClick={() => nav.push(settings?.receipts.enabled ? { name: 'receipt' } : { name: 'receipts' })}>
-              <Icon name="receipt" size={18} /> Scan a receipt to keep it
-            </button>
-          )}
-          {/* 0.12.4: "More ways to add" is gone: you search or you scan. Scan several and the pack photo are offered after a search, by Add manually. */}
           {!attachTo && scansLeft > 0 && (
             <button className="card add-scans" onClick={() => nav.push({ name: 'scanned', section })}>
               <Icon name="scan" size={18} />
@@ -1921,7 +1964,17 @@ export function AddScreen({
 
       {anyResults && view === 'all' && searched.length > 1 && (
         <>
+          {/* 0.12.5: said plainly: the first results are the closest match at each of your shops */}
+          {mixed.length > 0 && (
+            <div className="rec-head">
+              <span className="rec-tag">Recommended</span>
+              <span className="small">The closest matches at your shops. Tick the ones you buy.</span>
+            </div>
+          )}
           {mixed.length > 0 && <div className="card flush">{mixed.map((sp) => resultRow(sp, topKeys))}</div>}
+          {(searched as Chain[]).some((c) => results[c as StoreChain]?.status === 'ok' && shownItems(c).length > PER_SHOP) && (
+            <div className="eyebrow">Everything else</div>
+          )}
           {(searched as Chain[]).map((c) => {
             const r = results[c as StoreChain];
             const left = shownItems(c).length - Math.min(PER_SHOP, shownItems(c).length);
@@ -1998,7 +2051,10 @@ export function AddScreen({
             const limit = showing[chain] ?? FIRST_PAGE;
             const pool = r.status === 'ok' ? r.items.filter((sp) => !specialsOnly || sp.isSpecial) : [];
             const by = sortBy[chain] ?? 'relevant';
-            const ordered = sorted(pool, by);
+            // 0.12.5: by price or value, what doesn't mention what you typed goes after what does (steel wool isn't the cheapest potato)
+            const inOrder = sorted(pool, by);
+            const onTopic = by === 'relevant' || !rankQ.text ? inOrder : inOrder.filter((sp) => mentions(rankQ, sp));
+            const ordered = onTopic.length && onTopic.length < inOrder.length ? [...onTopic, ...inOrder.filter((sp) => !onTopic.includes(sp))] : inOrder;
             // Ticked products first, so a ticked best match is never hidden under "Show more".
             const firstTicked =
               by === 'relevant' ? [...ordered.filter((sp) => picks.has(keyOf(sp))), ...ordered.filter((sp) => !picks.has(keyOf(sp)))] : ordered;
@@ -2106,7 +2162,7 @@ export function AddScreen({
                   const mine = [...picks.values()].filter((x) => x.chain === chain);
                   const more = otherFlavours(mine, pool, (a, b) => keyOf(a) === keyOf(b));
                   if (!more.length) return null;
-                  const word = flavourWord([...mine, ...more].map((x) => x.name));
+                  const word = varietyWord([...mine, ...more].map((x) => x.name));
                   if (changing) return null; // 0.12.1: one choice at a time on "Pick one at …"
                   return (
                     <button
@@ -2183,10 +2239,24 @@ export function AddScreen({
       {/* 0.12.4: one shop's results end with the way on: the next shop, or your picks */}
       {view !== 'all' && anyResults && !attachTo && !forLine && results[view as StoreChain]?.status === 'ok' && (searched.length > 1 || !!changing) && (
         <div className="shop-done">
-          <button className="btn primary block shop-done-btn" onClick={() => finishedAt(view as Chain)}>
-            <Icon name="check" size={18} /> Finished at {chainName(view)}
-            {nextShopAfter(view as Chain) ? <span className="shop-done-next"> · next: {chainName(nextShopAfter(view as Chain)!)}</span> : null}
-          </button>
+          {/* 0.12.5: two ways on: the next shop, or straight to your picks (it was one button, "Finished at Coles") */}
+          {nextShopAfter(view as Chain) ? (
+            <>
+              <button className="btn primary block shop-done-btn" onClick={() => finishedAt(view as Chain)}>
+                Next shop: {chainName(nextShopAfter(view as Chain)!)}
+                <Icon name="chevron" size={18} />
+              </button>
+              {picks.size > 0 && (
+                <button className="btn block shop-done-btn" onClick={() => finishEarly(view as Chain)}>
+                  <Icon name="check" size={18} /> Finish: review and add
+                </button>
+              )}
+            </>
+          ) : (
+            <button className="btn primary block shop-done-btn" onClick={() => finishedAt(view as Chain)}>
+              <Icon name="check" size={18} /> {picks.size > 0 ? 'Finish: review and add' : `Finished at ${chainName(view)}`}
+            </button>
+          )}
           {![...picks.values()].some((x) => x.chain === view) && !declined.has(view) && picks.size > 0 && (
             <button
               className="btn block"
@@ -2208,19 +2278,69 @@ export function AddScreen({
           <button className="btn block add-manual-btn" onClick={() => setManual(true)}>
             <Icon name="pencil" size={18} /> Add manually
           </button>
-          {!forLine && (
-            <span className="add-manual-more">
-              {!scanned && (
-                <button className="linkish small" style={TAP} onClick={() => setPhotoFind(true)}>
-                  Find it from a photo of the pack
-                </button>
-              )}
-              {!attachTo && (
-                <button className="linkish small" style={TAP} onClick={() => nav.push({ name: 'scanned', section, start: true })}>
-                  Scan several barcodes
-                </button>
-              )}
+        </div>
+      )}
+
+      {/* 0.12.5: "More ways to add" is one button again, on the empty screen and under the results. It opens to the other ways in:
+          by hand, several barcodes in a row, a photo of the pack, a receipt. (0.12.4 had two small links under Add manually and a receipt button.) */}
+      {!forLine && !changing && (
+        <div className="add-more-ways">
+          <button className="btn block add-more-btn" aria-expanded={moreWays} onClick={() => setMoreWays((o) => !o)}>
+            <span className="grow">More ways to add</span>
+            <span className={moreWays ? 'turn-up' : 'turn-down'}>
+              <Icon name="chevron" size={16} />
             </span>
+          </button>
+          {moreWays && (
+            <div className="card flush">
+              <button className="row" onClick={() => setManual(true)}>
+                <Icon name="pencil" size={22} />
+                <span className="grow">
+                  <span className="title" style={{ fontSize: 15 }}>
+                    Add manually
+                  </span>
+                  <span className="small">Type it in, for things your shops don't list</span>
+                </span>
+                <Icon name="chevron" size={16} />
+              </button>
+              {!attachTo && (
+                <button className="row" onClick={() => nav.push({ name: 'scanned', section, start: true })}>
+                  <Icon name="scan" size={22} />
+                  <span className="grow">
+                    <span className="title" style={{ fontSize: 15 }}>
+                      Scan several barcodes
+                    </span>
+                    <span className="small">One after another, then match them</span>
+                  </span>
+                  <Icon name="chevron" size={16} />
+                </button>
+              )}
+              {!scanned && (
+                <button className="row" onClick={() => setPhotoFind(true)}>
+                  <Icon name="camera" size={22} />
+                  <span className="grow">
+                    <span className="title" style={{ fontSize: 15 }}>
+                      Find it from a photo
+                    </span>
+                    <span className="small">Take a picture of the pack</span>
+                  </span>
+                  <Icon name="chevron" size={16} />
+                </button>
+              )}
+              {/* Shown wherever Add is opened from (the old receipt button only showed on an Add tab, which is gone) */}
+              {!attachTo && !scanned && (
+                <button className="row" onClick={() => nav.push(settings?.receipts.enabled ? { name: 'receipt' } : { name: 'receipts' })}>
+                  <Icon name="receipt" size={22} />
+                  <span className="grow">
+                    <span className="title" style={{ fontSize: 15 }}>
+                      Scan a receipt
+                    </span>
+                    <span className="small">Keep it and add what you bought</span>
+                  </span>
+                  <Icon name="chevron" size={16} />
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -2232,11 +2352,11 @@ export function AddScreen({
           onClick={() => setPanelOpen((open) => sheetOpenAfter(open, { kind: 'arrow', size: picks.size }))}
           aria-haspopup="dialog"
           aria-expanded={panelOpen}
-          aria-label={`${picks.size} picked at ${tickedShops([...picks.values()])}. Finish`}
+          aria-label={`${picks.size} picked at ${tickedShops([...picks.values()])}. Review and add`}
         >
           <span className="grow add-mini-text">
             <span className="title" style={{ fontSize: 15 }}>
-              {picks.size} picked · Finish
+              {picks.size} picked · Review and add
             </span>
             {!flavourBarNote(picks.values(), chainName) && <span className="small">Tick any others you buy as this, then tap here.</span>}
             <span className="small clip">{tickedShops([...picks.values()])}</span>
@@ -2253,6 +2373,16 @@ export function AddScreen({
       {picks.size > 0 && panelOpen && (
         <Sheet title={sheetTitle} onClose={() => setPanelOpen((open) => sheetOpenAfter(open, { kind: 'close' }))}>
           {/* 0.12.0: your pick at each shop, with Change beside each (it was a list of what you'd ticked) */}
+          {/* 0.12.5: the name and category first (they were folded away under the picks), then your picks, then alerts */}
+          {!attachGroup && (
+            <div className="review-top">
+              <label className="field">
+                <span>{forLine ? 'Name in your pantry' : forList ? 'Name on your Shopping list' : `Name in ${SECTION_PLACE[section]} and Shopping list`}</span>
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={forLine ? 'e.g. Chopsticks' : forList ? 'e.g. Coffee' : 'e.g. Honey'} />
+              </label>
+              {(forLine || !forList) && <CategoryPick section={section} categories={categories ?? []} value={categoryId} onChange={setCategoryId} />}
+            </div>
+          )}
           <p className="small" style={{ margin: 0 }}>
             {recBusy.length > 0
               ? 'Looking for the same thing at your other shops…'
@@ -2273,17 +2403,12 @@ export function AddScreen({
                   </button>
                 </div>
               )}
-              <label className="field">
-                <span>Name in your pantry</span>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chopsticks" />
-              </label>
               <details className="explain">
                 <summary>
                   <Icon name="bell" size={18} />
-                  <span>Category and alerts</span>
+                  <span>Alerts</span>
                 </summary>
                 <div className="explain-body">
-                  <CategoryPick section={section} categories={categories ?? []} value={categoryId} onChange={setCategoryId} />
                   <AlertPicker level={alertLevel} pct={alertPct} onChange={(l, p) => (setAlertLevel(l), setAlertPct(p))} />
                 </div>
               </details>
@@ -2292,10 +2417,6 @@ export function AddScreen({
           ) : (
             forList && !attachGroup ? (
               <>
-                <label className="field">
-                  <span>Name on your Shopping list</span>
-                  <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Coffee" />
-                </label>
                   <AddBtn target="list" busy={busyAs} className="btn primary" onClick={() => void save('list')}>
                   <Icon name="cart" size={18} /> Add to list
                 </AddBtn>
@@ -2316,15 +2437,10 @@ export function AddScreen({
               <>
                 <details className="explain">
                   <summary>
-                    <Icon name="pencil" size={18} />
-                    <span>Name, category and alerts</span>
+                    <Icon name="bell" size={18} />
+                    <span>Alerts and savings</span>
                   </summary>
                   <div className="explain-body">
-                    <label className="field">
-                      <span>Name in {SECTION_PLACE[section]} and Shopping list</span>
-                      <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Honey" />
-                    </label>
-                    <CategoryPick section={section} categories={categories ?? []} value={categoryId} onChange={setCategoryId} />
                     <AlertPicker level={alertLevel} pct={alertPct} onChange={(l, p) => (setAlertLevel(l), setAlertPct(p))} />
                     <label className="check" style={{ padding: '4px 2px' }}>
                       <input type="checkbox" className="switch" checked={allowBulk} onChange={(e) => setAllowBulk(e.target.checked)} />

@@ -309,6 +309,21 @@ export function nameOnly(qTokens: string[]): boolean {
   return qTokens.length > 0 && !qTokens.some((t) => NOUNS.has(t)) && !kindOf(qTokens.join(' '));
 }
 
+/**
+ * 0.12.5: does this result say anything of what you typed? A shop's search brings back near-misses
+ * (steel wool pads for "potato"); sorted by price they'd come first. They aren't dropped (a shop
+ * knows "soft drink" means cola), only put after the ones that do, when you sort by price.
+ */
+export function mentions(q: RankQuery, p: StoreProduct): boolean {
+  if (isExactBarcode(q, p)) return true;
+  const qTokens = [...new Set(tokens(q.text))];
+  if (!qTokens.length) return true;
+  const pTokens = [...new Set(tokens([p.brand ?? '', p.name].join(' ')))];
+  const family = FAMILY[qTokens.join(' ')];
+  if (family && family.some((m) => ` ${pTokens.join(' ')} `.includes(` ${m} `))) return true;
+  return qTokens.some((t) => pTokens.some((u) => close(t, u)));
+}
+
 export function score(q: RankQuery, p: StoreProduct, index?: number): number {
   if (isExactBarcode(q, p)) return 10 - (index ?? 0) * 0.001;
   const qTokens = [...new Set(tokens(q.text))];

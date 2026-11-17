@@ -6581,12 +6581,6 @@ span.plus-btn:not(.on) {
   font-size: var(--fs-lg);
   font-weight: 800;
 }
-.add-manual-more {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px var(--sp-4);
-}
 /* What you type in a box on the navy top is dark on white, as anywhere else. */
 :is(.navy-top, .navy-cont) :is(input, select, textarea, .search-field) {
   color: var(--ink);
@@ -6693,4 +6687,164 @@ span.plus-btn:not(.on) {
 }
 .shop-done-next {
   font-weight: 600;
+}
+
+/* ---------- 0.12.5 ---------- */
+/* Add: "More ways to add", one button that opens to the other ways in */
+.add-more-ways {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.btn.add-more-btn {
+  justify-content: space-between;
+  text-align: left;
+  border: 2px solid var(--ink);
+  color: var(--ink);
+  background: var(--surface);
+}
+/* Add: the first results are the recommended ones */
+.rec-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.rec-tag {
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  background: var(--gold);
+  color: var(--navy);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* The review sheet: name and category first */
+.review-top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+/* Shopping list: how many on the line, and the i beside the price */
+.row.list-row {
+  flex-wrap: wrap;
+}
+.list-row-qty {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+.list-row-qty .small {
+  white-space: nowrap;
+}
+.list-row-qty .stepper {
+  align-self: center;
+}
+.list-row-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.list-row-each {
+  font-weight: 400;
+  white-space: nowrap;
+}
+.row > .row-info {
+  margin: 0 -10px;
+}
+.row.list-row {
+  column-gap: 10px;
+}
+.row.list-row .list-row-text .tag {
+  white-space: nowrap;
+}
+/* Shopping mode: the price, and the i under it */
+.shoprow-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.shoprow-side .row-info {
+  margin: 0 -10px -8px 0;
+}
+/* Pantry item page: the sections fold, all the same */
+.fold > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.fold > summary::-webkit-details-marker {
+  display: none;
+}
+.fold-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 60px;
+  padding: 8px 14px;
+}
+.fold-head .grow {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+.fold-head .title {
+  font-size: var(--fs-md);
+}
+.fold > summary .fold-arrow {
+  display: inline-flex;
+  color: var(--muted);
+  transform: rotate(90deg);
+}
+.fold[open] > summary .fold-arrow {
+  transform: rotate(-90deg);
+}
+.fold[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+button.fold-go {
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+.ph-bare {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+}
+.shop-best-head {
+  padding: 12px 14px 4px;
+}
+.shop-best-tag {
+  color: var(--green-ink);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.learn-line {
+  align-self: flex-start;
+  text-align: left;
+}
+/* With the i and How many on a list line, the product under its name may take three lines before it's cut */
+.row.list-row .list-row-main .small.clip {
+  -webkit-line-clamp: 3;
+}
+/* 0.12.5: with the largest text on a narrow phone the photo, the i and the button left the name no
+   room at all (it vanished and the shop ran under the i). When the words would get less than six
+   letters' width, the i and the button drop to a line of their own, on the right. */
+.irow {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 4px;
+}
+.irow-text {
+  flex: 1 1 6em;
 }

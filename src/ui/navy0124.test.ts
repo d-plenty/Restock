@@ -29,21 +29,13 @@ describe('0.12.4: one navy top on every screen', () => {
 
 describe('0.12.4: the Add screen is search or scan', () => {
   const add = read('./screens/Add.tsx');
-  it('has no More ways to add and no Change shops', () => {
-    expect(add).not.toContain('More ways to add{');
-    expect(add).not.toContain('toggleMoreWays');
+  it('has no Change shops (0.12.5 brought More ways to add back as one drop-down: see ways0125.test.ts)', () => {
     expect(add).not.toMatch(/>\s*Change shops\s*</);
   });
   it('offers Add manually only once you have searched or scanned', () => {
     expect(add).toContain('Add manually');
     expect(add).toContain('{(!!searchedFor || !!scanned || anyResults) && !changing && (');
     expect(add).not.toContain("Can't find it? Add it by hand");
-  });
-  it('keeps Scan several and the pack photo, by Add manually', () => {
-    const at = add.indexOf('className="add-manual-more"');
-    expect(at).toBeGreaterThan(0);
-    expect(add.slice(at, at + 900)).toContain('Find it from a photo of the pack');
-    expect(add.slice(at, at + 900)).toContain('Scan several barcodes');
   });
 });
 
@@ -78,8 +70,8 @@ describe('0.12.4: tick as many as you buy as one item', () => {
   it('the first tick does not open the sheet by itself', () => {
     expect(pick).toContain('if (preTickProp || rankQ.barcode) setPanelOpen(true);');
   });
-  it("one shop's results end with Finished at <shop>, which goes to the next shop and then your picks", () => {
-    expect(add).toContain('Finished at {chainName(view)}');
+  it("one shop's results end with the way on to the next shop, and then your picks", () => {
+    expect(add).toContain('Next shop: {chainName(nextShopAfter(view as Chain)!)}');
     expect(add).toContain('const nextShopAfter = (c: Chain): Chain | undefined => shopsInTurn[shopsInTurn.indexOf(c) + 1];');
     expect(add).toContain('if (picks.size > 0) setPanelOpen(true);');
   });

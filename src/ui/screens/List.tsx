@@ -43,6 +43,7 @@ import { stockPlaces } from '../../lib/stockWhere';
 import {
   ChainDot,
   ChainName,
+  DetailsPanel,
   Hold,
   useBackHandler,
   Icon,
@@ -50,9 +51,11 @@ import {
   previewFromOption,
   type PreviewProduct,
   ProductPreview,
+  RowInfo,
   SelectBar,
   Sheet,
   stockWhere,
+  storePageUrl,
   Thumb,
   useBackLayer,
 } from '../components';
@@ -486,6 +489,7 @@ export function ListScreen() {
       else setEditing(e);
     };
     const unpicked = !selecting && !e.groupId && !e.checked;
+    const qtyOnRow = !selecting && !e.checked;
     // 0.10.5: at most one tag on the row, the one that matters most; the rest are in the sheet.
     const tag = !deal ? null : line?.outOfStock ? (
       <StockInfoTag o={deal} />
@@ -520,7 +524,10 @@ export function ListScreen() {
           )}
           {!selecting &&
             (previewOf(e) ? (
-              <MoreInfo src={previewOf(e)!.imageUrl} name={previewOf(e)!.name} onOpen={() => setPreview(e)} />
+              // 0.12.5: the photo is just the photo (its little i moved beside the price); tapping it opens the line, as its name does
+              <button type="button" className="thumb-btn" tabIndex={-1} aria-hidden onClick={openRow}>
+                <Thumb src={previewOf(e)!.imageUrl} />
+              </button>
             ) : (
               // No photo: keep the space, so every name on the list lines up (0.7.3).
               <span className="thumb-space" aria-hidden />
@@ -528,7 +535,7 @@ export function ListScreen() {
           <div className="grow list-row-text">
             <button className="list-row-main" onClick={openRow} aria-label={`${title}: details and options`}>
               <span className="title clip">
-                {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}
+                {qtyOf(e) > 1 && !qtyOnRow && <span className="num">{qtyOf(e)} × </span>}
                 {title}
               </span>
               {deal ? (
@@ -553,7 +560,25 @@ export function ListScreen() {
               </button>
             )}
           </div>
-          {p !== undefined && <span className="num list-row-price">{money(p)}</span>}
+          {/* 0.12.5: the blue i sits beside the price, as on a pantry row, and opens the line's one page */}
+          {!selecting && <RowInfo name={title} onOpen={openRow} />}
+          {p !== undefined && (
+            <span className="num list-row-price">
+              {money(p)}
+              {qtyOf(e) > 1 && deal?.price !== undefined && Math.abs(deal.price * qtyOf(e) - p) < 0.005 && (
+                <span className="small list-row-each">
+                  {qtyOf(e)} × {money(deal.price)}
+                </span>
+              )}
+            </span>
+          )}
+          {/* 0.12.5: how many, on the line itself (it was only inside the line's sheet): its own row, under the price */}
+          {qtyOnRow && (
+            <div className="list-row-qty">
+              <span className="small">How many</span>
+              <Stepper e={e} />
+            </div>
+          )}
         </div>
       </Hold>
     );
@@ -1513,6 +1538,9 @@ function ShoppingMode({
 }) {
   // ⓘ on a line: what the product looks like, to find it on the shelf (0.7.3).
   const [info, setInfo] = useState<PreviewProduct>();
+  // 0.12.5: the blue i beside a line's price opens the same page as on the shopping list. It's the one place to change
+  // how many, edit, move or remove while you shop; the lines themselves stay plain ("3 × Juice").
+  const [editing, setEditing] = useState<ListEntry>();
   // Everything priced at only the shops picked (ticked rows too, so they keep their shop and price).
   const entries = allEntries.filter((e) => !skip.has(e.id));
   const skipped = allEntries.filter((e) => skip.has(e.id));
@@ -1764,6 +1792,29 @@ function ShoppingMode({
       {view && serverMode && <PhoneOnlyNote compact text="Aisle numbers are in shopping mode on the phone (they come from your Coles branch)." />}
       <div className="shopmode-list">
         {info && <ProductPreview product={info} onClose={() => setInfo(undefined)} />}
+        {editing &&
+          (() => {
+            const latest = allEntries.find((x) => x.id === editing.id);
+            if (!latest) return null;
+            return (
+              <EditEntry
+                entry={latest}
+                categories={categories}
+                shops={shops}
+                deal={dealFor(c, latest) ?? recFor(c, latest)?.options[0]}
+                name={recFor(c, latest)?.group.name}
+                onClose={() => setEditing(undefined)}
+                details={
+                  !latest.checked ? (
+                    <div className="entry-qty">
+                      <span className="title">How many</span>
+                      <Stepper e={latest} />
+                    </div>
+                  ) : undefined
+                }
+              />
+            );
+          })()}
         {!view && (
           <ShopPicker
             shops={shopKeys}
@@ -1811,20 +1862,24 @@ function ShoppingMode({
                     // (photo, size, ingredients), so you know what you're looking for on the shelf.
                     thumb={
                       shelfLook(e) ? (
-                        <MoreInfo src={shelfLook(e)!.imageUrl} name={name} onOpen={() => setInfo(shelfLook(e))} />
+                        <span className="thumb-btn" aria-hidden>
+                          <Thumb src={shelfLook(e)!.imageUrl} />
+                        </span>
                       ) : items.some((x) => !!shelfLook(x)) ? (
                         // keeps the names lined up with the ones that have a photo
                         <span className="thumb-space" aria-hidden />
                       ) : undefined
                     }
                     extra={
-                      <>
+                      // 0.12.5: the price with the blue i right under it (beside it there was no room left for the name on a phone)
+                      <span className="shoprow-side">
                         {priceOf(c, e) !== undefined && (
                           <span className="num" style={{ fontWeight: 700, fontSize: 17 }}>
                             {money(priceOf(c, e))}
                           </span>
                         )}
-                      </>
+                        <RowInfo name={name} onOpen={() => setEditing(e)} />
+                      </span>
                     }
                   >
                     <span
@@ -1994,6 +2049,8 @@ export function EditEntry({
   const nav = useNav();
   const [looking, setLooking] = useState(false);
   const [moving, setMoving] = useState(false); // 0.9.6 (Move to)
+  // 0.12.5: Shop, Category, Pantry item, Move to and Remove are folded under "Edit this item"
+  const [editOpen, setEditOpen] = useState(false);
   // Only a hand-written line (not a pantry item) can be renamed: it has nothing else to go by.
   const [text, setText] = useState(entry.text);
   // 0.9.6 (review H1): a line an earlier build put at Costco shows (and saves) as Any shop.
@@ -2012,6 +2069,7 @@ export function EditEntry({
   };
   // A one-off buy found at a shop keeps what it is, so it has a photo and details too (0.7.3).
   const oneOff = !deal && entry.product ? { ...entry.product, price: entry.price } : undefined;
+  const shown: PreviewProduct | undefined = deal ? previewFromOption(deal) : oneOff;
   if (looking && deal) return <ProductPreview product={previewFromOption(deal)} onClose={() => setLooking(false)} />;
   if (looking && oneOff) return <ProductPreview product={oneOff} onClose={() => setLooking(false)} />;
   if (moving && lists) return <MoveToSheet entry={entry} name={name ?? entry.text} lists={lists} onClose={onClose} />;
@@ -2048,21 +2106,21 @@ export function EditEntry({
             <span className="num" style={{ fontWeight: 700 }}>
               {money(deal.price)}
             </span>
+            {linked && (
+              <span className="tags">
+                <span className={`tag ${deal.role === 'alt' ? 'alt' : 'normal'}`}>{deal.role === 'alt' ? 'ALSO HAPPY WITH' : 'MY PICK'}</span>
+              </span>
+            )}
           </span>
         </div>
-      ) : (
-        !linked && (
-          <label className="field">
-            <span>Item</span>
-            <input className="input" value={text} onChange={(e) => setText(e.target.value)} />
-          </label>
-        )
-      )}
+      ) : null}
       {details}
-      {(deal || oneOff) && (
-        <button className="btn" onClick={() => setLooking(true)}>
-          <Icon name="info" size={18} /> Product details
-        </button>
+      {/* 0.12.5: one page: the product's details open here (they were two taps away), with the shop's own page */}
+      {shown && <DetailsPanel product={shown} />}
+      {shown && storePageUrl(shown) && (
+        <a className="btn" href={storePageUrl(shown)} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+          <Icon name="external" size={18} /> See it on the {chainName(shown.chain)} website
+        </a>
       )}
       {!linked && (
         <button
@@ -2081,6 +2139,18 @@ export function EditEntry({
         <p className="small" style={{ margin: '-4px 0 0' }}>
           Search your shops and pick the one you buy. Restock then tracks where it's cheapest.
         </p>
+      )}
+      <details className="explain entry-edit" open={editOpen} onToggle={(ev) => setEditOpen((ev.currentTarget as HTMLDetailsElement).open)}>
+        <summary>
+          <Icon name="pencil" size={18} />
+          <span>Edit this item</span>
+        </summary>
+        <div className="explain-body">
+      {!deal && !linked && (
+        <label className="field">
+          <span>Item</span>
+          <input className="input" value={text} onChange={(e) => setText(e.target.value)} />
+        </label>
       )}
       <div className="two">
         <label className="field">
@@ -2108,9 +2178,6 @@ export function EditEntry({
           </select>
         </label>
       </div>
-      <button className="btn primary" onClick={save}>
-        Save
-      </button>
       {/* 0.10.5: Pantry item and Move to side by side. */}
       {(linked || (lists && lists.length > 1)) && (
         <div className="two">
@@ -2141,6 +2208,12 @@ export function EditEntry({
         }}
       >
         <Icon name="trash" size={18} /> Remove from shopping list
+      </button>
+        </div>
+      </details>
+      {/* The main button: Save once the edit box is open (the shop, category or name may have changed), else Done */}
+      <button className="btn primary" onClick={editOpen ? save : onClose}>
+        {editOpen ? 'Save' : 'Done'}
       </button>
     </Sheet>
   );

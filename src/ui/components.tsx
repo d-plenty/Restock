@@ -453,6 +453,27 @@ export function MoreInfo({ src, name, onOpen }: { src?: string; name: string; on
   );
 }
 
+/**
+ * 0.12.5: the blue i on a shopping list line, beside its price (the same i as a pantry row's): it opens
+ * the one page with everything about the line. Safe inside a tick-the-row label (shopping mode).
+ */
+export function RowInfo({ name, onOpen }: { name: string; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      className="irow-i row-info"
+      aria-label={`About ${name}: details and options`}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onOpen();
+      }}
+    >
+      <Icon name="info" size={24} />
+    </button>
+  );
+}
+
 export function Thumb({ src, icon = 'box' }: { src?: string; icon?: string }) {
   // A shop's picture that won't load shows the plain icon instead of a broken image.
   const [broken, setBroken] = useState<string | undefined>();
@@ -1330,7 +1351,7 @@ export function ProductPreview({ product: p, onClose, action }: { product: Previ
 }
 
 /** Product details (ingredients, allergens, nutrition…), fetched when asked for. */
-function DetailsPanel({ product: p }: { product: PreviewProduct }) {
+export function DetailsPanel({ product: p }: { product: PreviewProduct }) {
   const [state, setState] = useState<'idle' | 'loading' | 'none' | ProductDetails>('idle');
   if (state === 'idle') {
     return (

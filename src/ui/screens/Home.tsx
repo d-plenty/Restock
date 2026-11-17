@@ -102,10 +102,8 @@ export function HomeScreen() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div className="sub">{today}</div>
         <div className="topbar">
+          {/* 0.12.5: no Settings cog here; Settings is in More */}
           <h1>{greeting()}</h1>
-          <button className="icon-btn" aria-label="Settings" onClick={() => nav.push({ name: 'settings' })}>
-            <Icon name="settings" size={20} />
-          </button>
         </div>
         {/* 0.10.10: Cards and Receipts live in More only. 0.12.2: the catalogues are here again, as buttons. */}
         <div className="checkline">

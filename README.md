@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.12.4" src="https://img.shields.io/badge/status-release%20candidate%200.12.4-ffcd00">
+  <img alt="Release candidate 0.12.5" src="https://img.shields.io/badge/status-release%20candidate%200.12.5-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0124">New in 0.12.4</a> ·
+  <a href="#new-in-0125">New in 0.12.5</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -138,6 +138,22 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.12.5
+
+Smoother adding and shopping, and less on each page.
+
+- **Adding**: the first results are marked **Recommended**. One shop's page ends with **Next shop** and **Finish: review and add**, so you can stop after one shop; a shop you didn't open is left empty on the review page, with **Find it**. The bar at the bottom says **Review and add**.
+- **The review page** starts with the name and category, then your picks at each shop, then **Alerts and savings** folded away, then the Add button.
+- **More ways to add** is one button on the Add screen again. It opens to Add manually, Scan several barcodes, Find it from a photo and Scan a receipt.
+- **Shopping list**: each line has **How many** with − and +, and its blue i sits beside the price. The i (or the line) opens one page for that item: the product, how many, its details, the shop's page, and **Edit this item** (shop, category, pantry item, move, remove) folded away.
+- **Shopping mode** keeps its plain lines ("3 × Juice"). The i is beside the price there too and opens the same page, the one place to change things while you shop.
+- **Pantry item page**: the verdict, Add to shopping list, then the **best price at each shop**. What I buy, Also happy with (alternative product), Price history and Alerts fold, and all look the same. The long explanations are behind the i buttons.
+- **More** has one **Create a custom tab** button. Chemist and Bottle shop are two of the starts inside it, with Baby, Pets, Automotive, Tools, Office and Your own; they're never put there ahead of time. Tabs you already have stay.
+- **Home** has no Settings cog; Settings is in More.
+- **Loose fruit and veg** sold "each" online also show a price by the kilo where the shop gives one or gives a weight ("about $5.00/kg").
+- Fresh fruit and veg are "kinds", not "flavours". Sorted by price, results that don't mention what you typed come after the ones that do.
+- **Fixed**: with the largest text on a narrow phone, a Pantry line lost its name. The i and the button now drop to their own line when the words would be squeezed.
 
 ## New in 0.12.4
 
@@ -567,7 +583,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.4.apk` (on macOS, `shasum -a 256 restock-0.12.4.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.5.apk` (on macOS, `shasum -a 256 restock-0.12.5.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

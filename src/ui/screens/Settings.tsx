@@ -309,7 +309,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             {/* 0.10.7: each custom section (Baby and Pets are custom sections now), then making another */}
             {customsInUse(settings).map((c) => row(SECTION_NAMES[c], shopSummary(settings, c), () => nav.push({ name: 'stores', section: c })))}
             {customsInUse(settings).length < MAX_CUSTOM &&
-              row('Make a custom section', 'Bottle shops, chemists, pet shops, tools, automotive and more · Beta', () => setNewCustom(true))}
+              row('Create a custom tab', 'Chemist, bottle shop, baby, pets, automotive, tools, office or your own · Beta', () => setNewCustom(true))}
           </div>
           {newCustom && <NewCustomSheet onClose={() => setNewCustom(false)} />}
         </>
