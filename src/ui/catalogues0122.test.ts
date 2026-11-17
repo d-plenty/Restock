@@ -10,25 +10,15 @@ describe('0.12.2: catalogues from Home, Your shops', () => {
     expect(src).toContain('attributionControl: false');
     expect(src).toContain('OpenStreetMap contributors');
   });
-  it('More has Open my catalogue and Your shops, on the phone and the iPhone web page', () => {
-    for (const f of ['./screens/More.tsx', '../server-mode/ui/PhoneLayout.tsx']) {
-      const src = read(f);
-      expect(src).toContain('title="Open my catalogue"');
-      expect(src).toContain('title="Your shops"');
-      expect(src).not.toContain('title="Catalogues and specials"');
-    }
-  });
-  it('Home has the catalogue button and a button per shop, and no deal lists', () => {
+  it('Home has a button per shop, and no deal lists', () => {
     const src = read('./screens/Home.tsx');
-    expect(src).toContain('Open my catalogue');
     expect(src).toContain("name: 'shopcatalogue'");
     expect(src).not.toContain('Your items on special');
   });
-  it("a tile's corner says whose it is, or how good", () => {
-    expect(tileBadge({ from: 'yours', price: 5, was: 10 })).toEqual({ text: 'Your item', mine: true });
-    expect(tileBadge({ from: 'list', price: 5, was: 10 })).toEqual({ text: 'Half price', mine: false });
-    expect(tileBadge({ from: 'seen', price: 8, was: 10 })).toEqual({ text: 'Special', mine: false });
-    expect(tileBadge({ from: 'seen', price: 8 })).toEqual({ text: 'Special', mine: false });
+  it("a tile's corner says whose it is (0.12.3: only your own things are shown)", () => {
+    expect(tileBadge({ from: 'yours' })).toEqual({ text: 'Your item', mine: true });
+    expect(tileBadge({ from: 'list' })).toEqual({ text: 'On your list', mine: false });
+    expect(tileBadge({ from: 'seen' })).toEqual({ text: 'On your list', mine: false });
   });
   it('names and the shops with a list of their own', () => {
     expect(possessive('Coles')).toBe("Coles'");

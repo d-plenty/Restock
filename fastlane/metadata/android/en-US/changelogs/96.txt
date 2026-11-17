@@ -1,0 +1,1 @@
+Release candidate (0.12.3): My catalogue is merged into each shop's page. Open my catalogue is gone from Home and More. A shop's page shows only your things on special there (pantry items and shopping list lines), with the shop's catalogue and website at the top. Home's shop buttons say how many are on special. More has one row, Your shops. The server's web page matches.

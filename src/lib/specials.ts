@@ -77,6 +77,11 @@ const FAKE: StoreProduct[] = [
   },
 ];
 
+/** 0.12.3: the last half-price lists fetched, however old (Home counts from them without asking the shops). */
+export async function cachedSpecials(): Promise<SpecialsList[]> {
+  return (await getKV<SpecialsList[]>(KEY).catch(() => undefined)) ?? [];
+}
+
 export async function loadSpecials(fresh = false): Promise<SpecialsList[]> {
   const cached = fresh ? undefined : await getKV<SpecialsList[]>(KEY).catch(() => undefined);
   if (cached?.length && cached.every((l) => Date.now() - Date.parse(l.at) < FRESH)) return cached;

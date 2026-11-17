@@ -1,4 +1,7 @@
-import { getSettings } from '../../lib/db';
+import { allListEntries, getSettings } from '../../lib/db';
+import { shopTileNote } from '../../lib/ownSpecials';
+import { ownCounts } from '../../lib/ownSpecialsLive';
+import { loadRecommendations } from '../../lib/recs';
 import { useLive } from '../../lib/useLive';
 import { activeSections, chainName, enabledIn, hostOf, shopDef, shopOnTab, websiteOf, type Section, type StoreChain, withCustom } from '../../shops';
 import { serverMode } from '../../server-mode/flag';
@@ -34,8 +37,8 @@ export function httpsLink(url: string | undefined): string | undefined {
   }
 }
 
-/** One of your shops: its catalogue (in Restock) and its website (in your browser). */
-function ShopRow({ chain }: { chain: StoreChain }) {
+/** One of your shops: your specials there (in Restock) and its website (in your browser). */
+function ShopRow({ chain, n }: { chain: StoreChain; n: number | undefined }) {
   const nav = useNav();
   const site = httpsLink(websiteOf(chain));
   const note = shopDef(chain)?.catalogue?.note ?? (site ? hostOf(site) : undefined);
@@ -44,11 +47,14 @@ function ShopRow({ chain }: { chain: StoreChain }) {
       <ChainDot chain={chain} />
       <span className="grow" style={{ minWidth: 0 }}>
         <span className="title">{chainName(chain)}</span>
-        {note && <span className="small">{note}</span>}
+        <span className="small">
+          <span className={n ? 'shop-row-deals' : undefined}>{shopTileNote(n)}</span>
+          {note ? ` · ${note}` : ''}
+        </span>
       </span>
       <span className="shop-row-btns">
-        <button className="btn small primary" onClick={() => nav.push({ name: 'shopcatalogue', chain })} aria-label={`${chainName(chain)} catalogue`}>
-          <Icon name="book" size={16} /> Catalogue
+        <button className="btn small primary" onClick={() => nav.push({ name: 'shopcatalogue', chain })} aria-label={`Your specials at ${chainName(chain)}`}>
+          <Icon name="flame" size={16} /> Your specials
         </button>
         {site && (
           <a
@@ -71,17 +77,22 @@ export function yourShops(settings: Settings): StoreChain[] {
   return [...new Set(catalogueShops(settings).flatMap((g) => g.chains))];
 }
 
-// 0.12.2: More → Your shops (it was Catalogues and specials: My catalogue has its own row in More
-// now, and each shop's specials are its Catalogue button here).
+// 0.12.2: More → Your shops (it was Catalogues and specials). 0.12.3: My catalogue is merged into
+// each shop's page, so this is the one way in from More: Your specials opens a shop's page (your own
+// things on special there), Website the shop's own site with its whole catalogue.
 export function CataloguesScreen() {
   const nav = useNav();
   const settings = useLive(getSettings, []);
+  const counts = useLive(async () => {
+    const [r, s, e] = await Promise.all([loadRecommendations(), getSettings(), allListEntries()]);
+    return ownCounts(r, yourShops(s), e);
+  }, []);
   if (!settings) return <div className="screen" />;
   const groups = catalogueShops(settings);
   return (
     <div className="screen">
       <TopBar title="Your shops" />
-      <p className="sub">Catalogue shows a shop's specials here in Restock. Website opens the shop's own site in your web browser.</p>
+      <p className="sub">Your specials shows the things you buy that are on special there. Website opens the shop's own site, with its whole catalogue.</p>
       {groups.map(({ section, chains }) => (
         <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {groups.length > 1 && (
@@ -91,7 +102,7 @@ export function CataloguesScreen() {
           )}
           <div className="card flush">
             {chains.map((c) => (
-              <ShopRow key={c} chain={c} />
+              <ShopRow key={c} chain={c} n={counts?.get(c)} />
             ))}
           </div>
         </div>

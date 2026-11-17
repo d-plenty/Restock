@@ -23,7 +23,7 @@
 <li>Other sizes of this: the same can or bottle in other packs, compared per litre or per 100 g</li>
 <li>Search that works out what you mean: "butter" puts butter first, not peanut butter or butter chicken sauce</li>
 <li>Price history for each product at each shop: where today's price sits, how often it's on special and when the next special is likely</li>
-<li>My catalogue: specials on the things you buy, a page for each shop</li>
+<li>Your specials at each shop: only the things you buy, with the shop's whole catalogue one tap away</li>
 <li>A Shopping list that suggests shopping around, or the one shop with everything when shopping around saves less than your minimum</li>
 <li>Background price checks and alerts, and a weekly deals summary</li>
 <li>Shared prices: new items judged from day one, and your phone shares the shelf prices it reads in return</li>

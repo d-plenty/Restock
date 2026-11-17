@@ -990,7 +990,7 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
           </select>
           <span className="small" role="status">
             {choice === 'off'
-              ? 'Nothing is checked until you tap Check now on Home. We recommend leaving automatic checks on: without them, prices, specials and My catalogue go out of date.'
+              ? 'Nothing is checked until you tap Check now on Home. We recommend leaving automatic checks on: without them, prices and your specials at each shop go out of date.'
               : `Runs ${dayWords(days)} at ${timeWords(settings.checkTime ?? CHECK_TIME_0110)}, your phone's own time. Android may run it a few minutes late; if the phone is off then, it checks soon after it's back. Checking by hand doesn't change it.`}
           </span>
         </div>

@@ -42,8 +42,9 @@ export type Screen =
   | { name: 'settings'; page?: import('./screens/Settings').SettingsPage }
   | { name: 'feedback' }
   | { name: 'catalogues' }
+  /** 0.12.3: My catalogue is merged into each shop's page; an old link to it opens Your shops. */
   | { name: 'mycatalogue' }
-  /** 0.12.2: one shop's catalogue (Home's square buttons; More → Your shops). */
+  /** 0.12.2: one shop's page (Home's square buttons; More → Your shops). 0.12.3: your own things on special there. */
   | { name: 'shopcatalogue'; chain: StoreChain }
   | { name: 'permissions' }
   | { name: 'stores'; section?: Section }

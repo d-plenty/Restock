@@ -4,14 +4,15 @@ import { addListEntry, allListEntries, getSettings, nowIso, uid } from '../../li
 import { findCatalogue, type CatalogueLink } from '../../lib/catalogues';
 import { addToList } from '../../lib/listActions';
 import { buildCatalogue } from '../../lib/myCatalogue';
-import { filterSpecials, shopSpecials, type Special, type SpecialSort } from '../../lib/mySpecials';
+import { filterSpecials, type Special, type SpecialSort } from '../../lib/mySpecials';
+import { listLineKeys, ownSpecials } from '../../lib/ownSpecials';
+import { weekDay } from '../../lib/ownSpecialsLive';
 import { loadRecommendations } from '../../lib/recs';
 import { unitTextOf } from '../../lib/searchHelp';
 import { noteSeen, seenSpecials } from '../../lib/seen';
 import { loadSpecials, type SpecialsList } from '../../lib/specials';
 import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
-import { specialsWeekStart } from '../../lib/verdict';
 import { chainName, SECTION_NAMES, shopDef, websiteOf, type Section, type StoreChain } from '../../shops';
 import { isNative } from '../../stores/http';
 import type { StoreProduct } from '../../stores/types';
@@ -23,11 +24,11 @@ import { useNav } from '../nav';
 import { catalogueShops, httpsLink } from './Catalogues';
 
 // 0.12.2: one shop's catalogue, opened from its square button on Home or from More → Your shops.
-// (Before, More → Catalogues and specials → My specials held every shop in one page of lists you
-// opened one at a time.) What it shows is what Restock can read without trawling the shop: the
-// shop's own half-price list (Coles and Woolworths), your items on special there, and what your
-// searches found on special there this week (lib/mySpecials.ts). The shop's whole catalogue is one
-// tap away, on the shop's own site.
+// 0.12.3: My catalogue is merged into it, and it shows only your own things on special there: the
+// items you track (on any tab) and one-off shopping list lines (lib/ownSpecials.ts). Nothing you
+// don't buy is shown; the shop's whole catalogue is the first thing on the page, on its own site.
+// The shop's half-price list (Coles and Woolworths) is only fetched to spot a one-off list line on
+// special, so a page with no such lines asks the shop for nothing.
 //
 // On a Restock server's web page nothing is fetched from a shop: the half-price list and the
 // catalogue link are the ones the phones shared.
@@ -42,14 +43,9 @@ const SORTS: { id: SpecialSort; label: string }[] = [
   { id: 'az', label: 'A–Z' },
 ];
 const STEP = 60;
-const localDay = (ms: number) => {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-/** The word on a tile's corner. */
-export function tileBadge(s: Pick<Special, 'from' | 'price' | 'was'>): { text: string; mine: boolean } {
-  if (s.from === 'yours') return { text: 'Your item', mine: true };
-  return { text: s.was && s.price <= s.was * 0.55 ? 'Half price' : 'Special', mine: false };
+/** The word on a tile's corner: an item you track, or a line on your shopping list. */
+export function tileBadge(s: Pick<Special, 'from'>): { text: string; mine: boolean } {
+  return s.from === 'yours' ? { text: 'Your item', mine: true } : { text: 'On your list', mine: false };
 }
 /** Outside links open in the phone's browser; on the web page, in a new tab. */
 const OUT = serverMode ? { target: '_blank', rel: 'noopener noreferrer' } : {};
@@ -62,9 +58,10 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
     const [settings, recs, entries] = await Promise.all([getSettings(), loadRecommendations(), allListEntries()]);
     const section: Section = catalogueShops(settings).find((g) => g.chains.includes(chain))?.section ?? 'pantry';
     const page = buildCatalogue(recs, [chain]).pages.find((p) => p.chain === chain && p.kind === 'sales');
-    const seen = await seenSpecials(chain, localDay(specialsWeekStart(Date.now()))).catch(() => []);
+    const lines = [...listLineKeys(entries)].some((k) => k.startsWith(`${chain}|`));
+    const seen = lines ? await seenSpecials(chain, weekDay()).catch(() => []) : [];
     const listed = new Set(entries.filter((e) => !e.checked && e.groupId).map((e) => e.groupId!));
-    return { section, deals: page?.deals ?? [], seen, listed };
+    return { section, deals: page?.deals ?? [], seen, listed, entries, lines };
   }, [chain]);
   // The web page: what the phones shared (nothing is asked of a shop from here).
   const shared = useLive(async () => (serverMode ? await sharedSpecials() : undefined), []);
@@ -73,13 +70,12 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
   const [link, setLink] = useState<CatalogueLink>();
   const [typed, setTyped] = useState('');
   const [sort, setSort] = useState<SpecialSort>('saving');
-  const [mineOnly, setMineOnly] = useState(false);
   const [shown, setShown] = useState(STEP);
   const [info, setInfo] = useState<Special>();
   const [added, setAdded] = useState<Set<string>>(new Set());
 
   const load = async (fresh = false) => {
-    if (!full || serverMode) return;
+    if (!full || serverMode || !base?.lines) return;
     setBusy(true);
     try {
       const l = await loadSpecials(fresh);
@@ -94,6 +90,9 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
   };
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chain, base?.lines]);
+  useEffect(() => {
     if (!serverMode) void findCatalogue(chain).then(setLink, () => setLink({ missing: 'unchecked' }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chain]);
@@ -102,16 +101,16 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
     () => (serverMode ? ((shared?.lists[chain]?.items ?? []) as unknown as StoreProduct[]) : (lists?.find((l) => l.chain === chain)?.items ?? [])),
     [shared, lists, chain],
   );
-  const all = useMemo(() => (base ? shopSpecials(base.deals, list, base.seen) : []), [base, list]);
-  const mine = useMemo(() => all.filter((s) => s.from === 'yours'), [all]);
-  const items = useMemo(() => filterSpecials(mineOnly ? mine : all, typed, sort), [all, mine, mineOnly, typed, sort]);
+  const all = useMemo(() => (base ? ownSpecials(base.deals, base.lines ? list : [], base.seen, base.entries) : []), [base, list]);
+  const items = useMemo(() => filterSpecials(all, typed, sort), [all, typed, sort]);
+  const saving = all.reduce((t, s) => t + s.saving, 0);
 
   if (!base) return <div className="screen" />;
   const err = lists?.find((l) => l.chain === chain)?.error;
   const known = shopDef(chain)?.catalogue;
   const own = httpsLink(serverMode ? (known?.url ?? shared?.catalogues[chain]?.url) : link?.url);
   const site = httpsLink(websiteOf(chain));
-  const isListed = (s: Special) => (s.groupId ? base.listed.has(s.groupId) : added.has(s.key));
+  const isListed = (s: Special) => (s.groupId ? base.listed.has(s.groupId) : s.from !== 'yours' || added.has(s.key));
 
   const addLine = async (s: Special) => {
     if (s.groupId) {
@@ -129,18 +128,50 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
   return (
     <div className="screen">
       <TopBar title={name} />
+      {/* 0.12.3: the whole catalogue first (it was a card at the bottom): Restock shows only your own things */}
+      <div className="card shopcat-top">
+        <strong>{own ? `${possessive(name)} whole catalogue` : `Everything at ${name}`}</strong>
+        <p className="small" style={{ margin: 0 }}>
+          Restock shows only your own things on special here. {own ? 'The whole catalogue is on the shop’s own site.' : 'Everything else is on the shop’s own site.'}
+        </p>
+        {(own || site) && (
+          <div className="shopcat-links">
+            {own && (
+              <a className="btn primary" href={own} {...OUT} style={{ textDecoration: 'none' }} aria-label={`Open ${possessive(name)} catalogue${serverMode ? ' (opens a new tab)' : ''}`}>
+                <Icon name="book" size={18} /> Open the catalogue
+              </a>
+            )}
+            {site && (
+              <a className="btn" href={site} {...OUT} style={{ textDecoration: 'none' }} aria-label={`Open ${possessive(name)} website${serverMode ? ' (opens a new tab)' : ''}`}>
+                <Icon name="external" size={18} /> Website
+              </a>
+            )}
+          </div>
+        )}
+        {!serverMode && !own && link?.missing && (
+          <span className="small">
+            {link.missing === 'unchecked'
+              ? isNative()
+                ? "Couldn't look for a catalogue just now."
+                : 'Looking for a catalogue works in the Android app.'
+              : `No catalogue found on ${site ? new URL(site).host.replace(/^www\./, '') : 'its website'}.`}
+          </span>
+        )}
+        <span className="small">{known?.note ? `${known.note} ` : ''}Catalogue prices can differ by state and branch.</span>
+      </div>
+
       <div className="banner green shopcat-banner">
         <span className="shopcat-kicker">{name} this week</span>
         <span className="big num" role="status">
-          {all.length ? `${all.length} special${all.length === 1 ? '' : 's'}` : busy ? 'Getting the list…' : 'No specials found yet'}
+          {all.length ? `${all.length} of yours on special` : busy ? 'Looking…' : 'None this week'}
         </span>
-        {known?.note && <span className="shopcat-note">{known.note}</span>}
+        {saving > 0.004 && <span className="shopcat-note num">Save about {money(saving)}</span>}
       </div>
       {busy && <LoadingBar seconds={15} />}
       {err && !list.length && (
         <div className="banner amber" role="alert">
-          <strong>{name} didn't send its list just now</strong>
-          <span className="shopcat-note">{err}</span>
+          <strong>{name} didn't send its specials just now</strong>
+          <span className="shopcat-note">One-off things on your shopping list may be missing from this page. {err}</span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn small" onClick={() => void load(true)} disabled={busy}>
               <Icon name="refresh" size={16} /> Try again
@@ -149,16 +180,6 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
         </div>
       )}
 
-      {all.length > 0 && (
-        <div className="chips" role="group" aria-label="Which specials">
-          <button className="chip" aria-pressed={!mineOnly} onClick={() => (setMineOnly(false), setShown(STEP))}>
-            All specials <span className="num">{all.length}</span>
-          </button>
-          <button className="chip" aria-pressed={mineOnly} onClick={() => (setMineOnly(true), setShown(STEP))}>
-            In my pantry <span className="num">{mine.length}</span>
-          </button>
-        </div>
-      )}
       {all.length > 8 && (
         <div className="shopcat-tools">
           <label className="search-field">
@@ -166,8 +187,8 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
             <input
               className="input"
               type="search"
-              placeholder={`Search ${possessive(name)} specials`}
-              aria-label={`Search ${possessive(name)} specials`}
+              placeholder={`Search your ${name} specials`}
+              aria-label={`Search your ${name} specials`}
               value={typed}
               onChange={(e) => (setTyped(e.target.value), setShown(STEP))}
             />
@@ -182,9 +203,11 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
         </div>
       )}
 
-      {all.length > 0 && !items.length && (
+      {!items.length && !busy && (
         <p className="small" role="status">
-          {typed.trim() ? `Nothing matches "${typed.trim()}".` : `Nothing in your pantry is on special at ${name} this week.`}
+          {typed.trim()
+            ? `Nothing matches "${typed.trim()}".`
+            : `When something in your pantry or on your shopping list is on special at ${name}, it shows here.`}
         </p>
       )}
       {items.length > 0 && (
@@ -226,45 +249,6 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
         </button>
       )}
 
-      <div className="card shopcat-foot">
-        <strong>{own ? `${possessive(name)} whole catalogue` : `More from ${name}`}</strong>
-        <p className="small" style={{ margin: 0 }}>
-          {full
-            ? serverMode && !list.length
-              ? `Your phones share ${possessive(name)} half-price list when they sync, and none has come in yet. Your own items on special there still show here.`
-              : `This page is ${possessive(name)} half-price list, with your own items on special there and what your searches found this week. Restock doesn't read the whole catalogue.`
-            : `Restock can't read ${possessive(name)} specials list. This page is your own items on special there and what your searches found this week.`}
-          {own ? ' The whole catalogue is on the shop’s own site.' : ''}
-        </p>
-        <div className="shopcat-links">
-          {own && (
-            <a className="btn primary" href={own} {...OUT} style={{ textDecoration: 'none' }} aria-label={`Open ${possessive(name)} catalogue${serverMode ? ' (opens a new tab)' : ''}`}>
-              <Icon name="book" size={18} /> Open the catalogue
-            </a>
-          )}
-          {site && (
-            <a className="btn" href={site} {...OUT} style={{ textDecoration: 'none' }} aria-label={`Open ${possessive(name)} website${serverMode ? ' (opens a new tab)' : ''}`}>
-              <Icon name="external" size={18} /> Website
-            </a>
-          )}
-          {full && !serverMode && isNative() && (
-            <button className="btn" onClick={() => void load(true)} disabled={busy}>
-              <Icon name="refresh" size={18} /> Refresh
-            </button>
-          )}
-        </div>
-        {!serverMode && !own && link?.missing && (
-          <span className="small">
-            {link.missing === 'unchecked'
-              ? isNative()
-                ? "Couldn't look for a catalogue just now."
-                : 'Looking for a catalogue works in the Android app.'
-              : `No catalogue found on ${site ? new URL(site).host.replace(/^www\./, '') : 'its website'}.`}
-          </span>
-        )}
-        <span className="small">Catalogue prices can differ by state and branch.</span>
-      </div>
-
       {info && (
         <Sheet title={info.name} onClose={() => setInfo(undefined)}>
           <dl className="pinfo-rows">
@@ -302,9 +286,7 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
           <p className="small" style={{ margin: 0 }}>
             {info.from === 'yours'
               ? `This is ${info.groupName ?? 'one of your items'}: Restock has its price history, so this is a real saving against what it usually costs.`
-              : info.from === 'seen'
-                ? `One of your searches found this on special at ${name} this week. It isn't in your pantry, so Restock doesn't watch its price.`
-                : `This is what ${name} says. It isn't in your pantry, so Restock can't tell you yet whether the special is a real one.`}
+              : `This is on your shopping list, and ${name} has it on special this week. It isn't in your pantry, so Restock doesn't watch its price or check the special is a real one.`}
           </p>
           <button
             className="btn primary"

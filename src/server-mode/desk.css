@@ -889,6 +889,22 @@ button.dk-tile:hover {
   margin: 0;
   border-top: 1px solid var(--line-soft);
 }
+/* 0.12.3: Home's "Your specials this week" rows are buttons (each opens that shop's page). */
+button.dk-row.dk-row-btn {
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  flex-wrap: nowrap;
+}
+button.dk-row.dk-row-btn:hover {
+  background: var(--surface-2, rgba(0, 0, 0, 0.03));
+}
 .dk-row .grow {
   flex: 1 1 220px;
   min-width: 0;

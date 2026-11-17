@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.12.2" src="https://img.shields.io/badge/status-release%20candidate%200.12.2-ffcd00">
+  <img alt="Release candidate 0.12.3" src="https://img.shields.io/badge/status-release%20candidate%200.12.3-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0122">New in 0.12.2</a> ·
+  <a href="#new-in-0123">New in 0.12.3</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -82,7 +82,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Your own Restock server** (optional). Run [Restock server](https://github.com/d-plenty/restock-server) on a NAS, mini PC or Raspberry Pi, or as an app in Home Assistant. **Your server is the house:** you name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs your Home Assistant shopping list, shows your spending and price charts in its **Data** tab, and gives you Restock on your computer and [on iPhone](#restock-on-iphone). See [Your own Restock server](#your-own-restock-server).
 - **Other sizes of this.** Tick a product and Restock shows the same thing in other packs (375 mL cans × 10, × 24, × 30), compared per litre or per 100 g, so a 10-pack on special doesn't slip past your usual 30-pack.
 - **Sync with your household, no server needed.** Up to 6 phones in the same house share one pantry and shopping list, straight from one phone to another on your Wi-Fi. Away from home, phones can also sync through Nextcloud, another WebDAV server or a Syncthing folder, sealed so only your phones can read it. You pick what's shared: groceries, Keg and Health, each on or off.
-- **My catalogue.** Specials on the things you buy: a page for each shop with this week's specials on your items (40% OFF, HALF PRICE, 2 FOR $5), and for a shop with no specials, a page of what it's cheapest for.
+- **Your specials at each shop.** A button on Home for every shop you use, saying how many of your things are on special there. It opens just the things you buy that are on special at that shop (from your pantry and your shopping list), and nothing you don't. The shop's whole catalogue is one tap away, on its own site.
 - **Shop around, or one shop.** Your list puts each item at its cheapest shop and suggests shopping around, unless it saves less than your minimum (a dollar to start with). Then it suggests the one shop that has everything, comparing the *same shopping* at each shop.
 - **Background price checks** on Android's own scheduler, with alerts only for the deals you care about, plus a weekly deals summary on catalogue day.
 - **Recall alerts.** Once a day Restock checks the official Australian recall lists (FSANZ, Product Safety Australia, TGA) against what you have.
@@ -139,6 +139,18 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.12.3
+
+My catalogue and the shops' pages are one thing now, and they only show what you buy.
+
+- **No more Open my catalogue.** It's gone from Home and More. Each shop's own page does the job instead.
+- **A shop's page shows only your things.** Items from your pantry (and your other tabs) that are on special there, plus one-off things on your shopping list that the shop has on special. The shop's general half-price list and what your searches found aren't shown any more.
+- **The whole catalogue is at the top.** Each shop's page opens with **Open the catalogue** and **Website**, for everything else the shop has (it was a card at the bottom).
+- **Home's shop buttons say how many.** Under each shop's name, "26 on special" (in green) or "None this week", instead of "Catalogue".
+- **More has one row: Your shops.** Each shop has **Your specials** (with the same count) and **Website**.
+- **The weekly deals summary** notification opens Home, where the shop buttons show what's on special.
+- **On the Restock server's web page** too: the sidebar's Catalogues and specials is **Your shops**, with each shop's count, Your specials and its links, and Home shows the count for each shop. The shops' general half-price lists and My catalogue are gone from the web as well.
 
 ## New in 0.12.2
 
@@ -539,7 +551,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.2.apk` (on macOS, `shasum -a 256 restock-0.12.2.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.3.apk` (on macOS, `shasum -a 256 restock-0.12.3.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

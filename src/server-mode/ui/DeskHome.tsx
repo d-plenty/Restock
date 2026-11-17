@@ -262,7 +262,7 @@ export function DeskHome() {
         </aside>
       </div>
 
-      {/* 0.9.4 (section 15): this week's specials the phones shared, and My catalogue. */}
+      {/* 0.9.4 (section 15); 0.12.3: how many of your things are on special at each shop (no half-price picks or My catalogue). */}
       <HomeSpecials />
     </div>
   );

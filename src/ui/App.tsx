@@ -25,7 +25,6 @@ import { placeToast } from './toastLift';
 import { AddScreen } from './screens/Add';
 import { CardsScreen } from './screens/Cards';
 import { CataloguesScreen } from './screens/Catalogues';
-import { MyCatalogueScreen } from './screens/MyCatalogue';
 import { PermissionsScreen } from './screens/Permissions';
 import { HomeScreen } from './screens/Home';
 import { HouseholdScreen } from './screens/Household';
@@ -376,8 +375,9 @@ function RestockApp() {
         nav.setTab('home');
         if (groupId) setStack([{ name: 'item', groupId }]);
       } else if (a.action === 'catalogue') {
+        // 0.12.3: the weekly deals summary opens Home, where each shop's button says how many of your things are on special there (My catalogue is merged into them)
         nav.setTab('home');
-        setStack([{ name: 'mycatalogue' }]);
+        setStack([]);
       } else if (a.action === 'daily') nav.setTab('pantry');
       else if (a.action === 'cards') setStack([{ name: 'cards' }]);
       else if (a.action === 'sync') setStack([{ name: 'settings' }, { name: 'settings', page: 'sync' }, { name: 'sync' }]);
@@ -596,7 +596,8 @@ function RestockApp() {
         )}
         {top.name === 'scanned' && <ScannedScreen section={top.section ?? addSection} start={top.start} />}
         {top.name === 'catalogues' && <CataloguesScreen />}
-        {top.name === 'mycatalogue' && <MyCatalogueScreen />}
+        {/* 0.12.3: My catalogue is merged into each shop's page; an old link to it lands on Your shops */}
+        {top.name === 'mycatalogue' && <CataloguesScreen />}
         {top.name === 'permissions' && <PermissionsScreen />}
         {top.name === 'settings' && <SettingsScreen key={top.page ?? 'main'} page={top.page} />}
         {top.name === 'feedback' && <FeedbackScreen />}

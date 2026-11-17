@@ -23,6 +23,8 @@ import { useNav } from '../nav';
 import { RecallBanner } from './Recalls';
 import { AddBar, ItemRow } from '../simple';
 import { yourShops } from './Catalogues';
+import { shopTileNote } from '../../lib/ownSpecials';
+import { ownCounts } from '../../lib/ownSpecialsLive';
 import { TabOffer } from './SetupNudges';
 import { loadSpecials } from '../../lib/specials';
 import type { StoreProduct } from '../../stores';
@@ -54,6 +56,11 @@ export function HomeScreen() {
   const [testing, setTesting] = useState(false);
   // 0.10.2: the background checks' log (above the early return: hooks always run in the same order).
   const runs = useLive(getCheckLog, []) ?? [];
+  // 0.12.3: each shop's square button says how many of your things are on special there (its page shows them).
+  const counts = useLive(async () => {
+    const [r, s, e] = await Promise.all([loadRecommendations(), getSettings(), allListEntries()]);
+    return ownCounts(r, yourShops(s), e);
+  }, []);
   if (!allRecs || !settings || !allEntries) return <div className="screen" />;
   const { on, recs, totals, openLines, worth, saving } = weekDeals(allRecs, settings, allEntries);
   const shops = yourShops(settings);
@@ -227,15 +234,8 @@ export function HomeScreen() {
 
       {!allRecs.length && <FirstHome tourSeen={settings.tour.seen} />}
 
-      {/* 0.12.2: Home is the way in to the catalogues (it listed every deal, group by group): your own
-          catalogue, made from your pantry, then a square button for each shop's catalogue. */}
-      {allRecs.length > 0 && (
-        <button className="btn primary home-cat" onClick={() => nav.push({ name: 'mycatalogue' })}>
-          <Icon name="book" size={24} />
-          <span className="grow">Open my catalogue</span>
-          <Icon name="chevron" size={20} />
-        </button>
-      )}
+      {/* 0.12.2: Home is the way in to the catalogues: a square button for each shop. 0.12.3: My catalogue
+          is merged into them (no Open my catalogue button): each shop's page is your own things on special there. */}
       {shops.length > 0 && (
         <section className="home-group" aria-labelledby="home-shops">
           <h2 className="eyebrow" id="home-shops">
@@ -243,13 +243,18 @@ export function HomeScreen() {
           </h2>
           <div className="shop-tiles">
             {shops.map((c) => (
-              <button key={c} className="shop-tile" onClick={() => nav.push({ name: 'shopcatalogue', chain: c })} aria-label={`${chainName(c)} catalogue`}>
+              <button
+                key={c}
+                className={`shop-tile${counts?.get(c) ? ' has-deals' : ''}`}
+                onClick={() => nav.push({ name: 'shopcatalogue', chain: c })}
+                aria-label={`${chainName(c)}: ${shopTileNote(counts?.get(c))}`}
+              >
                 <span className="shop-tile-icon">
                   <Icon name="shop" size={24} />
                   <ChainDot chain={c} />
                 </span>
                 <span className="shop-tile-name">{chainName(c)}</span>
-                <span className="shop-tile-note">Catalogue</span>
+                <span className="shop-tile-note num">{shopTileNote(counts?.get(c))}</span>
               </button>
             ))}
           </div>
@@ -326,7 +331,7 @@ export function weekDeals(allRecs: Recommendation[], settings: Settings, allEntr
 
 /**
  * 0.12.0: Home before anything's been added. This week's half-price lists from Woolworths and Coles
- * (the shops' own lists, as More → Catalogues and specials reads them; kept 12 hours), so there's
+ * (the shops' own lists, kept 12 hours), so there's
  * something to tap straight away: + searches your shops for it. Where the lists can't be read
  * (no signal, the web page, a shop turning Restock away) it's the plain first step instead.
  */

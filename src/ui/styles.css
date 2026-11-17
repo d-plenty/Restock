@@ -6433,22 +6433,7 @@ span.plus-btn {
   margin-top: 0;
 }
 
-/* ---------- 0.12.2: Home's catalogue buttons, Your shops, one shop's catalogue ---------- */
-/* Open my catalogue: the one big button on Home. */
-.btn.home-cat {
-  height: 64px;
-  padding: 0 var(--sp-5);
-  border-radius: var(--r-lg);
-  justify-content: flex-start;
-  gap: var(--sp-3);
-  font-size: var(--fs-lg);
-  font-weight: 800;
-  text-align: left;
-}
-.btn.home-cat .grow {
-  flex: 1;
-  min-width: 0;
-}
+/* ---------- 0.12.2: Home's shop buttons, Your shops, one shop's catalogue (0.12.3: no Open my catalogue) ---------- */
 /* A square button for each shop, three across (two when the text is set very large). */
 .shop-tiles {
   display: grid;
@@ -6492,6 +6477,13 @@ span.plus-btn {
 .shop-tile-note {
   font-size: var(--fs-sm);
   font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 0.12.3: a shop with your things on special says how many, in the deal green; the rest stay grey. */
+.shop-tile.has-deals .shop-tile-note {
   color: var(--green-ink);
 }
 /* Narrower phones: a little less padding and smaller names, so "Woolworths" stays on one line. */
@@ -6516,6 +6508,10 @@ span.plus-btn {
   flex-wrap: wrap;
 }
 /* The two buttons sit on their own line, side by side and the same width. */
+.shop-row-deals {
+  color: var(--green-ink);
+  font-weight: 700;
+}
 .shop-row-btns {
   flex: 1 1 100%;
   display: flex;
@@ -6628,7 +6624,7 @@ span.plus-btn {
   font-weight: 700;
   color: var(--green-ink);
 }
-.card.shopcat-foot {
+.card.shopcat-top {
   flex-direction: column;
   gap: var(--sp-2);
 }
