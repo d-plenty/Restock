@@ -83,6 +83,27 @@ function saleDeal(rec: Recommendation, o: Option): CatalogueDeal | undefined {
 }
 
 /** The Wednesday-to-Tuesday specials week that `now` is in. (0.9.0: the start is verdict.ts specialsWeekStart, which judges sales too.) */
+/**
+ * 0.12.6: your picks at one shop that the shop marks as a special but Restock doesn't count as one
+ * (a fake special, or one that's been better: "wait"), cheapest pick per item. Items with a real
+ * sale there (`real`) are left out. For a shop's page only: they never count as on special.
+ */
+export function doubtfulDeals(recs: Recommendation[], chain: string, real: CatalogueDeal[]): CatalogueDeal[] {
+  const has = new Set(real.map((d) => d.rec.group.id));
+  const out: CatalogueDeal[] = [];
+  for (const rec of recs) {
+    if (has.has(rec.group.id)) continue;
+    const notAt = new Set(notAtChains(rec.group, (id) => rec.options.find((o) => o.product.id === id)?.product.chain));
+    if (notAt.has(chain)) continue;
+    const o = rec.options
+      .filter((x) => x.role === 'main' && x.product.chain === chain && x.price !== undefined && x.product.inStock !== false && (x.verdict.kind === 'fake' || x.verdict.kind === 'wait'))
+      .sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity))[0];
+    if (!o) continue;
+    out.push({ rec, option: o, badge: o.verdict.kind === 'fake' ? 'NOT A REAL SPECIAL' : 'WAIT', saving: 0, note: o.verdict.kind === 'fake' ? 'Its usual price' : 'Has been cheaper' });
+  }
+  return out.sort((a, b) => a.rec.group.name.localeCompare(b.rec.group.name));
+}
+
 export function specialsWeek(now: Date): { from: Date; to: Date } {
   const from = new Date(specialsWeekStart(now.getTime()));
   const to = new Date(from);

@@ -6,11 +6,12 @@ import { aisleLabel, aisleOf, byAisle as sortByAisle, getAisles, type AisleAt } 
 import { noteTicksSoon } from '../../lib/spending';
 import { branchAdvice, branchName, stockRows } from '../../lib/stock';
 import { useFullRefresh } from '../refresh';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { nameHasSize } from '../../lib/naming';
 import { lookupBarcode, scanBarcode } from '../../lib/barcode';
 import { serverMode, serverUi } from '../../server-mode/flag';
 import { PhoneOnlyNote } from '../../server-mode/ui/PhoneOnly';
+import { cleanSearch } from '../../lib/searchText';
 import {
   addListEntry,
   allCards,
@@ -252,7 +253,8 @@ export function useListAdd(entries: ListEntry[], recs: Recommendation[], section
   /** `said`: the Undo toast's words, when not the usual "Milk added to your shopping list". */
   const add = async (value: string, groupId?: string, said?: string) => {
     // 0.9.12: "2 coconut cream" is two of them.
-    const { text: t, qty: n } = splitCount(value);
+    // 0.12.6: voice typing's full stop on the end isn't part of the name.
+    const { text: t, qty: n } = splitCount(cleanSearch(value));
     if (!t) return;
     // 0.9.5: a pantry item added on General (a scan) goes on its own tab's list, as it would anywhere.
     const item = groupId && section === 'general' ? (await allGroups()).find((g) => g.id === groupId) : undefined;
@@ -279,7 +281,7 @@ export function useListAdd(entries: ListEntry[], recs: Recommendation[], section
 
   // Typing in "Add anything": your own pantry items that match come first (0.7.4), so "Nescafe"
   // adds the Nescafe you track, with its photo and cheapest shop, not a blank line.
-  const typed = text.trim().toLowerCase();
+  const typed = cleanSearch(text).toLowerCase();
   const words = typed.split(/\s+/).filter((w) => w.length > 1);
   const pantryMatches = typed
     ? recs
@@ -360,6 +362,11 @@ export function ListScreen() {
   const { sectionsOn, section, groupSection, entries, recs, shops, totals, names, c, stockItems } = sums;
   const categories = allCats.filter((x) => x.section === section);
   const openCount = (sec: ListSection) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;
+  // 0.12.6: the General list's things come along when you shop for groceries (they were easy to
+  // forget on a list of their own): a folded card here, and a group at the bottom of every shop's
+  // page in shopping mode. They stay on the General list, and out of this list's totals.
+  const generalToo = section === 'pantry' && sectionsOn.includes('general') ? allEntries.filter((e) => entrySection(e, groupSection) === 'general') : [];
+  const generalOpen = generalToo.filter((e) => !e.checked);
 
   const pick = (id: string) =>
     setPicked((p) => {
@@ -466,7 +473,7 @@ export function ListScreen() {
     );
   };
 
-  const renderRow = (e: ListEntry) => {
+  const renderRow = (e: ListEntry, space = true) => {
     const rec = recFor(c, e);
     // Pantry items always show their current name, so renaming in the pantry renames here too.
     const title = rec?.group.name ?? e.text;
@@ -528,10 +535,11 @@ export function ListScreen() {
               <button type="button" className="thumb-btn" tabIndex={-1} aria-hidden onClick={openRow}>
                 <Thumb src={previewOf(e)!.imageUrl} />
               </button>
-            ) : (
-              // No photo: keep the space, so every name on the list lines up (0.7.3).
+            ) : space ? (
+              // No photo: keep the space, so every name in the group lines up (0.7.3). 0.12.6: only
+              // when something in the group has a photo; a group with none had an empty gap down its left.
               <span className="thumb-space" aria-hidden />
-            ))}
+            ) : null)}
           <div className="grow list-row-text">
             <button className="list-row-main" onClick={openRow} aria-label={`${title}: details and options`}>
               <span className="title clip">
@@ -802,7 +810,7 @@ export function ListScreen() {
         </div>
       )}
 
-      {view === 'all' && open.length > 0 && <div className="card flush">{open.map((e) => renderRow(e))}</div>}
+      {view === 'all' && open.length > 0 && <div className="card flush">{open.map((e) => renderRow(e, open.some((x) => !!previewOf(x))))}</div>}
 
       {/* 0.9.5: Aisle group, the same grouping as the web: each category in your order, then Other. */}
       {view === 'aisle' &&
@@ -826,7 +834,7 @@ export function ListScreen() {
                   </span>
                 </span>
               </div>
-              {g.items.map((e) => renderRow(e))}
+              {g.items.map((e) => renderRow(e, g.items.some((x) => !!previewOf(x))))}
             </section>
           ))}
 
@@ -879,7 +887,7 @@ export function ListScreen() {
                 {!selecting && (
                   <button
                     className="icon-btn"
-                    style={{ width: 36, height: 36 }}
+                    style={{ flex: 'none' }}
                     aria-label={`Share the ${shop === 'any' ? 'any shop' : chainName(shop)} list`}
                     onClick={async () => {
                       if (shop === 'woolworths' || shop === 'coles') return setSharing(shop);
@@ -893,7 +901,7 @@ export function ListScreen() {
                 {shopsInList.length > 1 && !selecting && (
                   <button
                     className="icon-btn"
-                    style={{ width: 36, height: 36 }}
+                    style={{ flex: 'none' }}
                     aria-label={`${isOpen ? 'Fold' : 'Open'} ${shop === 'any' ? 'any shop' : chainName(shop)}`}
                     aria-expanded={isOpen}
                     onClick={toggle}
@@ -902,11 +910,42 @@ export function ListScreen() {
                   </button>
                 )}
               </div>
-              {isOpen && items.map((e) => renderRow(e))}
+              {isOpen && items.map((e) => renderRow(e, items.some((x) => !!previewOf(x))))}
             </div>
           );
         })}
 
+
+      {/* 0.12.6: what's on the General list, folded: it comes along when you shop */}
+      {generalOpen.length > 0 && !selecting && (
+        <details className="card flush fold list-general">
+          <summary className="fold-head">
+            <span className="grow">
+              <span className="title">General list</span>
+              <span className="small">
+                {generalOpen.length} item{generalOpen.length === 1 ? '' : 's'} to get anywhere · shown at every shop when you start shopping
+              </span>
+            </span>
+            <span className="fold-arrow">
+              <Icon name="chevron" size={16} />
+            </span>
+          </summary>
+          <div className="fold-body">
+            <ul className="list-general-names">
+              {generalOpen.map((e) => (
+                <li key={e.id}>
+                  {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}
+                  {e.text}
+                  {e.chain && <span className="small"> · {chainName(e.chain)}</span>}
+                </li>
+              ))}
+            </ul>
+            <button className="btn block" onClick={() => setSection('general')}>
+              Open the General list
+            </button>
+          </div>
+        </details>
+      )}
 
       {/* 0.10.5: ticked items fold down to one line, with Clear. */}
       {done.length > 0 && (
@@ -936,7 +975,7 @@ export function ListScreen() {
               </button>
             )}
           </div>
-          {(showDone || selecting) && done.map((e) => renderRow(e))}
+          {(showDone || selecting) && done.map((e) => renderRow(e, done.some((x) => !!previewOf(x))))}
         </div>
       )}
 
@@ -1158,6 +1197,7 @@ export function ListScreen() {
           skip={skipToday}
           compare={settings.listCompare}
           entries={entries}
+          general={generalToo}
           categories={categories}
           onChangeShops={() => {
             setChangingFrom(shopping);
@@ -1213,6 +1253,7 @@ function ShopPicker({
   shops,
   doneAt,
   anyCount,
+  generalCount = 0,
   name,
   stats,
   onPick,
@@ -1222,6 +1263,7 @@ function ShopPicker({
   shops: ShopKey[];
   doneAt: ShopKey[];
   anyCount: number;
+  generalCount?: number;
   name: (s: ShopKey) => string;
   stats: (s: ShopKey) => { n: number; got: number; left: number; total: number; spent: number };
   onPick: (s: ShopKey) => void;
@@ -1277,6 +1319,11 @@ function ShopPicker({
       {anyCount > 0 && (
         <p className="small" style={{ margin: 0 }}>
           {anyCount === 1 ? '1 item has' : `${anyCount} items have`} no shop picked, so {anyCount === 1 ? 'it shows' : 'they show'} at every shop.
+        </p>
+      )}
+      {generalCount > 0 && (
+        <p className="small" style={{ margin: 0 }}>
+          {generalCount === 1 ? "1 thing" : `${generalCount} things`} from your General list {generalCount === 1 ? "shows" : "show"} at the bottom of each shop&apos;s page too.
         </p>
       )}
       {!toDo.length && (
@@ -1520,6 +1567,7 @@ function ShoppingMode({
   skip,
   compare,
   entries: allEntries,
+  general = [],
   categories,
   onChangeShops,
   onClose,
@@ -1532,6 +1580,8 @@ function ShoppingMode({
   skip: Set<string>;
   compare: 'unit' | 'price';
   entries: ListEntry[];
+  /** 0.12.6: the General list's lines, shown at the bottom of every shop's page ("get anywhere"). */
+  general?: ListEntry[];
   categories: Category[];
   onChangeShops: () => void;
   onClose: () => void;
@@ -1544,6 +1594,12 @@ function ShoppingMode({
   // Everything priced at only the shops picked (ticked rows too, so they keep their shop and price).
   const entries = allEntries.filter((e) => !skip.has(e.id));
   const skipped = allEntries.filter((e) => skip.has(e.id));
+  // 0.12.6: General lines still to get, and the ones ticked on this trip (they stay showing, ticked).
+  const generalSeen = useRef<Set<string>>(new Set());
+  for (const e of general) if (!e.checked) generalSeen.current.add(e.id);
+  const generalShown = general.filter((e) => generalSeen.current.has(e.id));
+  /** At one shop: the ones with no shop picked, and the ones picked for that shop. In one list: all of them. */
+  const generalAt = (v: ShopKey | 'all') => generalShown.filter((e) => v === 'all' || !e.chain || e.chain === v);
   const recs = onlyAt(all.recs, chosen);
   const c: Ctx = {
     ...all,
@@ -1794,7 +1850,7 @@ function ShoppingMode({
         {info && <ProductPreview product={info} onClose={() => setInfo(undefined)} />}
         {editing &&
           (() => {
-            const latest = allEntries.find((x) => x.id === editing.id);
+            const latest = allEntries.find((x) => x.id === editing.id) ?? general.find((x) => x.id === editing.id);
             if (!latest) return null;
             return (
               <EditEntry
@@ -1820,6 +1876,7 @@ function ShoppingMode({
             shops={shopKeys}
             doneAt={doneAt}
             anyCount={here('any').filter((e) => !e.checked).length}
+            generalCount={generalShown.filter((e) => !e.checked).length}
             name={shopName}
             stats={statsOf}
             onPick={setAt}
@@ -1940,6 +1997,48 @@ function ShoppingMode({
             </section>
           );
         })}
+        {/* 0.12.6: the General list, at the bottom of every shop's page: get these anywhere */}
+        {view !== undefined && generalAt(view).length > 0 && (
+          <section className="shop-general">
+            <div className="eyebrow" style={{ padding: '12px 16px 4px' }}>
+              General list · get anywhere
+            </div>
+            {generalAt(view).map((e) => (
+              <ShopRow
+                key={e.id}
+                e={e}
+                name={e.text}
+                thumb={generalAt(view).some((x) => !!x.product?.imageUrl) || (view !== 'all' && here(view).some((x) => !!shelfLook(x))) ? (
+                  e.product?.imageUrl ? (
+                    <span className="thumb-btn" aria-hidden>
+                      <Thumb src={e.product.imageUrl} />
+                    </span>
+                  ) : (
+                    <span className="thumb-space" aria-hidden />
+                  )
+                ) : undefined}
+                extra={
+                  <span className="shoprow-side">
+                    {e.price !== undefined && (
+                      <span className="num" style={{ fontWeight: 700, fontSize: 17 }}>
+                        {money(Math.round(e.price * qtyOf(e) * 100) / 100)}
+                      </span>
+                    )}
+                    <RowInfo name={e.text} onOpen={() => setEditing(e)} />
+                  </span>
+                }
+              >
+                <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <span className="title" style={{ fontSize: 17 }}>
+                    {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}
+                    {e.text}
+                  </span>
+                  {e.product && <span className="small">{e.product.name}</span>}
+                </span>
+              </ShopRow>
+            ))}
+          </section>
+        )}
         {view !== undefined && view !== 'all' && (
           // 0.10.9: done here: back to the shops (the done one greyed)
           <div className="shop-done-bar">

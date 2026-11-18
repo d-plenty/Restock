@@ -3,6 +3,7 @@
 // save, the other shops) is behind the "i", in PriceInfoSheet.
 import { useState, type ReactNode } from 'react';
 import { addToList, takeOffList } from '../lib/listActions';
+import { cleanSearch } from '../lib/searchText';
 import { lastUpdatedText, productLine } from '../lib/unitPrice';
 import { money } from '../lib/units';
 import type { Option, Recommendation } from '../lib/verdict';
@@ -254,7 +255,7 @@ export function AddBar({ placeholder = 'Search the shops to add' }: { placeholde
       className="add-bar"
       onSubmit={(e) => {
         e.preventDefault();
-        const query = q.trim();
+        const query = cleanSearch(q);
         setQ('');
         nav.push({ name: 'add', query: query || undefined });
       }}
@@ -264,6 +265,30 @@ export function AddBar({ placeholder = 'Search the shops to add' }: { placeholde
         <Icon name="scan" size={24} />
       </button>
     </form>
+  );
+}
+
+/**
+ * 0.12.6: a search that found nothing says so, and offers the next step: a button that carries on
+ * with what you typed (it opens Add already searching for it), so nothing is typed twice. Where the
+ * next step only works on a phone (the web page), `phoneOnly` says where instead.
+ */
+export function NoneFound({ text, label, onAdd, phoneOnly }: { text: string; label?: string; onAdd?: () => void; phoneOnly?: string }) {
+  return (
+    <div className="none-found" role="status">
+      <p className="small">{text}</p>
+      {onAdd && label && (
+        <button className="btn primary block" onClick={onAdd}>
+          <Icon name="plus" size={18} /> {label}
+        </button>
+      )}
+      {phoneOnly && (
+        <p className="phone-only compact" role="note">
+          <Icon name="phone" size={16} />
+          <span>{phoneOnly}</span>
+        </p>
+      )}
+    </div>
   );
 }
 

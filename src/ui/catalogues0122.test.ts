@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { dealWord } from '../lib/mySpecials';
 import { tileBadge, possessive, FULL_LIST } from './screens/ShopCatalogue';
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
@@ -16,9 +17,13 @@ describe('0.12.2: catalogues from Home, Your shops', () => {
     expect(src).not.toContain('Your items on special');
   });
   it("a tile's corner says whose it is (0.12.3: only your own things are shown)", () => {
-    expect(tileBadge({ from: 'yours' })).toEqual({ text: 'Your item', mine: true });
-    expect(tileBadge({ from: 'list' })).toEqual({ text: 'On your list', mine: false });
-    expect(tileBadge({ from: 'seen' })).toEqual({ text: 'On your list', mine: false });
+    // 0.12.6: the corner says the kind of deal (it said "Your item" on every tile).
+    expect(tileBadge({ deal: dealWord('great') })).toEqual({ text: 'Great deal', tone: 'good' });
+    expect(tileBadge({ deal: dealWord('good') })).toEqual({ text: 'On special', tone: 'good' });
+    expect(tileBadge({ deal: dealWord('small') })).toEqual({ text: 'Small saving', tone: 'good' });
+    expect(tileBadge({ deal: dealWord('good', { n: 2, total: 5.6 }) })).toEqual({ text: '2 for $5.60', tone: 'good' });
+    expect(tileBadge({ deal: dealWord('wait') })).toEqual({ text: 'Wait for a better special', tone: 'wait' });
+    expect(tileBadge({ deal: dealWord('fake') })).toEqual({ text: 'Not a real special', tone: 'fake' });
   });
   it('names and the shops with a list of their own', () => {
     expect(possessive('Coles')).toBe("Coles'");

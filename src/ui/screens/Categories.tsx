@@ -47,7 +47,7 @@ export function CategoryEditor({ section }: { section: Section }) {
           <div className="row" key={c.id}>
             <input
               className="input"
-              style={{ flex: 1, height: 40 }}
+              style={{ flex: 1 }}
               defaultValue={c.name}
               aria-label={`Category ${i + 1} name`}
               onBlur={(e) => {
@@ -55,19 +55,19 @@ export function CategoryEditor({ section }: { section: Section }) {
                 if (to && to !== c.name) void act(`${c.name} renamed ${to}`, () => renameCategory(c.id, to));
               }}
             />
-            <button className="icon-btn" style={{ width: 36, height: 36 }} aria-label={`Move ${c.name} up`} disabled={i === 0} onClick={() => move(i, -1)}>
+            <button className="icon-btn" style={{ flex: 'none' }} aria-label={`Move ${c.name} up`} disabled={i === 0} onClick={() => move(i, -1)}>
               <Icon name="up" size={16} />
             </button>
             <button
               className="icon-btn"
-              style={{ width: 36, height: 36 }}
+              style={{ flex: 'none' }}
               aria-label={`Move ${c.name} down`}
               disabled={i === categories.length - 1}
               onClick={() => move(i, 1)}
             >
               <Icon name="down" size={16} />
             </button>
-            <button className="icon-btn" style={{ width: 36, height: 36 }} aria-label={`Delete ${c.name}`} onClick={() => remove(c.id, c.name)}>
+            <button className="icon-btn" style={{ flex: 'none' }} aria-label={`Delete ${c.name}`} onClick={() => remove(c.id, c.name)}>
               <Icon name="trash" size={16} />
             </button>
           </div>

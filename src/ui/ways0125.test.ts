@@ -39,8 +39,7 @@ describe('0.12.5: the Add screen', () => {
   });
   it("a shop's page ends with Next shop and Finish: review and add; finishing leaves unopened shops empty", () => {
     expect(add).toContain('Finish: review and add');
-    expect(add).toContain('const finishEarly = (from: Chain) => {');
-    expect(add).toContain('if (declined.has(c) || skipped.has(c) || [...picks.values()].some((p) => p.chain === c)) continue;');
+    expect(add).toContain('const finishEarly = () => {');
     expect(add).toContain("'Not added'");
   });
   it('the bar says Review and add', () => {

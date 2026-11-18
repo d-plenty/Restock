@@ -1,7 +1,7 @@
 import type { StoreProduct } from '../stores/types';
 import type { ListEntry } from '../types';
 import type { CatalogueDeal } from './myCatalogue';
-import { shopSpecials, type Special } from './mySpecials';
+import { fromDoubt, shopSpecials, type Special } from './mySpecials';
 import type { SeenRow } from './seen';
 
 // 0.12.3: a shop's page shows only your own things on special there (My catalogue merged into each
@@ -21,10 +21,17 @@ export function listLineKeys(entries: ListEntry[]): Set<string> {
 }
 
 /** Your own specials at one shop: your items first (Restock judged the sale), then list lines. */
-export function ownSpecials(deals: CatalogueDeal[], list: StoreProduct[], seen: SeenRow[], entries: ListEntry[]): Special[] {
+export function ownSpecials(deals: CatalogueDeal[], list: StoreProduct[], seen: SeenRow[], entries: ListEntry[], doubts: CatalogueDeal[] = []): Special[] {
   const lines = listLineKeys(entries);
-  return shopSpecials(deals, list, seen).filter((s) => s.from === 'yours' || lines.has(s.key));
+  const real = shopSpecials(deals, list, seen).filter((s) => s.from === 'yours' || lines.has(s.key));
+  // 0.12.6: then the ones the shop calls a special and Restock doesn't (never counted: see realCount).
+  const keys = new Set(real.map((s) => s.key));
+  const extra = doubts.map(fromDoubt).filter((s): s is Special => !!s && !keys.has(s.key));
+  return [...real, ...extra];
 }
+
+/** How many are really on special (the banner and the saving leave the doubtful ones out). */
+export const realCount = (all: Special[]): number => all.filter((s) => !s.doubt).length;
 
 /** The line under a shop's square button: how many of your things are on special there. */
 export function shopTileNote(n: number | undefined): string {

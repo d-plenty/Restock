@@ -1,3 +1,4 @@
+import { cleanSearch } from '../../lib/searchText';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { version } from '../../../package.json';
 import legal from '../../lib/legal.json';
@@ -59,7 +60,7 @@ const SHOP_AROUND_MINS = [0, 0.5, 1, 2, 5, 10];
  * that matches shows its whole section). Returns how many settings matched.
  */
 function filterSettings(root: HTMLElement, query: string): number {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = cleanSearch(query).toLowerCase().split(/\s+/).filter(Boolean);
   const hits = (el: Element) => {
     const t = (el.textContent ?? '').toLowerCase() + ' ' + ((el as HTMLElement).getAttribute?.('aria-label') ?? '').toLowerCase();
     return words.every((w) => t.includes(w));
@@ -683,7 +684,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
                 </span>
                 <select
                   className="input"
-                  style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
+                  style={{ width: 'auto' }}
                   value={settings.connection}
                   onChange={(e) => updateSettings({ connection: e.target.value as Settings['connection'] })}
                   aria-label="Shop connections"
@@ -1027,7 +1028,7 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
               <input
                 type="time"
                 className="input"
-                style={{ width: 'auto', height: 44, padding: '0 10px', fontSize: 15 }}
+                style={{ width: 'auto' }}
                 value={settings.checkTime ?? CHECK_TIME_0110}
                 onChange={(e) => {
                   if (isCheckTime(e.target.value)) void save({ checkCustom: true, checkTime: e.target.value });
@@ -1078,7 +1079,7 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
+            style={{ width: 'auto' }}
             value={settings.alerts.catalogueWeekday}
             onChange={(e) => setAlerts({ catalogueWeekday: parseInt(e.target.value, 10) })}
             aria-label="Roundup day"
@@ -1101,7 +1102,7 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
           <input
             type="time"
             className="input"
-            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
+            style={{ width: 'auto' }}
             value={settings.alerts.dailyTime}
             onChange={(e) => setAlerts({ dailyTime: e.target.value || '07:30' })}
             aria-label="Reminder time"
@@ -1255,7 +1256,7 @@ function UpdateRowsOn({ settings }: { settings: Settings }) {
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
+            style={{ width: 'auto' }}
             value={u.everyDays === 7 ? 7 : 1}
             aria-label="How often to check for updates"
             onChange={(e) => void updateSettings({ updates: { ...u, everyDays: e.target.value === '1' ? 1 : 7 } })}

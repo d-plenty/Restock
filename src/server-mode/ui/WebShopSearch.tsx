@@ -310,11 +310,11 @@ export function WebShopSearch({
   };
 
   const picksForYouBlock = recs.length > 0 && anchor && (
-    <div role="group" aria-label="Picked for you at your other shops" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div className="eyebrow green">Picked for you at your other shops</div>
+    <div role="group" aria-label="Like it at your other shops" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="eyebrow green">Like it at your other shops</div>
       <span className="small">
-        Like the {anchor.name} you ticked at {chainName(anchor.chain)} ({money(anchor.price)}). Tick the ones you want here, or close this and tick your own in
-        each shop's results.
+        Like the {anchor.name} you ticked at {chainName(anchor.chain)} ({money(anchor.price)}). Nothing is ticked for you: tick the ones you buy here, or close this and tick
+        your own in each shop's results.
       </span>
       {recs.map((r) => {
         const rows = [...(r.same ? [r.same] : []), ...r.like];
@@ -454,7 +454,7 @@ export function WebShopSearch({
             </span>
             <span className="small clip">{tickedShops(picks.values())}</span>
             {flavourBarNote(picks.values(), chainName) && <span className="small clip">{flavourBarNote(picks.values(), chainName)}</span>}
-            {recShops.length > 0 && <span className="small clip">Picked for you at {recShops.map((c) => chainName(c)).join(' and ')}</span>}
+            {recShops.length > 0 && <span className="small clip">Suggestions inside for {recShops.map((c) => chainName(c)).join(' and ')}</span>}
           </span>
           <span className="add-mini-arrow" aria-hidden="true">
             <span style={{ display: 'inline-flex', transform: 'rotate(-90deg)' }}>

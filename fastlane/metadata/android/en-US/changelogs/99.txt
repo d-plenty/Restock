@@ -1,0 +1,1 @@
+Release candidate (0.12.6): nothing is picked for you when you add: you tick what you buy at each shop. The General list comes along when you shop: at the bottom of every shop's page. A search that finds nothing offers to add what you typed. A shop's specials say the kind of deal. Sizes of buttons, boxes and text evened out across the phone, the iPhone web page and the web page.

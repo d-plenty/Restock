@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.12.5" src="https://img.shields.io/badge/status-release%20candidate%200.12.5-ffcd00">
+  <img alt="Release candidate 0.12.6" src="https://img.shields.io/badge/status-release%20candidate%200.12.6-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0125">New in 0.12.5</a> ·
+  <a href="#new-in-0126">New in 0.12.6</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -76,7 +76,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 - **Your shops, your items.** Coles, Woolworths and Aldi, plus Costco (marked Beta), bottle shops (Bottle shop tab, 18+) and chemists (Chemist tab, both marked Beta) if you want them, and any other shop's website.
 - **Four shopping lists.** Groceries, Keg, Health and **General**. General is a list only, for things that aren't in your pantry: Home Assistant puts anything there that matches nothing you track, or you add to it yourself.
-- **Scan to add.** An open-source barcode scanner built in, with Open Food Facts lookup. Restock finds the same product at each of your shops and ticks it for you.
+- **Scan to add.** An open-source barcode scanner built in, with Open Food Facts lookup. A shop that lists that barcode has it ticked; at the others you tick what you buy.
 - **Undo.** After most changes (Add to list, a tick, a delete, an edit, "Add all to my list"), a small **Undo** shows for a few seconds. One tap puts it all back, however many things changed.
 - **Save settings.** Settings changes wait for a big green **Save settings** button, so you know when they're saved. Leaving with unsaved changes asks first.
 - **Your own Restock server** (optional). Run [Restock server](https://github.com/d-plenty/restock-server) on a NAS, mini PC or Raspberry Pi, or as an app in Home Assistant. **Your server is the house:** you name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs your Home Assistant shopping list, shows your spending and price charts in its **Data** tab, and gives you Restock on your computer and [on iPhone](#restock-on-iphone). See [Your own Restock server](#your-own-restock-server).
@@ -101,8 +101,8 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Costco** (off until you pick it with your supermarkets): everything Costco sells online, next to Woolworths, Coles and Aldi, shared with your household and server like any shop. Sign in to Costco in the app for member prices (optional). Restock only checks Costco when you search, one page at a time, like you browsing its website. Costco's website terms don't allow automated collection, so it's your choice to switch it on. Prices are Costco's online prices, which include delivery, so the warehouse can differ. If Costco changes or blocks its website, its prices stop until that's sorted. The shelf price in the warehouse can be typed in by hand.
 - **Any other shop**: add its website and Restock finds its search page and reads the products and prices, with Save and test to check it works.
 - **Pantry**: each item has My picks (what you buy at each shop, which can differ shop to shop) and Would also take (others you'd buy when they're cheaper, for Swap & save), on This size or Any size, and shops marked Not at this shop. Listed by shop then size, cheapest first, or A to Z. Swipe to add to your list or delete.
-- **Add**: from Home's search box, a tab's **Add to pantry**, or the barcode button beside either. It searches the shops of the tab you're on. Tap the one you buy and a sheet shows your pick at each shop, ready to add.
-- **Picked for you**: pick a product and Restock searches your other shops again for the same product, or the one closest to it in name, kind, size and price. Each says how sure it is, and has Change.
+- **Add**: from Home's search box, a tab's **Add to pantry**, or the barcode button beside either. It searches the shops of the tab you're on. Tick what you buy at each shop, then **Review and add**.
+- **You pick at each shop**: tick a product and Restock searches your other shops again for the same thing, so it's near the top there. Nothing is ticked for you: each other shop has **Find it** and **Not sold here**.
 - **Search**: ranked by what you most likely mean: type "butter" and butter comes first, with peanut butter and butter chicken sauce further down; children's medicines only when you ask for them. Unit prices worked out the same way everywhere, a best-value sort, "On special only", recent searches, and fixes for Aussie names (snags, loo paper).
 - **Scanning**: zxing-cpp inside the app. Normal barcodes, GS1 QR codes, Data Matrix and DataBar, from the camera or a photo, or type the number. **Scan several** walks your cupboard and fills your shopping list. Unknown barcodes fall back to the supermarkets' own data, a general search (an ingredient and strength for medicines) or reading the front of the pack.
 - **Best match**: after a scan, the same product (brand, variant and size) is ticked at each shop. If the barcode only names the brand, you pick which one it is once and Restock ticks it everywhere and remembers.
@@ -138,6 +138,17 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.12.6
+
+You pick everything yourself, and the look is evened out.
+
+- **Nothing is picked for you.** Tick a product at one shop and your other shops stay empty: each says **Not added**, with **Find it** and **Not sold here**. A search that's sure of itself isn't ticked either. A scan still ticks the very product scanned, where a shop lists that barcode.
+- **The General list comes along when you shop.** Shopping from Groceries, every shop's page ends with **General list · get anywhere**; tick things off there. The grocery list shows the General list folded under your shops. It stays out of the list's total.
+- **A search that finds nothing offers the next step.** Search your pantry for "lemon" and, if it isn't there, **Add lemon to pantry** opens Add already searching for it. A shop's specials page offers to search that shop. A full stop on the end (voice typing) no longer stops a search matching.
+- **A shop's specials say the kind of deal**: Great deal, On special, Small saving, "2 for $5.60". The ones the shop calls a special and Restock doesn't (**Not a real special**, **Wait for a better special**) are shown after the real ones and never counted. The tag said "Your item" on every tile.
+- **One size for each kind of thing.** Buttons, boxes, dropdowns, headings and row heights were measured on every screen of the phone app, the iPhone web page and the web page, and the odd ones evened out. Compare shops and Check stock have the shape every button has.
+- A shopping list group where nothing has a photo no longer leaves an empty gap down its left.
 
 ## New in 0.12.5
 
@@ -583,7 +594,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.5.apk` (on macOS, `shasum -a 256 restock-0.12.5.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.6.apk` (on macOS, `shasum -a 256 restock-0.12.6.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

@@ -64,8 +64,8 @@ describe('0.12.4: tick as many as you buy as one item', () => {
     expect(pick).toContain('if (picks.size > 0) {');
     expect(pick).not.toContain('p.chain !== sp.chain), [k, sp]]'); // one per shop
   });
-  it("a closest-found Restock ticked itself steps aside for your own pick at that shop; a good match stays", () => {
-    expect(pick).toContain("autoFrom.get(keyOf(x)) === 'like'");
+  it('0.12.6: nothing Restock ticked itself is left to step aside (it ticks nothing)', () => {
+    expect(add).not.toContain('autoFrom');
   });
   it('the first tick does not open the sheet by itself', () => {
     expect(pick).toContain('if (preTickProp || rankQ.barcode) setPanelOpen(true);');

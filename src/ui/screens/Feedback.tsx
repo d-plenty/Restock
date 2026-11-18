@@ -127,7 +127,7 @@ export function FeedbackScreen() {
                     ? 'What do you like about it?'
                     : 'Tell us anything'
             }
-            style={{ width: '100%', marginTop: 6, height: 'auto', fontSize: 16 }}
+            style={{ width: '100%', marginTop: 6, height: 'auto', fontSize: 17 }}
           />
         </label>
         {message.length > 4500 && <span className="small">{5000 - message.length} characters left</span>}

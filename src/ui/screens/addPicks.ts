@@ -44,7 +44,7 @@ export function tickMessage(prev: ReadonlyMap<string, StoreProduct>, next: Reado
   const total = next.size ? `${ticks(next.size)}. Tap the bar at the bottom to add.` : 'Nothing ticked.';
   if (added.length === 1 && !removed.length) return `Ticked ${added[0].name} at ${chainName(added[0].chain)}. ${total}`;
   if (removed.length === 1 && !added.length) return `Unticked ${removed[0].name} at ${chainName(removed[0].chain)}. ${total}`;
-  if (!removed.length) return `${added.length} more ticked for you. ${total}`;
+  if (!removed.length) return `${added.length} more ticked. ${total}`;
   if (!next.size) return 'Nothing ticked.';
   return total;
 }

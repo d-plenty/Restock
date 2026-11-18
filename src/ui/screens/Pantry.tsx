@@ -8,7 +8,8 @@ import { loadRecommendations } from '../../lib/recs';
 import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { BetaTag, Hold, Icon, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, SearchField } from '../components';
-import { BigAdd, RecRow } from '../simple';
+import { BigAdd, NoneFound, RecRow } from '../simple';
+import { cleanSearch } from '../../lib/searchText';
 import { serverMode } from '../../server-mode/flag';
 import { isMoreTab, useNav } from '../nav';
 import { isCustomSection, SECTION_NAMES, type Section, slots } from '../../shops';
@@ -105,8 +106,11 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   const onList = new Map(entries.filter((e) => !e.checked && e.groupId).map((e) => [e.groupId!, e.id]));
   // The same deals Home counts ("wait" isn't a deal yet).
   const onSale = (r: Recommendation) => r.action === 'buy' || r.action === 'alt' || r.action === 'small';
+  // 0.12.6: "Lemon." (voice typing) finds lemon.
+  const typed = cleanSearch(q);
+  const matches = (r: Recommendation) => !typed || r.group.name.toLowerCase().includes(typed.toLowerCase());
   const shown = recs.filter((r) => {
-    if (q && !r.group.name.toLowerCase().includes(q.toLowerCase())) return false;
+    if (!matches(r)) return false;
     if (filter === 'sale') return onSale(r);
     if (filter !== 'all') return r.group.categoryId === filter;
     return true;
@@ -291,7 +295,30 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           <p>{EMPTY[section]}</p>
         </div>
       )}
-      {recs.length > 0 && !shown.length && <p className="small">Nothing matches.</p>}
+      {/* 0.12.6: nothing found: say so, and offer the next step with what was typed carried over */}
+      {recs.length > 0 &&
+        !shown.length &&
+        (typed && filter !== 'all' && recs.some(matches) ? (
+          <div className="none-found" role="status">
+            <p className="small">
+              Nothing in this filter matches "{typed}", but something else in {section === 'pantry' ? 'your pantry' : SECTION_NAMES[section]} does.
+            </p>
+            <button className="btn block" onClick={() => setFilter('all')}>
+              Show all
+            </button>
+          </div>
+        ) : typed && !editing ? (
+          <NoneFound
+            text={`"${typed}" isn't in ${section === 'pantry' ? 'your pantry' : SECTION_NAMES[section]} yet.`}
+            label={serverMode ? undefined : `Add ${typed} to ${section === 'pantry' ? 'pantry' : SECTION_NAMES[section]}`}
+            onAdd={serverMode ? undefined : () => nav.push({ name: 'add', section, toPantry: true, query: typed })}
+            phoneOnly={serverMode ? 'Adding by shop search is done on a phone.' : undefined}
+          />
+        ) : (
+          <p className="small" role="status">
+            Nothing matches.
+          </p>
+        ))}
 
       {sections.map((s) => (
         <section key={s.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

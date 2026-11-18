@@ -73,7 +73,7 @@ describe('Add tab: a tap ticks, the arrow opens', () => {
       [keyOf(fanta), fanta],
       [keyOf(fantaW), fantaW],
     ]);
-    expect(tickMessage(none, both)).toBe('2 more ticked for you. 2 ticked. Tap the bar at the bottom to add.');
+    expect(tickMessage(none, both)).toBe('2 more ticked. 2 ticked. Tap the bar at the bottom to add.');
     expect(tickMessage(both, new Map(both))).toBe('');
   });
 });

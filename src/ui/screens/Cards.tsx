@@ -293,7 +293,8 @@ export function CardsScreen({
             : 'Save them to a private file, then open it in the Restock web page or on another phone, or the other way round.'}{' '}
           The file has your card numbers and PINs, so it's locked with a passphrase you choose.
         </p>
-        <div className="two">
+        {/* 0.12.6: one under the other (side by side their words wrapped to two and three lines) */}
+        <div className="stack-btns">
           <button className="btn" onClick={() => void saveFile()}>
             <Icon name="download" size={18} /> Save cards to a file
           </button>

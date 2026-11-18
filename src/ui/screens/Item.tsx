@@ -575,7 +575,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           {mains.length > 2 ? (
             <select
               className="input"
-              style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 14 }}
+              style={{ width: 'auto' }}
               value={order}
               onChange={(e) => void updateSettings({ productOrder: e.target.value as typeof order })}
               aria-label="Order of products"
@@ -680,8 +680,9 @@ export function ItemScreen({ groupId }: { groupId: string }) {
                 <button className="btn small" onClick={() => nav.push({ name: 'add', attachTo: group.id, as: 'main', chain: c, query: searchName })}>
                   <Icon name="search" size={16} /> Find it
                 </button>
+                {/* 0.12.6: the same words as the Add screen's review ("Not sold here") */}
                 <button className="btn small" onClick={() => void notAtShop(c)}>
-                  Not here
+                  Not sold here
                 </button>
               </span>
             </span>
@@ -1359,7 +1360,7 @@ function HowItWorks() {
             that amount, say three small bags instead of one big one.
           </p>
           <p>
-            <strong>Not here</strong>, on a shop with none of your picks, tells Restock you don't buy it there. It stops asking you to find it, and
+            <strong>Not sold here</strong>, on a shop with none of your picks, tells Restock you don't buy it there. It stops asking you to find it, and
             that shop counts as not having it.
           </p>
           <p>
@@ -1497,9 +1498,9 @@ function HistoryPicker({ options, picked, onPick }: { options: Option[]; picked:
                 <span className="ph-size">
                   {priceLine(x.product, x.price).unknown ? 'Size unknown' : sizeLabel(x.product)}
                   {low !== undefined && x.role !== 'alt' && costOf(x) !== undefined && Math.abs(costOf(x)! - low) < 1e-9 && (
-                    <span className="tag great">Cheapest</span>
+                    <span className="tag best">CHEAPEST</span>
                   )}
-                  {x.role === 'alt' && <span className="tag normal">Alternative</span>}
+                  {x.role === 'alt' && <span className="tag normal">ALTERNATIVE</span>}
                 </span>
                 <span className="ph-name">{nameWithoutSize(x)}</span>
                 {unitText(x, optionStyle(options)) && <span className="ph-name num">{unitText(x, optionStyle(options))}</span>}

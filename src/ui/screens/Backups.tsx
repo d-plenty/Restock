@@ -128,7 +128,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
         </span>
         <select
           className="input"
-          style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
+          style={{ width: 'auto' }}
           value={b.everyDays}
           aria-label="How often to back up"
           onChange={(e) => void set({ everyDays: parseInt(e.target.value, 10) })}
@@ -150,7 +150,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
         </span>
         <select
           className="input"
-          style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
+          style={{ width: 'auto' }}
           value={b.keep}
           aria-label="How many automatic backups to keep"
           onChange={(e) => void set({ keep: parseInt(e.target.value, 10) })}

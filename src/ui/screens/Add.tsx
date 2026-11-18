@@ -1,6 +1,7 @@
 import { tidyItemName } from '../../lib/itemName';
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { seenBefore, type SeenBefore } from '../../lib/seen';
+import { cleanSearch } from '../../lib/searchText';
 import { guessCategoryId } from '../../lib/categoryGuess';
 import { perKiloNote } from '../../lib/unitPrice';
 import { flavourBarNote, otherFlavours, varietyWord } from '../../lib/flavours';
@@ -47,7 +48,6 @@ import {
   whichOne,
   UNLIKELY,
   likeThis,
-  closestTo,
   matchesFor,
   normaliseQuery,
   queryChanged,
@@ -57,7 +57,6 @@ import {
   unitOf,
   unitTextOf,
   scoreAll,
-  surePick,
   topPicks,
   intendedKind,
   weakShops,
@@ -332,14 +331,14 @@ export function AddScreen({
   const insteadFor = useRef<string | undefined>(undefined);
   // After a match at one shop: the other shops being searched again by the product's type, and
   // similar products at shops that don't sell that brand.
-  const [following, setFollowing] = useState<Chain[]>([]);
+  const [, setFollowing] = useState<Chain[]>([]);
   const [, setSimilar] = useState<Partial<Record<Chain, StoreProduct[]>>>({});
   const followFor = useRef<string | undefined>(undefined);
   // After you tick your first product from a typed search (0.7.6): the other shops searched again
-  // for it, with the same product or the ones most like it (kind, size, price) picked out for you.
+  // for it, so the same product or the ones most like it are in that shop's results (0.12.6: never ticked for you).
   const [recAnchor, setRecAnchor] = useState<StoreProduct>();
-  const [recs, setRecs] = useState<Partial<Record<Chain, { same?: StoreProduct; like: StoreProduct[] }>>>({});
-  const [recBusy, setRecBusy] = useState<Chain[]>([]);
+  const [, setRecs] = useState<Partial<Record<Chain, { same?: StoreProduct; like: StoreProduct[] }>>>({});
+  const [, setRecBusy] = useState<Chain[]>([]);
   const recFor = useRef<string | undefined>(undefined);
   // Products already in your pantry, so search results can say so.
   const pantry = useLive(async () => {
@@ -435,15 +434,6 @@ export function AddScreen({
   const [shopView, setShopView] = useState<'all' | Chain>('all');
   const [changing, setChanging] = useState<Chain>();
   const [declined, setDeclined] = useState<Set<string>>(new Set());
-  // 0.12.5: shops you finished without looking at ("Finish: review and add"): nothing is picked for you there.
-  const [skipped, setSkipped] = useState<Set<string>>(new Set());
-  const visited = useRef<Set<string>>(new Set());
-  const [autoFrom, setAutoFrom] = useState<Map<string, 'same' | 'like'>>(new Map());
-  useEffect(() => {
-    if (changing) visited.current.add(changing);
-    if (shopView !== 'all') visited.current.add(shopView);
-  }, [changing, shopView]);
-  const autoDone = useRef<Set<string>>(new Set());
   // 0.12.0: a new phone's first search asks where you shop, once (in place of the setup step).
   // 0.12.1: the title is the section switcher (as on the shopping list); this is its menu.
   const [switching, setSwitching] = useState(false);
@@ -491,15 +481,9 @@ export function AddScreen({
     setShopView('all');
     setChanging(undefined);
     setDeclined(new Set());
-    setSkipped(new Set());
-    visited.current = new Set();
-    setAutoFrom(new Map());
-    autoDone.current = new Set();
     // A new scan is a new product: ticks left from an earlier search would block "ticked for you".
     if (rq.barcode && !attachGroup) setPicks(new Map());
     setShowing({});
-    setSureKey(undefined);
-    sureFor.current = undefined;
     setAuto(undefined);
     setCandidates(undefined);
     setShowUnlikely({});
@@ -526,7 +510,9 @@ export function AddScreen({
     const answers = searched.map((c) => results[c]);
     if (answers.some((r) => !r || r.status === 'loading')) return;
     const byChain = Object.fromEntries(searched.map((c) => [c, results[c]?.status === 'ok' ? (results[c] as { items: StoreProduct[] }).items : []]));
-    const found = bestMatches(rankQ, byChain);
+    // 0.12.6: only the product you scanned is ticked, where a shop lists that barcode. A match by
+    // name or size (a guess) is left for you to tick.
+    const found = new Map([...bestMatches(rankQ, byChain)].filter(([, m]) => m.sure === 'barcode'));
     setAuto(found);
     if (!found.size) {
       if (rankQ.brand) setCandidates(whichOne(rankQ, byChain));
@@ -550,24 +536,8 @@ export function AddScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results, searched, rankQ, auto]);
 
-  // A typed search specific enough to be sure of ("western star butter 500g"): once every shop
-  // has answered, tick it and look for the same at your other shops (0.8.5).
-  const [sureKey, setSureKey] = useState<string>();
-  const sureFor = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (rankQ.barcode || attachTo || !searched.length || picks.size || recFor.current) return;
-    if (sureFor.current === rankQ.text) return;
-    const answers = searched.map((c) => results[c]);
-    if (answers.some((r) => !r || r.status === 'loading')) return;
-    sureFor.current = rankQ.text;
-    const byChain = Object.fromEntries(searched.map((c) => [c, results[c]?.status === 'ok' ? (results[c] as { scored?: Scored[] }).scored : []]));
-    const sp = surePick(rankQ, byChain);
-    if (!sp) return;
-    setSureKey(keyOf(sp));
-    toggle(sp);
-    setPanelOpen(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [results, searched, rankQ]);
+  // 0.12.6: a typed search specific enough to be sure of ("western star butter 500g") is no longer
+  // ticked for you: it's at the top of the results, marked Good match, and you tick it.
 
   // Once every shop has answered a typed search: shops with nothing like it are searched again for
   // what it is, worked out from the shops that do have it ("western star" is butter at Woolworths
@@ -806,8 +776,8 @@ export function AddScreen({
   /** You picked which product it is: tick it at every shop that sells it. */
   const choose = (c: Candidate) => {
     const m = new Map<string, BestMatch>();
+    // 0.12.6: only the one you tapped. Its look-alikes at other shops are yours to tick.
     m.set(c.sp.chain, { sp: c.sp, sure: 'chosen' });
-    for (const p of c.at) if (!m.has(p.chain)) m.set(p.chain, { sp: p, sure: 'same' });
     setAuto(m);
     setCandidates(undefined);
     setSuggest([]);
@@ -988,8 +958,8 @@ export function AddScreen({
   /**
    * + on a result. 0.12.4: it ticks that product, and tapping it again unticks it, so you can tick as
    * many as you buy as this item, at any shop (it kept one per shop, and a second + started over).
-   * The first tick is the product: Restock looks for the same thing at your other shops and ticks
-   * what it finds. Nothing opens by itself: the bar at the bottom says how many are ticked, and
+   * The first tick is the product. 0.12.6: nothing is ticked for you at your other shops (Restock
+   * still searches them for it, so it's near the top when you look there). Nothing opens by itself: the bar at the bottom says how many are ticked, and
    * Finish opens the sheet to check them and add.
    */
   const pickOne = (sp: StoreProduct) => {
@@ -1001,15 +971,11 @@ export function AddScreen({
     }
     if (picks.has(k)) {
       setPicks((prev) => new Map([...prev].filter(([key]) => key !== k)));
-      setAutoFrom((m) => new Map([...m].filter(([key]) => key !== k)));
       return;
     }
     if (picks.size > 0) {
-      // One more of yours at this shop. A "closest found" Restock ticked there itself steps aside
-      // for it (a good match stays: untick it if you don't want it).
-      const guesses = new Set([...picks.values()].filter((x) => x.chain === sp.chain && autoFrom.get(keyOf(x)) === 'like').map(keyOf));
-      setPicks((prev) => new Map([...[...prev].filter(([key]) => !guesses.has(key)), [k, sp]]));
-      setAutoFrom((m) => new Map([...m].filter(([key]) => !guesses.has(key))));
+      // One more of yours.
+      setPicks((prev) => new Map([...prev, [k, sp]]));
       setDeclined((d) => new Set([...d].filter((c) => c !== sp.chain)));
       return;
     }
@@ -1018,8 +984,6 @@ export function AddScreen({
     if (!(forList && query)) setName(scanned?.name && !weakName(scanned) ? genericName(scanned.name, scanned.brand) : genericName(sp.name, sp.brand));
     setSuggest([]);
     setDeclined(new Set());
-    setAutoFrom(new Map());
-    autoDone.current = new Set();
     recFor.current = undefined;
     setRecs({});
     setRecBusy([]);
@@ -1030,32 +994,9 @@ export function AddScreen({
     if (preTickProp || rankQ.barcode) setPanelOpen(true);
   };
 
-  // 0.12.0: what Restock found at your other shops is picked for you (the same product, else the
-  // closest), once per shop; you check them in the sheet and change any that's wrong.
-  useEffect(() => {
-    if (!recAnchor || !picks.has(keyOf(recAnchor)) || attachTo) return;
-    const add: [StoreProduct, 'same' | 'like'][] = [];
-    for (const c of Object.keys(recs) as Chain[]) {
-      if (autoDone.current.has(c)) continue;
-      autoDone.current.add(c);
-      if (declined.has(c) || skipped.has(c) || [...picks.values()].some((p) => p.chain === c)) continue;
-      const r = recs[c]!;
-      const best = r.same ?? closestTo(recAnchor, r.like);
-      if (best) add.push([best, r.same ? 'same' : 'like']);
-    }
-    if (!add.length) return;
-    setPicks((prev) => {
-      const next = new Map(prev);
-      for (const [sp] of add) next.set(keyOf(sp), sp);
-      return next;
-    });
-    setAutoFrom((m) => {
-      const next = new Map(m);
-      for (const [sp, how] of add) next.set(keyOf(sp), how);
-      return next;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recs]);
+  // 0.12.6: nothing is picked for you at your other shops any more. Each shop starts empty on the
+  // review sheet ("Not added", with Find it and Not sold here) and you tick what you buy there.
+  // What recommend() finds is still merged into that shop's results, so Find it shows it first.
 
   /** Save each picked store product (or reuse it if it's already tracked) with today's price. */
   const barcodeFor = (sp: StoreProduct) => sp.barcode ?? (isExactBarcode(rankQ, sp) || as === 'main' ? rankQ.barcode : undefined);
@@ -1273,12 +1214,6 @@ export function AddScreen({
         ? 'Add to your shopping list'
         : name.trim() || 'Your pick at each shop';
 
-  // "Picked for you at your other shops", in the sheet the bar opens (0.9.5: not on the page).
-  const recShown = !!recAnchor && picks.has(keyOf(recAnchor));
-  const pickedChains = new Set([...picks.values()].map((p) => p.chain));
-  const recShops = recShown
-    ? (searched.filter((c) => c !== recAnchor!.chain && !pickedChains.has(c) && (recs[c as Chain]?.same || recs[c as Chain]?.like.length)) as Chain[])
-    : [];
   // ---------- 0.12.0: pick one, then your pick at each shop ----------
   const sentence = (t: string) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
   /** One result: the photo, the name, its shop and size, one price and a word. + picks it. */
@@ -1352,7 +1287,6 @@ export function AddScreen({
   /** 0.12.1: said on the sheet itself: this shop doesn't sell it (so nothing is picked there, and it isn't picked for you again). */
   const notSoldAt = (c: Chain) => {
     setPicks((prev) => new Map([...prev].filter(([, x]) => x.chain !== c)));
-    setAutoFrom((m) => new Map([...m].filter(([key]) => !key.startsWith(`${c}:`))));
     setDeclined((d) => new Set([...d, c]));
   };
   const toTop = () => screenRef.current?.scrollTo?.({ top: 0 });
@@ -1385,21 +1319,10 @@ export function AddScreen({
   };
   /**
    * 0.12.5: "Finish: review and add" on a shop's page: straight to your picks, without walking the
-   * other shops. A shop you haven't opened is left empty there (what Restock had guessed for it is
-   * dropped, and it isn't guessed again); your own ticks anywhere stay.
+   * other shops. 0.12.6: nothing is ever picked for you, so a shop you didn't tick at is simply empty
+   * there ("Not added").
    */
-  const finishEarly = (from: Chain) => {
-    // From "Find it" or "+ More" on the sheet you've already seen your picks: back to them as they are.
-    const skip = changing
-      ? []
-      : matchShops.filter(
-          (x) => x !== from && !visited.current.has(x) && !declined.has(x) && ![...picks.values()].some((sp) => sp.chain === x && !autoFrom.has(keyOf(sp))),
-        );
-    if (skip.length) {
-      setPicks((prev) => new Map([...prev].filter(([k, x]) => !(skip.includes(x.chain as Chain) && autoFrom.has(k)))));
-      setAutoFrom((m) => new Map([...m].filter(([key]) => !skip.some((x) => key.startsWith(`${x}:`)))));
-      setSkipped((prev) => new Set([...prev, ...skip]));
-    }
+  const finishEarly = () => {
     setChanging(undefined);
     setShopView('all');
     toTop();
@@ -1407,16 +1330,12 @@ export function AddScreen({
   };
   const pickLabel = (sp: StoreProduct): { text: string; tone: NoteTone } => {
     const k = keyOf(sp);
-    const how = autoFrom.get(k);
-    if (how === 'same') return { text: 'Good match', tone: 'good' };
-    if (how === 'like') return { text: 'Closest found · check it', tone: 'warn' };
     const scannedHere = auto?.get(sp.chain);
     // A scan's match says how sure it is (the same words as before 0.12.0, in sentence case).
     if (scannedHere && keyOf(scannedHere.sp) === k && scannedHere.sure !== 'chosen')
       return scannedHere.sure === 'closest'
         ? { text: 'Closest match · check it', tone: 'warn' }
         : { text: scannedHere.sure === 'barcode' ? 'Same barcode' : scannedHere.sure === 'same' ? 'Same product and size' : 'Name and size match', tone: 'good' };
-    if (k === sureKey) return { text: 'Best match for what you typed', tone: 'good' };
     return { text: 'You picked', tone: 'plain' };
   };
   const matchCards = (
@@ -1424,7 +1343,7 @@ export function AddScreen({
       {matchShops.map((c) => {
         const mine = [...picks.values()].filter((x) => x.chain === c);
         const r = results[c as StoreChain];
-        const busy = recBusy.includes(c) || following.includes(c) || r?.status === 'loading';
+        const busy = !r || r.status === 'loading';
         const canChange = (searched as Chain[]).includes(c) && r?.status === 'ok';
         if (mine.length)
           return mine.map((sp) => {
@@ -1477,13 +1396,11 @@ export function AddScreen({
                 {chainName(c)}
               </span>
               <span className="match-how plain">
-                {skipped.has(c) && !declined.has(c) ? 'Not added' : busy ? 'Searching' : r?.status === 'error' ? "Couldn't check" : declined.has(c) ? 'Not sold here' : 'Nothing close'}
+                {busy ? 'Searching' : r?.status === 'error' ? "Couldn't check" : declined.has(c) ? 'Not sold here' : 'Not added'}
               </span>
-              {skipped.has(c) && !declined.has(c) ? (
-                <span className="small">You finished without looking at {chainName(c)}. Find it there if you buy it there too.</span>
-              ) : busy ? (
+              {busy ? (
                 <span className="small" role="status">
-                  Looking for it at {chainName(c)}…
+                  Waiting for {chainName(c)}…
                   <LoadingBar seconds={15} />
                 </span>
               ) : r?.status === 'error' ? (
@@ -1494,20 +1411,12 @@ export function AddScreen({
               ) : declined.has(c) ? (
                 <span className="small">Left out of this item: you said {chainName(c)} doesn't sell it.</span>
               ) : (
-                <span className="small">Restock couldn't find this at {chainName(c)}. It may not sell it.</span>
+                // 0.12.6: nothing is picked for you; every shop you haven't ticked at reads the same.
+                <span className="small">Nothing picked at {chainName(c)}. Find it there if you buy it there too.</span>
               )}
-              {(!busy || skipped.has(c)) && (
+              {!busy && (
                 <span className="match-actions">
-                  {skipped.has(c) && !declined.has(c) && canChange ? (
-                    <>
-                      <button className="btn small" style={TAP} onClick={() => startChange(c)} aria-label={`Find it at ${chainName(c)}`}>
-                        <Icon name="search" size={16} /> Find it
-                      </button>
-                      <button className="btn small" style={TAP} onClick={() => notSoldAt(c)} aria-label={`Not sold at ${chainName(c)}`}>
-                        Not sold here
-                      </button>
-                    </>
-                  ) : r?.status === 'error' && settings ? (
+                  {r?.status === 'error' && settings ? (
                     <button className="btn small" style={TAP} onClick={() => void searchChain(c as StoreChain, lastText, rankQ, searchStoreId(settings, c as StoreChain))}>
                       <Icon name="refresh" size={16} /> Try again
                     </button>
@@ -1517,15 +1426,14 @@ export function AddScreen({
                     </button>
                   ) : (
                     <>
-                      {/* 0.12.1: both answers on the sheet (Not sold here was a button on the next screen) */}
+                      {canChange && (
+                        <button className="btn small" style={TAP} onClick={() => startChange(c)} aria-label={`Find it at ${chainName(c)}`}>
+                          <Icon name="search" size={16} /> Find it
+                        </button>
+                      )}
                       <button className="btn small" style={TAP} onClick={() => notSoldAt(c)} aria-label={`Not sold at ${chainName(c)}`}>
                         Not sold here
                       </button>
-                      {canChange && (
-                        <button className="btn small" style={TAP} onClick={() => startChange(c)} aria-label={`Pick one myself at ${chainName(c)}`}>
-                          Pick one myself
-                        </button>
-                      )}
                     </>
                   )}
                 </span>
@@ -1638,7 +1546,8 @@ export function AddScreen({
           e.preventDefault();
           setScanned(undefined);
           setKnown(undefined);
-          const t = term.trim();
+          // 0.12.6: "Lemon." (voice typing) searches for lemon.
+          const t = cleanSearch(term);
           const code = productCode(t);
           // The Search press: the only search that asks Costco too (0.9.6, review L1).
           if (code) void handleBarcode(code, false, true);
@@ -1878,7 +1787,7 @@ export function AddScreen({
             {brandOnly(rankQ)
               ? `The barcode only told Restock the brand (${rankQ.brand}).`
               : `Restock couldn't be sure which ${rankQ.brand} product this is.`}{' '}
-            Tap the one you've got and Restock picks it at every shop that sells it. It remembers this barcode for next time.
+            Tap the one you've got. It remembers this barcode for next time.
           </span>
           <div className="card flush" style={{ boxShadow: 'none' }}>
             {candidates.map((c) => (
@@ -1905,8 +1814,8 @@ export function AddScreen({
       )}
       {auto && auto.size === 0 && rankQ.barcode && !candidates?.length && (
         <div className="banner grey" style={{ fontSize: 13 }}>
-          Restock couldn't be sure which product this is at your shops, so nothing's picked yet. Pick it at one shop and Restock finds the same
-          product at the others.
+          Restock couldn't be sure which product this is at your shops, so nothing's picked yet. Tick it at each shop
+          you buy it at.
         </div>
       )}
 
@@ -2247,7 +2156,7 @@ export function AddScreen({
                 <Icon name="chevron" size={18} />
               </button>
               {picks.size > 0 && (
-                <button className="btn block shop-done-btn" onClick={() => finishEarly(view as Chain)}>
+                <button className="btn block shop-done-btn" onClick={() => finishEarly()}>
                   <Icon name="check" size={18} /> Finish: review and add
                 </button>
               )}
@@ -2361,7 +2270,6 @@ export function AddScreen({
             {!flavourBarNote(picks.values(), chainName) && <span className="small">Tick any others you buy as this, then tap here.</span>}
             <span className="small clip">{tickedShops([...picks.values()])}</span>
             {flavourBarNote(picks.values(), chainName) && <span className="small">{flavourBarNote(picks.values(), chainName)}</span>}
-            {recShops.length > 0 && <span className="small clip">Picked for you at {recShops.map((c) => chainName(c)).join(' and ')}</span>}
           </span>
           <span className="add-mini-arrow" aria-hidden="true">
             <span style={{ display: 'inline-flex', transform: 'rotate(-90deg)' }}>
@@ -2384,11 +2292,7 @@ export function AddScreen({
             </div>
           )}
           <p className="small" style={{ margin: 0 }}>
-            {recBusy.length > 0
-              ? 'Looking for the same thing at your other shops…'
-              : matchShops.length > 1
-                ? 'Your picks at each shop. Check them, then add.'
-                : 'Check it, then add.'}
+            {matchShops.length > 1 ? 'Your picks at each shop. Check them, then add.' : 'Check it, then add.'}
           </p>
           {matchCards}
           {forLine ? (

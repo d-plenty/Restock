@@ -231,7 +231,7 @@ function JoinedPage({ joined, info, onDone }: { joined: { label?: string | null;
       </div>
       <div className="card" style={{ gap: 8 }}>
         <label className="field" style={{ margin: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 500 }}>What to call it on this phone</span>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>What to call it on this phone</span>
           <input className="input" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} />
         </label>
         <span className="small">Just a name for you. A phone belongs to one house at a time.</span>

@@ -12,6 +12,13 @@ import type { SeenRow } from './seen';
 export type SpecialFrom = 'yours' | 'list' | 'seen';
 export type SpecialSort = 'saving' | 'price' | 'az';
 
+/** 0.12.6: the kind of deal, said on the tile's corner (it said "Your item" on every one). */
+export type DealTone = 'good' | 'wait' | 'fake';
+export interface DealWord {
+  text: string;
+  tone: DealTone;
+}
+
 export interface Special {
   key: string;
   chain: string;
@@ -29,6 +36,18 @@ export interface Special {
   note?: string;
   /** list and seen: the shop's product, for the per-litre price. */
   product?: StoreProduct;
+  /** What kind of deal it is: "Great deal", "On special", "Small saving", "2 for $5.60", "Half price". */
+  deal: DealWord;
+  /** yours: the shop calls it a special, but Restock doesn't count it as one (fake, or wait for a better one). */
+  doubt?: boolean;
+}
+
+/** The Pantry's own words for a judged sale (ui/simple.tsx recNote says the same). */
+export function dealWord(kind: string, multi?: { n: number; total: number }): DealWord {
+  if (kind === 'fake') return { text: 'Not a real special', tone: 'fake' };
+  if (kind === 'wait') return { text: 'Wait for a better special', tone: 'wait' };
+  if (multi) return { text: `${multi.n} for $${multi.total.toFixed(2)}`, tone: 'good' };
+  return { text: kind === 'great' ? 'Great deal' : kind === 'small' ? 'Small saving' : 'On special', tone: 'good' };
 }
 
 const fromDeal = (d: CatalogueDeal): Special | undefined => {
@@ -46,6 +65,31 @@ const fromDeal = (d: CatalogueDeal): Special | undefined => {
     groupId: d.rec.group.id,
     groupName: d.rec.group.name,
     note: o.multi ? `${o.multi.n} for $${o.multi.total.toFixed(2)}` : undefined,
+    deal: dealWord(o.verdict?.kind ?? 'good', o.multi),
+  };
+};
+
+/**
+ * 0.12.6: one of yours the shop marks as a special that Restock doesn't count as one: its usual
+ * price dressed up, or a special that's been better. Shown after the real ones, said plainly, and
+ * never counted in "N of yours on special" or the saving.
+ */
+export const fromDoubt = (d: CatalogueDeal): Special | undefined => {
+  const o = d.option;
+  if (o.price === undefined) return undefined;
+  return {
+    key: `${o.product.chain}|${o.product.storeProductId ?? o.product.id}`,
+    chain: o.product.chain,
+    name: o.product.name,
+    price: o.price,
+    saving: 0,
+    imageUrl: o.product.imageUrl,
+    from: 'yours',
+    groupId: d.rec.group.id,
+    groupName: d.rec.group.name,
+    note: d.note,
+    deal: dealWord(o.verdict.kind),
+    doubt: true,
   };
 };
 
@@ -61,6 +105,8 @@ const fromProduct = (p: StoreProduct, from: SpecialFrom): Special | undefined =>
         imageUrl: p.imageUrl,
         from,
         product: p,
+        // Not one of your items, so Restock hasn't judged it: what the shop says, in plain words.
+        deal: { text: p.wasPrice && Math.abs(p.wasPrice - 2 * p.price) <= p.wasPrice * 0.02 ? 'Half price' : 'On special', tone: 'good' },
       }
     : undefined;
 
@@ -102,10 +148,12 @@ export function filterSpecials(all: Special[], typed: string, sort: SpecialSort)
     return words.every((w) => hay.includes(w));
   };
   const rank = (s: Special) => (s.from === 'yours' ? 0 : 1);
+  // 0.12.6: the ones Restock doesn't count as a real special come after the real ones, however sorted.
+  const doubt = (s: Special) => (s.doubt ? 1 : 0);
   const by: Record<SpecialSort, (a: Special, b: Special) => number> = {
     saving: (a, b) => b.saving - a.saving || rank(a) - rank(b) || a.name.localeCompare(b.name),
     price: (a, b) => a.price - b.price || rank(a) - rank(b) || a.name.localeCompare(b.name),
     az: (a, b) => a.name.localeCompare(b.name) || rank(a) - rank(b),
   };
-  return all.filter(hit).sort(by[sort]);
+  return all.filter(hit).sort((a, b) => doubt(a) - doubt(b) || by[sort](a, b));
 }

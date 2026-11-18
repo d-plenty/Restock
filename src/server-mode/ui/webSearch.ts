@@ -5,6 +5,7 @@
 // for what can go wrong, and the plain logic the screens use (WebShopSearch.tsx), kept here so it's
 // tested on its own. Ticking, the bar and when the details sheet opens are the phone's (addPicks.ts).
 
+import { cleanSearch } from '../../lib/searchText';
 import { useEffect, useSyncExternalStore } from 'react';
 import { genericName } from '../../lib/naming';
 import { likeThis, matchesFor } from '../../lib/searchHelp';
@@ -126,7 +127,7 @@ export interface AddAnswer {
 }
 
 export async function searchShops(ask: SearchAsk): Promise<SearchAnswer> {
-  const body: Record<string, unknown> = { q: ask.q, section: ask.section };
+  const body: Record<string, unknown> = { q: cleanSearch(ask.q), section: ask.section };
   if (ask.chain) body.chain = ask.chain;
   if (ask.barcode) body.barcode = ask.barcode;
   try {

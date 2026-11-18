@@ -3510,6 +3510,8 @@ select {
 }
 .shop-gap-btns {
   display: flex;
+  /* 0.12.6: at the largest text the two buttons go one under the other, not off the side */
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
 }
@@ -6388,9 +6390,27 @@ span.plus-btn:not(.on) {
   font-size: var(--fs-xs);
   font-weight: 800;
 }
-.cat-tile-badge.mine {
+.cat-tile-badge.mine,
+.cat-tile-badge.good {
   background: var(--green-solid);
   color: var(--on-accent);
+}
+/* 0.12.6: the corner says the kind of deal, in the Pantry's colours (amber: wait; red: not a real special) */
+.cat-tile-badge {
+  max-width: calc(100% - 12px);
+  text-align: left;
+  line-height: 1.2;
+}
+.cat-tile-badge.wait {
+  background: var(--amber-bg);
+  color: var(--amber-ink);
+}
+.cat-tile-badge.fake {
+  background: var(--red-bg);
+  color: var(--red-ink);
+}
+.cat-tile-save.doubt {
+  color: var(--amber-ink);
 }
 .cat-tile-name {
   font-size: var(--fs-md);
@@ -6847,4 +6867,65 @@ button.fold-go {
 }
 .irow-text {
   flex: 1 1 6em;
+}
+/* 0.12.6: the General list folded on the grocery list, and its group in shopping mode */
+.list-general-names {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--fs-md);
+}
+.list-general .fold-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: 12px 14px 14px;
+}
+/* 0.12.6: a search that found nothing: a line saying so, and the button for the next step */
+.none-found {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.none-found > p {
+  margin: 0;
+}
+/* 0.12.6: one button shape. Compare shops and Check stock were pills beside the squarer Start
+   shopping on the same screen; they take the shape every other button has. */
+.btn.list-sum-go,
+.btn.small.stock-btn {
+  border-radius: var(--r-md);
+}
+/* 0.12.6: one size for each kind of thing, on every screen (measured across the phone app, the
+   iPhone web page and the web page, then evened out):
+   - a fold's title is the size of a row's title (it was a size smaller)
+   - the list's summary card has the padding every card has, and Compare shops is the height and
+     type size every button is (it was taller and bolder than Start shopping under it)
+   - dropdowns and icon buttons no longer carry sizes of their own (see the screens) */
+.fold-head .title {
+  font-size: var(--fs-body);
+}
+.card.list-sum {
+  padding: 14px;
+}
+.btn.list-sum-go {
+  height: 48px;
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+/* 0.12.6: two buttons whose words don't fit side by side on a phone go one under the other */
+.stack-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* 0.12.6: on the narrowest phones a shop's line on the list keeps its smaller round buttons, so
+   the shop's name and its total don't touch */
+@media (max-width: 359px) {
+  .shop-head > .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
 }

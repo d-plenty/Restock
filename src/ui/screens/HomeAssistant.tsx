@@ -429,7 +429,7 @@ export function HomeAssistantScreen() {
           </span>
           <select
             className="input"
-            style={{ width: 'auto', maxWidth: '55%', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
+            style={{ width: 'auto', maxWidth: '55%' }}
             value={entityShown}
             aria-label="Home Assistant's list"
             disabled={!tested}

@@ -93,7 +93,8 @@ html.web-phone.pt-more-open .overlay {
   min-height: 44px;
 }
 .pt-row {
-  min-height: 56px;
+  /* 0.12.6: the same row height as the phone app's More */
+  min-height: 52px;
   color: var(--ink);
 }
 .pt-row-icon {

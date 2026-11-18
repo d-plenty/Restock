@@ -42,7 +42,7 @@ const STEPS: Step[] = [
     tab: 'pantry',
     find: '.big-add',
     title: 'Adding things',
-    text: 'Add to pantry searches your shops, or scan the barcode beside it. Pick the one you buy and Restock finds the same thing at your other shops.',
+    text: 'Add to pantry searches your shops, or scan the barcode beside it. Tick the one you buy at each of your shops.',
   },
   {
     tab: 'list',

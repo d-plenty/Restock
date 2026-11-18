@@ -131,7 +131,7 @@ export function ReceiptsSettings({ settings, inSetup }: { settings: Settings; in
           </span>
           <select
             className="input"
-            style={{ width: 'auto', height: 44, padding: '0 36px 0 10px', fontSize: 15 }}
+            style={{ width: 'auto' }}
             value={r.keepMonths}
             aria-label="Keep receipts for"
             onChange={(e) => void setKeep(parseInt(e.target.value, 10))}

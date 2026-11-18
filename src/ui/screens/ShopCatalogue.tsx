@@ -3,9 +3,9 @@ import { act } from '../../lib/undo';
 import { addListEntry, allListEntries, getSettings, nowIso, uid } from '../../lib/db';
 import { findCatalogue, type CatalogueLink } from '../../lib/catalogues';
 import { addToList } from '../../lib/listActions';
-import { buildCatalogue } from '../../lib/myCatalogue';
+import { buildCatalogue, doubtfulDeals } from '../../lib/myCatalogue';
 import { filterSpecials, type Special, type SpecialSort } from '../../lib/mySpecials';
-import { listLineKeys, ownSpecials } from '../../lib/ownSpecials';
+import { listLineKeys, ownSpecials, realCount } from '../../lib/ownSpecials';
 import { weekDay } from '../../lib/ownSpecialsLive';
 import { loadRecommendations } from '../../lib/recs';
 import { unitTextOf } from '../../lib/searchHelp';
@@ -21,6 +21,8 @@ import { sharedSpecials } from '../../server-mode/live';
 import { photoUrl } from '../../server-mode/ui/deskShared';
 import { ChainDot, Icon, LoadingBar, Sheet, Thumb, TopBar } from '../components';
 import { useNav } from '../nav';
+import { NoneFound } from '../simple';
+import { cleanSearch } from '../../lib/searchText';
 import { catalogueShops, httpsLink } from './Catalogues';
 
 // 0.12.2: one shop's catalogue, opened from its square button on Home or from More → Your shops.
@@ -43,9 +45,13 @@ const SORTS: { id: SpecialSort; label: string }[] = [
   { id: 'az', label: 'A–Z' },
 ];
 const STEP = 60;
-/** The word on a tile's corner: an item you track, or a line on your shopping list. */
-export function tileBadge(s: Pick<Special, 'from'>): { text: string; mine: boolean } {
-  return s.from === 'yours' ? { text: 'Your item', mine: true } : { text: 'On your list', mine: false };
+/**
+ * The word on a tile's corner. 0.12.6: the kind of deal ("Great deal", "On special", "Small saving",
+ * "2 for $5.60", "Wait for a better special", "Not a real special"), in the Pantry's words and
+ * colours. It said "Your item" on every tile, which the page already says.
+ */
+export function tileBadge(s: Pick<Special, 'deal'>): { text: string; tone: Special['deal']['tone'] } {
+  return s.deal;
 }
 /** Outside links open in the phone's browser; on the web page, in a new tab. */
 const OUT = serverMode ? { target: '_blank', rel: 'noopener noreferrer' } : {};
@@ -61,7 +67,7 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
     const lines = [...listLineKeys(entries)].some((k) => k.startsWith(`${chain}|`));
     const seen = lines ? await seenSpecials(chain, weekDay()).catch(() => []) : [];
     const listed = new Set(entries.filter((e) => !e.checked && e.groupId).map((e) => e.groupId!));
-    return { section, deals: page?.deals ?? [], seen, listed, entries, lines };
+    return { section, deals: page?.deals ?? [], doubts: doubtfulDeals(recs, chain, page?.deals ?? []), seen, listed, entries, lines };
   }, [chain]);
   // The web page: what the phones shared (nothing is asked of a shop from here).
   const shared = useLive(async () => (serverMode ? await sharedSpecials() : undefined), []);
@@ -101,7 +107,8 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
     () => (serverMode ? ((shared?.lists[chain]?.items ?? []) as unknown as StoreProduct[]) : (lists?.find((l) => l.chain === chain)?.items ?? [])),
     [shared, lists, chain],
   );
-  const all = useMemo(() => (base ? ownSpecials(base.deals, base.lines ? list : [], base.seen, base.entries) : []), [base, list]);
+  const all = useMemo(() => (base ? ownSpecials(base.deals, base.lines ? list : [], base.seen, base.entries, base.doubts) : []), [base, list]);
+  const real = realCount(all);
   const items = useMemo(() => filterSpecials(all, typed, sort), [all, typed, sort]);
   const saving = all.reduce((t, s) => t + s.saving, 0);
 
@@ -163,7 +170,7 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
       <div className="banner green shopcat-banner">
         <span className="shopcat-kicker">{name} this week</span>
         <span className="big num" role="status">
-          {all.length ? `${all.length} of yours on special` : busy ? 'Looking…' : 'None this week'}
+          {real ? `${real} of yours on special` : busy ? 'Looking…' : 'None this week'}
         </span>
         {saving > 0.004 && <span className="shopcat-note num">Save about {money(saving)}</span>}
       </div>
@@ -203,11 +210,18 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
         </div>
       )}
 
-      {!items.length && !busy && (
+      {/* 0.12.6: nothing found: the next step, with what was typed carried over */}
+      {!items.length && !busy && cleanSearch(typed) && (
+        <NoneFound
+          text={`None of your ${name} specials match "${cleanSearch(typed)}".`}
+          label={serverMode ? undefined : `Search ${name} for ${cleanSearch(typed)}`}
+          onAdd={serverMode ? undefined : () => nav.push({ name: 'add', section: base.section, toPantry: true, chain, query: cleanSearch(typed) })}
+          phoneOnly={serverMode ? 'Searching a shop is done on a phone.' : undefined}
+        />
+      )}
+      {!items.length && !busy && !cleanSearch(typed) && (
         <p className="small" role="status">
-          {typed.trim()
-            ? `Nothing matches "${typed.trim()}".`
-            : `When something in your pantry or on your shopping list is on special at ${name}, it shows here.`}
+          {`When something in your pantry or on your shopping list is on special at ${name}, it shows here.`}
         </p>
       )}
       {items.length > 0 && (
@@ -220,14 +234,14 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
                 <button className="cat-tile-open" onClick={() => setInfo(s)} aria-label={`${s.name}, ${money(s.price)}. Details`}>
                   <span className="cat-tile-photo">
                     <Thumb src={serverMode ? photoUrl(s.imageUrl) : s.imageUrl} />
-                    <span className={`cat-tile-badge${badge.mine ? ' mine' : ''}`}>{badge.text}</span>
+                    <span className={`cat-tile-badge ${badge.tone}`}>{badge.text}</span>
                   </span>
                   <span className="cat-tile-name">{s.name}</span>
                 </button>
                 <span className="cat-tile-foot">
                   <span className="cat-tile-prices">
                     <span className="cat-tile-price num">{money(s.price)}</span>
-                    <span className="cat-tile-save num">{s.saving > 0 ? `Save ${money(s.saving)}` : (s.note ?? 'On special')}</span>
+                    <span className={`cat-tile-save num${s.doubt ? ' doubt' : ''}`}>{s.saving > 0 ? `Save ${money(s.saving)}` : (s.note ?? 'On special')}</span>
                   </span>
                   <button
                     className={`btn primary plus-btn${on ? ' on' : ''}`}
@@ -284,7 +298,11 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
             )}
           </dl>
           <p className="small" style={{ margin: 0 }}>
-            {info.from === 'yours'
+            {info.doubt
+              ? info.deal.tone === 'fake'
+                ? `This is ${info.groupName ?? 'one of your items'}. ${name} marks it as a special, but from its price history this is what it usually costs.`
+                : `This is ${info.groupName ?? 'one of your items'}. It's on special at ${name}, but it has been cheaper: worth waiting if you can.`
+              : info.from === 'yours'
               ? `This is ${info.groupName ?? 'one of your items'}: Restock has its price history, so this is a real saving against what it usually costs.`
               : `This is on your shopping list, and ${name} has it on special this week. It isn't in your pantry, so Restock doesn't watch its price or check the special is a real one.`}
           </p>

@@ -27,6 +27,8 @@ import { EditSheet, LastUpdated, PriceSheet } from '../../ui/screens/Item';
 import { DEAL_RANK, underTarget } from '../../ui/screens/Pantry';
 import { ActionInfoTag } from '../../ui/tagInfo';
 import { PhoneOnlyNote } from './PhoneOnly';
+import { NoneFound } from '../../ui/simple';
+import { cleanSearch } from '../../lib/searchText';
 import { CategoriesSheet } from './DeskSettings';
 import { DeskHead, firstPhoto, ItemPhoto, takeOpenItem } from './deskShared';
 import { serverHistory } from '../live';
@@ -94,7 +96,8 @@ export function DeskPantry({ section }: { section: Section }) {
 
   const shown = recs
     .filter((r) => {
-      if (q && !`${r.group.name} ${r.options.map((o) => o.product.name).join(' ')}`.toLowerCase().includes(q.toLowerCase())) return false;
+      // 0.12.6: "Lemon." (voice typing) finds lemon.
+      if (cleanSearch(q) && !`${r.group.name} ${r.options.map((o) => o.product.name).join(' ')}`.toLowerCase().includes(cleanSearch(q).toLowerCase())) return false;
       if (filter === 'sale') return onSale(r);
       if (filter !== 'all') return r.group.categoryId === filter;
       return true;
@@ -174,7 +177,16 @@ export function DeskPantry({ section }: { section: Section }) {
               <p className="small">{EMPTY[section]}</p>
             </div>
           )}
-          {recs.length > 0 && !shown.length && <p className="small">Nothing matches.</p>}
+          {/* 0.12.6: nothing found says so, and where the next step is done (as the phone offers Add) */}
+          {recs.length > 0 &&
+            !shown.length &&
+            (cleanSearch(q) ? (
+              <NoneFound text={`"${cleanSearch(q)}" isn't in ${section === 'pantry' ? 'your pantry' : SECTION_NAMES[section]} yet.`} phoneOnly="Adding by shop search is done on a phone." />
+            ) : (
+              <p className="small" role="status">
+                Nothing matches.
+              </p>
+            ))}
           {shown.length > 0 && (
             <div className="dk-table-wrap">
               <table className="dk-table dk-pick">

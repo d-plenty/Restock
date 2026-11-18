@@ -1,3 +1,4 @@
+import { cleanSearch } from '../../lib/searchText';
 import { useEffect, useMemo, useState } from 'react';
 import { allGroups } from '../../lib/db';
 import { phoneSpending, noteTicks, spendingOnServer } from '../../lib/spending';
@@ -40,9 +41,9 @@ const serverReader = (): Reader => ({
 
 function Tile({ label, big, sub }: { label: string; big: string; sub?: string }) {
   return (
-    <div className="card" style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: 2, padding: 12 }}>
+    <div className="card" style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: 2 }}>
       <span className="small">{label}</span>
-      <span className="num" style={{ fontSize: 22, fontWeight: 700 }}>
+      <span className="num" style={{ fontSize: 24, fontWeight: 700 }}>
         {big}
       </span>
       {sub && <span className="small">{sub}</span>}
@@ -113,7 +114,7 @@ export function YourData() {
   }, [itemId, period, source]);
 
   if (serverMode) return <p className="small">Your data is on the Your data page here.</p>;
-  const shown = find.trim() ? items.filter((g) => g.name.toLowerCase().includes(find.trim().toLowerCase())) : items;
+  const shown = cleanSearch(find) ? items.filter((g) => g.name.toLowerCase().includes(cleanSearch(find).toLowerCase())) : items;
   const sp = stats?.spending;
 
   return (

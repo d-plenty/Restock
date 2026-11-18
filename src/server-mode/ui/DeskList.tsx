@@ -191,7 +191,13 @@ export function DeskList() {
   const openCount = (sec: ListSection) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;
   const pickLines = open.filter((e) => !e.groupId && toPick?.has(e.id));
 
-  const columns: { key: string; title: ReactNode; label: string; items: ListEntry[]; any?: boolean }[] =
+  // 0.12.6: the General list's things show with the groceries too (as on the phone, where they come
+  // along when you shop): a column of their own, out of this list's total.
+  const generalToo =
+    section === 'pantry' && sectionsOn.includes('general')
+      ? allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === 'general').sort((a, b) => a.text.localeCompare(b.text, undefined, { sensitivity: 'base' }))
+      : [];
+  const shopColumns: { key: string; title: ReactNode; label: string; items: ListEntry[]; any?: boolean }[] =
     view === 'shop'
       ? c.order
           .map((shop: ShopKey) => ({
@@ -210,6 +216,9 @@ export function DeskList() {
         : open.length
           ? [{ key: 'all', title: 'Everything', label: 'Everything', items: open }]
           : [];
+  const columns = generalToo.length
+    ? [...shopColumns, { key: 'general-list', title: 'General list · get anywhere', label: 'General list, get anywhere', items: generalToo, any: true }]
+    : shopColumns;
 
   const line = (e: ListEntry, showShop: boolean) => {
     const rec = recFor(c, e);
