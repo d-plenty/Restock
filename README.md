@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.12.6" src="https://img.shields.io/badge/status-release%20candidate%200.12.6-ffcd00">
+  <img alt="Release candidate 0.12.7" src="https://img.shields.io/badge/status-release%20candidate%200.12.7-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0126">New in 0.12.6</a> ·
+  <a href="#new-in-0127">New in 0.12.7</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -138,6 +138,24 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.12.7
+
+You name things, shopping follows your day, and true black has depth.
+
+- **You name each item.** The name box is first on the review page, bigger, and starts empty. Under it is one short idea to tap (**Use "Strawberry jam"**): the kind of thing, no brand or size. Adding won't finish without a name.
+- **A category only when Restock is sure.** If the name and your picks agree, the category is chosen and says so; otherwise it stays **No category** for you to pick.
+- **Also happy with, while you add.** The review page has two groups: **What I buy** and **Also happy with (alternative product)**, with **Find one** at each shop. A pick can be moved between the groups. It was only on an item's page afterwards. (On the web it's greyed: choose it on a phone, or on the item's page.)
+- **Start shopping asks about today.** First **Which shops today?**: big buttons, none chosen for you. Then **Where are you first?** With one shop it goes straight in. **Change shops** is gone from shopping; your loyalty cards button stays.
+- **Each item is offered at the cheapest shop you're visiting today.** Leave that shop without ticking it and it moves to your next shop, marked **Cheaper at Coles ($5.25)**. It doesn't show at the dearer shop while the cheaper one is still to come. Ticking it anywhere ticks it once.
+- **Alternatives only fill gaps.** An Also happy with product is offered (tagged **ALTERNATIVE**) when yours is out of stock, when you've finished the shops that have yours without ticking it, or when none of today's shops has yours. A shop that could stand in says how many alternatives it has.
+- **Nothing drops off.** What none of today's shops has is listed at the bottom of every shop's page, under **Not at today's shops**.
+- **The General list comes along from every list**, not only Groceries.
+- **The ⓘ is in one place**: on the right, by the price, on every line (it sat on the photo on some).
+- **"Was $5.80 - 01/09/2026" reads "Was $5.80 until 1 Sep 2026"**, and turns red once that day is more than 14 days back. The SPECIAL tag is unchanged.
+- **True black has depth.** The page stays black; the top bar and the tab bar are a very dark navy-grey; cards and sheets are a step lighter with an edge. Light and ordinary dark are unchanged.
+- **One title style on every tab.** **Shopping list** is the big white title, like Home, Pantry and More; under it is the list's icon and name in gold, with **Change**.
+- Narrow phones: an item's price line wraps so the name keeps its room. The Done bar while shopping sits on the bottom edge.
 
 ## New in 0.12.6
 
@@ -594,7 +612,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.6.apk` (on macOS, `shasum -a 256 restock-0.12.6.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.7.apk` (on macOS, `shasum -a 256 restock-0.12.7.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

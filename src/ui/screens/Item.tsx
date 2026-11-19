@@ -64,6 +64,7 @@ import {
   CheckedAgo,
   Hold,
   MoreInfo,
+  RowInfo,
   previewFromOption,
   ProductPreview,
   ChainDot,
@@ -411,7 +412,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
               {o.stats.current?.memberOnly && <MemberInfoTag chain={o.product.chain} hasCard={!o.locked} />}
             </span>
           </span>
-          <span style={{ textAlign: 'right' }}>
+          <span className="price-and-info">
             <span className="num" style={{ fontWeight: 600, display: 'block' }}>
               {money(o.multi ? o.shelfPrice : o.price)}
             </span>
@@ -440,6 +441,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
                 )}
               </span>
             )}
+            {/* 0.12.7: the ⓘ on the right, under the price, as on a shopping line (it sat on the photo) */}
+            <RowInfo name={o.product.name} onOpen={() => setPreview(o)} />
           </span>
         </div>
       </div>

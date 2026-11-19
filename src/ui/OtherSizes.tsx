@@ -4,7 +4,7 @@ import { compareStyleOf } from '../lib/unitPrice';
 import { formatUnitPrice, money } from '../lib/units';
 import { chainName } from '../types';
 import type { StoreProduct } from '../stores/types';
-import { ChainDot, Icon, MoreInfo, Sheet } from './components';
+import { ChainDot, Icon, MoreInfo, RowInfo, Sheet } from './components';
 
 /** Exactly what the ⓘ next to the switch says (0.9.1). */
 export const OTHER_SIZES_HELP =
@@ -91,6 +91,8 @@ export function OtherSizesCard({
           {/* 0.9.6: both prices: per item (one can), then per litre or 100 g (what decides best value). */}
           {o.pack.count > 1 && o.sp.price !== undefined && <span className="small">{money(o.sp.price / o.pack.count)} each</span>}
           <span className="small">{formatUnitPrice(o.per, unit, cstyle)}</span>
+          {/* 0.12.7: the ⓘ on the right, under the price (it sat on the photo) */}
+          <RowInfo name={o.sp.name} onOpen={() => onPreview(o.sp)} />
         </span>
       </label>
     );

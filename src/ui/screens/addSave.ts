@@ -66,9 +66,16 @@ export interface NewItem {
 }
 
 /** A new pantry (or Keg, or Health) item whose picks are the ticked products: the first is the usual one. */
-export async function addItemFromPicks(picks: Iterable<StoreProduct>, item: NewItem, barcodeFor?: (sp: StoreProduct) => string | undefined): Promise<Group> {
+export async function addItemFromPicks(
+  picks: Iterable<StoreProduct>,
+  item: NewItem,
+  barcodeFor?: (sp: StoreProduct) => string | undefined,
+  /** 0.12.7: picked as "Also happy with" while adding (alternative products). */
+  alts: Iterable<StoreProduct> = [],
+): Promise<Group> {
   const list = [...picks];
   const ids = await saveStoreProducts(list, barcodeFor);
+  const altIds = (await saveStoreProducts([...alts], barcodeFor)).filter((id) => !ids.includes(id));
   const alertLevel = item.alertLevel ?? 'good';
   // 0.11.2: no category chosen: the one its name fits (Shampoo → Bathroom), else none ("Other").
   const categoryId = item.categoryId || guessCategoryId([item.name, ...list.map((p) => p.name)], await allCategories().catch(() => []), item.section);
@@ -78,7 +85,7 @@ export async function addItemFromPicks(picks: Iterable<StoreProduct>, item: NewI
     categoryId: categoryId || undefined,
     usualProductId: ids[0],
     sameProductIds: ids.slice(1),
-    altProductIds: [],
+    altProductIds: altIds,
     alertLevel,
     alertPct: alertLevel === 'custom' ? item.alertPct : undefined,
     allowBulk: item.allowBulk ?? false,
@@ -103,8 +110,9 @@ export async function addItemForLine(
   barcodeFor?: (sp: StoreProduct) => string | undefined,
   /** 0.9.11: "both" (the line becomes the item) or "pantry" (the line comes off the list). */
   target: 'both' | 'pantry' = 'both',
+  alts: Iterable<StoreProduct> = [],
 ): Promise<{ group: Group; linked: boolean }> {
-  const group = await addItemFromPicks(picks, item, barcodeFor);
+  const group = await addItemFromPicks(picks, item, barcodeFor, alts);
   const linked = await (target === 'pantry' ? pickItemOffList : pickItemFor)(entry, group, always);
   return { group, linked };
 }
@@ -122,7 +130,8 @@ export const addItemForLineUndoable = (
   said: (r: { group: Group; linked: boolean }) => string,
   barcodeFor?: (sp: StoreProduct) => string | undefined,
   target: 'both' | 'pantry' = 'both',
-): Promise<{ group: Group; linked: boolean }> => act(said, () => addItemForLine(entry, picks, item, always, barcodeFor, target));
+  alts: Iterable<StoreProduct> = [],
+): Promise<{ group: Group; linked: boolean }> => act(said, () => addItemForLine(entry, picks, item, always, barcodeFor, target, alts));
 
 /** What the Pick sheet says once a line has its item ("Chopsticks added to your pantry. "chopsticks" is Chopsticks from now on"). */
 export function pickedWords(name: string, opts: { made: boolean; linked: boolean; always: boolean; word: string; place?: string; off?: boolean }): string {

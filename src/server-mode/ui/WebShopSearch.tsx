@@ -16,10 +16,12 @@ import { useLive } from '../../lib/useLive';
 import { SECTION_NAMES, SECTION_PLACE, type ListSection, type Section, type StoreChain } from '../../shops';
 import type { StoreProduct } from '../../stores/types';
 import { chainName, type ListEntry } from '../../types';
-import { ChainDot, ChainName, Icon, LoadingBar, MemberTag, Sheet, specialTag, Thumb } from '../../ui/components';
-import { promoLabel } from '../../stores/http';
+import { ChainDot, ChainName, Icon, LoadingBar, MemberTag, PromoTag, RowInfo, Sheet, specialTag, Thumb } from '../../ui/components';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from '../../ui/screens/addPicks';
 import { CategoryPick } from '../../ui/screens/Categories';
+import { NameFirst } from '../../ui/screens/NameFirst';
+import { confidentCategoryId } from '../../lib/categoryGuess';
+import { suggestName } from '../../lib/nameSuggest';
 import { AddBtn, AddPair, addButtonsNote, AlwaysTick, pickButtonsNote, toPantryNote } from '../../ui/screens/addPickWords';
 import { useNav } from '../../ui/nav';
 import { ScanButton } from '../pwa/WebScanner';
@@ -125,6 +127,9 @@ export function WebShopSearch({
   const [name, setName] = useState('');
   const [listPick, setListPick] = useState<ListSection>(list === 'general' ? 'general' : tab);
   const [categoryId, setCategoryId] = useState('');
+  // 0.12.7: as on the phone: you name it (the box starts empty), and the category is chosen when Restock is sure.
+  const [catTouched, setCatTouched] = useState(false);
+  const [nameMissing, setNameMissing] = useState(false);
   const [saving, setSaving] = useState(false);
   /** 0.10.7: which Add button is saving, so only that one shows it (as on the phone). */
   const [busyAs, setBusyAs] = useState<Target>();
@@ -156,7 +161,8 @@ export function WebShopSearch({
       }
       if (tick.size) {
         setPicks(tick);
-        setName(suggestedName(tick.values(), forLine?.word));
+        // A Pick sheet line keeps the words you wrote on the list; anything else you name yourself (0.12.7).
+        if (forLine?.word) setName(suggestedName(tick.values(), forLine.word));
       }
     } catch (e) {
       if (asked.current === key) setError(searchErrorText(e));
@@ -188,7 +194,7 @@ export function WebShopSearch({
     const next = togglePick(picks, sp);
     if (next.has(keyOf(sp)) && !picks.size) {
       setAnchor(sp);
-      if (!name) setName(suggestedName([sp], forLine?.word));
+      if (!name && forLine?.word) setName(suggestedName([sp], forLine.word));
     }
     if (!next.size) setAnchor(undefined);
     setPicks(next);
@@ -200,16 +206,25 @@ export function WebShopSearch({
   const recShops = recs.filter((r) => !pickedChains.has(r.chain)).map((r) => r.chain);
   const trackedPick = [...picks.values()].map((p) => p as FoundProduct).find((p) => p.itemId);
 
+  const nameIdea = suggestName([...picks.values()].map((p) => ({ name: p.name, brand: p.brand })), forLine?.word || answer?.text || query);
+  const sureCategory = listPick !== 'general' ? (confidentCategoryId(name.trim() || nameIdea, [...picks.values()].map((p) => p.name), (cats ?? []).map((c) => ({ ...c, section: tab })), tab) ?? '') : '';
+  const shownCategory = catTouched ? categoryId : categoryId || sureCategory;
+
   const save = async (target: Target) => {
     if (!answer || !picks.size || saving) return;
+    // 0.12.7: you name it (Restock never fills the name in).
+    if (!name.trim()) {
+      setNameMissing(true);
+      return;
+    }
     setSaving(true);
     setBusyAs(target);
     setSaveError(undefined);
     try {
-      const itemName = tidyItemName(name) || suggestedName(picks.values(), forLine?.word); // 0.11.3: starts with a capital
+      const itemName = tidyItemName(name); // 0.11.3: starts with a capital
       // 0.9.11: from the Pick sheet "both" makes the item and the line becomes it, so the server only makes the item.
       const sent: Target = forLine && target === 'both' ? 'pantry' : target;
-      const body = addBody(answer.search, picks.values(), { target: sent, tab, list: forLine || target === 'pantry' ? tab : listPick, name: itemName, categoryId });
+      const body = addBody(answer.search, picks.values(), { target: sent, tab, list: forLine || target === 'pantry' ? tab : listPick, name: itemName, categoryId: shownCategory });
       const had = await productIdsHere();
       const a = await addFromSearch(body);
       await fetchIt();
@@ -268,9 +283,6 @@ export function WebShopSearch({
           }}
         >
           <Thumb src={photoUrl(sp.imageUrl)} />
-          <span className="info-dot" aria-hidden>
-            <Icon name="info" size={12} />
-          </span>
         </button>
         <span className="grow" style={{ minWidth: 0 }}>
           <span className="title" style={{ fontSize: 15 }}>
@@ -278,6 +290,8 @@ export function WebShopSearch({
           </span>
           {sp.size && !nameHasSize(sp.name, sp.size) && <span className="small">{tidySize(sp.size, sp.name)}</span>}
         </span>
+        {/* 0.12.7: the ⓘ on the right, beside the price, as in the phone app (it sat on the photo) */}
+        <RowInfo name={sp.name} onOpen={() => setPreview(sp)} />
         <span style={{ textAlign: 'right', flex: 'none' }}>
           <span className="num" style={{ fontWeight: 600, display: 'block' }}>
             {money(sp.price)}
@@ -302,7 +316,7 @@ export function WebShopSearch({
           {!barcode && top.has(sp.storeProductId) && <span className="tag good">GOOD MATCH</span>}
           {sp.itemId && <span className="tag normal">IN YOUR PANTRY</span>}
           {sp.isSpecial && !sp.memberOnly && <span className="tag wait">{specialTag(sp.price, sp.wasPrice, sp.halfPrice)}</span>}
-          {sp.isSpecial && promoLabel(sp.promo) && <span className="tag normal">{promoLabel(sp.promo)}</span>}
+          {sp.isSpecial && <PromoTag promo={sp.promo} />}
           {sp.memberOnly && <MemberTag chain={sp.chain} />}
         </span>
       </label>
@@ -351,10 +365,39 @@ export function WebShopSearch({
   const categorySelect = listPick !== 'general' && (
     <div className="field">
       <span>Category</span>
-      <CategoryPick section={tab} categories={cats ?? []} value={categoryId} onChange={setCategoryId} />
+      <CategoryPick
+        section={tab}
+        categories={cats ?? []}
+        value={shownCategory}
+        onChange={(id) => {
+          setCatTouched(true);
+          setCategoryId(id);
+        }}
+      />
+      {!catTouched && !categoryId && sureCategory && <span className="small">Restock chose this category from what it is. Change it if it's wrong.</span>}
     </div>
   );
-  const categoryName = cats?.find((c) => c.id === categoryId)?.name;
+  const categoryName = cats?.find((c) => c.id === shownCategory)?.name;
+  const nameField = (help: string, placeholder: string) => (
+    <NameFirst
+      value={name}
+      onChange={(n) => {
+        setName(n);
+        if (n.trim()) setNameMissing(false);
+      }}
+      idea={nameIdea}
+      missing={nameMissing}
+      help={help}
+      placeholder={placeholder}
+    />
+  );
+  // 0.12.7: Also happy with is offered while adding on the phone; here it says where that is done.
+  const altNote = (
+    <p className="phone-only compact" role="note">
+      <Icon name="phone" size={16} />
+      <span>Also happy with (alternative product) is chosen while adding on a phone, or afterwards on the item's page.</span>
+    </p>
+  );
 
   return (
     <div className="web-shop-search" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
@@ -493,12 +536,10 @@ export function WebShopSearch({
                   </button>
                 </div>
               )}
-              <label className="field">
-                <span>Name in your pantry</span>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chopsticks" />
-              </label>
+              {nameField('What it is called in your pantry.', 'e.g. Chopsticks')}
               {picksForYouBlock}
               {categorySelect}
+              {altNote}
               {/* 0.9.11: the same three buttons and tick as the phone's Pick sheet. */}
               <AlwaysTick forLine={forLine} />
               {forLine.toPantry ? (
@@ -525,10 +566,7 @@ export function WebShopSearch({
             </>
           ) : (
             <>
-              <label className="field">
-                <span>Name</span>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Honey" />
-              </label>
+              {nameField(`What it is called in ${SECTION_PLACE[tab]} and on your Shopping list. Short is best.`, 'e.g. Honey')}
               <label className="field">
                 <span>Which list</span>
                 <select className="input" value={listPick} onChange={(e) => setListPick(e.target.value as ListSection)}>
@@ -541,6 +579,7 @@ export function WebShopSearch({
               </label>
               {picksForYouBlock}
               {categorySelect}
+              {altNote}
               {/* 0.9.12: the phone's words and layout: Add to both first, then list or pantry on their own. */}
               {listPick === 'general' ? (
                 <div className="two">

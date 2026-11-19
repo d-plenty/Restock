@@ -104,6 +104,21 @@ export function guessCategoryId(names: string[], categories: Pick<Category, 'id'
   return undefined;
 }
 
+/**
+ * 0.12.7: the category to show already chosen when adding, and only when Restock is sure: the
+ * item's name (or the name on offer) says one, and no pick says a different one; or, with no name
+ * to go on, every pick says the same one. Anything less stays "No category".
+ */
+export function confidentCategoryId(name: string, pickNames: string[], categories: Pick<Category, 'id' | 'name' | 'section'>[], section: Section): string | undefined {
+  const one = (n: string) => (n.trim() ? guessCategoryId([n], categories, section) : undefined);
+  const fromName = one(name);
+  const fromPicks = pickNames.map(one);
+  const said = fromPicks.filter((x): x is string => !!x);
+  if (fromName) return said.every((x) => x === fromName) ? fromName : undefined;
+  if (!pickNames.length || said.length !== fromPicks.length) return undefined;
+  return said.every((x) => x === said[0]) ? said[0] : undefined;
+}
+
 interface Rec {
   group: { id: string; name: string; categoryId?: string };
   options: { role: string; product: { name: string } }[];

@@ -30,7 +30,7 @@ describe('0.12.6: nothing is picked for you', () => {
 describe('0.12.6: the General list comes along when you shop', () => {
   const list = read('./screens/List.tsx');
   it('the grocery list shows it folded, and shopping mode shows it at the bottom of every shop', () => {
-    expect(list).toContain("section === 'pantry' && sectionsOn.includes('general')");
+    expect(list).toContain("section !== 'general' && sectionsOn.includes('general')"); // 0.12.7: every list
     expect(list).toContain('className="card flush fold list-general"');
     expect(list).toContain('General list · get anywhere');
     expect(list).toContain('general={generalToo}');

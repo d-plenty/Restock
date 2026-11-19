@@ -6929,3 +6929,179 @@ button.fold-go {
     height: 36px;
   }
 }
+/* 0.12.7: adding. You name the item: the name box is first and bigger, and starts empty, with one
+   short idea under it to tap. Then What I buy, then Also happy with (alternative product). */
+.name-first > span {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  color: var(--ink);
+}
+.name-first .input {
+  height: 56px;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  border-width: 2px;
+  border-color: var(--ink-2);
+}
+.name-first.missing .input {
+  border-color: var(--red-ink);
+  background: var(--red-bg);
+}
+.name-first-help.missing {
+  color: var(--red-ink);
+  font-weight: 700;
+}
+.chip.name-idea {
+  align-self: flex-start;
+  border-color: var(--green);
+  color: var(--green-ink);
+  font-weight: 700;
+}
+.alt-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.alt-group-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.alt-shop {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+.alt-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  width: 100%;
+}
+.alt-pick .grow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.alt-pick .thumb {
+  width: 48px;
+  height: 48px;
+}
+.alt-pick > .match-actions {
+  flex-basis: 100%;
+  justify-content: flex-end;
+  margin-top: 0;
+}
+/* 0.12.7: Start shopping, step 1: which shops today. The where-first cards, as buttons you turn on. */
+.shop-pick.trip-pick.on {
+  border: 2px solid var(--green);
+  background: var(--green-bg);
+}
+.trip-tick {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-full);
+  border: 2px solid var(--line-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--on-accent);
+}
+.trip-pick.on .trip-tick {
+  border-color: var(--green-solid);
+  background: var(--green-solid);
+}
+/* 0.12.7: a line's ⓘ sits above the line's own tap target wherever it is used */
+.row-main > .row-info,
+.row > .row-info {
+  position: relative;
+  z-index: 1;
+}
+/* 0.12.7: a special's "Was $5.80 until 1 Sep 2026": dark ink on the tag (it was grey on grey), and
+   red once that date is more than 14 days back. Not upper case: it's a sentence, with a date. */
+.tag.was-since {
+  background: var(--sunken);
+  color: var(--ink);
+  font-weight: 800;
+}
+.tag.was-since.old {
+  background: var(--red-bg);
+  color: var(--red-ink);
+}
+/* 0.12.7: one title on the four tabs. "Shopping list" is the big white title, the size and weight
+   Home's greeting, Pantry and More have; under it, in gold with its icon, is which list. */
+.list-title {
+  margin: 0;
+}
+:is(.navy-top, .navy-cont) .list-switch.which-list {
+  min-height: var(--hit);
+}
+.list-switch.which-list .list-switch-name {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--gold);
+}
+.dk-main .list-switch.which-list .list-switch-name {
+  color: var(--ink-2);
+}
+.list-switch.which-list.still {
+  cursor: default;
+}
+/* 0.12.7, true black: a box you type in on the top bar is black, set into the bar (it was the
+   bar's own colour and vanished into it). */
+:root[data-black='1'] :is(.navy-top, .navy-cont, .more-top) :is(.input, .search-field) {
+  background: var(--bg);
+  border-color: var(--line-2);
+}
+/* 0.12.7: the "Not at today's shops" card has its top edge (a line of words sits between its
+   heading and its first row), and the Done bar sits on the very bottom while you scroll (rows
+   showed in a strip under it). */
+.shopmode-list section > p + .shoprow {
+  border-top: 1px solid var(--line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  margin-top: var(--s-2, 8px);
+}
+.shopmode-list:has(> .shop-done-bar) {
+  padding-bottom: 0;
+}
+/* 0.12.7: a price with its ⓘ under it, on the right of a line (the same as a shopping line) */
+.price-and-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  flex: none;
+}
+.price-and-info > .row-info,
+.size-price > .row-info {
+  position: relative;
+  z-index: 1;
+  align-self: flex-end;
+}
+/* 0.12.7, narrow phones: "special · was $10.50" under a price wraps, so the name keeps its room
+   (the name and its tags were squeezed to a few letters a line). */
+@media (max-width: 340px) {
+  .price-and-info {
+    max-width: 34%;
+  }
+  .price-and-info > .small {
+    white-space: normal;
+  }
+}
+/* 0.12.7, true black: a sheet is a shade off the black page, with an edge along its top, so it
+   reads as a sheet lying over the page. */
+:root[data-black='1'] .sheet {
+  background: color-mix(in srgb, var(--surface) 55%, var(--bg));
+  border-top: 1px solid var(--line-2);
+}

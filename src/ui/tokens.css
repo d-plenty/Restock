@@ -382,19 +382,21 @@
 }
 
 /* ---------- true black, in dark mode, for OLED screens (0.8.9) ----------
-   Every background is black, so those pixels are off. Cards keep a faint edge so they still read
-   as cards. Works with both styles; the navy bars go black too (the gold line and savings banner
-   keep their colour). */
+   The page itself is black, so those pixels are off. 0.12.7: it had no depth (the bars, the cards
+   and the page were all black, so nothing read as a bar or a card). Now the page stays black; the
+   top bar and the tab bar are a very dark navy-grey, so they read as bars again; and cards, sheets
+   and boxes sit one step lighter than the page, with an edge you can see. Works with both styles;
+   the gold line and the savings banner keep their colour. */
 :root[data-black='1'][data-theme][data-style] {
   --bg: #000000;
-  --surface: #0a0a0a;
-  --sunken: #141414;
-  --line: #262626;
-  --line-2: #333333;
-  --dash: #4d4d4d;
-  --tabbar-bg: #000000;
-  --shade-bg: #000000;
-  --chrome-bg: #000000;
+  --surface: #111317;
+  --sunken: #1c1f25;
+  --line: #2a2e36;
+  --line-2: #3a3f49;
+  --dash: #575d69;
+  --tabbar-bg: #0e1422;
+  --shade-bg: #0e1422;
+  --chrome-bg: #0e1422;
   --shadow: rgba(0, 0, 0, 0);
 }
 

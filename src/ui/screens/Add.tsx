@@ -2,7 +2,9 @@ import { tidyItemName } from '../../lib/itemName';
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { seenBefore, type SeenBefore } from '../../lib/seen';
 import { cleanSearch } from '../../lib/searchText';
-import { guessCategoryId } from '../../lib/categoryGuess';
+import { confidentCategoryId, guessCategoryId } from '../../lib/categoryGuess';
+import { suggestName } from '../../lib/nameSuggest';
+import { NameFirst } from './NameFirst';
 import { perKiloNote } from '../../lib/unitPrice';
 import { flavourBarNote, otherFlavours, varietyWord } from '../../lib/flavours';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
@@ -100,7 +102,7 @@ const SEARCH_PLACEHOLDER: Record<Section, string> = {
 };
 /** Small buttons and links still get a 44 px target. */
 const TAP: CSSProperties = { minHeight: 44 };
-import { ChainDot, ChainName, Hold, Icon, useBackHandler, LoadingBar, MoreInfo, ProductPreview, Sheet, specialTag, Thumb, TopBar, type PreviewProduct, SearchField } from '../components';
+import { ChainDot, ChainName, Hold, Icon, useBackHandler, LoadingBar, MoreInfo, ProductPreview, RowInfo, Sheet, specialTag, Thumb, TopBar, type PreviewProduct, SearchField } from '../components';
 import { useNav } from '../nav';
 import { OtherSizesCard } from '../OtherSizes';
 import { ItemRow, type NoteTone } from '../simple';
@@ -291,6 +293,15 @@ export function AddScreen({
   // 0.10.2: a line's "Add to pantry" keeps the line's name ("Eggs").
   const [name, setName] = useState(forLine?.toPantry ? forLine.entry.text : forList && query ? query : '');
   const [categoryId, setCategoryId] = useState('');
+  // 0.12.7: the category is chosen for you when Restock is sure of it, until you choose one yourself.
+  const [catTouched, setCatTouched] = useState(false);
+  // 0.12.7: the name box starts empty and has to be filled in (Restock named a dressing "Sugar").
+  const [nameMissing, setNameMissing] = useState(false);
+  const nameBox = useRef<HTMLInputElement>(null);
+  // 0.12.7: picks that are "Also happy with" (an alternative product), chosen while adding. `altMode`:
+  // you tapped Find one under Also happy with, so what you tick on that shop's page is an alternative.
+  const [alts, setAlts] = useState<Set<string>>(new Set());
+  const [altMode, setAltMode] = useState(false);
   const [alertLevel, setAlertLevel] = useState<AlertLevel>('good');
   const [allowBulk, setAllowBulk] = useState(false);
   const [allowMulti, setAllowMulti] = useState(true);
@@ -527,11 +538,6 @@ export function AddScreen({
     });
     setPanelOpen(true); // 0.12.0: straight to "your pick at each shop"
     const first = [...found.values()][0].sp;
-    if (!name && !attachTo) {
-      const sc = scanned as (BarcodeInfo & { kindOnly?: boolean }) | undefined;
-      if (!(forList && query))
-        setName(sc?.name && !weakName(sc) && !sc.kindOnly ? genericName(sc.name, sc.brand) : genericName(first.name, first.brand));
-    }
     void followUp(first, new Set(found.keys()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results, searched, rankQ, auto]);
@@ -636,8 +642,6 @@ export function AddScreen({
     const { term: q, generic } = searchTermFor(info, section);
     setTerm(q);
     setSearchedFor(generic ? q : undefined);
-    // A name that's only the brand ("Earth Choice") waits for the product you tick to name it.
-    if (info.name && !attachGroup && !weakName(info)) setName(genericName(info.name, info.brand));
     await search(q, { text: displayName(info), brand: info.brand, size: info.size, barcode: code }, section, pressed);
   };
 
@@ -782,7 +786,6 @@ export function AddScreen({
     setCandidates(undefined);
     setSuggest([]);
     setPicks(new Map([...m.values()].map((x) => [keyOf(x.sp), x.sp])));
-    if (!name && !attachTo) setName(genericName(c.sp.name, c.sp.brand));
     void followUp(c.sp, new Set(m.keys()));
   };
 
@@ -895,12 +898,15 @@ export function AddScreen({
   const sizesSkip = attach ? new Set(attach.mains.filter((p) => p.storeProductId).map((p) => `${p.chain}:${p.storeProductId}`)) : undefined;
 
   const toggle = (sp: StoreProduct) => {
-    setPicks((prev) => {
-      const next = togglePick(prev, sp);
-      if (next.has(keyOf(sp)) && !name && !attachTo)
-        setName(scanned?.name && !weakName(scanned) ? genericName(scanned.name, scanned.brand) : genericName(sp.name, sp.brand));
+    // 0.12.7: ticked from "Find one" under Also happy with: it's an alternative. Unticked: no longer one.
+    const on = !picks.has(keyOf(sp));
+    setAlts((a) => {
+      const next = new Set(a);
+      if (on && altMode) next.add(keyOf(sp));
+      else next.delete(keyOf(sp));
       return next;
     });
+    setPicks((prev) => togglePick(prev, sp));
     // Ticked one? Look for the same thing at the other stores, so it's one tap to tick them all.
     if (as === 'alt' || picks.has(keyOf(sp))) {
       setSuggest((list) => list.filter((x) => keyOf(x) !== keyOf(sp)));
@@ -971,17 +977,18 @@ export function AddScreen({
     }
     if (picks.has(k)) {
       setPicks((prev) => new Map([...prev].filter(([key]) => key !== k)));
+      setAlts((a) => new Set([...a].filter((key) => key !== k)));
       return;
     }
     if (picks.size > 0) {
-      // One more of yours.
+      // One more of yours (0.12.7: or, from Find one under Also happy with, an alternative).
+      if (altMode) setAlts((a) => new Set([...a, k]));
       setPicks((prev) => new Map([...prev, [k, sp]]));
       setDeclined((d) => new Set([...d].filter((c) => c !== sp.chain)));
       return;
     }
     // The first tick: the product itself.
     setPicks(new Map([[k, sp]]));
-    if (!(forList && query)) setName(scanned?.name && !weakName(scanned) ? genericName(scanned.name, scanned.brand) : genericName(sp.name, sp.brand));
     setSuggest([]);
     setDeclined(new Set());
     recFor.current = undefined;
@@ -1002,8 +1009,24 @@ export function AddScreen({
   const barcodeFor = (sp: StoreProduct) => sp.barcode ?? (isExactBarcode(rankQ, sp) || as === 'main' ? rankQ.barcode : undefined);
   const saveProducts = (): Promise<string[]> => saveStoreProducts(picks.values(), barcodeFor);
 
-  const cheapestPick = () => [...picks.values()].filter((p) => p.price !== undefined).sort((a, b) => a.price! - b.price!)[0];
-  const cheapestChain = (): Chain | undefined => cheapestPick()?.chain ?? [...picks.values()][0]?.chain;
+  // 0.12.7: what you buy, and what you'd also be happy with (alternatives never go on the list as your pick).
+  const mainPicks = [...picks.values()].filter((p) => !alts.has(keyOf(p)));
+  const altPicks = [...picks.values()].filter((p) => alts.has(keyOf(p)));
+  const cheapestPick = () => mainPicks.filter((p) => p.price !== undefined).sort((a, b) => a.price! - b.price!)[0];
+  const cheapestChain = (): Chain | undefined => cheapestPick()?.chain ?? mainPicks[0]?.chain;
+  /** Does adding make a pantry item (so it has a name, a category and Also happy with)? Not a one-off list line. */
+  const makesItem = !attachGroup && (!forList || !!forLine);
+  // The name on offer under the empty box: short, no brand, no size (lib/nameSuggest).
+  const nameIdea = !attachGroup
+    ? suggestName(
+        mainPicks.map((p) => ({ name: p.name, brand: p.brand })),
+        rankQ.barcode ? undefined : rankQ.text || lastText,
+        scanned?.name && !weakName(scanned) ? { name: scanned.name, brand: scanned.brand } : undefined,
+      )
+    : '';
+  const sureCategory = makesItem ? (confidentCategoryId(name.trim() || nameIdea, mainPicks.map((p) => p.name), (categories ?? []).map((c) => ({ ...c, section })), section) ?? '') : '';
+  const shownCategory = catTouched ? categoryId : categoryId || sureCategory;
+
 
   const saveAttach = async () => {
     if (!attachGroup || !picks.size) return;
@@ -1039,24 +1062,38 @@ export function AddScreen({
 
   const save = async (target: Target) => {
     if (!picks.size || saving) return;
+    // 0.12.7: you name it (Restock never fills the name in), and at least one pick is what you buy.
+    if (!name.trim()) {
+      setNameMissing(true);
+      setPanelOpen(true);
+      requestAnimationFrame(() => {
+        nameBox.current?.scrollIntoView({ block: 'center' });
+        nameBox.current?.focus();
+      });
+      return;
+    }
+    if (!mainPicks.length) {
+      nav.toast('Pick what you buy first. Also happy with is for a second choice.');
+      return;
+    }
     setSaving(true);
     setBusyAs(target);
     try {
-      const first = [...picks.values()][0];
-      const itemName = name.trim() || genericName(first.name, first.brand);
-      const item = { name: itemName, section, categoryId, alertLevel, alertPct, allowBulk, allowMulti };
+      const itemName = name.trim();
+      const item = { name: itemName, section, categoryId: shownCategory, alertLevel, alertPct, allowBulk, allowMulti };
       if (forLine && target !== 'list') {
         // From the Pick sheet: the new item, and the list line becomes it ("both"), or comes off the
         // list ("pantry", 0.9.11). 0.9.5 (final review): with an Undo, as every other add.
         const off = target === 'pantry';
         const { group, linked } = await addItemForLineUndoable(
           forLine.entry,
-          picks.values(),
+          mainPicks,
           item,
           forLine.always,
           (r) => pickedWords(r.group.name, { made: true, linked: r.linked, always: forLine.always, word: forLine.word, place: SECTION_PLACE[section], off }),
           barcodeFor,
           off ? 'pantry' : 'both',
+          altPicks,
         );
         reset();
         forLine.onDone(group, true, linked);
@@ -1073,7 +1110,7 @@ export function AddScreen({
             ? `${itemName} added to ${SECTION_PLACE[section]} and shopping list`
             : `${itemName} added to ${SECTION_PLACE[section]}`;
       await act(said, async () => {
-      if (target !== 'list') groupId = (await addItemFromPicks(picks.values(), item, barcodeFor)).id;
+      if (target !== 'list') groupId = (await addItemFromPicks(mainPicks, item, barcodeFor, altPicks)).id;
       if (target !== 'pantry') {
         const one = groupId || costcoLine ? undefined : cheapestPick();
         await addListEntry({
@@ -1082,7 +1119,7 @@ export function AddScreen({
           groupId,
           chain: groupId || costcoLine ? undefined : cheapestChain(),
           price: one?.price,
-          categoryId: categoryId || undefined,
+          categoryId: shownCategory || undefined,
           section,
           // What it is, so the list can show its photo and details (0.7.3).
           product: one
@@ -1134,7 +1171,12 @@ export function AddScreen({
     setScanned(undefined);
     setResults({});
     setPicks(new Map());
+    setAlts(new Set());
+    setAltMode(false);
     setName('');
+    setNameMissing(false);
+    setCatTouched(false);
+    setCategoryId('');
     setRankQ({ text: '' });
     setSuggest([]);
     setKnown(undefined);
@@ -1280,6 +1322,7 @@ export function AddScreen({
   for (let i = 0; i < PER_SHOP; i++) for (const c of searched as Chain[]) if (shownItems(c)[i]) mixed.push(shownItems(c)[i]);
   const view: 'all' | Chain = changing ?? (searched.length > 1 ? shopView : ((searched[0] as Chain | undefined) ?? 'all'));
   const backToPicks = () => {
+    setAltMode(false);
     setChanging(undefined);
     setShopView('all');
     setPanelOpen(true);
@@ -1290,7 +1333,8 @@ export function AddScreen({
     setDeclined((d) => new Set([...d, c]));
   };
   const toTop = () => screenRef.current?.scrollTo?.({ top: 0 });
-  const startChange = (c: Chain) => {
+  const startChange = (c: Chain, asAlt = false) => {
+    setAltMode(asAlt);
     setChanging(c);
     setPanelOpen(false);
     toTop();
@@ -1323,6 +1367,7 @@ export function AddScreen({
    * there ("Not added").
    */
   const finishEarly = () => {
+    setAltMode(false);
     setChanging(undefined);
     setShopView('all');
     toTop();
@@ -1341,7 +1386,7 @@ export function AddScreen({
   const matchCards = (
     <div className="match-list" role="list" aria-label="Your pick at each shop">
       {matchShops.map((c) => {
-        const mine = [...picks.values()].filter((x) => x.chain === c);
+        const mine = mainPicks.filter((x) => x.chain === c);
         const r = results[c as StoreChain];
         const busy = !r || r.status === 'loading';
         const canChange = (searched as Chain[]).includes(c) && r?.status === 'ok';
@@ -1372,6 +1417,12 @@ export function AddScreen({
                       <button className="btn small" style={TAP} onClick={() => pickOne(sp)} aria-label={`Remove ${sp.name} at ${chainName(c)}`}>
                         Remove
                       </button>
+                      {/* 0.12.7: it's a second choice, not what you buy: one tap moves it to Also happy with */}
+                      {makesItem && (
+                        <button className="btn small" style={TAP} onClick={() => setAlts((a) => new Set([...a, keyOf(sp)]))} aria-label={`Make ${sp.name} an alternative`}>
+                          Make it an alternative
+                        </button>
+                      )}
                       {sp === mine[mine.length - 1] && c !== anchorChain && (
                         <button className="btn small" style={TAP} onClick={() => notSoldAt(c)} aria-label={`Not sold at ${chainName(c)}`}>
                           Not sold here
@@ -1445,7 +1496,60 @@ export function AddScreen({
     </div>
   );
 
-  const pickedCategory = categories?.find((c) => c.id === categoryId)?.name;
+  // 0.12.7: "Also happy with (alternative product)" while adding. It was only on the item's page
+  // afterwards, so people never found it. One line per shop: your alternative there, or Find one.
+  const altGroup = makesItem && (
+    <section className="alt-group" aria-label="Also happy with (alternative product)">
+      <div className="alt-group-head">
+        <span className="title">Also happy with (alternative product)</span>
+        <span className="small">A second choice you'd accept. Restock uses it when yours is out of stock or not at the shop you're in.</span>
+      </div>
+      {matchShops.map((c) => {
+        const here = altPicks.filter((x) => x.chain === c);
+        const r = results[c as StoreChain];
+        const canFind = (searched as Chain[]).includes(c) && r?.status === 'ok';
+        return (
+          <div key={c} className="alt-shop">
+            <span className="match-lab">
+              <ChainDot chain={c} />
+              {chainName(c)}
+            </span>
+            {here.map((sp) => (
+              <div key={keyOf(sp)} className="alt-pick">
+                <Thumb src={sp.imageUrl ?? photoFor(sp)} />
+                <span className="grow">
+                  <span className="match-name">{sp.name}</span>
+                  <span className="num match-price">{money(sp.price)}</span>
+                </span>
+                <span className="match-actions">
+                  <button className="btn small" style={TAP} onClick={() => pickOne(sp)} aria-label={`Remove ${sp.name} from Also happy with`}>
+                    Remove
+                  </button>
+                  <button
+                    className="btn small"
+                    style={TAP}
+                    onClick={() => setAlts((a) => new Set([...a].filter((k) => k !== keyOf(sp))))}
+                    aria-label={`Make ${sp.name} what I buy`}
+                  >
+                    Make it what I buy
+                  </button>
+                </span>
+              </div>
+            ))}
+            {canFind ? (
+              <button className="btn small" style={TAP} onClick={() => startChange(c, true)} aria-label={`Find an alternative at ${chainName(c)}`}>
+                <Icon name="search" size={16} /> {here.length ? 'Find another' : 'Find one'}
+              </button>
+            ) : (
+              !here.length && <span className="small">{r?.status === 'error' ? "Couldn't check this shop just now." : 'Still searching…'}</span>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
+
+  const pickedCategory = categories?.find((c) => c.id === shownCategory)?.name;
 
   return (
     // Inside the Pick sheet the sheet scrolls, so the bar at the bottom stays in view there too.
@@ -1456,7 +1560,7 @@ export function AddScreen({
           <button className="icon-btn" aria-label="Back" onClick={backToPicks}>
             <Icon name="back" size={20} />
           </button>
-          <h1 style={{ fontSize: 24 }}>Pick at {chainName(changing)}</h1>
+          <h1 style={{ fontSize: 24 }}>{altMode ? `Alternative at ${chainName(changing)}` : `Pick at ${chainName(changing)}`}</h1>
         </div>
       ) : !attachGroup && !onlyChain && sectionsOn.length > 1 ? (
         // 0.12.1: the title is the switcher, as on the shopping list (it was a row of buttons under the title)
@@ -1704,7 +1808,6 @@ export function AddScreen({
             e.preventDefault();
             const t = whatIsIt.trim();
             if (!t) return;
-            if (!attachGroup) setName(genericName(t));
             setTerm(t);
             const fixed = normaliseQuery(t);
             void search(fixed, { text: fixed, barcode: scanned.barcode }, section, true); // its Search button
@@ -1723,7 +1826,6 @@ export function AddScreen({
               if (!go) return;
               setTerm(n);
               setSearchedFor(n);
-              if (!attachGroup) setName(genericName(n));
               const fixed = normaliseQuery(n);
               void search(fixed, { text: fixed, barcode: scanned.barcode });
             }}
@@ -1749,7 +1851,6 @@ export function AddScreen({
                   className="chip"
                   onClick={() => {
                     setWhatIsIt(q);
-                    if (!attachGroup) setName(q);
                     setTerm(q);
                     setSearchedFor(q);
                     void search(q.toLowerCase(), { text: q.toLowerCase(), barcode: scanned.barcode });
@@ -1806,6 +1907,7 @@ export function AddScreen({
                   </span>
                   <Icon name="chevron" size={18} />
                 </button>
+                <RowInfo name={c.sp.name} onOpen={() => setPreview(c.sp)} />
               </div>
             ))}
           </div>
@@ -1844,7 +1946,9 @@ export function AddScreen({
             </p>
           )}
           <p className="small" style={{ margin: 0 }}>
-            Tick everything you buy as this at {chainName(changing)}. Tap one again to untick it.
+            {altMode
+              ? `Tick a second choice at ${chainName(changing)}: another brand or size you'd accept. Tap one again to untick it.`
+              : `Tick everything you buy as this at ${chainName(changing)}. Tap one again to untick it.`}
           </p>
           <button className="btn block" onClick={backToPicks}>
             Back to your picks
@@ -2149,7 +2253,12 @@ export function AddScreen({
       {view !== 'all' && anyResults && !attachTo && !forLine && results[view as StoreChain]?.status === 'ok' && (searched.length > 1 || !!changing) && (
         <div className="shop-done">
           {/* 0.12.5: two ways on: the next shop, or straight to your picks (it was one button, "Finished at Coles") */}
-          {nextShopAfter(view as Chain) ? (
+          {altMode ? (
+            // 0.12.7: finding an alternative at one shop: one way on, back to your picks.
+            <button className="btn primary block shop-done-btn" onClick={backToPicks}>
+              <Icon name="check" size={18} /> Done: back to your picks
+            </button>
+          ) : nextShopAfter(view as Chain) ? (
             <>
               <button className="btn primary block shop-done-btn" onClick={() => finishedAt(view as Chain)}>
                 Next shop: {chainName(nextShopAfter(view as Chain)!)}
@@ -2166,7 +2275,7 @@ export function AddScreen({
               <Icon name="check" size={18} /> {picks.size > 0 ? 'Finish: review and add' : `Finished at ${chainName(view)}`}
             </button>
           )}
-          {![...picks.values()].some((x) => x.chain === view) && !declined.has(view) && picks.size > 0 && (
+          {!altMode && ![...picks.values()].some((x) => x.chain === view) && !declined.has(view) && picks.size > 0 && (
             <button
               className="btn block"
               onClick={() => {
@@ -2284,17 +2393,50 @@ export function AddScreen({
           {/* 0.12.5: the name and category first (they were folded away under the picks), then your picks, then alerts */}
           {!attachGroup && (
             <div className="review-top">
-              <label className="field">
-                <span>{forLine ? 'Name in your pantry' : forList ? 'Name on your Shopping list' : `Name in ${SECTION_PLACE[section]} and Shopping list`}</span>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={forLine ? 'e.g. Chopsticks' : forList ? 'e.g. Coffee' : 'e.g. Honey'} />
-              </label>
-              {(forLine || !forList) && <CategoryPick section={section} categories={categories ?? []} value={categoryId} onChange={setCategoryId} />}
+              {/* 0.12.7: you name it. The box is first, bigger, and starts empty; one short idea sits under it to tap. */}
+              <NameFirst
+                value={name}
+                onChange={(n) => {
+                  setName(n);
+                  if (n.trim()) setNameMissing(false);
+                }}
+                idea={nameIdea}
+                missing={nameMissing}
+                inputRef={nameBox}
+                placeholder={forLine ? 'e.g. Chopsticks' : forList ? 'e.g. Coffee' : 'e.g. Honey'}
+                help={
+                  forLine
+                    ? 'What it is called in your pantry.'
+                    : forList
+                      ? 'What it is called on your Shopping list.'
+                      : `What it is called in ${SECTION_PLACE[section]} and on your Shopping list. Short is best.`
+                }
+              />
+              {(forLine || !forList) && (
+                <CategoryPick
+                  section={section}
+                  categories={categories ?? []}
+                  value={shownCategory}
+                  onChange={(id) => {
+                    setCatTouched(true);
+                    setCategoryId(id);
+                  }}
+                />
+              )}
+              {(forLine || !forList) && !catTouched && !categoryId && sureCategory && (
+                <span className="small">Restock chose this category from what it is. Change it if it's wrong.</span>
+              )}
             </div>
           )}
-          <p className="small" style={{ margin: 0 }}>
-            {matchShops.length > 1 ? 'Your picks at each shop. Check them, then add.' : 'Check it, then add.'}
-          </p>
+          {makesItem ? (
+            <div className="eyebrow">What I buy</div>
+          ) : (
+            <p className="small" style={{ margin: 0 }}>
+              {matchShops.length > 1 ? 'Your picks at each shop. Check them, then add.' : 'Check it, then add.'}
+            </p>
+          )}
           {matchCards}
+          {altGroup}
           {forLine ? (
             <>
               {trackedPick && (
@@ -2452,7 +2594,7 @@ export function AddScreen({
         <ManualSheet
           attachTo={attachGroup}
           as={as}
-          defaultName={name || (scanned?.name ? genericName(scanned.name, scanned.brand) : term)}
+          defaultName={name || term}
           barcode={scanned?.barcode}
           categories={categories ?? []}
           section={section}

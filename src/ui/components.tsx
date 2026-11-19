@@ -1,3 +1,4 @@
+import { wasSince } from '../lib/wasSince';
 import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type MutableRefObject, type InputHTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { nameHasSize } from '../lib/naming';
@@ -430,8 +431,26 @@ export function stockWhere(chain: string, long = false): string {
 }
 
 /**
- * A product's photo with an ⓘ on it: tap it for more info (a bigger photo, ingredients and
- * nutrition), so you don't have to know to press and hold. Used on every list of products.
+ * A shop's promo words as a tag ("2 for $12"). 0.12.7: its "Was $5.80 - 01/09/2026" reads "Was $5.80
+ * until 1 Sep 2026", easier to see than the grey it was, and red once that date is more than 14 days
+ * back (lib/wasSince). The SPECIAL tag beside it is unchanged.
+ */
+export function PromoTag({ promo }: { promo?: string }) {
+  const label = promoLabel(promo);
+  if (!label) return null;
+  const was = wasSince(label);
+  if (!was) return <span className="tag normal">{label}</span>;
+  return (
+    <span className={`tag was-since${was.old ? ' old' : ''}`} title={was.old ? 'This special price has run for more than 14 days.' : undefined}>
+      {was.text}
+    </span>
+  );
+}
+
+/**
+ * A product's photo: tap it for more info (a bigger photo, ingredients and nutrition). 0.12.7: the ⓘ
+ * no longer sits on the photo. Every line has its ⓘ in one place, on the right beside the price
+ * (RowInfo), so lines that use this put a RowInfo there too.
  */
 export function MoreInfo({ src, name, onOpen }: { src?: string; name: string; onOpen: () => void }) {
   return (
@@ -446,9 +465,6 @@ export function MoreInfo({ src, name, onOpen }: { src?: string; name: string; on
       }}
     >
       <Thumb src={src} />
-      <span className="info-dot" aria-hidden>
-        <Icon name="info" size={12} />
-      </span>
     </button>
   );
 }
@@ -1334,7 +1350,7 @@ export function ProductPreview({ product: p, onClose, action }: { product: Previ
         {p.role && <span className={`tag ${p.role === 'alt' ? 'alt' : 'normal'}`}>{p.role === 'alt' ? 'ALSO HAPPY WITH' : 'MY PICK'}</span>}
         {/* A member-only special is still a special (0.9.0): both tags show. */}
         {p.isSpecial && <span className="tag good">SPECIAL</span>}
-        {promoLabel(p.promo) && <span className="tag normal">{promoLabel(p.promo)}</span>}
+        <PromoTag promo={p.promo} />
         {p.memberOnly && <MemberTag chain={p.chain} />}
         {p.inStock === false && <span className="tag fake">OUT OF STOCK {stockWhere(p.chain).toUpperCase()}</span>}
       </div>

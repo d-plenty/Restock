@@ -243,6 +243,8 @@ function fakeAdapter(chain: StoreChain): StoreAdapter {
         price: section === 'keg' ? 54 + i * 3 - (chain.length % 4) : 0.95 + i * 0.4 + (chain === 'aldi' ? -0.1 : 0) + (chain.length % 3) * 0.15,
         isSpecial: i === 1,
         wasPrice: i === 1 ? (section === 'keg' ? 72 : 1.8) : undefined,
+        // 0.12.7 (test builds): a shop's own "Was $1.80 - 01/11/2026", recent at Coles and old at Woolworths
+        promo: i === 1 && section !== 'keg' && chain !== 'aldi' ? `Was $1.80 - ${new Date(Date.now() - (chain === 'coles' ? 5 : 30) * 86_400_000).toLocaleDateString('en-GB')}` : undefined,
         memberOnly: false,
       }));
     },

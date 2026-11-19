@@ -34,7 +34,7 @@ import { buzz, scannedLine, splitCount } from '../../lib/listActions';
 import { loadRecommendations } from '../../lib/recs';
 import { bothPrices, lineCost, type Option } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
-import { aroundPlan, cheaperThan, recommendedStores, shopTotals, type ShopTotals } from '../../lib/shopTotals';
+import { aroundPlan, cheaperThan, shopTotals, type ShopTotals } from '../../lib/shopTotals';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { money, tidySize } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
@@ -48,7 +48,6 @@ import {
   Hold,
   useBackHandler,
   Icon,
-  MoreInfo,
   previewFromOption,
   type PreviewProduct,
   ProductPreview,
@@ -69,6 +68,7 @@ import { useNav } from '../nav';
 import { enabledIn, isLocalOnlyShop, LIST_NAMES, SECTION_NAMES, LIST_PLACE, listSectionsOn, priceSource, searchChainsIn, SECTIONS, type ListSection, type Section, type StoreChain, slots, withCustom } from '../../shops';
 import { CardBarcode, PROGRAMS } from './Cards';
 import { ShopTotalsCard } from '../shopTotalsCard';
+import { shopsLeft, tripRecs } from '../../lib/tripPlan';
 
 export type ShopKey = Chain | 'any';
 
@@ -331,7 +331,6 @@ export function ListScreen() {
   // Start shopping: first which shops you're going to today, then the in-store view for those.
   const [choosingShops, setChoosingShops] = useState(false);
   // 0.10.2: Change shops from shopping mode: closing the sheet goes back to that trip.
-  const [changingFrom, setChangingFrom] = useState<StoreChain[]>();
   const [shopping, setShopping] = useState<StoreChain[]>();
   const [skipToday, setSkipToday] = useState<Set<string>>(new Set());
   const [preview, setPreview] = useState<ListEntry>();
@@ -365,7 +364,8 @@ export function ListScreen() {
   // 0.12.6: the General list's things come along when you shop for groceries (they were easy to
   // forget on a list of their own): a folded card here, and a group at the bottom of every shop's
   // page in shopping mode. They stay on the General list, and out of this list's totals.
-  const generalToo = section === 'pantry' && sectionsOn.includes('general') ? allEntries.filter((e) => entrySection(e, groupSection) === 'general') : [];
+  // 0.12.7: with any list (it was Groceries only), so they're seen whichever list you shop from.
+  const generalToo = section !== 'general' && sectionsOn.includes('general') ? allEntries.filter((e) => entrySection(e, groupSection) === 'general') : [];
   const generalOpen = generalToo.filter((e) => !e.checked);
 
   const pick = (id: string) =>
@@ -593,16 +593,15 @@ export function ListScreen() {
   };
 
 
-  // 0.10.10: Start shopping goes straight in, at the shops your list is split across (the same
-  // shops "Your list by shop" shows). Before, it asked "Where are you shopping today?" and then
-  // "Where are you first?": the same question twice. It doesn't narrow to the one recommended shop
-  // either: with rinse aid left for Aldi, starting again opened Woolworths only. Shopping at fewer
-  // shops today is Change shops, in shopping mode.
+  // 0.12.7: Start shopping asks "Which shops today?" first, with none chosen for you (TripShops),
+  // then "Where are you first?". (0.10.10 went straight in at every shop on the list, and shopping at
+  // fewer was a small Change shops button inside shopping mode.) With one shop there's nothing to ask.
   const startShopping = () => {
-    const start = totals.around.chains.filter((x) => shops.includes(x as StoreChain)) as StoreChain[];
     setSkipToday(new Set());
-    setChangingFrom(undefined);
-    setShopping(start.length ? start : shops);
+    // Nothing on the list is tied to a shop's product (hand-written lines only): there's nothing to
+    // plan, so it goes straight to the one list.
+    if (shops.length > 1 && totals.linked > 0) setChoosingShops(true);
+    else setShopping(shops);
   };
 
   return (
@@ -613,23 +612,32 @@ export function ListScreen() {
       <div className="navy-top">
       {/* 0.10.5: the list's name is the list picker (a dropdown). 0.10.6: then Edit, and the view options. */}
       <div className="list-top">
-        {sectionsOn.length > 1 && !selecting && <span className="navy-kicker">Shopping list</span>}
+        {/* 0.12.7: "Shopping list" is the big white title, as Pantry and More are; under it, in gold with
+            its icon, is which list (the part Change switches). It was the other way round: a small gold
+            "Shopping list" over a big "Groceries". */}
+        {sectionsOn.length > 1 && <h1 className="list-title">Shopping list</h1>}
         <div className="list-top-row">
           {sectionsOn.length > 1 && !selecting ? (
             <button
-              className="list-switch"
+              className="list-switch which-list"
               aria-haspopup="menu"
               aria-expanded={switching}
               aria-label={`Which list: ${LIST_NAMES[section]}, ${open.length} item${open.length === 1 ? '' : 's'}. Tap to switch list`}
               onClick={() => setSwitching((x) => !x)}
             >
-              <Icon name={section} size={22} />
+              <Icon name={section} size={20} />
               <span className="list-switch-name">{LIST_NAMES[section]}</span>
               <span className="list-switch-pill">
                 {/* 0.12.4: "Change" with its arrow, so it reads as the way to another list (Edit moved to the row below) */}
                 Change <span className={switching ? 'turn-up' : 'turn-down'}><Icon name="chevron" size={16} /></span>
               </span>
             </button>
+          ) : sectionsOn.length > 1 ? (
+            // Picking items (Edit): the list's name, no Change
+            <span className="list-switch which-list still">
+              <Icon name={section} size={20} />
+              <span className="list-switch-name">{LIST_NAMES[section]}</span>
+            </span>
           ) : (
             <h1 style={{ flex: 1, margin: 0 }}>{LIST_TITLE[section]}</h1>
           )}
@@ -1163,27 +1171,15 @@ export function ListScreen() {
         />
       )}
       {choosingShops && (
-        <PickShops
+        <TripShops
           shops={shops}
           entries={entries}
           recs={recs}
           totals={totals}
           compare={settings.listCompare}
-          min={settings.shopAroundMin ?? 1}
-          start={(() => {
-            if (changingFrom) return changingFrom;
-            // The recommendation on the list: one store when it wins, otherwise the shops shopping around uses.
-            const pick = aroundPlan(totals, totals.by, settings.shopAroundMin ?? 1).pick;
-            return pick === 'around' ? totals.around.chains : [pick.chain];
-          })()}
-          onClose={() => {
-            setChoosingShops(false);
-            if (changingFrom) setShopping(changingFrom);
-            setChangingFrom(undefined);
-          }}
+          onClose={() => setChoosingShops(false)}
           onStart={(chosen, skip) => {
             setChoosingShops(false);
-            setChangingFrom(undefined);
             setSkipToday(skip);
             setShopping(chosen);
           }}
@@ -1199,11 +1195,6 @@ export function ListScreen() {
           entries={entries}
           general={generalToo}
           categories={categories}
-          onChangeShops={() => {
-            setChangingFrom(shopping);
-            setShopping(undefined);
-            setChoosingShops(true);
-          }}
           onClose={() => setShopping(undefined)}
         />
       )}
@@ -1237,10 +1228,6 @@ export function ListScreen() {
   );
 }
 
-/** Each item's products at these shops only, for shopping at just those. */
-const onlyAt = (recs: Recommendation[], chains: StoreChain[]): Recommendation[] =>
-  recs.map((r) => ({ ...r, options: r.options.filter((o) => chains.includes(o.product.chain as StoreChain)) }));
-
 /**
  * A line in shopping mode. On the phone the whole line ticks it (a big target in the shop). 0.9.4,
  * the web on a server (design 15): only the checkbox ticks, and the line opens its product.
@@ -1254,6 +1241,7 @@ function ShopPicker({
   doneAt,
   anyCount,
   generalCount = 0,
+  standby,
   name,
   stats,
   onPick,
@@ -1264,6 +1252,8 @@ function ShopPicker({
   doneAt: ShopKey[];
   anyCount: number;
   generalCount?: number;
+  /** How many things this shop could stand in for with an alternative, if the other shops miss out. */
+  standby?: (s: ShopKey) => number;
   name: (s: ShopKey) => string;
   stats: (s: ShopKey) => { n: number; got: number; left: number; total: number; spent: number };
   onPick: (s: ShopKey) => void;
@@ -1274,7 +1264,7 @@ function ShopPicker({
   const done = shops.filter((s) => doneAt.includes(s));
   const last = doneAt[doneAt.length - 1];
   // The shop with the most still to get, marked the first time (the obvious place to start).
-  const most = !doneAt.length ? [...toDo].sort((a, b) => stats(b).left - stats(a).left)[0] : undefined;
+  const most = !doneAt.length ? [...toDo].filter((x) => stats(x).left > 0).sort((a, b) => stats(b).left - stats(a).left)[0] : undefined;
   const card = (s: ShopKey, isDone: boolean) => {
     const st = stats(s);
     return (
@@ -1291,8 +1281,13 @@ function ShopPicker({
           <span className="small num">
             {isDone
               ? `Done · ${st.got} of ${st.n} · ${money(st.spent)} · tap to go back in`
-              : `${st.left === 1 ? '1 item' : `${st.left} items`}${st.total > 0 ? ` · about ${money(st.total - st.spent)}` : ''}`}
+              : st.n === 0
+                ? 'Nothing from your list yet'
+                : `${st.left === 1 ? '1 item' : `${st.left} items`}${st.total > 0 ? ` · about ${money(st.total - st.spent)}` : ''}`}
           </span>
+          {!isDone && (standby?.(s) ?? 0) > 0 && (
+            <span className="small">{standby!(s) === 1 ? '1 alternative' : `${standby!(s)} alternatives`} here, if the other shops miss out</span>
+          )}
           {s === most && <span className="tag good shop-pick-tag">MOST ON YOUR LIST</span>}
         </span>
         {!isDone && <Icon name="chevron" size={18} />}
@@ -1307,23 +1302,14 @@ function ShopPicker({
         </div>
       )}
       <h2 className="shop-picker-title">{!toDo.length ? 'Every shop done' : doneAt.length ? 'Where to next?' : 'Where are you first?'}</h2>
-      {!doneAt.length && (
-        <p className="small" style={{ margin: 0 }}>
-          Tap a shop to see only what to get there. When you've got it all, you come back here for the next one.
-        </p>
-      )}
       <div className="shop-picks">
         {toDo.map((s) => card(s, false))}
         {done.map((s) => card(s, true))}
       </div>
-      {anyCount > 0 && (
+      {/* 0.12.7: one short line (it was three paragraphs) */}
+      {anyCount + generalCount > 0 && (
         <p className="small" style={{ margin: 0 }}>
-          {anyCount === 1 ? '1 item has' : `${anyCount} items have`} no shop picked, so {anyCount === 1 ? 'it shows' : 'they show'} at every shop.
-        </p>
-      )}
-      {generalCount > 0 && (
-        <p className="small" style={{ margin: 0 }}>
-          {generalCount === 1 ? "1 thing" : `${generalCount} things`} from your General list {generalCount === 1 ? "shows" : "show"} at the bottom of each shop&apos;s page too.
+          Plus {anyCount + generalCount} to get anywhere, at the bottom of each shop.
         </p>
       )}
       {!toDo.length && (
@@ -1345,16 +1331,20 @@ function ShopRow({
   thumb,
   extra,
   children,
+  onTicked,
 }: {
   e: ListEntry;
   name: string;
   onOpen?: () => void;
+  /** 0.12.7: told before the tick is saved, so the trip remembers which shop it was got at. */
+  onTicked?: (on: boolean) => void;
   thumb?: ReactNode;
   extra?: ReactNode;
   children: ReactNode;
 }) {
   const tick = (ev: { target: { checked: boolean } }) => {
     buzz(10);
+    onTicked?.(ev.target.checked);
     void tickEntry(e, ev.target.checked, name);
   };
   if (!serverMode)
@@ -1441,17 +1431,17 @@ function StockCheck({
 }
 
 /**
- * Before shopping: which shops you're going to today. Each shop says how much of the list it has
- * and what it comes to; the total is worked out again for the shops picked.
+ * 0.12.7: Start shopping, step 1: "Which shops today?" Big buttons, none chosen for you; tap the ones
+ * you're going to, then Continue. Step 2 is shopping mode's "Where are you first?" (with one shop
+ * chosen it goes straight to that shop's list). It replaces Change shops, which was a small button
+ * people had to find once they were already shopping.
  */
-function PickShops({
+function TripShops({
   shops,
   entries,
   recs,
   totals,
   compare,
-  min,
-  start,
   onClose,
   onStart,
 }: {
@@ -1460,102 +1450,77 @@ function PickShops({
   recs: Recommendation[];
   totals: ShopTotals;
   compare: 'unit' | 'price';
-  /** Settings → Shopping list: what shopping around has to save. */
-  min: number;
-  /** Ticked to begin with: the shops the list is split across now. */
-  start: StoreChain[];
   onClose: () => void;
   onStart: (chosen: StoreChain[], skip: Set<string>) => void;
 }) {
   const [skip, setSkip] = useState<Set<string>>(new Set());
-  const recommended = recommendedStores(totals).recommended?.chain as StoreChain | undefined;
-  // RECOMMENDED only when one store wins over shopping around, as on the list (0.9.0).
-  const aroundPick = aroundPlan(totals, compare, min).pick;
-  const oneWins = aroundPick === 'around' ? undefined : (aroundPick.chain as StoreChain);
-  const [chosen, setChosen] = useState<StoreChain[]>(start.length ? start.filter((x) => shops.includes(x)) : shops);
+  const [chosen, setChosen] = useState<StoreChain[]>([]);
+  useBackLayer(onClose);
   const n = totals.linked;
-  const plan = chosen.length ? shopTotals(entries, onlyAt(recs, chosen), chosen as never, compare) : undefined;
-  const flip = (x: StoreChain) =>
-    setChosen((cur) => (cur.includes(x) ? cur.filter((y) => y !== x) : shops.filter((y) => y === x || cur.includes(y))));
-  const names = (list: StoreChain[]) => list.map((x) => chainName(x)).join(list.length === 2 ? ' and ' : ', ');
+  const plan = chosen.length ? shopTotals(entries, tripRecs(recs, chosen).recs, chosen as never, compare) : undefined;
+  const flip = (x: StoreChain) => setChosen((cur) => (cur.includes(x) ? cur.filter((y) => y !== x) : shops.filter((y) => y === x || cur.includes(y))));
   return (
-    <Sheet title="Where are you shopping today?" onClose={onClose}>
-      <p className="small">Tick the shops you're going to. Restock puts each item at the cheapest of those, and tells you what they don't have.</p>
-      <div className="chips">
-        {recommended && (
-          <button className="chip" aria-pressed={chosen.length === 1 && chosen[0] === recommended} onClick={() => setChosen([recommended])}>
-            Just {chainName(recommended)}
-          </button>
-        )}
-        <button className="chip" aria-pressed={chosen.length === shops.length} onClick={() => setChosen(shops)}>
-          All {shops.length}
+    <div className="shopmode" role="dialog" aria-label="Which shops today?">
+      <div className="shopmode-top">
+        <button className="icon-btn" aria-label="Back to your list" onClick={onClose}>
+          <Icon name="back" size={20} />
+        </button>
+        <div style={{ flex: 1 }}>
+          <div className="title" style={{ fontSize: 17 }}>
+            Shopping
+          </div>
+          <div className="small">Step 1 of 2</div>
+        </div>
+      </div>
+      <div className="shopmode-list">
+        <div className="shop-picker">
+          <h2 className="shop-picker-title">Which shops today?</h2>
+          <div className="shop-picks" role="group" aria-label="The shops you're going to today">
+            {shops.map((x) => {
+              const on = chosen.includes(x);
+              const st = totals.stores.find((t) => t.chain === x);
+              const has = st?.lines.length ?? 0;
+              // 0.12.7: what this shop could stand in for, with an "Also happy with" product
+              const alone = shopTotals(entries, tripRecs(recs, [x]).recs, [x] as never, compare).stores.find((t) => t.chain === x);
+              const alts = Math.max(0, (alone?.lines.length ?? 0) - has);
+              return (
+                <button key={x} type="button" className={`shop-pick trip-pick${on ? ' on' : ''}`} aria-pressed={on} onClick={() => flip(x)}>
+                  <ChainDot chain={x} />
+                  <span className="grow" style={{ minWidth: 0 }}>
+                    <span className="title shop-pick-name">{branchName(cachedSettings(), x)}</span>
+                    {n > 0 && <span className="small num">{has >= n ? (n === 1 ? 'Has your item' : `Has all ${n} items`) : has ? `Has ${has} of your ${n} items` : 'None of your picks'}{alts > 0 ? ` · ${alts === 1 ? '1 alternative' : `${alts} alternatives`}` : ''}</span>}
+                  </span>
+                  <span className="trip-tick" aria-hidden>
+                    {on && <Icon name="check" size={18} />}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {/* 0.9.9: which branch to go to, by stock (Coles' two branches, Woolworths signed in). Only when there's something to say. */}
+          {(() => {
+            const advice = branchAdvice(
+              entries.filter((e) => !e.checked).map((e) => {
+                const r = e.groupId ? recs.find((x) => x.group.id === e.groupId) : undefined;
+                return r ? stockRows(r.options.filter((o) => o.role === 'main').map((o) => o.product), cachedSettings()) : [];
+              }),
+            );
+            return advice ? (
+              <div className="banner green" role="note" style={{ fontSize: 13 }}>
+                {advice}
+              </div>
+            ) : null;
+          })()}
+          {plan && <StockCheck entries={entries} recs={recs} plan={plan} skip={skip} onSkip={setSkip} />}
+        </div>
+      </div>
+      <div className="shop-done-bar">
+        <button className="btn primary block" disabled={!chosen.length} onClick={() => onStart(chosen, skip)}>
+          {chosen.length ? 'Continue' : 'Tap the shops you are going to'}
+          {chosen.length > 0 && <Icon name="chevron" size={18} />}
         </button>
       </div>
-      <div className="card flush">
-        {shops.map((x) => {
-          const st = totals.stores.find((t) => t.chain === x);
-          return (
-            <label key={x} className="check">
-              <input type="checkbox" checked={chosen.includes(x)} onChange={() => flip(x)} aria-label={`Shopping at ${chainName(x)}`} />
-              <ChainDot chain={x} />
-              <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <span className="title" style={{ fontSize: 15 }}>
-                  {branchName(cachedSettings(), x)}{' '}
-                  {x === oneWins ? (
-                    <span className="tag rec">RECOMMENDED</span>
-                  ) : (
-                    x === recommended && !oneWins && <span className="tag info">BEST ONE SHOP</span>
-                  )}
-                </span>
-                {st && n > 0 && (
-                  <span className="small">
-                    {st.missing.length ? `Has ${st.lines.length} of ${n}` : n === 1 ? 'Has your item' : `Has all ${n}`}
-                    {st.lines.length ? ` · ${money(st.total)}` : ''}
-                    {st.missing.length && st.lines.length && st.missing.every((m) => m.elsewhere)
-                      ? ` · about ${money(st.totalWithElsewhere)} with the other ${st.missing.length === 1 ? 'one' : st.missing.length} elsewhere`
-                      : ''}
-                  </span>
-                )}
-              </span>
-            </label>
-          );
-        })}
-      </div>
-      {plan && plan.around.missing.length > 0 && (
-        <div className="banner amber" style={{ fontSize: 13, gap: 4 }}>
-          <strong>
-            Not at {names(chosen)} ({plan.around.missing.length})
-          </strong>
-          <ul className="missing-list">
-            {plan.around.missing.map((m) => (
-              <li key={m}>{m}</li>
-            ))}
-          </ul>
-          <span>None of your picks are there. They'll be listed separately while you shop, so you don't forget them.</span>
-        </div>
-      )}
-      {/* 0.9.9: which branch to go to, by stock (Coles' two branches, Woolworths signed in). */}
-      {(() => {
-        const advice = branchAdvice(
-          entries.filter((e) => !e.checked).map((e) => {
-            const r = e.groupId ? recs.find((x) => x.group.id === e.groupId) : undefined;
-            return r ? stockRows(r.options.filter((o) => o.role === 'main').map((o) => o.product), cachedSettings()) : [];
-          }),
-        );
-        return advice ? (
-          <div className="banner green" role="note" style={{ fontSize: 13 }}>
-            {advice}
-          </div>
-        ) : null;
-      })()}
-      {plan && <StockCheck entries={entries} recs={recs} plan={plan} skip={skip} onSkip={setSkip} />}
-      <button className="btn primary block" disabled={!chosen.length} onClick={() => onStart(chosen, skip)}>
-        <Icon name="cart" size={18} />{' '}
-        {chosen.length
-          ? `Start shopping at ${chosen.length === shops.length && shops.length > 2 ? 'all of them' : names(chosen)}${plan && plan.around.total > 0 ? ` · about ${money(plan.around.total)}` : ''}`
-          : 'Tick a shop'}
-      </button>
-    </Sheet>
+    </div>
   );
 }
 
@@ -1569,7 +1534,6 @@ function ShoppingMode({
   entries: allEntries,
   general = [],
   categories,
-  onChangeShops,
   onClose,
 }: {
   c: Ctx;
@@ -1583,7 +1547,6 @@ function ShoppingMode({
   /** 0.12.6: the General list's lines, shown at the bottom of every shop's page ("get anywhere"). */
   general?: ListEntry[];
   categories: Category[];
-  onChangeShops: () => void;
   onClose: () => void;
 }) {
   // ⓘ on a line: what the product looks like, to find it on the shelf (0.7.3).
@@ -1600,27 +1563,68 @@ function ShoppingMode({
   const generalShown = general.filter((e) => generalSeen.current.has(e.id));
   /** At one shop: the ones with no shop picked, and the ones picked for that shop. In one list: all of them. */
   const generalAt = (v: ShopKey | 'all') => generalShown.filter((e) => v === 'all' || !e.chain || e.chain === v);
-  const recs = onlyAt(all.recs, chosen);
-  const c: Ctx = {
-    ...all,
-    recs,
-    totals: shopTotals(
-      entries.map((e) => ({ ...e, checked: false })),
-      recs,
-      chosen as never,
-      compare,
-    ),
-    order: [...chosen, 'other', 'any'],
+  // 0.10.9: one shop at a time (see below). 0.12.7: declared here, because what each shop shows now
+  // depends on which shops are finished.
+  const [at, setAt] = useState<ShopKey | 'all'>();
+  const [doneAt, setDoneAt] = useState<ShopKey[]>([]);
+  /** Where each thing was ticked on this trip, so a ticked line keeps that shop and its price. */
+  const gotAt = useRef<Map<string, ShopKey>>(new Map());
+  // 0.12.7 (lib/tripPlan): each item is offered at the cheapest shop still to visit that has one of
+  // your picks. Finish a shop without ticking it and it moves to the next. An "Also happy with"
+  // product only fills a gap: no pick of yours at the shops left, or your picks there out of stock.
+  const ctxOf = (shopsNow: StoreChain[], finished: ShopKey[]): Ctx & { alternatives: Set<string> } => {
+    const t = tripRecs(all.recs, shopsNow, finished);
+    return {
+      ...all,
+      recs: t.recs,
+      alternatives: t.alternatives,
+      totals: shopTotals(
+        entries.map((e) => ({ ...e, checked: false })),
+        t.recs,
+        shopsLeft(shopsNow, finished) as never,
+        compare,
+      ),
+      order: [...chosen, 'other', 'any'],
+    };
   };
-  const elsewhere = (e: ListEntry) => (e.groupId ? !dealFor(c, e) : !!e.chain && e.chain !== 'other' && !chosen.includes(e.chain as StoreChain));
+  /** The trip as it stands: the shops still to visit. Unticked lines are placed by this. */
+  const c = ctxOf(chosen, doneAt);
+  /** The whole trip, as it started: where each thing is cheapest today. */
+  const whole = ctxOf(chosen, []);
+  const oneShop = new Map<string, ReturnType<typeof ctxOf>>();
+  const atShop = (shop: StoreChain) => oneShop.get(shop) ?? (oneShop.set(shop, ctxOf([shop], [])), oneShop.get(shop)!);
+  /** The context a line is priced and placed by: where it was ticked, else the shops still to visit. */
+  const cx = (e: ListEntry) => {
+    if (!e.checked) return c;
+    const where = gotAt.current.get(e.id);
+    return where && chosen.includes(where as StoreChain) ? atShop(where as StoreChain) : whole;
+  };
+  const isAlternative = (e: ListEntry) => {
+    const d = dealFor(cx(e), e);
+    return !!d && cx(e).alternatives.has(d.product.id);
+  };
+  /** Not ticked at a cheaper shop you've finished: "Cheaper at Coles ($3.80)". */
+  const cheaperWas = (e: ListEntry): string | undefined => {
+    if (e.checked || !e.groupId) return undefined;
+    const first = dealFor(whole, e);
+    const now = dealFor(cx(e), e);
+    if (!first || !now || first.product.chain === now.product.chain || !doneAt.includes(first.product.chain as ShopKey)) return undefined;
+    const was = priceOf(whole, e);
+    const is = priceOf(cx(e), e);
+    return was !== undefined && is !== undefined && was < is - 0.004 ? `Cheaper at ${chainName(first.product.chain)} (${money(was)})` : undefined;
+  };
+  const noteTick = (e: ListEntry, on: boolean) => {
+    if (on) gotAt.current.set(e.id, shopOf(c, e));
+    else gotAt.current.delete(e.id);
+  };
+  const elsewhere = (e: ListEntry) => (e.groupId ? !dealFor(cx(e), e) : !!e.chain && e.chain !== 'other' && !chosen.includes(e.chain as StoreChain));
   const cards = useLive(allCards, []);
   const [card, setCard] = useState<LoyaltyCard>();
 
   // 0.10.9: one shop at a time. With things at two or more shops, shopping mode starts by asking
   // which shop you're at; that shop's things show (and the ones with no shop), then "Done at Coles"
   // goes back to the shops, with the done ones greyed. "See everything in one list" is the old view.
-  const [at, setAt] = useState<ShopKey | 'all'>();
-  const [doneAt, setDoneAt] = useState<ShopKey[]>([]);
+  // (`at` and `doneAt` are declared above, with the trip's plan.)
 
   // Back (or Escape) goes back to the shops from one shop, else closes shopping mode, unless a sheet
   // is open on top of it.
@@ -1673,7 +1677,7 @@ function ShoppingMode({
   const colesStoreNo = live?.localPrices ? (colesSlot === '1' ? live.stores?.coles?.branchStoreNo : live.stores?.coles?.branchStoreNo2) : undefined;
   const second = secondBranch(live);
   const aisleAt = (e: ListEntry): AisleAt | undefined => {
-    const d = dealFor(c, e);
+    const d = dealFor(cx(e), e);
     if (!d || d.product.chain !== 'coles' || !colesStoreNo) return undefined;
     return aisleOf(aisles, d.product.id, colesSlot, colesStoreNo);
   };
@@ -1683,12 +1687,22 @@ function ShoppingMode({
   const by = sort.by === 'aisle' && !anyAisle ? 'category' : sort.by;
   const sortShop = (items: ListEntry[]) =>
     by === 'az' ? [...items].sort(azOf) : by === 'category' ? [...items].sort(byCategory) : sortByAisle(items, aisleAt, nameOf, !!sort.down);
-  const inTrolley = entries.filter((e) => e.checked && !elsewhere(e)).reduce((s, e) => s + (priceOf(c, e) ?? 0), 0);
+  const inTrolley = entries.filter((e) => e.checked && !elsewhere(e)).reduce((s, e) => s + (priceOf(cx(e), e) ?? 0), 0);
   const notHere = entries.filter((e) => elsewhere(e));
   const left = entries.filter((e) => !e.checked);
-  const here = (shop: ShopKey) => entries.filter((e) => !elsewhere(e) && shopOf(c, e) === shop);
-  const shopKeys = c.order.filter((s) => s !== 'any' && here(s).length > 0);
-  const byShop = shopKeys.length > 1;
+  const here = (shop: ShopKey) => entries.filter((e) => !elsewhere(e) && shopOf(cx(e), e) === shop);
+  // 0.12.7: every shop you said you're going to has its page, even with nothing of yours there yet
+  // (an alternative may land there once the other shops are finished, and General lines show there).
+  const shopKeys = c.order.filter((s) => s !== 'any' && (here(s).length > 0 || chosen.includes(s as StoreChain)));
+  const standby = (shop: ShopKey) =>
+    shop === 'other' || shop === 'any' || doneAt.includes(shop)
+      ? 0
+      : left.filter((e) => {
+          if (!e.groupId || shopOf(c, e) === shop) return false;
+          const d = dealFor(atShop(shop as StoreChain), e);
+          return !!d && atShop(shop as StoreChain).alternatives.has(d.product.id);
+        }).length;
+  const byShop = shopKeys.length > 1 && shopKeys.some((s) => here(s).length > 0 || doneAt.includes(s));
   /** The shop showing: one shop, all of them in one list, or none (the shops to pick from). */
   const view: ShopKey | 'all' | undefined = byShop ? at : 'all';
   const shopName = (shop: ShopKey) =>
@@ -1700,8 +1714,8 @@ function ShoppingMode({
       n: items.length,
       got: got.length,
       left: items.length - got.length,
-      total: items.reduce((s, e) => s + (priceOf(c, e) ?? 0), 0),
-      spent: got.reduce((s, e) => s + (priceOf(c, e) ?? 0), 0),
+      total: items.reduce((s, e) => s + (priceOf(cx(e), e) ?? 0), 0),
+      spent: got.reduce((s, e) => s + (priceOf(cx(e), e) ?? 0), 0),
     };
   };
   // (the shops' page says it's done, in a banner that's read out too)
@@ -1731,18 +1745,19 @@ function ShoppingMode({
     }
     const r = recFor(c, match)!;
     const o = r.options.find((x) => x.product.barcode === out.code);
-    const want = dealFor(c, match);
+    const want = dealFor(cx(match), match);
     const name = r.group.name;
     // 0.9.5 (undo): the message comes with Undo.
     const said =
       o && want && o.product.id !== want.product.id
         ? `${name} ticked. Restock picked ${want.product.name}, ${money(want.price)}, at ${chainName(want.product.chain)}.`
         : `${name} ticked${want?.price !== undefined ? `, ${money(want.price)}` : ''}.`;
+    noteTick(match, true);
     await act(said, () => updateListEntry(match.id, { checked: true }));
   };
 
   const shelfLook = (e: ListEntry): PreviewProduct | undefined => {
-    const o = dealFor(c, e) ?? recFor(c, e)?.options[0];
+    const o = dealFor(cx(e), e) ?? recFor(c, e)?.options[0];
     if (o) return previewFromOption(o);
     return e.product ? { ...e.product, price: e.price } : undefined;
   };
@@ -1801,14 +1816,10 @@ function ShoppingMode({
         </button>
       </div>
       {/* 0.10.2: Change shops is a button (it was a link under the total), beside your cards. */}
-      {(shops.length > 1 || (cards && cards.length > 0)) && (
+      {/* 0.12.7: Change shops went: Start shopping asks which shops you're going to today. Your cards stay. */}
+      {cards && cards.length > 0 && (
         <div className="chips shopmode-cards">
-          {shops.length > 1 && (
-            <button className="chip" onClick={onChangeShops} aria-label={`Change shops. Shopping at ${chosen.map((x) => chainName(x)).join(', ')}`}>
-              <Icon name="cart" size={16} /> Change shops
-            </button>
-          )}
-          {cards?.map((k) => (
+          {cards.map((k) => (
             <button key={k.id} className="chip" onClick={() => setCard(k)}>
               <Icon name="card" size={16} /> Show {k.program === 'other' ? k.label : PROGRAMS[k.program].name}
             </button>
@@ -1857,8 +1868,9 @@ function ShoppingMode({
                 entry={latest}
                 categories={categories}
                 shops={shops}
-                deal={dealFor(c, latest) ?? recFor(c, latest)?.options[0]}
+                deal={dealFor(cx(latest), latest) ?? recFor(c, latest)?.options[0]}
                 name={recFor(c, latest)?.group.name}
+                alternative={isAlternative(latest)}
                 onClose={() => setEditing(undefined)}
                 details={
                   !latest.checked ? (
@@ -1877,6 +1889,7 @@ function ShoppingMode({
             doneAt={doneAt}
             anyCount={here('any').filter((e) => !e.checked).length}
             generalCount={generalShown.filter((e) => !e.checked).length}
+            standby={standby}
             name={shopName}
             stats={statsOf}
             onPick={setAt}
@@ -1886,7 +1899,19 @@ function ShoppingMode({
         )}
         {(view === 'all' ? c.order : view ? [view, 'any' as ShopKey] : []).map((shop) => {
           const items = sortShop(here(shop));
-          if (!items.length) return null;
+          // 0.12.7: a shop you're going to with nothing of yours there (yet) says so, plainly.
+          if (!items.length)
+            return view === shop && shop !== 'any' ? (
+              <section key={shop}>
+                <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '12px 16px 4px' }}>
+                  <ChainDot chain={shop} /> {shopName(shop)}
+                </div>
+                <p className="small" style={{ margin: 0, padding: '4px 16px 12px' }}>
+                  Nothing from your list here right now.
+                  {standby(shop) > 0 ? ' An alternative shows here if your other shops miss out.' : ''}
+                </p>
+              </section>
+            ) : null;
           return (
             <section key={shop}>
               <div
@@ -1907,7 +1932,7 @@ function ShoppingMode({
                 )}
               </div>
               {items.map((e) => {
-                const d = dealFor(c, e);
+                const d = dealFor(cx(e), e);
                 const name = recFor(c, e)?.group.name ?? e.text;
                 return (
                   <ShopRow
@@ -1915,6 +1940,7 @@ function ShoppingMode({
                     e={e}
                     name={name}
                     onOpen={openOf(e)}
+                    onTicked={(on) => noteTick(e, on)}
                     // 0.10.8: its photo, with the blue ⓘ, as on the list: tap it to see the product in full
                     // (photo, size, ingredients), so you know what you're looking for on the shelf.
                     thumb={
@@ -1930,9 +1956,9 @@ function ShoppingMode({
                     extra={
                       // 0.12.5: the price with the blue i right under it (beside it there was no room left for the name on a phone)
                       <span className="shoprow-side">
-                        {priceOf(c, e) !== undefined && (
+                        {priceOf(cx(e), e) !== undefined && (
                           <span className="num" style={{ fontWeight: 700, fontSize: 17 }}>
-                            {money(priceOf(c, e))}
+                            {money(priceOf(cx(e), e))}
                           </span>
                         )}
                         <RowInfo name={name} onOpen={() => setEditing(e)} />
@@ -1952,7 +1978,7 @@ function ShoppingMode({
                       </span>
                       {d ? (
                         <span className="small">
-                          {packsOf(c, e)}
+                          {packsOf(cx(e), e)}
                           {d.product.name}
                           {/* 0.10.9: or any of the others you picked here (flavours, scents, colours) */}
                           {(() => {
@@ -1963,6 +1989,13 @@ function ShoppingMode({
                       ) : (
                         e.product && <span className="small">{e.product.name}</span>
                       )}
+                      {/* 0.12.7: an "Also happy with" product standing in, or a pick you passed at a cheaper shop */}
+                      {(isAlternative(e) || cheaperWas(e)) && (
+                        <span className="tags" style={{ marginTop: 3 }}>
+                          {isAlternative(e) && <span className="tag info">ALTERNATIVE</span>}
+                          {cheaperWas(e) && <span className="tag normal">{cheaperWas(e)}</span>}
+                        </span>
+                      )}
                       {/* 0.10.2: where it is in the shop (shopping mode only). 0.10.8: only when the shop
                           has said; no 'Aisle: unknown' on every line. */}
                       {!e.checked && !serverMode && aisleAt(e) && (
@@ -1970,12 +2003,12 @@ function ShoppingMode({
                           <span className="tag aisle">{aisleLabel(aisleAt(e))}</span>
                         </span>
                       )}
-                      {stockNote(c, e) && (
+                      {stockNote(cx(e), e) && (
                         <span
                           className="small"
-                          style={{ color: stockNote(c, e)!.kind === 'second' ? 'var(--green-ink)' : 'var(--amber-ink)', fontWeight: 600 }}
+                          style={{ color: stockNote(cx(e), e)!.kind === 'second' ? 'var(--green-ink)' : 'var(--amber-ink)', fontWeight: 600 }}
                         >
-                          {stockNote(c, e)!.text}
+                          {stockNote(cx(e), e)!.text}
                         </span>
                       )}
                       {/* 0.9.9: stock at each shop the item is bought at, a tap away. */}
@@ -2039,6 +2072,57 @@ function ShoppingMode({
             ))}
           </section>
         )}
+        {/* 0.12.7: nothing drops off silently: what none of today's shops has is at the bottom of every page (it was only on the shops page) */}
+        {notHere.length > 0 && (
+          <section className="not-today">
+            <div className="eyebrow" style={{ padding: '12px 16px 4px', color: 'var(--amber-ink, inherit)' }}>
+              {doneAt.length && shopsLeft(chosen, doneAt).length ? 'Not at the shops you have left' : "Not at today's shops"}
+            </div>
+            <p className="small" style={{ padding: '0 16px', margin: 0 }}>
+              {doneAt.length && shopsLeft(chosen, doneAt).length
+                ? "These were at a shop you've finished, or aren't at any of today's shops."
+                : `${chosen.length === 1 ? `${chainName(chosen[0])} doesn't` : "The shops you're going to don't"} have these.`}{' '}
+              Tick them off if you find them anyway.
+            </p>
+            {notHere.map((e) => {
+              const best = dealFor(all, e);
+              const name = recFor(all, e)?.group.name ?? e.text;
+              return (
+                <ShopRow
+                  key={e.id}
+                  e={e}
+                  name={name}
+                  onOpen={openOf(e)}
+                  thumb={
+                    best ? (
+                      <span className="thumb-btn" aria-hidden>
+                        <Thumb src={previewFromOption(best).imageUrl} />
+                      </span>
+                    ) : notHere.some((x) => !!dealFor(all, x)) ? (
+                      <span className="thumb-space" aria-hidden />
+                    ) : undefined
+                  }
+                  extra={
+                    // The ⓘ on the right, as on every line (0.12.7: it sat on the photo here)
+                    <span className="shoprow-side">
+                      <RowInfo name={name} onOpen={() => setEditing(e)} />
+                    </span>
+                  }
+                >
+                  <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <span className="title" style={{ fontSize: 17 }}>
+                      {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}
+                      {name}
+                    </span>
+                    <span className="small">
+                      {best ? `At ${chainName(best.product.chain)}: ${best.product.name}, ${money(best.price)}` : 'No price at any of your shops yet'}
+                    </span>
+                  </span>
+                </ShopRow>
+              );
+            })}
+          </section>
+        )}
         {view !== undefined && view !== 'all' && (
           // 0.10.9: done here: back to the shops (the done one greyed)
           <div className="shop-done-bar">
@@ -2056,45 +2140,6 @@ function ShoppingMode({
           <p className="small" style={{ padding: '12px 16px 0', margin: 0 }}>
             Skipped today (out of stock): {skipped.map((e) => recFor(all, e)?.group.name ?? e.text).join(', ')}. Still on your list.
           </p>
-        )}
-        {notHere.length > 0 && (view === 'all' || !view) && (
-          <section>
-            <div className="eyebrow" style={{ padding: '12px 16px 4px', color: 'var(--amber-ink, inherit)' }}>
-              Not at {chosen.map((x) => chainName(x)).join(' or ')}
-            </div>
-            <p className="small" style={{ padding: '0 16px', margin: 0 }}>
-              {chosen.length === 1 ? `${chainName(chosen[0])} doesn't` : "These shops don't"} sell any of your picks for these. Tick them off if you find them anyway.
-            </p>
-            {notHere.map((e) => {
-              const best = dealFor(all, e);
-              const name = recFor(all, e)?.group.name ?? e.text;
-              return (
-                <ShopRow
-                  key={e.id}
-                  e={e}
-                  name={name}
-                  onOpen={openOf(e)}
-                  thumb={
-                    best ? (
-                      <MoreInfo src={previewFromOption(best).imageUrl} name={name} onOpen={() => setInfo(previewFromOption(best))} />
-                    ) : notHere.some((x) => !!dealFor(all, x)) ? (
-                      <span className="thumb-space" aria-hidden />
-                    ) : undefined
-                  }
-                >
-                  <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <span className="title" style={{ fontSize: 17 }}>
-                      {qtyOf(e) > 1 && <span className="num">{qtyOf(e)} × </span>}
-                      {name}
-                    </span>
-                    <span className="small">
-                      {best ? `At ${chainName(best.product.chain)}: ${best.product.name}, ${money(best.price)}` : 'No price at any of your shops yet'}
-                    </span>
-                  </span>
-                </ShopRow>
-              );
-            })}
-          </section>
         )}
       </div>
       {card && (
@@ -2128,7 +2173,10 @@ export function EditEntry({
   onPick,
   onAddToPantry,
   details,
+  alternative,
 }: {
+  /** 0.12.7: the product showing is an "Also happy with" one, standing in on this trip. */
+  alternative?: boolean;
   /** 0.10.5: the line's how many, prices, tags and cheaper swap (worked out by the list). */
   details?: ReactNode;
   /** 0.9.11: "Pick my cordial" opens the Pick sheet, as the line's search button does. */
@@ -2207,7 +2255,8 @@ export function EditEntry({
             </span>
             {linked && (
               <span className="tags">
-                <span className={`tag ${deal.role === 'alt' ? 'alt' : 'normal'}`}>{deal.role === 'alt' ? 'ALSO HAPPY WITH' : 'MY PICK'}</span>
+                {/* 0.12.7: a trip can offer an alternative as the one to get: it's still tagged as one */}
+                <span className={`tag ${deal.role === 'alt' || alternative ? 'alt' : 'normal'}`}>{deal.role === 'alt' || alternative ? 'ALSO HAPPY WITH' : 'MY PICK'}</span>
               </span>
             )}
           </span>
