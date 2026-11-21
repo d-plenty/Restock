@@ -17,19 +17,73 @@ import { useNav } from './nav';
 /** What the shop's page says along the top while it's open (StoreWeb.java's bar). */
 export const UNBLOCK_BAR = 'Do the tick box or puzzle if the page shows one. When you see its normal page with products, tap Done.';
 
-export type UnblockResult = 'working' | 'blocked' | 'unknown';
+// 0.12.8: 'unread': the shop's page opened and nothing turned Restock away, but no products could be
+// read from its search (it said "Still blocked" for that too, which sent people round in circles).
+export type UnblockResult = 'working' | 'blocked' | 'unread' | 'unknown';
+
+/** What a test of one shop came to (pure, for testing). */
+export function resultOf(r: { ok: boolean; blocked?: boolean } | undefined): UnblockResult {
+  if (!r) return 'unknown';
+  return r.ok ? 'working' : r.blocked ? 'blocked' : 'unread';
+}
+
+/** Test one shop now, as Test connections does. */
+export async function testShop(chain: StoreChain): Promise<{ result: UnblockResult; error?: string }> {
+  if (isPressOnlyShop(chain)) return { result: 'unknown' };
+  const settings = await getSettings();
+  const [r] = await testConnections([chain], { [chain]: settings.stores[chain]?.storeId });
+  if (r?.ok) await unhideWarning(chain).catch(() => undefined);
+  return { result: resultOf(r), error: r?.error };
+}
 
 /** Open the shop's page, then check it once. */
 export async function unblockShop(chain: StoreChain): Promise<UnblockResult> {
   await RestockNative.openStore({ chain, home: websiteOf(chain), message: UNBLOCK_BAR });
   // A search page worked out from a "checking your browser" page could be wrong: look again.
   if ((kindOf(chain) ?? 'web') === 'web') await forgetSearchInfo(chain).catch(() => undefined);
-  if (isPressOnlyShop(chain)) return 'unknown';
-  const settings = await getSettings();
-  const [r] = await testConnections([chain], { [chain]: settings.stores[chain]?.storeId });
-  if (!r) return 'unknown';
-  if (r.ok) await unhideWarning(chain).catch(() => undefined);
-  return r.ok ? 'working' : 'blocked';
+  return (await testShop(chain)).result;
+}
+
+/** What "Try again" says when the shop still isn't working (pure, for testing). */
+export function tryAgainWords(name: string, result: UnblockResult): string {
+  if (result === 'working') return `${name} is working again.`;
+  if (result === 'blocked') return `${name} is still blocking Restock. Tap Unblock ${name} and pass its check.`;
+  if (result === 'unread') return `${name} answered, but Restock couldn't read any products from it. Try Unblock ${name}, or again later.`;
+  return `Restock tries ${name} again the next time you search it.`;
+}
+
+/**
+ * 0.12.8: "Try again" on a shop's warning. It tests that one shop and says what happened (it ran the
+ * whole price check, whose progress is at the top of Home: scrolled down, it looked like nothing).
+ */
+export function TryAgain({ chain, onWorked }: { chain: StoreChain; onWorked?: () => void }) {
+  const nav = useNav();
+  const name = chainName(chain);
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string>();
+  const go = async () => {
+    if (busy) return;
+    if (!isNative() || isPressOnlyShop(chain)) return onWorked?.();
+    setBusy(true);
+    setSaid(undefined);
+    const { result } = await testShop(chain).catch(() => ({ result: 'unread' as UnblockResult }));
+    setBusy(false);
+    if (result === 'working') {
+      nav.toast(tryAgainWords(name, result));
+      onWorked?.();
+    } else setSaid(tryAgainWords(name, result));
+  };
+  return (
+    <>
+      <button className={`btn small${busy ? ' is-busy' : ''}`} style={{ alignSelf: 'flex-start' }} disabled={busy} onClick={() => void go()}>
+        {busy ? <span className="spinner" aria-hidden="true" /> : <Icon name="refresh" size={16} />} {busy ? `Checking ${name}…` : 'Try again'}
+      </button>
+      {/* Said under the button, where the tap was (and read out) */}
+      <span className="small try-again-said" role="status">
+        {busy ? 'This can take up to a minute.' : (said ?? '')}
+      </span>
+    </>
+  );
 }
 
 /** The steps, then the shop's page, then whether it worked. */
@@ -71,6 +125,15 @@ export function UnblockSheet({ chain, onClose, onWorked }: { chain: StoreChain; 
           <span style={{ fontSize: 13 }}>Prices carry on at the next check.</span>
         </div>
       )}
+      {stage === 'unread' && (
+        <div className="banner amber" role="status">
+          <strong>{name} opened, but Restock still can’t read it</strong>
+          <span style={{ fontSize: 13 }}>
+            Nothing is blocking it now, but no products came back. If its page asks you to choose a shop near you, choose one and wait for products
+            before you tap Done. If it still won’t work, {name}’s website may have changed: Settings, Feedback tells the developer.
+          </span>
+        </div>
+      )}
       {stage === 'blocked' && (
         <div className="banner amber" role="status">
           <strong>Still blocked: try again later</strong>
@@ -91,7 +154,7 @@ export function UnblockSheet({ chain, onClose, onWorked }: { chain: StoreChain; 
         </button>
       ) : (
         <button className="btn primary block" disabled={!isNative() || stage === 'checking'} onClick={() => void go()}>
-          <Icon name="external" size={18} /> {stage === 'blocked' ? `Open ${name} again` : `Open ${name}`}
+          <Icon name="external" size={18} /> {stage === 'blocked' || stage === 'unread' ? `Open ${name} again` : `Open ${name}`}
         </button>
       )}
       {!isNative() && (

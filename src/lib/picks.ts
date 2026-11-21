@@ -2,14 +2,14 @@ import type { Group, Product } from '../types';
 import { packSize } from './units';
 import { costcoNotHere } from '../shops';
 
-// What I buy and Also happy with (0.8.9).
+// Products I buy and Also happy with (0.8.9).
 //
-// Each item has, at each shop, the products you'd buy there ("What I buy": the usual product and the
+// Each item has, at each shop, the products you'd buy there ("Products I buy": the usual product and the
 // "same" products) and others you'd also take when they're cheaper ("Also happy with", the
-// alternatives). Store comparisons use What I buy only; Also happy with is only for Cheaper swap.
+// alternatives). Store comparisons use Products I buy only; Also happy with is only for Cheaper swap.
 //
 // Before 0.8.9 an alternative also counted for a store comparison when it was the only product an
-// item had at that shop. So nothing changes when you update, those alternatives become What I buy at
+// item had at that shop. So nothing changes when you update, those alternatives become Products I buy at
 // their shop. Alternatives at a shop that already has one of your picks stay Also happy with, and
 // so does a bulk pack on an item that said no to bulk packs (0.8.8 never used those either).
 
@@ -19,7 +19,7 @@ const amount = (p: Sized | undefined) =>
   !p ? undefined : p.qty && p.qtyUnit ? { qty: p.qty, unit: p.qtyUnit as string } : packSize(p.size, p.name);
 
 /**
- * An item's products moved over to What I buy / Also happy with. `chainOf` gives a product's shop;
+ * An item's products moved over to Products I buy / Also happy with. `chainOf` gives a product's shop;
  * `productOf` (optional) its size, to leave bulk packs alone when the item doesn't want them.
  */
 export function toPicks<G extends Pick<Group, 'usualProductId' | 'sameProductIds' | 'altProductIds' | 'allowBulk'>>(

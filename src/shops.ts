@@ -488,7 +488,8 @@ export const SHOPS: ShopDef[] = [
     name: 'Pharmacy 4 Less',
     color: '#0091d0',
     website: 'https://www.pharmacy4less.com.au',
-    search: 'https://www.pharmacy4less.com.au/?s={q}',
+    // 0.12.8: its shop moved: "/?s=" now opens its front page (no products, so it read as blocked)
+    search: 'https://pharmacy4less.com.au/search.php?search_query={q}&section=product',
     map: /pharmacy\s*4\s*less/i,
   }),
   P({

@@ -32,10 +32,10 @@ describe('0.12.7: the name is yours', () => {
 
 describe('0.12.7: Also happy with, while adding', () => {
   it('the review page has both groups and saves the alternatives', () => {
-    expect(add).toMatch(/What I buy/);
+    expect(add).toMatch(/Products I buy/); // 0.12.8: renamed from What I buy
     expect(add).toMatch(/Also happy with \(alternative product\)/);
     expect(add).toMatch(/Make it an alternative/);
-    expect(add).toMatch(/Make it what I buy/);
+    expect(add).toMatch(/Move to Products I buy/); // 0.12.8: was "Make it what I buy"
     expect(add).toMatch(/addItemFromPicks\([^)]*altPicks\)/s);
   });
   it('the web says where it works (it is a phone part)', () => {

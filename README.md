@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.12.7" src="https://img.shields.io/badge/status-release%20candidate%200.12.7-ffcd00">
+  <img alt="Release candidate 0.12.8" src="https://img.shields.io/badge/status-release%20candidate%200.12.8-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0127">New in 0.12.7</a> ·
+  <a href="#new-in-0128">New in 0.12.8</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -138,6 +138,21 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.12.8
+
+Getting to your products, and a tidy-up of things testers ran into.
+
+- **A shopping list item opens its pantry item.** Tap an item on the list and there's an **Open in Pantry** button on its sheet, before and while shopping. It was a small button folded under Edit this item.
+- **Products I buy.** That's the one name now for the products you buy as an item (it was What I buy). On an item's page it has a pencil, a green edge and the line **Add, change or remove products**. **Edit** has a button that takes you there too.
+- **Adding another product is one tap.** From an item's **Add another product** (or Find it, or Also happy with), tapping **+** adds that product straight away, with **Undo**. The "Check it, then add" sheet that opened after every tick is gone. Products already in the item show ticked, and **Done** goes back. A brand-new item still ends on its review page, where you name it.
+- **No doubled-up search results.** A shop sometimes sends the same product twice; it now shows once.
+- **Loose fruit and veg are priced by the kilo**, as on the shelf ticket: **$4.50/kg**, with the shop's price for one under it (**about $0.90 each**). List totals still use the shop's price for one, and say "about".
+- **Backup reminders.** The first **Not now** brings the reminder back in a week; after that every 30 days. **Settings, Sync and backups, Remind me to back up** changes it: every week, every 30 days, every 3 months or never.
+- **Try again says what happened.** On a shop's "hasn't worked" card, Try again tests that one shop, shows **Checking Cellarbrations…**, then says whether it's working, still blocking, or answering with nothing Restock can read. Unblock no longer says "Still blocked" when nothing was blocking it.
+- **Cellarbrations, The Bottle-O and Porters show product photos.**
+- **Pharmacy 4 Less** is searched at its shop's new address (the old one opened its front page, which read as blocked).
+- On the web pages: the same names, Open in Pantry, per-kilo prices and no doubled-up results.
 
 ## New in 0.12.7
 
@@ -612,7 +627,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.7.apk` (on macOS, `shasum -a 256 restock-0.12.7.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.8.apk` (on macOS, `shasum -a 256 restock-0.12.8.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

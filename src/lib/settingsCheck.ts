@@ -271,6 +271,8 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     seenTabOffers: tabs(s.seenTabOffers),
     lastBackupAt: when(s.lastBackupAt),
     backupNudgeAt: when(s.backupNudgeAt),
+    backupNudges: typeof s.backupNudges === 'number' && s.backupNudges > 0 ? Math.min(999, Math.floor(s.backupNudges)) : undefined,
+    backupRemindDays: [0, 7, 90].includes(s.backupRemindDays as number) ? (s.backupRemindDays as number) : undefined,
     marketData: {
       // 0.10.0: one switch, Shared prices: on exactly when sending prices back is.
       enabled: (s.sharePrices ?? D.sharePrices) !== 'no',

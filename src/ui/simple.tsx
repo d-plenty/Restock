@@ -4,7 +4,7 @@
 import { useState, type ReactNode } from 'react';
 import { addToList, takeOffList } from '../lib/listActions';
 import { cleanSearch } from '../lib/searchText';
-import { lastUpdatedText, productLine } from '../lib/unitPrice';
+import { kiloPrice, lastUpdatedText, productLine } from '../lib/unitPrice';
 import { money } from '../lib/units';
 import type { Option, Recommendation } from '../lib/verdict';
 import { chainName, type Chain } from '../types';
@@ -45,6 +45,7 @@ export function ItemRow({
   chain,
   shopText,
   price,
+  priceText,
   note,
   onOpen,
   openLabel,
@@ -60,6 +61,8 @@ export function ItemRow({
   /** In place of the shop's name ("3 shops", "Any shop"). */
   shopText?: string;
   price?: number;
+  /** 0.12.8: in place of the price as written ("$5.00/kg" for loose fruit and veg). */
+  priceText?: string;
   note?: { text: string; tone: NoteTone };
   /** Tapping the row (not its buttons). */
   onOpen?: () => void;
@@ -85,7 +88,7 @@ export function ItemRow({
           </span>
         )}
         <span className="irow-price">
-          {price !== undefined && <span className="num">{money(price)}</span>}
+          {price !== undefined && <span className="num">{priceText ?? money(price)}</span>}
           {note && <span className={`irow-note ${note.tone}`}>{note.text}</span>}
         </span>
       </span>
@@ -234,6 +237,7 @@ export function RecRow({ rec, listed, lead, onOpen, openLabel, hideActions }: { 
         chain={o?.product.chain}
         shopText={o ? undefined : 'No price yet'}
         price={o ? (o.multi ? o.shelfPrice : o.price) : undefined}
+        priceText={o && !o.multi ? kiloPrice(o.product, o.price)?.main : undefined}
         note={recNote(rec)}
         lead={lead}
         onOpen={onOpen ?? (() => nav.push({ name: 'item', groupId: rec.group.id }))}

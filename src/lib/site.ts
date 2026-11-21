@@ -83,3 +83,23 @@ export function searchOnSite(search: string | undefined, website: string | undef
   if (!t.includes('{q}') || !sameSite(t, website)) return undefined;
   return t.replace(/^http:\/\//i, 'https://');
 }
+
+/**
+ * 0.12.8: Cellarbrations, The Bottle-O and Porters (one shopping website between them) draw a grey
+ * "missing image" square until a product scrolls into view, so the page Restock reads has no photos.
+ * Each product's own photo is kept under its number, the "-id-562785" at the end of its address. A
+ * product with no photo there just shows the plain icon, as before.
+ */
+export function siteImage(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return undefined;
+  }
+  if (!/(^|\.)(cellarbrations|thebottle-o|portersliquor)\.com\.au$/i.test(u.hostname)) return undefined;
+  const id = /\/product\/[^/?#]*-id-(\d{3,12})\/?$/i.exec(u.pathname)?.[1];
+  return id ? `https://cdn.metcash.media/image/upload/w_300,h_300,c_pad,b_auto/alm-online/images/${id}.jpg` : undefined;
+}
+

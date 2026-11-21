@@ -1,7 +1,7 @@
 // 0.12.7: what a shopping trip offers at the shops still to visit.
 //
 // You say which shops you're going to today. Each item starts at the cheapest of those that has one
-// of your picks ("What I buy"). Finish a shop without ticking an item and it moves on to the next
+// of your picks ("Products I buy"). Finish a shop without ticking an item and it moves on to the next
 // cheapest shop still to visit. "Also happy with" (an alternative product) only fills a gap:
 //   - none of the shops still to visit has one of your picks, but one has an alternative; or
 //   - your picks at those shops are all out of stock, and an alternative there isn't.
@@ -36,7 +36,7 @@ export function tripRecs(recs: Recommendation[], chosen: readonly string[], done
     const standIn = !mains.length ? alts : mainsOut ? altsIn : [];
     if (!standIn.length) return { ...r, options: here };
     for (const o of standIn) alternatives.add(o.product.id);
-    // The list buys from "What I buy" only (shopTotals), so a stand-in is passed as one.
+    // The list buys from "Products I buy" only (shopTotals), so a stand-in is passed as one.
     return { ...r, options: [...here.filter((o) => o.role === 'main'), ...standIn.map((o) => ({ ...o, role: 'main' as const }))] };
   });
   return { recs: out, alternatives };

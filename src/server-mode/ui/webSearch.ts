@@ -5,6 +5,7 @@
 // for what can go wrong, and the plain logic the screens use (WebShopSearch.tsx), kept here so it's
 // tested on its own. Ticking, the bar and when the details sheet opens are the phone's (addPicks.ts).
 
+import { uniqueProducts } from '../../ui/screens/attachOne';
 import { cleanSearch } from '../../lib/searchText';
 import { useEffect, useSyncExternalStore } from 'react';
 import { genericName } from '../../lib/naming';
@@ -239,7 +240,8 @@ export function shopNote(s: ShopAnswer): string | undefined {
 
 /** Best first, as the server ranked them; with "ticked first" so a tick is never under Show more. */
 export function shownItems(s: ShopAnswer, picks: ReadonlyMap<string, StoreProduct>, specialsOnly: boolean, limit: number) {
-  const items = s.status === 'ok' ? s.items.filter((p) => !specialsOnly || p.isSpecial) : [];
+  // 0.12.8: no repeats (a shop sometimes sends the same product twice)
+  const items = s.status === 'ok' ? uniqueProducts(s.items).filter((p) => !specialsOnly || p.isSpecial) : [];
   const ordered = [...items.filter((p) => picks.has(keyOf(p))), ...items.filter((p) => !picks.has(keyOf(p)))];
   return { list: ordered.slice(0, limit), left: Math.max(0, ordered.length - limit), total: items.length };
 }

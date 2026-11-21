@@ -1,5 +1,6 @@
 // 0.9.3: the shopping list at desktop widths: each shop in its own column with its total, then
 // Anywhere. The same picks, totals and add box as the phone's list (List.tsx listSums, useListAdd).
+import { kiloPrice } from '../../lib/unitPrice';
 import { useMemo, useState, type ReactNode } from 'react';
 import { allCategories, allListEntries, getSettings, updateSettings } from '../../lib/db';
 import { linesToPick, pickWord } from '../../lib/homeAssistant';
@@ -262,7 +263,7 @@ export function DeskList() {
           {deal && bothPrices(deal) && <span className="dk-sub num">{bothPrices(deal)}</span>}
           {(p !== undefined || onSale) && (
             <span className={`dk-sub num${onSale ? ' dk-good' : ''}`}>
-              {p !== undefined ? money(p) : ''}
+              {p !== undefined ? (deal && !deal.multi && kiloPrice(deal.product, deal.price, qtyOf(e)) ? `${kiloPrice(deal.product, deal.price)!.main} · ${kiloPrice(deal.product, deal.price, qtyOf(e))!.each}` : money(p)) : ''}
               {onSale ? ` · ${deal!.verdict.kind === 'small' ? 'small saving' : 'on special'}` : ''}
             </span>
           )}

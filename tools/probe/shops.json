@@ -166,7 +166,7 @@
   "website": "https://www.pharmacy4less.com.au",
   "kind": "web",
   "section": "pharmacy",
-  "search": "https://www.pharmacy4less.com.au/?s={q}"
+  "search": "https://pharmacy4less.com.au/search.php?search_query={q}&section=product"
  },
  {
   "id": "directchemist",

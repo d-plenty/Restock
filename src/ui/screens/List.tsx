@@ -37,6 +37,7 @@ import { isNative } from '../../stores/http';
 import { aroundPlan, cheaperThan, shopTotals, type ShopTotals } from '../../lib/shopTotals';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { money, tidySize } from '../../lib/units';
+import { kiloPrice } from '../../lib/unitPrice';
 import { useLive } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
 import { chainName, secondBranch, type Category, type Chain, type ListEntry, type LoyaltyCard, type Settings } from '../../types';
@@ -572,8 +573,12 @@ export function ListScreen() {
           {!selecting && <RowInfo name={title} onOpen={openRow} />}
           {p !== undefined && (
             <span className="num list-row-price">
-              {money(p)}
-              {qtyOf(e) > 1 && deal?.price !== undefined && Math.abs(deal.price * qtyOf(e) - p) < 0.005 && (
+              {/* 0.12.8: loose fruit and veg by the kilo, as on the shelf ticket, with the shop's price for one (or for how many) under it */}
+              {(deal && !deal.multi && kiloPrice(deal.product, deal.price)?.main) || money(p)}
+              {deal && !deal.multi && kiloPrice(deal.product, deal.price, qtyOf(e))?.each && (
+                <span className="small list-row-each kilo-each">{kiloPrice(deal.product, deal.price, qtyOf(e))!.each}</span>
+              )}
+              {!(deal && !deal.multi && kiloPrice(deal.product, deal.price)) && qtyOf(e) > 1 && deal?.price !== undefined && Math.abs(deal.price * qtyOf(e) - p) < 0.005 && (
                 <span className="small list-row-each">
                   {qtyOf(e)} × {money(deal.price)}
                 </span>
@@ -1958,9 +1963,10 @@ function ShoppingMode({
                       <span className="shoprow-side">
                         {priceOf(cx(e), e) !== undefined && (
                           <span className="num" style={{ fontWeight: 700, fontSize: 17 }}>
-                            {money(priceOf(cx(e), e))}
+                            {(d && !d.multi && kiloPrice(d.product, d.price)?.main) || money(priceOf(cx(e), e))}
                           </span>
                         )}
+                        {d && !d.multi && kiloPrice(d.product, d.price, qtyOf(e))?.each && <span className="small num kilo-each">{kiloPrice(d.product, d.price, qtyOf(e))!.each}</span>}
                         <RowInfo name={name} onOpen={() => setEditing(e)} />
                       </span>
                     }
@@ -2251,8 +2257,9 @@ export function EditEntry({
             </span>
             {deal.product.size && !nameHasSize(deal.product.name, deal.product.size) && <span className="small">{deal.product.size}</span>}
             <span className="num" style={{ fontWeight: 700 }}>
-              {money(deal.price)}
+              {(!deal.multi && kiloPrice(deal.product, deal.price)?.main) || money(deal.price)}
             </span>
+            {!deal.multi && kiloPrice(deal.product, deal.price)?.each && <span className="small num kilo-each">{kiloPrice(deal.product, deal.price)!.each}</span>}
             {linked && (
               <span className="tags">
                 {/* 0.12.7: a trip can offer an alternative as the one to get: it's still tagged as one */}
@@ -2287,6 +2294,18 @@ export function EditEntry({
         <p className="small" style={{ margin: '-4px 0 0' }}>
           Search your shops and pick the one you buy. Restock then tracks where it's cheapest.
         </p>
+      )}
+      {/* 0.12.8: straight to the item itself (it was a small "Pantry item" button folded under Edit this item) */}
+      {linked && (
+        <button
+          className="btn"
+          onClick={() => {
+            onClose();
+            nav.push({ name: 'item', groupId: entry.groupId! });
+          }}
+        >
+          <Icon name={tab} size={18} /> Open in {SECTION_NAMES[tab]}
+        </button>
       )}
       <details className="explain entry-edit" open={editOpen} onToggle={(ev) => setEditOpen((ev.currentTarget as HTMLDetailsElement).open)}>
         <summary>
@@ -2327,26 +2346,11 @@ export function EditEntry({
         </label>
       </div>
       {/* 0.10.5: Pantry item and Move to side by side. */}
-      {(linked || (lists && lists.length > 1)) && (
-        <div className="two">
-          {linked && (
-            <button
-              className="btn"
-              onClick={() => {
-                onClose();
-                nav.push({ name: 'item', groupId: entry.groupId! });
-              }}
-            >
-              <Icon name="pantry" size={18} /> Pantry item
-            </button>
-          )}
-          {/* 0.9.6 (Move to): to Groceries, Keg, Health or General (MoveTo.tsx), with Undo. */}
-          {lists && lists.length > 1 && (
-            <button className="btn" onClick={() => setMoving(true)}>
-              <Icon name="swap" size={18} /> Move to
-            </button>
-          )}
-        </div>
+      {/* 0.9.6 (Move to): to Groceries, Keg, Health or General (MoveTo.tsx), with Undo. */}
+      {lists && lists.length > 1 && (
+        <button className="btn" onClick={() => setMoving(true)}>
+          <Icon name="swap" size={18} /> Move to another list
+        </button>
       )}
       <button
         className="btn danger"

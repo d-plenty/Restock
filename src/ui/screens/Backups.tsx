@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AUTO_GIFT_NOTE, BACKUP_EVERY, BACKUP_KEEP, everyLabel, defaultBackupFolder, maybeAutoBackup } from '../../lib/autoBackup';
+import { BACKUP_REMIND, remindDays, remindLabel } from '../../lib/backup';
 import { askPassword, confirmAction } from '../../lib/confirm';
 import { getSettings, priceHistorySpan, updateSettings } from '../../lib/db';
 // 0.9.5 (save): Settings → Automatic backups waits for Save settings (settingsDraft.ts).
@@ -195,6 +196,31 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
           )}
         </span>
       </div>
+      {!inSetup && (
+        // 0.12.8: how often Home reminds you to back up (it was fixed at once a month)
+        <label className="check">
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              Remind me to back up
+            </span>
+            <span className="small">A reminder on Home when nothing keeps a copy of your pantry. Not now brings it back in a week, then this often.</span>
+          </span>
+          <select
+            className="input"
+            style={{ width: 'auto' }}
+            value={remindDays(settings)}
+            aria-label="How often to remind me to back up"
+            onChange={(e) => void draft.updateSettings({ backupRemindDays: parseInt(e.target.value, 10) })}
+          >
+            {BACKUP_REMIND.map((d) => (
+              <option key={d} value={d}>
+                {remindLabel(d)}
+                {d === 30 ? ' (default)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {!inSetup && (
         <div className="row" style={{ flexWrap: 'wrap' }}>
           <span className="grow" style={{ minWidth: 180 }}>

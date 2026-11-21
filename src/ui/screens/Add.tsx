@@ -5,7 +5,7 @@ import { cleanSearch } from '../../lib/searchText';
 import { confidentCategoryId, guessCategoryId } from '../../lib/categoryGuess';
 import { suggestName } from '../../lib/nameSuggest';
 import { NameFirst } from './NameFirst';
-import { perKiloNote } from '../../lib/unitPrice';
+import { kiloPrice } from '../../lib/unitPrice';
 import { flavourBarNote, otherFlavours, varietyWord } from '../../lib/flavours';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
 import { productCode, scanBarcode, type BarcodeInfo } from '../../lib/barcode';
@@ -31,6 +31,7 @@ import {
   nowIso,
   readingsFor,
   uid,
+  removeProductFromGroup,
   updateGroup,
   updateProduct,
   updateSettings,
@@ -108,6 +109,7 @@ import { OtherSizesCard } from '../OtherSizes';
 import { ItemRow, type NoteTone } from '../simple';
 import { keyOf, sheetOpenAfter, tickMessage, togglePick } from './addPicks';
 import { addItemForLineUndoable, addItemFromPicks, pickedWords, saveStoreProducts } from './addSave';
+import { attachPatch, rolesIn, uniqueProducts } from './attachOne';
 import { AlertPicker } from './Item';
 import { CategoryPick } from './Categories';
 import { AddBtn, AddPair, addButtonsNote, addToWord, AlwaysTick, pickButtonsNote, toPantryNote } from './addPickWords';
@@ -267,7 +269,9 @@ export function AddScreen({
     // 0.9.1: each pick's latest price, so "Other sizes of this" can compare with the usual one.
     const readings = await readingsFor(mains.map((p) => p.id));
     const latest = new Map([...readings].map(([id, rs]) => [id, rs[rs.length - 1]?.price]));
-    return { group, mains, latest };
+    // 0.12.8: which results are already this item's, so they show ticked.
+    const inItem = rolesIn(group, [...mains, ...(await getProducts(group.altProductIds))]);
+    return { group, mains, latest, inItem };
   }, [attachTo]);
   const attachGroup = attach?.group;
   // Adding to an item: its tab. Otherwise the tab you came from, or the one picked at the top.
@@ -403,7 +407,7 @@ export function AddScreen({
       const [found, coded] = await Promise.all([a.search(text, storeId), byCode]);
       const exact = coded.filter((p) => sameCode(p.barcode, rq.barcode));
       const seen = new Set(exact.map(keyOf));
-      const items = [...exact, ...found.filter((p) => !seen.has(keyOf(p)))];
+      const items = uniqueProducts([...exact, ...found.filter((p) => !seen.has(keyOf(p)))]);
       const scored = scoreAll(rq, items);
       void seenBefore(items)
         .then((m) => m.size && setBefore((b) => new Map([...b, ...m])))
@@ -693,7 +697,7 @@ export function AddScreen({
       const ok = cur?.status === 'ok' ? cur : undefined;
       const have = ok?.items ?? [];
       const seen = new Set(have.map(keyOf));
-      return { ...r, [chain]: { ...ok, status: 'ok', items: [...have, ...items.filter((p) => !seen.has(keyOf(p)))] } };
+      return { ...r, [chain]: { ...ok, status: 'ok', items: uniqueProducts([...have, ...items.filter((p) => !seen.has(keyOf(p)))]) } };
     });
 
   /**
@@ -718,7 +722,7 @@ export function AddScreen({
       const now = r[chain];
       if (now?.status !== 'ok') return r;
       const seen = new Set(now.items.map(keyOf));
-      const fresh = rankAll(rankQ, found.filter((p) => !seen.has(keyOf(p))));
+      const fresh = rankAll(rankQ, uniqueProducts(found.filter((p) => !seen.has(keyOf(p)))));
       return {
         ...r,
         [chain]: { ...now, items: [...now.items, ...fresh], page, loadingMore: false, more: fresh.length > 0 && found.length >= FULL_PAGE },
@@ -837,7 +841,7 @@ export function AddScreen({
   };
 
   // 0.9.1: "Other sizes of this": other packs and sizes of the first thing you ticked or, on an
-  // item's "Add another pick", of its usual pick. Found in what the shops sent back, plus one more
+  // item's "Add another product", of its usual pick. Found in what the shops sent back, plus one more
   // search for its brand and type (at its own shop; the others are searched by recommend()).
   const sizesFor: StoreProduct | undefined = (() => {
     if (attachGroup) {
@@ -897,7 +901,53 @@ export function AddScreen({
   ];
   const sizesSkip = attach ? new Set(attach.mains.filter((p) => p.storeProductId).map((p) => `${p.chain}:${p.storeProductId}`)) : undefined;
 
+  // 0.12.8: adding to an item you already have: + adds that one product straight away, with Undo
+  // (a sheet opened after every tick: "Check it, then add"). A product already in the item shows ticked.
+  const addingToItem = !!attachTo && !forLine;
+  const isPicked = (k: string) => (addingToItem ? attach?.inItem.get(k) === as : picks.has(k));
+  const [addedHere, setAddedHere] = useState<Set<string>>(new Set());
+  const attachBusy = useRef(false);
+  const attachToggle = async (sp: StoreProduct) => {
+    if (!attachGroup || attachBusy.current) return;
+    attachBusy.current = true;
+    const k = keyOf(sp);
+    try {
+      const g = (await getGroup(attachGroup.id)) ?? attachGroup;
+      if (isPicked(k)) {
+        if (!addedHere.has(k)) {
+          nav.toast(`${g.name} already has this one. To take it off, open ${g.name} and tap it under ${as === 'alt' ? 'Also happy with' : 'Products I buy'}.`);
+          return;
+        }
+        const id = (await getProducts(groupProductIds(g))).find((p) => p.chain === sp.chain && String(p.storeProductId) === String(sp.storeProductId))?.id;
+        if (id) await act(`Taken off ${g.name}`, () => removeProductFromGroup(g, id));
+        setAddedHere((a) => new Set([...a].filter((x) => x !== k)));
+        return;
+      }
+      const has = attach?.inItem.get(k);
+      if (has === 'main' && as === 'alt') {
+        // Already one you buy: it can't also be a second choice.
+        nav.toast(`${g.name} already has this one under Products I buy.`);
+        return;
+      }
+      await act(as === 'alt' ? `Added to Also happy with for ${g.name}` : has === 'alt' ? `Moved to Products I buy for ${g.name}` : `Added to ${g.name}`, async () => {
+        const ids = await saveStoreProducts([sp], barcodeFor);
+        const patch = attachPatch((await getGroup(g.id)) ?? g, ids, as, [sp.chain]);
+        if (patch) await updateGroup(g.id, patch);
+      });
+      setAddedHere((a) => new Set([...a, k]));
+    } finally {
+      attachBusy.current = false;
+    }
+  };
+
+  // How many of this item's products were added on this visit (Undo takes one back off).
+  const addedCount = addingToItem ? [...addedHere].filter((k) => attach?.inItem.get(k) === as).length : 0;
+
   const toggle = (sp: StoreProduct) => {
+    if (addingToItem) {
+      void attachToggle(sp);
+      return;
+    }
     // 0.12.7: ticked from "Find one" under Also happy with: it's an alternative. Unticked: no longer one.
     const on = !picks.has(keyOf(sp));
     setAlts((a) => {
@@ -970,7 +1020,11 @@ export function AddScreen({
    */
   const pickOne = (sp: StoreProduct) => {
     const k = keyOf(sp);
-    if (attachTo || forLine) {
+    if (addingToItem) {
+      void attachToggle(sp);
+      return;
+    }
+    if (forLine) {
       toggle(sp);
       setPanelOpen(true);
       return;
@@ -1033,14 +1087,14 @@ export function AddScreen({
     setSaving(true);
     try {
       // 0.9.5 (undo): the whole attach is one Undo.
-      await act(as === 'alt' ? `Added to Also happy with for ${attachGroup.name}` : `Added to What I buy for ${attachGroup.name}`, async () => {
+      await act(as === 'alt' ? `Added to Also happy with for ${attachGroup.name}` : `Added to ${attachGroup.name}`, async () => {
       const ids = await saveProducts();
       const all = new Set([attachGroup.usualProductId, ...attachGroup.sameProductIds, ...attachGroup.altProductIds]);
       if (as === 'alt') {
         const fresh = ids.filter((id) => !all.has(id));
         await updateGroup(attachGroup.id, { altProductIds: [...attachGroup.altProductIds, ...fresh] });
       } else {
-        // One you'd also take, ticked as a pick, moves to What I buy (0.8.9).
+        // One you'd also take, ticked as a pick, moves to Products I buy (0.8.9).
         const mains = new Set([attachGroup.usualProductId, ...attachGroup.sameProductIds]);
         const fresh = ids.filter((id) => !mains.has(id));
         // A pick ticked at a shop marked "Not at this shop" puts the shop back in (0.8.9).
@@ -1221,7 +1275,7 @@ export function AddScreen({
         ? `Find one at ${chainName(onlyChain)}`
         : 'Also happy with'
       : another
-        ? 'Add another pick'
+        ? 'Add another product'
         : onlyChain
           ? `Find it at ${chainName(onlyChain)}`
           : 'Find at another shop'
@@ -1261,7 +1315,7 @@ export function AddScreen({
   /** One result: the photo, the name, its shop and size, one price and a word. + picks it. */
   const resultRow = (sp: StoreProduct, top: Set<string>) => {
     const k = keyOf(sp);
-    const picked = picks.has(k);
+    const picked = isPicked(k);
     const tracked = pantry?.get(k);
     const size = sp.size && !nameHasSize(sp.name, sp.size) ? tidySize(sp.size, sp.name) : undefined;
     const note: { text: string; tone: NoteTone } | undefined = isExactBarcode(rankQ, sp)
@@ -1287,8 +1341,10 @@ export function AddScreen({
           name={sp.name}
           chain={sp.chain}
           // 0.12.5: loose fruit and veg also say their price by the kilo
-          shopText={`${chainName(sp.chain)}${size ? ` · ${size}` : ''}${perKiloNote(sp) ? ` · ${perKiloNote(sp)}` : ''}`}
+          // 0.12.8: and that price is the main one, as on the shelf ticket; the shop's price for one sits beside the shop
+          shopText={`${chainName(sp.chain)}${size ? ` · ${size}` : ''}${kiloPrice(sp, sp.price)?.each ? ` · ${kiloPrice(sp, sp.price)!.each}` : ''}`}
           price={sp.price}
+          priceText={kiloPrice(sp, sp.price)?.main}
           note={note}
           onOpen={() => pickOne(sp)}
           openLabel={picked ? `${what}: picked. Tap to unpick` : `Pick ${what}`}
@@ -1307,7 +1363,7 @@ export function AddScreen({
     const alt = instead[c];
     const r = results[c];
     const items = alt && !original[c] ? alt.items : r?.status === 'ok' ? r.items : [];
-    return items.filter((sp) => !specialsOnly || sp.isSpecial);
+    return uniqueProducts(items).filter((sp) => !specialsOnly || sp.isSpecial);
   };
   const topKeys = new Set(
     (searched as Chain[]).flatMap((c) => {
@@ -1529,9 +1585,9 @@ export function AddScreen({
                     className="btn small"
                     style={TAP}
                     onClick={() => setAlts((a) => new Set([...a].filter((k) => k !== keyOf(sp))))}
-                    aria-label={`Make ${sp.name} what I buy`}
+                    aria-label={`Move ${sp.name} to Products I buy`}
                   >
-                    Make it what I buy
+                    Move to Products I buy
                   </button>
                 </span>
               </div>
@@ -1926,7 +1982,7 @@ export function AddScreen({
           anchor={sizesFor}
           pool={sizesPool}
           skip={sizesSkip}
-          picks={picks}
+          picks={addingToItem ? new Map(sizesPool.filter((sp) => isPicked(keyOf(sp))).map((sp) => [keyOf(sp), sp])) : picks}
           onToggle={toggle}
           onPreview={setPreview}
           photoFor={photoFor}
@@ -2062,7 +2118,7 @@ export function AddScreen({
             const r: ChainResult = useAlt ? { status: 'ok', items: alt.items, top: alt.top } : first;
             if (r.status === 'error' && !isNative()) return null;
             const limit = showing[chain] ?? FIRST_PAGE;
-            const pool = r.status === 'ok' ? r.items.filter((sp) => !specialsOnly || sp.isSpecial) : [];
+            const pool = r.status === 'ok' ? uniqueProducts(r.items).filter((sp) => !specialsOnly || sp.isSpecial) : [];
             const by = sortBy[chain] ?? 'relevant';
             // 0.12.5: by price or value, what doesn't mention what you typed goes after what does (steel wool isn't the cheapest potato)
             const inOrder = sorted(pool, by);
@@ -2363,6 +2419,20 @@ export function AddScreen({
         </div>
       )}
 
+      {addingToItem && attachGroup && picks.size === 0 && addedCount > 0 && (
+        // 0.12.8: adding to an item you already have: each + is saved as you tap it, so this only says so and goes back.
+        <button className="card add-mini" onClick={() => nav.pop()} aria-label={`${addedCount} added to ${attachGroup.name}. Done`}>
+          <span className="grow add-mini-text">
+            <span className="title" style={{ fontSize: 15 }}>
+              {addedCount} added to {as === 'alt' ? 'Also happy with' : attachGroup.name}
+            </span>
+            <span className="small">Saved already. Tick any others, then tap Done.</span>
+          </span>
+          <span className="add-mini-arrow add-mini-done" aria-hidden="true">
+            Done
+          </span>
+        </button>
+      )}
       {picks.size > 0 && !changing && (
         // The bar: what's ticked and where. Tap it (or its green arrow) to name it and add it.
         <button
@@ -2429,7 +2499,7 @@ export function AddScreen({
             </div>
           )}
           {makesItem ? (
-            <div className="eyebrow">What I buy</div>
+            <div className="eyebrow">Products I buy</div>
           ) : (
             <p className="small" style={{ margin: 0 }}>
               {matchShops.length > 1 ? 'Your picks at each shop. Check them, then add.' : 'Check it, then add.'}
@@ -2558,14 +2628,14 @@ export function AddScreen({
             <>
               <CostcoLines sp={preview} />
               <button
-                className={`btn ${picks.has(keyOf(preview)) ? '' : 'primary'}`}
+                className={`btn ${isPicked(keyOf(preview)) ? '' : 'primary'}`}
                 onClick={() => {
-                  if (picks.has(keyOf(preview))) toggle(preview);
+                  if (isPicked(keyOf(preview))) toggle(preview);
                   else pickOne(preview);
                   setPreview(undefined);
                 }}
               >
-                <Icon name={picks.has(keyOf(preview)) ? 'close' : 'plus'} size={18} /> {picks.has(keyOf(preview)) ? 'Remove this pick' : 'Pick this one'}
+                <Icon name={isPicked(keyOf(preview)) ? 'close' : 'plus'} size={18} /> {isPicked(keyOf(preview)) ? (addingToItem ? 'Take it off' : 'Remove this pick') : addingToItem ? 'Add this one' : 'Pick this one'}
               </button>
             </>
           }

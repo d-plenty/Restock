@@ -1,6 +1,7 @@
 // 0.9.3: Pantry, Keg and Pharmacy at desktop widths: a table with category filters and search, and
 // the item picked in a side panel (its price history, Shop around, its alert, Add to list and Edit).
 // The same recommendations and filters as the phone's tab (Pantry.tsx) and item page (Item.tsx).
+import { kiloPrice } from '../../lib/unitPrice';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   allCategories,
@@ -239,7 +240,9 @@ export function DeskPantry({ section }: { section: Section }) {
                         <td className="num dk-nowrap">
                           {deal?.price !== undefined ? (
                             <>
-                              <strong>{money(deal.price)}</strong>
+                              {/* 0.12.8: loose fruit and veg by the kilo, as on the phone */}
+                              <strong>{(!deal.multi && kiloPrice(deal.product, deal.price)?.main) || money(deal.price)}</strong>
+                              {!deal.multi && kiloPrice(deal.product, deal.price)?.each && <span className="dk-sub">{kiloPrice(deal.product, deal.price)!.each}</span>}
                               {/* 0.9.6: both prices, as on the phone: per item, then per litre or per 100 g. */}
                               {bothPrices(deal) && <span className="dk-sub">{bothPrices(deal)}</span>}
                               <span className="dk-sub">
@@ -509,7 +512,7 @@ function AroundRow({ o, best, style }: { o: Option; best: boolean; style?: Compa
         {/* 0.9.6: both prices; a line with no size is left out of "cheapest". */}
         {productLine(o.product, o.price, style) && <span className="dk-sub num" style={{ display: 'block' }}>{productLine(o.product, o.price, style)}</span>}
       </span>
-      <strong className="num">{money(o.multi ? o.shelfPrice : o.price)}</strong>
+      <strong className="num">{(!o.multi && kiloPrice(o.product, o.price)?.main) || money(o.multi ? o.shelfPrice : o.price)}</strong>
     </div>
   );
 }

@@ -254,12 +254,25 @@ export async function exportBackup(parts: ExportParts = EVERYTHING): Promise<str
   return name;
 }
 
+/** 0.12.8: how often the backup reminder comes back (Settings, Sync and backups). 0 is never. */
+export const BACKUP_REMIND = [7, 30, 90, 0] as const;
+export const remindLabel = (d: number) => (d === 0 ? 'Never' : d === 7 ? 'Every week' : d === 90 ? 'Every 3 months' : 'Every 30 days');
+export const remindDays = (s: { backupRemindDays?: number }) => ((BACKUP_REMIND as readonly number[]).includes(s.backupRemindDays as number) ? s.backupRemindDays! : 30);
+
+/** "Not now" on the reminder: when, and how many times so far. */
+export function putOffBackup(s: { backupNudgeAt?: string; backupNudges?: number }, now = Date.now()): { backupNudgeAt: string; backupNudges: number } {
+  // Put off before 0.12.8 (no count kept): that was the first time.
+  const before = s.backupNudges ?? (s.backupNudgeAt ? 1 : 0);
+  return { backupNudgeAt: new Date(now).toISOString(), backupNudges: before + 1 };
+}
+
 /**
  * Time for a backup nudge? Everything lives on this phone, so once there's something worth
- * keeping, remind about once a month (or a month after "Not now").
+ * keeping, remind. 0.12.8: the first "Not now" brings it back in a week; after that, and after
+ * each backup, every 30 days (or what Settings says: every week, every 3 months, never).
  */
 export function needsBackupNudge(
-  s: { lastBackupAt?: string; backupNudgeAt?: string },
+  s: { lastBackupAt?: string; backupNudgeAt?: string; backupNudges?: number; backupRemindDays?: number },
   items: number,
   oldestItemAt: string | undefined,
   now = Date.now(),
@@ -269,8 +282,12 @@ export function needsBackupNudge(
   const DAY = 86_400_000;
   if (keptElsewhere) return false;
   if (items < 3 || !oldestItemAt || now - Date.parse(oldestItemAt) < 7 * DAY) return false;
-  if (s.lastBackupAt && now - Date.parse(s.lastBackupAt) < 30 * DAY) return false;
-  if (s.backupNudgeAt && now - Date.parse(s.backupNudgeAt) < 30 * DAY) return false;
+  const every = remindDays(s);
+  if (every === 0) return false;
+  if (s.lastBackupAt && now - Date.parse(s.lastBackupAt) < every * DAY) return false;
+  // Put off once: a week (sooner never hurts a longer setting). Put off again: the usual gap.
+  const gap = (s.backupNudges ?? 2) <= 1 ? Math.min(7, every) : every;
+  if (s.backupNudgeAt && now - Date.parse(s.backupNudgeAt) < gap * DAY) return false;
   return true;
 }
 

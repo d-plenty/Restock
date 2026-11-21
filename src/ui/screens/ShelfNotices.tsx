@@ -12,7 +12,7 @@ import { chainName, searchStoreId, type StoreChain } from '../../types';
 import { Icon, LoadingBar, Sheet, Thumb } from '../components';
 import { saveStoreProducts } from './addSave';
 
-// 0.11.3: on an item's page, under What I buy: a pick whose pack changed size, and a pick its shop no
+// 0.11.3: on an item's page, under Products I buy: a pick whose pack changed size, and a pick its shop no
 // longer lists (lib/shelfWatch.ts). "Find a replacement" searches that one shop, only when it's
 // pressed, and nothing is swapped until you say so.
 

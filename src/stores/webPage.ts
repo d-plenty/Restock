@@ -1,5 +1,6 @@
 import type { Chain } from '../types';
-import { sameSite } from '../lib/site';
+import { sameSite, siteImage } from '../lib/site';
+export { siteImage };
 import { num } from './http';
 import type { StoreProduct } from './types';
 
@@ -216,7 +217,7 @@ function product(chain: Chain, p: Partial<StoreProduct> & { name?: string; url?:
     brand: p.brand,
     size: p.size ?? sizeIn(name),
     barcode: p.barcode,
-    imageUrl: goodImage(p.imageUrl),
+    imageUrl: goodImage(p.imageUrl) ?? siteImage(p.url),
     price,
     wasPrice: was,
     isSpecial: !!was || !!p.promo,
@@ -749,7 +750,8 @@ export const SEARCH_GUESSES: Record<Platform, string[]> = {
   shopify: ['/search?q={q}&type=product'],
   woocommerce: ['/?s={q}&post_type=product'],
   magento: ['/catalogsearch/result/?q={q}'],
-  other: ['/search?q={q}', '/search?query={q}', '/search?searchTerm={q}', '/search?text={q}', '/catalogsearch/result/?q={q}', '/?s={q}'],
+  // 0.12.8: "/search.php?search_query=" added, after the ones already tried first
+  other: ['/search?q={q}', '/search?query={q}', '/search?searchTerm={q}', '/search?text={q}', '/catalogsearch/result/?q={q}', '/?s={q}', '/search.php?search_query={q}'],
 };
 
 /**

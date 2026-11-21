@@ -424,6 +424,10 @@ export interface Settings {
   /** When a backup was last exported, and when the reminder was last put off. */
   lastBackupAt?: string;
   backupNudgeAt?: string;
+  /** 0.12.8: how many times "Not now" was pressed on the reminder (the first brings it back in a week). */
+  backupNudges?: number;
+  /** 0.12.8: remind to back up every this many days: 7, 30 (missing: the default) or 90; 0 is never. */
+  backupRemindDays?: number;
   /** Shared price history download (testing): off until turned on. */
   /** 0.9.13: `days`, how much shared history: 56 (8 weeks, the default), 182 (6 months) or 365 (12 months). */
   /**

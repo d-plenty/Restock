@@ -14,8 +14,8 @@ import { chainName, stockKnown, type ListEntry, type Settings } from '../../type
 import { ChainDot, Icon, LoadingBar } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { failingStores, getHealth, getHiddenWarnings, isBlockedError, isHidden, offerUnblock } from '../../lib/health';
-import { HideForADay, UnblockButton } from '../Unblock';
-import { exportBackup, needsBackupNudge } from '../../lib/backup';
+import { HideForADay, TryAgain, UnblockButton } from '../Unblock';
+import { exportBackup, needsBackupNudge, putOffBackup } from '../../lib/backup';
 import { syncInfo } from '../../lib/sync';
 import { protection } from '../../lib/protection';
 import { confirmAction } from '../../lib/confirm';
@@ -177,10 +177,14 @@ export function HomeScreen() {
           <div key={chain} className="banner amber" role="alert">
             <strong>{chainName(chain)}</strong>
             <span style={{ fontSize: 13 }}>{msg}</span>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn small" onClick={runCheck}>
-                <Icon name="refresh" size={16} /> Try again
-              </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {chain === 'other' ? (
+                <button className="btn small" onClick={runCheck}>
+                  <Icon name="refresh" size={16} /> Try again
+                </button>
+              ) : (
+                <TryAgain chain={chain as StoreChain} onWorked={runCheck} />
+              )}
             </div>
           </div>
         ),
@@ -195,7 +199,7 @@ export function HomeScreen() {
             <button className="btn small primary" onClick={backupNow}>
               Back up now
             </button>
-            <button className="btn small" onClick={() => updateSettings({ backupNudgeAt: new Date().toISOString() })}>
+            <button className="btn small" onClick={() => updateSettings(putOffBackup(settings))}>
               Not now
             </button>
           </div>
@@ -215,10 +219,8 @@ export function HomeScreen() {
               <span style={{ fontSize: 13 }}>
                 Its prices may be out of date.{f.error ? ` Last error: ${f.error.replace(/\.$/, '')}.` : ''}
               </span>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn small" onClick={runCheck}>
-                  <Icon name="refresh" size={16} /> Try again
-                </button>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <TryAgain chain={f.chain} onWorked={runCheck} />
                 <button className="btn small" onClick={() => setTesting(true)}>
                   Test connections
                 </button>
@@ -407,11 +409,7 @@ function BlockedCard({ chain, onWorked, hide, maybe, days }: { chain: StoreChain
       <div className="unblock-actions">
         <UnblockButton chain={chain} onWorked={onWorked} />
         {!isNative() && <span className="small">Unblock is in the Android app: the shop’s page opens on your phone.</span>}
-        {maybe && (
-          <button className="btn small" style={{ alignSelf: 'flex-start', marginTop: 6 }} onClick={onWorked}>
-            <Icon name="refresh" size={16} /> Try again
-          </button>
-        )}
+        {maybe && <TryAgain chain={chain} onWorked={onWorked} />}
         {hide && <HideForADay chain={chain} />}
       </div>
     </div>

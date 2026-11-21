@@ -7105,3 +7105,70 @@ button.fold-go {
   background: color-mix(in srgb, var(--surface) 55%, var(--bg));
   border-top: 1px solid var(--line-2);
 }
+
+/* 0.12.8: adding to an item you already have: the bar's button says Done (each + is saved as you tap it) */
+.add-mini-done {
+  font-weight: 700;
+  font-size: var(--fs-lg);
+}
+
+/* 0.12.8: the item page's "Products I buy": a pencil in a green tile and a green edge, so it's found */
+.fold[data-products] {
+  border-color: var(--green);
+}
+.fold-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+  color: var(--green);
+}
+
+/* 0.12.8: what "Try again" on a shop's warning found, said right under the button */
+.try-again-said:empty {
+  display: none;
+}
+.try-again-said {
+  flex-basis: 100%;
+  color: inherit;
+}
+.banner .unblock-actions > .btn.small {
+  margin-top: 6px;
+}
+
+/* 0.12.8: loose fruit and veg: "$5.00/kg" with "about $0.75 each" under it. The second line may wrap,
+   and on narrow phones the pair takes at most a third of the row, so the name keeps its room. */
+.kilo-each {
+  white-space: normal;
+  text-align: right;
+  font-weight: 400;
+}
+@media (max-width: 380px) {
+  .shoprow-side:has(.kilo-each),
+  .list-row-price:has(.kilo-each),
+  .price-and-info:has(.kilo-each) {
+    max-width: 36%;
+  }
+  .shoprow-side:has(.kilo-each) > .num:first-child,
+  .list-row-price:has(.kilo-each),
+  .price-and-info:has(.kilo-each) > .num:first-child {
+    font-size: var(--fs-body) !important;
+  }
+}
+@media (max-width: 340px) {
+  .shoprow-side:has(.kilo-each) > .num:first-child,
+  .list-row-price:has(.kilo-each),
+  .price-and-info:has(.kilo-each) > .num:first-child {
+    font-size: var(--fs-sm) !important;
+  }
+  .kilo-each {
+    max-width: 9ch;
+    font-size: var(--fs-xs);
+  }
+  .shoprow:has(.kilo-each) {
+    gap: 8px;
+  }
+}

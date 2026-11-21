@@ -20,6 +20,7 @@ import { GIFT_CARDS_TABLE, migrate, SEEN_INDEX, SEEN_TABLE, SPEND_TABLE } from '
 import { cleanGiftCard } from './giftCards'; // 0.9.6 (cards)
 import { toPicks } from './picks';
 import { checkSettings } from './settingsCheck';
+import { siteImage } from './site';
 import { isPhotoPath } from './receiptPaths';
 import { HA_CONFIG, HA_STATE, LOCAL_ONLY_KV, resetHaPairing } from './haKeys';
 import { applyRows, changedRows, syncedTabs } from './sharedSettings';
@@ -94,7 +95,8 @@ const toProduct = (r: Row): Product => ({
   size: opt(r.size as string | null),
   barcode: opt(r.barcode as string | null),
   storeProductId: opt(r.store_product_id as string | null),
-  imageUrl: opt(r.image_url as string | null),
+  // 0.12.8: a Cellarbrations, Bottle-O or Porters product saved before it had a photo gets its photo too
+  imageUrl: opt(r.image_url as string | null) ?? siteImage(opt(r.store_product_id as string | null)),
   qty: opt(r.qty as number | null),
   qtyUnit: opt(r.qty_unit as Product['qtyUnit'] | null),
   inStock: r.in_stock === null || r.in_stock === undefined ? undefined : Number(r.in_stock) === 1,
@@ -1010,7 +1012,7 @@ export async function snapshot(): Promise<Snapshot> {
 
 /**
  * An item from a backup. One from before 0.8.9 (it has no "Any size" setting) gets the same move to
- * What I buy as an update does (picks.ts), so restoring an old backup gives the same results.
+ * Products I buy as an update does (picks.ts), so restoring an old backup gives the same results.
  */
 function fromBackup(g: Group, s: Snapshot): Group {
   const full = { ...g, sameProductIds: g.sameProductIds ?? [], altProductIds: g.altProductIds ?? [] };
@@ -1119,6 +1121,7 @@ const DEVICE_SETTINGS = [
   'lastCheck',
   'lastBackupAt',
   'backupNudgeAt',
+  'backupNudges',
   'demoLoaded',
   'marketData',
   // 0.9.0: whether you're signed in to a shop is about this phone's own sign-in, not the backup's.

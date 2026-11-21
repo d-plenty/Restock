@@ -459,14 +459,37 @@ export function storePriceLine(sp: SizeSource & { price?: number }, pool: (SizeS
  * produce, or the shop gives neither (never a guess).
  */
 export function perKiloNote(p: { name: string; size?: string; price?: number; unitPriceText?: string }): string | undefined {
+  const k = looseKilo(p, p.price);
+  return k ? `${k.about ? 'about ' : ''}${money(k.perKg)}/kg` : undefined;
+}
+
+/**
+ * 0.12.8: loose fruit and veg, by the kilo: the shop's own per-kilo price, or (`about`) worked out from the
+ * weight of one that it gives. Undefined when it isn't loose produce or the shop gives neither.
+ */
+type LooseSource = { name: string; size?: string; unitPriceText?: string; qty?: number; qtyUnit?: string; sizing?: Sizing };
+export function looseKilo(p: LooseSource, price: number | undefined): { perKg: number; about: boolean } | undefined {
   const size = (p.size ?? '').trim();
   const loose = /\bapprox\b/i.test(size) || /^(?:1\s*)?(?:each|ea)$/i.test(size) || /\b(?:each|loose)\s*$/i.test(p.name.trim());
   if (!loose) return undefined;
   const given = /\$\s*(\d+(?:\.\d+)?)\s*(?:\/|per)\s*(?:1\s*)?kg\b/i.exec(p.unitPriceText ?? '');
-  if (given) return `${money(Number(given[1]))}/kg`;
+  if (given && Number(given[1]) > 0) return { perKg: Number(given[1]), about: false };
+  if (price === undefined || !Number.isFinite(price)) return undefined;
   const w = /approx\.?\s*(\d+(?:\.\d+)?)\s*(kg|g)\b/i.exec(size);
-  if (!w || p.price === undefined) return undefined;
-  const kg = Number(w[1]) * (w[2].toLowerCase() === 'kg' ? 1 : 0.001);
-  if (!(kg > 0)) return undefined;
-  return `about ${money(p.price / kg)}/kg`;
+  // One of yours (the shop's own per-kilo words aren't kept): the weight of one saved with it.
+  const grams = w ? Number(w[1]) * (w[2].toLowerCase() === 'kg' ? 1000 : 1) : p.qty && p.qtyUnit === 'g' ? p.qty : p.sizing?.size?.unit === 'g' ? p.sizing.size.qty : undefined;
+  if (!grams || !(grams > 0)) return undefined;
+  return { perKg: (price / grams) * 1000, about: true };
+}
+
+/**
+ * 0.12.8: how loose produce's price is written: by the kilo, as on the shelf ticket ("$5.00/kg"), with the
+ * shop's price for one beside it ("about $0.75 each": one potato, a weight the shop estimates). `n`: how
+ * many are on the list ("2 × about $0.75"). Undefined for everything that isn't loose produce.
+ */
+export function kiloPrice(p: LooseSource, price: number | undefined, n = 1): { main: string; each?: string } | undefined {
+  const k = looseKilo(p, price);
+  if (!k) return undefined;
+  const one = price !== undefined && Number.isFinite(price) ? `about ${money(price)}` : undefined;
+  return { main: `${money(k.perKg)}/kg`, each: one ? (n > 1 ? `${n} × ${one}` : `${one} each`) : undefined };
 }

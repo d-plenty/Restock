@@ -30,7 +30,7 @@ import { firstPhoto, ItemPhoto } from '../../server-mode/ui/deskShared';
 import { getSettings, updateSettings } from '../../lib/db';
 import { loadRecommendations } from '../../lib/recs';
 import { money, parseMoney, tidySize } from '../../lib/units';
-import { amountToConfirm, basisWord, lastUpdatedText, newestReading, priceLine, productLine, sizeLabel, type CompareStyle } from '../../lib/unitPrice';
+import { amountToConfirm, basisWord, kiloPrice, lastUpdatedText, newestReading, priceLine, productLine, sizeLabel, type CompareStyle } from '../../lib/unitPrice';
 import { useLive } from '../../lib/useLive';
 import {
   eachPriceOf,
@@ -266,6 +266,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   }, [groupId]);
   const [selected, setSelected] = useState<string>();
   const [sheet, setSheet] = useState<'edit' | 'alerts' | 'price' | 'menu' | { option: Option; wantUnit?: 'g' | 'ml' | 'ea' }>();
+  // 0.12.8: the Products I buy fold, so Edit can open it (a hook: kept above the early returns)
+  const productsFold = useRef<HTMLDetailsElement>(null);
   const [learnOpen, setLearnOpen] = useState(false);
   const appSettings = useLive(getSettings, []);
   const [preview, setPreview] = useState<Option>();
@@ -414,8 +416,13 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           </span>
           <span className="price-and-info">
             <span className="num" style={{ fontWeight: 600, display: 'block' }}>
-              {money(o.multi ? o.shelfPrice : o.price)}
+              {(!o.multi && kiloPrice(o.product, o.price)?.main) || money(o.multi ? o.shelfPrice : o.price)}
             </span>
+            {!o.multi && kiloPrice(o.product, o.price)?.each && (
+              <span className="small num kilo-each" style={{ display: 'block' }}>
+                {kiloPrice(o.product, o.price)!.each}
+              </span>
+            )}
             {o.multi && (
               <span className="small num" style={{ display: 'block' }}>
                 {money(o.price)} each in {o.multi.n}s
@@ -457,7 +464,17 @@ export function ItemScreen({ groupId }: { groupId: string }) {
     const inStock = at.filter((o) => o.product.inStock !== false);
     return [...(inStock.length ? inStock : at)].sort((a, b) => costOf(a) - costOf(b))[0];
   });
-  // What I buy opens by itself when something in it needs you: nothing linked yet, picks measured differently, or a shelf notice.
+  // 0.12.8: Edit has a row that opens Products I buy (people looked for their products under Edit).
+  const showProducts = () => {
+    setSheet(undefined);
+    requestAnimationFrame(() => {
+      const el = productsFold.current;
+      if (!el) return;
+      el.open = true;
+      el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+  };
+  // Products I buy opens by itself when something in it needs you: nothing linked yet, picks measured differently, or a shelf notice.
   const whatOpen = !mains.length || !!rec.mixedUnits || !!rec.shelf;
   // New items: say plainly that the verdict gets better once there's a few weeks of history.
   const learning = learningDays(rec.options.filter((o) => o.role === 'main'));
@@ -538,7 +555,8 @@ export function ItemScreen({ groupId }: { groupId: string }) {
                 <span className="small clip">{o.product.name}</span>
               </span>
               <span className="num" style={{ fontWeight: 700 }}>
-                {o.price !== undefined ? money(o.multi ? o.shelfPrice : o.price) : 'No price yet'}
+                {/* 0.12.8: loose fruit and veg by the kilo, as on the shelf ticket */}
+                {o.price !== undefined ? ((!o.multi && kiloPrice(o.product, o.price)?.main) || money(o.multi ? o.shelfPrice : o.price)) : 'No price yet'}
               </span>
             </button>
           ))}
@@ -559,10 +577,15 @@ export function ItemScreen({ groupId }: { groupId: string }) {
         </div>
       )}
 
-      <details className="card flush fold" open={whatOpen}>
+      {/* 0.12.8: "Products I buy" (it was called by another name), with what it's for and a pencil, so it's found: this is where products are added, changed and removed */}
+      <details className="card flush fold" data-products open={whatOpen} ref={productsFold}>
         <summary className="fold-head">
+          <span className="fold-icon" aria-hidden>
+            <Icon name="pencil" size={18} />
+          </span>
           <span className="grow">
-            <span className="title">What I buy</span>
+            <span className="title">Products I buy</span>
+            <span className="small">Add, change or remove products</span>
             <span className="small">
               {mains.length ? `${productsAndShops(mains)} · ${group.anySize ? 'any size' : 'this size'}` : 'Not linked to a shop yet'}
             </span>
@@ -721,7 +744,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
             <Icon name="plus" size={18} />
             <span className="grow">
               <span className="title" style={{ fontSize: 15, color: 'var(--green)' }}>
-                Add another pick
+                Add another product
               </span>
               <span className="small">
                 Another one you buy as {group.name}, at any shop ({kindOfVariety(group, data.categories)}, say)
@@ -887,6 +910,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
           categories={categories}
           suggested={genericName(mains[0]?.product.name, mains[0]?.product.brand)}
           onClose={() => setSheet(undefined)}
+          onProducts={showProducts}
         />
       )}
       {preview && <ProductPreview product={previewFromOption(preview)} onClose={() => setPreview(undefined)} />}
@@ -934,7 +958,10 @@ export function EditSheet({
   suggested,
   onClose,
   alertsOnly = false,
+  onProducts,
 }: {
+  /** 0.12.8: "Products I buy" from Edit: saves what's changed here, then opens that part of the item's page. */
+  onProducts?: () => void;
   group: Group;
   categories: { id: string; name: string }[];
   suggested?: string;
@@ -966,20 +993,21 @@ export function EditSheet({
     onClose();
   };
 
+  const unsaved =
+    name !== group.name ||
+    categoryId !== (group.categoryId ?? '') ||
+    alertLevel !== group.alertLevel ||
+    (alertLevel === 'custom' && alertPct !== (group.alertPct ?? 30)) ||
+    allowBulk !== (group.allowBulk !== false) ||
+    allowMulti !== (group.allowMulti !== false) ||
+    target !== (group.targetPrice !== undefined ? group.targetPrice.toFixed(2) : '');
+
   return (
     <Sheet
       title={alertsOnly ? 'Price alerts' : 'Edit item'}
       onClose={onClose}
       // 0.10.11: closing with something changed and not saved asks first
-      unsaved={
-        name !== group.name ||
-        categoryId !== (group.categoryId ?? '') ||
-        alertLevel !== group.alertLevel ||
-        (alertLevel === 'custom' && alertPct !== (group.alertPct ?? 30)) ||
-        allowBulk !== (group.allowBulk !== false) ||
-        allowMulti !== (group.allowMulti !== false) ||
-        target !== (group.targetPrice !== undefined ? group.targetPrice.toFixed(2) : '')
-      }
+      unsaved={unsaved}
     >
       {!alertsOnly && (
         <>
@@ -990,6 +1018,18 @@ export function EditSheet({
           {suggested && suggested.toLowerCase() !== name.trim().toLowerCase() && (
             <button className="chip wrap" style={{ alignSelf: 'flex-start' }} onClick={() => setName(suggested)}>
               Use a short name: {suggested}
+            </button>
+          )}
+          {onProducts && (
+            <button
+              className="btn"
+              onClick={async () => {
+                // What's changed here is saved first (nothing changed: nothing to save, or to undo)
+                if (unsaved) await save();
+                onProducts();
+              }}
+            >
+              <Icon name="pencil" size={18} /> Products I buy: add, change or remove
             </button>
           )}
           <label className="field">
@@ -1231,13 +1271,13 @@ function OptionSheet({
   const isAlt = option.role === 'alt';
   const lastAtShop = !isAlt && options.filter((o) => o.role === 'main' && o.product.chain === option.product.chain).length === 1;
 
-  /** Move between What I buy and Also happy with. */
+  /** Move between Products I buy and Also happy with. */
   const move = async () => {
     const mains = [group.usualProductId, ...group.sameProductIds].filter((x): x is string => !!x && x !== id);
     const alts = group.altProductIds.filter((x) => x !== id);
     if (isAlt) mains.push(id);
     else alts.push(id);
-    await act(isAlt ? `${option.product.name} is one of your picks` : `${option.product.name} moved to Also happy with`, () =>
+    await act(isAlt ? `${option.product.name} moved to Products I buy` : `${option.product.name} moved to Also happy with`, () =>
       updateGroup(group.id, { usualProductId: mains[0], sameProductIds: mains.slice(1), altProductIds: alts }),
     ); // 0.9.5 (undo)
     onClose();
@@ -1312,7 +1352,7 @@ function OptionSheet({
         </button>
       </div>
       <button className="btn" onClick={move}>
-        <Icon name="swap" size={18} /> {isAlt ? 'Make this one of my picks' : 'Move to Also happy with'}
+        <Icon name="swap" size={18} /> {isAlt ? 'Move to Products I buy' : 'Move to Also happy with'}
       </button>
       {!isAlt && lastAtShop && (
         <p className="small" style={{ marginTop: -6 }}>
@@ -1339,18 +1379,18 @@ const isSample = (o: Option) => /\(sample\)/i.test(o.product.name);
  * A picture of the statistics: where today's price sits between the lowest, the usual sale
  * and the normal price, and how much of the time it's on sale.
  */
-/** The "how What I buy and Also happy with work" explanation, from a small ⓘ by the section titles. */
+/** The "how Products I buy and Also happy with work" explanation, from a small ⓘ by the section titles. */
 function HowItWorks() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className="icon-btn inline-info" aria-label="How What I buy and Also happy with work" onClick={() => setOpen(true)}>
+      <button className="icon-btn inline-info" aria-label="How Products I buy and Also happy with work" onClick={() => setOpen(true)}>
         <Icon name="info" size={16} />
       </button>
       {open && (
-        <Sheet title="What I buy and Also happy with" onClose={() => setOpen(false)}>
+        <Sheet title="Products I buy and Also happy with" onClose={() => setOpen(false)}>
           <p>
-            <strong>What I buy</strong> are what you buy at each shop. They can be different at each one: Heinz at Coles and Woolworths, Aldi's own
+            <strong>Products I buy</strong> are what you buy at each shop. They can be different at each one: Heinz at Coles and Woolworths, Aldi's own
             at Aldi. Shops are compared using your picks only, so a shop with none of them counts as not having it.
           </p>
           <p>
@@ -1451,7 +1491,7 @@ function HistoryPicker({ options, picked, onPick }: { options: Option[]; picked:
   useEffect(() => setShop(picked.product.chain), [picked.product.chain]);
   const rows = options.filter((x) => x.product.chain === shop);
   // 0.11.2: "Cheapest" is by the comparison price only when every pick is measured the same way (all per
-  // 100 g, say); grams against a count can't be compared, so the shelf price decides, as in What I buy.
+  // 100 g, say); grams against a count can't be compared, so the shelf price decides, as in Products I buy.
   const mains = options.filter((x) => x.role !== 'alt' && x.price !== undefined);
   const sameMeasure = mains.every((x) => x.unitPrice !== undefined) && new Set(mains.map((x) => productQty(x.product).unit)).size === 1;
   // 0.11.3: different measures, but each says how many are in it: the price of one (as recommend does).

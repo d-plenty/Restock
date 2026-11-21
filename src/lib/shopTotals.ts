@@ -353,7 +353,7 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], allChai
   // 0.9.6: Costco counts as a shop to buy at only when "I buy from Costco online" is ticked.
   const chains = allChains.filter((c) => c !== 'costco' || costcoDecides());
   const open = entries.filter((e) => !e.checked);
-  // What I buy only (0.8.9), at shops you buy it at. Also happy with is for Cheaper swap.
+  // Products I buy only (0.8.9), at shops you buy it at. Also happy with is for Cheaper swap.
   const usable = (rec: Recommendation) => {
     const notAt = new Set(notAtChains(rec.group, (id) => rec.options.find((o) => o.product.id === id)?.product.chain));
     return rec.options.filter((o) => o.role === 'main' && !notAt.has(o.product.chain) && (o.product.chain !== 'costco' || costcoDecides()));
