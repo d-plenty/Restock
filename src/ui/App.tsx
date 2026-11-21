@@ -6,7 +6,8 @@ import { createPortal } from 'react-dom';
 import { openDatabase } from '../lib/boot';
 import { wireSync } from '../lib/sync';
 import { syncBackgroundSchedule } from '../lib/check';
-import { CheckStrip, trackCheck } from './refresh';
+import { CheckLine, trackCheck } from './refresh';
+import { wireKeyboard } from '../lib/keyboard';
 import { cachedSettings, getKV, getSettings, pruneHistory, putKV, refresh, updateSettings } from '../lib/db';
 import { checkForUpdate, SELF_UPDATE, weeklyCheckDue } from '../lib/updates';
 import { version as appVersion } from '../../package.json';
@@ -32,6 +33,8 @@ import { CategoriesScreen } from './screens/Categories';
 import { ItemScreen } from './screens/Item';
 import { ListScreen } from './screens/List';
 import { Onboarding } from './screens/Onboarding';
+import { WhatsNewPrompt, WhatsNewScreen } from './screens/WhatsNew';
+import { noteSeenVersion, seenVersion, shouldOfferWhatsNew } from '../lib/whatsNew';
 import { SetupScreen } from './screens/Setup';
 import { addShared, nameFromLink, splitShared } from '../lib/shared';
 import { takeLensBarcode } from '../lib/lens';
@@ -104,6 +107,8 @@ function RestockApp() {
   // 0.9.3: the web app on a Restock server, in a wide window: the desktop layout. Always false on a phone.
   const desk = useDesktopWidth();
 
+  // 0.12.9: the keyboard opens where the page puts the cursor (lib/keyboard.ts)
+  useEffect(() => wireKeyboard(), []);
   useEffect(() => {
     void syncInsets();
     // Re-measure after the system bars settle, and when the phone turns.
@@ -337,6 +342,21 @@ function RestockApp() {
 
   // Check prices when the app opens or comes back, if it's been a while.
   const onboarded = settings?.onboarded;
+  // 0.12.9: after an update, offer What's new once. A new install is never asked: it notes the
+  // version while it's being set up.
+  const [whatsNew, setWhatsNew] = useState(false);
+  const closeWhatsNew = () => {
+    noteSeenVersion(appVersion);
+    setWhatsNew(false);
+  };
+  useEffect(() => {
+    if (!settings) return;
+    if (!settings.onboarded) return noteSeenVersion(appVersion);
+    if (shouldOfferWhatsNew(appVersion, seenVersion(), true, !serverMode)) setWhatsNew(true);
+    else noteSeenVersion(appVersion);
+    // only when setup finishes or the app opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboarded, !settings]);
 
   // 0.10.7: barcode-number lines Scan several used to put on the list go back to Scanned barcodes.
   useEffect(() => {
@@ -601,6 +621,7 @@ function RestockApp() {
         {top.name === 'permissions' && <PermissionsScreen />}
         {top.name === 'settings' && <SettingsScreen key={top.page ?? 'main'} page={top.page} />}
         {top.name === 'feedback' && <FeedbackScreen />}
+        {top.name === 'whatsnew' && <WhatsNewScreen />}
         {top.name === 'stores' && <StoresScreen section={top.section} />}
         {top.name === 'cards' && <CardsScreen />}
         {top.name === 'sync' && <SyncScreen invite={top.invite} />}
@@ -673,6 +694,15 @@ function RestockApp() {
         {/* 0.10.3: a wide window's sidebar has room for every tab that's on (no More there). */}
         <Desktop tabs={['home', ...inBar, 'list'] as Tab[]} tab={shownTab === 'more' ? 'home' : shownTab} stack={stack} overlay={overlay} />
         <ConfirmHost />
+        {whatsNew && (
+          <WhatsNewPrompt
+            onRead={() => {
+              closeWhatsNew();
+              nav.push({ name: 'whatsnew' });
+            }}
+            onSkip={closeWhatsNew}
+          />
+        )}
         {layers}
       </NavContext.Provider>
     );
@@ -684,8 +714,8 @@ function RestockApp() {
         {/* Covers the status bar, so pages don't scroll up underneath the clock and battery. */}
         <div className="status-shade" aria-hidden />
         {serverMode && serverUi.current && <serverUi.current.Strip />}
-        {/* 0.11.1: a running price check shows on every tab (Home, Pantry and the list show their own line) */}
-        {shownTab === 'more' && !serverMode && <CheckStrip />}
+        {/* 0.12.9: a running sync or price check is one slim line under the clock on every screen (Home shows it in its own top) */}
+        {(shownTab !== 'home' || !!top) && <CheckLine />}
         {shownTab === 'home' && <HomeScreen />}
         {isSectionTab(shownTab) && <PantryScreen key={shownTab} section={shownTab} />}
         {shownTab === 'list' && <ListScreen />}
@@ -709,6 +739,15 @@ function RestockApp() {
 
         <TourHost />
         <ConfirmHost />
+        {whatsNew && (
+          <WhatsNewPrompt
+            onRead={() => {
+              closeWhatsNew();
+              nav.push({ name: 'whatsnew' });
+            }}
+            onSkip={closeWhatsNew}
+          />
+        )}
         {layers}
       </div>
     </NavContext.Provider>

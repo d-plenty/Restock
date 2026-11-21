@@ -217,7 +217,6 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   return (
     <div className="screen" {...full.props}>
       {full.indicator}
-      {full.status}
       {/* 0.12.4: the navy top every screen has: the title, the add button and the search box */}
       <div className="navy-top">
       <div className="topbar">

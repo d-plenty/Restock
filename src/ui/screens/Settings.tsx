@@ -625,6 +625,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             Something not working?
           </div>
           <div className="card flush">
+            {row("What's new", `What changed in Restock ${version} and the versions before it`, () => nav.push({ name: 'whatsnew' }))}
             {row('Check my shops are working', 'Tries a search at each of your shops and shows what happens', () => setTesting(true))}
             {row('Send feedback', 'Good or bad, tell us what works and what doesn’t. Screenshots welcome.', () => nav.push({ name: 'feedback' }))}
             <a className="row" href="https://github.com/d-plenty/Restock/issues" target="_blank" rel="noreferrer">

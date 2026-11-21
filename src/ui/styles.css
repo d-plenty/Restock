@@ -3032,16 +3032,6 @@ details.fold-inline {
   user-select: all;
 }
 
-/* 0.8.2: pull down for a full update (sync, then prices). */
-.refresh-status {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 14px;
-  border-radius: var(--r-md);
-  background: var(--card);
-}
-
 /* 0.8.5: a choice in a list of rows, with the picked one (and a recommended one) in green. */
 .row.choice {
   border: 2px solid transparent;
@@ -5667,16 +5657,6 @@ svg.icon-info {
 }
 
 /* 0.11.1: a running price check, on the tabs with no refresh line of their own (Add, More) */
-.check-strip {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 8px 16px 0;
-  padding: 10px 14px;
-  border-radius: var(--r-md);
-  background: var(--card);
-}
-
 /* ================= 0.12.0: the simpler look ================= */
 
 /* One row everywhere: photo, name, shop, one price and a word; "i" and one button at the end. */
@@ -7107,11 +7087,6 @@ button.fold-go {
 }
 
 /* 0.12.8: adding to an item you already have: the bar's button says Done (each + is saved as you tap it) */
-.add-mini-done {
-  font-weight: 700;
-  font-size: var(--fs-lg);
-}
-
 /* 0.12.8: the item page's "Products I buy": a pencil in a green tile and a green edge, so it's found */
 .fold[data-products] {
   border-color: var(--green);
@@ -7171,4 +7146,88 @@ button.fold-go {
   .shoprow:has(.kilo-each) {
     gap: 8px;
   }
+}
+
+/* ================= 0.12.9 ================= */
+
+/* One slim line under the clock while a sync or price check runs, the same on every screen. The
+   page moves down by this line only. */
+:root.checking {
+  --check-h: calc(var(--fs-sm) + 12px);
+}
+.check-line {
+  position: fixed;
+  top: var(--bar-top);
+  left: 0;
+  right: 0;
+  height: var(--check-h);
+  z-index: 16;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  background: var(--more-top);
+  color: var(--on-navy-muted);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.check-line > span {
+  flex-shrink: 0;
+}
+.check-line > :is(.progress, .loading-bar) {
+  flex: 1;
+  min-width: 40px;
+}
+
+/* What's new: each version is a card; Done and the GitHub link end the page. */
+.whats-new h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.whats-new > .small {
+  margin: 4px 0 0;
+}
+.whats-new ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.whats-new-tag {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: var(--green-bg);
+  color: var(--green-ink);
+}
+.whats-new-end {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Add another product: Done on the bottom edge, with what's been saved over it. */
+.sticky-cta.add-done {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+}
+
+/* A link that is a button looks like every other button: no underline, the button's own colour. */
+a.btn {
+  text-decoration: none;
+  color: inherit;
+}
+/* On a screen with no tab bar under it, a bottom bar reaches the screen's edge and keeps its button
+   clear of the phone's gesture strip. */
+.overlay .screen > .sticky-cta {
+  bottom: calc(-24px - var(--bottom));
+  margin-bottom: calc(-24px - var(--bottom));
+  padding-bottom: calc(12px + var(--bottom));
 }

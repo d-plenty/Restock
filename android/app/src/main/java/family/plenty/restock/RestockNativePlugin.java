@@ -88,6 +88,26 @@ public class RestockNativePlugin extends Plugin {
     }
 
     /**
+     * 0.12.9: opens the keyboard for the box the page has just put the cursor in (Add to pantry's
+     * search box, say). A WebView doesn't always raise it for a cursor the page placed.
+     */
+    @PluginMethod
+    public void showKeyboard(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            try {
+                android.view.View web = getBridge().getWebView();
+                web.requestFocus();
+                android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showSoftInput(web, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            } catch (Exception ignored) {
+                // no keyboard to show: typing still works once the box is tapped
+            }
+            call.resolve();
+        });
+    }
+
+    /**
      * A pause that keeps time with the screen off: the WebView's own timers slow right down when
      * Restock isn't on screen, which would stretch a 1-second pause to a minute.
      */

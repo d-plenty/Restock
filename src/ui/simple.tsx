@@ -261,6 +261,8 @@ export function AddBar({ placeholder = 'Search the shops to add' }: { placeholde
         e.preventDefault();
         const query = cleanSearch(q);
         setQ('');
+        // 0.12.9: the keyboard goes down, so it isn't left over the results Add opens with
+        (document.activeElement as HTMLElement | null)?.blur?.();
         nav.push({ name: 'add', query: query || undefined });
       }}
     >

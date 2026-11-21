@@ -41,6 +41,8 @@ export type Screen =
   | { name: 'scanned'; section?: Section; start?: boolean }
   | { name: 'settings'; page?: import('./screens/Settings').SettingsPage }
   | { name: 'feedback' }
+  /** 0.12.9: Settings → What's new: what changed in each version. */
+  | { name: 'whatsnew' }
   | { name: 'catalogues' }
   /** 0.12.3: My catalogue is merged into each shop's page; an old link to it opens Your shops. */
   | { name: 'mycatalogue' }

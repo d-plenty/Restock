@@ -97,6 +97,8 @@ export interface RestockNativePlugin {
   scheduleRecalls(opts: { enabled: boolean }): Promise<void>;
   /** Check the official recall lists now (the same check as the daily one). */
   checkRecalls(): Promise<{ checked: number; found: number; fresh: number; errors: Record<string, string> }>;
+  /** 0.12.9: open the keyboard for the box the page has just put the cursor in (lib/keyboard.ts). */
+  showKeyboard(): Promise<void>;
   /** Show a notification right away (recalls found by "Check now", the weekly summary). */
   notify(opts: { id: number; title: string; body: string; action?: string }): Promise<void>;
   /**

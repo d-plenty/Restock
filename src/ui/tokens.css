@@ -188,7 +188,9 @@
   --info-bg: var(--blue-bg);
   --focus: var(--green);
 
-  --top: max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px), var(--native-top, 0px));
+  /* 0.12.9: --bar-top is the status bar; --top adds the slim checking line while one shows. */
+  --bar-top: max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px), var(--native-top, 0px));
+  --top: calc(var(--bar-top) + var(--check-h, 0px));
   --bottom: max(var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px), var(--native-bottom, 0px));
   color-scheme: light;
 }

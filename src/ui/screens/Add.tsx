@@ -1317,11 +1317,13 @@ export function AddScreen({
     const k = keyOf(sp);
     const picked = isPicked(k);
     const tracked = pantry?.get(k);
+    const inRole = addingToItem ? attach?.inItem.get(k) : undefined;
     const size = sp.size && !nameHasSize(sp.name, sp.size) ? tidySize(sp.size, sp.name) : undefined;
     const note: { text: string; tone: NoteTone } | undefined = isExactBarcode(rankQ, sp)
       ? { text: 'Exact match', tone: 'good' }
       : tracked
-        ? { text: `In ${SECTION_PLACE[(tracked.section ?? section) as Section]}`, tone: 'plain' }
+        ? // 0.12.9: in the item being added to, it says which group it's in (an Also happy with one read "In your pantry" beside a +)
+          { text: inRole === 'alt' ? 'Also happy with' : inRole === 'main' ? 'Products I buy' : `In ${SECTION_PLACE[(tracked.section ?? section) as Section]}`, tone: 'plain' }
         : sp.isSpecial && !sp.memberOnly
           ? { text: sentence(specialTag(sp.price, sp.wasPrice)), tone: 'good' }
           : sp.memberOnly && sp.chain !== 'costco'
@@ -1715,7 +1717,8 @@ export function AddScreen({
         }}
         style={{ display: 'flex', gap: 8 }}
       >
-        <SearchField placeholder={SEARCH_PLACEHOLDER[section]} aria-label={`Search ${SECTION_SHOPS[section]}`} enterKeyHint="search" value={term} onValue={setTerm} />
+        {/* 0.12.9: opened to type (nothing searched, scanned or picked yet): the cursor is in the box and the keyboard is up */}
+        <SearchField placeholder={SEARCH_PLACEHOLDER[section]} aria-label={`Search ${SECTION_SHOPS[section]}`} enterKeyHint="search" value={term} onValue={setTerm} autoFocus={!query && !barcode && !scan && !preTickProp && !fromScans && !forLine} />
         {/* 0.12.0: Enter (the keyboard's Search key) searches, so there's no Search button; the barcode button sits by the box */}
         {!forLine && (
           <button className="btn primary" type="button" aria-label="Scan a barcode" style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }} onClick={doScan}>
@@ -2419,19 +2422,19 @@ export function AddScreen({
         </div>
       )}
 
-      {addingToItem && attachGroup && picks.size === 0 && addedCount > 0 && (
-        // 0.12.8: adding to an item you already have: each + is saved as you tap it, so this only says so and goes back.
-        <button className="card add-mini" onClick={() => nav.pop()} aria-label={`${addedCount} added to ${attachGroup.name}. Done`}>
-          <span className="grow add-mini-text">
-            <span className="title" style={{ fontSize: 15 }}>
-              {addedCount} added to {as === 'alt' ? 'Also happy with' : attachGroup.name}
-            </span>
-            <span className="small">Saved already. Tick any others, then tap Done.</span>
+      {addingToItem && attachGroup && picks.size === 0 && (
+        // 0.12.8: adding to an item you already have: each + is saved as you tap it.
+        // 0.12.9: a big Done button on the bottom edge from the start (it was a small bar that showed after the first +).
+        <div className="sticky-cta add-done">
+          <span className="small" role="status">
+            {addedCount > 0
+              ? `${addedCount} added to ${as === 'alt' ? 'Also happy with' : attachGroup.name} · saved already`
+              : 'Each + is saved as you tap it.'}
           </span>
-          <span className="add-mini-arrow add-mini-done" aria-hidden="true">
-            Done
-          </span>
-        </button>
+          <button className="btn primary block" onClick={() => nav.pop()}>
+            <Icon name="check" size={18} /> Done
+          </button>
+        </div>
       )}
       {picks.size > 0 && !changing && (
         // The bar: what's ticked and where. Tap it (or its green arrow) to name it and add it.
@@ -2835,11 +2838,11 @@ export function ManualSheet({
   };
 
   return (
-    <Sheet title="Add by hand" onClose={onClose} unsaved={!saving && !busyAs && (name.trim() !== defaultName.trim() || !!size.trim() || !!price.trim())}>
+    <Sheet title="Add manually" onClose={onClose} unsaved={!saving && !busyAs && (name.trim() !== defaultName.trim() || !!size.trim() || !!price.trim())}>
       <p className="small">Prices for hand-added products aren't checked automatically. Enter them from the shelf or catalogue as you see them.</p>
       <label className="field">
         <span>Product name</span>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus={!defaultName.trim()} />
       </label>
       <div className="two">
         <label className="field">

@@ -60,7 +60,7 @@ export function AddOnServer({ back }: { back?: boolean }) {
             void look();
           }}
         >
-          <input className="input" inputMode="numeric" aria-label="Barcode number" placeholder="9300633…" value={code} onChange={(e) => (setCode(e.target.value), setMsg(undefined))} />
+          <input autoFocus className="input" inputMode="numeric" aria-label="Barcode number" placeholder="9300633…" value={code} onChange={(e) => (setCode(e.target.value), setMsg(undefined))} />
           <button className="btn primary" type="submit">
             Find
           </button>

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.12.8" src="https://img.shields.io/badge/status-release%20candidate%200.12.8-ffcd00">
+  <img alt="Release candidate 0.12.9" src="https://img.shields.io/badge/status-release%20candidate%200.12.9-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0128">New in 0.12.8</a> ·
+  <a href="#new-in-0129">New in 0.12.9</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -138,6 +138,17 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.12.9
+
+Less tapping, and a page that tells you what changed.
+
+- **What's new.** After an update Restock asks once: **See what's new** or **I'll figure it out**. The page lists what changed in this version and the few before it, in plain words, and ends with **Done** and **Open the GitHub page**. It's always in **Settings, Help, What's new**. Nothing is fetched to show it. A new install isn't asked.
+- **Add another product has a big Done button** on the bottom edge, from the start. Each + is still saved as you tap it; Done takes you back to the item. (It was a small bar that only showed after the first +.)
+- **The keyboard opens by itself where you go to type**: Add to pantry, Add manually, and the boxes that already took the cursor (a category's new name, a price). Opened with something to show (a search, a scan), the results stay in view. The barcode button and More ways to add stay above the keyboard.
+- **One slim line while prices are checked.** Every screen shows the same line under the clock, "Checking prices… 11 of 484" with its bar, and moves down by that one line. Pantry, the list and More used to leave a big gap, with the words hidden under the status bar. Home keeps the line in its own top.
+- **Also happy with says so.** In an item's search results, a product you already have under Also happy with is tagged that (it said In your pantry beside a +). One under Products I buy says Products I buy.
+- On the web pages: the same What's new box and page, the same Done button and the same tags.
 
 ## New in 0.12.8
 
@@ -627,7 +638,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.8.apk` (on macOS, `shasum -a 256 restock-0.12.8.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.9.apk` (on macOS, `shasum -a 256 restock-0.12.9.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

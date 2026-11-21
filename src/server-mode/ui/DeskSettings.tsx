@@ -755,6 +755,11 @@ function HouseholdPart() {
       </Group>
 
       <Group id="dk-s-help" title="Help">
+        <Line title="What's new" sub="What changed in this version and the versions before it">
+          <button className="btn small" onClick={() => nav.push({ name: 'whatsnew' })}>
+            See what's new
+          </button>
+        </Line>
         <Line title="Send feedback" sub="Good or bad, tell us what works and what doesn’t. Screenshots welcome.">
           <button className="btn small" onClick={() => nav.push({ name: 'feedback' })}>
             Send feedback

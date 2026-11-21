@@ -1,4 +1,4 @@
-import { useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { checkPrices, type CheckResult } from '../lib/check';
 import { useLive } from '../lib/useLive';
 import { RestockNative } from '../lib/sql/native';
@@ -20,7 +20,7 @@ let running: Promise<void> | undefined;
 // 0.11.1: what a refresh is doing is kept here, not in the screen that started it. Before, it was
 // Home's own: leaving Home threw it away, and coming back showed "Prices updated Wednesday" while
 // the check was still going, as if it had been cancelled. Now every screen that shows it (Home,
-// Pantry, the list, and the strip on Add and More) reads the same thing, for as long as it runs.
+// and the slim line on every other screen, 0.12.9) reads the same thing, for as long as it runs.
 interface RefreshLive {
   stage?: RefreshStage;
   progress?: [number, number];
@@ -52,17 +52,29 @@ export async function trackCheck(opts?: { slot?: boolean }): Promise<CheckResult
   }
 }
 
-/** 0.11.1: the same line on the tabs that have no refresh of their own (Add, More), while a check runs. */
-export function CheckStrip() {
+/**
+ * 0.12.9: one slim line under the clock, the same on every screen but Home (which shows the check in
+ * its own top), while a sync or price check runs. It was a card above each page's navy top, which
+ * hid under the status bar and pushed the page down; on More it didn't show at all. The page moves
+ * down by this one line (--check-h) and no more.
+ */
+export function CheckLine() {
   const { stage, progress } = useRefreshLive();
+  useEffect(() => {
+    if (!stage) return;
+    document.documentElement.classList.add('checking');
+    return () => document.documentElement.classList.remove('checking');
+  }, [stage]);
   if (!stage) return null;
   return (
-    <div className="check-strip" role="status">
-      <span className="small">{refreshText(stage, progress)}</span>
-      {stage === 'prices' && progress && (
+    <div className="check-line" role="status">
+      <span>{refreshText(stage, progress)}</span>
+      {stage === 'prices' && progress ? (
         <div className="progress">
           <div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} />
         </div>
+      ) : (
+        <LoadingBar seconds={stage === 'prices' ? 30 : 6} />
       )}
     </div>
   );
@@ -153,17 +165,5 @@ export function useFullRefresh(onChecked?: (res: CheckResult) => void) {
 
   // Not in a household: pulling does nothing at all.
   const pull = usePullToRefresh(syncOnly, !!stage || !paired, 'Pull to sync with your household', 'Let go to sync');
-  const status = stage ? (
-    <div className="refresh-status" role="status">
-      <span className="small">{refreshText(stage, progress)}</span>
-      {stage === 'prices' && progress ? (
-        <div className="progress">
-          <div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} />
-        </div>
-      ) : (
-        <LoadingBar seconds={stage === 'prices' ? 30 : 6} />
-      )}
-    </div>
-  ) : null;
-  return { props: pull.props, indicator: pull.indicator, status, run, busy: !!stage, stage, progress, paired };
+  return { props: pull.props, indicator: pull.indicator, run, busy: !!stage, stage, progress, paired };
 }

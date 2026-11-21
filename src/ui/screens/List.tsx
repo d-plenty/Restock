@@ -612,7 +612,6 @@ export function ListScreen() {
   return (
     <div className="screen" {...full.props}>
       {full.indicator}
-      {full.status}
       {/* 0.12.4: the navy top every screen has: which list (Change), the add box, then Edit and the view options */}
       <div className="navy-top">
       {/* 0.10.5: the list's name is the list picker (a dropdown). 0.10.6: then Edit, and the view options. */}
