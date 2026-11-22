@@ -3,7 +3,7 @@ import { isPressOnlyShop, kindOf, priceSource, sectionOn, tabsOf, type StoreChai
 import { adapterFor } from '../stores';
 import { isNative } from '../stores/http';
 import type { Chain, Settings } from '../types';
-import { addReading, allProducts, getSettings, nowIso, readingsFor, refresh } from './db';
+import { addReading, allProducts, getSettings, nowIso, readingsFor, refresh, updateProduct } from './db';
 import { RestockNative } from './sql/native';
 import { localDay } from './verdict';
 import { background } from './undo';
@@ -80,6 +80,8 @@ async function refreshPagelessProducts(limit = 30): Promise<{ checked: number; u
     try {
       const hit = (await adapterFor(p.chain)!.search(p.name)).find((x) => x.storeProductId === p.storeProductId);
       checked++;
+      // 0.12.10: a product saved before its shop's photos could be read gets its photo now.
+      if (hit?.imageUrl && !p.imageUrl) await background(() => updateProduct(p.id, { imageUrl: hit.imageUrl })).catch(() => undefined);
       if (!hit || hit.price === undefined) continue;
       const prev = (last.get(p.id) ?? []).slice(-1)[0];
       // Same day on the phone's own calendar, not UTC's (verdict.ts localDay).

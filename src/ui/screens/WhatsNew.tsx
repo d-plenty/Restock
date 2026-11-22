@@ -7,28 +7,25 @@ import { useNav } from '../nav';
 
 export function WhatsNewScreen() {
   const nav = useNav();
+  // 0.12.10: the latest version only (it listed the last four, which was a lot to scroll past).
+  const v = WHATS_NEW[0];
   return (
     <div className="screen">
       <TopBar title="What's new" />
+      <section className="card whats-new" aria-label={`Restock ${v.version}`}>
+        <h2>
+          Restock {v.version}
+          {v.version === version && <span className="whats-new-tag">This version</span>}
+        </h2>
+        <p className="small">{v.about}</p>
+        <ul>
+          {v.changes.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      </section>
       <p className="small" style={{ margin: 0 }}>
-        You have Restock {version}. The newest changes are first.
-      </p>
-      {WHATS_NEW.map((v) => (
-        <section className="card whats-new" key={v.version} aria-label={`Restock ${v.version}`}>
-          <h2>
-            Restock {v.version}
-            {v.version === version && <span className="whats-new-tag">This version</span>}
-          </h2>
-          <p className="small">{v.about}</p>
-          <ul>
-            {v.changes.map((c) => (
-              <li key={c}>{c}</li>
-            ))}
-          </ul>
-        </section>
-      ))}
-      <p className="small" style={{ margin: 0 }}>
-        Older versions, and every detail of these, are on Restock's GitHub page.
+        Earlier versions, and every detail of this one, are on Restock's GitHub page.
       </p>
       <div className="whats-new-end">
         <button className="btn primary block" onClick={nav.pop}>

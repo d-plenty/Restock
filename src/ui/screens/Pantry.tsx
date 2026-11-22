@@ -231,6 +231,14 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           {/* 0.11.3: a custom tab says Beta at the top */}
           {isCustomSection(section) && <> <BetaTag /></>}
         </h1>
+        {/* 0.12.10: a tab you made always has Edit (it only showed once the tab had items, so an
+            empty "Tools" couldn't be renamed from here). With nothing in it, Edit goes straight to
+            the tab's own page: its name, colour, icon and shops. */}
+        {recs.length === 0 && isCustomSection(section) && (
+          <button className="btn small edit-btn" aria-label={`Edit this tab: its name, icon and shops`} onClick={() => nav.push({ name: 'stores', section })}>
+            <Icon name="pencil" size={16} /> Edit
+          </button>
+        )}
         {recs.length > 0 && (
           editing ? (
             <button className="btn small primary" onClick={stopEditing}>
@@ -248,6 +256,11 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       {editing && (
         <button className="btn small block edit-cats" onClick={() => nav.push({ name: 'categories', section })}>
           <Icon name="pencil" size={16} /> Edit categories
+        </button>
+      )}
+      {editing && isCustomSection(section) && (
+        <button className="btn small block edit-cats" onClick={() => nav.push({ name: 'stores', section })}>
+          <Icon name="pencil" size={16} /> Edit this tab: name, icon and shops
         </button>
       )}
       {/* 0.12.0: this tab's one add button, with the barcode beside it (it was a small + at the top and a tab in the bar) */}

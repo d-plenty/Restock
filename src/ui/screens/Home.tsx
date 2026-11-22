@@ -1,5 +1,6 @@
 import { greeting, todayText } from '../../lib/greeting';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
+import { askResume, clearTrip, loadTrip, subscribeTrip } from '../../lib/trip';
 import { refreshText, useFullRefresh } from '../refresh';
 import { allCards, allListEntries, getSettings, updateSettings } from '../../lib/db';
 import { loadDemo } from '../../lib/demo';
@@ -163,6 +164,8 @@ export function HomeScreen() {
       )}
       </div>
 
+      {/* 0.12.10: a shop you stepped out of (or that Android closed): pick it up, or begin again */}
+      <TripCard open={allEntries.filter((e) => !e.checked).length} />
       {/* 0.10.12: a newer Restock is out: first thing on Home, until it's installed */}
       <UpdateBanner settings={settings} />
       <RecallBanner />
@@ -411,6 +414,47 @@ function BlockedCard({ chain, onWorked, hide, maybe, days }: { chain: StoreChain
         {!isNative() && <span className="small">Unblock is in the Android app: the shop’s page opens on your phone.</span>}
         {maybe && <TryAgain chain={chain} onWorked={onWorked} />}
         {hide && <HideForADay chain={chain} />}
+      </div>
+    </div>
+  );
+}
+
+/** 0.12.10: "You were shopping": Resume shopping, or Start fresh. Shown while a trip is kept (lib/trip). */
+function TripCard({ open }: { open: number }) {
+  const nav = useNav();
+  const trip = useSyncExternalStore(subscribeTrip, () => loadTrip(), () => undefined);
+  if (!trip || !open) return null;
+  const shops = trip.chosen.map((c) => chainName(c as StoreChain));
+  const done = trip.doneAt.filter((d) => trip.chosen.includes(d)).length;
+  return (
+    <div className="card trip-card" role="region" aria-label="Shopping you paused">
+      <div>
+        <div className="title">You were shopping</div>
+        <div className="small">
+          {shops.length <= 3 ? shops.join(', ') : `${shops.length} shops`}
+          {trip.chosen.length > 1 ? ` · ${done} of ${trip.chosen.length} shops done` : ''}
+        </div>
+      </div>
+      <div className="two">
+        <button
+          className="btn primary"
+          onClick={() => {
+            askResume();
+            nav.setTab('list');
+          }}
+        >
+          Resume shopping
+        </button>
+        <button
+          className="btn"
+          onClick={() => {
+            clearTrip();
+            nav.setTab('list');
+            nav.toast('Starting fresh. What you ticked stays ticked.');
+          }}
+        >
+          Start fresh
+        </button>
       </div>
     </div>
   );

@@ -168,8 +168,8 @@ describe('0.12.8: shops that stopped working', () => {
     expect(resultOf({ ok: false, blocked: true })).toBe('blocked');
     expect(resultOf({ ok: false })).toBe('unread');
     expect(resultOf(undefined)).toBe('unknown');
-    expect(tryAgainWords('Cellarbrations', 'unread')).toMatch(/couldn't read any products/);
-    expect(tryAgainWords('Cellarbrations', 'blocked')).toMatch(/Unblock Cellarbrations/);
+    expect(tryAgainWords('Cellarbrations', 'unread')).toMatch(/still isn't answering/);
+    expect(tryAgainWords('Cellarbrations', 'blocked')).toMatch(/Open Cellarbrations/);
   });
   it('Cellarbrations, The Bottle-O and Porters get their photos', () => {
     expect(siteImage('https://www.cellarbrations.com.au/sm/pickup/rsid/218/product/hard-rated-alcoholic-lemon-can-375ml-id-562785')).toBe(

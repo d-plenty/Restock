@@ -1408,7 +1408,8 @@ select.input {
   flex-shrink: 0;
 }
 .shoprow.got {
-  opacity: 0.5;
+  /* 0.12.10: 0.5 left a ticked name under the 4.5:1 it needs to be read */
+  opacity: 0.72;
 }
 .shoprow.got .title {
   text-decoration: line-through;
@@ -7230,4 +7231,42 @@ a.btn {
   bottom: calc(-24px - var(--bottom));
   margin-bottom: calc(-24px - var(--bottom));
   padding-bottom: calc(12px + var(--bottom));
+}
+
+/* 0.12.10: Home's "You were shopping" card, and the list's Resume shopping / Start fresh pair */
+.trip-card {
+  gap: 12px;
+  border-color: var(--green);
+}
+.trip-pair {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+}
+
+/* 0.12.10: a matching pantry item in a narrow sheet: its two lines shorten with … instead of spilling */
+.pantry-matches .row > .grow {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* 0.12.10: on a narrow phone a long word in a shopping line ("Dishwashing") pushed its price off the edge */
+.shoprow > span:not(.shoprow-side):not(.thumb-btn):not(.thumb-space),
+.shoprow > div,
+.shoprow > .shoprow-open {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* …and on the narrowest phones the line gives its photo's room to the name (the blue i still shows it) */
+@media (max-width: 340px) {
+  .shopmode-list .shoprow .thumb-btn,
+  .shopmode-list .shoprow .thumb-space {
+    display: none;
+  }
+}
+/* A ticked line's grey second line stays readable when the line is dimmed */
+.shoprow.got .small {
+  color: var(--ink);
+}
+.trip-card .btn,
+.trip-pair .btn {
+  padding-inline: 10px;
 }

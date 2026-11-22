@@ -12,6 +12,8 @@ export function NameFirst({
   help,
   placeholder = 'e.g. Honey',
   inputRef,
+  taken,
+  onOpenTaken,
 }: {
   value: string;
   onChange: (name: string) => void;
@@ -23,9 +25,13 @@ export function NameFirst({
   help: string;
   placeholder?: string;
   inputRef?: RefObject<HTMLInputElement | null>;
+  /** 0.12.10: another item already has this name (sameNameWords): it can't be added under it. */
+  taken?: string;
+  /** With `taken`: open the item that has the name. */
+  onOpenTaken?: { label: string; open: () => void };
 }) {
   const empty = !value.trim();
-  const bad = missing && empty;
+  const bad = (missing && empty) || !!taken;
   return (
     <>
       <label className={`field name-first${bad ? ' missing' : ''}`}>
@@ -42,8 +48,13 @@ export function NameFirst({
         />
       </label>
       <span id="name-first-help" className={`small name-first-help${bad ? ' missing' : ''}`} role={bad ? 'alert' : undefined}>
-        {bad ? 'Give it a name first. Short is best: it is what you search for and say.' : help}
+        {taken ? taken : bad ? 'Give it a name first. Short is best: it is what you search for and say.' : help}
       </span>
+      {taken && onOpenTaken && (
+        <button type="button" className="btn small" style={{ alignSelf: 'flex-start' }} onClick={onOpenTaken.open}>
+          {onOpenTaken.label}
+        </button>
+      )}
       {empty && idea && (
         <button type="button" className="chip name-idea" onClick={() => onChange(idea)} aria-label={`Use the name ${idea}`}>
           Use "{idea}"

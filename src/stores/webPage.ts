@@ -59,15 +59,64 @@ function priceOf(v: unknown): number | undefined {
   return n !== undefined && n > 0 && n < 100000 ? Math.round(n * 100) / 100 : undefined;
 }
 
-function imageOf(v: unknown, base: string): string | undefined {
-  if (!v) return undefined;
-  if (typeof v === 'string') return absolute(v, base);
-  if (Array.isArray(v)) return imageOf(v[0], base);
+// 0.12.10: photos reworked. A picture is looked for under any field that sounds like one (shops
+// spell it "thumbnailImageUrl", "primaryImage", "imageURL", "photo"…), inside lists and nested
+// objects, and the first that is a real picture's address wins (not a placeholder, not a word
+// like "true"). A product read without a photo borrows it from the same product on the page's
+// cards. Plain http pictures are asked for over https (the app can't show http ones).
+const IMG_INNER = ['url', 'src', 'contentUrl', 'thumbnailUrl', 'href', 'large', 'medium', 'small', 'original', 'default', 'path', 'uri', 'link', 'secure_url'];
+const IMG_NAME = /image|img|thumb|photo|picture|^media$|^assets?$|packshot/i;
+/** Pictures that aren't the product: a brand's logo, a "new" badge, a rating's stars. */
+const NOT_PRODUCT = /brand|logo|badge|icon|flag|promo|banner|sticker|rating|swatch|award|label|seller|vendor/i;
+/** Does it read like a picture's address ("…/p/1234.jpg", "//cdn…", "/media/a/b")? */
+const pictureLike = (v: string) => /^(https?:)?\/\//i.test(v) || /^\/[^\s]+/.test(v) || /\.(jpe?g|png|webp|avif|gif)(\?|$)/i.test(v);
+
+function imageOf(v: unknown, base: string, depth = 0): string | undefined {
+  if (!v || depth > 4) return undefined;
+  if (typeof v === 'string') {
+    const t = v.trim();
+    return pictureLike(t) ? goodImage(absolute(t, base)) : undefined;
+  }
+  if (Array.isArray(v)) {
+    for (const x of v.slice(0, 6)) {
+      const hit = imageOf(x, base, depth + 1);
+      if (hit) return hit;
+    }
+    return undefined;
+  }
   if (typeof v === 'object') {
     const o = v as Raw;
-    return imageOf(o.url ?? o.src ?? o.contentUrl ?? o.href ?? o.large ?? o.medium ?? o.small, base);
+    for (const k of IMG_INNER) {
+      const hit = imageOf(o[k], base, depth + 1);
+      if (hit) return hit;
+    }
+    for (const k of Object.keys(o)) {
+      if (!IMG_NAME.test(k) || NOT_PRODUCT.test(k)) continue;
+      const hit = imageOf(o[k], base, depth + 1);
+      if (hit) return hit;
+    }
   }
   return undefined;
+}
+
+/** A product object's picture: the usual fields first, then any field that sounds like a picture. */
+function imageIn(o: Raw, base: string): string | undefined {
+  for (const k of IMG_KEYS) {
+    const hit = imageOf(o[k], base);
+    if (hit) return hit;
+  }
+  for (const k of Object.keys(o)) {
+    if (IMG_KEYS.includes(k) || !IMG_NAME.test(k) || NOT_PRODUCT.test(k)) continue;
+    const hit = imageOf(o[k], base);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/** A size worth showing: "0", "N/A" and the like aren't (Bunnings sends size 0 for a bucket). */
+function sizeText(v: unknown): string | undefined {
+  const t = text(v);
+  return t && !/^(0+(\.0+)?|n\/?a|none|null|undefined|-+)$/i.test(t) ? t : undefined;
 }
 
 /** A size like "375ml", "6 x 375mL", "500g" or "24 Pack" in a product name. */
@@ -215,7 +264,7 @@ function product(chain: Chain, p: Partial<StoreProduct> & { name?: string; url?:
     storeProductId: id,
     name,
     brand: p.brand,
-    size: p.size ?? sizeIn(name),
+    size: sizeText(p.size) ?? sizeIn(name),
     barcode: p.barcode,
     imageUrl: goodImage(p.imageUrl) ?? siteImage(p.url),
     price,
@@ -229,6 +278,8 @@ function product(chain: Chain, p: Partial<StoreProduct> & { name?: string; url?:
 
 /** Drop placeholder images (spacers, "loading" pictures, tiny gifs and svgs). */
 function goodImage(url?: string): string | undefined {
+  // The app runs on https, where a plain http picture is never shown: ask for it over https.
+  if (url && /^http:\/\//i.test(url)) url = `https://${url.slice(7)}`;
   if (
     !url ||
     /^data:|placeholder|no[-_]?image|image[-_]coming|Product-Image-and-Receipt|spacer|blank\.|loading|lazy[-_]?load|1x1|pixel\.gif|\.svg(\?|$)/i.test(
@@ -447,11 +498,11 @@ export function fromEmbedded(chain: Chain, data: unknown[], base: string, limit 
           url,
           id: id ? `${new URL(base).origin}#${id}` : undefined,
           brand: text(typeof o.brand === 'object' ? (o.brand as Raw)?.name : o.brand),
-          imageUrl: imageOf(first(o, IMG_KEYS), base),
+          imageUrl: imageIn(o, base),
           price,
           wasPrice: priceOf(first(o, WAS_KEYS)) ?? was,
           barcode: text(o.gtin ?? o.gtin13 ?? o.barcode ?? o.ean),
-          size: text(o.size ?? o.packageSize ?? o.PackageSize ?? o.volume),
+          size: sizeText(o.size ?? o.packageSize ?? o.PackageSize ?? o.volume),
           inStock:
             typeof o.inStock === 'boolean'
               ? o.inStock
@@ -718,12 +769,33 @@ export function cardPrice(card: Element): { price?: number; was?: number } {
 /** Everything the page offers, best source first: JSON-LD, then embedded data, then cards. */
 export function extractProducts(chain: Chain, html: string, base: string, parse: ParseHtml = defaultParse): StoreProduct[] {
   const ld = fromJsonLd(chain, html, base);
-  if (ld.length >= 2) return ld;
+  // 0.12.10: whichever source the products come from, one read without a photo takes it from the
+  // same product in the other sources (the page's data often has no picture; its cards do).
+  let cards: StoreProduct[] | undefined;
+  const cardsOnce = () => (cards ??= fromCards(chain, html, base, parse));
+  if (ld.length >= 2) return ld.every((p) => p.imageUrl) ? ld : withPhotos(ld, [fromEmbedded(chain, embeddedJson(html), base), cardsOnce()]);
   const embedded = fromEmbedded(chain, embeddedJson(html), base);
-  if (embedded.length >= 2) return embedded;
-  const cards = fromCards(chain, html, base, parse);
-  const all = [ld, embedded, cards].sort((a, b) => b.length - a.length)[0];
-  return all;
+  if (embedded.length >= 2) return embedded.every((p) => p.imageUrl) ? embedded : withPhotos(embedded, [ld, cardsOnce()]);
+  const all = [ld, embedded, cardsOnce()].sort((a, b) => b.length - a.length)[0];
+  return withPhotos(all, [ld, embedded, cardsOnce()]);
+}
+
+const photoKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/** Products missing a photo take it from the same product (same address, else same name) in `others`. */
+export function withPhotos(products: StoreProduct[], others: StoreProduct[][]): StoreProduct[] {
+  if (products.every((p) => p.imageUrl)) return products;
+  const byId = new Map<string, string>();
+  const byName = new Map<string, string>();
+  for (const list of others)
+    for (const o of list) {
+      if (!o.imageUrl) continue;
+      if (!byId.has(o.storeProductId)) byId.set(o.storeProductId, o.imageUrl);
+      const k = photoKey(o.name);
+      if (k && !byName.has(k)) byName.set(k, o.imageUrl);
+    }
+  if (!byId.size) return products;
+  return products.map((p) => (p.imageUrl ? p : { ...p, imageUrl: byId.get(p.storeProductId) ?? byName.get(photoKey(p.name)) }));
 }
 
 // ---------- finding a shop's search page ----------

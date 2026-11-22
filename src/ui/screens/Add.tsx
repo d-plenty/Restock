@@ -5,6 +5,7 @@ import { cleanSearch } from '../../lib/searchText';
 import { confidentCategoryId, guessCategoryId } from '../../lib/categoryGuess';
 import { suggestName } from '../../lib/nameSuggest';
 import { NameFirst } from './NameFirst';
+import { sameNameItem, sameNameWords } from '../../lib/sameName';
 import { kiloPrice } from '../../lib/unitPrice';
 import { flavourBarNote, otherFlavours, varietyWord } from '../../lib/flavours';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
@@ -302,6 +303,8 @@ export function AddScreen({
   // 0.12.7: the name box starts empty and has to be filled in (Restock named a dressing "Sugar").
   const [nameMissing, setNameMissing] = useState(false);
   const nameBox = useRef<HTMLInputElement>(null);
+  // 0.12.10: a name another item already has can't be used again ("Rinse aid" twice).
+  const everyItem = useLive(allGroups, []);
   // 0.12.7: picks that are "Also happy with" (an alternative product), chosen while adding. `altMode`:
   // you tapped Find one under Also happy with, so what you tick on that shop's page is an alternative.
   const [alts, setAlts] = useState<Set<string>>(new Set());
@@ -1070,6 +1073,7 @@ export function AddScreen({
   const cheapestChain = (): Chain | undefined => cheapestPick()?.chain ?? mainPicks[0]?.chain;
   /** Does adding make a pantry item (so it has a name, a category and Also happy with)? Not a one-off list line. */
   const makesItem = !attachGroup && (!forList || !!forLine);
+  const takenItem = attachGroup ? undefined : sameNameItem(everyItem, name);
   // The name on offer under the empty box: short, no brand, no size (lib/nameSuggest).
   const nameIdea = !attachGroup
     ? suggestName(
@@ -1128,6 +1132,15 @@ export function AddScreen({
     }
     if (!mainPicks.length) {
       nav.toast('Pick what you buy first. Also happy with is for a second choice.');
+      return;
+    }
+    // 0.12.10: no second item under a name you already use (a list line alone is fine).
+    if (target !== 'list' && sameNameItem(everyItem, name)) {
+      setPanelOpen(true);
+      requestAnimationFrame(() => {
+        nameBox.current?.scrollIntoView({ block: 'center' });
+        nameBox.current?.focus();
+      });
       return;
     }
     setSaving(true);
@@ -1289,6 +1302,13 @@ export function AddScreen({
           : 'Add an item';
   // A ticked product that's already a pantry item: from the Pick sheet, the line can just be that item.
   const trackedPick = forLine ? [...picks.keys()].map((k) => pantry?.get(k)).find((g): g is Group => !!g) : undefined;
+  /** 0.12.10: adding a new item with a product that's already "Products I buy" of another item. */
+  const havePick =
+    makesItem && !forLine
+      ? mainPicks
+          .map((p) => pantry?.get(`${p.chain}:${p.storeProductId}`))
+          .find((g): g is Group => !!g && [g.usualProductId, ...g.sameProductIds].some((id) => !!id))
+      : undefined;
   const useTracked = async (g: Group) => {
     if (!forLine) return;
     setSaving(true);
@@ -2476,6 +2496,12 @@ export function AddScreen({
                 idea={nameIdea}
                 missing={nameMissing}
                 inputRef={nameBox}
+                taken={takenItem && (forLine || !forList) ? sameNameWords(takenItem) : undefined}
+                onOpenTaken={
+                  takenItem && !forLine
+                    ? { label: `Open ${takenItem.name}`, open: () => nav.push({ name: 'item', groupId: takenItem.id }) }
+                    : undefined
+                }
                 placeholder={forLine ? 'e.g. Chopsticks' : forList ? 'e.g. Coffee' : 'e.g. Honey'}
                 help={
                   forLine
@@ -2510,6 +2536,18 @@ export function AddScreen({
           )}
           {matchCards}
           {altGroup}
+          {/* 0.12.10: a pick that's already one of your items says so before it's added a second time
+              (a barcode scanned for something you already track at a shop with no barcodes). */}
+          {havePick && (
+            <div className="banner grey" style={{ fontSize: 14 }}>
+              <span>
+                You already have this in {SECTION_PLACE[(havePick.section ?? section) as Section]} as <strong>{havePick.name}</strong>.
+              </span>
+              <button className="btn small" style={TAP} onClick={() => nav.push({ name: 'item', groupId: havePick.id })}>
+                Open {havePick.name}
+              </button>
+            </div>
+          )}
           {forLine ? (
             <>
               {trackedPick && (
@@ -2760,9 +2798,18 @@ export function ManualSheet({
   const [saving, setSaving] = useState(false);
   const [busyAs, setBusyAs] = useState<Target>();
   const savingRef = useRef(false);
+  // 0.12.10: a new item can't take a name another item has (adding to an item, or a list line, can).
+  const everyItem = useLive(allGroups, []);
+  const takenItem = attachTo ? undefined : sameNameItem(everyItem, name);
+  const [takenSaid, setTakenSaid] = useState(false);
 
   const save = async (target: Target) => {
     if (!name.trim() || savingRef.current) return;
+    if (target !== 'list' && takenItem) {
+      setTakenSaid(true);
+      requestAnimationFrame(() => document.getElementById('manual-name-taken')?.scrollIntoView({ block: 'center' }));
+      return;
+    }
     savingRef.current = true;
     setSaving(true);
     setBusyAs(target);
@@ -2842,8 +2889,20 @@ export function ManualSheet({
       <p className="small">Prices for hand-added products aren't checked automatically. Enter them from the shelf or catalogue as you see them.</p>
       <label className="field">
         <span>Product name</span>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus={!defaultName.trim()} />
+        <input
+          className="input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus={!defaultName.trim()}
+          aria-invalid={takenSaid && !!takenItem}
+          aria-describedby={takenSaid && takenItem ? 'manual-name-taken' : undefined}
+        />
       </label>
+      {takenSaid && takenItem && (
+        <span id="manual-name-taken" className="small name-first-help missing" role="alert">
+          {sameNameWords(takenItem)}
+        </span>
+      )}
       <div className="two">
         <label className="field">
           <span>Shop</span>

@@ -27,7 +27,8 @@ import { ensureNotificationPermission, notificationsAllowed, scheduleReminders }
 import { isNative } from '../../stores/http';
 import { serverMode, serverUi } from '../../server-mode/flag';
 import { firstPhoto, ItemPhoto } from '../../server-mode/ui/deskShared';
-import { getSettings, updateSettings } from '../../lib/db';
+import { allGroups, getSettings, updateSettings } from '../../lib/db';
+import { sameNameItem, sameNameWords } from '../../lib/sameName';
 import { loadRecommendations } from '../../lib/recs';
 import { money, parseMoney, tidySize } from '../../lib/units';
 import { amountToConfirm, basisWord, kiloPrice, lastUpdatedText, newestReading, priceLine, productLine, sizeLabel, type CompareStyle } from '../../lib/unitPrice';
@@ -978,7 +979,17 @@ export function EditSheet({
   const [allowMulti, setAllowMulti] = useState(group.allowMulti !== false);
   const [target, setTarget] = useState(group.targetPrice !== undefined ? group.targetPrice.toFixed(2) : '');
 
-  const save = async () => {
+  // 0.12.10: a rename can't land on another item's name (its own name, doubled or not, it keeps).
+  const everyItem = useLive(allGroups, []);
+  const takenItem = sameNameItem(everyItem, name, group);
+  const [takenSaid, setTakenSaid] = useState(false);
+  const save = async (): Promise<boolean> => {
+    if (takenItem) {
+      setTakenSaid(true);
+      // Save is at the bottom of the sheet and the name is at the top: bring the reason into view.
+      requestAnimationFrame(() => document.getElementById('edit-name-taken')?.scrollIntoView({ block: 'center' }));
+      return false;
+    }
     const t = parseFloat(target.replace(/[^0-9.]/g, ''));
     // 0.9.5 (undo)
     await act(`Saved ${name.trim() || group.name}`, () => updateGroup(group.id, {
@@ -991,6 +1002,7 @@ export function EditSheet({
       targetPrice: Number.isFinite(t) && t > 0 ? Math.round(t * 100) / 100 : undefined,
     }));
     onClose();
+    return true;
   };
 
   const unsaved =
@@ -1013,8 +1025,19 @@ export function EditSheet({
         <>
           <label className="field">
             <span>Name</span>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+            <input
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              aria-invalid={takenSaid && !!takenItem}
+              aria-describedby={takenSaid && takenItem ? 'edit-name-taken' : undefined}
+            />
           </label>
+          {takenSaid && takenItem && (
+            <span id="edit-name-taken" className="small name-first-help missing" role="alert">
+              {sameNameWords(takenItem)}
+            </span>
+          )}
           {suggested && suggested.toLowerCase() !== name.trim().toLowerCase() && (
             <button className="chip wrap" style={{ alignSelf: 'flex-start' }} onClick={() => setName(suggested)}>
               Use a short name: {suggested}
@@ -1025,7 +1048,7 @@ export function EditSheet({
               className="btn"
               onClick={async () => {
                 // What's changed here is saved first (nothing changed: nothing to save, or to undo)
-                if (unsaved) await save();
+                if (unsaved && !(await save())) return;
                 onProducts();
               }}
             >

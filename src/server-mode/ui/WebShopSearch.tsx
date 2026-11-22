@@ -8,7 +8,8 @@
 import { tidyItemName } from '../../lib/itemName';
 import { flavourBarNote } from '../../lib/flavours';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { allCategories, deleteListEntries } from '../../lib/db';
+import { allCategories, allGroups, deleteListEntries } from '../../lib/db';
+import { sameNameItem, sameNameWords } from '../../lib/sameName';
 import { pickItemFor, pickItemOffList } from '../../lib/listPicks';
 import { nameHasSize } from '../../lib/naming';
 import { money, tidySize } from '../../lib/units';
@@ -210,6 +211,8 @@ export function WebShopSearch({
   const sureCategory = listPick !== 'general' ? (confidentCategoryId(name.trim() || nameIdea, [...picks.values()].map((p) => p.name), (cats ?? []).map((c) => ({ ...c, section: tab })), tab) ?? '') : '';
   const shownCategory = catTouched ? categoryId : categoryId || sureCategory;
 
+  const everyItem = useLive(allGroups, []);
+  const takenItem = sameNameItem(everyItem, name);
   const save = async (target: Target) => {
     if (!answer || !picks.size || saving) return;
     // 0.12.7: you name it (Restock never fills the name in).
@@ -217,6 +220,8 @@ export function WebShopSearch({
       setNameMissing(true);
       return;
     }
+    // 0.12.10: no second item under a name you already use (a list line alone is fine).
+    if (target !== 'list' && takenItem) return;
     setSaving(true);
     setBusyAs(target);
     setSaveError(undefined);
@@ -387,6 +392,7 @@ export function WebShopSearch({
       }}
       idea={nameIdea}
       missing={nameMissing}
+      taken={takenItem ? sameNameWords(takenItem) : undefined}
       help={help}
       placeholder={placeholder}
     />

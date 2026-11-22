@@ -6,7 +6,8 @@ import { aisleLabel, aisleOf, byAisle as sortByAisle, getAisles, type AisleAt } 
 import { noteTicksSoon } from '../../lib/spending';
 import { branchAdvice, branchName, stockRows } from '../../lib/stock';
 import { useFullRefresh } from '../refresh';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { clearTrip, loadTrip, reopensTrip, resumeAsked, saveTrip, subscribeTrip, takeResume, type SavedTrip } from '../../lib/trip';
 import { nameHasSize } from '../../lib/naming';
 import { lookupBarcode, scanBarcode } from '../../lib/barcode';
 import { serverMode, serverUi } from '../../server-mode/flag';
@@ -334,6 +335,26 @@ export function ListScreen() {
   // 0.10.2: Change shops from shopping mode: closing the sheet goes back to that trip.
   const [shopping, setShopping] = useState<StoreChain[]>();
   const [skipToday, setSkipToday] = useState<Set<string>>(new Set());
+  // 0.12.10: the trip is kept on this phone (lib/trip), so it can be picked up after leaving the app.
+  const trip = useSyncExternalStore(subscribeTrip, () => loadTrip(), () => undefined);
+  const wantResume = useSyncExternalStore(subscribeTrip, resumeAsked, () => false);
+  const [resumed, setResumed] = useState<SavedTrip>();
+  const reopened = useRef(false);
+  const ready = !!(allEntries && allRecs && allCats && settings);
+  useEffect(() => {
+    if (!ready) return;
+    // Opened again soon after being closed mid-shop (once), or "Resume shopping" pressed on Home.
+    const first = !reopened.current;
+    reopened.current = true;
+    const t = loadTrip();
+    const asked = takeResume();
+    if (!t || shopping) return;
+    if (!asked && !(first && reopensTrip(t, Date.now()))) return;
+    setSection(t.section as ListSection);
+    setPendingTrip(t);
+  }, [ready, wantResume]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The list has to be showing the trip's own list before the trip opens on it.
+  const [pendingTrip, setPendingTrip] = useState<SavedTrip>();
   const [preview, setPreview] = useState<ListEntry>();
   // Shops opened on the list (0.9.0): each starts folded down to one line.
   const [openShops, setOpenShops] = useState<Set<ShopKey>>(new Set());
@@ -351,6 +372,23 @@ export function ListScreen() {
     () => (!allEntries || !allRecs || !settings ? undefined : listSums(allEntries, allRecs, settings, picked0)),
     [allEntries, allRecs, settings, picked0],
   );
+  /** Pick the kept trip up where it was: the same shops, the ones done, the page you were on. */
+  const resumeWith = (t: SavedTrip, now: NonNullable<typeof sums>) => {
+    const still = t.chosen.filter((x) => now.shops.includes(x as StoreChain)) as StoreChain[];
+    // Nothing left to get on that list (ticked or removed since): the trip is over.
+    if (now.section !== t.section || !now.entries.some((e) => !e.checked)) {
+      clearTrip();
+      return;
+    }
+    setSkipToday(new Set(t.skip));
+    setResumed(t);
+    setShopping(still.length ? still : now.shops);
+  };
+  useEffect(() => {
+    if (!pendingTrip || !sums || picked0 !== pendingTrip.section) return;
+    setPendingTrip(undefined);
+    resumeWith(pendingTrip, sums);
+  }, [pendingTrip, sums, picked0]); // eslint-disable-line react-hooks/exhaustive-deps
   const adder = useListAdd(sums?.entries ?? [], sums?.recs ?? [], sums?.section ?? 'pantry');
   // 0.10.7: Back while picking items stops picking (one step), instead of leaving the list.
   useBackHandler(() => {
@@ -601,7 +639,12 @@ export function ListScreen() {
   // 0.12.7: Start shopping asks "Which shops today?" first, with none chosen for you (TripShops),
   // then "Where are you first?". (0.10.10 went straight in at every shop on the list, and shopping at
   // fewer was a small Change shops button inside shopping mode.) With one shop there's nothing to ask.
+  const resumeTrip = (t: SavedTrip) => resumeWith(t, sums);
+  /** A trip you stepped out of, for this list, with things still to get. */
+  const paused = !shopping && trip && trip.section === section && open.length > 0 ? trip : undefined;
   const startShopping = () => {
+    clearTrip();
+    setResumed(undefined);
     setSkipToday(new Set());
     // Nothing on the list is tied to a shop's product (hand-written lines only): there's nothing to
     // plan, so it goes straight to the one list.
@@ -1033,9 +1076,21 @@ export function ListScreen() {
 
       {open.length > 0 && !selecting && (
         <div className="sticky-cta">
-          <button className="btn primary block" onClick={startShopping}>
-            <Icon name="cart" size={18} /> Start shopping{total > 0 ? ` · about ${money(total)}` : ''}
-          </button>
+          {paused ? (
+            // 0.12.10: a trip you stepped out of: carry on with it, or begin again
+            <div className="two trip-pair">
+              <button className="btn primary" onClick={() => resumeTrip(paused)}>
+                Resume shopping
+              </button>
+              <button className="btn" onClick={startShopping}>
+                Start fresh
+              </button>
+            </div>
+          ) : (
+            <button className="btn primary block" onClick={startShopping}>
+              <Icon name="cart" size={18} /> Start shopping{total > 0 ? ` · about ${money(total)}` : ''}
+            </button>
+          )}
         </div>
       )}
 
@@ -1199,7 +1254,13 @@ export function ListScreen() {
           entries={entries}
           general={generalToo}
           categories={categories}
-          onClose={() => setShopping(undefined)}
+          section={section}
+          recs={recs}
+          resume={resumed}
+          onClose={() => {
+            setShopping(undefined);
+            setResumed(undefined);
+          }}
         />
       )}
       {movingMany && (
@@ -1528,6 +1589,61 @@ function TripShops({
   );
 }
 
+/**
+ * 0.12.10: "Add to list" inside shopping mode. Type a thing: one of your own items adds that item
+ * (with its price, so the trolley total keeps up), anything else goes on as a plain line to get at
+ * any shop. The sheet stays open for the next one.
+ */
+function AddWhileShopping({ entries, recs, section, onClose }: { entries: ListEntry[]; recs: Recommendation[]; section: ListSection; onClose: () => void }) {
+  const { text, setText, add, pantryMatches, exactPantry, addFromPantry } = useListAdd(entries, recs, section);
+  const [added, setAdded] = useState(0);
+  const did = <T,>(p: Promise<T>) => void p.then(() => setAdded((n) => n + 1));
+  return (
+    <Sheet title="Add to your list" onClose={onClose}>
+      <form
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          if (text.trim()) did(exactPantry ? addFromPantry(exactPantry) : add(text));
+        }}
+        style={{ display: 'flex', gap: 8 }}
+      >
+        <input className="input" autoFocus placeholder="e.g. Milk" aria-label="Add to shopping list" value={text} onChange={(e) => setText(e.target.value)} />
+        <button type="submit" className="btn primary" disabled={!text.trim()} style={{ flexShrink: 0 }}>
+          <Icon name="plus" size={18} /> Add
+        </button>
+      </form>
+      {pantryMatches.length > 0 && (
+        <div className="card flush pantry-matches" role="list" aria-label="In your pantry">
+          {pantryMatches.map((r) => (
+            <button key={r.group.id} role="listitem" className="row" onClick={() => did(addFromPantry(r))}>
+              <Thumb src={(r.best ?? r.options[0])?.product.imageUrl} />
+              <span className="grow">
+                <span className="title clip" style={{ fontSize: 15 }}>
+                  {r.group.name}
+                </span>
+                <span className="small clip">
+                  In your pantry
+                  {(r.best ?? r.options[0]) ? ` · ${chainName((r.best ?? r.options[0])!.product.chain)} ${money((r.best ?? r.options[0])!.price)}` : ''}
+                </span>
+              </span>
+              <span className="btn small primary" aria-hidden>
+                <Icon name="plus" size={16} /> Add
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      <p className="small" role="status" style={{ margin: 0 }}>
+        {added > 0 ? `${added} added. ` : ''}
+        Your own items come with their price. Anything else shows under Any shop.
+      </p>
+      <button className="btn block" onClick={onClose}>
+        Back to shopping
+      </button>
+    </Sheet>
+  );
+}
+
 /** Big, simple, in-store view: tick things off, see the trolley total, show your card. */
 function ShoppingMode({
   c: all,
@@ -1538,10 +1654,18 @@ function ShoppingMode({
   entries: allEntries,
   general = [],
   categories,
+  section,
+  recs,
+  resume,
   onClose,
 }: {
   c: Ctx;
   shops: StoreChain[];
+  /** 0.12.10: which list this is, and its items, for "Add to list" while you shop. */
+  section: ListSection;
+  recs: Recommendation[];
+  /** 0.12.10: a trip being picked up again: the shops done, the page open, where things were ticked. */
+  resume?: SavedTrip;
   /** The shops you're going to today. */
   chosen: StoreChain[];
   /** Out of stock, and skipped for this trip. */
@@ -1569,10 +1693,14 @@ function ShoppingMode({
   const generalAt = (v: ShopKey | 'all') => generalShown.filter((e) => v === 'all' || !e.chain || e.chain === v);
   // 0.10.9: one shop at a time (see below). 0.12.7: declared here, because what each shop shows now
   // depends on which shops are finished.
-  const [at, setAt] = useState<ShopKey | 'all'>();
-  const [doneAt, setDoneAt] = useState<ShopKey[]>([]);
+  const [at, setAt] = useState<ShopKey | 'all' | undefined>(() =>
+    resume?.at === 'all' || (resume?.at && (chosen as string[]).concat('other').includes(resume.at)) ? (resume.at as ShopKey | 'all') : undefined,
+  );
+  const [doneAt, setDoneAt] = useState<ShopKey[]>(() => (resume?.doneAt ?? []) as ShopKey[]);
   /** Where each thing was ticked on this trip, so a ticked line keeps that shop and its price. */
-  const gotAt = useRef<Map<string, ShopKey>>(new Map());
+  const gotAt = useRef<Map<string, ShopKey>>(new Map((resume?.gotAt ?? []) as [string, ShopKey][]));
+  // 0.12.10: adding to the list without leaving the shop.
+  const [adding, setAdding] = useState(false);
   // 0.12.7 (lib/tripPlan): each item is offered at the cheapest shop still to visit that has one of
   // your picks. Finish a shop without ticking it and it moves to the next. An "Also happy with"
   // product only fills a gap: no pick of yours at the shops left, or your picks there out of stock.
@@ -1632,7 +1760,7 @@ function ShoppingMode({
 
   // Back (or Escape) goes back to the shops from one shop, else closes shopping mode, unless a sheet
   // is open on top of it.
-  useBackLayer(() => (at ? setAt(undefined) : onClose()));
+  useBackLayer(() => (at ? setAt(undefined) : leave()));
 
   // Keep the screen on while shopping: asked for once, let go when shopping mode closes.
   useEffect(() => {
@@ -1729,6 +1857,22 @@ function ShoppingMode({
   };
   const nav = useNav();
   const toast = nav.toast;
+  // 0.12.10: the trip is kept as it goes, so leaving the app (or Android closing it) doesn't lose it.
+  const tripNow = (isOpen: boolean) => ({ section, chosen, skip: [...skip], at, doneAt, gotAt: [...gotAt.current], open: isOpen });
+  const ticked = entries.filter((e) => e.checked).length;
+  useEffect(() => {
+    saveTrip(tripNow(true));
+  }, [at, doneAt, ticked, chosen.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Step out: with things still to get the trip is kept ("Resume shopping"); with none it's over. */
+  function leave() {
+    if (left.length) saveTrip(tripNow(false));
+    else clearTrip();
+    onClose();
+  }
+  const finish = () => {
+    clearTrip();
+    onClose();
+  };
   // 0.9.4, the web on a server: a line opens its product (only the checkbox ticks); see ShopRow.
   const openOf = (e: ListEntry) => {
     const g = recFor(all, e)?.group.id;
@@ -1815,15 +1959,22 @@ function ShoppingMode({
             <Icon name="scan" size={20} />
           </button>
         )}
-        <button className="btn small primary" onClick={onClose}>
-          Done
+        {/* 0.12.10: with things still to get it's Pause (the trip is kept); with none, Done */}
+        <button className="btn small primary" onClick={leave} aria-label={left.length ? 'Pause shopping. You can resume it later' : 'Done shopping'}>
+          {left.length ? 'Pause' : 'Done'}
         </button>
       </div>
       {/* 0.10.2: Change shops is a button (it was a link under the total), beside your cards. */}
       {/* 0.12.7: Change shops went: Start shopping asks which shops you're going to today. Your cards stay. */}
-      {cards && cards.length > 0 && (
+      {(view || (cards && cards.length > 0)) && (
         <div className="chips shopmode-cards">
-          {cards.map((k) => (
+          {/* 0.12.10: picked up something that wasn't on the list? Add it here and the total keeps up. */}
+          {view && (
+            <button className="chip" onClick={() => setAdding(true)}>
+              <Icon name="plus" size={16} /> Add to list
+            </button>
+          )}
+          {(cards ?? []).map((k) => (
             <button key={k.id} className="chip" onClick={() => setCard(k)}>
               <Icon name="card" size={16} /> Show {k.program === 'other' ? k.label : PROGRAMS[k.program].name}
             </button>
@@ -1863,6 +2014,7 @@ function ShoppingMode({
       {view && serverMode && <PhoneOnlyNote compact text="Aisle numbers are in shopping mode on the phone (they come from your Coles branch)." />}
       <div className="shopmode-list">
         {info && <ProductPreview product={info} onClose={() => setInfo(undefined)} />}
+        {adding && <AddWhileShopping entries={allEntries} recs={recs} section={section} onClose={() => setAdding(false)} />}
         {editing &&
           (() => {
             const latest = allEntries.find((x) => x.id === editing.id) ?? general.find((x) => x.id === editing.id);
@@ -1898,7 +2050,7 @@ function ShoppingMode({
             stats={statsOf}
             onPick={setAt}
             onAll={() => setAt('all')}
-            onFinish={onClose}
+            onFinish={finish}
           />
         )}
         {(view === 'all' ? c.order : view ? [view, 'any' as ShopKey] : []).map((shop) => {
@@ -2145,6 +2297,19 @@ function ShoppingMode({
           <p className="small" style={{ padding: '12px 16px 0', margin: 0 }}>
             Skipped today (out of stock): {skipped.map((e) => recFor(all, e)?.group.name ?? e.text).join(', ')}. Still on your list.
           </p>
+        )}
+        {view === 'all' && (
+          // 0.12.10: everything in one list has its own way to end the shop (the top button pauses it)
+          <div className="shop-done-bar">
+            <button className="btn primary block" onClick={finish}>
+              <Icon name="check" size={18} /> Finish shopping
+            </button>
+            {left.length > 0 && (
+              <span className="small">
+                {left.length === 1 ? "The 1 you didn't tick stays" : `The ${left.length} you didn't tick stay`} on your list.
+              </span>
+            )}
+          </div>
         )}
       </div>
       {card && (

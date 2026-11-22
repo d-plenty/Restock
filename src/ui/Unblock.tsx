@@ -47,20 +47,24 @@ export async function unblockShop(chain: StoreChain): Promise<UnblockResult> {
 /** What "Try again" says when the shop still isn't working (pure, for testing). */
 export function tryAgainWords(name: string, result: UnblockResult): string {
   if (result === 'working') return `${name} is working again.`;
-  if (result === 'blocked') return `${name} is still blocking Restock. Tap Unblock ${name} and pass its check.`;
-  if (result === 'unread') return `${name} answered, but Restock couldn't read any products from it. Try Unblock ${name}, or again later.`;
+  if (result === 'blocked') return `${name} is still blocking Restock. Open ${name} and pass its check.`;
+  if (result === 'unread') return `${name} still isn't answering. Opening its page usually gets it going again.`;
   return `Restock tries ${name} again the next time you search it.`;
 }
 
 /**
  * 0.12.8: "Try again" on a shop's warning. It tests that one shop and says what happened (it ran the
  * whole price check, whose progress is at the top of Home: scrolled down, it looked like nothing).
+ * 0.12.10: when the shop still fails, it goes straight on to what does work: the sheet that opens
+ * the shop's own page (testers found Try again kept failing while opening the shop fixed it). The
+ * person still opens the page and passes any check themselves.
  */
 export function TryAgain({ chain, onWorked }: { chain: StoreChain; onWorked?: () => void }) {
   const nav = useNav();
   const name = chainName(chain);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string>();
+  const [open, setOpen] = useState(false);
   const go = async () => {
     if (busy) return;
     if (!isNative() || isPressOnlyShop(chain)) return onWorked?.();
@@ -71,7 +75,10 @@ export function TryAgain({ chain, onWorked }: { chain: StoreChain; onWorked?: ()
     if (result === 'working') {
       nav.toast(tryAgainWords(name, result));
       onWorked?.();
-    } else setSaid(tryAgainWords(name, result));
+    } else {
+      setSaid(tryAgainWords(name, result));
+      setOpen(true);
+    }
   };
   return (
     <>
@@ -82,12 +89,34 @@ export function TryAgain({ chain, onWorked }: { chain: StoreChain; onWorked?: ()
       <span className="small try-again-said" role="status">
         {busy ? 'This can take up to a minute.' : (said ?? '')}
       </span>
+      {open && (
+        <UnblockSheet
+          chain={chain}
+          lead={said}
+          onClose={() => setOpen(false)}
+          onWorked={() => {
+            setSaid(tryAgainWords(name, 'working'));
+            onWorked?.();
+          }}
+        />
+      )}
     </>
   );
 }
 
 /** The steps, then the shop's page, then whether it worked. */
-export function UnblockSheet({ chain, onClose, onWorked }: { chain: StoreChain; onClose: () => void; onWorked?: () => void }) {
+export function UnblockSheet({
+  chain,
+  onClose,
+  onWorked,
+  lead,
+}: {
+  chain: StoreChain;
+  onClose: () => void;
+  onWorked?: () => void;
+  /** 0.12.10: from Try again: what the test just found, said first. */
+  lead?: string;
+}) {
   const name = chainName(chain);
   const [stage, setStage] = useState<'steps' | 'checking' | UnblockResult>('steps');
   const go = async () => {
@@ -97,10 +126,17 @@ export function UnblockSheet({ chain, onClose, onWorked }: { chain: StoreChain; 
     if (r === 'working') onWorked?.();
   };
   return (
-    <Sheet title={`Unblock ${name}`} onClose={onClose}>
+    <Sheet title={lead ? `Open ${name}` : `Unblock ${name}`} onClose={onClose}>
+      {lead && stage === 'steps' && (
+        <div className="banner amber" role="status">
+          <strong>Trying again didn’t work</strong>
+          <span style={{ fontSize: 13 }}>{lead}</span>
+        </div>
+      )}
       <p style={{ margin: 0 }}>
-        {name}’s website wants to check you’re a person. Pass its check once and prices carry on. It’s {name}’s own check: nothing’s wrong
-        with Restock or your phone.
+        {lead
+          ? `Opening ${name}’s own page is what usually fixes this. If it asks you to prove you’re a person, do that: it’s ${name}’s own check, and nothing’s wrong with Restock or your phone.`
+          : `${name}’s website wants to check you’re a person. Pass its check once and prices carry on. It’s ${name}’s own check: nothing’s wrong with Restock or your phone.`}
       </p>
       <ol className="unblock-steps">
         <li>The shop’s own page opens.</li>

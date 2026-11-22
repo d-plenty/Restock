@@ -493,10 +493,21 @@ export function RowInfo({ name, onOpen }: { name: string; onOpen: () => void }) 
 export function Thumb({ src, icon = 'box' }: { src?: string; icon?: string }) {
   // A shop's picture that won't load shows the plain icon instead of a broken image.
   const [broken, setBroken] = useState<string | undefined>();
+  // 0.12.10: some shops' picture servers refuse a request that doesn't say where it came from.
+  // The photo is asked for the private way first (nothing said); only if that fails, once more
+  // the ordinary way, before the plain icon.
+  const [plain, setPlain] = useState<string | undefined>();
   return (
     <div className="thumb">
       {src && broken !== src ? (
-        <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(src)} />
+        <img
+          key={plain === src ? 'plain' : 'private'}
+          src={src}
+          alt=""
+          loading="lazy"
+          referrerPolicy={plain === src ? 'strict-origin-when-cross-origin' : 'no-referrer'}
+          onError={() => (plain === src ? setBroken(src) : setPlain(src))}
+        />
       ) : (
         <span style={{ color: 'var(--muted)' }}>
           <Icon name={icon} size={24} />

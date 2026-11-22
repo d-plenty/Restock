@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.12.9" src="https://img.shields.io/badge/status-release%20candidate%200.12.9-ffcd00">
+  <img alt="Release candidate 0.12.10" src="https://img.shields.io/badge/status-release%20candidate%200.12.10-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0129">New in 0.12.9</a> ·
+  <a href="#new-in-01210">New in 0.12.10</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -138,6 +138,20 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.12.10
+
+Shopping that survives leaving the app, and fewer doubles.
+
+- **Your shop is kept when you leave.** Shopping mode's place (which shops, which are done, where you were) lived only on the screen, so leaving the app, or Android closing it, put you back on Home. It's now kept on the phone. Opened again within three hours of being closed mid-shop, Restock goes straight back in. Otherwise Home shows **You were shopping**, and the list's bottom button becomes **Resume shopping** and **Start fresh**. A shop is forgotten after 18 hours. Ticks were always kept: they are the list.
+- **Pause.** The top button in shopping mode says **Pause** while there are things left to get (it said Done, beside a Done at Coles). With nothing left it says Done.
+- **Add to list, in shopping mode.** Picked up something that wasn't on the list? Add it without leaving the shop. One of your own items comes with its price, so the trolley total keeps up; anything else shows under Any shop.
+- **No two items with one name.** Adding an item, adding one manually, or renaming onto a name another item has is refused, and says which item has it. Capitals, extra spaces and a full stop on the end don't count: "Rinse aid" and "Rinse Aid" are the same. Items already doubled stay as they are and can still be edited.
+- **"You already have this" while adding.** A product you tick that is already one of your items says so in the review sheet, with a button to open that item. (A barcode scanned for something tracked at a shop with no barcodes went in a second time without a word.)
+- **Try again goes on to what works.** When a shop still fails its test, Try again opens the sheet that opens the shop's own page, which is what fixes it most of the time. You still open the page and pass any check yourself.
+- **A tab you made always has Edit** at the top right. With nothing in the tab it opens the tab's page (name, colour, icon, shops); with items, Edit also offers "Edit this tab".
+- **Photos reworked.** A product's photo is looked for under any field that sounds like one, in lists and nested data, and a product read without one takes it from the same product on the page's cards. Plain http photos are asked for over https. A photo that fails to load is tried once more before the plain icon. A product saved without a photo takes one the next time its shop shows it. A size of "0" is no longer shown.
+- **What's new shows the latest version only.**
 
 ## New in 0.12.9
 
@@ -638,7 +652,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.9.apk` (on macOS, `shasum -a 256 restock-0.12.9.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.10.apk` (on macOS, `shasum -a 256 restock-0.12.10.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

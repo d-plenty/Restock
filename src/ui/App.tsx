@@ -1,3 +1,4 @@
+import { loadTrip, reopensTrip } from '../lib/trip';
 import { App as CapApp } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
@@ -87,7 +88,8 @@ export default function App() {
 function RestockApp() {
   const [ready, setReady] = useState(false);
   const [bootError, setBootError] = useState<string>();
-  const [tab, setTab] = useState<Tab>('home');
+  // 0.12.10: closed mid-shop and opened again soon after: straight back to the list, which reopens the trip.
+  const [tab, setTab] = useState<Tab>(() => (reopensTrip(loadTrip(), Date.now()) ? 'list' : 'home'));
   const [section, setSection] = useState<Section>('pantry');
   const [stack, setStack] = useState<Screen[]>([]);
   const [toastMsg, setToastMsg] = useState<string>();

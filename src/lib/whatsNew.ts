@@ -1,6 +1,7 @@
 // 0.12.9: what changed in each version, in plain words, kept in the app itself: nothing is fetched
 // to show it. After an update Restock offers it once ("See what's new" / "I'll figure it out"),
-// and it stays in Settings → What's new. The newest version is first; the README has the long form.
+// and it stays in Settings → What's new. 0.12.10: only the latest version is kept here (the page
+// showed the last four); older ones are on the GitHub page the screen links to.
 export interface VersionNotes {
   version: string;
   /** One line that sums the version up. */
@@ -10,50 +11,18 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.12.9',
-    about: 'Less tapping, and a page that tells you what changed.',
+    version: '0.12.10',
+    about: 'Shopping that survives leaving the app, and fewer doubles.',
     changes: [
-      "What's new: after an update Restock offers this page once. It's always in Settings, under Help.",
-      'Add another product has a big Done button at the bottom that takes you back to the item.',
-      'The keyboard opens by itself where you go to type, such as Add to pantry and Add manually.',
-      'While prices are being checked, every screen shows the same one slim line at the top. It no longer pushes the page down.',
-      'A product you have under Also happy with says so in search results (it said In your pantry).',
-    ],
-  },
-  {
-    version: '0.12.8',
-    about: 'Getting to your products, and a tidy-up of things testers ran into.',
-    changes: [
-      'Tap an item on the shopping list and there is an Open in Pantry button.',
-      'What I buy is called Products I buy, and is easier to spot on an item’s page.',
-      'Adding another product to an item is one tap on +, with Undo.',
-      'A shop’s search no longer shows the same product twice.',
-      'Loose fruit and veg are priced by the kilo, with the price for one under it.',
-      'Backup reminders come back a week after Not now, then every 30 days. You can change that in Settings.',
-      'Try again on a shop’s card says what happened.',
-      'Cellarbrations, The Bottle-O and Porters show product photos.',
-    ],
-  },
-  {
-    version: '0.12.7',
-    about: 'You name things, shopping follows your day, and true black has depth.',
-    changes: [
-      'You name each item yourself when you add it.',
-      'Start shopping asks which shops you’re going to today, and where you are first.',
-      'Each item is offered at the cheapest shop you’re visiting today.',
-      'Also happy with products only fill gaps, such as when yours is out of stock.',
-      'The General list comes along from every list.',
-      'True black has depth: bars and cards are a step lighter than the page.',
-    ],
-  },
-  {
-    version: '0.12.6',
-    about: 'You pick everything yourself, and the look is evened out.',
-    changes: [
-      'Nothing is picked for you: each shop stays empty until you tick a product there.',
-      'A search that finds nothing offers the next step.',
-      'A shop’s specials say the kind of deal.',
-      'Buttons, boxes and headings are one size on every screen.',
+      'Leave the app mid-shop and your shop is kept. Home and the list offer Resume shopping or Start fresh.',
+      'The top button in shopping mode says Pause while there are things left to get.',
+      'Add to list is in shopping mode, so the trolley total keeps up with what you pick up.',
+      'Two items can’t have the same name. Capitals don’t count: Rinse aid and Rinse Aid are the same.',
+      'Adding a product you already have says which item it is in.',
+      'When Try again on a shop still fails, it goes on to opening the shop’s page, which usually fixes it.',
+      'A tab you made always has Edit at the top right, to rename it or change its icon and shops.',
+      'Photos are read from more shops, and a shop no longer shows 0 as a size.',
+      'This page shows the latest version only.',
     ],
   },
 ];

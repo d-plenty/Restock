@@ -36,7 +36,12 @@ export async function saveStoreProducts(picks: Iterable<StoreProduct>, barcodeFo
       await addProduct(product);
     } else {
       // Always overwrite, so a stale "out of stock" is cleared when the shop stops saying so.
-      await updateProduct(id, { inStock: sp.inStock, stockAt: sp.inStock === undefined ? undefined : nowIso() });
+      // 0.12.10: and one kept without a photo takes the photo the shop shows now.
+      await updateProduct(id, {
+        inStock: sp.inStock,
+        stockAt: sp.inStock === undefined ? undefined : nowIso(),
+        ...(sp.imageUrl && !existing?.imageUrl ? { imageUrl: sp.imageUrl } : {}),
+      });
     }
     if (sp.price !== undefined) {
       await addReading({
