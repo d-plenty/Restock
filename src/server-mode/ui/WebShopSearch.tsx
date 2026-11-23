@@ -216,7 +216,8 @@ export function WebShopSearch({
   const save = async (target: Target) => {
     if (!answer || !picks.size || saving) return;
     // 0.12.7: you name it (Restock never fills the name in).
-    if (!name.trim()) {
+    // 0.13.0: only what's kept needs a name; a line on the list alone takes the product's own.
+    if (!name.trim() && target !== 'list') {
       setNameMissing(true);
       return;
     }
@@ -226,7 +227,7 @@ export function WebShopSearch({
     setBusyAs(target);
     setSaveError(undefined);
     try {
-      const itemName = tidyItemName(name); // 0.11.3: starts with a capital
+      const itemName = tidyItemName(name.trim() || [...picks.values()][0]?.name || 'Item'); // 0.11.3: starts with a capital
       // 0.9.11: from the Pick sheet "both" makes the item and the line becomes it, so the server only makes the item.
       const sent: Target = forLine && target === 'both' ? 'pantry' : target;
       const body = addBody(answer.search, picks.values(), { target: sent, tab, list: forLine || target === 'pantry' ? tab : listPick, name: itemName, categoryId: shownCategory });

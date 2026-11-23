@@ -19,7 +19,7 @@ import {
   pickForTab,
   SECTION_NAMES,
   SECTION_SHOPS,
-  isCustomSection,
+  isMadeSection,
   sectionOf,
   shopDef,
   shopsByGroup,
@@ -45,7 +45,7 @@ import {
   stopUsingWoolworths,
 } from '../../lib/accounts';
 import { confirmAction } from '../../lib/confirm';
-import { BETA_NOTE, BETA_SECTIONS, BetaTag, CUSTOM_BETA_NOTE, ChainDot, Icon, LoadingBar, Sheet, TopBar, SearchField } from '../components';
+import { BetaTag, CUSTOM_BETA_NOTE, ChainDot, Icon, LoadingBar, Sheet, TopBar, SearchField } from '../components';
 import { useNav } from '../nav';
 import { money } from '../../lib/units';
 import {
@@ -775,98 +775,6 @@ export function CustomShopSheet({ section, shop, onClose }: { section: Section; 
   );
 }
 
-/** Switch the Keg or Pharmacy tab on or off. Keg asks once that you're 18 or over. */
-/** 0.10.3: each tab's switch, what it's for, and its line in setup and Settings. */
-const TAB_ABOUT: Record<Exclude<Section, 'pantry'>, { title: string; text: string; seldom: string }> = withCustom<
-  { title: string; text: string; seldom: string },
-  Exclude<Section, 'pantry'>
->(
-  {
-    keg: {
-      title: 'Bottle shops',
-      text: 'Track beer, wine and spirits prices at the shops you pick. Kept separate from groceries.',
-      seldom: 'a drink',
-    },
-    pharmacy: {
-      title: 'Chemists',
-      text: 'Track medicine, first aid and personal care prices at the shops you pick. Kept separate from groceries.',
-      seldom: 'from a chemist',
-    },
-  },
-  // 0.10.7: a custom section (Baby and Pets are custom sections now)
-  (name) => ({ title: `${name} tab`, text: `Compare prices at the shops you pick for ${name}.`, seldom: `for ${name}` }),
-);
-
-export function SectionSwitch({ settings, section }: { settings: Settings; section: Exclude<Section, 'pantry'> }) {
-  const [askAge, setAskAge] = useState(false);
-  const on = !!settings.sections[section];
-  const about = TAB_ABOUT[section];
-  const turn = async (v: boolean) => {
-    if (v && section === 'keg' && !settings.adultConfirmed) return setAskAge(true);
-    await updateSettings({ sections: { ...settings.sections, [section]: v } });
-  };
-  return (
-    <>
-      <div className="card flush">
-        <label className="check tab-switch">
-          <Icon name={section} size={22} />
-          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-            <span className="title" style={{ fontSize: 15 }}>
-              {about.title} {BETA_SECTIONS.includes(section) && <BetaTag />}
-            </span>
-            <span className="small">{about.text}</span>
-          </span>
-          <input type="checkbox" className="switch" checked={on} onChange={(e) => void turn(e.target.checked)} aria-label={`Use the ${SECTION_NAMES[section]} tab`} />
-        </label>
-        {on && (
-          <label className="check" style={{ borderTop: '1px solid var(--line)' }}>
-            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-              <span className="title" style={{ fontSize: 15 }}>
-                Show {SECTION_NAMES[section]} in More
-              </span>
-              <span className="small">
-                Turn this off if you only buy {about.seldom} now and then. You can still search these shops on Add and put things on your
-                shopping list without tracking them.
-              </span>
-            </span>
-            <input
-              type="checkbox" className="switch"
-              checked={!settings.hiddenTabs?.includes(section)}
-              onChange={(e) =>
-                void updateSettings({
-                  hiddenTabs: e.target.checked
-                    ? (settings.hiddenTabs ?? []).filter((x) => x !== section)
-                    : [...new Set([...(settings.hiddenTabs ?? []), section])],
-                })
-              }
-              aria-label={`Show ${SECTION_NAMES[section]} in More`}
-            />
-          </label>
-        )}
-      </div>
-      {askAge && (
-        <Sheet title="Bottle shops are 18+" onClose={() => setAskAge(false)}>
-          <p>The Bottle shop tab tracks alcohol prices. Please confirm you're 18 or over.</p>
-          <div className="two">
-            <button className="btn" onClick={() => setAskAge(false)}>
-              Not yet
-            </button>
-            <button
-              className="btn primary"
-              onClick={async () => {
-                await updateSettings({ adultConfirmed: true, sections: { ...settings.sections, keg: true } });
-                setAskAge(false);
-              }}
-            >
-              I'm 18 or over
-            </button>
-          </div>
-        </Sheet>
-      )}
-    </>
-  );
-}
-
 /** Store names typed by hand, for shops not on the map (or to name a branch differently). */
 function ManualNames({ settings, section }: { settings: Settings; section: Section }) {
   const chains = enabledIn(settings.enabledChains, section, settings.shopTabs ?? {});
@@ -930,8 +838,16 @@ export function StoreFields({ settings, section = 'pantry' }: { settings: Settin
   const on = section === 'pantry' || !!settings.sections[section];
   return (
     <>
-      {/* 0.10.7: a custom section's name, colour, icon and Delete; Keg and Health keep their switch */}
-      {isCustomSection(section) && on ? <CustomSectionHead settings={settings} section={section} /> : section !== 'pantry' && <SectionSwitch settings={settings} section={section} />}
+      {/* 0.10.7: a custom section's name, colour, icon and Delete. 0.13.0: Bottle shop and Chemist have the
+          same (each had a switch of its own, and "Show in More"); a tab that isn't made says where to make it. */}
+      {isMadeSection(section) &&
+        (on ? (
+          <CustomSectionHead settings={settings} section={section} />
+        ) : (
+          <p className="small" role="status" style={{ margin: 0 }}>
+            You don't have this tab. Make it from More, under Create a custom tab.
+          </p>
+        ))}
       {on && (
         <>
           <div className="eyebrow">1 · {TAB_SHOPS_TITLE[section]}</div>
@@ -983,8 +899,7 @@ function branchText(st: StoreChoice, chain: StoreChain): string {
 }
 
 /** 0.10.7: a section's page title in Settings. */
-export const sectionPageTitle = (s: Section): string =>
-  s === 'pantry' ? 'Supermarkets' : s === 'keg' ? 'Bottle shops' : s === 'pharmacy' ? 'Chemists' : SECTION_NAMES[s];
+export const sectionPageTitle = (s: Section): string => (s === 'pantry' ? 'Supermarkets' : SECTION_NAMES[s]);
 
 export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
   useSettingsDraft(); // 0.9.5 (save)
@@ -999,15 +914,14 @@ export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
   });
   return (
     <div className="screen">
-      <TopBar title={sectionPageTitle(tab)} tag={isCustomSection(tab) ? <BetaTag /> : undefined} />
+      <TopBar title={sectionPageTitle(tab)} tag={isMadeSection(tab) ? <BetaTag /> : undefined} />
       {isNew && (
         <p className="small" role="note" style={{ margin: 0 }}>
           Not saved yet. Set it up, then tap <strong>Save section</strong> at the bottom. Going back without saving doesn't keep it.
         </p>
       )}
-      {BETA_SECTIONS.includes(tab) && <p className="small" style={{ margin: 0 }}>{BETA_NOTE}</p>}
-      {/* 0.11.3: custom sections say they're in beta on their own page too */}
-      {isCustomSection(tab) && (
+      {/* 0.11.3: custom sections say they're in beta on their own page too (0.13.0: Bottle shop and Chemist with them) */}
+      {isMadeSection(tab) && (
         <p className="small" role="note" style={{ margin: 0 }}>
           {CUSTOM_BETA_NOTE}
         </p>

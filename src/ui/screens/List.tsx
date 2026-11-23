@@ -37,6 +37,7 @@ import { bothPrices, lineCost, type Option } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
 import { aroundPlan, cheaperThan, shopTotals, type ShopTotals } from '../../lib/shopTotals';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
+import { Stepper } from '../Stepper';
 import { money, tidySize } from '../../lib/units';
 import { kiloPrice } from '../../lib/unitPrice';
 import { useLive } from '../../lib/useLive';
@@ -154,26 +155,11 @@ export const tickEntry = (e: { id: string; text: string }, checked: boolean, nam
     await updateListEntry(e.id, { checked });
     noteTicksSoon(); // 0.9.14: Your data's spending (spending.ts)
   });
-/** 0.9.5 (undo): a new amount; pressing + a few times is one Undo. */
-export const setQty = (e: { id: string; text: string }, qty: number, name = e.text) =>
-  act(`${name}: ${qty} on your list`, () => updateListEntry(e.id, { qty }), { merge: `qty:${e.id}` });
 /** 0.9.5 (undo): lines off the list, as one undoable action. */
 export const removeEntries = (ids: string[], label: string) => act(label, () => deleteListEntries(ids));
 
-export function Stepper({ e }: { e: ListEntry }) {
-  const q = qtyOf(e);
-  return (
-    <span className="stepper" role="group" aria-label={`How many ${e.text}`}>
-      <button aria-label="One fewer" disabled={q <= 1} onClick={() => void setQty(e, q - 1)}>
-        −
-      </button>
-      <span className="num">{q}</span>
-      <button aria-label="One more" onClick={() => void setQty(e, q + 1)}>
-        +
-      </button>
-    </span>
-  );
-}
+// 0.13.0: the stepper has its own file (a tab's rows use it too).
+export { Stepper, setQty } from '../Stepper';
 
 /**
  * A line whose pick is out of stock where you're shopping: in stock at your second Coles (go there
@@ -1921,7 +1907,7 @@ function ShoppingMode({
         {view && view !== 'all' ? (
           // 0.10.9: at one shop: its name, and how far through its things you are
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="title" style={{ fontSize: 17, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="title shopmode-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <ChainDot chain={view as Chain} /> <span className="clip">{shopName(view)}</span>
             </div>
             <div className="small num">
@@ -1933,9 +1919,7 @@ function ShoppingMode({
           </div>
         ) : (
           <div style={{ flex: 1 }}>
-            <div className="title" style={{ fontSize: 17 }}>
-              Shopping
-            </div>
+            <div className="title shopmode-title">Shopping</div>
             <div className="small num">
               {!view && byShop ? (
                 <>
@@ -1963,9 +1947,9 @@ function ShoppingMode({
         <button className="btn small primary" onClick={leave} aria-label={left.length ? 'Pause shopping. You can resume it later' : 'Done shopping'}>
           {left.length ? 'Pause' : 'Done'}
         </button>
-      </div>
       {/* 0.10.2: Change shops is a button (it was a link under the total), beside your cards. */}
       {/* 0.12.7: Change shops went: Start shopping asks which shops you're going to today. Your cards stay. */}
+      {/* 0.13.0: your cards (and Add to list) sit in the navy top itself, on their own line under the title */}
       {(view || (cards && cards.length > 0)) && (
         <div className="chips shopmode-cards">
           {/* 0.12.10: picked up something that wasn't on the list? Add it here and the total keeps up. */}
@@ -1981,6 +1965,7 @@ function ShoppingMode({
           ))}
         </div>
       )}
+      </div>
       {view && (
       <div className="shopmode-sort">
         <span className="small" style={{ fontWeight: 600 }}>

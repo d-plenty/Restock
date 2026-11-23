@@ -256,11 +256,12 @@ describe('leaving with changes not saved', () => {
 describe('0.10.7 Save always saves', () => {
   it('a change the saved settings tidy (put in order) still leaves the draft', async () => {
     close = openDraft();
+    // 0.13.0: hiddenTabs is tidied away altogether (no tab is hidden any more)
     await updateSettings({ hiddenTabs: ['pharmacy', 'keg'] });
     expect(hasUnsaved()).toBe(true);
     expect(await saveDraft()).toBe(true);
     expect(hasUnsaved()).toBe(false);
-    expect((await savedSettings()).hiddenTabs).toEqual(['keg', 'pharmacy']);
+    expect((await savedSettings()).hiddenTabs).toBeUndefined();
   });
 
   it("closing a page brings back the draft of the page underneath, with its changes", async () => {

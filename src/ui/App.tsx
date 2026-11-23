@@ -35,6 +35,7 @@ import { ItemScreen } from './screens/Item';
 import { ListScreen } from './screens/List';
 import { Onboarding } from './screens/Onboarding';
 import { WhatsNewPrompt, WhatsNewScreen } from './screens/WhatsNew';
+import { PicksScreen } from './screens/Picks';
 import { noteSeenVersion, seenVersion, shouldOfferWhatsNew } from '../lib/whatsNew';
 import { SetupScreen } from './screens/Setup';
 import { addShared, nameFromLink, splitShared } from '../lib/shared';
@@ -586,7 +587,7 @@ function RestockApp() {
   // Keg and Pharmacy only show when they're switched on and have a shop picked.
   const on = activeSections(settings);
   // A tab can also be left out of the bar while its shops stay in use (Add, shopping list).
-  const inBar = on.filter((sec) => sec === 'pantry' || !settings.hiddenTabs?.includes(sec));
+  const inBar = on; // 0.13.0: no tab is hidden any more (settingsCheck.ts)
   const tabs = ALL_TABS;
   // A tab that's off shows Pantry instead (0.10.3: a hidden one still opens, from Add or a link).
   const shownTab: Tab = isSectionTab(tab) && !on.includes(tab) ? 'pantry' : tab;
@@ -624,6 +625,7 @@ function RestockApp() {
         {top.name === 'settings' && <SettingsScreen key={top.page ?? 'main'} page={top.page} />}
         {top.name === 'feedback' && <FeedbackScreen />}
         {top.name === 'whatsnew' && <WhatsNewScreen />}
+        {top.name === 'picks' && <PicksScreen />}
         {top.name === 'stores' && <StoresScreen section={top.section} />}
         {top.name === 'cards' && <CardsScreen />}
         {top.name === 'sync' && <SyncScreen invite={top.invite} />}

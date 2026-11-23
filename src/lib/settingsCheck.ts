@@ -1,5 +1,5 @@
 import { CHECK_INTERVALS, DEFAULT_SETTINGS, HISTORY_WEEKS, keepDays, keepWeeks, type HomeArea, type Settings, type ShopAccount, type StoreChoice } from '../types';
-import { CUSTOM_SECTIONS, SECTIONS, checkCustomDef, isLocalOnlyShop, shopDef, type CustomDef, type CustomSection, type CustomShop, type Section, type StoreChain } from '../shops';
+import { CUSTOM_SECTIONS, MADE_SECTIONS, SECTIONS, checkCustomDef, isLocalOnlyShop, shopDef, type CustomDef, type CustomShop, type MadeSection, type Section, type StoreChain } from '../shops';
 import { isCheckTime } from './checkSchedule';
 import { ICON_COLOURS } from './looks';
 import { asHttps, searchOnSite } from './site';
@@ -181,11 +181,12 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     customSections: (() => {
       const cs = obj(s.customSections);
       const out = Object.fromEntries(
-        CUSTOM_SECTIONS.map((c) => [c, checkCustomDef(cs[c])] as const).filter((x): x is readonly [CustomSection, CustomDef] => !!x[1]),
+        MADE_SECTIONS.map((c) => [c, checkCustomDef(cs[c])] as const).filter((x): x is readonly [MadeSection, CustomDef] => !!x[1]),
       );
       return Object.keys(out).length ? out : undefined;
     })(),
-    hiddenTabs: tabs(s.hiddenTabs),
+    // 0.13.0: no tab is hidden any more (Bottle shop and Chemist had a "Show in More" switch; a tab you don't want is deleted, as any other)
+    hiddenTabs: undefined,
     // 0.10.3: the tabs a shop is in, when it isn't just its own (shops known here, at least one tab).
     shopTabs: (() => {
       if (!isObj(s.shopTabs)) return undefined;

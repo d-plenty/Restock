@@ -4,7 +4,6 @@ import { loadDemo, removeDemo } from '../lib/demo';
 import { useLive } from '../lib/useLive';
 import type { Settings } from '../types';
 import { useNav, type Tab } from './nav';
-import { sectionOn } from '../shops';
 
 // The guided tour: a card at the bottom of the screen that walks round the app, highlighting
 // each part it talks about. Sample items are added for the tour and taken away when it ends
@@ -22,12 +21,13 @@ interface Step {
 const STEPS: Step[] = [
   {
     tab: 'home',
-    find: '.banner.green',
+    // 0.13.0: the two Home steps pointed at parts Home no longer has (nothing was highlighted)
+    find: '.navy-sum',
     title: 'Your week at a glance',
     text: 'Home shows what is genuinely worth buying this week, and roughly how much you save against usual prices.',
   },
   {
-    tab: 'home',
+    tab: 'pantry',
     find: '.irow-i',
     title: 'Every deal is checked',
     text: 'Each row shows one price and a word, like On special or Wait. Tap the i for the usual price, what you save and why.',
@@ -49,14 +49,6 @@ const STEPS: Step[] = [
     find: '.screen h1',
     title: 'Your shopping list',
     text: 'Just this trip. Each line shows the cheapest version and where, and the bottom shows what one shop would cost.',
-  },
-  {
-    tab: 'keg',
-    find: '.screen h1',
-    title: 'Bottle shops',
-    text: 'Drinks live on their own Bottle shop tab, so a search for chips never goes to a bottle shop.',
-    // Only when the Keg tab is really there: switched on, a bottle shop picked, and not hidden.
-    when: (s) => sectionOn(s, 'keg') && !s.hiddenTabs?.includes('keg'),
   },
   {
     tab: 'home',

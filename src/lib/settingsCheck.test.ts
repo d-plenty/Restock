@@ -104,7 +104,7 @@ describe('checking settings', () => {
     );
     expect(s.enabledChains).toEqual(['coles']);
     expect(s.stores).toEqual({ woolworths: {}, coles: { primary: 'Coles Kirwan' }, aldi: {} });
-    expect(s.hiddenTabs).toEqual(['keg']);
+    expect(s.hiddenTabs).toBeUndefined(); // 0.13.0: no tab is hidden any more
     expect('evil' in s).toBe(false);
     expect(Object.keys(s)).not.toContain('__proto__');
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();

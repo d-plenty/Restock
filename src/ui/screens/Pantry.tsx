@@ -9,10 +9,12 @@ import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { BetaTag, Hold, Icon, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, SearchField } from '../components';
 import { BigAdd, NoneFound, RecRow } from '../simple';
+import { picksOffered } from '../../lib/makerPicks';
+import { PicksOffer } from './Picks';
 import { cleanSearch } from '../../lib/searchText';
 import { serverMode } from '../../server-mode/flag';
 import { isMoreTab, useNav } from '../nav';
-import { isCustomSection, SECTION_NAMES, type Section, slots } from '../../shops';
+import { isMadeSection, SECTION_NAMES, type Section, slots } from '../../shops';
 import { confirmAction } from '../../lib/confirm';
 
 type Filter = 'all' | 'sale' | string; // string = category id
@@ -53,20 +55,24 @@ function markSwiped() {
 
 /** "Add to pantry", "Add to Bottle shop", "Add to Pets". */
 const ADD_LABEL = (s: Section) => (s === 'pantry' ? 'Add to pantry' : `Add to ${SECTION_NAMES[s]}`);
+/** 0.13.0: what a tab's own page changes. */
+const TAB_EDIT_WORDS = (s: Section) => (s === 'pantry' ? 'its shops' : 'name, icon and shops');
+const MADE_EMPTY = 'Nothing here yet. Add the things you buy, and Restock watches the shops you picked for this tab.';
 const EMPTY: Record<Section, string> = {
   pantry: 'Your pantry is empty. Add the things you buy so Restock can watch their prices.',
-  keg: 'Nothing here yet. Add the beer, wine or spirits you buy, and Restock watches the bottle shops you picked.',
-  pharmacy: 'Nothing here yet. Add the medicine, first aid and personal care things you buy, and Restock watches the chemists you picked.',
-  baby: 'Nothing here yet. Add the nappies, wipes and baby things you buy, and Restock watches the shops you picked for Baby.',
-  pets: 'Nothing here yet. Add the pet food, litter and treats you buy, and Restock watches the shops you picked for Pets.',
-  ...slots('Nothing here yet. Add the things you buy, and Restock watches the shops you picked for this tab.'),
+  // 0.13.0: every tab you made says the same thing (Bottle shop, Chemist, Baby and Pets had words of their own, which a rename left behind)
+  keg: MADE_EMPTY,
+  pharmacy: MADE_EMPTY,
+  baby: MADE_EMPTY,
+  pets: MADE_EMPTY,
+  ...slots(MADE_EMPTY),
 };
 const SEARCH_HINT: Record<Section, string> = {
   pantry: 'Search your pantry',
-  keg: 'Search your bottle shop items',
-  pharmacy: 'Search your health items',
-  baby: 'Search your baby things',
-  pets: 'Search your pet things',
+  keg: 'Search this tab',
+  pharmacy: 'Search this tab',
+  baby: 'Search this tab',
+  pets: 'Search this tab',
   ...slots('Search this tab'),
 };
 
@@ -91,6 +97,9 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   const [filterSheet, setFilterSheet] = useState(false);
   const [preview, setPreview] = useState<Recommendation>();
   const adding = useRef(false);
+  // read each time the Pantry is drawn (it stays behind the picks page, and must notice they were added)
+  const [picksNo, setPicksNo] = useState(false);
+  const picksOn = !picksNo && picksOffered();
   const setSort = (v: Sort) => {
     setSortState(v);
     try {
@@ -229,13 +238,14 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
         <h1 style={isMoreTab(section) ? { fontSize: 24 } : undefined}>
           {SECTION_NAMES[section]}
           {/* 0.11.3: a custom tab says Beta at the top */}
-          {isCustomSection(section) && <> <BetaTag /></>}
+          {isMadeSection(section) && <> <BetaTag /></>}
         </h1>
-        {/* 0.12.10: a tab you made always has Edit (it only showed once the tab had items, so an
-            empty "Tools" couldn't be renamed from here). With nothing in it, Edit goes straight to
-            the tab's own page: its name, colour, icon and shops. */}
-        {recs.length === 0 && isCustomSection(section) && (
-          <button className="btn small edit-btn" aria-label={`Edit this tab: its name, icon and shops`} onClick={() => nav.push({ name: 'stores', section })}>
+        {/* 0.13.0: every tab has Edit at the top right, with items or without (0.12.10 gave it to an
+            empty tab you made; Pantry, Bottle shop and Chemist had none until something was in them).
+            With nothing in the tab, Edit goes straight to the tab's own page: its shops, categories
+            and, for a tab you made, its name, colour and icon. */}
+        {recs.length === 0 && (
+          <button className="btn small edit-btn" aria-label={`Edit this tab: ${TAB_EDIT_WORDS(section)}`} onClick={() => nav.push({ name: 'stores', section })}>
             <Icon name="pencil" size={16} /> Edit
           </button>
         )}
@@ -258,9 +268,9 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           <Icon name="pencil" size={16} /> Edit categories
         </button>
       )}
-      {editing && isCustomSection(section) && (
+      {editing && (
         <button className="btn small block edit-cats" onClick={() => nav.push({ name: 'stores', section })}>
-          <Icon name="pencil" size={16} /> Edit this tab: name, icon and shops
+          <Icon name="pencil" size={16} /> Edit this tab: {TAB_EDIT_WORDS(section)}
         </button>
       )}
       {/* 0.12.0: this tab's one add button, with the barcode beside it (it was a small + at the top and a tab in the bar) */}
@@ -374,6 +384,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                     <RecRow
                       rec={r}
                       listed={onList.get(r.group.id)}
+                      entry={entries.find((e) => !e.checked && e.groupId === r.group.id)}
                       hideActions={editing}
                       openLabel={editing ? `Select ${r.group.name}` : r.group.name}
                       onOpen={editing ? () => pick(r.group.id) : undefined}
@@ -401,6 +412,9 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
             : `Showing ${shown.length.toLocaleString('en-AU')} of ${recs.length.toLocaleString('en-AU')} item${recs.length === 1 ? '' : 's'}`}
         </p>
       )}
+
+      {/* 0.13.0: a head start, offered at the bottom of the Pantry until it's used or turned down */}
+      {section === 'pantry' && !editing && !serverMode && picksOn && <PicksOffer onNo={() => setPicksNo(true)} />}
 
       {editing && (
         <SelectBar

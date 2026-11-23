@@ -280,7 +280,8 @@ export function AddScreen({
   const categories = allCats?.filter((c) => c.section === section);
   const sectionsOn = settings ? activeSections(settings) : (['pantry'] as Section[]);
   /** This tab is left out of the bottom bar: a one-off buy, so the shopping list comes first. */
-  const tabHidden = section !== 'pantry' && !!settings?.hiddenTabs?.includes(section);
+  // 0.13.0: no tab is hidden any more (Bottle shop and Chemist had a "Show in More" switch)
+  const tabHidden = false as boolean;
 
   const [term, setTerm] = useState(query ?? '');
   // 0.10.8: Find it from a photo, in a sheet (it used to open in the page, pushing everything down)
@@ -1118,10 +1119,14 @@ export function AddScreen({
     }
   };
 
+  /** 0.13.0: a once-only line's name when none was typed: the product's own. */
+  const onceName = (p: { name: string; brand?: string } | undefined) => (p?.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Item';
   const save = async (target: Target) => {
     if (!picks.size || saving) return;
     // 0.12.7: you name it (Restock never fills the name in), and at least one pick is what you buy.
-    if (!name.trim()) {
+    // 0.13.0: only what's kept needs a name. A line that's on the list just this once takes the
+    // product's own name when you haven't typed one.
+    if (!name.trim() && target !== 'list') {
       setNameMissing(true);
       setPanelOpen(true);
       requestAnimationFrame(() => {
@@ -1146,7 +1151,7 @@ export function AddScreen({
     setSaving(true);
     setBusyAs(target);
     try {
-      const itemName = name.trim();
+      const itemName = name.trim() || onceName(cheapestPick() ?? mainPicks[0]);
       const item = { name: itemName, section, categoryId: shownCategory, alertLevel, alertPct, allowBulk, allowMulti };
       if (forLine && target !== 'list') {
         // From the Pick sheet: the new item, and the list line becomes it ("both"), or comes off the
@@ -2635,8 +2640,14 @@ export function AddScreen({
                       <Icon name={section} size={18} /> Add to{' '}
                       {pickedCategory ? addToWord(pickedCategory) : section === 'pantry' ? 'pantry' : SECTION_NAMES[section]}
                     </AddBtn>
+                    {/* 0.13.0: three buttons that say what each does (the second read "And put it on my list", which sounded
+                        like the list alone, but it keeps the item too). The third is the list alone: no name
+                        needed, nothing kept, for something you're buying once. */}
                     <AddBtn target="both" busy={busyAs} className="btn" onClick={() => void save('both')}>
-                      <Icon name="cart" size={18} /> And put it on my shopping list
+                      <Icon name="cart" size={18} /> Add to {pickedCategory ? addToWord(pickedCategory) : section === 'pantry' ? 'pantry' : SECTION_NAMES[section]} and shopping list
+                    </AddBtn>
+                    <AddBtn target="list" busy={busyAs} className="btn" onClick={() => void save('list')}>
+                      <Icon name="cart" size={18} /> Shopping list only, just this once
                     </AddBtn>
                   </>
                 ) : (
@@ -2652,7 +2663,7 @@ export function AddScreen({
                   {tabHidden
                     ? "Add to list puts it on your Shopping list for this trip only, at the price shown. Restock won't keep watching its price."
                     : toPantry
-                      ? `Kept in ${SECTION_PLACE[section]}, and Restock keeps watching its price.`
+                      ? `The first two keep it in ${SECTION_PLACE[section]}, and Restock keeps watching its price. Just this once puts it on your Shopping list for this trip only: it isn't kept or watched, and it doesn't need a name.`
                       : addButtonsNote(SECTION_PLACE[section], pickedCategory)}
                 </p>
               </>

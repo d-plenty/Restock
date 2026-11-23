@@ -5,7 +5,7 @@ import { confirmAction } from '../../lib/confirm';
 import { wifiSyncOn } from '../../lib/protection'; // 0.9.6 (review L4)
 import { allGroups, allProducts, getSettings, reapplyHouseholdSettings, updateSettings } from '../../lib/db';
 import { CARRIED_TILES, householdSettingsFor } from '../../lib/household';
-import { chainName, enabledIn, SECTIONS, sectionOn, shopDef, type Section } from '../../shops';
+import { chainName, enabledIn, SECTION_NAMES, SECTIONS, sectionOn, shopDef, type Section } from '../../shops';
 import type { Settings } from '../../types';
 import { RestockNative, type TakeBack } from '../../lib/sql/native';
 import {
@@ -273,8 +273,8 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
 /** The tabs a household can share, in plain words. */
 export const SHARE_TABS: { tab: Section; title: string; sub: string }[] = [
   { tab: 'pantry', title: 'Groceries', sub: 'Pantry, its shopping list (and General, Baby and Pets) and prices' },
-  { tab: 'keg', title: 'Bottle shop', sub: '18+' },
-  { tab: 'pharmacy', title: 'Chemist', sub: 'Medicine and personal care' },
+  { tab: 'keg', get title() { return SECTION_NAMES.keg; }, sub: '18+' },
+  { tab: 'pharmacy', get title() { return SECTION_NAMES.pharmacy; }, sub: 'Its own tab' },
 ];
 
 /** 0.9.5 (save): changes to this phone's sync settings, held until Save (SyncScreen). */
@@ -1297,8 +1297,8 @@ export function AddPhoneSheet({ info, onClose, onWifi }: { info: SyncInfo; onClo
 
 /** The personal things a phone can take back off a v3 server (never groceries). */
 export const PERSONAL: { kind: TakeBack; title: string }[] = [
-  { kind: 'keg', title: 'Bottle shop' },
-  { kind: 'pharmacy', title: 'Chemist' },
+  { kind: 'keg', get title() { return SECTION_NAMES.keg; } },
+  { kind: 'pharmacy', get title() { return SECTION_NAMES.pharmacy; } },
   { kind: 'receipts', title: 'Receipts' },
   { kind: 'cards', title: 'Loyalty cards' },
 ];

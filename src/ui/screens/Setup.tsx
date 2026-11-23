@@ -10,8 +10,8 @@ import { HistoryLengths } from './DayOne';
 import { SHARED_ONE_LINE, SHARED_TITLE, TurnOffShared } from './SharedPrices';
 import { shareFromNow, sharedOn } from '../../lib/priceShare';
 import { useLive } from '../../lib/useLive';
-import { enabledIn, SECTION_NAMES, sectionOn, type CustomSection } from '../../shops';
-import { CustomStarts, customsInUse } from './CustomSections';
+import { enabledIn, SECTION_NAMES, sectionOn, type MadeSection } from '../../shops';
+import { CustomStarts, madeInUse } from './CustomSections';
 import { checkAll } from '../../lib/permissions';
 import { ensureNotificationPermission } from '../../lib/notify';
 import { SELF_UPDATE } from '../../lib/updates';
@@ -99,7 +99,7 @@ const ALL_TILES: Tile[] = [
   },
   {
     id: 'custom',
-    title: 'Custom sections',
+    title: 'Custom tabs',
     sub: 'Pets, tools, automotive, baby and more · Beta',
     icon: 'pack:star',
     heading: 'Compare other kinds of shops?',
@@ -264,7 +264,7 @@ export function tileStatus(s: Settings, id: TileId, cover?: Cover): { text: stri
   if (isTabTile(id) && sectionOn(s, id)) return { text: 'On', ok: true };
   if (isTabTile(id) && s.setup.done.includes(id)) return { text: 'Off', ok: true };
   // 0.10.7: custom sections: done once one's made (or the tile's been passed)
-  if (id === 'custom' && customsInUse(s).length) return { text: `${customsInUse(s).length} made`, ok: true };
+  if (id === 'custom' && madeInUse(s).length) return { text: `${madeInUse(s).length} made`, ok: true };
   if (id === 'custom' && s.setup.done.includes(id)) return { text: 'None', ok: true };
   if (id === 'pantry' && !s.setup.done.includes(id) && Object.values(s.stores).some((c) => c?.primary || c?.storeId))
     return { text: 'Done ✓', ok: true };
@@ -274,7 +274,8 @@ export function tileStatus(s: Settings, id: TileId, cover?: Cover): { text: stri
 }
 
 /** 0.12.0: Bottle shop and Chemist have a tile only once they're switched on (they're starts under "Make a custom section" before that). */
-export const tilesFor = (s: Settings) => TILES.filter((t) => !isTabTile(t.id) || !!s.sections[t.id]);
+// 0.13.0: they have no tile of their own at all: they're tabs you make, counted on the Custom tabs tile with the rest.
+export const tilesFor = (_s: Settings) => TILES.filter((t) => !isTabTile(t.id));
 
 /** Tiles that still need a look: not done and not skipped. (Recall alerts are on by default, so they count as done.) */
 // Tiles still to go: not done, skipped, or already showing as set up (Keg on after a restore, say).
@@ -590,8 +591,8 @@ function SyncTile() {
 
 /** 0.10.7: setup's custom sections: the starts, then the shops for the one just made. */
 function CustomTile({ settings }: { settings: Settings }) {
-  const [made, setMade] = useState<CustomSection>();
-  const mine = customsInUse(settings);
+  const [made, setMade] = useState<MadeSection>();
+  const mine = madeInUse(settings);
   return (
     <>
       {mine.length > 0 && <p className="small" style={{ margin: 0 }}>Made so far: {mine.map((c) => SECTION_NAMES[c]).join(', ')}.</p>}

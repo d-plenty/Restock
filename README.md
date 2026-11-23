@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.12.10" src="https://img.shields.io/badge/status-release%20candidate%200.12.10-ffcd00">
+  <img alt="Release candidate 0.13.0" src="https://img.shields.io/badge/status-release%20candidate%200.13.0-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-01210">New in 0.12.10</a> ·
+  <a href="#new-in-0130">New in 0.13.0</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -138,6 +138,20 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.13.0
+
+A head start for a new pantry, and tabs that all work the same way.
+
+- **See what Declan and Sarah use.** The two people who make Restock share their own pantry as a starting point: every item, with the products they buy at Coles, Woolworths and Aldi. Tick the ones you'd use, or Select all, then **Add to my pantry**. They go in the pantry only (nothing goes on the shopping list), with no prices: Restock checks each one once it's added. An item whose name you already use is greyed, says **Already in your pantry** and is never changed; the message afterwards says how many were added and how many were skipped. It's offered at the bottom of the Pantry until it's used or turned down, and stays in Settings, under Try it out.
+- **The walkthrough uses real items.** Twenty items from that pantry, ten of them on the shopping list, in place of seven made-up ones. Their prices are example prices: they're what each product cost when the list was made, and they aren't checked or shared. All of it goes when the walkthrough ends.
+- **Bottle shop and Chemist are tabs you make.** They were two tabs Restock came with, each with a switch and a "Show in More" setting. Now they're two of the starts under **Create a custom tab**, and they're named, coloured, given an icon, edited and deleted the same way as any other tab. Tabs you already have stay as they are, with their items and shops. A bottle shop tab still asks once that you're 18 or over. Their two tiles in Setup are gone (they're counted on Custom tabs), and no tab is hidden any more.
+- **Every tab has Edit** at the top right, with items or without. With nothing in the tab it opens the tab's page; with items, Edit also offers "Edit this tab".
+- **Beta on every tab you made**, in the top right corner of its tile on More.
+- **Three buttons when adding from a tab.** **Add to Pantry** keeps it. **Add to Pantry and shopping list** does both (it read "And put it on my shopping list", which sounded like the list alone). **Shopping list only, just this once** puts it on the list for this trip and keeps nothing: it needs no name, and takes the product's own.
+- **How many, on a tab's rows.** Once an item is on your shopping list its row shows minus, the number and plus in place of the cart button.
+- **Minus to 0 takes it off the list.** On the shopping list and on a tab's rows, minus at 1 goes to 0, waits about two seconds, then takes the line off the list, with Undo. Plus in that moment keeps it. The item stays in its tab.
+- **Loyalty cards in shopping mode's top bar.** Show Flybuys, Show Everyday Rewards and Add to list sit in the navy bar itself, on a line under the title, and "Shopping" and "Where are you first?" are bigger.
 
 ## New in 0.12.10
 
@@ -652,7 +666,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.12.10.apk` (on macOS, `shasum -a 256 restock-0.12.10.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.13.0.apk` (on macOS, `shasum -a 256 restock-0.13.0.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

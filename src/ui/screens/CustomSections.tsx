@@ -11,6 +11,7 @@ import {
   CUSTOM_COLOURS,
   CUSTOM_SECTIONS,
   CUSTOM_SLOTS,
+  MADE_SECTIONS,
   MAX_CUSTOM,
   PACK_ICON_IDS,
   customDef,
@@ -18,6 +19,7 @@ import {
   type CustomColour,
   type CustomDef,
   type CustomSection,
+  type MadeSection,
   type Section,
 } from '../../shops';
 import type { Settings } from '../../types';
@@ -25,7 +27,11 @@ import { BetaTag, CUSTOM_BETA_NOTE, Icon, Sheet } from '../components';
 import { useNav } from '../nav';
 
 /** Ready-made starts: a name, a colour and an icon (the shops are picked next). */
-export const CUSTOM_PRESETS: { def: CustomDef; about: string; slot?: CustomSection }[] = [
+// 0.13.0: Chemist and Bottle shop are two starts like the rest (they were tabs Restock came with,
+// each with a switch). `more`: offered from More and Settings, not in first-time setup.
+export const CUSTOM_PRESETS: { def: CustomDef; about: string; slot?: MadeSection; more?: boolean; adult?: boolean }[] = [
+  { def: { name: 'Chemist', colour: 'green', icon: 'pack:cross' }, about: 'Medicine, first aid and personal care', slot: 'pharmacy', more: true },
+  { def: { name: 'Bottle shop', colour: 'amber', icon: 'pack:keg' }, about: 'Beer, wine and spirits (18+)', slot: 'keg', more: true, adult: true },
   { def: { name: 'Baby', colour: 'pink', icon: 'pack:bottle' }, about: 'Nappies, wipes and formula', slot: 'baby' },
   { def: { name: 'Pets', colour: 'blue', icon: 'pack:paw' }, about: 'Pet food, litter and treats', slot: 'pets' },
   { def: { name: 'Automotive', colour: 'slate', icon: 'pack:car' }, about: 'Oil, car care and parts' },
@@ -47,15 +53,17 @@ const ICON_NAME: Record<string, string> = {
   bottle: 'Baby bottle', paw: 'Paw', car: 'Car', tools: 'Spanner and screwdriver', papers: 'Paper stack', office: 'Office',
   plant: 'Plant', roller: 'Paint roller', bulb: 'Light bulb', gift: 'Gift', shirt: 'T-shirt', book: 'Book', gamepad: 'Game controller',
   dumbbell: 'Dumbbell', tent: 'Tent', fishing: 'Fishing rod', couch: 'Couch', phone: 'Phone', spray: 'Spray bottle', scissors: 'Scissors',
-  ball: 'Football', coffee: 'Coffee cup', wine: 'Wine glass', star: 'Star',
+  ball: 'Football', coffee: 'Coffee cup', wine: 'Wine glass', star: 'Star', keg: 'Keg', cross: 'Green cross',
 };
 
 /** The custom sections in use (switched on), in their order. */
 export const customsInUse = (s: Settings | undefined): CustomSection[] => CUSTOM_SECTIONS.filter((c) => !!s?.sections?.[c]);
+/** 0.13.0: every tab you've made, Bottle shop and Chemist among them, in their order. */
+export const madeInUse = (s: Settings | undefined): MadeSection[] => MADE_SECTIONS.filter((c) => !!s?.sections?.[c]);
 
 /** A free slot for a new section: a preset's own (Baby, Pets) when it's free, else the first free c1–c6. */
-function freeSlot(s: Settings, want?: CustomSection): CustomSection | undefined {
-  if (want && !s.sections[want]) return want;
+function freeSlot(s: Settings, want?: MadeSection): CustomSection | undefined {
+  if (want && want !== 'keg' && want !== 'pharmacy' && !s.sections[want]) return want;
   return [...CUSTOM_SLOTS, 'baby' as const, 'pets' as const].find((c) => !s.sections[c] && !s.customSections?.[c]) ?? [...CUSTOM_SLOTS].find((c) => !s.sections[c]);
 }
 
@@ -63,10 +71,10 @@ function freeSlot(s: Settings, want?: CustomSection): CustomSection | undefined 
 // Tapping a start (Office, say) used to make the section there and then, so having a look and going
 // Back left an Office section behind. Now its page opens as "not saved yet": Save section keeps it;
 // Back asks "You haven't saved", and leaving takes it away again (with any shops ticked for it).
-let fresh: { id: CustomSection; at: number } | undefined;
-let pending: CustomSection | undefined;
+let fresh: { id: MadeSection; at: number } | undefined;
+let pending: MadeSection | undefined;
 /** The new section whose page is open and not saved yet. */
-export const pendingCustom = (): CustomSection | undefined => pending;
+export const pendingCustom = (): MadeSection | undefined => pending;
 /** Its page has opened (StoresScreen): from now, leaving asks first. Only just after it was made. */
 export function openedCustomPage(section: string): void {
   if (fresh && fresh.id === section && Date.now() - fresh.at < 10_000) pending = fresh.id;
@@ -106,10 +114,12 @@ export async function leavePendingCustom(): Promise<boolean> {
 }
 
 /** Makes a section and opens its page in Settings to pick its shops (0.10.11: kept once you tap Save section there). */
-export async function makeCustomSection(def: CustomDef, want?: CustomSection): Promise<CustomSection | undefined> {
+export async function makeCustomSection(def: CustomDef, want?: MadeSection): Promise<MadeSection | undefined> {
   const s = await getSaved();
-  if (customsInUse(s).length >= MAX_CUSTOM) return undefined;
-  const id = freeSlot(s, want);
+  // 0.13.0: Bottle shop and Chemist have places of their own (they don't use one of the eight)
+  const own = want === 'keg' || want === 'pharmacy';
+  if (!own && customsInUse(s).length >= MAX_CUSTOM) return undefined;
+  const id = own ? (s.sections[want] ? undefined : want) : freeSlot(s, want);
   if (!id) return undefined;
   const patch = {
     sections: { ...s.sections, [id]: true },
@@ -124,20 +134,15 @@ export async function makeCustomSection(def: CustomDef, want?: CustomSection): P
 }
 
 /** The starts to pick from (and "Your own"): makes the section, then onMade (More, Settings, setup). */
-/** 0.12.0: the two tabs Restock has always had besides Pantry, offered beside the custom starts. */
-const BUILT_IN: { id: 'keg' | 'pharmacy'; name: string; about: string; colour: string }[] = [
-  { id: 'pharmacy', name: 'Chemist', about: 'Medicine, first aid and personal care at the chemists you pick', colour: 'green' },
-  { id: 'keg', name: 'Bottle shop', about: 'Beer, wine and spirits at the bottle shops you pick (18+)', colour: 'amber' },
-];
-
-export function CustomStarts({ onMade, onBuiltIn }: { onMade: (id: CustomSection) => void; /** Bottle shop or Chemist: open its shops page. Left out: they aren't offered. */ onBuiltIn?: (id: 'keg' | 'pharmacy') => void }) {
+export function CustomStarts({ onMade, more }: { onMade: (id: MadeSection) => void; /** From More and Settings: Chemist and Bottle shop are among the starts. */ more?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [full, setFull] = useState(false);
+  const [askAge, setAskAge] = useState<(typeof CUSTOM_PRESETS)[number]>();
   const saved = useLive(getSaved, []);
   // A start that's already one of your sections isn't offered again (Pets twice).
-  const inUse = new Set(saved ? customsInUse(saved).map((c) => customDef(saved, c).name.trim().toLowerCase()) : []);
-  const presets = CUSTOM_PRESETS.filter((p) => !inUse.has(p.def.name.toLowerCase()) && !(p.slot && saved?.sections?.[p.slot]));
-  const make = async (def: CustomDef, slot?: CustomSection) => {
+  const inUse = new Set(saved ? madeInUse(saved).map((c) => customDef(saved, c).name.trim().toLowerCase()) : []);
+  const presets = CUSTOM_PRESETS.filter((p) => (more || !p.more) && !inUse.has(p.def.name.toLowerCase()) && !(p.slot && saved?.sections?.[p.slot]));
+  const make = async (def: CustomDef, slot?: MadeSection) => {
     setBusy(true);
     try {
       const id = await makeCustomSection(def, slot);
@@ -147,31 +152,43 @@ export function CustomStarts({ onMade, onBuiltIn }: { onMade: (id: CustomSection
       setBusy(false);
     }
   };
+  /** 18+: a bottle shop tab asks once that you're 18 or over (as it always has). */
+  const start = (p: (typeof CUSTOM_PRESETS)[number]) => {
+    if (p.adult && !saved?.adultConfirmed) return setAskAge(p);
+    void make(p.def, p.slot);
+  };
   return (
     <>
       {full && (
         <p className="small" role="alert" style={{ margin: 0 }}>
-          You have {MAX_CUSTOM} custom sections, the most there can be. Delete one in Settings to make another.
+          You have {MAX_CUSTOM} custom tabs, the most there can be. Delete one in Settings to make another.
         </p>
       )}
+      {askAge && (
+        <Sheet title="Bottle shops are 18+" onClose={() => setAskAge(undefined)}>
+          <p>A bottle shop tab tracks alcohol prices. Please confirm you're 18 or over.</p>
+          <div className="two">
+            <button className="btn" onClick={() => setAskAge(undefined)}>
+              Not yet
+            </button>
+            <button
+              className="btn primary"
+              onClick={async () => {
+                const p = askAge;
+                await saveNow({ adultConfirmed: true });
+                await updateSettings({ adultConfirmed: true });
+                setAskAge(undefined);
+                await make(p.def, p.slot);
+              }}
+            >
+              I'm 18 or over
+            </button>
+          </div>
+        </Sheet>
+      )}
       <div className="card flush">
-        {/* 0.12.0: Bottle shop and Chemist are offered here, with the other sections you can add (they were their own rows in Settings and tiles in setup) */}
-        {(onBuiltIn ? BUILT_IN : []).filter((b) => saved && !saved.sections?.[b.id]).map((b) => (
-          <button key={b.id} className="row" disabled={busy} onClick={() => onBuiltIn?.(b.id)}>
-            <span className={`custom-mark tile-colour-${b.colour}`}>
-              <Icon name={b.id} size={22} />
-            </span>
-            <span className="grow">
-              <span className="title" style={{ fontSize: 15 }}>
-                {b.name}
-              </span>
-              <span className="small">{b.about}</span>
-            </span>
-            <Icon name="plus" size={18} />
-          </button>
-        ))}
         {presets.map((p) => (
-          <button key={p.def.name} className="row" disabled={busy} onClick={() => void make(p.def, p.slot)}>
+          <button key={p.def.name} className="row" disabled={busy} onClick={() => start(p)}>
             <span className={`custom-mark tile-colour-${p.def.colour}`}>
               <Icon name={p.def.icon} size={22} />
             </span>
@@ -213,12 +230,8 @@ export function NewCustomSheet({ onClose }: { onClose: () => void }) {
         {CUSTOM_BETA_NOTE}
       </p>
       <CustomStarts
+        more
         onMade={(id) => {
-          onClose();
-          nav.push({ name: 'settings' });
-          nav.push({ name: 'stores', section: id });
-        }}
-        onBuiltIn={(id) => {
           onClose();
           nav.push({ name: 'settings' });
           nav.push({ name: 'stores', section: id });
@@ -229,7 +242,7 @@ export function NewCustomSheet({ onClose }: { onClose: () => void }) {
 }
 
 /** The top of a custom section's page in Settings: its name, colour and icon, and Delete. */
-export function CustomSectionHead({ settings, section }: { settings: Settings; section: CustomSection }) {
+export function CustomSectionHead({ settings, section }: { settings: Settings; section: MadeSection }) {
   const nav = useNav();
   const def = customDef(settings, section);
   const [emoji, setEmoji] = useState(def.icon.startsWith('pack:') ? '' : def.icon);

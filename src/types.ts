@@ -1,6 +1,6 @@
 // Core data types. Everything here is stored on the device in SQLite.
 
-import type { Chain, CustomDef, CustomSection, CustomShop, ListSection, Section, StoreChain } from './shops';
+import type { Chain, CustomDef, CustomSection, CustomShop, ListSection, MadeSection, Section, StoreChain } from './shops';
 export type { Chain, CustomShop, ListSection, Section, StoreChain } from './shops';
 export { chainName } from './shops';
 
@@ -305,7 +305,7 @@ export interface Settings {
   /** Keg and Pharmacy tabs (0.10.3: and Baby and Pets): switched on? (They also need at least one shop picked.) */
   sections: { keg: boolean; pharmacy: boolean } & Partial<Record<CustomSection, boolean>>;
   /** 0.10.7: each custom section's name, colour and icon (shops.ts customDef; shared with the household). */
-  customSections?: Partial<Record<CustomSection, CustomDef>>;
+  customSections?: Partial<Record<MadeSection, CustomDef>>;
   /**
    * 0.10.3: the tabs each shop is in, by shop id, when it isn't just its own tab (shops.ts tabsOf):
    * Woolworths in Pantry and Baby, say. Shared with the household (shop:<chain> rows' `tabs`).

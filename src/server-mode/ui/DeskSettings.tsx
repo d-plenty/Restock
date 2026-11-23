@@ -6,8 +6,8 @@ import { Fragment, useRef, useState, type KeyboardEvent, type ReactNode } from '
 import { confirmAction } from '../../lib/confirm';
 import { useLive } from '../../lib/useLive';
 import { money } from '../../lib/units';
-import { isCustomSection, SECTION_NAMES, type Section } from '../../shops';
-import { BETA_NOTE, BETA_SECTIONS, CUSTOM_BETA_NOTE, Icon, Sheet, TopBar, timeAgo } from '../../ui/components';
+import { isMadeSection, SECTION_NAMES, type Section } from '../../shops';
+import { CUSTOM_BETA_NOTE, Icon, Sheet, TopBar, timeAgo } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { PassphraseForm } from './Gate';
 import { DeskHead, WhereNote } from './deskShared';
@@ -193,9 +193,8 @@ function ShopsSheet({ tab, onClose, onCategories }: { tab: ShopsForTab; onClose:
   return (
     <Sheet title={tab.title} onClose={onClose}>
       <p className="small">The shops the household uses on this tab. Each phone keeps its own branch and shop sign-ins.</p>
-      {BETA_SECTIONS.includes(tab.section) && <p className="small">{BETA_NOTE}</p>}
       {/* 0.11.3: as on a phone: a custom section says it's in beta on its own page, and each tab's page opens its categories */}
-      {isCustomSection(tab.section) && (
+      {isMadeSection(tab.section) && (
         <p className="small" role="note">
           {CUSTOM_BETA_NOTE}
         </p>
@@ -769,6 +768,10 @@ function HouseholdPart() {
           <a className="btn small" href="https://github.com/d-plenty/Restock/issues" target="_blank" rel="noreferrer">
             GitHub
           </a>
+        </Line>
+        {/* 0.13.0: the makers' pantry is added from a phone (the phone's Settings, and the bottom of its Pantry) */}
+        <Line title="See what Declan and Sarah use" sub="The pantry of the two people who make Restock, to add from. On each phone." greyed>
+          <PhoneOnlyNote compact text="Done on a phone: Settings, then See what Declan and Sarah use." />
         </Line>
         <Line title={'Tour, sample items, check your shops are working'} sub={'On each phone.'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />

@@ -20,6 +20,7 @@ import { YourData } from './YourData';
 import { Credits } from './Credits';
 import { SaveBar, useSettingsDraft } from '../SaveBar';
 import { loadDemo, removeDemo } from '../../lib/demo';
+import { PICKS_TITLE } from '../../lib/makerPicks';
 import { syncBackgroundSchedule } from '../../lib/check';
 import { CHECK_TIME_0110, checkChoice, type CheckChoice, dayWords, isCheckTime, presetDays, timeWords } from '../../lib/checkSchedule';
 import { ensureNotificationPermission, scheduleReminders } from '../../lib/notify';
@@ -42,7 +43,7 @@ import { getHealth, testConnections, type ConnectionTest, type StoreChain } from
 import { useNav } from '../nav';
 import { checkForUpdate, installUpdate, RELEASES, SELF_UPDATE, type UpdateInfo } from '../../lib/updates';
 import { activeSections, MAX_CUSTOM, SECTION_NAMES, searchChainsIn, type Section, withCustom } from '../../shops';
-import { customsInUse, NewCustomSheet } from './CustomSections';
+import { customsInUse, madeInUse, NewCustomSheet } from './CustomSections';
 import { shopSummary } from './Stores';
 import { ExportSheet, pricesIn } from './BackupParts';
 import { LegalSheet } from './Legal';
@@ -305,11 +306,10 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             {row('Supermarkets (Pantry tab)', `${shopSummary(settings, 'pantry')} · ${shopAccountsSummary(settings)}`, () => nav.push({ name: 'stores', section: 'pantry' }))}
             {/* 0.10.12: Beta is said on each one's page (and in Setup), not on these rows. */}
             {/* 0.12.0: Bottle shops and Chemists show once they're switched on; before that they're two of the starts under "Make a custom section" */}
-            {settings.sections.keg && row('Bottle shops', shopSummary(settings, 'keg'), () => nav.push({ name: 'stores', section: 'keg' }))}
-            {settings.sections.pharmacy && row('Chemists', shopSummary(settings, 'pharmacy'), () => nav.push({ name: 'stores', section: 'pharmacy' }))}
             {/* 0.10.7: each custom section (Baby and Pets are custom sections now), then making another */}
-            {customsInUse(settings).map((c) => row(SECTION_NAMES[c], shopSummary(settings, c), () => nav.push({ name: 'stores', section: c })))}
-            {customsInUse(settings).length < MAX_CUSTOM &&
+            {/* 0.13.0: Bottle shop and Chemist are two of them, under whatever they're called now */}
+            {madeInUse(settings).map((c) => row(SECTION_NAMES[c], shopSummary(settings, c), () => nav.push({ name: 'stores', section: c })))}
+            {(customsInUse(settings).length < MAX_CUSTOM || !settings.sections.keg || !settings.sections.pharmacy) &&
               row('Create a custom tab', 'Chemist, bottle shop, baby, pets, automotive, tools, office or your own · Beta', () => setNewCustom(true))}
           </div>
           {newCustom && <NewCustomSheet onClose={() => setNewCustom(false)} />}
@@ -579,6 +579,8 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             Try it out
           </div>
           <div className="card flush">
+            {/* 0.13.0: the makers' own pantry, to add from (also offered at the bottom of the Pantry) */}
+            {row(PICKS_TITLE, 'The pantry of the two people who make Restock: add what you would use', () => nav.push({ name: 'picks' }))}
             {settings.demoLoaded ? (
               <button
                 className="row"
@@ -604,7 +606,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
               >
                 <span className="grow">
                   <span className="title">Add sample items</span>
-                  <span className="small">Seven made-up items with price history, to see how verdicts work</span>
+                  <span className="small">Twenty real items with example prices, ten on the shopping list, to see how it works</span>
                 </span>
               </button>
             )}

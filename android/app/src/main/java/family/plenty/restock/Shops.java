@@ -136,6 +136,14 @@ final class Shops {
         return false;
     }
 
+    /** 0.13.0: every tab but Pantry is one you made (shops.ts MADE_SECTIONS): Bottle shop and Chemist have a name, colour and icon too. */
+    static final String[] MADE_SECTIONS = { "keg", "pharmacy", "baby", "pets", "c1", "c2", "c3", "c4", "c5", "c6" };
+
+    static boolean isMade(String section) {
+        for (String c : MADE_SECTIONS) if (c.equals(section)) return true;
+        return false;
+    }
+
     /** 0.10.3: the tab a section's records are shared with: Baby and Pets with Groceries (shops.ts shareTab). 0.10.7: every custom section. */
     static String shareTab(String section) {
         return isCustom(section) ? "pantry" : section;

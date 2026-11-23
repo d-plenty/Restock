@@ -1,4 +1,5 @@
 import initSqlJs, { type SqlJsStatic } from 'sql.js';
+import { FIXTURE } from './demoFixture';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   addCard,
@@ -184,7 +185,7 @@ describe('undo: each kind of action goes back exactly', () => {
   });
 
   it('edit an item: name, category, alerts, picks', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     const [g] = await allGroups();
     const before = tables();
     await act('Saved', () =>
@@ -196,7 +197,7 @@ describe('undo: each kind of action goes back exactly', () => {
   });
 
   it('delete a pantry item: the item, its products, prices and list lines come back with the same ids', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     const [g] = await allGroups();
     await addListEntry(line('l1', g.name, { groupId: g.id, qty: 3 }));
     const before = tables();
@@ -209,7 +210,7 @@ describe('undo: each kind of action goes back exactly', () => {
   });
 
   it('deleting several pantry items is one Undo', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     const ids = (await allGroups()).slice(0, 4).map((g) => g.id);
     const before = tables();
     await act('4 items deleted', async () => {

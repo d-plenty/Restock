@@ -1,4 +1,5 @@
 import initSqlJs from 'sql.js';
+import { FIXTURE } from '../demoFixture';
 import { describe, expect, it, vi } from 'vitest';
 
 // Stand-in for the Java plugin: same method names and argument shapes as
@@ -55,7 +56,7 @@ describe('native bridge contract', () => {
 
     await initDb(createNativeDriver());
     await ensureDefaults();
-    await loadDemo();
+    await loadDemo(FIXTURE);
     await addCard({ id: uid(), program: 'flybuys', label: 'Flybuys', number: '6008940000000000', createdAt: '' });
     const recs = await loadRecommendations();
 

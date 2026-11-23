@@ -21,7 +21,7 @@ import {
   type SyncInfo,
 } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
-import { SECTIONS, sectionOn, type Section } from '../../shops';
+import { SECTION_NAMES, SECTIONS, sectionOn, type Section } from '../../shops';
 import { Icon, LoadingBar, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
 import { serverKeepText } from '../../lib/autoDelete';
@@ -57,8 +57,8 @@ type Kind = 'pantry' | 'keg' | 'pharmacy' | 'receipts' | 'cards';
 
 const ROWS: { kind: Kind; title: string; sub: string }[] = [
   { kind: 'pantry', title: 'Groceries', sub: 'Pantry and shopping list (General, Baby and Pets too), ticks too, with their prices and alerts' },
-  { kind: 'keg', title: 'Bottle shop', sub: 'Off unless you want the house to see it' },
-  { kind: 'pharmacy', title: 'Chemist', sub: 'Off unless you want the house to see it' },
+  { kind: 'keg', get title() { return SECTION_NAMES.keg; }, sub: 'Off unless you want the house to see it' },
+  { kind: 'pharmacy', get title() { return SECTION_NAMES.pharmacy; }, sub: 'Off unless you want the house to see it' },
   { kind: 'receipts', title: 'Receipts', sub: 'What you spent, and the photos. Off unless you want the house to see them' },
   { kind: 'cards', title: 'Loyalty cards', sub: 'Best kept on your phone. Turn on only to share cards with the house.' },
 ];

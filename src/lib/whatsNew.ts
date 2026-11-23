@@ -11,18 +11,18 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.12.10',
-    about: 'Shopping that survives leaving the app, and fewer doubles.',
+    version: '0.13.0',
+    about: 'A head start for a new pantry, and tabs that all work the same way.',
     changes: [
-      'Leave the app mid-shop and your shop is kept. Home and the list offer Resume shopping or Start fresh.',
-      'The top button in shopping mode says Pause while there are things left to get.',
-      'Add to list is in shopping mode, so the trolley total keeps up with what you pick up.',
-      'Two items can’t have the same name. Capitals don’t count: Rinse aid and Rinse Aid are the same.',
-      'Adding a product you already have says which item it is in.',
-      'When Try again on a shop still fails, it goes on to opening the shop’s page, which usually fixes it.',
-      'A tab you made always has Edit at the top right, to rename it or change its icon and shops.',
-      'Photos are read from more shops, and a shop no longer shows 0 as a size.',
-      'This page shows the latest version only.',
+      'See what Declan and Sarah use: the pantry of the two people who make Restock. Tick what you’d use and add it to yours. It’s at the bottom of the Pantry, and in Settings.',
+      'Anything you already have by the same name is left exactly as it is.',
+      'The walkthrough uses twenty real items, ten of them on the shopping list.',
+      'Bottle shop and Chemist are tabs you make, name and colour like any other.',
+      'Every tab has Edit at the top right, and every tab you made says Beta on More.',
+      'Adding from a tab has three buttons: the tab, the tab and the shopping list, or the shopping list just this once (no name needed).',
+      'Once an item is on your list, its row shows minus, how many, and plus.',
+      'Minus down to 0 takes a line off your list after a moment, with Undo.',
+      'Your loyalty cards sit in shopping mode’s top bar, and its titles are bigger.',
     ],
   },
 ];

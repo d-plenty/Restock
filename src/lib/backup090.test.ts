@@ -1,4 +1,5 @@
 import initSqlJs from 'sql.js';
+import { FIXTURE } from './demoFixture';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { addListEntry, ensureDefaults, getSettings, initDb, snapshot, updateSettings } from './db';
 import { loadDemo } from './demo';
@@ -16,7 +17,7 @@ beforeEach(async () => {
 
 describe('backup passwords', () => {
   it('locks a backup so only the password opens it', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     const plain = await backupJson(EVERYTHING);
     const locked = await backupJson({ ...EVERYTHING, password: 'correct horse' });
     expect(isLocked(locked)).toBe(true);
@@ -60,7 +61,7 @@ describe('spreadsheets', () => {
   });
 
   it('makes the pantry, list and price history', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     await addListEntry({ id: 'x1', text: 'Bin bags', checked: false, createdAt: '2026-11-09T00:00:00Z', qty: 2 });
     const files = csvFiles(await snapshot());
     expect(files.map((f) => f.name)).toEqual(['restock-pantry.csv', 'restock-shopping-list.csv', 'restock-price-history.csv']);

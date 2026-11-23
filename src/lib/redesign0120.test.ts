@@ -76,9 +76,11 @@ describe('setup tiles: Bottle shop and Chemist only once they are switched on', 
     expect(off).not.toContain('keg');
     expect(off).not.toContain('pharmacy');
     expect(off).toContain('pantry');
+    // 0.13.0: nor when one is on: they're tabs you make, counted on the Custom tabs tile
     const on = tilesFor({ ...DEFAULT_SETTINGS, sections: { keg: true, pharmacy: false } }).map((t) => t.id);
-    expect(on).toContain('keg');
+    expect(on).not.toContain('keg');
     expect(on).not.toContain('pharmacy');
+    expect(on).toContain('custom');
     expect(TILES.map((t) => t.id)).toContain('pharmacy');
   });
 });

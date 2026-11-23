@@ -16,11 +16,14 @@ describe('0.12.5: Home and More', () => {
   });
   it('the starts inside it are Chemist and Bottle shop, then the ready-made ones, then Your own', () => {
     const cs = read('./screens/CustomSections.tsx');
-    expect(cs.indexOf("id: 'pharmacy', name: 'Chemist'")).toBeLessThan(cs.indexOf("id: 'keg', name: 'Bottle shop'"));
+    expect(cs.indexOf("name: 'Chemist'")).toBeGreaterThan(-1);
+    expect(cs.indexOf("name: 'Chemist'")).toBeLessThan(cs.indexOf("name: 'Bottle shop'"));
+    expect(cs.indexOf("name: 'Bottle shop'")).toBeLessThan(cs.indexOf("name: 'Baby'"));
     for (const n of ['Baby', 'Pets', 'Automotive', 'Tools', 'Office', 'Your own']) expect(cs).toContain(n);
   });
   it('setup never lists Bottle shops or Chemists unless that tab is already on', () => {
-    expect(read('./screens/Setup.tsx')).toContain('TILES.filter((t) => !isTabTile(t.id) || !!s.sections[t.id])');
+    // 0.13.0: nor then: they have no tile of their own at all
+    expect(read('./screens/Setup.tsx')).toContain('TILES.filter((t) => !isTabTile(t.id))');
   });
 });
 

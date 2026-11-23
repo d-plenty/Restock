@@ -20,7 +20,7 @@ import { money, parseMoney, tidySize } from '../../lib/units';
 import { productLine, sizeLabel, type CompareStyle } from '../../lib/unitPrice';
 import { useLive } from '../../lib/useLive';
 import { ALERT_LEVELS, bothPrices, computeStats, HISTORY_DAYS, multiBuy, optionStyle, tiedWithBest, withMarket, type Option, type Recommendation } from '../../lib/verdict';
-import { isCustomSection, SECTION_NAMES, type Section, slots } from '../../shops';
+import { isMadeSection, SECTION_NAMES, type Section, slots } from '../../shops';
 import { chainName, type AlertLevel } from '../../types';
 import { BetaTag, ChainName, Icon, MoreInfo, PriceChart, previewFromOption, ProductPreview, Thumb, SearchField, type PreviewProduct } from '../../ui/components';
 import { useNav } from '../../ui/nav';
@@ -44,18 +44,18 @@ const SORTS: { id: Sort; label: string }[] = [
 ];
 const SEARCH_HINT: Record<Section, string> = {
   pantry: 'Search the pantry',
-  keg: 'Search your bottle shop items',
-  pharmacy: 'Search your pharmacy items',
-  baby: 'Search your baby things',
-  pets: 'Search your pet things',
+  keg: 'Search this tab',
+  pharmacy: 'Search this tab',
+  baby: 'Search this tab',
+  pets: 'Search this tab',
   ...slots('Search this tab'),
 };
 const EMPTY: Record<Section, string> = {
   pantry: 'Your pantry is empty. Add the things you buy on a phone, and Restock watches their prices.',
-  keg: 'Nothing here yet. Add the beer, wine or spirits you buy on a phone.',
-  pharmacy: 'Nothing here yet. Add the medicine, first aid and personal care things you buy on a phone.',
-  baby: 'Nothing here yet. Add the nappies, wipes and baby things you buy on a phone.',
-  pets: 'Nothing here yet. Add the pet food, litter and treats you buy on a phone.',
+  keg: 'Nothing here yet. Add the things you buy on a phone.',
+  pharmacy: 'Nothing here yet. Add the things you buy on a phone.',
+  baby: 'Nothing here yet. Add the things you buy on a phone.',
+  pets: 'Nothing here yet. Add the things you buy on a phone.',
   ...slots('Nothing here yet. Add the things you buy on a phone.'),
 };
 /** The same deals the phone's Pantry counts ("wait" isn't a deal yet). */
@@ -124,7 +124,7 @@ export function DeskPantry({ section }: { section: Section }) {
         <section className="dk-wide" aria-label={SECTION_NAMES[section]}>
           <DeskHead title={SECTION_NAMES[section]} sub={`${recs.length} item${recs.length === 1 ? '' : 's'}`}>
             {/* 0.11.3: a custom tab says Beta at the top, and every tab opens its categories from here */}
-            {isCustomSection(section) && <BetaTag />}
+            {isMadeSection(section) && <BetaTag />}
             <button className="btn small" onClick={() => setCatsOpen(true)}>
               <Icon name="pencil" size={16} /> Categories
             </button>

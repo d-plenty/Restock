@@ -8,11 +8,11 @@ import { getSettings } from '../../lib/db';
 import { loadRecommendations } from '../../lib/recs';
 import { useLive } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
-import { chainName, customDef, EXTRA_SECTIONS, enabledIn, isCustomSection, MAX_CUSTOM, SECTION_NAMES, sectionOn, type Section } from '../../shops';
+import { chainName, customDef, EXTRA_SECTIONS, enabledIn, MAX_CUSTOM, SECTION_NAMES, type Section } from '../../shops';
 import { customsInUse, NewCustomSheet } from './CustomSections';
 import type { Chain } from '../../types';
 import { serverMode } from '../../server-mode/flag';
-import { Icon } from '../components';
+import { BetaTag, Icon } from '../components';
 import { useNav } from '../nav';
 
 
@@ -42,10 +42,11 @@ export function MoreTop({ children }: { children?: ReactNode }) {
   const recs = useLive(loadRecommendations, []);
   // 0.10.7: a custom section shows as soon as it's made, before its shops are picked (tapping it opens its page in Settings).
   const shown = settings
-    ? EXTRA_SECTIONS.filter((s) => (sectionOn(settings, s) || (isCustomSection(s) && !!settings.sections?.[s])) && !settings.hiddenTabs?.includes(s))
+    ? EXTRA_SECTIONS.filter((s) => !!settings.sections?.[s])
     : [];
   // 0.12.5: Bottle shop and Chemist aren't offered on More itself any more. They're two of the starts inside "Create a custom tab".
-  const builtInFree = settings ? (['keg', 'pharmacy'] as const).some((s) => !sectionOn(settings, s)) : false;
+  // 0.13.0: they're tabs you make like any other, so there's room while any slot is free
+  const builtInFree = settings ? (['keg', 'pharmacy'] as const).some((s) => !settings.sections?.[s]) : false;
   const customRoom = settings ? customsInUse(settings).length < MAX_CUSTOM : false;
   const [making, setMaking] = useState(false);
   return (
@@ -62,7 +63,7 @@ export function MoreTop({ children }: { children?: ReactNode }) {
               return (
                 <button
                   key={s}
-                  className={`more-tile ${isCustomSection(s) ? `tile-colour-${customDef(settings, s).colour}` : `tile-${s}`}`}
+                  className={`more-tile tile-colour-${customDef(settings, s).colour}`}
                   onClick={() => {
                     if (shops.length) return nav.setTab(s);
                     nav.push({ name: 'settings' });
@@ -71,6 +72,10 @@ export function MoreTop({ children }: { children?: ReactNode }) {
                 >
                   <span className="more-tile-icon">
                     <Icon name={s} size={24} />
+                  </span>
+                  {/* 0.13.0: every tab you made says Beta, in its top right corner */}
+                  <span className="more-tile-beta">
+                    <BetaTag />
                   </span>
                   <span className="more-tile-name">
                     {SECTION_NAMES[s]}

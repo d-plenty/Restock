@@ -1,4 +1,5 @@
 import initSqlJs from 'sql.js';
+import { FIXTURE } from './demoFixture';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   addCard,
@@ -93,7 +94,7 @@ describe('settings', () => {
 
 describe('sample data end to end', () => {
   it('produces the expected verdict for each sample item', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     const byName = Object.fromEntries((await loadRecommendations()).map((r) => [r.group.name, r]));
     expect(byName['A4 copy paper'].action).toBe('buy');
     expect(byName['A4 copy paper'].best?.verdict.kind).toBe('great');
@@ -109,7 +110,7 @@ describe('sample data end to end', () => {
   });
 
   it('round-trips booleans and arrays through SQLite', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     const g = await getGroup('demo-tp');
     expect(g?.altProductIds).toEqual(['demo-tp-coles', 'demo-tp-ww']);
     const readings = (await readingsFor(['demo-laundry-ww'])).get('demo-laundry-ww')!;
@@ -119,13 +120,13 @@ describe('sample data end to end', () => {
   });
 
   it('removes all sample data cleanly', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     await removeDemo();
     for (const t of ['products', 'items', 'prices', 'list_entries']) expect(count(t)).toBe(0);
   });
 
   it('deleting a pantry item removes its orphaned products and prices', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     await deleteGroup('demo-tp');
     expect(await getProduct('demo-tp-coles')).toBeUndefined();
     expect(Number(raw.exec("SELECT COUNT(*) FROM prices WHERE product_id = 'demo-tp-coles'")[0].values[0][0])).toBe(0);
@@ -135,7 +136,7 @@ describe('sample data end to end', () => {
 
 describe('updates', () => {
   it('patches only the named fields and announces the change', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     let fired = 0;
     const off = onChange(() => fired++);
     await updateGroup('demo-milk', { name: 'Milk', alertPct: 15 });
@@ -147,7 +148,7 @@ describe('updates', () => {
   });
 
   it('deleting a category un-files its items and list entries', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     const cleaning = (await allCategories()).find((c) => c.name === 'Cleaning')!;
     await deleteCategory(cleaning.id);
     expect((await allGroups()).filter((g) => g.categoryId === cleaning.id)).toHaveLength(0);
@@ -158,7 +159,7 @@ describe('updates', () => {
 
 describe('backup', () => {
   it('snapshot → restore gives back identical data', async () => {
-    await loadDemo();
+    await loadDemo(FIXTURE);
     await addCard({ id: 'c1', program: 'flybuys', label: 'Flybuys', number: '6008940012345678', createdAt: '2026-11-05T00:00:00Z' });
     const before = await snapshot();
     await removeDemo();
@@ -176,7 +177,7 @@ describe('backup', () => {
   it('restores a backup onto a fresh phone and finishes setup', async () => {
     const { snapshot, getSettings, updateSettings } = await import('./db');
     const { importBackup } = await import('./backup');
-    await loadDemo();
+    await loadDemo(FIXTURE);
     const tables = await snapshot();
     const file = JSON.stringify({ app: 'restock', version: 2, exportedAt: '', tables });
     await updateSettings({ onboarded: false });
@@ -191,7 +192,7 @@ describe('picking what to restore', () => {
   it('restores just the pantry, tidies names, and leaves everything else alone', async () => {
     const { snapshot, getSettings, updateSettings, allGroups, allListEntries, allCards, addCard, addListEntry, updateGroup } = await import('./db');
     const { readBackup, restoreBackup } = await import('./backup');
-    await loadDemo();
+    await loadDemo(FIXTURE);
     // A pantry item still named after its product, like the honey from before.
     const { allProducts } = await import('./db');
     const { genericName } = await import('./naming');
@@ -224,7 +225,7 @@ describe('picking what to restore', () => {
   it('turns list lines into plain lines when their pantry item is not restored', async () => {
     const { snapshot, allListEntries, addListEntry, allGroups } = await import('./db');
     const { readBackup, restoreBackup } = await import('./backup');
-    await loadDemo();
+    await loadDemo(FIXTURE);
     const [g] = await allGroups();
     await addListEntry({ id: 'linked', text: g.name, groupId: g.id, qty: 2, checked: false, createdAt: '' });
     const file = JSON.stringify({ app: 'restock', version: 2, exportedAt: '', tables: await snapshot() });
@@ -239,7 +240,7 @@ describe('picking what to restore', () => {
   it('exports just the picked tabs, and restoring them leaves the other tabs alone', async () => {
     const { snapshot, pickSnapshot, allGroups, allProducts, addGroup, addProduct, addReading, readingsFor } = await import('./db');
     const { readBackup, restoreBackup } = await import('./backup');
-    await loadDemo();
+    await loadDemo(FIXTURE);
     const pantryBefore = (await allGroups()).length;
     await addProduct({ id: 'beer', chain: 'bws', name: 'Great Northern Super Crisp 30 Pack', storeProductId: '915769', createdAt: '' });
     await addReading({ productId: 'beer', date: '2026-11-01T00:00:00Z', price: 54, isSpecial: true, memberOnly: false, source: 'auto' });
@@ -378,7 +379,7 @@ describe('targeted undo', () => {
   it('puts a deleted item, its products, prices and list line back', async () => {
     const { allGroups, allListEntries, addListEntry, deleteGroup, snapshot, deleteListEntries } = await import('./db');
     const { undoable, groupRows, entryRows } = await import('./undo');
-    await loadDemo();
+    await loadDemo(FIXTURE);
     const [g] = await allGroups();
     await addListEntry({ id: 'l1', text: g.name, groupId: g.id, qty: 3, checked: false, createdAt: '' });
     const before = await snapshot();
@@ -417,7 +418,7 @@ describe('restoring settings', () => {
     const { getSettings, updateSettings, snapshot } = await import('./db');
     const { readBackup, restoreBackup } = await import('./backup');
     // An old backup: Keg off, no shops picked, no setup progress.
-    await loadDemo();
+    await loadDemo(FIXTURE);
     await updateSettings({ sections: { keg: false, pharmacy: false }, stores: {} });
     const old = await snapshot();
     old.kv = old.kv.map((k) => (k.key === 'settings' ? { ...k, value: { ...(k.value as object), setup: undefined, look: undefined } } : k));

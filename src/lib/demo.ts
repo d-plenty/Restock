@@ -1,24 +1,29 @@
 import type { Chain, Group, PriceReading } from '../types';
 import { allCategories, insertEntryOp, insertGroupOp, insertProductOp, insertReadingOp, nowIso, runOps, updateSettings } from './db';
 import type { SqlOp } from './sql/driver';
+import { DEMO_GROUPS, DEMO_LIST } from './demoData';
 
-// Sample items so testers can see verdicts working before real price history exists.
-// Everything here is clearly marked "(sample)" and can be removed in Settings.
+// Sample items so people can see Restock working before they've added anything of their own.
+// 0.13.0: they're real items (demoData.ts), with example prices; all removed in Settings, or when the
+// walkthrough ends. Their ids start "demo-", which keeps them out of sync, sharing and price checks.
 
 const DAY = 86_400_000;
 
-interface DemoProduct {
+export interface DemoProduct {
   key: string;
   chain: Chain;
   name: string;
   size: string;
+  /** 0.13.0: real items have their brand and photo. */
+  brand?: string;
+  imageUrl?: string;
   normal: number;
   /** weeks-ago → sale price */
   sales?: Record<number, number>;
   current: { price: number; special?: boolean; was?: number; member?: boolean; promo?: string };
 }
 
-interface DemoGroup {
+export interface DemoGroup {
   key: string;
   name: string;
   category: string;
@@ -26,163 +31,6 @@ interface DemoGroup {
   same?: DemoProduct[];
   alts?: DemoProduct[];
 }
-
-const GROUPS: DemoGroup[] = [
-  // 0.10.9: three scents of one thing at Coles (flavours, scents and colours): two on special.
-  {
-    key: 'wash',
-    name: 'Body wash',
-    category: 'Bathroom',
-    usual: {
-      key: 'wash-coles-honey',
-      chain: 'coles',
-      name: 'Body Wash Milk & Honey 1L (sample)',
-      size: '1L',
-      normal: 4.8,
-      current: { price: 4.8 },
-    },
-    same: [
-      {
-        key: 'wash-coles-ocean',
-        chain: 'coles',
-        name: 'Body Wash Ocean Breeze 1L (sample)',
-        size: '1L',
-        normal: 4.8,
-        current: { price: 3.3, special: true, was: 4.8 },
-      },
-      {
-        key: 'wash-coles-guava',
-        chain: 'coles',
-        name: 'Body Wash Guava & Peach 1L (sample)',
-        size: '1L',
-        normal: 4.8,
-        current: { price: 3.3, special: true, was: 4.8 },
-      },
-    ],
-  },
-  {
-    key: 'paper',
-    name: 'A4 copy paper',
-    category: 'Pantry',
-    usual: {
-      key: 'paper-ww',
-      chain: 'woolworths',
-      name: 'A4 copy paper 500 sheets (sample)',
-      size: '500 sheets',
-      normal: 9,
-      sales: { 20: 6.75, 12: 6.75, 6: 7.2 },
-      current: { price: 4.5, special: true, was: 9, promo: '1/2 price' },
-    },
-    same: [
-      {
-        key: 'paper-coles',
-        chain: 'coles',
-        name: 'A4 copy paper 500 sheets (sample)',
-        size: '500 sheets',
-        normal: 8.5,
-        current: { price: 8.5 },
-      },
-    ],
-  },
-  {
-    key: 'tp',
-    name: 'Toilet paper',
-    category: 'Bathroom',
-    usual: {
-      key: 'tp-aldi',
-      chain: 'aldi',
-      name: 'Toilet paper 24 pack (sample)',
-      size: '24 pack',
-      normal: 5,
-      current: { price: 5 },
-    },
-    alts: [
-      {
-        key: 'tp-coles',
-        chain: 'coles',
-        name: 'Coles toilet paper 24 pack (sample)',
-        size: '24 pack',
-        normal: 6,
-        sales: { 15: 4.5 },
-        current: { price: 3.5, special: true, was: 6, promo: 'Save $2.50' },
-      },
-      {
-        key: 'tp-ww',
-        chain: 'woolworths',
-        name: 'Woolworths toilet paper 24 pack (sample)',
-        size: '24 pack',
-        normal: 6.2,
-        current: { price: 6.2 },
-      },
-    ],
-  },
-  {
-    key: 'coffee',
-    name: 'Ground coffee 1kg',
-    category: 'Pantry',
-    usual: {
-      key: 'coffee-coles',
-      chain: 'coles',
-      name: 'Ground coffee 1kg (sample)',
-      size: '1kg',
-      normal: 20,
-      sales: { 24: 12, 18: 12, 12: 12, 6: 12 },
-      current: { price: 15, special: true, was: 20, promo: 'Save $5' },
-    },
-  },
-  {
-    key: 'dish',
-    name: 'Dishwasher tablets',
-    category: 'Cleaning',
-    usual: {
-      key: 'dish-ww',
-      chain: 'woolworths',
-      name: 'Dishwasher tablets 60 pack (sample)',
-      size: '60 pack',
-      normal: 25,
-      current: { price: 25, special: true, was: 27, promo: 'Special' },
-    },
-  },
-  {
-    key: 'laundry',
-    name: 'Laundry liquid 2L',
-    category: 'Cleaning',
-    usual: {
-      key: 'laundry-ww',
-      chain: 'woolworths',
-      name: 'Laundry liquid 2L (sample)',
-      size: '2L',
-      normal: 16,
-      current: { price: 10, special: true, was: 16, member: true, promo: 'Member price' },
-    },
-  },
-  {
-    key: 'milk',
-    name: 'Milk 2L',
-    category: 'Fridge & freezer',
-    usual: {
-      key: 'milk-aldi',
-      chain: 'aldi',
-      name: 'Full cream milk 2L (sample)',
-      size: '2L',
-      normal: 3.1,
-      current: { price: 3.1 },
-    },
-  },
-  {
-    key: 'pasta',
-    name: 'Spaghetti 500g',
-    category: 'Pantry',
-    usual: {
-      key: 'pasta-coles',
-      chain: 'coles',
-      name: 'Spaghetti 500g (sample)',
-      size: '500g',
-      normal: 2,
-      current: { price: 1.8, special: true, was: 2, promo: 'Save 20c' },
-    },
-  },
-];
 
 function buildReadings(p: DemoProduct, now: number): Omit<PriceReading, 'id'>[] {
   const out: Omit<PriceReading, 'id'>[] = [];
@@ -212,16 +60,28 @@ function buildReadings(p: DemoProduct, now: number): Omit<PriceReading, 'id'>[] 
   return out;
 }
 
-export async function loadDemo(): Promise<void> {
+/** What a sample set holds: the items, and what starts on the shopping list. */
+export interface DemoSet {
+  groups: DemoGroup[];
+  /** Loose lines on the list (not one of the items). */
+  entries?: { id: string; text: string; chain?: Chain; category?: string }[];
+  /** Items (by key) that start on the shopping list. */
+  listed?: string[];
+}
+
+/** 0.13.0: twenty real items from the makers' pantry, ten of them on the shopping list (demoData.ts). */
+export const REAL_SET: DemoSet = { groups: DEMO_GROUPS, listed: DEMO_LIST };
+
+export async function loadDemo(set: DemoSet = REAL_SET): Promise<void> {
   const now = Date.now();
   const categories = await allCategories();
   const catId = (name: string) => categories.find((c) => c.name === name)?.id;
   await removeDemo();
   const ops: SqlOp[] = [];
-  for (const g of GROUPS) {
+  for (const g of set.groups) {
     const all = [g.usual, ...(g.same ?? []), ...(g.alts ?? [])];
     for (const p of all) {
-      ops.push(insertProductOp({ id: `demo-${p.key}`, chain: p.chain, name: p.name, size: p.size, createdAt: nowIso() }, true));
+      ops.push(insertProductOp({ id: `demo-${p.key}`, chain: p.chain, name: p.name, brand: p.brand, size: p.size, imageUrl: p.imageUrl, createdAt: nowIso() }, true));
       buildReadings(p, now).forEach((r) => ops.push(insertReadingOp(r)));
     }
     const group: Group = {
@@ -236,13 +96,13 @@ export async function loadDemo(): Promise<void> {
     };
     ops.push(insertGroupOp(group, true));
   }
-  ops.push(
-    insertEntryOp(
-      { id: 'demo-list-1', text: 'Bananas', chain: 'woolworths', checked: false, createdAt: nowIso(), categoryId: catId('Fridge & freezer') },
-      true,
-    ),
-    insertEntryOp({ id: 'demo-list-2', text: 'Bin bags', checked: false, createdAt: nowIso(), categoryId: catId('Cleaning') }, true),
-  );
+  for (const e of set.entries ?? [])
+    ops.push(insertEntryOp({ id: e.id, text: e.text, chain: e.chain, checked: false, createdAt: nowIso(), categoryId: e.category ? catId(e.category) : undefined }, true));
+  // the items that start on the list: each line is its item (so it shows the item's price and shop)
+  (set.listed ?? []).forEach((key, i) => {
+    const g = set.groups.find((x) => x.key === key);
+    if (g) ops.push(insertEntryOp({ id: `demo-list-${i + 1}`, text: g.name, groupId: `demo-${g.key}`, checked: false, createdAt: nowIso(), categoryId: catId(g.category) }, true));
+  });
   await runOps(ops);
   await updateSettings({ demoLoaded: true });
 }

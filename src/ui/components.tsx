@@ -274,6 +274,9 @@ export const PACK_ICONS: Record<string, ReactNode> = {
   coffee: <path d="M4 9h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM16 11h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3" />,
   wine: <path d="M8 3h8l-.5 6a3.5 3.5 0 0 1-7 0zM12 12.5V20M8.5 21h7M8.3 7h7.4" />,
   star: <path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9z" />,
+  // 0.13.0: Bottle shop's keg and Chemist's green cross are pack icons like the rest
+  keg: paths.keg,
+  cross: paths.pharmacy,
 };
 
 /**

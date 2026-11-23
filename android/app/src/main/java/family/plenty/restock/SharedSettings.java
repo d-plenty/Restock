@@ -166,7 +166,9 @@ final class SharedSettings {
     static final String[] CUSTOM_COLOURS = { "pink", "blue", "teal", "purple", "orange", "amber", "green", "slate" };
     static final String[] PACK_ICONS = {
         "bottle", "paw", "car", "tools", "papers", "office", "plant", "roller", "bulb", "gift", "shirt", "book",
-        "gamepad", "dumbbell", "tent", "fishing", "couch", "phone", "spray", "scissors", "ball", "coffee", "wine", "star" };
+        "gamepad", "dumbbell", "tent", "fishing", "couch", "phone", "spray", "scissors", "ball", "coffee", "wine", "star",
+        // 0.13.0: Bottle shop's keg and Chemist's cross
+        "keg", "cross" };
 
     /** 0.10.8: letters that are invisible or turn text around, never in a name (shops.ts HIDDEN). */
     private static final Pattern HIDDEN = Pattern.compile("[\\u0080-\\u009f\\u200b-\\u200f\\u2028-\\u202e\\u2060-\\u206f\\ufeff]");
@@ -252,7 +254,8 @@ final class SharedSettings {
         }
         // 0.10.7: custom sections (Baby, Pets, c1–c6): switched on, and their name, colour and icon
         if (k.startsWith("tab:") && Shops.isCustom(k.substring(4))) return v instanceof Boolean ? v : null;
-        if (k.startsWith(CUSTOM_PREFIX)) return Shops.isCustom(k.substring(CUSTOM_PREFIX.length())) ? checkCustomDef(v) : null;
+        // 0.13.0: and Bottle shop's and Chemist's (custom:keg, custom:pharmacy), each shared with its own tab
+        if (k.startsWith(CUSTOM_PREFIX)) return Shops.isMade(k.substring(CUSTOM_PREFIX.length())) ? checkCustomDef(v) : null;
         if (k.startsWith(BRANCH_PREFIX)) return checkBranch(k, v);
         if (!k.startsWith("shop:") || !(v instanceof JSONObject) || !(((JSONObject) v).opt("on") instanceof Boolean)) return null;
         JSONObject o = (JSONObject) v;
@@ -362,7 +365,7 @@ final class SharedSettings {
         if (k == null) return null;
         // 0.10.3: Baby and Pets rows are shared with Groceries (rowTab).
         if (k.startsWith("tab:")) return rowTab(k.substring(4));
-        if (k.startsWith(CUSTOM_PREFIX)) return "pantry";
+        if (k.startsWith(CUSTOM_PREFIX)) return rowTab(k.substring(CUSTOM_PREFIX.length()));
         // 0.9.4: a default branch is about its shop's tab (a shop someone added: left alone).
         if (k.startsWith(BRANCH_PREFIX)) {
             String b = k.substring(BRANCH_PREFIX.length());
@@ -634,7 +637,7 @@ final class SharedSettings {
         for (String t : named) if (tabs.contains(rowTab(t))) out.add("tab:" + t);
         // 0.10.7: the custom sections that have a name of their own
         JSONObject cs = s.optJSONObject("customSections");
-        if (tabs.contains("pantry") && cs != null) for (String c : Shops.CUSTOM_SECTIONS) if (checkCustomDef(cs.opt(c)) != null) out.add(CUSTOM_PREFIX + c);
+        if (cs != null) for (String c : Shops.MADE_SECTIONS) if (tabs.contains(rowTab(c)) && checkCustomDef(cs.opt(c)) != null) out.add(CUSTOM_PREFIX + c);
         for (String t : SyncEngine.ALL_TABS) if (tabs.contains(t)) for (String id : builtInsOn(t)) out.add("shop:" + id);
         JSONArray list = s.optJSONArray("customShops");
         if (list != null) for (int i = 0; i < list.length(); i++) {

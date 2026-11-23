@@ -27,6 +27,15 @@ export const slots = <T,>(v: T): Record<CustomSlot, T> => Object.fromEntries(CUS
 
 export type Section = 'pantry' | 'keg' | 'pharmacy' | 'baby' | 'pets' | CustomSlot;
 export const SECTIONS: Section[] = ['pantry', 'keg', 'pharmacy', 'baby', 'pets', ...CUSTOM_SLOTS];
+/**
+ * 0.13.0: every tab but Pantry is a tab you made. Bottle shop and Chemist were two tabs Restock came
+ * with (a switch each, their own names and colours); now they're made, named, coloured, edited and
+ * deleted the same way as any other. Their ids stay 'keg' and 'pharmacy', and for household sync
+ * each is still shared on its own (shareTab), so nothing anyone has moves.
+ */
+export type MadeSection = 'keg' | 'pharmacy' | CustomSection;
+export const MADE_SECTIONS: MadeSection[] = ['keg', 'pharmacy', ...CUSTOM_SECTIONS];
+export const isMadeSection = (s: unknown): s is MadeSection => s === 'keg' || s === 'pharmacy' || isCustomSection(s);
 /** The tabs besides Pantry, in the order they're set up and shown in More. */
 export const EXTRA_SECTIONS: Exclude<Section, 'pantry'>[] = ['keg', 'pharmacy', 'baby', 'pets', ...CUSTOM_SLOTS];
 /** A section's name. Custom ones are filled in from settings (applyCustomSections). */
@@ -47,9 +56,10 @@ export const SECTION_SHOPS: Record<Section, string> = { pantry: 'supermarkets', 
  * A table by section whose custom sections' entries are worked out from each one's current name
  * ("Shops for Car stuff"): they follow a rename without the table being made again.
  */
-export function withCustom<T, K extends string = Section>(base: Omit<Record<K, T>, CustomSection> & Partial<Record<CustomSection, T>>, fn: (name: string, id: CustomSection) => T): Record<K, T> {
+export function withCustom<T, K extends string = Section>(base: Omit<Record<K, T>, MadeSection> & Partial<Record<MadeSection, T>>, fn: (name: string, id: MadeSection) => T): Record<K, T> {
   const out = { ...base } as Record<string, T>;
-  for (const id of CUSTOM_SECTIONS) Object.defineProperty(out, id, { get: () => fn(SECTION_NAMES[id], id), enumerable: true, configurable: true });
+  // 0.13.0: Bottle shop and Chemist follow their own names too (they can be renamed)
+  for (const id of MADE_SECTIONS) Object.defineProperty(out, id, { get: () => fn(SECTION_NAMES[id], id), enumerable: true, configurable: true });
   return out as Record<K, T>;
 }
 
@@ -94,6 +104,8 @@ const HIDDEN = /[\u0080-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/;
 export const PACK_ICON_IDS = [
   'bottle', 'paw', 'car', 'tools', 'papers', 'office', 'plant', 'roller', 'bulb', 'gift', 'shirt', 'book',
   'gamepad', 'dumbbell', 'tent', 'fishing', 'couch', 'phone', 'spray', 'scissors', 'ball', 'coffee', 'wine', 'star',
+  // 0.13.0: the keg and the green cross Bottle shop and Chemist have always had, now two of the pack
+  'keg', 'cross',
 ] as const;
 /**
  * A custom section's name, colour and icon as it may be kept, or undefined (0.10.7). Used for
@@ -111,19 +123,21 @@ export function checkCustomDef(v: unknown): CustomDef | undefined {
   return { name, colour: o.colour as CustomColour, icon };
 }
 
-/** What Baby and Pets look like until someone changes them. */
-export const CUSTOM_DEFAULTS: Partial<Record<CustomSection, CustomDef>> = {
+/** What Bottle shop, Chemist, Baby and Pets look like until someone changes them. */
+export const CUSTOM_DEFAULTS: Partial<Record<MadeSection, CustomDef>> = {
+  keg: { name: 'Bottle shop', colour: 'amber', icon: 'pack:keg' },
+  pharmacy: { name: 'Chemist', colour: 'green', icon: 'pack:cross' },
   baby: { name: 'Baby', colour: 'pink', icon: 'pack:bottle' },
   pets: { name: 'Pets', colour: 'blue', icon: 'pack:paw' },
 };
-/** A custom section's name, colour and icon. */
-export function customDef(s: { customSections?: Partial<Record<CustomSection, CustomDef>> } | undefined, id: CustomSection): CustomDef {
+/** A tab's name, colour and icon. */
+export function customDef(s: { customSections?: Partial<Record<MadeSection, CustomDef>> } | undefined, id: MadeSection): CustomDef {
   return s?.customSections?.[id] ?? CUSTOM_DEFAULTS[id] ?? { name: 'Custom', colour: 'slate', icon: 'pack:star' };
 }
-/** Puts each custom section's own name into the tables above (called whenever settings load or change). */
-export function applyCustomSections(s: { customSections?: Partial<Record<CustomSection, CustomDef>> } | undefined) {
+/** Puts each tab's own name into the tables above (called whenever settings load or change). */
+export function applyCustomSections(s: { customSections?: Partial<Record<MadeSection, CustomDef>> } | undefined) {
   const icons: Partial<Record<string, string>> = {};
-  for (const id of CUSTOM_SECTIONS) {
+  for (const id of MADE_SECTIONS) {
     const d = customDef(s, id);
     SECTION_NAMES[id] = d.name;
     SECTION_PLACE[id] = `your ${d.name} list`;

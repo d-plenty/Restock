@@ -3,11 +3,12 @@
 // save, the other shops) is behind the "i", in PriceInfoSheet.
 import { useState, type ReactNode } from 'react';
 import { addToList, takeOffList } from '../lib/listActions';
+import { Stepper } from './Stepper';
 import { cleanSearch } from '../lib/searchText';
 import { kiloPrice, lastUpdatedText, productLine } from '../lib/unitPrice';
 import { money } from '../lib/units';
 import type { Option, Recommendation } from '../lib/verdict';
-import { chainName, type Chain } from '../types';
+import { chainName, type Chain, type ListEntry } from '../types';
 import { ChainDot, Icon, SearchField, Sheet, Thumb } from './components';
 import { useNav } from './nav';
 import { MemberInfoTag, MultiInfoTag } from './tagInfo';
@@ -223,7 +224,7 @@ export function PriceInfoSheet({ rec, listed, onClose }: { rec: Recommendation; 
 }
 
 /** A row for one of your items (Home and Pantry): tap for its page, "i" for the numbers, the cart for the list. */
-export function RecRow({ rec, listed, lead, onOpen, openLabel, hideActions }: { rec: Recommendation; listed?: string; lead?: ReactNode; onOpen?: () => void; /** What the row's button is called (Pantry: just the item's name, as before 0.12.0). */ openLabel?: string; hideActions?: boolean }) {
+export function RecRow({ rec, listed, entry, lead, onOpen, openLabel, hideActions }: { rec: Recommendation; listed?: string; /** 0.13.0: its line on the shopping list: the row shows how many, with minus and plus. */ entry?: ListEntry; lead?: ReactNode; onOpen?: () => void; /** What the row's button is called (Pantry: just the item's name, as before 0.12.0). */ openLabel?: string; hideActions?: boolean }) {
   const nav = useNav();
   const [info, setInfo] = useState(false);
   const o = shownOption(rec);
@@ -243,7 +244,7 @@ export function RecRow({ rec, listed, lead, onOpen, openLabel, hideActions }: { 
         onOpen={onOpen ?? (() => nav.push({ name: 'item', groupId: rec.group.id }))}
         openLabel={openLabel ?? `${rec.group.name}: ${rec.headline}`}
         onInfo={hideActions ? undefined : () => setInfo(true)}
-        action={hideActions ? undefined : <ListButton rec={rec} listed={listed} />}
+        action={hideActions ? undefined : entry ? <Stepper key={entry.id} e={entry} name={rec.group.name} small /> : <ListButton rec={rec} listed={listed} />}
       />
       {info && <PriceInfoSheet rec={rec} listed={listed} onClose={() => setInfo(false)} />}
     </>

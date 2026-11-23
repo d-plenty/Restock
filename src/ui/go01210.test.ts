@@ -114,6 +114,7 @@ describe('0.12.10: the rest', () => {
     expect(read('./Unblock.tsx')).toMatch(/setSaid\(tryAgainWords\(name, result\)\);\s*setOpen\(true\);/);
   });
   it('a tab you made always has Edit', () => {
-    expect(read('./screens/Pantry.tsx')).toMatch(/recs\.length === 0 && isCustomSection\(section\) && \(\s*<button className="btn small edit-btn"/);
+    // 0.13.0: every tab does, Pantry too
+    expect(read('./screens/Pantry.tsx')).toMatch(/recs\.length === 0 && \(\s*<button className="btn small edit-btn"/);
   });
 });

@@ -43,6 +43,8 @@ export type Screen =
   | { name: 'feedback' }
   /** 0.12.9: Settings → What's new: what changed in each version. */
   | { name: 'whatsnew' }
+  /** 0.13.0: "See what Declan and Sarah use": the makers' own pantry, to add from. */
+  | { name: 'picks' }
   | { name: 'catalogues' }
   /** 0.12.3: My catalogue is merged into each shop's page; an old link to it opens Your shops. */
   | { name: 'mycatalogue' }

@@ -50,7 +50,7 @@
 //                                                  a phone that hasn't picked its own (StoreChoice
 //                                                  primary empty, or still the default it took)
 
-import { CUSTOM_SECTIONS, SECTIONS, SHOPS, checkCustomDef, isCustomSection, isLocalOnlyShop, shareTab, shopDef, type CustomShop, type Section } from '../shops';
+import { CUSTOM_SECTIONS, MADE_SECTIONS, SECTIONS, SHOPS, checkCustomDef, isCustomSection, isMadeSection, isLocalOnlyShop, shareTab, shopDef, type CustomShop, type Section } from '../shops';
 import { siteOf } from './site';
 
 export const ALL_TABS: Section[] = ['pantry', 'keg', 'pharmacy'];
@@ -179,7 +179,8 @@ export function checkValue(k: string, v: unknown): unknown {
   }
   // 0.10.7: custom sections (Baby, Pets, c1–c6): switched on, and their name, colour and icon
   if (k.startsWith('tab:') && isCustomSection(k.slice(4))) return typeof v === 'boolean' ? v : undefined;
-  if (k.startsWith(CUSTOM_PREFIX)) return isCustomSection(k.slice(CUSTOM_PREFIX.length)) ? checkCustomDef(v) : undefined;
+  // 0.13.0: and Bottle shop's and Chemist's (custom:keg, custom:pharmacy), each shared with its own tab
+  if (k.startsWith(CUSTOM_PREFIX)) return isMadeSection(k.slice(CUSTOM_PREFIX.length)) ? checkCustomDef(v) : undefined;
   if (k.startsWith(BRANCH_PREFIX)) return checkBranch(k, v);
   if (!k.startsWith('shop:') || !isObj(v) || typeof v.on !== 'boolean') return undefined;
   const id = k.slice(5);
@@ -280,7 +281,7 @@ export function settingChangeOk(pk: string, row: unknown, deleted: boolean, room
 export function settingTab(k: string, v: string | null | undefined): string | null {
   // 0.10.3: Baby and Pets rows are shared with Groceries (rowTab). 0.10.7: every custom section's too.
   if (k.startsWith('tab:')) return rowTab(k.slice(4));
-  if (k.startsWith(CUSTOM_PREFIX)) return 'pantry';
+  if (k.startsWith(CUSTOM_PREFIX)) return rowTab(k.slice(CUSTOM_PREFIX.length));
   // 0.9.4: a default branch is about its shop's tab (a shop someone added: left alone).
   if (k.startsWith(BRANCH_PREFIX)) {
     const b = k.slice(BRANCH_PREFIX.length);
@@ -444,7 +445,7 @@ export function keysFor(s: Obj, tabs: ReadonlySet<string>): string[] {
   for (const t of ['keg', 'pharmacy', ...CUSTOM_SECTIONS]) if (tabs.has(rowTab(t))) out.push('tab:' + t);
   // 0.10.7: the custom sections that have a name of their own
   const cs = isObj(s.customSections) ? s.customSections : {};
-  if (tabs.has('pantry')) for (const c of CUSTOM_SECTIONS) if (checkCustomDef(cs[c])) out.push(CUSTOM_PREFIX + c);
+  for (const c of MADE_SECTIONS) if (tabs.has(rowTab(c)) && checkCustomDef(cs[c])) out.push(CUSTOM_PREFIX + c);
   for (const t of ALL_TABS) if (tabs.has(t)) for (const id of builtInsOn(t)) out.push('shop:' + id);
   for (const c of Array.isArray(s.customShops) ? (s.customShops as unknown[]) : [])
     if (isObj(c) && typeof c.id === 'string' && typeof c.section === 'string' && tabs.has(rowTab(c.section)) && checkShop(c, c.id)) out.push('shop:' + c.id);
