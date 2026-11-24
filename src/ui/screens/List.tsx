@@ -4,6 +4,7 @@ import { CheckStockButton } from '../CheckStock';
 import type { StockItem } from '../../lib/stockWhere';
 import { aisleLabel, aisleOf, byAisle as sortByAisle, getAisles, type AisleAt } from '../../lib/aisles';
 import { noteTicksSoon } from '../../lib/spending';
+import { countTicks } from '../../lib/inventory';
 import { branchAdvice, branchName, stockRows } from '../../lib/stock';
 import { useFullRefresh } from '../refresh';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
@@ -153,6 +154,7 @@ export async function shareText(text: string): Promise<'shared' | 'copied'> {
 export const tickEntry = (e: { id: string; text: string }, checked: boolean, name = e.text) =>
   act(`${checked ? 'Ticked' : 'Unticked'} ${name}`, async () => {
     await updateListEntry(e.id, { checked });
+    await countTicks([e.id], checked).catch(() => undefined); // 0.13.1: what's at home follows (inventory.ts)
     noteTicksSoon(); // 0.9.14: Your data's spending (spending.ts)
   });
 /** 0.9.5 (undo): lines off the list, as one undoable action. */
@@ -1033,7 +1035,12 @@ export function ListScreen() {
             onClick={async () => {
               // 0.9.0: one write for all of them, so the list reloads once, not once per item.
               const ids = [...picked];
-              await act(`${ids.length} marked as got`, () => runOps([checkEntriesOp(ids)]));
+              await act(`${ids.length} marked as got`, async () => {
+                // 0.13.1: only the ones that weren't ticked already count towards what's at home
+                const fresh = entries.filter((e) => picked.has(e.id) && !e.checked).map((e) => e.id);
+                await runOps([checkEntriesOp(ids)]);
+                await countTicks(fresh, true).catch(() => undefined);
+              });
               stopSelecting();
             }}
           >
@@ -1887,7 +1894,10 @@ function ShoppingMode({
         ? `${name} ticked. Restock picked ${want.product.name}, ${money(want.price)}, at ${chainName(want.product.chain)}.`
         : `${name} ticked${want?.price !== undefined ? `, ${money(want.price)}` : ''}.`;
     noteTick(match, true);
-    await act(said, () => updateListEntry(match.id, { checked: true }));
+    await act(said, async () => {
+      await updateListEntry(match.id, { checked: true });
+      await countTicks([match.id], true).catch(() => undefined); // 0.13.1
+    });
   };
 
   const shelfLook = (e: ListEntry): PreviewProduct | undefined => {

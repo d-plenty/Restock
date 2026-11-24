@@ -82,6 +82,7 @@ const KNOWN_NAMES: Record<string, string> = {
   shops: 'shops',
   settings: 'settings',
   aliases: 'words for items',
+  inventory: 'inventory',
   spending: 'spending',
   ticked: 'what was ticked off',
 };

@@ -22,6 +22,7 @@ import { base64ToText, textToBase64 } from './base64';
 import { shareTextFile } from './shareFile';
 import { LIST_ALIASES, LOCAL_ONLY_KV } from './haKeys';
 import { aliasesForBackup } from './listPicks';
+import { INV_BACKUP_KV, inventoryForBackup, restoreInventory } from './inventory';
 import { isCardPhotoPath, readCardPhoto, writeCardPhoto } from './cardPhotos'; // 0.9.6 (cards)
 import { costcoOf, withCostcoKept, withoutCostco } from './costcoLocal';
 
@@ -115,6 +116,9 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
   // them where it always did (a restore moves them back into rows).
   const aliases = await aliasesForBackup().catch(() => undefined);
   if (aliases) all.kv = [...all.kv.filter((k) => k.key !== LIST_ALIASES), { key: LIST_ALIASES, value: aliases }];
+  // 0.13.1: the inventory is the household's rows too (inventory.ts); a backup carries it the same way.
+  const inventory = parts.pantry ? await inventoryForBackup().catch(() => undefined) : undefined;
+  all.kv = all.kv.filter((k) => k.key !== INV_BACKUP_KV);
   const picked: ExportParts = { ...parts, sections: parts.pantry ? (parts.sections ?? SECTIONS) : [] };
   const file: BackupFile = {
     app: 'restock',
@@ -124,6 +128,8 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
     tables: withoutSecrets(pickSnapshot(all, picked, { prices: parts.prices })),
   };
   if (parts.giftCards === false) delete file.tables.giftCards;
+  // (after the parts are picked: it goes with the items, whether or not the settings are in the file)
+  if (inventory) file.tables.kv = [...(file.tables.kv ?? []), { key: INV_BACKUP_KV, value: inventory }];
   file.tables.list = toBackupList(file.tables.list);
   // With "Share prices" on (the default) and price history in the file. 0.9.0: made from what's in
   // this file only (the tabs picked), not from everything on the phone.
@@ -425,6 +431,9 @@ export async function restoreBackup(
   // 0.9.6 (review L5): this phone's own Costco data stays (backup files never have it).
   const kept = withCostcoKept(summary.snapshot, costcoOf(await snapshot()));
   await restoreParts(kept, parts, opts.renames, { household: opts.household });
+  // 0.13.1: the amounts of the items that came back, and inventory on for their tabs (inventory.ts).
+  if (parts.pantry)
+    await restoreInventory({ raw: summary.snapshot.kv.find((k) => k.key === INV_BACKUP_KV)?.value ?? {}, sections: parts.sections, settings: parts.settings }).catch(() => 0);
   if (parts.receipts) await restorePhotos(summary.photos);
   if (parts.cards) await restoreCardPhotos(summary.cardPhotos, summary.snapshot);
   if (opts.stayInSetup) await updateSettings({ privacyAccepted: opts.stayInSetup });
@@ -481,6 +490,8 @@ export async function importBackup(text: string, opts: { stayInSetup?: string } 
     // 0.9.6 (review L6): none in the file (0.9.5 and older): this phone's gift cards stay.
     giftCards: Array.isArray(t.giftCards) ? t.giftCards : undefined,
   }, here));
+  // 0.13.1: the inventory the backup carried goes back into the household's rows (inventory.ts).
+  await restoreInventory().catch(() => 0);
   await restorePhotos(file.photos);
   await restoreCardPhotos(file.cardPhotos, t);
   // A restored phone is set up, even if the backup was made part-way through setup.

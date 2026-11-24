@@ -1,5 +1,5 @@
 import type { Chain, Group, PriceReading } from '../types';
-import { allCategories, insertEntryOp, insertGroupOp, insertProductOp, insertReadingOp, nowIso, runOps, updateSettings } from './db';
+import { allCategories, insertEntryOp, insertGroupOp, insertProductOp, insertReadingOp, nowIso, putKV, runOps, updateSettings } from './db';
 import type { SqlOp } from './sql/driver';
 import { DEMO_GROUPS, DEMO_LIST } from './demoData';
 
@@ -114,5 +114,7 @@ export async function removeDemo(): Promise<void> {
     { sql: "DELETE FROM list_entries WHERE id LIKE 'demo-%' OR item_id LIKE 'demo-%'" },
     { sql: "DELETE FROM items WHERE id LIKE 'demo-%'" },
   ]);
+  // 0.13.1: and any amounts counted for them (inventory.ts)
+  await putKV('inv.demo', {}).catch(() => undefined);
   await updateSettings({ demoLoaded: false });
 }

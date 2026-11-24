@@ -53,6 +53,7 @@ export function ItemRow({
   onInfo,
   action,
   lead,
+  extra,
   className,
 }: {
   photo?: string;
@@ -73,6 +74,8 @@ export function ItemRow({
   action?: ReactNode;
   /** Before the photo (a select circle while editing). */
   lead?: ReactNode;
+  /** 0.13.1: under the price (a tab with inventory on: the "Have: 14" box). */
+  extra?: ReactNode;
   className?: string;
 }) {
   return (
@@ -92,6 +95,7 @@ export function ItemRow({
           {price !== undefined && <span className="num">{priceText ?? money(price)}</span>}
           {note && <span className={`irow-note ${note.tone}`}>{note.text}</span>}
         </span>
+        {extra}
       </span>
       {onInfo && (
         <button className="irow-i" aria-label={`About this price: ${name}`} onClick={onInfo}>
@@ -224,7 +228,7 @@ export function PriceInfoSheet({ rec, listed, onClose }: { rec: Recommendation; 
 }
 
 /** A row for one of your items (Home and Pantry): tap for its page, "i" for the numbers, the cart for the list. */
-export function RecRow({ rec, listed, entry, lead, onOpen, openLabel, hideActions }: { rec: Recommendation; listed?: string; /** 0.13.0: its line on the shopping list: the row shows how many, with minus and plus. */ entry?: ListEntry; lead?: ReactNode; onOpen?: () => void; /** What the row's button is called (Pantry: just the item's name, as before 0.12.0). */ openLabel?: string; hideActions?: boolean }) {
+export function RecRow({ rec, listed, entry, lead, onOpen, openLabel, hideActions, extra }: { /** 0.13.1: under the price (the "Have" box of a tab with inventory on). */ extra?: ReactNode; rec: Recommendation; listed?: string; /** 0.13.0: its line on the shopping list: the row shows how many, with minus and plus. */ entry?: ListEntry; lead?: ReactNode; onOpen?: () => void; /** What the row's button is called (Pantry: just the item's name, as before 0.12.0). */ openLabel?: string; hideActions?: boolean }) {
   const nav = useNav();
   const [info, setInfo] = useState(false);
   const o = shownOption(rec);
@@ -241,6 +245,7 @@ export function RecRow({ rec, listed, entry, lead, onOpen, openLabel, hideAction
         priceText={o && !o.multi ? kiloPrice(o.product, o.price)?.main : undefined}
         note={recNote(rec)}
         lead={lead}
+        extra={extra}
         onOpen={onOpen ?? (() => nav.push({ name: 'item', groupId: rec.group.id }))}
         openLabel={openLabel ?? `${rec.group.name}: ${rec.headline}`}
         onInfo={hideActions ? undefined : () => setInfo(true)}

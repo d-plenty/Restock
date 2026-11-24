@@ -29,13 +29,15 @@ import { DEAL_RANK, underTarget } from '../../ui/screens/Pantry';
 import { ActionInfoTag } from '../../ui/tagInfo';
 import { PhoneOnlyNote } from './PhoneOnly';
 import { NoneFound } from '../../ui/simple';
+import { HaveChip, HaveSheet, InventoryBody, useInventory } from '../../ui/Inventory';
+import { haveState, INVENTORY_SECTIONS } from '../../lib/inventory';
 import { cleanSearch } from '../../lib/searchText';
 import { CategoriesSheet } from './DeskSettings';
 import { DeskHead, firstPhoto, ItemPhoto, takeOpenItem } from './deskShared';
 import { serverHistory } from '../live';
 import type { PriceReading } from '../../types';
 
-type Filter = 'all' | 'sale' | string;
+type Filter = 'all' | 'sale' | 'low' | string;
 type Sort = 'az' | 'sale' | 'recent';
 const SORTS: { id: Sort; label: string }[] = [
   { id: 'az', label: 'A–Z' },
@@ -89,17 +91,24 @@ export function DeskPantry({ section }: { section: Section }) {
   const [open, setOpen] = useState<string | undefined>(takeOpenItem);
   // 0.10.9: an item's photo, with the blue ⓘ, opens the product in full, as on the phone
   const [looking, setLooking] = useState<PreviewProduct>();
+  // 0.13.1: inventory, as on the phone: the Inventory button, each row's "Have" box, the same page and sheet
+  const inv = useInventory();
+  const invOn = inv.tabs.has(section);
+  const [invPage, setInvPage] = useState(false);
+  const [haveFor, setHaveFor] = useState<Recommendation>();
   const recs = useMemo(() => allRecs?.filter((r) => (r.group.section ?? 'pantry') === section), [allRecs, section]);
   if (!recs || !allCats || !entries) return <div className="dk-page" aria-busy="true" />;
   const categories = allCats.filter((c) => c.section === section);
   const catName = new Map(categories.map((c) => [c.id, c.name]));
   const onList = new Map(entries.filter((e) => !e.checked && e.groupId).map((e) => [e.groupId!, e.id]));
 
+  const isLow = (r: Recommendation) => invOn && haveState(inv.have.get(r.group.id)) !== 'ok';
   const shown = recs
     .filter((r) => {
       // 0.12.6: "Lemon." (voice typing) finds lemon.
       if (cleanSearch(q) && !`${r.group.name} ${r.options.map((o) => o.product.name).join(' ')}`.toLowerCase().includes(cleanSearch(q).toLowerCase())) return false;
       if (filter === 'sale') return onSale(r);
+      if (filter === 'low') return isLow(r);
       if (filter !== 'all') return r.group.categoryId === filter;
       return true;
     })
@@ -118,6 +127,25 @@ export function DeskPantry({ section }: { section: Section }) {
     });
   };
 
+  if (invPage)
+    return (
+      <div className="dk-page dk-inv">
+        <DeskHead title={`${section === 'pantry' ? 'Pantry' : SECTION_NAMES[section]} inventory`} sub="How much you have at home">
+          <button className="btn small" onClick={() => nav.push({ name: 'inventorySettings' })}>
+            <Icon name="settings" size={16} /> Inventory settings
+          </button>
+        </DeskHead>
+        <InventoryBody
+          section={section}
+          back={
+            <button className="btn small dk-inv-back" onClick={() => setInvPage(false)}>
+              <Icon name="back" size={16} /> Back to {section === 'pantry' ? 'Pantry' : SECTION_NAMES[section]}
+            </button>
+          }
+        />
+      </div>
+    );
+
   return (
     <div className="dk-page">
       <div className={`dk-with-panel${open ? ' has-panel' : ''}`}>
@@ -125,6 +153,11 @@ export function DeskPantry({ section }: { section: Section }) {
           <DeskHead title={SECTION_NAMES[section]} sub={`${recs.length} item${recs.length === 1 ? '' : 's'}`}>
             {/* 0.11.3: a custom tab says Beta at the top, and every tab opens its categories from here */}
             {isMadeSection(section) && <BetaTag />}
+            {INVENTORY_SECTIONS.includes(section) && (
+              <button className="btn small" aria-label={`Inventory: how much you have in ${section === 'pantry' ? 'your pantry' : SECTION_NAMES[section]}`} onClick={() => setInvPage(true)}>
+                <Icon name="pencil" size={16} /> Inventory
+              </button>
+            )}
             <button className="btn small" onClick={() => setCatsOpen(true)}>
               <Icon name="pencil" size={16} /> Categories
             </button>
@@ -149,6 +182,11 @@ export function DeskPantry({ section }: { section: Section }) {
                 <button className="chip" aria-pressed={filter === 'sale'} onClick={() => setFilter('sale')}>
                   On special {recs.filter(onSale).length}
                 </button>
+                {(recs.some(isLow) || filter === 'low') && (
+                  <button className="chip" aria-pressed={filter === 'low'} onClick={() => setFilter('low')}>
+                    Low or out {recs.filter(isLow).length}
+                  </button>
+                )}
               </div>
               <label className="dk-sort">
                 <span className="small">Sort</span>
@@ -235,6 +273,7 @@ export function DeskPantry({ section }: { section: Section }) {
                               .filter(Boolean)
                               .join(' · ')}
                           </span>
+                          {invOn && <HaveChip name={r.group.name} have={inv.have.get(r.group.id)} onEdit={() => setHaveFor(r)} />}
                           </span>
                         </td>
                         <td className="num dk-nowrap">
@@ -273,6 +312,7 @@ export function DeskPantry({ section }: { section: Section }) {
           <p className="small">Adding items and checking prices happen on your phones. Everything else about an item can be changed here.</p>
         </section>
         {looking && <ProductPreview product={looking} onClose={() => setLooking(undefined)} />}
+        {haveFor && <HaveSheet group={haveFor.group} have={inv.have.get(haveFor.group.id)} inv={inv} usualProductId={haveFor.group.usualProductId} onClose={() => setHaveFor(undefined)} />}
         {catsOpen && <CategoriesSheet sections={[{ section, title: SECTION_NAMES[section] }]} onClose={() => setCatsOpen(false)} />}
         {open && <ItemPanel key={open} groupId={open} listed={onList.get(open)} onClose={() => setOpen(undefined)} nav={nav} />}
       </div>

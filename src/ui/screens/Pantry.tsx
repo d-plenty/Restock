@@ -11,13 +11,15 @@ import { BetaTag, Hold, Icon, previewFromOption, ProductPreview, SelectBar, Shee
 import { BigAdd, NoneFound, RecRow } from '../simple';
 import { picksOffered } from '../../lib/makerPicks';
 import { PicksOffer } from './Picks';
+import { HaveChip, HaveSheet, InventoryButton, useInventory } from '../Inventory';
+import { haveState, INVENTORY_SECTIONS } from '../../lib/inventory';
 import { cleanSearch } from '../../lib/searchText';
 import { serverMode } from '../../server-mode/flag';
 import { isMoreTab, useNav } from '../nav';
 import { isMadeSection, SECTION_NAMES, type Section, slots } from '../../shops';
 import { confirmAction } from '../../lib/confirm';
 
-type Filter = 'all' | 'sale' | string; // string = category id
+type Filter = 'all' | 'sale' | 'low' | string; // string = category id; 0.13.1: 'low' = running low or out (inventory)
 type Sort = 'sale' | 'az' | 'recent';
 const SORTS: { id: Sort; label: string }[] = [
   { id: 'az', label: 'A–Z' },
@@ -96,6 +98,11 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   const [sort, setSortState] = useState<Sort>(loadSort);
   const [filterSheet, setFilterSheet] = useState(false);
   const [preview, setPreview] = useState<Recommendation>();
+  // 0.13.1: inventory, when it's on for this tab: each row's "Have" box, and "Low or out" among the filters
+  const inv = useInventory();
+  const invOn = inv.tabs.has(section);
+  const [haveFor, setHaveFor] = useState<Recommendation>();
+  const isLow = (r: Recommendation) => invOn && haveState(inv.have.get(r.group.id)) !== 'ok';
   const adding = useRef(false);
   // read each time the Pantry is drawn (it stays behind the picks page, and must notice they were added)
   const [picksNo, setPicksNo] = useState(false);
@@ -121,6 +128,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   const shown = recs.filter((r) => {
     if (!matches(r)) return false;
     if (filter === 'sale') return onSale(r);
+    if (filter === 'low') return isLow(r);
     if (filter !== 'all') return r.group.categoryId === filter;
     return true;
   });
@@ -244,6 +252,10 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
             empty tab you made; Pantry, Bottle shop and Chemist had none until something was in them).
             With nothing in the tab, Edit goes straight to the tab's own page: its shops, categories
             and, for a tab you made, its name, colour and icon. */}
+        {/* 0.13.1: Inventory, beside Edit, whether it's on for this tab or not (off: its page says what it is, with Turn on) */}
+        {/* (the two stay side by side: on a tab with a long name they move under it together) */}
+        <span className="topbar-actions">
+        {!editing && INVENTORY_SECTIONS.includes(section) && <InventoryButton section={section} onOpen={() => nav.push({ name: 'inventory', section })} />}
         {recs.length === 0 && (
           <button className="btn small edit-btn" aria-label={`Edit this tab: ${TAB_EDIT_WORDS(section)}`} onClick={() => nav.push({ name: 'stores', section })}>
             <Icon name="pencil" size={16} /> Edit
@@ -261,6 +273,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
             </button>
           )
         )}
+        </span>
       </div>
       {/* 0.11.3: Edit also opens this tab's categories (add, rename, reorder, delete) */}
       {editing && (
@@ -297,7 +310,12 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           <button className="chip" aria-pressed={filter === 'sale'} onClick={() => setFilter('sale')}>
             On special {recs.filter(onSale).length}
           </button>
-          <button className="chip" aria-pressed={filter !== 'all' && filter !== 'sale'} onClick={() => setFilterSheet(true)}>
+          {(recs.some(isLow) || filter === 'low') && (
+            <button className="chip" aria-pressed={filter === 'low'} onClick={() => setFilter('low')}>
+              Low or out {recs.filter(isLow).length}
+            </button>
+          )}
+          <button className="chip" aria-pressed={filter !== 'all' && filter !== 'sale' && filter !== 'low'} onClick={() => setFilterSheet(true)}>
             {categories.find((c) => c.id === filter)?.name ?? 'Category'}{' '}
             <span className="turn-down"><Icon name="chevron" size={12} /></span>
           </button>
@@ -386,6 +404,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
                       listed={onList.get(r.group.id)}
                       entry={entries.find((e) => !e.checked && e.groupId === r.group.id)}
                       hideActions={editing}
+                      extra={invOn && !editing ? <HaveChip name={r.group.name} have={inv.have.get(r.group.id)} onEdit={() => setHaveFor(r)} /> : undefined}
                       openLabel={editing ? `Select ${r.group.name}` : r.group.name}
                       onOpen={editing ? () => pick(r.group.id) : undefined}
                       lead={
@@ -453,6 +472,8 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           }
         />
       )}
+
+      {haveFor && <HaveSheet group={haveFor.group} have={inv.have.get(haveFor.group.id)} inv={inv} usualProductId={haveFor.group.usualProductId} onClose={() => setHaveFor(undefined)} />}
 
       {filterSheet && (
         <Sheet title="Sort and filter" onClose={() => setFilterSheet(false)}>

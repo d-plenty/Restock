@@ -373,7 +373,7 @@ function FlagBackground() {
   );
 }
 
-function Welcome({ onSetUp, onRestore, onJoin, onA11y }: { onSetUp: () => void; onRestore: () => void; onJoin: () => void; onA11y: () => void }) {
+function Welcome({ onSetUp, onRestoreFile, onJoin, onA11y }: { onSetUp: () => void; /** A backup file was picked. */ onRestoreFile: (file: File) => void; onJoin: () => void; onA11y: () => void }) {
   // 0.9.10: navy behind the clock and the gesture bar, with light icons, while the welcome shows.
   useEffect(() => {
     document.documentElement.classList.add('on-welcome');
@@ -407,9 +407,22 @@ function Welcome({ onSetUp, onRestore, onJoin, onA11y }: { onSetUp: () => void; 
           <button className="welcome-go" onClick={onSetUp}>
             Set up
           </button>
-          <button className="welcome-restore" onClick={onRestore}>
+          {/* 0.13.1: the file box itself is what's tapped (it lies over the words, unseen). Before, a button
+              pressed a hidden file box from code, which on one phone opened nothing and left the screen stuck:
+              a tap straight on a file box is the way every web view opens its picker. */}
+          <label className="welcome-restore welcome-file">
             Restore from a backup
-          </button>
+            <input
+              type="file"
+              accept="application/json,.json"
+              aria-label="Restore from a backup"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) onRestoreFile(file);
+              }}
+            />
+          </label>
           <button className="welcome-restore" onClick={onJoin}>
             Join your household
           </button>
@@ -885,7 +898,6 @@ export function Onboarding() {
   const [picking, setPicking] = useState<BackupSummary>();
   const [asking, setAsking] = useState(false);
   const nav = useNav();
-  const fileRef = useRef<HTMLInputElement>(null);
   const finish = async () => {
     await updateSettings({ onboarded: true });
     // Shared prices on (0.10.0: on to start with): the first download now (it waits for Wi-Fi if asked).
@@ -926,20 +938,6 @@ export function Onboarding() {
       nav.toast(e instanceof Error ? e.message : 'Could not read that file');
     }
   };
-
-  const fileInput = (
-    <input
-      ref={fileRef}
-      type="file"
-      accept="application/json,.json"
-      hidden
-      onChange={(e) => {
-        const file = e.target.files?.[0];
-        e.target.value = '';
-        if (file) void restore(file);
-      }}
-    />
-  );
 
   const sheets = (
     <>
@@ -982,14 +980,13 @@ export function Onboarding() {
             setJoiningHousehold(false);
             setStage('privacy');
           }}
-          onRestore={() => fileRef.current?.click()}
+          onRestoreFile={(file) => void restore(file)}
           onJoin={() => {
             setJoiningHousehold(true);
             setStage('privacy');
           }}
           onA11y={() => setStage('a11y')}
         />
-        {fileInput}
         {sheets}
       </>
     );
@@ -1152,7 +1149,6 @@ export function Onboarding() {
           </button>
         </>
       )}
-      {fileInput}
       {sheets}
     </div>
   );

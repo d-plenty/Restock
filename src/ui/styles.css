@@ -7399,3 +7399,304 @@ a.btn {
     column-gap: 8px;
   }
 }
+
+/* ---------- 0.13.1: inventory ---------- */
+/* The little "Have: 14" box under a row's price: a button of its own on top of the row's own tap. */
+.inv-have {
+  position: relative;
+  pointer-events: auto;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  max-width: 100%;
+  margin-top: 4px;
+  padding: 4px 12px;
+  /* (not a full pill: two lines of words beside the list buttons still look like a box) */
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+/* A bigger place to tap than it looks (44 tall). */
+.inv-have::after {
+  content: '';
+  position: absolute;
+  inset: -4px -6px;
+}
+.inv-have.unset {
+  border-style: dashed;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.inv-have.low {
+  border-color: var(--amber-ink);
+  background: var(--amber-bg);
+  color: var(--amber-ink);
+}
+.inv-have.out {
+  border-color: var(--red-ink);
+  background: var(--red-bg);
+  color: var(--red-ink);
+}
+.chip.inv-chip.low {
+  border-color: var(--amber-ink);
+  color: var(--amber-ink);
+  background: var(--amber-bg);
+}
+.chip.inv-chip.out {
+  border-color: var(--red-ink);
+  color: var(--red-ink);
+  background: var(--red-bg);
+}
+.chip.inv-chip[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 2px currentColor;
+}
+/* The Inventory button sits beside Edit in the navy top; the two stay together. */
+.topbar-actions {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* The sheet: how it's counted, the amount, when it's low. */
+.inv-modes,
+.inv-units,
+.inv-frac {
+  display: grid;
+  gap: 8px;
+}
+.inv-modes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.inv-units {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.inv-frac {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.inv-modes button,
+.inv-units button,
+.inv-frac button {
+  min-height: 44px;
+  min-width: 0;
+  padding: 6px 4px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.inv-modes button[aria-pressed='true'],
+.inv-units button[aria-pressed='true'],
+.inv-frac button[aria-pressed='true'] {
+  background: var(--green-solid);
+  border-color: var(--green-solid);
+  color: var(--white);
+}
+.inv-big {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.inv-big button,
+.inv-step {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.inv-big button:disabled,
+.inv-step:disabled {
+  opacity: 0.4;
+}
+.inv-num {
+  width: 5.5ch;
+  min-width: 96px;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-3xl);
+  font-weight: 800;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 0;
+  border-bottom: 2px solid var(--line-2);
+  border-radius: 0;
+}
+span.inv-num {
+  border-bottom: none;
+}
+.inv-low-measure {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.inv-low-measure .input {
+  width: 6.5em;
+  flex: none;
+}
+/* The Inventory page. */
+.inv-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 14px;
+  min-height: 60px;
+}
+.card.flush > .inv-row ~ .inv-row {
+  border-top: 1px solid var(--line-soft);
+}
+.inv-row-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.inv-row-have {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 62%;
+}
+.inv-row .inv-have {
+  white-space: nowrap;
+  margin-top: 0;
+  min-height: 36px;
+  padding: 4px 14px;
+  font-size: var(--fs-body);
+  align-self: center;
+}
+.inv-row .inv-step {
+  width: 44px;
+  height: 44px;
+  font-size: var(--fs-xl);
+}
+.inv-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.inv-intro p,
+.inv-intro ul {
+  margin: 0;
+}
+.inv-intro > p:not(.small) {
+  font-size: var(--fs-body);
+}
+.inv-intro ul {
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.inv-turn-on {
+  min-height: 56px;
+  font-size: var(--fs-lg);
+}
+.inv-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+/* Settings → Inventory's Save is the Save bar every settings page has (.save-bar), so the Undo message sits above it. */
+@media (max-width: 380px) {
+  .inv-row .inv-step {
+    width: 40px;
+    height: 40px;
+  }
+  .inv-row-have {
+    gap: 6px;
+  }
+}
+/* The web page: the Have box under an item's words, and the Inventory view in the page's width. */
+.dk-item-words .inv-have {
+  margin-top: 6px;
+}
+.dk-page.dk-inv {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 760px;
+}
+.dk-inv .dk-inv-back {
+  align-self: flex-start;
+}
+.dk-phone-page .save-bar.inv-save,
+.dk-inv .save-bar.inv-save {
+  position: static;
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+}
+/* 0.13.1: the welcome's Restore: the file box lies over its words, so the tap lands on it. */
+.welcome-file {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.welcome-file input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+}
+.welcome-file:focus-within {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+/* The smallest phones: Inventory and Edit still sit on the title's line, and "Empty" stays one word. */
+.inv-frac button {
+  overflow-wrap: normal;
+  padding: 6px 2px;
+}
+@media (max-width: 350px) {
+  .topbar .inv-btn,
+  .topbar .inv-btn + .btn.small.edit-btn {
+    padding: 0 10px;
+  }
+  .topbar .inv-btn svg,
+  .topbar .inv-btn + .btn.small.edit-btn svg {
+    display: none;
+  }
+  .inv-frac {
+    gap: 5px;
+  }
+  .inv-frac button {
+    font-size: var(--fs-md);
+  }
+}

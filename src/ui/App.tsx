@@ -36,6 +36,7 @@ import { ListScreen } from './screens/List';
 import { Onboarding } from './screens/Onboarding';
 import { WhatsNewPrompt, WhatsNewScreen } from './screens/WhatsNew';
 import { PicksScreen } from './screens/Picks';
+import { InventoryScreen, InventorySettingsScreen } from './Inventory';
 import { noteSeenVersion, seenVersion, shouldOfferWhatsNew } from '../lib/whatsNew';
 import { SetupScreen } from './screens/Setup';
 import { addShared, nameFromLink, splitShared } from '../lib/shared';
@@ -626,6 +627,8 @@ function RestockApp() {
         {top.name === 'feedback' && <FeedbackScreen />}
         {top.name === 'whatsnew' && <WhatsNewScreen />}
         {top.name === 'picks' && <PicksScreen />}
+        {top.name === 'inventory' && <InventoryScreen section={top.section} />}
+        {top.name === 'inventorySettings' && <InventorySettingsScreen />}
         {top.name === 'stores' && <StoresScreen section={top.section} />}
         {top.name === 'cards' && <CardsScreen />}
         {top.name === 'sync' && <SyncScreen invite={top.invite} />}

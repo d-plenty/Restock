@@ -80,6 +80,8 @@ import { CheapestInfoTag, MemberInfoTag, MultiInfoTag, StockInfoTag, SwapInfoTag
 import { useNav } from '../nav';
 import { costcoIsOn, isLocalOnlyShop, searchChainsIn, type StoreChain } from '../../shops';
 import { checkAtCostco, costcoCheckable } from '../../lib/costcoCheck'; // 0.9.6 (review L1)
+import { haveLabel } from '../../lib/inventory';
+import { HaveSheet, useInventory } from '../Inventory';
 import { notAtChains } from '../../lib/picks';
 
 const BANNER: Record<Recommendation['action'], string> = {
@@ -267,6 +269,9 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   }, [groupId]);
   const [selected, setSelected] = useState<string>();
   const [sheet, setSheet] = useState<'edit' | 'alerts' | 'price' | 'menu' | { option: Option; wantUnit?: 'g' | 'ml' | 'ea' }>();
+  // 0.13.1: inventory (Inventory.tsx)
+  const inv = useInventory();
+  const [haveOpen, setHaveOpen] = useState(false);
   // 0.12.8: the Products I buy fold, so Edit can open it (a hook: kept above the early returns)
   const productsFold = useRef<HTMLDetailsElement>(null);
   const [learnOpen, setLearnOpen] = useState(false);
@@ -540,6 +545,20 @@ export function ItemScreen({ groupId }: { groupId: string }) {
       <button className={`btn block ${onList ? '' : 'primary'}`} onClick={addToList}>
         <Icon name={onList ? 'cartCheck' : 'cartPlus'} size={18} /> {onList ? 'On your shopping list' : 'Add to shopping list'}
       </button>
+
+      {/* 0.13.1: how much is at home, when this item's tab keeps an inventory; a tap changes it */}
+      {inv.tabs.has(group.section ?? 'pantry') && (
+        <button className="card flush fold fold-go" onClick={() => setHaveOpen(true)} aria-label={`How much ${group.name} you have. Change it`}>
+          <span className="fold-head">
+            <span className="grow">
+              <span className="title">How much I have</span>
+              <span className="small">{inv.have.get(group.id) ? haveLabel(inv.have.get(group.id)).replace(/^Have: /, '') : 'Not counted yet'}</span>
+            </span>
+            <Icon name="chevron" size={18} />
+          </span>
+        </button>
+      )}
+      {haveOpen && <HaveSheet group={group} have={inv.have.get(group.id)} inv={inv} usualProductId={group.usualProductId} onClose={() => setHaveOpen(false)} />}
 
       {/* 0.12.5: the answer first: the best of your picks at each shop, one line each. Everything else on this page is folded under it. */}
       {(shopBest.length > 0 || missingChains.length > 0) && (

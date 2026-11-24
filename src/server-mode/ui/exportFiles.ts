@@ -288,6 +288,7 @@ const TABLE_NAMES: [string, string][] = [
   ['receipts', 'Receipts'],
   ['shops', 'Shops'],
   ['aliases', 'Words for items'],
+  ['inventory', 'Inventory'],
   ['settings', 'Settings'],
 ];
 

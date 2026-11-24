@@ -1167,7 +1167,7 @@ final class SyncHousehold implements SyncEngine.Household {
             // items and lines, and go with them if it makes or joins another household).
             if (SharedSettings.hasTable(e)) {
                 e.db.exec("DELETE FROM " + SharedSettings.TABLE + " WHERE NOT " + SharedSettings.KEPT_ON_LEAVING);
-                e.db.exec("DELETE FROM sync_log WHERE tbl = ? AND NOT (pk LIKE 'alias:%' OR pk LIKE 'keep:%')", SharedSettings.TABLE);
+                e.db.exec("DELETE FROM sync_log WHERE tbl = ? AND NOT (pk LIKE 'alias:%' OR pk LIKE 'keep:%' OR pk LIKE 'inv:%' OR pk LIKE 'have:%')", SharedSettings.TABLE);
             }
             e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'folder_got:%' OR key LIKE 'server_seen:%' OR key LIKE 'server_ver:%' OR key LIKE 'server_webpub:%' OR key LIKE 'server_photorefs:%'"
                 + " OR key LIKE 'server_keysver:%' OR key LIKE 'server_bad:%' OR key LIKE 'folder_bad:%' OR key LIKE 'catchup:%' OR key LIKE 'catchup_peer:%'");

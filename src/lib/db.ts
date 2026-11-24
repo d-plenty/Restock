@@ -626,6 +626,8 @@ export async function deleteGroup(groupId: string): Promise<void> {
   const ops: SqlOp[] = [
     { sql: 'DELETE FROM items WHERE id = ?', params: [groupId] },
     { sql: 'UPDATE list_entries SET item_id = NULL WHERE item_id = ?', params: [groupId] },
+    // 0.13.1: and how much of it there is at home (inventory.ts), so Undo brings that back too
+    { sql: 'DELETE FROM household_settings WHERE k = ?', params: ['have:' + groupId] },
   ];
   if (orphans.length) {
     const ph = placeholders(orphans.length);

@@ -11,18 +11,17 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.13.0',
-    about: 'A head start for a new pantry, and tabs that all work the same way.',
+    version: '0.13.1',
+    about: 'Inventory, for those who want it: how much of each thing you have at home.',
     changes: [
-      'See what Declan and Sarah use: the pantry of the two people who make Restock. Tick what you’d use and add it to yours. It’s at the bottom of the Pantry, and in Settings.',
-      'Anything you already have by the same name is left exactly as it is.',
-      'The walkthrough uses twenty real items, ten of them on the shopping list.',
-      'Bottle shop and Chemist are tabs you make, name and colour like any other.',
-      'Every tab has Edit at the top right, and every tab you made says Beta on More.',
-      'Adding from a tab has three buttons: the tab, the tab and the shopping list, or the shopping list just this once (no name needed).',
-      'Once an item is on your list, its row shows minus, how many, and plus.',
-      'Minus down to 0 takes a line off your list after a moment, with Undo.',
-      'Your loyalty cards sit in shopping mode’s top bar, and its titles are bigger.',
+      'Every tab has an Inventory button beside Edit. It’s off until you turn it on, tab by tab, and can be turned off again there or in Settings.',
+      'With it on, each item shows a small “Have” box. Tap it to change the amount.',
+      'Count each item its own way: a number, a weight or volume, or roughly (a quarter, half or three quarters of a pack, plus unopened ones).',
+      'The Inventory page lists the whole tab with minus and plus, and filters for Running low and Out.',
+      'When something runs out or gets low, Restock asks to put it on your list, or adds it by itself if you choose that in Settings → Inventory.',
+      'Ticking something off while shopping adds what you bought to what you have.',
+      'It’s shared with your household, kept in backups, and works on the web page and iPhone web app too.',
+      'Restore from a backup on the first screen opens the file picker with a plain tap.',
     ],
   },
 ];

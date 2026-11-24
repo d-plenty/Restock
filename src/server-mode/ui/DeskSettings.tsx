@@ -11,6 +11,7 @@ import { CUSTOM_BETA_NOTE, Icon, Sheet, TopBar, timeAgo } from '../../ui/compone
 import { useNav } from '../../ui/nav';
 import { PassphraseForm } from './Gate';
 import { DeskHead, WhereNote } from './deskShared';
+import { inventorySummary, useInventory } from '../../ui/Inventory';
 import { BackupSheet, BranchSheet, KeepDataFor, PassphraseV3, RecoverySheet, SignOutChoices } from './DeskHouseSettings';
 import { ADMIN_NOTE, canAdmin, house, saveHouseSettings, useHouseSettings } from './houseData';
 import { HA_SHARED } from './ServerHomeAssistant';
@@ -73,6 +74,19 @@ export function Line({ title, sub, children, greyed, htmlFor }: { title: string;
       )}
       {children}
     </div>
+  );
+}
+
+/** 0.13.1: Settings → Inventory, the page the phone has. */
+function InventoryLine() {
+  const nav = useNav();
+  const inv = useInventory();
+  return (
+    <Line title="Inventory" sub={inventorySummary(inv)}>
+      <button className="btn small" onClick={() => nav.push({ name: 'inventorySettings' })}>
+        Inventory
+      </button>
+    </Line>
   );
 }
 
@@ -647,6 +661,11 @@ function HouseholdPart() {
         <Line title={'Phone sharing and backups on the phone'} sub={'Phones swap changes over Wi-Fi, and each makes its own backups.'} greyed>
           <PhoneOnlyNote compact text="Set on each phone (Settings on the phone)." />
         </Line>
+      </Group>
+
+      {/* 0.13.1: inventory, as on the phone (Settings → Inventory): the same page, the household's */}
+      <Group id="dk-s-inventory" title="Inventory">
+        <InventoryLine />
       </Group>
 
       <Group id="dk-s-privacy" title="Privacy and sharing">

@@ -19,6 +19,7 @@ import { PriceHistorySettings } from './DayOne';
 import { YourData } from './YourData';
 import { Credits } from './Credits';
 import { SaveBar, useSettingsDraft } from '../SaveBar';
+import { inventorySummary, useInventory } from '../Inventory';
 import { loadDemo, removeDemo } from '../../lib/demo';
 import { PICKS_TITLE } from '../../lib/makerPicks';
 import { syncBackgroundSchedule } from '../../lib/check';
@@ -193,6 +194,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
   useSettingsDraft(); // 0.9.5 (save)
   const nav = useNav();
   const settings = useLive(getSettings, []);
+  const inv = useInventory(); // 0.13.1
   const cardCount = useLive(async () => (await allCards()).length + (await allGiftCards()).length, []); // 0.9.6 (cards): loyalty and gift
   const sync = useLive(syncInfo, []);
   // 0.9.3: Sync now in Sync and backups shows its result straight away.
@@ -313,6 +315,13 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
               row('Create a custom tab', 'Chemist, bottle shop, baby, pets, automotive, tools, office or your own · Beta', () => setNewCustom(true))}
           </div>
           {newCustom && <NewCustomSheet onClose={() => setNewCustom(false)} />}
+          {/* 0.13.1: inventory (how much of each thing is at home), off until it's turned on, tab by tab */}
+          <div className="eyebrow" id="s-inventory">
+            Inventory
+          </div>
+          <div className="card flush">
+            {row('Inventory', inventorySummary(inv), () => nav.push({ name: 'inventorySettings' }))}
+          </div>
         </>
       )}
       {/* 0.9.13: everything else is a row that opens its own page. */}

@@ -17,9 +17,11 @@ const cell = (v: unknown): string => {
 export const csv = (rows: unknown[][]): string => '﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
 /** The day on the phone's own calendar (0.9.0), not UTC's: a 7:30 am Monday price in Brisbane is Monday, not Sunday. */
 const day = (iso: string | undefined) => (iso ? localDay(iso) : '');
+type HaveRow = { mode: 'count' | 'measure' | 'rough'; amount: number; unit?: string; low?: number };
+const COUNTED_BY = { count: 'Number', measure: 'Weight or volume', rough: 'Rough amount' } as const;
 const money = (n: number | undefined) => (n === undefined || n === null || Number.isNaN(n) ? '' : n.toFixed(2));
 
-export function csvFiles(all: Snapshot): { name: string; text: string }[] {
+export function csvFiles(all: Snapshot, have?: ReadonlyMap<string, HaveRow>): { name: string; text: string }[] {
   // 0.9.6: Costco's prices stay on the phone (costcoLocal.ts).
   const s = withoutCostco(all);
   const products = new Map(s.products.map((p) => [p.id, p]));
@@ -74,18 +76,28 @@ export function csvFiles(all: Snapshot): { name: string; text: string }[] {
     prices.push([day(r.date), chainName(p.chain), p.name, p.size ?? '', money(r.price), money(r.wasPrice), r.isSpecial ? 'Yes' : 'No', r.memberOnly ? 'Yes' : 'No', r.promo ?? '']);
   }
 
+  // 0.13.1: the inventory, when anything is counted (inventory.ts): one line an item.
+  const inventory: unknown[][] = [['Tab', 'Item', 'Category', 'Counted by', 'Have', 'Unit', 'Running low at']];
+  for (const g of s.groups) {
+    const h = have?.get(g.id);
+    if (!h || g.id.startsWith('demo-')) continue;
+    inventory.push([sectionName(g.section), g.name, cats.get(g.categoryId ?? '') ?? '', COUNTED_BY[h.mode], h.amount, h.mode === 'measure' ? (h.unit ?? 'g') : h.mode === 'rough' ? 'packs' : '', h.low ?? '']);
+  }
+
   return [
     { name: 'restock-pantry.csv', text: csv(pantry) },
     { name: 'restock-shopping-list.csv', text: csv(list) },
     { name: 'restock-price-history.csv', text: csv(prices) },
+    ...(inventory.length > 1 ? [{ name: 'restock-inventory.csv', text: csv(inventory) }] : []),
   ];
 }
 
-/** The three CSV files, through Android's share menu (or downloads, in a browser). */
+/** The CSV files (three, and the inventory when there is one), through Android's share menu (or downloads, in a browser). */
 export async function shareCsv(): Promise<number> {
   const { snapshot } = await import('./db');
   const { shareTextFiles } = await import('./shareFile');
-  const files = csvFiles(await snapshot());
+  const { loadInventory } = await import('./inventory');
+  const files = csvFiles(await snapshot(), (await loadInventory().catch(() => undefined))?.have);
   await shareTextFiles(files, 'text/csv', 'Restock spreadsheets');
   return files.length;
 }

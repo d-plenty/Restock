@@ -38,7 +38,8 @@ import org.json.JSONObject;
 final class SharedSettings {
     static final String TABLE = "household_settings";
     /** The rows a phone keeps when it leaves the household (see above): SQL for them. */
-    static final String KEPT_ON_LEAVING = "(k LIKE 'alias:%' OR k LIKE 'keep:%')";
+    // 0.13.1: and its inventory (src/lib/inventory.ts: inv: and have: rows), which is about its own items too.
+    static final String KEPT_ON_LEAVING = "(k LIKE 'alias:%' OR k LIKE 'keep:%' OR k LIKE 'inv:%' OR k LIKE 'have:%')";
     static final String[] SCALARS = { "shopAroundMin", "defaultThresholdPct", "listCompare", "productOrder", "recalls.enabled" };
     static final List<String> DEFAULT_CHAINS = Arrays.asList("woolworths", "coles", "aldi");
     private static final Pattern CUSTOM_ID = Pattern.compile("custom-[A-Za-z0-9_-]{1,40}");

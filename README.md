@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.13.0" src="https://img.shields.io/badge/status-release%20candidate%200.13.0-ffcd00">
+  <img alt="Release candidate 0.13.1" src="https://img.shields.io/badge/status-release%20candidate%200.13.1-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0130">New in 0.13.0</a> ·
+  <a href="#new-in-0131">New in 0.13.1</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -138,6 +138,21 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Feedback**: Settings → Send feedback sends a message (with screenshots and diagnostics if you like) straight to the people who make Restock. No GitHub account needed.
 
 </details>
+
+## New in 0.13.1
+
+Inventory, for those who want it. It's off unless you turn it on.
+
+- **Inventory, tab by tab.** Every tab (Pantry, and each tab you made) has an **Inventory** button beside Edit. The first time, it says what inventory is, with one **Turn on** button; it can be turned off again there or in Settings, and turning it off keeps your amounts.
+- **A "Have" box on each item.** With inventory on for a tab, each row shows how much you have ("Have: 14"). Tap the box to change it. An item that hasn't been counted yet says "How many?".
+- **Count each item its own way.** By **number** (14 cans), by **weight or volume** (300 g, 750 mL, 1.5 kg, 2 L), or as a **rough amount**: a quarter, half, three quarters or all of the pack you normally buy, plus any unopened packs (2½ bags of flour).
+- **The Inventory page** lists everything in the tab by category with how much there is. Counted items have minus and plus right there; tap any amount to change it or how it's counted. Filter to **Running low** or **Out**, and search.
+- **Running low and out.** Each item can have its own "running low" level; with none, only running out counts. Low is amber, out is red, and the tab gets a **Low or out** filter.
+- **Running out can fill your shopping list.** In Settings → Inventory, **Add to my shopping list automatically** puts an item on the list when it runs out or gets low. With that off (the default), Restock asks first. Something already on your list is never asked about or added twice.
+- **Ticking off while shopping adds it.** Tick an item on your shopping list and what you bought is added to what you have (three ticked is three more). Undo takes both back. It can be switched off in Settings → Inventory. Only the phone that ticks counts it, so a household never counts the same shop twice.
+- **Shared with your household.** Amounts sync between phones and a Restock server like your pantry does, they're in backups, and the spreadsheet export gets an inventory file. Phones and servers still on 0.13.0 or older pass the amounts along untouched but don't show them.
+- **On the web page and iPhone web app too**: the same button, box, page and Settings row.
+- **Restore from a backup on the first screen** is now a plain tap on the file picker itself. On one phone the old button opened nothing and left the screen stuck.
 
 ## New in 0.13.0
 
@@ -666,7 +681,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.13.0.apk` (on macOS, `shasum -a 256 restock-0.13.0.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.13.1.apk` (on macOS, `shasum -a 256 restock-0.13.1.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 
