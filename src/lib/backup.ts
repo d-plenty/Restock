@@ -49,6 +49,11 @@ interface BackupFile {
 export interface ExportParts extends RestoreParts {
   /** Include saved prices (price history). Without them the file is much smaller. */
   prices: boolean;
+  /**
+   * 0.14.0: leave out prices typed in by hand (source 'manual'). For a copy sent straight to someone
+   * else's phone: prices you typed in never leave your phone, as with shared prices (sharedPrices.ts).
+   */
+  noTypedPrices?: boolean;
   /** Include the receipt photos Restock keeps (not the phone's own photos). */
   receiptPhotos?: boolean;
   /**
@@ -124,9 +129,10 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
     app: 'restock',
     version: 2,
     exportedAt: new Date().toISOString(),
-    parts: { ...picked, password: undefined, serverPhotos: undefined, keepCostco: undefined },
+    parts: { ...picked, password: undefined, serverPhotos: undefined, keepCostco: undefined, noTypedPrices: undefined },
     tables: withoutSecrets(pickSnapshot(all, picked, { prices: parts.prices })),
   };
+  if (parts.noTypedPrices) file.tables.prices = file.tables.prices.filter((r) => r.source !== 'manual');
   if (parts.giftCards === false) delete file.tables.giftCards;
   // (after the parts are picked: it goes with the items, whether or not the settings are in the file)
   if (inventory) file.tables.kv = [...(file.tables.kv ?? []), { key: INV_BACKUP_KV, value: inventory }];
@@ -425,14 +431,15 @@ export function suggestRenames(groups: Group[], products: Product[]): BackupSumm
 export async function restoreBackup(
   summary: BackupSummary,
   parts: RestoreParts,
-  opts: { stayInSetup?: string; renames?: Map<string, string>; household?: boolean } = {},
+  opts: { stayInSetup?: string; renames?: Map<string, string>; household?: boolean; add?: boolean } = {},
 ): Promise<void> {
   // 0.9.0: `household` ("Restore for the household") adds the backup's cards rather than replacing them all (db.ts restoreParts).
   // 0.9.6 (review L5): this phone's own Costco data stays (backup files never have it).
   const kept = withCostcoKept(summary.snapshot, costcoOf(await snapshot()));
-  await restoreParts(kept, parts, opts.renames, { household: opts.household });
+  await restoreParts(kept, opts.add ? { ...parts, settings: false, shops: false } : parts, opts.renames, { household: opts.household, add: opts.add });
   // 0.13.1: the amounts of the items that came back, and inventory on for their tabs (inventory.ts).
-  if (parts.pantry)
+  // (0.14.0: not when adding alongside: this phone's own amounts stay as they are.)
+  if (parts.pantry && !opts.add)
     await restoreInventory({ raw: summary.snapshot.kv.find((k) => k.key === INV_BACKUP_KV)?.value ?? {}, sections: parts.sections, settings: parts.settings }).catch(() => 0);
   if (parts.receipts) await restorePhotos(summary.photos);
   if (parts.cards) await restoreCardPhotos(summary.cardPhotos, summary.snapshot);

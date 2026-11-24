@@ -18,3 +18,9 @@ export class IosUnavailable extends Error {
     this.name = 'IosUnavailable';
   }
 }
+
+/** 0.13.2: an iPad running the iPhone and iPad app. */
+export const isPad = (): boolean => isIos() && typeof navigator !== 'undefined' && (/iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1));
+
+/** "iPhone", "iPad" or "phone": what this device is called in a sentence. */
+export const deviceWord = (): string => (isPad() ? 'iPad' : isIos() ? 'iPhone' : 'phone');

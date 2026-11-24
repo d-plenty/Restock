@@ -200,7 +200,7 @@ export function UnblockSheet({
           Only in the Android app: the shop’s page opens on your phone.
         </p>
       )}
-      <IosWhy reason="shopPage" />
+      <IosWhy reason="shopPage" label="Why is this unavailable?" />
     </Sheet>
   );
 }
@@ -218,7 +218,7 @@ export function UnblockButton({ chain, onWorked, small, label }: { chain: StoreC
       >
         <Icon name="unlock" size={small ? 16 : 18} /> {label ?? `Unblock ${chainName(chain)}`}
       </button>
-      {isNative() && !canOpenShop() && <IosWhy reason="shopPage" />}
+      {isNative() && !canOpenShop() && <IosWhy reason="shopPage" label="Why is this unavailable?" />}
       {open && <UnblockSheet chain={chain} onClose={() => setOpen(false)} onWorked={onWorked} />}
     </>
   );

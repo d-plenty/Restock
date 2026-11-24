@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { EVERYTHING, exportBackup, exportCounts, GIFT_NO_PASSWORD_WARNING, giftCardsUnlocked, type ExportParts } from '../../lib/backup';
+import { backupJson, EVERYTHING, exportBackup, exportCounts, GIFT_NO_PASSWORD_WARNING, giftCardsUnlocked, type ExportParts } from '../../lib/backup';
 import { confirmAction } from '../../lib/confirm';
 import { getSettings, priceHistorySpan } from '../../lib/db';
 import { SECTION_NAMES, SECTIONS, type Section, slots } from '../../shops';
 import { historyLabel, type Settings } from '../../types';
 import { cardsCount } from '../../lib/giftCards';
+import { canSendDirect, deviceLan, offerData, type Offer } from '../../lib/handover';
 import { Icon, Sheet } from '../components';
+import { PairingQr } from './Sync';
 
 /** What can be picked in a backup, and how many of each there are. */
 export interface PartCounts {
@@ -230,16 +232,88 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
     setBusy(true);
     try {
       const name = await exportBackup({ ...parts, password: lock ? pw : undefined });
-      onDone(`Backup ready: ${name}`);
+      onDone(`File ready: ${name}`);
       onClose();
     } catch (e) {
       setBusy(false);
-      onDone(`Backup failed: ${e instanceof Error ? e.message : e}`);
+      onDone(`Export failed: ${e instanceof Error ? e.message : e}`);
     }
   };
+  // 0.14.0: or straight to another phone on the same Wi-Fi, once (lib/handover.ts).
+  const [offer, setOffer] = useState<Offer>();
+  const [sent, setSent] = useState<number>();
+  const [sendError, setSendError] = useState<string>();
+  const [handed, setHanded] = useState(false);
+  useEffect(() => () => offer?.stop(), [offer]);
+  const direct = canSendDirect();
+  const send = async () => {
+    if (parts.cards && counts?.cards) {
+      const ok = await confirmAction(counts.giftCards ? 'This sends your card numbers and gift card PINs' : 'This sends your card numbers', {
+        detail: 'Only send them to someone you trust with them. Or go back and untick Cards.',
+        action: 'Send them',
+      });
+      if (!ok) return;
+    }
+    const lan = deviceLan();
+    if (!lan) return;
+    setBusy(true);
+    setSendError(undefined);
+    try {
+      // Prices typed in by hand stay on this phone; the transfer itself is sealed, so no password.
+      const text = await backupJson({ ...parts, password: undefined, serverPhotos: false, noTypedPrices: true });
+      const name = (await getSettings()).household.name || 'A Restock phone';
+      const o = await offerData(lan, text, { name }, (p) => setSent(p));
+      setOffer(o);
+      void o.done.then((how) => {
+        if (how === 'sent') setHanded(true);
+        else if (how === 'expired') {
+          setOffer(undefined);
+          setSendError('That code ran out. Make a new one to send it.');
+        }
+      });
+    } catch (e) {
+      setSendError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (offer)
+    return (
+      <Sheet title="Send to another phone" onClose={onClose}>
+        {handed ? (
+          <>
+            <div className="banner green" role="status">
+              <strong>Sent</strong>
+              <span style={{ fontSize: 13 }}>The other phone has it. There it picks what to bring in.</span>
+            </div>
+            <button className="btn primary block" onClick={onClose}>
+              Done
+            </button>
+          </>
+        ) : (
+          <>
+            <ol className="small" style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <li>Put the other phone on the same Wi-Fi as this one.</li>
+              <li>
+                In Restock on it, open <strong>Settings</strong>, then <strong>Sync and backups</strong>, and choose <strong>Import data</strong>, then{' '}
+                <strong>From another phone</strong>.
+              </li>
+              <li>Scan this code with it. Keep this screen open until it says Sent.</li>
+            </ol>
+            <PairingQr code={offer.code} label="Code for the other phone to scan" />
+            <p className="small" role="status" style={{ margin: 0 }}>
+              {sent ? `Sending… ${Math.round(sent * 100)}%` : 'Waiting for the other phone… This code works once, for 10 minutes.'}
+            </p>
+            <button className="btn block" onClick={onClose}>
+              Stop
+            </button>
+          </>
+        )}
+      </Sheet>
+    );
   return (
-    <Sheet title="Export a backup" onClose={onClose}>
-      <p className="small">Pick what goes in the file. Restoring it later only replaces the parts that are in it.</p>
+    <Sheet title="Export data" onClose={onClose}>
+      <p className="small">Pick what goes in. Then save it as a file, or send it straight to another phone.</p>
       {counts && (
         <PartsPicker
           counts={counts}
@@ -283,9 +357,22 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
           <Icon name="alert" size={16} /> {GIFT_NO_PASSWORD_WARNING}
         </p>
       )}
+      {sendError && (
+        <p className="banner amber small" role="alert">
+          {sendError}
+        </p>
+      )}
       <button className="btn primary block" disabled={!any || busy || !counts || !!pwProblem} onClick={go}>
-        <Icon name="external" size={18} /> {busy ? 'Making the backup…' : 'Export'}
+        <Icon name="external" size={18} /> {busy ? 'Working…' : 'Save to a file'}
       </button>
+      <button className="btn block" disabled={!any || busy || !counts || !direct} onClick={() => void send()}>
+        <Icon name="phone" size={18} /> Send to another phone
+      </button>
+      <p className="small" style={{ margin: 0 }}>
+        {direct
+          ? 'Sending shows a code for the other phone to scan. It goes straight across your Wi-Fi, once: iPhone or Android, either way. Prices you typed in by hand stay on this phone.'
+          : 'Sending straight to another phone works in the Restock app on Android, iPhone and iPad.'}
+      </p>
     </Sheet>
   );
 }

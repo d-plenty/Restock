@@ -11,17 +11,16 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.13.1',
-    about: 'Inventory, for those who want it: how much of each thing you have at home.',
+    version: '0.14.0',
+    about: 'Restock on iPhone and iPad, sending your data straight to another phone, and expiry dates on loyalty cards.',
     changes: [
-      'Every tab has an Inventory button beside Edit. It’s off until you turn it on, tab by tab, and can be turned off again there or in Settings.',
-      'With it on, each item shows a small “Have” box. Tap it to change the amount.',
-      'Count each item its own way: a number, a weight or volume, or roughly (a quarter, half or three quarters of a pack, plus unopened ones).',
-      'The Inventory page lists the whole tab with minus and plus, and filters for Running low and Out.',
-      'When something runs out or gets low, Restock asks to put it on your list, or adds it by itself if you choose that in Settings → Inventory.',
-      'Ticking something off while shopping adds what you bought to what you have.',
-      'It’s shared with your household, kept in backups, and works on the web page and iPhone web app too.',
-      'Restore from a backup on the first screen opens the file picker with a plain tap.',
+      'Restock now runs on iPhone and iPad as well as Android, with the same screens.',
+      'An Android phone and an iPhone can sync with each other over your Wi-Fi: add the iPhone from Phone sharing. The iPhone does its part while Restock is open on it.',
+      'Export data: pick what goes in, then save it as a file or send it straight to another phone with a QR code. It works between any two phones on the same Wi-Fi, once.',
+      'Import data: from a file, by scanning the other phone’s code, or from a photo of the code. Then add it alongside what’s here (same names are skipped) or replace what’s here.',
+      'Loyalty cards can have an expiry date. Restock reminds you a month before, and Home shows it with Update and Remind me later.',
+      'Phone sharing is the recommended way to sync now. A Restock server is for people who run one.',
+      'With a Restock server, your data stays on your phone too. Leaving the server, or being taken off it, deletes nothing on the phone.',
     ],
   },
 ];

@@ -1,0 +1,67 @@
+// 0.13.2: the iPhone and iPad app's own native plugin (ios/App/App/RestockApple.swift): a hidden browser
+// page, the shop's site on screen, a folder picked in Files, and the keychain. Everything that uses it
+// asks appleHere() first and carries on without it (an older build of the app's native side).
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
+
+export interface FolderFile {
+  name: string;
+  size: number;
+  /** When it last changed, ms. */
+  mtime: number;
+  /** iCloud hasn't brought it down yet (it has been asked to). */
+  waiting?: boolean;
+}
+
+export interface RestockApplePlugin {
+  info(): Promise<{ version: number; pad: boolean; system: string }>;
+  /** Loads `url` in the hidden page called `key`. Resolves when it has loaded, failed (status 0) or timed out. */
+  webLoad(o: { key: string; url: string; timeoutMs?: number }): Promise<{ status: number; url: string }>;
+  /** Runs `js` (a function body; it may await and must return a string) in that page. */
+  webEval(o: { key: string; js: string }): Promise<{ value: string }>;
+  webClose(o: { key?: string }): Promise<void>;
+  /** The page on screen until Done, or until its address matches `closeOn` (a regular expression). */
+  webOpen(o: { url: string; message?: string; allowed?: string[]; closeOn?: string }): Promise<{ url: string; matched: boolean }>;
+  folderPick(): Promise<{ bookmark: string; name: string }>;
+  folderList(o: { bookmark: string }): Promise<{ files: FolderFile[]; bookmark?: string }>;
+  folderRead(o: { bookmark: string; name: string }): Promise<{ data: string; bookmark?: string }>;
+  folderWrite(o: { bookmark: string; name: string; data: string }): Promise<{ bytes: number; bookmark?: string }>;
+  folderDelete(o: { bookmark: string; name: string }): Promise<{ bookmark?: string }>;
+  secretSet(o: { key: string; value: string }): Promise<void>;
+  secretGet(o: { key: string }): Promise<{ found: boolean; value?: string }>;
+  secretDelete(o: { key: string }): Promise<void>;
+  // 0.14.0: the Wi-Fi (ios/lan.ts). Messages are base64; each is one whole sealed message.
+  lanInfo(): Promise<{ ip?: string }>;
+  lanDial(o: { host: string; port: number; timeoutMs?: number }): Promise<{ id: string }>;
+  lanAsk(o: { id: string; data: string; timeoutMs?: number }): Promise<{ data: string }>;
+  lanClose(o: { id: string }): Promise<void>;
+  lanListen(o: { key: string; port?: number }): Promise<{ port: number }>;
+  lanReply(o: { conn: string; data?: string }): Promise<void>;
+  lanStop(o: { key: string }): Promise<void>;
+  lanAdvertise(o: { key: string; name: string; type: string; txt: Record<string, string> }): Promise<void>;
+  lanUnadvertise(o: { key: string }): Promise<void>;
+  lanBrowse(o: { type: string; ms: number }): Promise<{ found: { name?: string; host: string; port: number; txt?: Record<string, string> }[] }>;
+  /** 0.14.0: asks iOS to wake the app later for a short sync (it tells the app with a "backgroundRefresh" event). */
+  backgroundSchedule(): Promise<void>;
+  backgroundDone(o: { ok: boolean }): Promise<void>;
+  addListener(event: string, handler: (data: never) => void): Promise<PluginListenerHandle>;
+}
+
+/** A stand-in for the tests and the click-through (set before the app starts). */
+const fake = (): RestockApplePlugin | undefined => (globalThis as { __restockAppleFake?: RestockApplePlugin }).__restockAppleFake;
+
+/** Hands each call to whichever stand-in is set at the time (Capacitor keeps the first answer it's given). */
+const standIn = async (): Promise<RestockApplePlugin> =>
+  new Proxy({} as RestockApplePlugin, {
+    get: (_t, prop) => {
+      const f = fake() as unknown as Record<string | symbol, unknown> | undefined;
+      const v = f?.[prop];
+      // A stand-in sends no events: listening for them is allowed, and nothing ever comes.
+      if (prop === 'addListener' && typeof v !== 'function') return async () => ({ remove: async () => undefined });
+      return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(f) : undefined;
+    },
+  });
+
+export const RestockApple = registerPlugin<RestockApplePlugin>('RestockApple', { ios: standIn, web: standIn });
+
+/** Is the native plugin in this build of the app? */
+export const appleHere = (): boolean => !!fake() || (Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('RestockApple'));

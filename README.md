@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.13.1" src="https://img.shields.io/badge/status-release%20candidate%200.13.1-ffcd00">
+  <img alt="Release candidate 0.14.0" src="https://img.shields.io/badge/status-release%20candidate%200.14.0-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0131">New in 0.13.1</a> ·
+  <a href="#new-in-0140">New in 0.14.0</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -139,9 +139,26 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 </details>
 
-## iPhone (test build)
+## iPhone and iPad
 
-There is an iPhone app, as a test build you install from a computer. It is not on the App Store or TestFlight yet, it has to be re-installed every 7 days with a free Apple Account, and some things from the Android app aren't there yet (household sync, the Restock server, shop sign-ins, widgets). **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder. Two things aren't possible because of Apple's restrictions: checking prices at a set time of day (they're checked when you open Restock) and the app updating itself. Still to come there: widgets, recall alerts and shared price history. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.14.0
+
+Restock on iPhone and iPad, and a household of both kinds of phone.
+
+- **iPhone and iPad.** The same app, screens and settings as Android. Held sideways, an iPad puts the tabs down the left side. See [Restock on iPhone and iPad](docs/IPHONE.md) for installing it.
+- **An Android phone and an iPhone sync over your Wi-Fi.** On the Android phone: Phone sharing → Add a phone. On the iPhone: Sync and backups → Sync with an Android phone → Join with a code. The Android phone answers in the background; the iPhone does its part while Restock is open on it. An iPhone can also start the household and an Android phone join it.
+- **iCloud sync** for a household of iPhones and iPads: one shared folder in iCloud Drive, no server and no account with Restock.
+- **iPhone to iPhone over Wi-Fi** is there under Advanced, for people who want it. It only works while both have Restock open at the same moment, so iCloud sync is the better choice.
+- **Export data, two ways.** Pick what goes in (tabs, lists, cards, receipts, settings), then **Save to a file** or **Send to another phone**. Sending shows a QR code; the other phone scans it and the data goes straight across your Wi-Fi, sealed with a key that's only in the code. Once, nothing is paired, and it works between any two phones: Android or iPhone, either way. Prices you typed in by hand stay on your phone.
+- **Import data, three ways in.** From a file, by scanning the other phone's code, or from a photo of the code. Then tick what to bring in and choose: **Add alongside what's here** (nothing is replaced; anything with the same name is skipped) or **Replace what's here** (only the parts you tick).
+- **Loyalty cards can have an expiry date.** Set it when adding the card or later. Restock notifies you a month before, and Home shows "Your Flybuys card expires in 1 month" with **Update** and **Remind me later**. The date syncs with the card where your household shares cards.
+- **What's recommended for syncing changed.** Android: Phone sharing first. iPhone and iPad: iCloud sync first. A Restock server is listed last, as "If you run one": most households don't have one.
+- **With a Restock server, your data stays on your phone too.** The server is one more copy. Your pantry, lists, cards and settings stay on the phone in full, with as much price history as "Keep price history for" says (8 weeks unless you change it); the server keeps 12 months unless you change it on its page. Leaving the server, or being taken off it, deletes nothing on the phone.
+- **Joining a server through a Cloudflare Tunnel from an iPhone** works when the server gives its address as `http://` and the tunnel sends that on to `https://`.
+- **Sign in on a computer** by scanning the server page's code works from an iPhone, and an iPhone shares receipts and loyalty cards with the household like an Android phone does.
+- **On the web page and iPhone web app:** the same Export data and Import data, with "Send to another phone" greyed (it works in the phone apps), and expiry dates on loyalty cards.
 
 ## New in 0.13.1
 
@@ -685,7 +702,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
-**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.13.1.apk` (on macOS, `shasum -a 256 restock-0.13.1.apk`) should print the same.
+**Check your download (optional):** each release lists the APK's SHA-256 checksum. On Linux, `sha256sum restock-0.14.0.apk` (on macOS, `shasum -a 256 restock-0.14.0.apk`) should print the same.
 
 **Moving to a new phone?** Settings → Sync and backups → **Export a backup** on the old phone, then **Restore from a backup** on the new phone's first screen. If your household syncs, the new phone can simply **Join your household** (or **Join your server**) instead.
 

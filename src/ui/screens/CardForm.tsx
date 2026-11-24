@@ -161,6 +161,8 @@ function LoyaltyFields({ store, onAdded }: { store: CardStore; onAdded: (id: str
   // Other with the name typed: tapped, or nothing Restock knows matches it.
   const [other, setOther] = useState(false);
   const [error, setError] = useState<string>();
+  // 0.14.0: an expiry date, for cards that have one.
+  const [expiry, setExpiry] = useState('');
 
   const clean = number.replace(/\s+/g, '');
   const kind: GiftBarcodeType = type === 'auto' ? guessBarcodeType(clean) : type;
@@ -190,6 +192,7 @@ function LoyaltyFields({ store, onAdded }: { store: CardStore; onAdded: (id: str
       label: brand && brand.program !== 'other' ? PROGRAMS[brand.program].name : name.slice(0, 80),
       number: clean,
       createdAt: nowIso(),
+      ...(expiry ? { expiry } : {}),
     };
     try {
       await store.addLoyalty(card);
@@ -329,6 +332,15 @@ function LoyaltyFields({ store, onAdded }: { store: CardStore; onAdded: (id: str
       {error && (
         <p className="small" role="alert">
           {error}
+        </p>
+      )}
+      <label className="field">
+        <span>Expiry date, if the card has one</span>
+        <input className="input" type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+      </label>
+      {expiry && (
+        <p className="small" style={{ margin: 0 }}>
+          {store.canRemind ? 'Restock reminds you a month before, and shows it on Home.' : 'Restock shows it on Home a month before.'}
         </p>
       )}
       <button className="btn primary" disabled={!name || saving} onClick={() => void save()}>

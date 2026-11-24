@@ -26,12 +26,31 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Restock talks to things on your own Wi-Fi that you set up: your Restock server, your Home Assistant, or another phone in your household.</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>family.plenty.restock.refresh</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_restocksync._tcp</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Restock uses the camera to scan barcodes and QR codes, and to photograph receipts and cards. The picture stays on your iPhone.</string>
+	<string>Restock uses the camera to scan barcodes and QR codes, and to photograph receipts and cards. The picture stays on this device.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Restock uses your rough location to find your nearest shops, only when you tap "Use my location".</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Restock reads a photo you pick, to scan a barcode or keep a receipt. It stays on your iPhone.</string>
+	<string>Restock reads a photo you pick, to scan a barcode or keep a receipt. It stays on this device.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

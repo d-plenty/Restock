@@ -464,6 +464,8 @@ export const MIGRATIONS: string[][] = [
   SYNC_093,
   // 0.9.4: who made each record (sync_log.origin).
   SYNC_094,
+  // 0.14.0: a loyalty card can have an expiry date (it syncs with the card, where cards are shared).
+  ['ALTER TABLE cards ADD COLUMN expiry TEXT'],
 ];
 
 /**

@@ -14,6 +14,18 @@ export default defineConfig({
   // 0.9.5: the shop connections (src/stores/*, for "Let the web page search the shops") come in, but
   // not Capacitor: on the server nothing is native, and requests go through src/stores/node.ts.
   resolve: { alias: { '@capacitor/core': fileURLToPath(new URL('./src/server-core/capacitor-shim.ts', import.meta.url)) } },
+  // 0.14.0: and not the iPhone and iPad app's own modules (src/ios/*): only an iPhone loads them, but
+  // the bundler follows the imports and would pull in Capacitor's iOS plugins.
+  plugins: [
+    {
+      name: 'restock-no-ios',
+      enforce: 'pre',
+      resolveId(source: string, importer: string | undefined) {
+        if (importer && !importer.includes('node_modules') && /(^|\/)ios\/(native|sync|apple|lan|wire)$/.test(source)) return fileURLToPath(new URL('./src/server-core/ios-shim.ts', import.meta.url));
+        return null;
+      },
+    },
+  ],
   // Every dependency inside, and their plain (not Node-only) builds: fflate's Node build reaches for
   // worker_threads through createRequire, noble's for node:crypto; Node 22 has globalThis.crypto.
   ssr: { noExternal: true, target: 'node', resolve: { conditions: ['module', 'import', 'default'], externalConditions: [] } },

@@ -58,7 +58,14 @@ java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncTest096 "$O"
 java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncWifiTest096 "$O"
 # 0.9.6 (review H1, L2): Costco and the shared shopping list and items.
 
+# 0.14.0: the Wi-Fi for Export data → Send to another phone (LanBridge.java), against itself.
+rm -rf $O/lan-classes && mkdir -p $O/lan-classes
+javac -nowarn -d $O/lan-classes -cp "$ORGJSON" -sourcepath android/app/src/main/java tools/sync-test/family/plenty/restock/LanBridgeTest.java android/app/src/main/java/family/plenty/restock/LanBridge.java android/app/src/main/java/family/plenty/restock/SyncWire.java
+java -cp "$O/lan-classes:$ORGJSON" family.plenty.restock.LanBridgeTest
+
 bash tools/sync-test/web-parity.sh
+# 0.14.0: the iPhone's phone-to-phone sync (src/ios/wire.ts) against this Java code, over real sockets.
+bash tools/sync-test/wire-parity.sh
 # 0.9.4: Home Assistant's round in Java (HaSync.java) against haSync.ts, on shared fixtures.
 bash tools/sync-test/ha-parity.sh
 

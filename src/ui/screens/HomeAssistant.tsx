@@ -1,4 +1,5 @@
 import { NotHereBanner } from '../IosWhy';
+import { isIos } from '../../lib/platform';
 import { useEffect, useState } from 'react';
 import { confirmAction } from '../../lib/confirm';
 import {
@@ -476,11 +477,18 @@ export function HomeAssistantScreen() {
 
       <div className="eyebrow">Good to know</div>
       <div className="card" style={{ gap: 8 }}>
-        <span className="small">
-          <strong>Voice adds come in within about 15 minutes.</strong> Restock talks to Home Assistant every minute while it's open, and about
-          every 15 minutes in the background when it isn't (Android decides exactly when), so something you add by voice comes onto your Restock
-          list, and your other phones, even with Restock closed.
-        </span>
+        {isIos() ? (
+          <span className="small">
+            <strong>Voice adds come in when you open Restock.</strong> On an iPhone, Restock talks to Home Assistant every minute while it's open,
+            and not while it's closed (iOS doesn't allow that). Something you add by voice is on your Restock list a moment after you open it.
+          </span>
+        ) : (
+          <span className="small">
+            <strong>Voice adds come in within about 15 minutes.</strong> Restock talks to Home Assistant every minute while it's open, and about
+            every 15 minutes in the background when it isn't (Android decides exactly when), so something you add by voice comes onto your Restock
+            list, and your other phones, even with Restock closed.
+          </span>
+        )}
         <span className="small">
           <strong>Only the groceries list.</strong> Bottle shop and Chemist lists stay in Restock. Something new goes across
           while it's still to buy, and ticking off works both ways.

@@ -422,7 +422,8 @@ export function applyRows(s: Obj, rows: { k: string; v: string }[], tabs: Readon
 }
 
 /** The value a row would have for this setting, from a settings object (merged settings). */
-function valueOf(s: Obj, k: string): unknown {
+/** 0.13.2: exported for the engine's seeding (SharedSettings.valueOf). */
+export function valueOf(s: Obj, k: string): unknown {
   if (k === 'recalls.enabled') return isObj(s.recalls) && typeof s.recalls.enabled === 'boolean' ? s.recalls.enabled : DEFAULTS['recalls.enabled'];
   if ((SCALAR_KEYS as readonly string[]).includes(k)) return s[k] ?? DEFAULTS[k as ScalarKey];
   if (k.startsWith('tab:')) return isObj(s.sections) ? s.sections[k.slice(4)] === true : false;

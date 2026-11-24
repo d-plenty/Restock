@@ -11,12 +11,126 @@ import { CapacitorHttp, WebPlugin } from '@capacitor/core';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { IosUnavailable } from '../lib/platform';
+import { websiteOf } from '../shops';
+import { appleHere, RestockApple } from './apple';
+import * as sync from './sync';
+import type { Section } from '../shops';
+import { forgetPage, FRESH_MS, looksBlocked, pageFetch, pageRender } from './shopWeb';
 import type { NativePermissions, SyncInfo } from '../lib/sql/native';
 
 const NO_SYNC: SyncInfo = { paired: false, batteryExempt: true };
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 const BACKUP_DIR = 'Restock backups';
 const BACKUP_URI = 'ios-documents:';
+const HA_FILE = 'restock-private/home-assistant.json';
+/** HomeAssistant.java PATH. */
+const HA_PATH = /^\/api\/[A-Za-z0-9_./-]{0,200}(\?return_response)?$/;
+
+/** HomeAssistant.java base(): the address as scheme://host[:port], http when none was typed. */
+export function haBase(typed: string): string {
+  let t = (typed ?? '').trim();
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) t = `http://${t}`;
+  let u: URL;
+  try {
+    u = new URL(t);
+  } catch {
+    throw new Error("That doesn't look like an address. Try something like http://homeassistant.local:8123");
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('The address has to start with http:// or https://');
+  if (u.username || u.password) throw new Error('Leave any user name out of the address.');
+  if (u.protocol === 'http:' && !homeHost(u.hostname))
+    throw new Error('Plain http only works for an address at home (like 192.168.1.20 or homeassistant.local) or on Tailscale. For any other address, use https://');
+  return `${u.protocol}//${u.host}`;
+}
+
+/**
+ * The rule sync keeps on Android (SyncDav.resolve): plain http only to an address at home or on
+ * Tailscale. An iPhone app can't look a name up first, so it goes by the name itself: a private or
+ * Tailscale number, a .local / .lan / .home.arpa / .internal / .ts.net name, or a bare one ("homeassistant").
+ */
+export function homeHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '');
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    return a === 10 || a === 127 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31) || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127);
+  }
+  if (h.includes(':')) return /^(fe80|fc|fd)/.test(h) || h === '::1';
+  if (!h.includes('.')) return /^[a-z0-9-]+$/.test(h);
+  return /\.(local|lan|home|home\.arpa|internal|ts\.net)$/.test(h);
+}
+
+/** A long-lived access token as pasted: no spaces or line breaks inside, and not absurdly long. */
+function haToken(typed: string): string {
+  const t = (typed ?? '').trim().replace(/^bearer\s+/i, '');
+  if (!t || t.length > 4096 || /\s/.test(t)) throw new Error("That doesn't look like a Home Assistant token. Copy the whole long-lived access token and paste it again.");
+  return t;
+}
+
+/** StoreWeb.COLES_STORE_PAGE: ".../find-stores/coles/qld/kirwan-0844". */
+const COLES_STORE_PAGE = '/find-stores/[^?#]*?-(\\d{3,5})/?(?:[?#].*)?$';
+
+/** StoreWeb.home: the shop's home page, ending in "/". */
+export function shopHome(chain: string, given?: string): string | undefined {
+  const site = websiteOf(chain) ?? (chain.startsWith('custom-') ? given : undefined) ?? (chain === 'aldi' ? 'https://www.aldi.com.au/' : undefined);
+  if (!site) return undefined;
+  try {
+    const u = new URL(site);
+    if (u.protocol !== 'https:') return undefined;
+    return u.href.endsWith('/') ? u.href : `${u.href}/`;
+  } catch {
+    return undefined;
+  }
+}
+
+/** StoreWeb.alsoAllowed: other sites of the same shop its pages may go to (signing in, its rewards program). */
+const ALSO: Record<string, string[]> = { woolworths: ['everyday.com.au', 'woolworthsrewards.com.au'], coles: ['flybuys.com.au'] };
+
+/** The hosts a shop's pages may be on: its own site without "www." (which covers its subdomains), and ALSO. */
+export function shopHosts(chain: string, home: string): string[] {
+  return [new URL(home).hostname.toLowerCase().replace(/^www\./, ''), ...(ALSO[chain] ?? [])];
+}
+
+/**
+ * StoreWeb.onSite: `url` (a full address, or a path such as "/api/...") as a full https address on the
+ * shop's own site, or undefined if it isn't one. "//elsewhere" and "/\\elsewhere" (which a browser
+ * reads as another site) are refused.
+ */
+export function onSite(chain: string, url: string, home: string | undefined): string | undefined {
+  if (!home || typeof url !== 'string' || !url || /[\\\s]/.test(url) || url.startsWith('//')) return undefined;
+  let u: URL;
+  try {
+    u = new URL(url, home);
+  } catch {
+    return undefined;
+  }
+  if (u.protocol !== 'https:' || u.username || u.password) return undefined;
+  const host = u.hostname.toLowerCase();
+  return shopHosts(chain, home).some((h) => host === h || host.endsWith(`.${h}`)) ? u.href : undefined;
+}
+
+// Without the native plugin: a plain request, after a visit to the shop's home page (its cookies, and Coles' key).
+const visited = new Map<string, { at: number; key?: string }>();
+async function plainShopFetch(chain: string, home: string, method: 'GET' | 'POST', full: string, body?: string): Promise<{ status: number; body: string }> {
+  const attempt = async (fresh: boolean) => {
+    let v = visited.get(chain);
+    if (fresh || !v || Date.now() - v.at > FRESH_MS) {
+      const page = await http({ method: 'GET', url: home, headers: { Accept: 'text/html' } }).catch(() => undefined);
+      v = { at: Date.now(), key: chain === 'coles' ? page?.body.match(/BFF_API_SUBSCRIPTION_KEY["']?\s*:\s*["']([^"']+)["']/)?.[1] : undefined };
+      visited.set(chain, v);
+    }
+    let url = full;
+    if (chain === 'coles') {
+      if (!v.key) return { status: 0, body: 'no key' };
+      url += `${url.includes('?') ? '&' : '?'}subscription-key=${encodeURIComponent(v.key)}`;
+    }
+    const r = await http({ method, url, body, headers: { Accept: 'application/json, text/plain, */*', Referer: home, Origin: home.replace(/\/$/, '') } });
+    return { status: r.status, body: r.body };
+  };
+  let r = await attempt(false);
+  if (looksBlocked(r)) r = await attempt(true);
+  return r;
+}
 
 const text = (d: unknown): string => (typeof d === 'string' ? d : d === undefined || d === null ? '' : JSON.stringify(d));
 
@@ -48,22 +162,42 @@ export class RestockIos extends WebPlugin {
   // ---------- the database: sql.js in the web view (lib/boot.ts), so nothing here ----------
 
   // ---------- shops ----------
-  /** Android makes this from inside the shop's page in a hidden browser; here it's a plain request with the app's cookies. */
-  async storeFetch(o: { chain: string; method: 'GET' | 'POST'; url: string; body?: string }) {
-    const r = await http({ method: o.method, url: o.url, body: o.body, headers: { Accept: 'application/json, text/plain, */*' } });
-    return { status: r.status, body: r.body };
+  /**
+   * A request from inside the shop's own page. 0.13.2: in a hidden browser, as on Android (ios/shopWeb.ts
+   * on the native plugin). Without the plugin (an older build of the native side) it's a plain request
+   * that visits the shop's home page first, for its cookies and, at Coles, its key.
+   */
+  async storeFetch(o: { chain: string; method: 'GET' | 'POST'; url: string; body?: string; home?: string }) {
+    const home = shopHome(o.chain, o.home);
+    const full = onSite(o.chain, o.url, home);
+    if (!home || !full) throw new Error('Not a shop address Restock uses');
+    if (appleHere()) return pageFetch(o.chain, home, o.method, o.url, o.body);
+    return plainShopFetch(o.chain, home, o.method, full, o.body);
   }
   async plainFetch(o: { jar: string; method: 'GET' | 'POST'; url: string; headers?: Record<string, string>; body?: string; timeoutMs?: number }) {
     const r = await http(o);
     return { status: r.status, body: r.body, headers: r.headers };
   }
-  /** The page as the shop sends it. (Android waits for the page's scripts to draw it; an iPhone can't do that yet.) */
+  /** The page once its scripts have drawn it (the hidden browser); without the plugin, the page as the shop sends it. */
   async storeRender(o: { chain: string; url: string; home?: string }) {
+    const home = shopHome(o.chain, o.home);
+    if (!home || !onSite(o.chain, o.url, home)) throw new Error('Not a page of a shop Restock uses');
+    if (appleHere()) return pageRender(o.chain, o.url);
     const r = await http({ method: 'GET', url: o.url });
     return { status: r.status, html: r.body, url: r.url };
   }
-  async openStore(): Promise<void> {
-    throw new IosUnavailable("Opening a shop's page inside Restock");
+  /** The shop's website on screen (signing in, picking a branch, passing its "are you a person" check). */
+  async openStore(o: { chain: string; home?: string; path?: string; message?: string; record?: boolean; pickStore?: boolean }) {
+    if (!appleHere()) throw new IosUnavailable("Opening a shop's page inside Restock");
+    if (o.record) throw new IosUnavailable('Recording a trolley');
+    const home = shopHome(o.chain, o.home);
+    if (!home) throw new Error('Not a shop Restock uses');
+    const url = o.path ? onSite(o.chain, o.path, home) : home;
+    if (!url) throw new Error("Not a page on that shop's website");
+    const out = await RestockApple.webOpen({ url, message: o.message, allowed: shopHosts(o.chain, home), closeOn: o.pickStore ? COLES_STORE_PAGE : undefined });
+    // What the visit left (a sign-in, a passed check) is used by the hidden page from its next load.
+    forgetPage(o.chain);
+    return o.pickStore && out.matched ? { storePage: out.url } : {};
   }
 
   // ---------- price checks: lib/check.ts runs them on iPhone (while Restock is open) ----------
@@ -94,14 +228,15 @@ export class RestockIos extends WebPlugin {
   async checkRecalls() {
     return { checked: 0, found: 0, fresh: 0, errors: {} };
   }
-  async serverSpend() {
-    return { added: 0, skipped: 0 };
+  // 0.13.2: the server's Your data, as on Android (sealed with the household's server key: ios/house.ts).
+  async serverSpend(o: { rows: Record<string, unknown>[] }) {
+    return sync.serverRows('spend', o?.rows ?? []);
   }
-  async serverSeen() {
-    return { added: 0, skipped: 0 };
+  async serverSeen(o: { rows: Record<string, unknown>[] }) {
+    return sync.serverRows('seen', o?.rows ?? []);
   }
-  async serverData(): Promise<never> {
-    throw new IosUnavailable('A Restock server');
+  async serverData(o: { path: string }) {
+    return sync.serverData(o?.path ?? '');
   }
 
   // ---------- permissions, and the phone itself ----------
@@ -217,7 +352,7 @@ export class RestockIos extends WebPlugin {
     await Filesystem.writeFile({ path: `${BACKUP_DIR}/${o.name}`, data: o.json, directory: Directory.Documents, encoding: Encoding.UTF8, recursive: true });
     let removed = 0;
     const all = (await Filesystem.readdir({ path: BACKUP_DIR, directory: Directory.Documents }).catch(() => ({ files: [] }))).files
-      .filter((f) => f.type === 'file' && /^restock-.*\.json$/i.test(f.name))
+      .filter((f) => f.type === 'file' && /^restock-auto-.*\.json$/i.test(f.name))
       .sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0));
     for (const f of all.slice(Math.max(1, o.keep))) {
       await Filesystem.deleteFile({ path: `${BACKUP_DIR}/${f.name}`, directory: Directory.Documents })
@@ -227,44 +362,151 @@ export class RestockIos extends WebPlugin {
     return { written: o.name, removed };
   }
 
-  // ---------- Home Assistant: not on iPhone yet ----------
+  // ---------- Home Assistant (0.13.2): the token and the requests here; the rounds are haSync.ts ----------
+  // The token is kept in Restock's own storage on the iPhone (its Library folder, which the Files app
+  // doesn't show), and only ever goes to the address it was saved for (as HomeAssistant.java).
+  private async haSaved(): Promise<{ token: string; for: string } | undefined> {
+    try {
+      const r = await Filesystem.readFile({ path: HA_FILE, directory: Directory.Library, encoding: Encoding.UTF8 });
+      const v = JSON.parse(typeof r.data === 'string' ? r.data : '') as { token?: unknown; for?: unknown };
+      return typeof v.token === 'string' && typeof v.for === 'string' && v.token ? { token: v.token, for: v.for } : undefined;
+    } catch {
+      return undefined;
+    }
+  }
   async haHasToken() {
-    return { saved: false };
+    return { saved: !!(await this.haSaved()) };
   }
-  async haForgetToken() {}
-  async haSaveToken(): Promise<never> {
-    throw new IosUnavailable('Home Assistant');
+  async haForgetToken() {
+    await Filesystem.deleteFile({ path: HA_FILE, directory: Directory.Library }).catch(() => undefined);
   }
-  async haRequest(): Promise<never> {
-    throw new IosUnavailable('Home Assistant');
+  async haSaveToken(o: { token: string; address: string }) {
+    const token = haToken(o.token);
+    await Filesystem.writeFile({ path: HA_FILE, directory: Directory.Library, encoding: Encoding.UTF8, recursive: true, data: JSON.stringify({ token, for: haBase(o.address) }) });
   }
+  async haRequest(o: { address: string; method: 'GET' | 'POST'; path: string; body?: string; token?: string }) {
+    if (o.method !== 'GET' && o.method !== 'POST') throw new Error('Only GET and POST');
+    if (!HA_PATH.test(o.path) || o.path.includes('..')) throw new Error('Not a Home Assistant API path');
+    const at = haBase(o.address);
+    let token: string;
+    if (o.token && o.token.trim()) token = haToken(o.token);
+    else {
+      const saved = await this.haSaved();
+      if (!saved) throw new Error('No Home Assistant token is saved on this iPhone.');
+      // The saved token only goes to the address it was saved for, whatever the screens ask.
+      if (saved.for !== at) throw new Error("Home Assistant's address has changed. Tap Change and paste the token in again, so it's only sent to the new address.");
+      token = saved.token;
+    }
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
+    if (o.body !== undefined) headers['Content-Type'] = 'application/json';
+    const r = await http({ method: o.method, url: at + o.path, headers, body: o.body, timeoutMs: 20000 });
+    return { status: r.status, body: r.body };
+  }
+  /** No round of its own here: lib/homeAssistant.ts hears "not implemented" and runs haSync.ts itself. */
   async haRound(): Promise<never> {
-    throw new IosUnavailable('Home Assistant');
+    throw this.unimplemented('haRound is not implemented on iOS: the round runs in haSync.ts');
   }
   async haResetPairing() {}
 
-  // ---------- households, phone-to-phone and server sync: not on iPhone yet ----------
-  async syncInfo(): Promise<SyncInfo> {
-    return NO_SYNC;
+  // ---------- households (0.13.2): a Restock server's house, while Restock is open (ios/sync.ts) ----------
+  // Phone sharing with an Android phone and iCloud sync aren't in this build; what isn't here says so.
+  private syncWired = false;
+  /** The screens hear about changes that came in and rounds that finished, as on Android. */
+  private wireSyncEvents(): void {
+    if (this.syncWired) return;
+    this.syncWired = true;
+    sync.setSyncEvents({ changed: () => this.notifyListeners('syncChanged', {}), done: (i) => this.notifyListeners('syncDone', i) });
   }
-  async syncDismissNotice() {}
-  async syncCloseInvite() {}
-  async syncNextcloudCancel() {}
+  async syncInfo(): Promise<SyncInfo> {
+    this.wireSyncEvents();
+    try {
+      return sync.info();
+    } catch {
+      return NO_SYNC;
+    }
+  }
+  async syncNow() {
+    this.wireSyncEvents();
+    return sync.syncNow();
+  }
   async syncServerPoll() {
-    return { received: 0 };
+    this.wireSyncEvents();
+    try {
+      return await sync.serverPoll();
+    } catch {
+      return { received: 0 }; // not open yet, or out of reach: the next look tries again
+    }
+  }
+  async syncCheckServer(o: { code: string }) {
+    return sync.checkServer(o.code);
+  }
+  async syncJoinServer3(o: { code: string; how: 'join' | 'bring' | 'leave' }) {
+    this.wireSyncEvents();
+    return sync.joinServer3(o.code, o.how);
+  }
+  async syncSetServer(o: { label?: string; tabs?: Section[]; receipts?: boolean; cards?: boolean; takeBack?: string[] }) {
+    return sync.setServer(o);
+  }
+  /** What this device shares, from the household's own screen: only its tabs here. */
+  async syncSet(o: { name?: string; household?: string; tabs?: Section[]; shareCards?: boolean }) {
+    if (o.shareCards !== undefined) sync.setServer({ cards: o.shareCards });
+    // The household's name: an iCloud household's first device changes it (a server's house is named on the server).
+    if (o.household !== undefined) {
+      const { house, folder, saved } = sync.hub();
+      if (house.joined()) throw new Error("Your household's name is changed on your Restock server's page.");
+      if (folder.joined()) {
+        folder.rename(o.household);
+        saved();
+      }
+    }
+    if (o.name !== undefined) {
+      const { e, saved } = sync.hub();
+      e.setMeta('name', o.name.trim().slice(0, 40) || 'iPhone');
+      saved();
+    }
+    return o.tabs ? sync.setServer({ tabs: o.tabs }) : sync.info();
+  }
+  async syncStopServer(o: { bringBack?: boolean; takeBack?: string[] }) {
+    this.wireSyncEvents();
+    return sync.stopServer({ takeBack: o?.takeBack });
+  }
+  /** Leaving the household: in a house, that's leaving the server. */
+  async syncLeave() {
+    this.wireSyncEvents();
+    const r = await sync.stopServer({});
+    return { ...r, left: r.left !== false };
   }
   async syncServerHealth() {
-    return {};
+    return sync.serverHealth().catch(() => ({}));
+  }
+  async syncDismissNotice() {
+    try {
+      sync.dismissNotice();
+    } catch {
+      // nothing open yet: nothing to dismiss
+    }
+  }
+  /** 0.14.0: Sign in on a computer: the code on the server's sign-in page. */
+  async syncWebCode(o: { code: string }) {
+    return sync.webCode(o.code);
+  }
+  async syncWebApprove(o: { code: string }) {
+    return sync.webApprove(o.code);
+  }
+  async syncCloseInvite() {}
+  async syncNextcloudCancel() {}
+  async syncJoinServer(): Promise<never> {
+    throw new Error('That code is from an older Restock server. On iPhone and iPad, Restock joins a server that is the house: update the server, choose "Make this server the house" on its page, then scan a new Add a phone code.');
   }
 }
 
 // Everything else to do with sync says the same thing.
 for (const m of [
   'syncInvite', 'syncStartHousehold', 'syncRemove', 'syncHandOver', 'syncCancelHandOver', 'syncRecovery', 'syncRecoverySaved', 'syncTakeOver',
-  'syncSetFolder', 'syncSetWebDav', 'syncNextcloud', 'syncJoinServer', 'syncStopServer', 'syncWebCode', 'syncWebApprove', 'syncServerPhoto',
-  'syncCheckServer', 'syncJoinHouse', 'syncSetServer', 'syncSetWifi', 'syncHandOverServer', 'syncPeek', 'syncJoin', 'syncNow', 'syncSet', 'syncLeave',
+  'syncSetFolder', 'syncSetWebDav', 'syncNextcloud', 'syncServerPhoto',
+  'syncJoinHouse', 'syncSetWifi', 'syncHandOverServer', 'syncPeek', 'syncJoin',
 ]) {
   (RestockIos.prototype as unknown as Record<string, () => Promise<never>>)[m] = async () => {
-    throw new IosUnavailable('Sharing with a household');
+    throw new IosUnavailable('That way of sharing');
   };
 }

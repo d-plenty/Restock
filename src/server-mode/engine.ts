@@ -74,7 +74,7 @@ export function keepLocalCostcoLine(cur: Row, merged: Row): void {
   merged.price = cur.price ?? null;
   merged.product = cur.product ?? null;
 }
-import { applyRows, settingChangeOk, settingTab, type SettingsRoom } from '../lib/sharedSettings';
+import { applyRows, checkValue, keysFor, settingChangeOk, settingTab, valueOf as settingValueOf, type SettingsRoom } from '../lib/sharedSettings';
 import { cleanSummary } from '../lib/phoneSummary';
 
 export type Row = Record<string, unknown>;
@@ -127,8 +127,13 @@ export interface Shares {
 
 /** 0.9.4: the engine's options. */
 export interface EngineOptions {
-  /** 'web' (the default): the web app. 'server': the Restock server, the household's owner. */
-  role?: 'web' | 'server';
+  /**
+   * 'web' (the default): the web app. 'server': the Restock server, the household's owner.
+   * 'phone' (0.13.2): the iPhone and iPad app, a phone of the household like an Android one
+   * (SyncEngine.java, SyncFolder.java): its file carries recent prices and the household's rows it
+   * holds, loyalty cards only when it shares them, and cards that come in are kept whole.
+   */
+  role?: 'web' | 'server' | 'phone';
   /** Server: signs a household change's text (signedText) with the owner key; base64url DER. */
   sign?: (text: string) => string;
   /**
@@ -136,6 +141,8 @@ export interface EngineOptions {
    * everything. Asked each time a file comes in, so a changed setting counts from the next file.
    */
   keepFrom?: () => string | null;
+  /** Phone: false for a file that carries no prices (a picked folder); a server's file carries the last 60 days'. */
+  prices?: boolean;
 }
 
 /** 0.9.4: the household's owner-signed `server` row (where the house is, its kex key, Keep data for). */
@@ -259,7 +266,7 @@ export type SigCheck = (pub: string, text: string, sig: string) => boolean;
 
 export class WebSyncEngine {
   private customTabs?: Map<string, string>;
-  readonly role: 'web' | 'server';
+  readonly role: 'web' | 'server' | 'phone';
 
   constructor(
     readonly db: SyncDb,
@@ -606,6 +613,8 @@ export class WebSyncEngine {
         const deleted = truthy(e.deleted);
         if (tbl === 'household' && !this.householdChangeAllowed(pk, device, e)) continue;
         if (tbl === 'receipts' && !receipts) continue;
+        // 0.13.2, a phone: loyalty cards only when this phone shares its own (SyncEngine.apply).
+        if (tbl === 'cards' && this.role === 'phone' && !this.shareCards()) continue;
         // 0.9.3: household settings only of a sensible size and shape, and not without end.
         if (tbl === 'household_settings' && !settingChangeOk(pk, e.row, deleted, room)) continue;
         if (stamp > now + CLOCK_SLACK_MS) this.setMeta('clock_warn', device);
@@ -655,7 +664,7 @@ export class WebSyncEngine {
         } else {
           if (row === null) continue;
           if (tbl === 'items') this.keepLocalCostcoPicks(pk, row);
-          this.writeRow(tbl, tbl === 'cards' ? stripCard(row) : row, this.columnsOf(tbl, columns));
+          this.writeRow(tbl, tbl === 'cards' && this.role !== 'phone' ? stripCard(row) : row, this.columnsOf(tbl, columns));
         }
         this.logEntry(tbl, pk, stamp, device, deleted, e.sig === null || e.sig === undefined ? null : String(e.sig), created, this.originOf(e, stamp, device, deleted, created, had, this.applyingFrom));
         if (tbl === 'household_settings') settings = true;
@@ -1140,7 +1149,8 @@ export class WebSyncEngine {
    * Returns the entry as it goes out in the server's file.
    */
   writeHousehold(k: string, v: string | null): Entry | null {
-    if (this.role !== 'server' || !this.opts.sign) throw new Error('Only the server signs household changes.');
+    // 0.13.2: and a phone that is its household's owner (an iCloud household's first device: ios/folderHouse.ts).
+    if ((this.role !== 'server' && this.role !== 'phone') || !this.opts.sign) throw new Error('Only the household\'s owner signs household changes.');
     const sign = this.opts.sign;
     let out: Entry | null = null;
     this.db.transaction(() => {
@@ -1162,6 +1172,47 @@ export class WebSyncEngine {
       out = e;
     });
     return out;
+  }
+
+  /**
+   * 0.13.2 (SharedSettings.seed): the household's settings rows made from this device's own settings,
+   * where the household has none yet. Only the household's owner phone does it, or the first phone of
+   * a new house (sync_meta seed_settings). Stamped 1, so any row another phone already wrote wins.
+   */
+  seedSettings(): number {
+    const owner = this.householdValue('owner');
+    if (!((owner !== null && owner === this.device()) || this.meta('seed_settings') === '1')) return 0;
+    let s: Record<string, unknown> | null = null;
+    try {
+      const r = this.db.query("SELECT value FROM kv WHERE key = 'settings'");
+      const v: unknown = r.length ? JSON.parse(String(r[0].value)) : null;
+      s = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+    } catch {
+      s = null;
+    }
+    if (!s) return 0;
+    const have = new Set<string>();
+    for (const r of this.db.query('SELECT k FROM household_settings')) have.add(String(r.k));
+    // Rows already noted (another phone's, or a delete) count as there too.
+    for (const r of this.db.query("SELECT pk FROM sync_log WHERE tbl = 'household_settings'")) have.add(String(r.pk));
+    const add: [string, string][] = [];
+    for (const k of keysFor(s, this.tabs())) {
+      if (have.has(k)) continue;
+      const v = settingValueOf(s, k);
+      if (v === undefined || v === null || checkValue(k, v) === undefined) continue;
+      add.push([k, JSON.stringify(v)]);
+    }
+    if (!add.length) return 0;
+    const me = this.device();
+    this.db.transaction(() => {
+      this.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
+      for (const [k, v] of add) {
+        this.db.exec('INSERT OR IGNORE INTO household_settings (k, v) VALUES (?, ?)', [k, v]);
+        this.logEntry('household_settings', k, 1, me, false, null, 1, null);
+      }
+      this.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
+    });
+    return add.length;
   }
 
   /** 0.9.4: the household's `server` row, checked (null without one). */
@@ -1259,10 +1310,14 @@ export class WebSyncEngine {
     if (mark === this.meta('folder_top') && present) return null;
     const oldest = this.now() - OLD_DELETE_MS;
     const server = this.role === 'server';
-    const leaves = server ? SERVER_LEAVES_OUT : WEB_LEAVES_OUT;
-    let where = ` AND tbl NOT IN (${leaves.map((t) => `'${t}'`).join(', ')})`;
+    const phone = this.role === 'phone';
+    // A phone leaves nothing out by name: collect() already drops its cards and receipts unless it shares them.
+    const leaves = server ? SERVER_LEAVES_OUT : phone ? [] : WEB_LEAVES_OUT;
+    let where = leaves.length ? ` AND tbl NOT IN (${leaves.map((t) => `'${t}'`).join(', ')})` : '';
     // 0.9.4: the server's file carries recent prices, as a phone's file on a server does.
-    if (server) where += ` AND (tbl <> 'prices' OR stamp > ${Math.trunc(this.now() - SERVER_PRICES_MS)})`;
+    if (server || (phone && this.opts.prices !== false)) where += ` AND (tbl <> 'prices' OR stamp > ${Math.trunc(this.now() - SERVER_PRICES_MS)})`;
+    // A phone's file in a picked folder (iCloud Drive) carries no prices, to stay small (SyncFolder.writeOwn).
+    else if (phone) where += ` AND tbl <> 'prices'`;
     const c = this.collect(0, null, 5_000_000, null, where, true, oldest);
     let fileTop = top;
     const left = this.db.query("SELECT MIN(seq) AS s FROM sync_log WHERE deleted = 1 AND tbl <> '_seq' AND stamp < ?", [oldest]);
@@ -1278,7 +1333,7 @@ export class WebSyncEngine {
       format: 'restock-sync',
       v: 1,
       device: this.device(),
-      name: this.meta('name') ?? (server ? 'Server' : 'Web'),
+      name: this.meta('name') ?? (server ? 'Server' : phone ? 'iPhone' : 'Web'),
       keyv,
       at,
       entries: c.entries,

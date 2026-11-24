@@ -2254,4 +2254,121 @@ public class RestockNativePlugin extends Plugin {
         pendingAction = null;
         call.resolve(a);
     }
+
+    // ---------- 0.14.0: the Wi-Fi for the app's own screens (LanBridge; src/lib/handover.ts) ----------
+
+    private final ExecutorService lanThread = Executors.newCachedThreadPool();
+    private LanBridge lanBridge;
+
+    private synchronized LanBridge lan() {
+        if (lanBridge == null) {
+            lanBridge = new LanBridge(new LanBridge.Events() {
+                @Override
+                public void message(String key, String conn, String from, byte[] data) {
+                    JSObject e = new JSObject();
+                    e.put("key", key);
+                    e.put("conn", conn);
+                    e.put("from", from);
+                    e.put("data", android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP));
+                    notifyListeners("lanMessage", e);
+                }
+
+                @Override
+                public void ended(String key, String conn) {
+                    JSObject e = new JSObject();
+                    e.put("key", key);
+                    e.put("conn", conn);
+                    notifyListeners("lanEnded", e);
+                }
+            });
+        }
+        return lanBridge;
+    }
+
+    /** This phone's address on the Wi-Fi (nothing when it isn't on Wi-Fi or Ethernet). */
+    @PluginMethod
+    public void lanInfo(PluginCall call) {
+        lanThread.execute(() -> {
+            JSObject r = new JSObject();
+            try {
+                SyncHub hub = SyncHub.get(getContext());
+                String ip = hub.onLan() ? hub.localIp() : null;
+                if (ip != null) r.put("ip", ip);
+            } catch (Exception ignored) {
+                // no address
+            }
+            call.resolve(r);
+        });
+    }
+
+    @PluginMethod
+    public void lanDial(PluginCall call) {
+        final String host = call.getString("host", "");
+        final int port = call.getInt("port", 0);
+        final int timeout = call.getInt("timeoutMs", 3000);
+        lanThread.execute(() -> {
+            try {
+                if (!SyncHub.get(getContext()).onLan()) throw new java.io.IOException("This phone isn't on Wi-Fi.");
+                JSObject r = new JSObject();
+                r.put("id", lan().dial(host, port, timeout));
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Couldn't connect." : e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void lanAsk(PluginCall call) {
+        final String id = call.getString("id", "");
+        final String data = call.getString("data", "");
+        final int timeout = call.getInt("timeoutMs", 60000);
+        lanThread.execute(() -> {
+            try {
+                byte[] answer = lan().ask(id, android.util.Base64.decode(data, android.util.Base64.DEFAULT), timeout);
+                JSObject r = new JSObject();
+                r.put("data", android.util.Base64.encodeToString(answer, android.util.Base64.NO_WRAP));
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "The other phone didn't answer." : e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void lanClose(PluginCall call) {
+        lan().close(call.getString("id", ""));
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void lanListen(PluginCall call) {
+        final String key = call.getString("key", "send");
+        lanThread.execute(() -> {
+            try {
+                if (!SyncHub.get(getContext()).onLan()) throw new java.io.IOException("This phone isn't on Wi-Fi.");
+                JSObject r = new JSObject();
+                r.put("port", lan().listen(key, null));
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Restock couldn't start listening on this Wi-Fi." : e.getMessage(), e);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void lanReply(PluginCall call) {
+        String data = call.getString("data");
+        lan().reply(call.getString("conn", ""), data == null ? null : android.util.Base64.decode(data, android.util.Base64.DEFAULT));
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void lanStop(PluginCall call) {
+        final String key = call.getString("key", "send");
+        lanThread.execute(() -> {
+            lan().stop(key);
+            call.resolve();
+        });
+    }
 }

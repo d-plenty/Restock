@@ -2,7 +2,7 @@ import { loadTrip, reopensTrip } from '../lib/trip';
 import { App as CapApp } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { openDatabase } from '../lib/boot';
 import { wireSync } from '../lib/sync';
@@ -61,10 +61,15 @@ import { SettingsScreen } from './screens/Settings';
 import { FeedbackScreen } from './screens/Feedback';
 import { StoresScreen } from './screens/Stores';
 import { SyncScreen } from './screens/Sync';
+// Only ever shown on iPhone and iPad, so it (and the sync engine it brings) is loaded only there.
+const WifiSyncScreen = lazy(() => import('./screens/WifiSync').then((m) => ({ default: m.WifiSyncScreen })));
+const IcloudSyncScreen = lazy(() => import('./screens/IcloudSync').then((m) => ({ default: m.IcloudSyncScreen })));
 import { RestockServerScreen } from './screens/RestockServer';
 import { HomeAssistantScreen } from './screens/HomeAssistant';
 import { wireHomeAssistant } from '../lib/homeAssistant';
 import { serverMode, serverUi, useDesktopWidth } from '../server-mode/flag';
+import { PAD_SIDE, usePadWide, type PadSide } from './padWide';
+import { isIos } from '../lib/platform';
 import { onUndo, undo as undoStep, undoneText } from '../lib/undo'; // 0.9.5 (undo)
 import { canLeave, getSettings as shownSettings, hasUnsaved } from '../lib/settingsDraft'; // 0.9.5 (save)
 import { askChoice, askLeave } from '../lib/confirm'; // 0.9.5 (save), 0.10.0
@@ -288,6 +293,15 @@ function RestockApp() {
       restoreScroll(next.length);
       return next;
     });
+  // 0.13.2: an iPad held sideways (ui/padWide.ts): one of More's rows, opened from the side bar.
+  const padWide = usePadWide();
+  const openFromSide = (name: PadSide) =>
+    leaveBack(() => {
+      scrolls.current.length = 0;
+      setTab('more');
+      setStack([{ name } as Screen]);
+    });
+  const sideAt = padWide && tab === 'more' ? PAD_SIDE.find((x) => x.screen === stack[0]?.name)?.screen : undefined;
   const popRef = useRef(popScreen);
   popRef.current = popScreen;
   const exitArmed = useRef(0);
@@ -631,7 +645,20 @@ function RestockApp() {
         {top.name === 'inventorySettings' && <InventorySettingsScreen />}
         {top.name === 'stores' && <StoresScreen section={top.section} />}
         {top.name === 'cards' && <CardsScreen />}
-        {top.name === 'sync' && <SyncScreen invite={top.invite} />}
+        {/* 0.13.2: on iPhone and iPad, Sync is iCloud sync (syncing with another phone has its own screen there, wifiSync) */}
+        {top.name === 'sync' &&
+          (isIos() ? (
+            <Suspense fallback={<div className="screen" />}>
+              <IcloudSyncScreen />
+            </Suspense>
+          ) : (
+            <SyncScreen invite={top.invite} />
+          ))}
+        {top.name === 'wifiSync' && (
+          <Suspense fallback={<div className="screen" />}>
+            <WifiSyncScreen apple={top.apple} />
+          </Suspense>
+        )}
         {top.name === 'restockServer' && <RestockServerScreen />}
         {top.name === 'homeAssistant' && <HomeAssistantScreen />}
         {top.name === 'household' && <HouseholdScreen />}
@@ -717,7 +744,7 @@ function RestockApp() {
 
   return (
     <NavContext.Provider value={nav}>
-      <div className="app">
+      <div className={`app${padWide ? ' pad-wide' : ''}`}>
         {/* Covers the status bar, so pages don't scroll up underneath the clock and battery. */}
         <div className="status-shade" aria-hidden />
         {serverMode && serverUi.current && <serverUi.current.Strip />}
@@ -729,20 +756,40 @@ function RestockApp() {
         {shownTab === 'more' && <MoreScreen />}
 
         <nav className="tabs" aria-label="Main" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              className="tab"
-              aria-current={shownTab === t.id || (t.id === 'more' && isMoreTab(shownTab)) ? 'page' : undefined}
-              onClick={() => nav.setTab(t.id)}
-            >
-              <Icon name={t.icon} />
-              {t.label}
-            </button>
-          ))}
+          {/* 0.13.2, an iPad held sideways: the same tabs down the left side, with More's rows listed under them. */}
+          {padWide && (
+            <div className="pad-brand" aria-hidden="true">
+              <span className="pad-brand-mark">R</span>
+              <span>Restock</span>
+            </div>
+          )}
+          {tabs
+            .filter((t) => !padWide || t.id !== 'more')
+            .map((t) => (
+              <button
+                key={t.id}
+                className="tab"
+                aria-current={(shownTab === t.id && !(padWide && sideAt)) || (t.id === 'more' && isMoreTab(shownTab)) ? 'page' : undefined}
+                onClick={() => nav.setTab(t.id)}
+              >
+                <Icon name={t.icon} />
+                {t.label}
+              </button>
+            ))}
+          {padWide && (
+            <>
+              <span className="pad-rule" aria-hidden="true" />
+              {PAD_SIDE.map((x) => (
+                <button key={x.screen} className="tab" aria-current={sideAt === x.screen ? 'page' : undefined} onClick={() => openFromSide(x.screen)}>
+                  <Icon name={x.icon} />
+                  {x.label}
+                </button>
+              ))}
+            </>
+          )}
         </nav>
 
-        {top && <div className="overlay">{overlay}</div>}
+        {top && <div className={`overlay${sideAt && stack.length === 1 ? ' side-root' : ''}`}>{overlay}</div>}
 
         <TourHost />
         <ConfirmHost />

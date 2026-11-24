@@ -4,8 +4,8 @@
 // The words say the card's name and the day only, never its number, PIN or balance.
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import type { GiftCard } from '../types';
-import { isReminderId, reminderAt, reminderId, reminderText } from './giftCards';
+import type { GiftCard, LoyaltyCard } from '../types';
+import { isReminderId, loyaltyReminderAt, reminderAt, reminderId, reminderText } from './giftCards';
 import { notificationsAllowed } from './notify';
 
 // Not async on purpose (notify.ts plugin(): a Capacitor plugin object answers `then`).
@@ -14,24 +14,29 @@ function plugin(): typeof LocalNotifications | undefined {
 }
 
 /** The notifications to have for these cards (exported for tests). */
-export function wantedReminders(cards: GiftCard[], now = Date.now()) {
+export function wantedReminders(cards: GiftCard[], now = Date.now(), loyalty: LoyaltyCard[] = []) {
   const out: { id: number; title: string; body: string; at: Date }[] = [];
   for (const c of cards) {
     const at = reminderAt(c, now);
     if (at) out.push({ id: reminderId(c.id), ...reminderText(c), at });
   }
+  // 0.14.0: a loyalty card with an expiry date, a month before. Its name and the day only, never its number.
+  for (const c of loyalty) {
+    const at = loyaltyReminderAt(c, now);
+    if (at) out.push({ id: reminderId(c.id), title: `${c.label || 'Your card'} expires in 1 month`, body: `Your ${c.label || 'loyalty'} card expires on ${c.expiry}. Open Restock to update it.`, at });
+  }
   return out;
 }
 
 /** Cancels every gift card reminder, then schedules the ones the cards want now. Never asks for permission. */
-export async function scheduleCardReminders(cards: GiftCard[]): Promise<void> {
+export async function scheduleCardReminders(cards: GiftCard[], loyalty: LoyaltyCard[] = []): Promise<void> {
   const ln = plugin();
   if (!ln) return;
   try {
     const pending = await ln.getPending();
     const old = pending.notifications.filter((n) => isReminderId(n.id)).map((n) => ({ id: n.id }));
     if (old.length) await ln.cancel({ notifications: old });
-    const want = wantedReminders(cards);
+    const want = wantedReminders(cards, Date.now(), loyalty);
     if (!want.length || !(await notificationsAllowed())) return;
     await ln.schedule({
       notifications: want.map((w) => ({ id: w.id, title: w.title, body: w.body, extra: { action: 'cards' }, schedule: { at: w.at, allowWhileIdle: true } })),

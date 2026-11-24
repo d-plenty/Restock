@@ -76,9 +76,15 @@ export async function openDatabase(): Promise<void> {
       },
     });
     await initDb(driver);
+    // 0.13.2: the iPhone and iPad app's sync works on the database itself (ios/sync.ts), as the web app's does.
+    sqlJs = { db: driver.raw, saved: () => void driver.run('SELECT 1').catch(() => undefined) };
   }
   await ensureDefaults();
 }
+
+/** The sql.js database itself, where that's what this app runs on (not Android), and a nudge to save it after writing to it directly. */
+let sqlJs: { db: import('sql.js').Database; saved: () => void } | undefined;
+export const sqlJsDatabase = () => sqlJs;
 
 /**
  * Whether this is a different version from last time (or the database needs upgrading). 0.9.6: Restock

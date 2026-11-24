@@ -57,6 +57,8 @@ export type Screen =
   | { name: 'stores'; section?: Section }
   | { name: 'cards' }
   | { name: 'sync'; invite?: boolean }
+  /** 0.14.0, iPhone and iPad: syncing with another phone over the Wi-Fi (`apple`: opened as iPhone to iPhone). */
+  | { name: 'wifiSync'; apple?: boolean }
   | { name: 'restockServer' }
   /** 0.9.3: Settings → Home Assistant (the shopping list both ways). */
   | { name: 'homeAssistant' }

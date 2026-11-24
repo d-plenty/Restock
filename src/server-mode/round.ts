@@ -50,6 +50,9 @@ export interface SharedSection {
 export interface RoundOptions {
   /** A house (protocol v3): no webkeys/, no archives, no webPub. */
   v3?: boolean;
+  /** 0.13.2, a phone (the iPhone and iPad app): its own file's name, and what goes in it besides the entries (`shares`). */
+  ownName?: string;
+  extra?: () => Record<string, unknown>;
 }
 
 const CHAIN = /^[a-z0-9-]{1,60}$/;
@@ -104,7 +107,7 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
     const f = list.find((x) => x.name === n);
     return f?.version ?? (f ? `${f.size}/${f.modified ?? ''}` : null);
   };
-  const own = webFileName(k.webId);
+  const own = opts.ownName ?? webFileName(k.webId);
 
   // A newer household key, sealed to this browser by a phone (after a phone was removed). Anyone
   // can seal a webkeys/ file to the web's public key (it's no secret), so what's in it is only a
@@ -237,7 +240,7 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
     // So only a browser that has the key pair names one: a browser signed in with a phone only
     // knows the webPub the server told it, and passes on the one already in the file instead.
     const webPub = opts.v3 ? null : k.webPriv ? k.webPub : e.meta('own_webpub');
-    const sealed = sealRsf1(unb64(k.keys[String(keyv)]), { ...out.msg, ...(webPub ? { webPub } : {}) });
+    const sealed = sealRsf1(unb64(k.keys[String(keyv)]), { ...out.msg, ...(webPub ? { webPub } : {}), ...(opts.extra?.() ?? {}) });
     if (attempt > 0 || f) {
       const now2 = await remote.files();
       const g = now2.find((x) => x.name === own);

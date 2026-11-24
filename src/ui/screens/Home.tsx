@@ -1,4 +1,4 @@
-import { isIos } from '../../lib/platform';
+import { isIos, isPad } from '../../lib/platform';
 import { greeting, todayText } from '../../lib/greeting';
 import { useState, useSyncExternalStore } from 'react';
 import { askResume, clearTrip, loadTrip, subscribeTrip } from '../../lib/trip';
@@ -23,6 +23,7 @@ import { protection } from '../../lib/protection';
 import { confirmAction } from '../../lib/confirm';
 import { useNav } from '../nav';
 import { RecallBanner } from './Recalls';
+import { CardExpiryNotice } from './CardExpiryNotice';
 import { AddBar } from '../simple';
 import { yourShops } from './Catalogues';
 import { shopTileNote } from '../../lib/ownSpecials';
@@ -194,11 +195,14 @@ export function HomeScreen() {
         ),
       )}
 
+      {/* 0.14.0: a loyalty card about to run out (Cards → its expiry date). */}
+      <CardExpiryNotice />
+
       {!serverMode && sync && recs.length > 0 && needsBackupNudge(settings, recs.length, oldest, Date.now(), protection(false, sync).covered) && (
         <div className="card hint" style={{ flexDirection: 'column', gap: 8 }}>
           <strong>Back up your pantry</strong>
           {/* 0.12.0: two lines (it was a paragraph) */}
-          <span>Everything is kept on this phone. A backup is the only way to get it back if the phone is lost or reset.</span>
+          <span>{isPad() ? 'Everything is kept on this iPad. A backup is the only way to get it back if the iPad is lost or reset.' : 'Everything is kept on this phone. A backup is the only way to get it back if the phone is lost or reset.'}</span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn small primary" onClick={backupNow}>
               Back up now

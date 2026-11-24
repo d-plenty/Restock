@@ -200,6 +200,8 @@ export interface LoyaltyCard {
   label: string;
   number: string;
   createdAt: string;
+  /** 0.14.0: the day the card runs out (YYYY-MM-DD), when it has one. Restock reminds a month before. */
+  expiry?: string;
 }
 
 // ---------- 0.9.6 (cards): gift cards, beside loyalty cards on the Cards screen ----------

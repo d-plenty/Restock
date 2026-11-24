@@ -9,6 +9,7 @@ import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
 import { Icon, LoadingBar, timeAgo, TopBar } from '../components';
 import { useNav } from '../nav';
+import { isIos } from '../../lib/platform';
 
 // Recall alerts: once a day (separately from price checks, and not adjustable) Android checks the
 // official Australian recall lists against what you have. RecallChecker.java does the checking,
@@ -192,6 +193,12 @@ export function RecallsScreen() {
   return (
     <div className="screen">
       <TopBar title="Recall alerts" />
+      {isIos() && (
+        <div className="banner grey" role="status">
+          <strong>Coming to iPhone and iPad</strong>
+          <span style={{ fontSize: 13 }}>Restock doesn't check the recall lists on an iPhone or iPad yet. The official lists are linked below.</span>
+        </div>
+      )}
       <RecallSettings settings={settings} />
       <div className="card">
         <span className="small">

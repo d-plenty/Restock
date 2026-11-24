@@ -1,4 +1,3 @@
-import { IosWhy } from '../IosWhy';
 import { IOS_CHECK_EVERY_HOURS } from '../../lib/check';
 import { isIos } from '../../lib/platform';
 import { cleanSearch } from '../../lib/searchText';
@@ -51,7 +50,7 @@ import { customsInUse, madeInUse, NewCustomSheet } from './CustomSections';
 import { shopSummary } from './Stores';
 import { ExportSheet, pricesIn } from './BackupParts';
 import { LegalSheet } from './Legal';
-import { readBackupFile, RestoreSheet } from './Restore';
+import { ImportSheet, RestoreSheet } from './Restore';
 import { getHaConfig, haPhone, phoneLabel } from '../../lib/homeAssistant';
 import { serverMode } from '../../server-mode/flag';
 import { webLink } from '../../lib/site';
@@ -209,11 +208,11 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
   useEffect(() => setSyncShown(undefined), [sync]);
   // 0.9.1: how much price history a backup holds.
   const span = useLive(priceHistorySpan, []);
-  const fileRef = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState<'privacy' | 'disclaimer'>();
   const [picking, setPicking] = useState<BackupSummary>();
   const [testing, setTesting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState<number>();
   const screen = useRef<HTMLDivElement>(null);
@@ -501,37 +500,22 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
           <div className="card flush">
             <button className="row" onClick={() => setExporting(true)}>
               <span className="grow">
-                <span className="title">Export a backup</span>
+                <span className="title">Export data</span>
                 <span className="small">
-                  Pick what goes in: everything, or just some tabs, lists, cards or settings. {pricesIn(settings, span)} Keep it private.
+                  Pick what goes in: everything, or just some tabs, lists, cards or settings. Save it as a file, or send it straight to another phone.{' '}
+                  {pricesIn(settings, span)} Keep it private.
                 </span>
+              </span>
+            </button>
+            <button className="row" onClick={() => setImporting(true)}>
+              <span className="grow">
+                <span className="title">Import data</span>
+                <span className="small">From a file or straight from another phone. Add it alongside what's here, or replace what's here.</span>
               </span>
             </button>
           </div>
           <AutoBackupSettings settings={settings} />
           <div className="card flush">
-            <button className="row" onClick={() => fileRef.current?.click()}>
-              <span className="grow">
-                <span className="title">Restore a backup</span>
-                <span className="small">Pick what to bring back: pantry, shopping list, cards or settings</span>
-              </span>
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/json,.json"
-              hidden
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (!file) return;
-                try {
-                  setPicking(await readBackupFile(file));
-                } catch (err) {
-                  nav.toast(err instanceof Error ? err.message : 'Could not read that file');
-                }
-              }}
-            />
             <button
               className="row"
               onClick={async () => {
@@ -547,15 +531,6 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
                 <span className="small">Your pantry, shopping list and price history, for Excel, Google Sheets, LibreOffice or Numbers.</span>
               </span>
             </button>
-            {/* 0.9.8: what only the server's web page does is shown here too, greyed, saying where. */}
-            {!serverMode && (
-              <div className="row" aria-disabled="true" style={{ opacity: 0.55 }}>
-                <span className="grow">
-                  <span className="title">Import data</span>
-                  <span className="small">On your Restock server's web page (Your data): adds products and prices from a file.</span>
-                </span>
-              </div>
-            )}
           </div>
         </>
       )}
@@ -571,13 +546,11 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             Home screen widgets
           </div>
           {isIos() ? (
-            <>
-              <div className="card ios-greyed" aria-disabled="true">
-                <span className="title">Home screen widgets</span>
-                <span className="small">Deals, shopping list and quick actions. Not on iPhone yet.</span>
-              </div>
-              <IosWhy reason="widgets" />
-            </>
+            // 0.14.0: widgets for iPhone are on the Coming soon list.
+            <button className="card" style={{ textAlign: 'left' }} onClick={() => nav.push({ name: 'soon', id: 'iphone' })}>
+              <span className="title">Home screen widgets</span>
+              <span className="small">Coming to iPhone and iPad. See Coming soon.</span>
+            </button>
           ) : (
             <Fold title="Home screen widgets" sub="Deals, shopping list and quick actions">
               <WidgetSettings settings={settings} />
@@ -783,13 +756,24 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       {reading && <LegalSheet doc={reading} onClose={() => setReading(undefined)} />}
       {testing && <ConnectionsSheet settings={settings} onClose={() => setTesting(false)} />}
       {exporting && <ExportSheet onClose={() => setExporting(false)} onDone={(m) => nav.toast(m)} />}
+      {importing && (
+        <ImportSheet
+          onClose={() => setImporting(false)}
+          onError={(m) => nav.toast(m)}
+          onPicked={(sum) => {
+            setImporting(false);
+            setPicking(sum);
+          }}
+        />
+      )}
       {picking && (
         <RestoreSheet
           summary={picking}
           onClose={() => setPicking(undefined)}
-          onDone={(what) => {
+          onDone={(what, whole) => {
             setPicking(undefined);
-            nav.toast(`Restored your ${what}`);
+            nav.toast(whole ? what : `Replaced your ${what}`);
+            if (whole) return;
             // 0.8.2: backups never hold the household; offer to join it again.
             void syncInfo().then(async (i) => {
               if (i.paired || !isNative()) return;
@@ -1017,7 +1001,7 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
                 ? 'An iPhone decides when apps may work in the background, so Restock can’t pick a time of day here. Open it now and then and your prices stay current. Check now on Home checks straight away.'
                 : 'Nothing is checked until you tap Check now on Home. We recommend leaving this on: without it, prices and your specials at each shop go out of date.'}
             </span>
-            <IosWhy reason="background" label="Why can’t I pick a time?" />
+            <span className="small">Picking a time of day: not possible on iPhone due to Apple's restrictions.</span>
           </div>
         </div>
       </>
@@ -1215,16 +1199,13 @@ export function UpdateRows({ settings }: { settings: Settings }) {
   // iPhone app: on an iPhone the section stays, greyed, and says why (Apple doesn't let an app update itself).
   if (isIos())
     return (
-      <>
-        <div className="card ios-greyed" aria-disabled="true">
-          <span className="title">Check for updates</span>
-          <span className="small">Restock {version}. Updating from inside the app isn't possible on an iPhone.</span>
-          <button className="btn block" disabled>
-            Check for updates
-          </button>
-        </div>
-        <IosWhy reason="updates" />
-      </>
+      <div className="card" aria-disabled="true">
+        <span className="title">Updates</span>
+        <span className="small">
+          Restock {version}. Updating from inside the app: not possible on iPhone due to Apple's restrictions. New versions come from where you
+          installed Restock.
+        </span>
+      </div>
     );
   if (!SELF_UPDATE) return null;
   return <UpdateRowsOn settings={settings} />;

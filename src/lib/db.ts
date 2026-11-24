@@ -168,6 +168,7 @@ const toCard = (r: Row): LoyaltyCard => ({
   label: r.label as string,
   number: r.number as string,
   createdAt: r.created_at as string,
+  ...(typeof r.expiry === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.expiry) ? { expiry: r.expiry } : {}),
 });
 
 const toReceipt = (r: Row): Receipt => ({
@@ -270,8 +271,8 @@ const entryOp = (e: ListEntry, replace: boolean): SqlOp => ({
 });
 
 const insertCardOp = (c: LoyaltyCard): SqlOp => ({
-  sql: `INSERT INTO cards (id, program, label, number, created_at) VALUES (?,?,?,?,?)`,
-  params: [c.id, c.program, c.label, c.number, c.createdAt],
+  sql: `INSERT INTO cards (id, program, label, number, created_at, expiry) VALUES (?,?,?,?,?,?)`,
+  params: [c.id, c.program, c.label, c.number, c.createdAt, c.expiry && /^\d{4}-\d{2}-\d{2}$/.test(c.expiry) ? c.expiry : null],
 });
 
 export const insertReceiptOp = (r: Receipt): SqlOp => ({
@@ -783,6 +784,12 @@ export async function addCard(c: LoyaltyCard): Promise<void> {
   await write([insertCardOp(c)]);
 }
 
+/** 0.14.0: a loyalty card's expiry date (YYYY-MM-DD), or undefined for none. */
+export async function setCardExpiry(id: string, expiry: string | undefined): Promise<void> {
+  const v = expiry && /^\d{4}-\d{2}-\d{2}$/.test(expiry) ? expiry : null;
+  await write([{ sql: 'UPDATE cards SET expiry = ? WHERE id = ?', params: [v, id] }]);
+}
+
 export async function deleteCard(id: string): Promise<void> {
   await write([{ sql: 'DELETE FROM cards WHERE id = ?', params: [id] }]);
 }
@@ -1256,8 +1263,10 @@ export async function restoreParts(
   s: Snapshot,
   parts: RestoreParts,
   renames: Map<string, string> = new Map(),
-  opts: { household?: boolean } = {},
+  opts: { household?: boolean; add?: boolean } = {},
 ): Promise<void> {
+  // 0.14.0: "Add alongside what's here": nothing on this phone is replaced or removed (addParts).
+  if (opts.add) return addParts(s, parts, renames);
   resetWatcher?.(); // 0.9.5 (undo)
   const ops: SqlOp[] = [];
   const before = await allGroups();
@@ -1355,6 +1364,139 @@ export async function restoreParts(
   if (ops.length) await write(ops);
   // 0.9.3: restored shops and settings on a household's tabs give way to the household's.
   if (parts.settings || parts.shops) await reapplyHouseholdSettings().catch(() => false);
+}
+
+const sameName = (x: string) => x.trim().toLowerCase().replace(/\s+/g, ' ');
+
+/** What addParts brought in and what it passed over, for the screen to say. */
+export interface AddCounts {
+  added: { items: number; lines: number; cards: number; receipts: number };
+  skipped: { items: number; lines: number; cards: number; receipts: number };
+}
+let lastAdd: AddCounts | undefined;
+/** The counts from the last "Add alongside" (restoreParts with `add`). */
+export const lastAddCounts = () => lastAdd;
+
+/**
+ * 0.14.0, Import data → "Add alongside what's here": the parts picked from a file are added to what
+ * this phone has, and nothing here is replaced or removed. Anything with the same name as something
+ * already here is skipped: an item (same name on the same tab), a list line (same words on the same
+ * list), a loyalty card (same program and number), a receipt or gift card (the very same one). A
+ * line for an item that was skipped is joined to this phone's item of that name. Settings and shops
+ * are never changed this way: this phone keeps its own.
+ */
+async function addParts(s: Snapshot, parts: RestoreParts, renames: Map<string, string>): Promise<void> {
+  resetWatcher?.();
+  const ops: SqlOp[] = [];
+  const counts: AddCounts = { added: { items: 0, lines: 0, cards: 0, receipts: 0 }, skipped: { items: 0, lines: 0, cards: 0, receipts: 0 } };
+  const before = await allGroups();
+  const tabOf = (g: { section?: string }) => g.section ?? 'pantry';
+  // An item in the file that's skipped: which of this phone's items it is.
+  const sameAs = new Map<string, string>();
+  const addedGroups = new Set<string>();
+  const secs = parts.pantry ? (parts.sections ?? SECTIONS) : [];
+  if (parts.pantry) {
+    const hereById = new Set(before.map((g) => g.id));
+    const hereByName = new Map(before.map((g) => [`${tabOf(g)}|${sameName(g.name)}`, g.id]));
+    const cats = await allCategories();
+    const catById = new Set(cats.map((c) => c.id));
+    const catByName = new Map(cats.map((c) => [`${c.section ?? 'pantry'}|${sameName(c.name)}`, c.id]));
+    // The file's categories on those tabs: one with a name already here is that one; the rest are added.
+    const catIs = new Map<string, string>();
+    for (const c of s.categories.filter((x) => secs.includes((x.section ?? 'pantry') as Section))) {
+      const here = catById.has(c.id) ? c.id : catByName.get(`${c.section ?? 'pantry'}|${sameName(c.name)}`);
+      if (here) catIs.set(c.id, here);
+      else {
+        ops.push(insertCategoryOp(c));
+        catIs.set(c.id, c.id);
+        catByName.set(`${c.section ?? 'pantry'}|${sameName(c.name)}`, c.id);
+      }
+    }
+    const haveProducts = new Set((await allProducts()).map((p) => p.id));
+    const newProducts = new Set<string>();
+    for (const g of s.groups.filter((x) => secs.includes(tabOf(x) as Section))) {
+      const name = renames.get(g.id) ?? g.name;
+      const here = hereById.has(g.id) ? g.id : (hereByName.get(`${tabOf(g)}|${sameName(name)}`) ?? hereByName.get(`${tabOf(g)}|${sameName(g.name)}`));
+      if (here) {
+        sameAs.set(g.id, here);
+        counts.skipped.items++;
+        continue;
+      }
+      for (const id of groupProductIds(g)) if (!haveProducts.has(id)) newProducts.add(id);
+      const full = fromBackup(g, s);
+      ops.push(insertGroupOp({ ...full, name, categoryId: full.categoryId ? (catIs.get(full.categoryId) ?? undefined) : undefined }));
+      hereByName.set(`${tabOf(g)}|${sameName(name)}`, g.id);
+      addedGroups.add(g.id);
+      counts.added.items++;
+    }
+    s.products.filter((p) => newProducts.has(p.id)).forEach((p) => ops.push(insertProductOp(p)));
+    // Prices only for products that are new here, so nothing is there twice.
+    s.prices.filter((r) => newProducts.has(r.productId)).forEach((r) => ops.push(insertReadingOp(r)));
+  }
+  if (parts.list) {
+    const backupTabs = new Map(s.groups.map((g) => [g.id, asSection(g.section)]));
+    const hereTabs = new Map(before.map((g) => [g.id, asSection(g.section)]));
+    const hereNames = new Map(before.map((g) => [g.id, g.name]));
+    const wordsOf = (e: ListEntry, names: Map<string, string>) => sameName((e.groupId ? names.get(e.groupId) : undefined) ?? e.text ?? '');
+    const here = await allListEntries();
+    const hereIds = new Set(here.map((e) => e.id));
+    const have = new Set(here.map((e) => `${lineTab(e, hereTabs)}|${wordsOf(e, hereNames)}`));
+    const fileNames = new Map(s.groups.map((g) => [g.id, renames.get(g.id) ?? g.name]));
+    for (const e of s.list) {
+      const tab = lineTab(e, backupTabs);
+      const key = `${tab}|${wordsOf(e, fileNames)}`;
+      if (hereIds.has(e.id) || have.has(key)) {
+        counts.skipped.lines++;
+        continue;
+      }
+      have.add(key);
+      // Its item came in with it, is one this phone already has, or didn't come: then it's a line of plain words.
+      const group = e.groupId ? (addedGroups.has(e.groupId) ? e.groupId : sameAs.get(e.groupId)) : undefined;
+      const text = e.groupId ? (fileNames.get(e.groupId) ?? e.text) : e.text;
+      const section = e.section ?? (e.groupId ? backupTabs.get(e.groupId) : undefined);
+      ops.push(insertEntryOp(group ? { ...e, groupId: group } : { ...e, groupId: undefined, text, section }));
+      counts.added.lines++;
+    }
+  }
+  if (parts.cards) {
+    const here = await allCards();
+    const ids = new Set(here.map((c) => c.id));
+    const same = new Set(here.map((c) => `${c.program}|${String(c.number).replace(/\s+/g, '')}`));
+    for (const c of s.cards) {
+      const key = `${c.program}|${String(c.number).replace(/\s+/g, '')}`;
+      if (ids.has(c.id) || same.has(key)) {
+        counts.skipped.cards++;
+        continue;
+      }
+      same.add(key);
+      ops.push(insertCardOp(c));
+      counts.added.cards++;
+    }
+    if (s.giftCards) {
+      const gifts = new Set((await allGiftCards()).map((g) => g.id));
+      for (const raw of s.giftCards) {
+        const g = cleanGiftCard(raw);
+        if (!g) continue;
+        if (gifts.has(g.id)) counts.skipped.cards++;
+        else {
+          ops.push(giftCardOp(g));
+          counts.added.cards++;
+        }
+      }
+    }
+  }
+  if (parts.receipts) {
+    const ids = new Set((await allReceipts()).map((r) => r.id));
+    for (const r of s.receipts ?? []) {
+      if (ids.has(r.id)) counts.skipped.receipts++;
+      else {
+        ops.push(insertReceiptOp(withSafePhotos(r)));
+        counts.added.receipts++;
+      }
+    }
+  }
+  lastAdd = counts;
+  if (ops.length) await write(ops);
 }
 
 /** Read the same tables the Android worker writes (used after a background check). */

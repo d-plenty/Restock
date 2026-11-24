@@ -4,7 +4,7 @@
 //   gift cards in `gift_cards`, never synced) and its own private storage for card photos;
 // - the web: this browser only (server-mode/cardStore.ts, IndexedDB), never the server.
 import type { GiftBarcodeType, GiftCard, LoyaltyCard } from '../types';
-import { addCard, allCards, allGiftCards, deleteCard, deleteGiftCard, getKV, putKV, saveGiftCard } from './db';
+import { addCard, allCards, allGiftCards, deleteCard, deleteGiftCard, getKV, putKV, saveGiftCard, setCardExpiry } from './db';
 import { onChange } from './live';
 import { act } from './undo';
 import { cardPhotoPath, deleteCardPhoto, readCardPhoto, writeCardPhoto } from './cardPhotos';
@@ -40,18 +40,27 @@ export interface CardStore {
    */
   codeTypes?(): Promise<Partial<Record<string, GiftBarcodeType>>>;
   setCodeType?(id: string, type: GiftBarcodeType): Promise<void>;
+  /** 0.14.0: a loyalty card's expiry date (YYYY-MM-DD), or undefined to take it off. */
+  setLoyaltyExpiry(id: string, expiry: string | undefined): Promise<void>;
 }
 
 const CODE_TYPES = 'cardCodeTypes';
 
-const reschedule = async () => scheduleCardReminders(await allGiftCards());
+const reschedule = async () => scheduleCardReminders(await allGiftCards(), await allCards());
 
 /** The phone's cards. */
 export const phoneCards: CardStore = {
   where: 'phone',
   loyalty: allCards,
-  addLoyalty: (c) => act(`${c.label} added`, () => addCard(c)),
+  async addLoyalty(c) {
+    await act(`${c.label} added`, () => addCard(c));
+    if (c.expiry) await reschedule();
+  },
   removeLoyalty: (id) => act('Card removed. Member prices for that shop stop counting.', () => deleteCard(id)),
+  async setLoyaltyExpiry(id, expiry) {
+    await act(expiry ? 'Expiry date saved' : 'Expiry date removed', () => setCardExpiry(id, expiry));
+    await reschedule();
+  },
   gifts: allGiftCards,
   async saveGift(g, label) {
     await act(label, () => saveGiftCard(g));

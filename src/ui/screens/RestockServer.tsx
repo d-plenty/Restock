@@ -1,4 +1,5 @@
 import { NotHereBanner } from '../IosWhy';
+import { deviceWord, isIos } from '../../lib/platform';
 import { useEffect, useRef, useState } from 'react';
 import { stage } from '../../lib/settingsDraft'; // 0.9.5 (save)
 import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar'; // 0.9.5 (save)
@@ -8,6 +9,7 @@ import { getSettings, updateSettings } from '../../lib/db';
 import { protection, suggestLocalText, wifiSyncOn } from '../../lib/protection';
 import { RestockNative, type ServerCodeCheck, type TakeBack } from '../../lib/sql/native';
 import {
+  canSync,
   agoText,
   demoSync,
   handoverCode,
@@ -99,14 +101,14 @@ function TurnOffSheet({ kind, onClose, onDone }: { kind: Kind; onClose: () => vo
     <Sheet title={`Stop sharing ${thing}?`} onClose={onClose}>
       <p className="small" style={{ margin: 0 }}>
         From now on this phone keeps its {thing} to itself.{' '}
-        {offer
+        {offer && !isIos()
           ? `What it already shared of its ${thing} stays on the server for the house, unless you tick the box below.`
           : 'What it already shared stays on the server for the house.'}
       </p>
       <div className="card" style={{ gap: 8 }}>
         <ShopDataStays />
       </div>
-      {offer && (
+      {offer && !isIos() && (
         <div className="card flush">
           <label className="check">
             <input type="checkbox" checked={takeBack} onChange={(e) => setTakeBack(e.target.checked)} />
@@ -381,7 +383,10 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
           {info.serverAway ? ` · Away: ${addressText(info.serverAway)}` : ''}
         </span>
         <span className="small">
-          {serverKeepText(keep)} This phone keeps your "Keep price history for" and moves older prices there{moved ? `: ${moved} so far` : ''}.
+          {serverKeepText(keep)}{' '}
+          {isIos()
+            ? `This ${deviceWord()} keeps its own price history and sends the last 60 days' prices to the house.`
+            : `This phone keeps your "Keep price history for" and moves older prices there${moved ? `: ${moved} so far` : ''}.`}
         </span>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn small primary" aria-expanded={sharing} onClick={() => setSharing((s) => !s)}>
@@ -426,7 +431,7 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
         </p>
       </div>
 
-      <div className="card flush">
+      <div className="card flush" hidden={isIos() && !canSync('wifi')}>
         <button className="row" onClick={() => nav.push({ name: 'sync' })}>
           <Icon name="wifi" size={18} />
           <span className="grow">
@@ -770,18 +775,28 @@ export function RestockServerScreen() {
             </div>
           )}
           <div className="card" style={{ gap: 8 }}>
-            <span className="eyebrow green" style={{ margin: 0 }}>
-              Recommended
+            {/* 0.13.2: not "Recommended" any more: it's for households that run a server */}
+            <span className="eyebrow" style={{ margin: 0 }}>
+              If you run one
             </span>
             <strong style={{ fontSize: 17 }}>Your Restock server</strong>
             <span className="small">
-              Your server is the house: phones join it. It syncs around the clock, at home and away, keeps everything for years, and gives you Restock
-              on your computer. It runs on a NAS, mini PC, Raspberry Pi or Home Assistant. Still no account, and the makers of Restock never see any of it.
+              Your server is the house: phones join it. It syncs around the clock, at home and away, keeps a year of prices and receipts (you choose how
+              long on its page), and gives you Restock on your computer. It runs on a NAS, mini PC, Raspberry Pi or Home Assistant. Still no account, and the makers of Restock never see any of it.
             </span>
             <button className="btn primary" disabled={!syncAvailable() || !!working} onClick={() => void scan()}>
               <Icon name="scan" size={18} /> Scan the code from your server's Add a phone page
             </button>
             <span className="small">On a computer, open your server's page, sign in and choose Add a phone. Each code works once, for 10 minutes.</span>
+          </div>
+          {/* 0.14.0: the server is another copy, never the only one. */}
+          <div className="card" style={{ gap: 6 }}>
+            <strong>Your data stays on this {deviceWord()} too</strong>
+            <span className="small">
+              The server is one more copy, not the only one. Your pantry, lists, cards and settings stay here in full, with as much price history as
+              "Keep price history for" says (8 weeks unless you change it). Leaving the server, or being taken off it, deletes nothing here: you can
+              still export it, import it or send it to another phone.
+            </span>
           </div>
           <div className="card" style={{ gap: 6 }}>
             <strong>Don't have a server yet?</strong>

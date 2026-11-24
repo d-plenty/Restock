@@ -8,6 +8,7 @@ import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
 import { Icon, Sheet, timeAgo } from '../components';
 import { useNav } from '../nav';
+import { isIos } from '../../lib/platform';
 
 // 0.10.0: Shared prices, one switch (Settings → Privacy and sharing, and setup): this phone gets
 // the shared price history (Judge new items from day one) and sends back the shelf prices it reads
@@ -101,6 +102,12 @@ export function SharedPricesSection({ settings }: { settings: Settings }) {
       <div className="eyebrow" id="s-shared">
         {SHARED_TITLE}
       </div>
+      {isIos() && (
+        <div className="banner grey" role="status">
+          <strong>Coming to iPhone and iPad</strong>
+          <span style={{ fontSize: 13 }}>Shared prices aren't downloaded or sent from an iPhone or iPad yet. Restock still learns each item's usual price from its own checks.</span>
+        </div>
+      )}
       <div className="card flush">
         <label className="check">
           <input

@@ -160,6 +160,15 @@ export function browserCards(backend: CardsBackend, channelName = CARDS_DB): Bro
       await backend.del('loyalty', id);
       changed();
     },
+    async setLoyaltyExpiry(id, expiry) {
+      const had = (await self.loyalty()).find((c) => c.id === id);
+      if (!had) return;
+      const next = cleanLoyaltyCard({ ...had, expiry });
+      if (!next) return;
+      if (!expiry) delete next.expiry;
+      await backend.put('loyalty', id, next);
+      changed();
+    },
     async gifts() {
       return (await backend.all('gift'))
         .map((r) => cleanGiftCard(r.value))

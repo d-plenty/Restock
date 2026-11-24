@@ -97,8 +97,15 @@ export function demoSync(): (SyncInfo & { _joined?: { label?: string; houseName?
   }
 }
 
-// iPhone app: not on the iPhone app yet (its screens say so, greyed: ui/IosWhy.tsx).
-export const syncAvailable = () => (Capacitor.isNativePlatform() && !isIos()) || !!demoSync();
+// iPhone and iPad (0.13.2): each way of syncing is asked about by itself (canSync), because they
+// arrive one at a time there; a way that isn't there yet stays on the screen, greyed, with why.
+export type SyncWay = 'server' | 'wifi' | 'folder';
+/** The ways of syncing this build of the iPhone and iPad app can do. */
+export const IOS_SYNC: Record<SyncWay, boolean> = { server: true, wifi: true, folder: true };
+/** Can this device sync that way? Android: every way. The web preview: none (its screens say so). */
+export const canSync = (way: SyncWay): boolean => (Capacitor.isNativePlatform() ? !isIos() || IOS_SYNC[way] : !!demoSync());
+/** Can this device sync at all (at least one way)? */
+export const syncAvailable = () => (Capacitor.isNativePlatform() && (!isIos() || Object.values(IOS_SYNC).some(Boolean))) || !!demoSync();
 
 export async function syncInfo(): Promise<SyncInfo> {
   const demo = demoSync();
@@ -159,7 +166,8 @@ let serverKnown: { on: boolean; at: number } | undefined;
 async function usesServer(): Promise<boolean> {
   if (serverKnown && Date.now() - serverKnown.at < 5 * 60_000) return serverKnown.on;
   const i = await syncInfo();
-  serverKnown = { on: !!(i.paired && i.server), at: Date.now() };
+  // 0.13.2: an iPhone or iPad has no background sync, so its every-minute look covers whichever household it's in (ios/sync.ts).
+  serverKnown = { on: isIos() ? true : !!(i.paired && i.server), at: Date.now() };
   return serverKnown.on;
 }
 
@@ -169,9 +177,14 @@ async function usesServer(): Promise<boolean> {
  * server every 60 s while open, and bring the settings in line with the household's.
  */
 export function wireSync(): void {
-  if (wired || !Capacitor.isNativePlatform() || isIos()) return;
+  if (wired || !syncAvailable() || !Capacitor.isNativePlatform()) return;
   wired = true;
   void reapplyHouseholdSettings().catch(() => undefined);
+  // 0.13.2: an iPhone or iPad has no background sync, so it syncs as soon as Restock opens.
+  if (isIos())
+    void syncInfo()
+      .then((i) => (i.paired ? RestockNative.syncNow() : undefined))
+      .catch(() => undefined);
   void RestockNative.addListener('syncChanged', () => {
     applying = true;
     serverKnown = undefined;
@@ -199,6 +212,28 @@ export function wireSync(): void {
       };
     },
   });
+  // 0.14.0, iPhone and iPad: iOS stops an app listening on the Wi-Fi when it leaves the screen, so
+  // syncing with another phone starts listening again each time Restock comes back.
+  if (isIos()) {
+    const lan = () => import('../ios/sync').then((m) => m.wifi);
+    void App.addListener('resume', () => void lan().then((w) => w.resumed()).catch(() => undefined));
+    void App.addListener('pause', () => void lan().then((w) => w.paused()).catch(() => undefined));
+    // And a short sync now and then while Restock isn't on screen, when iOS allows one (RestockBackground.swift).
+    void import('../ios/apple').then(({ appleHere, RestockApple }) => {
+      if (!appleHere()) return;
+      void App.addListener('pause', () => void RestockApple.backgroundSchedule().catch(() => undefined));
+      void RestockApple.addListener('backgroundRefresh', () => {
+        void syncInfo()
+          .then((i) => (i.paired ? RestockNative.syncNow() : undefined))
+          .then(
+            () => RestockApple.backgroundDone({ ok: true }),
+            () => RestockApple.backgroundDone({ ok: false }),
+          )
+          .catch(() => undefined);
+      }).catch(() => undefined);
+    }).catch(() => undefined);
+    void lan().then((w) => w.resumed()).catch(() => undefined);
+  }
   onChange(() => {
     if (applying) return;
     if (timer) clearTimeout(timer);

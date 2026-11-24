@@ -7703,7 +7703,67 @@ span.inv-num {
 
 /* ---------- iPhone app: the iPhone app ---------- */
 /* "Why is this greyed out?": the line under something an iPhone can't do. */
+/* 0.13.2: "Android phones: Samsung, Google Pixel…" under a way to sync */
+.sync-eg {
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+}
+/* 0.13.2: the line under What's planned sat hard against the card's edge */
+.soon-foot {
+  margin: 0;
+  padding: 10px 14px 14px;
+}
+.card.flush > .ios-box,
+.fold-body > .ios-box {
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.ios-box {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.ios-box > .card,
+.ios-box > .pick-more,
+.ios-box > .sync-choice,
+.ios-box > .btn {
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+}
+.ios-box > .btn {
+  align-self: stretch;
+}
 .ios-why {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  background: var(--sunken);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: left;
+}
+.ios-why .grow {
+  flex: 1;
+}
+.banner .ios-why {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.ios-why-link {
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
@@ -7719,13 +7779,99 @@ span.inv-num {
 .ios-greyed .btn:disabled {
   opacity: 1;
 }
-.banner.ios-not-here .ios-why {
-  min-height: 36px;
-}
 .ios-greyed-row {
   display: flex;
   align-items: center;
   gap: 10px;
   min-height: 48px;
   padding: 0 14px;
+}
+
+/* ---------- 0.13.2: an iPad held sideways (ui/padWide.ts) ----------
+   The phone app's own screens beside a navy side bar: the same tabs, and More's rows under them. */
+.app.pad-wide {
+  max-width: none;
+  margin: 0;
+  padding-left: var(--pad-side);
+  --pad-side: 264px;
+}
+.app.pad-wide > .tabs {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--pad-side);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: calc(var(--top) + 18px) 14px calc(var(--bottom) + 14px);
+  border-top: 0;
+  overflow-y: auto;
+}
+:root:not([data-style='plain']) .app.pad-wide > .tabs {
+  border-top: 0;
+  border-right: 3px solid var(--gold);
+}
+.app.pad-wide > .tabs .tab {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 14px;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: var(--r-md);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.app.pad-wide > .tabs .tab[aria-current='page'] {
+  background: rgba(255, 255, 255, 0.1);
+}
+.app.pad-wide > .tabs .tab::before,
+.app.pad-wide > .tabs .tab::after {
+  display: none;
+}
+.pad-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 10px 18px;
+  color: var(--tab-on);
+  font-size: var(--fs-xl);
+  font-weight: 800;
+}
+.pad-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-md);
+  background: var(--gold);
+  color: var(--navy);
+  font-weight: 800;
+}
+.pad-rule {
+  height: 1px;
+  margin: 10px 8px;
+  background: rgba(255, 255, 255, 0.18);
+}
+/* A screen opened on top covers the page, not the side bar. */
+.app.pad-wide > .overlay {
+  left: var(--pad-side);
+}
+/* The page itself: a comfortable column in the middle of the space. */
+.app.pad-wide .screen {
+  padding-left: max(18px, calc((100% - 820px) / 2));
+  padding-right: max(18px, calc((100% - 820px) / 2));
+}
+/* Shop buttons: six across on the wide page, and not giant squares. */
+.app.pad-wide .shop-tiles {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.app.pad-wide .shop-tile {
+  aspect-ratio: auto;
+  min-height: 116px;
+}
+/* A page opened from the side bar has nowhere to go back to: the side bar is the way out. */
+.app.pad-wide > .overlay.side-root .topbar > .icon-btn[aria-label='Back'] {
+  display: none;
 }

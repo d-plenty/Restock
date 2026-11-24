@@ -8,6 +8,7 @@ import * as draft from '../../lib/settingsDraft';
 import { useLive } from '../../lib/useLive';
 import { RestockNative } from '../../lib/sql/native';
 import { isNative } from '../../stores/http';
+import { isIos } from '../../lib/platform';
 import type { Settings } from '../../types';
 import { Icon, timeAgo } from '../components';
 import { pricesIn } from './BackupParts';
@@ -104,22 +105,39 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
             Back up automatically
           </span>
           <span className="small">
-            Saves a whole backup into Documents/Restock backups on this phone, or a folder you pick (Nextcloud, Syncthing). {pricesIn(settings, span)} {AUTO_GIFT_NOTE}
+            {isIos()
+              ? 'Saves a whole backup on this iPhone when you open Restock and the last one is old enough. An iPhone can’t do it while Restock is closed.'
+              : 'Saves a whole backup into Documents/Restock backups on this phone, or a folder you pick (Nextcloud, Syncthing).'}{' '}
+            {pricesIn(settings, span)} {AUTO_GIFT_NOTE}
           </span>
         </span>
         <input type="checkbox" className="switch" checked={b.enabled} onChange={(e) => void toggle(e.target.checked)} aria-label="Back up automatically" />
       </label>
-      <button className="row" onClick={() => void pick()}>
-        <span className="grow">
-          <span className="title" style={{ fontSize: 15 }}>
-            Folder
+      {isIos() ? (
+        // 0.13.2: an iPhone keeps them in one place (the Files app shows it), so there's nothing to pick.
+        <div className="row">
+          <span className="grow">
+            <span className="title" style={{ fontSize: 15 }}>
+              Where they go
+            </span>
+            <span className="small">
+              The Files app → On My iPhone → Restock → Restock backups. From there you can copy one to iCloud Drive or send it to another phone.
+            </span>
           </span>
-          <span className="small">{b.folderName ?? 'Documents/Restock backups, made for you when you turn this on'}</span>
-        </span>
-        <span className="small" style={{ fontWeight: 700 }}>
-          {b.folder ? 'Change' : 'Pick'}
-        </span>
-      </button>
+        </div>
+      ) : (
+        <button className="row" onClick={() => void pick()}>
+          <span className="grow">
+            <span className="title" style={{ fontSize: 15 }}>
+              Folder
+            </span>
+            <span className="small">{b.folderName ?? 'Documents/Restock backups, made for you when you turn this on'}</span>
+          </span>
+          <span className="small" style={{ fontWeight: 700 }}>
+            {b.folder ? 'Change' : 'Pick'}
+          </span>
+        </button>
+      )}
       <label className="check">
         <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <span className="title" style={{ fontSize: 15 }}>

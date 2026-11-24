@@ -6,8 +6,12 @@ import { RestockNative } from '../lib/sql/native';
 // so they look like an ordinary app request and aren't blocked by browser CORS.
 
 export const isNative = () => Capacitor.isNativePlatform();
-/** iPhone app: the shop's own page can open inside Restock (Android's built-in browser; not on iPhone yet). */
-export const canOpenShop = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() !== 'ios';
+/**
+ * The shop's own page can open inside Restock: Android's built-in browser, and on iPhone and iPad the
+ * app's own (0.13.2, when this build of the app has it: ios/apple.ts).
+ */
+export const canOpenShop = () =>
+  Capacitor.isNativePlatform() && (Capacitor.getPlatform() !== 'ios' || Capacitor.isPluginAvailable('RestockApple') || !!(globalThis as { __restockAppleFake?: unknown }).__restockAppleFake);
 
 export class NativeOnlyError extends Error {
   constructor() {

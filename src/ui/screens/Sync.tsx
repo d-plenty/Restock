@@ -51,7 +51,7 @@ export function qrSvg(symbol: { data: ArrayLike<number>; width: number; height: 
 }
 
 /** The pairing code as a QR code, drawn on the phone (zxing, bundled; nothing is sent anywhere). */
-function PairingQr({ code, label = 'Pairing QR code' }: { code: string; label?: string }) {
+export function PairingQr({ code, label = 'Pairing QR code' }: { code: string; label?: string }) {
   const [svg, setSvg] = useState<string>();
   useEffect(() => {
     let alive = true;
@@ -76,7 +76,7 @@ function PairingQr({ code, label = 'Pairing QR code' }: { code: string; label?: 
  * The pairing code as text, for when the camera won't read the QR code (0.8.1): send it to the
  * other phone in a message and paste it into Join a household → "Or paste the code".
  */
-function CodeText({ code }: { code: string }) {
+export function CodeText({ code }: { code: string }) {
   const nav = useNav();
   const share = async () => {
     try {
@@ -260,6 +260,8 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
           <ol className="small" style={{ margin: 0, paddingLeft: 18 }}>
             <li>Put both phones on the same Wi-Fi, and keep this screen open.</li>
             <li>On the other phone (Restock 0.8.5 or newer), tap Join your household on the first screen, or Settings → Sync and backups → Join a household.</li>
+            {/* 0.14.0: an iPhone or iPad joins the same way, from its own screen. */}
+            <li>On an iPhone or iPad (Restock 0.14.0 or newer): Settings → Sync and backups → Sync with an Android phone → Join with a code. It syncs while Restock is open on it.</li>
             <li>Scan this code.</li>
           </ol>
           <button className="btn block" onClick={close}>

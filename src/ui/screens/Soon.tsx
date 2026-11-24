@@ -60,23 +60,25 @@ export const SOON: Soon[] = [
     id: 'iphone',
     icon: 'phone',
     title: 'iPhone app',
-    short: 'Restock on iPhone works now, through your server. An App Store app later',
+    short: 'Restock runs on iPhone and iPad now. Widgets, recall alerts and the App Store are still to come',
     body: (
       <>
         <p>
-          You can use Restock on iPhone now, through your own Restock server. Open the server's https address in Safari, tap Share, then{' '}
-          <strong>Add to Home Screen</strong>. It opens like an app, and your Shopping list works with no signal.
-        </p>
-        <p>
-          The server's sign-in page has the steps under <strong>On iPhone?</strong>, and so does the{' '}
-          <a href="https://github.com/d-plenty/Restock#restock-on-iphone" target="_blank" rel="noreferrer">
-            README
+          There is a Restock app for iPhone and iPad now. It isn't in the App Store yet, so it's installed from a computer, and with a
+          free Apple account it has to be installed again every 7 days (your data stays). The steps and the warnings are on{' '}
+          <a href="https://github.com/d-plenty/Restock/blob/main/docs/IPHONE.md" target="_blank" rel="noreferrer">
+            the iPhone page on GitHub
           </a>
-          . It needs an https address, such as a Cloudflare tunnel or Tailscale's https.
+          .
         </p>
         <p>
-          Still to come: a real iPhone app, with background price checks, alerts, widgets and Phone sharing. That needs a developer
-          with an Apple developer account.
+          Restock also works on an iPhone without installing anything, through your own Restock server: open the server's https address in Safari,
+          tap Share, then <strong>Add to Home Screen</strong>. The server's sign-in page has the steps under <strong>On iPhone?</strong>
+        </p>
+        <p>
+          Still to come on iPhone and iPad: home screen widgets, recall alerts, shared price history (knowing an item's usual price from day one),
+          app icon colours, and the App Store and TestFlight. Two things aren't possible on an iPhone because of Apple's restrictions: checking
+          prices at a set time of day (they're checked when you open Restock) and Restock updating itself.
         </p>
       </>
     ),
@@ -156,7 +158,7 @@ export function ComingSoon() {
           </button>
         ))}
       </div>
-      <p className="small">On the way. Each page says what's here already and what's still to come.</p>
+      <p className="small soon-foot">On the way. Each page says what's here already and what's still to come.</p>
     </>
   );
 }

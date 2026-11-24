@@ -231,7 +231,53 @@ export function cleanLoyaltyCard(raw: unknown, now = new Date().toISOString()): 
   const id = typeof r.id === 'string' && SAFE_ID.test(r.id) ? r.id : undefined;
   const number = typeof r.number === 'string' ? r.number.replace(/\s+/g, '').slice(0, 64) : '';
   if (!id || !number || !PROGRAMS.includes(r.program as CardProgram)) return undefined;
-  return { id, program: r.program as CardProgram, label: str(r.label, MAX_TEXT) ?? 'Card', number, createdAt: iso(r.createdAt) ?? now };
+  const expiry = typeof r.expiry === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.expiry) && Number.isFinite(dayStart(r.expiry)) ? r.expiry : undefined;
+  return { id, program: r.program as CardProgram, label: str(r.label, MAX_TEXT) ?? 'Card', number, createdAt: iso(r.createdAt) ?? now, ...(expiry ? { expiry } : {}) };
+}
+
+// ---------- 0.14.0: a loyalty card's expiry date ----------
+
+/** A loyalty card is reminded about this many days before it runs out. */
+export const LOYALTY_REMIND_DAYS = 30;
+
+/** When a loyalty card's reminder goes (9 am, a month before it expires), or undefined (no date, or already past). */
+export function loyaltyReminderAt(card: Pick<LoyaltyCard, 'expiry'>, now = Date.now()): Date | undefined {
+  if (!card.expiry) return undefined;
+  const start = dayStart(card.expiry);
+  if (!Number.isFinite(start)) return undefined;
+  const d = new Date(start);
+  d.setDate(d.getDate() - LOYALTY_REMIND_DAYS);
+  d.setHours(9, 0, 0, 0);
+  return d.getTime() > now ? d : undefined;
+}
+
+/** "in 1 month", "in 12 days", "tomorrow", "today"; undefined when it's more than a month off, or there's no date. */
+export function expiresWords(card: Pick<LoyaltyCard, 'expiry'>, now = Date.now()): { words: string; expired: boolean } | undefined {
+  const e = expiryState(card, now);
+  if (e.kind === 'expired') return { words: 'has expired', expired: true };
+  if (e.kind !== 'soon') return undefined;
+  const d = e.days ?? 0;
+  return { words: d === 0 ? 'expires today' : d === 1 ? 'expires tomorrow' : d >= 28 ? 'expires in 1 month' : `expires in ${d} days`, expired: false };
+}
+
+/** The loyalty cards to say something about on Home: expiring within a month (or expired), and not put off. */
+export function cardsToMention(cards: LoyaltyCard[], later: Record<string, string> | undefined, now = Date.now()): { card: LoyaltyCard; words: string; expired: boolean }[] {
+  const out: { card: LoyaltyCard; words: string; expired: boolean }[] = [];
+  for (const card of cards) {
+    const w = expiresWords(card, now);
+    if (!w) continue;
+    const until = later?.[card.id] ? Date.parse(later[card.id]) : 0;
+    if (Number.isFinite(until) && until > now) continue;
+    out.push({ card, ...w });
+  }
+  return out;
+}
+
+/** "Remind me later": a week from now, or tomorrow once the card is a week or less from running out. */
+export function putOffCard(card: Pick<LoyaltyCard, 'id' | 'expiry'>, later: Record<string, string> | undefined, now = Date.now()): Record<string, string> {
+  const e = expiryState(card, now);
+  const days = e.kind === 'soon' && (e.days ?? 0) <= 7 ? 1 : 7;
+  return { ...(later ?? {}), [card.id]: new Date(now + days * 24 * 3600 * 1000).toISOString() };
 }
 
 // ---------- the cards file (moving cards between a phone and a browser) ----------

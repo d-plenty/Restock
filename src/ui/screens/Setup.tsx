@@ -4,7 +4,7 @@ import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 import { applyTheme } from '../../lib/theme';
 import type { BackupSummary } from '../../lib/backup';
 import { allCards, getSettings, updateSettings } from '../../lib/db';
-import { syncInfo } from '../../lib/sync';
+import { canSync, syncInfo } from '../../lib/sync';
 import legal from '../../lib/legal.json';
 import { downloadMarket } from '../../lib/market';
 import { HistoryLengths } from './DayOne';
@@ -546,7 +546,7 @@ function BackupsTile({ settings }: { settings: Settings }) {
           <Icon name="server" size={18} />
           <span className="grow">
             <span className="title">{p.server ? 'Your Restock server is on' : 'Your Restock server'}</span>
-            <span className="small">Keeps a copy for years, syncs at home and away, and gives you Restock on your computer.</span>
+            <span className="small">Keeps a copy on your own server, syncs at home and away, and gives you Restock on your computer.</span>
           </span>
           <Icon name="chevron" size={18} />
         </button>
@@ -564,41 +564,62 @@ function BackupsTile({ settings }: { settings: Settings }) {
   );
 }
 
-/** Sync: where it's at, and the way in (0.8.0). */
+/**
+ * Sync: where it's at, and the way in (0.8.0). 0.13.2: Phone sharing first and "Recommended" (no
+ * account, no server), then a cloud folder, then a Restock server for those who run one. On iPhone
+ * and iPad, only the ways that build can do (the rest are in Sync and backups, greyed, with why).
+ */
 function SyncTile() {
   const nav = useNav();
   const info = useLive(syncInfo, []);
+  const ios = isIos();
+  const wifiOn = !!info?.paired && !info.house;
+  /** Everywhere but an iPhone or iPad, every way is listed (the web preview's screens say where they work). */
+  const shown = (w: 'wifi' | 'folder' | 'server') => !ios || canSync(w);
   return (
     <div className="card flush">
-      <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
-        <Icon name="server" size={18} />
-        <span className="grow">
-          <span className="title" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            {info?.server ? 'Your Restock server' : 'Join your Restock server'}
-            {!info?.server && <span className="tag great">Recommended</span>}
+      {shown('wifi') && (
+        <button className="row" onClick={() => nav.push({ name: 'sync' })}>
+          <Icon name="refresh" size={18} />
+          <span className="grow">
+            <span className="title" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              {wifiOn ? 'Phone sharing is on' : 'Phone sharing (no server, local Wi-Fi)'}
+              {!wifiOn && !info?.server && !ios && <span className="tag great">Recommended</span>}
+            </span>
+            <span className="small">{wifiOn ? syncSummary(info) : 'Phones swap changes straight to each other on the same Wi-Fi. No account, and nothing leaves your home.'}</span>
           </span>
-          <span className="small">
-            {info?.server ? syncSummary(info) : 'Your server is the house: phones join it. Around the clock, at home and away, and Restock on your computer.'}
+          <Icon name="chevron" size={18} />
+        </button>
+      )}
+      {shown('folder') && (
+        <button className="row" onClick={() => nav.push({ name: 'sync' })}>
+          <Icon name="folder" size={18} />
+          <span className="grow">
+            <span className="title">A cloud drive folder</span>
+            <span className="small">Google Drive, Dropbox, OneDrive, Syncthing, Nextcloud or WebDAV, for phones away from home without a server.</span>
           </span>
-        </span>
-        <Icon name="chevron" size={18} />
-      </button>
-      <button className="row" onClick={() => nav.push({ name: 'sync' })}>
-        <Icon name="refresh" size={18} />
-        <span className="grow">
-          <span className="title">{info?.paired && !info.house ? 'Phone sharing is on' : 'Phone sharing (no server, local Wi-Fi)'}</span>
-          <span className="small">{info?.paired && !info.house ? syncSummary(info) : 'Phones swap changes straight to each other on the same Wi-Fi. Nothing leaves your home.'}</span>
-        </span>
-        <Icon name="chevron" size={18} />
-      </button>
-      <button className="row" onClick={() => nav.push({ name: 'sync' })}>
-        <Icon name="folder" size={18} />
-        <span className="grow">
-          <span className="title">A cloud drive folder</span>
-          <span className="small">Google Drive, Dropbox, OneDrive, Syncthing, Nextcloud or WebDAV, for phones away from home without a server.</span>
-        </span>
-        <Icon name="chevron" size={18} />
-      </button>
+          <Icon name="chevron" size={18} />
+        </button>
+      )}
+      {shown('server') && (
+        <button className="row" onClick={() => nav.push({ name: 'restockServer' })}>
+          <Icon name="server" size={18} />
+          <span className="grow">
+            <span className="title">{info?.server ? 'Your Restock server' : 'Join your Restock server'}</span>
+            <span className="small">
+              {info?.server ? syncSummary(info) : 'If you run one: phones join it, it syncs around the clock at home and away, and gives you Restock on your computer.'}
+            </span>
+          </span>
+          <Icon name="chevron" size={18} />
+        </button>
+      )}
+      {ios && (
+        <div className="row">
+          <span className="grow">
+            <span className="small">An iPhone or iPad syncs while Restock is open. Every way of sharing, and what isn't here yet, is in Settings → Sync and backups.</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

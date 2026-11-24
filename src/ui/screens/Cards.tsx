@@ -111,7 +111,7 @@ export function CardsScreen({
   useEffect(() => {
     if (!data || store.where !== 'phone' || rescheduled.current) return;
     rescheduled.current = true;
-    void scheduleCardReminders(data.gifts);
+    void scheduleCardReminders(data.gifts, data.loyalty);
   }, [data, store]);
 
   if (!data) return <div className="screen" />;
@@ -266,6 +266,8 @@ export function CardsScreen({
         <Icon name="plus" size={18} /> Add a card
       </button>
 
+      {shownLoyalty && <LoyaltyExpiry key={shownLoyalty.id} store={store} card={shownLoyalty} />}
+
       {shownLoyalty && (
         <button className="btn danger" onClick={() => void removeLoyalty(shownLoyalty)}>
           <Icon name="trash" size={18} /> Delete this card
@@ -353,6 +355,40 @@ function LoyaltyView({ store, card }: { store: CardStore; card: LoyaltyCard }) {
         </button>
       </div>
       <div style={{ fontSize: 13, textAlign: 'center' }}>Turn your screen brightness up at the checkout.</div>
+    </div>
+  );
+}
+
+/** 0.14.0: a loyalty card's expiry date: shown, and set or changed here. */
+function LoyaltyExpiry({ store, card }: { store: CardStore; card: LoyaltyCard }) {
+  const [value, setValue] = useState(card.expiry ?? '');
+  const e = expiryState(card);
+  const save = (v: string) => {
+    setValue(v);
+    if (v !== (card.expiry ?? '') && (v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v))) void store.setLoyaltyExpiry(card.id, v || undefined);
+  };
+  return (
+    <div className="card flush">
+      <label className="check">
+        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <span className="title" style={{ fontSize: 15 }}>
+            Expiry date
+          </span>
+          <span className="small" style={e.kind === 'expired' || e.kind === 'soon' ? { color: e.kind === 'expired' ? 'var(--red-ink)' : 'var(--amber-ink, inherit)', fontWeight: 700 } : undefined}>
+            {e.kind === 'none' ? 'Optional. Restock tells you a month before the card runs out.' : e.text}
+          </span>
+        </span>
+        <input className="input" style={{ width: 'auto' }} type="date" value={value} aria-label="Expiry date" onChange={(ev) => save(ev.target.value)} />
+      </label>
+      {card.expiry && (
+        <button className="row" onClick={() => save('')}>
+          <span className="grow">
+            <span className="small" style={{ fontWeight: 700 }}>
+              Remove the expiry date
+            </span>
+          </span>
+        </button>
+      )}
     </div>
   );
 }
