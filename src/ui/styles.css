@@ -7700,3 +7700,32 @@ span.inv-num {
     font-size: var(--fs-md);
   }
 }
+
+/* ---------- iPhone app: the iPhone app ---------- */
+/* "Why is this greyed out?": the line under something an iPhone can't do. */
+.ios-why {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 2px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.ios-greyed {
+  opacity: 0.6;
+}
+.ios-greyed .btn:disabled {
+  opacity: 1;
+}
+.banner.ios-not-here .ios-why {
+  min-height: 36px;
+}
+.ios-greyed-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 14px;
+}

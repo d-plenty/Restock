@@ -1,3 +1,4 @@
+import { isIos } from '../../lib/platform';
 import { useEffect, useState } from 'react';
 import { confirmAction } from '../../lib/confirm';
 import { pruneHistory, serverKeepsHistory } from '../../lib/db';
@@ -182,7 +183,7 @@ export function PriceHistorySettings({ settings }: { settings: Settings }) {
             settings={settings}
             onPicked={() =>
               void afterSave('market-days', (s) => {
-                if (sharedOn(s) && isNative()) void downloadMarket(undefined, { onlyUnmetered: s.marketData.wifiOnly }).catch(() => undefined);
+                if (sharedOn(s) && isNative() && !isIos()) void downloadMarket(undefined, { onlyUnmetered: s.marketData.wifiOnly }).catch(() => undefined);
               })
             }
           />

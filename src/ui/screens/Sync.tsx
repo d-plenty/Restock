@@ -1,3 +1,4 @@
+import { NotHereBanner } from '../IosWhy';
 import { useEffect, useState } from 'react';
 import { scanBarcode } from '../../lib/barcode';
 import { saveCopyInApp } from '../../lib/backup';
@@ -1699,12 +1700,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
     <div className="screen">
       <TopBar title={isHouse ? 'Phone sharing' : 'Phones and sharing'} />
 
-      {!syncAvailable() && (
-        <div className="banner grey">
-          <strong>Sync works in the Android app</strong>
-          <span style={{ fontSize: 13 }}>In this preview everything stays in this browser.</span>
-        </div>
-      )}
+      {!syncAvailable() && <NotHereBanner reason="sync" title="Sync works in the Android app" />}
 
       {info?.notice && !info.paired && (
         <div className="banner amber" role="status">

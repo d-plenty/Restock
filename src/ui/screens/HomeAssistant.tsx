@@ -1,3 +1,4 @@
+import { NotHereBanner } from '../IosWhy';
 import { useEffect, useState } from 'react';
 import { confirmAction } from '../../lib/confirm';
 import {
@@ -274,12 +275,7 @@ export function HomeAssistantScreen() {
     <div className="screen">
       <TopBar title="Home Assistant" />
 
-      {!haAvailable() && (
-        <div className="banner grey">
-          <strong>Home Assistant works in the Android app</strong>
-          <span style={{ fontSize: 13 }}>In this preview everything stays in this browser.</span>
-        </div>
-      )}
+      {!haAvailable() && <NotHereBanner reason="homeAssistant" title="Home Assistant works in the Android app" />}
 
       <div className="card" style={{ gap: 8 }}>
         <strong>Your shopping list in Home Assistant, both ways</strong>

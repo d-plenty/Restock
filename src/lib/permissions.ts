@@ -1,3 +1,4 @@
+import { isIos } from './platform';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { RestockNative } from './sql/native';
@@ -59,6 +60,14 @@ function within<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 
 export async function checkAll(): Promise<Record<PermKey, PermStatus>> {
   if (!native()) return { notifications: 'unsupported', alarms: 'unsupported', camera: 'unsupported', location: 'unsupported' };
+  // iPhone app: an iPhone has no "alarms and reminders" switch: a reminder set for a time just arrives.
+  if (isIos()) {
+    const [n, p] = await Promise.all([
+      within(LocalNotifications.checkPermissions(), 5000, { display: 'prompt' as const }),
+      within(RestockNative.checkPermissions(), 5000, { camera: 'prompt' as const, location: 'prompt' as const }),
+    ]);
+    return { notifications: norm(n.display), alarms: 'unsupported', camera: norm(p.camera), location: norm(p.location) };
+  }
   const [n, a, p] = await Promise.all([
     within(LocalNotifications.checkPermissions(), 5000, { display: 'prompt' as const }),
     within(LocalNotifications.checkExactNotificationSetting(), 5000, { exact_alarm: 'prompt' as const }),

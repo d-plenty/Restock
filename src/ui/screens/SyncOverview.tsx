@@ -1,3 +1,4 @@
+import { IosWhy } from '../IosWhy';
 import { useState } from 'react';
 import { RestockNative } from '../../lib/sql/native';
 import { protection, suggestLocalText, syncStatus, wifiSyncOn } from '../../lib/protection';
@@ -137,6 +138,7 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
             </span>
             <span className="sync-choice-go">Join your server ›</span>
           </button>
+          <IosWhy reason="server" />
           <button className="sync-choice" disabled={!syncAvailable()} onClick={() => nav.push({ name: 'sync' })}>
             <span className="sync-choice-head">
               <span className="sync-choice-ic wifi" aria-hidden="true">
@@ -153,6 +155,7 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
               No server and no account. Phones swap changes straight to each other when they're on the same Wi-Fi. Nothing leaves your home.
             </span>
           </button>
+          <IosWhy reason="sync" />
           <button className="sync-choice" disabled={!syncAvailable()} onClick={() => nav.push({ name: 'sync' })}>
             <span className="sync-choice-head">
               <span className="sync-choice-ic folder" aria-hidden="true">

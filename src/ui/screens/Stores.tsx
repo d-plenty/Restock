@@ -1,3 +1,7 @@
+import { canOpenShop } from '../../stores/http';
+import { isIos } from '../../lib/platform';
+/** iPhone app: what a button for the shop's own page says where that page can't open. */
+const notHere = () => (isIos() ? 'Not on iPhone yet' : 'Works in the Android app');
 import { useState, type ReactNode } from 'react';
 import { AISLE_NOTE } from '../../lib/aisles';
 import { nowIso, uid, updateSettings as saveNow } from '../../lib/db';
@@ -602,7 +606,7 @@ function PickOnSite({ chain }: { chain: StoreChain }) {
           }
         }}
       >
-        {isNative() ? (busy ? 'Reading your branch…' : `Choose your ${chainName(chain)} branch`) : 'Works in the Android app'}
+        {canOpenShop() ? (busy ? 'Reading your branch…' : `Choose your ${chainName(chain)} branch`) : notHere()}
       </button>
       {ask !== undefined && (
         <form
@@ -1169,8 +1173,8 @@ function WoolworthsAccount({ settings, inline }: { settings: Settings; inline?: 
           </button>
         </div>
       ) : (
-        <button className="btn primary" disabled={!!busy || !isNative()} onClick={() => void go('in', signInWoolworths)}>
-          {busy === 'in' ? 'Checking…' : isNative() ? 'Sign in to Woolworths' : 'Sign in works in the Android app'}
+        <button className="btn primary" disabled={!!busy || !canOpenShop()} onClick={() => void go('in', signInWoolworths)}>
+          {busy === 'in' ? 'Checking…' : canOpenShop() ? 'Sign in to Woolworths' : `Sign in: ${notHere().toLowerCase()}`}
         </button>
       )}
       {note && (
@@ -1316,8 +1320,8 @@ function ColesStore({ settings, inline }: { settings: Settings; inline?: boolean
           </button>
         </div>
       ) : (
-        <button className="btn primary" disabled={busy || !isNative()} onClick={() => void choose('primary')}>
-          {busy ? 'Opening Coles…' : isNative() ? 'Choose your Coles branch' : 'Choosing your branch works in the Android app'}
+        <button className="btn primary" disabled={busy || !canOpenShop()} onClick={() => void choose('primary')}>
+          {busy ? 'Opening Coles…' : canOpenShop() ? 'Choose your Coles branch' : `Choose your branch: ${notHere().toLowerCase()}`}
         </button>
       )}
       {!on && st.branchStoreNo && (
@@ -1649,14 +1653,14 @@ function CostcoAccount({ settings }: { settings: Settings }) {
             ) : (
               <button
                 className="btn primary"
-                disabled={!isNative()}
+                disabled={!canOpenShop()}
                 onClick={() =>
                   void signInCostco(() =>
                     confirmAction('Did you sign in to Costco?', { detail: "Costco doesn't tell Restock, so just say if you did.", action: 'Yes, signed in' }),
                   ).catch(() => undefined)
                 }
               >
-                {isNative() ? 'Sign in to Costco' : 'Sign in works in the Android app'}
+                {canOpenShop() ? 'Sign in to Costco' : `Sign in: ${notHere().toLowerCase()}`}
               </button>
             ))}
         </div>

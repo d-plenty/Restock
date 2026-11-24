@@ -1,3 +1,6 @@
+import { IosWhy } from '../IosWhy';
+import { IOS_CHECK_EVERY_HOURS } from '../../lib/check';
+import { isIos } from '../../lib/platform';
 import { cleanSearch } from '../../lib/searchText';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { version } from '../../../package.json';
@@ -567,9 +570,19 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
           <div className={all ? 'eyebrow' : 'sr-only'} id="s-widgets">
             Home screen widgets
           </div>
-          <Fold title="Home screen widgets" sub="Deals, shopping list and quick actions">
-            <WidgetSettings settings={settings} />
-          </Fold>
+          {isIos() ? (
+            <>
+              <div className="card ios-greyed" aria-disabled="true">
+                <span className="title">Home screen widgets</span>
+                <span className="small">Deals, shopping list and quick actions. Not on iPhone yet.</span>
+              </div>
+              <IosWhy reason="widgets" />
+            </>
+          ) : (
+            <Fold title="Home screen widgets" sub="Deals, shopping list and quick actions">
+              <WidgetSettings settings={settings} />
+            </Fold>
+          )}
         </>
       )}
       {on('privacy') && (
@@ -982,6 +995,35 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
   };
   const blocked = choice !== 'off' && !settings.sync.backgroundActivity;
 
+  // iPhone app: an iPhone can't run a check at a set time, so this is one switch: check when Restock is
+  // opened (when the last check is more than 12 hours old), or only when Check now is tapped.
+  if (isIos()) {
+    const on = choice !== 'off' && settings.sync.backgroundActivity;
+    return (
+      <>
+        <div className="card flush">
+          <label className="check">
+            <input className="switch" type="checkbox" checked={on} onChange={(e) => void pick(e.target.checked ? 'twice' : 'off')} />
+            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <span className="title" style={{ fontSize: 15 }}>
+                Check prices when I open Restock
+              </span>
+              <span className="small">Only the items in your pantry and your tabs. A check runs when you open Restock and the last one is more than {IOS_CHECK_EVERY_HOURS} hours old.</span>
+            </span>
+          </label>
+          <div className="check" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+            <span className="small" role="status">
+              {on
+                ? 'An iPhone decides when apps may work in the background, so Restock can’t pick a time of day here. Open it now and then and your prices stay current. Check now on Home checks straight away.'
+                : 'Nothing is checked until you tap Check now on Home. We recommend leaving this on: without it, prices and your specials at each shop go out of date.'}
+            </span>
+            <IosWhy reason="background" label="Why can’t I pick a time?" />
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="card flush">
@@ -1170,6 +1212,20 @@ function Fold({ title, sub, children }: { title: string; sub?: string; children:
  * screen), and an optional weekly check when Restock opens. Nothing is sent but the request itself.
  */
 export function UpdateRows({ settings }: { settings: Settings }) {
+  // iPhone app: on an iPhone the section stays, greyed, and says why (Apple doesn't let an app update itself).
+  if (isIos())
+    return (
+      <>
+        <div className="card ios-greyed" aria-disabled="true">
+          <span className="title">Check for updates</span>
+          <span className="small">Restock {version}. Updating from inside the app isn't possible on an iPhone.</span>
+          <button className="btn block" disabled>
+            Check for updates
+          </button>
+        </div>
+        <IosWhy reason="updates" />
+      </>
+    );
   if (!SELF_UPDATE) return null;
   return <UpdateRowsOn settings={settings} />;
 }

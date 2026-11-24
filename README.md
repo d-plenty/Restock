@@ -139,6 +139,10 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 </details>
 
+## iPhone (test build)
+
+There is an iPhone app, as a test build you install from a computer. It is not on the App Store or TestFlight yet, it has to be re-installed every 7 days with a free Apple Account, and some things from the Android app aren't there yet (household sync, the Restock server, shop sign-ins, widgets). **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
 ## New in 0.13.1
 
 Inventory, for those who want it. It's off unless you turn it on.

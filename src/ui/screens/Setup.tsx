@@ -1,3 +1,4 @@
+import { isIos } from '../../lib/platform';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 import { applyTheme } from '../../lib/theme';
@@ -902,7 +903,8 @@ export function Onboarding() {
     await updateSettings({ onboarded: true });
     // Shared prices on (0.10.0: on to start with): the first download now (it waits for Wi-Fi if asked).
     const md = (await getSettings()).marketData;
-    if (md.enabled && isNative()) {
+    // (iPhone app: shared price history isn't downloaded there yet, so nothing is said about it)
+    if (md.enabled && isNative() && !isIos()) {
       downloadMarket(undefined, { onlyUnmetered: md.wifiOnly })
         .then((r) =>
           nav.toast(

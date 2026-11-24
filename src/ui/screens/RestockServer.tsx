@@ -1,3 +1,4 @@
+import { NotHereBanner } from '../IosWhy';
 import { useEffect, useRef, useState } from 'react';
 import { stage } from '../../lib/settingsDraft'; // 0.9.5 (save)
 import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar'; // 0.9.5 (save)
@@ -723,12 +724,7 @@ export function RestockServerScreen() {
     <div className="screen">
       <TopBar title={joined ? 'Join your server' : v3 ? serverName(info) : 'Restock server'} />
 
-      {!syncAvailable() && (
-        <div className="banner grey">
-          <strong>The Restock server works in the Android app</strong>
-          <span style={{ fontSize: 13 }}>In this preview everything stays in this browser.</span>
-        </div>
-      )}
+      {!syncAvailable() && <NotHereBanner reason="server" title="The Restock server works in the Android app" />}
 
       {info?.notice === 'server-removed' && (
         <div className="banner amber" role="status">

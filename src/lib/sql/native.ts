@@ -394,7 +394,11 @@ export interface NativePermissions {
   location: PermissionState;
 }
 
-export const RestockNative = registerPlugin<RestockNativePlugin>('RestockNative');
+// iPhone app: on an iPhone the other side is src/ios/native.ts (TypeScript on Capacitor's own iOS plugins),
+// loaded only there. Android's is Java and is found by name.
+export const RestockNative = registerPlugin<RestockNativePlugin>('RestockNative', {
+  ios: () => import('../../ios/native').then((m) => new m.RestockIos() as unknown as RestockNativePlugin),
+});
 
 export function createNativeDriver(): SqlDriver {
   return {

@@ -1,3 +1,4 @@
+import { isIos } from './platform';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { cachedSettings, getSettings, reapplyHouseholdSettings } from './db';
@@ -96,7 +97,8 @@ export function demoSync(): (SyncInfo & { _joined?: { label?: string; houseName?
   }
 }
 
-export const syncAvailable = () => Capacitor.isNativePlatform() || !!demoSync();
+// iPhone app: not on the iPhone app yet (its screens say so, greyed: ui/IosWhy.tsx).
+export const syncAvailable = () => (Capacitor.isNativePlatform() && !isIos()) || !!demoSync();
 
 export async function syncInfo(): Promise<SyncInfo> {
   const demo = demoSync();
@@ -167,7 +169,7 @@ async function usesServer(): Promise<boolean> {
  * server every 60 s while open, and bring the settings in line with the household's.
  */
 export function wireSync(): void {
-  if (wired || !Capacitor.isNativePlatform()) return;
+  if (wired || !Capacitor.isNativePlatform() || isIos()) return;
   wired = true;
   void reapplyHouseholdSettings().catch(() => undefined);
   void RestockNative.addListener('syncChanged', () => {

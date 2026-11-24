@@ -1,3 +1,4 @@
+import { isIos } from './platform';
 import { RestockNative } from './sql/native';
 import { isNative } from '../stores/http';
 
@@ -5,7 +6,8 @@ import { isNative } from '../stores/http';
  * F-Droid installs and updates apps itself and doesn't allow apps that update themselves, so its
  * build (VITE_FDROID=1) leaves "Check for updates" out entirely.
  */
-export const SELF_UPDATE = !import.meta.env.VITE_FDROID;
+// iPhone app: nor on an iPhone: Apple doesn't let an app update itself (Settings says so, greyed).
+export const SELF_UPDATE = !import.meta.env.VITE_FDROID && !isIos();
 
 /** Where official Restock releases are published. */
 export const RELEASES = 'https://github.com/d-plenty/Restock/releases';

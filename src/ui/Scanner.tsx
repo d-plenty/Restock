@@ -1,3 +1,4 @@
+import { isIos } from '../lib/platform';
 import { Capacitor } from '@capacitor/core';
 import { useEffect, useRef, useState } from 'react';
 
@@ -186,7 +187,7 @@ function Scanner({
         else
           setError(
             /denied|permission|notallowed/i.test(msg)
-              ? 'Camera permission was refused. Allow it in Android settings, or type the barcode below.'
+              ? isIos() ? 'Camera permission was refused. Allow it in the iPhone Settings app, under Restock, or type the barcode below.' : 'Camera permission was refused. Allow it in Android settings, or type the barcode below.'
               : `Camera unavailable: ${msg}`,
           );
       }

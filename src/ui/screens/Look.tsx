@@ -1,3 +1,5 @@
+import { isIos } from '../../lib/platform';
+import { IosWhy } from '../IosWhy';
 import { useState } from 'react';
 import { ACCENTS, AUS_GREEN, ICON_COLOURS, nearestIcon } from '../../lib/looks';
 // 0.9.5 (save): on a settings screen these wait for Save settings (settingsDraft.ts).
@@ -123,7 +125,19 @@ export function LookSettings({ settings }: { settings: Settings }) {
         </div>
       </details>
 
-      <details className="pick-more">
+      {/* iPhone: the section stays, greyed, with why */}
+      {isIos() && (
+        <>
+          <div className="pick-more ios-greyed" aria-disabled="true">
+            <div className="ios-greyed-row">
+              <span className="grow">App icon colour</span>
+              <span className="small">Not on iPhone yet</span>
+            </div>
+          </div>
+          <IosWhy reason="appIcon" />
+        </>
+      )}
+      <details className="pick-more" hidden={isIos()}>
         <summary>
           <span className="grow">App icon colour</span>
           <span className="small">{look.icon === 'match' ? 'Matches accent' : (ICON_COLOURS.find((c) => c.id === iconId)?.name ?? '')}</span>

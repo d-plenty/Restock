@@ -4,6 +4,7 @@ import { createNativeDriver } from './sql/native';
 import { MIGRATIONS } from './sql/schema';
 import type { SqlDriver } from './sql/driver';
 import { createSqlJsDriver } from './sql/sqljs';
+import { isIos } from './platform';
 
 // Opens the database: the phone's SQLite on Android, or sql.js (kept in the browser's
 // storage) in the web preview.
@@ -31,7 +32,9 @@ export const setDatabaseOpener = (fn: () => Promise<void>) => (opener = fn);
 
 export async function openDatabase(): Promise<void> {
   if (opener) return opener();
-  if (Capacitor.isNativePlatform()) {
+  // iPhone app: Android has its own SQLite. The iPhone app keeps the same database with sql.js, in the
+  // app's own web storage (it isn't Safari's, so iOS doesn't clear it after a week unused).
+  if (Capacitor.isNativePlatform() && !isIos()) {
     const d = createNativeDriver();
     const updated = await versionChanged(d);
     await initDb(d);

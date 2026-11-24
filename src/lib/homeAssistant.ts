@@ -1,3 +1,4 @@
+import { isIos } from './platform';
 import { Capacitor } from '@capacitor/core';
 import { allGroups, allListEntries, deleteListEntries, getKV, getSettings, insertEntryOp, nowIso, putKV, queryRows, runOps, uid, updateListEntry } from './db';
 import { activeSections } from '../shops';
@@ -102,7 +103,8 @@ export interface HaStatus {
   held?: boolean;
 }
 
-export const haAvailable = () => Capacitor.isNativePlatform();
+// iPhone app: not on the iPhone app yet.
+export const haAvailable = () => Capacitor.isNativePlatform() && !isIos();
 
 /** 0.9.4: this phone is in a house (its household's owner is a Restock server). */
 async function inHouse(): Promise<boolean> {

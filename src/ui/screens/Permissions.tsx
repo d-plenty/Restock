@@ -1,3 +1,4 @@
+import { isIos } from '../../lib/platform';
 import { useEffect, useState } from 'react';
 import { checkAll, openAppSettings, PERMISSIONS, request, type PermKey, type PermStatus } from '../../lib/permissions';
 import { getSettings } from '../../lib/db';
@@ -53,7 +54,8 @@ export function PermissionList({ hideNote }: { hideNote?: boolean } = {}) {
         </div>
       )}
       <div className="card flush">
-        {PERMISSIONS.map((p) => {
+        {/* iPhone: no "Alarms & reminders" switch exists there, so no row for it */}
+        {PERMISSIONS.filter((p) => !(isIos() && p.key === 'alarms')).map((p) => {
           const s = state[p.key];
           return (
             <div key={p.key} className="row" style={{ alignItems: 'flex-start', padding: '14px' }}>
@@ -73,7 +75,7 @@ export function PermissionList({ hideNote }: { hideNote?: boolean } = {}) {
                       <Icon name="check" size={16} /> Allowed
                     </span>
                   )}
-                  {s === 'denied' && <span className="perm-state no">Turned off. Android won't ask again, so switch it on in Settings.</span>}
+                  {s === 'denied' && <span className="perm-state no">Turned off. {isIos() ? 'Your iPhone' : 'Android'} won't ask again, so switch it on in Settings.</span>}
                 </span>
               </div>
               {s === 'prompt' && (
@@ -97,8 +99,9 @@ export function PermissionList({ hideNote }: { hideNote?: boolean } = {}) {
       )}
       {!hideNote && (
         <p className="small">
-          Android asks about each one in turn. For location, "While using the app" is all Restock needs. Alarms & reminders opens a settings page
-          instead of a question, so Allow all opens it last. All of these are optional, and you can change them any time in Settings.
+          {isIos()
+            ? 'Your iPhone asks about each one in turn. For location, "While Using the App" is all Restock needs. All of these are optional, and you can change them any time in the iPhone Settings app, under Restock.'
+            : 'Android asks about each one in turn. For location, "While using the app" is all Restock needs. Alarms & reminders opens a settings page instead of a question, so Allow all opens it last. All of these are optional, and you can change them any time in Settings.'}
         </p>
       )}
     </>

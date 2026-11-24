@@ -1,0 +1,77 @@
+name: iPhone app
+
+# Builds the iPhone app on one of GitHub's Macs and hands back an UNSIGNED .ipa: a file you sign
+# and install yourself from a computer (docs/IPHONE.md). Nothing here needs an Apple account.
+#
+# Run it by hand (Actions > iPhone app > Run workflow), or it runs when a release is published and
+# attaches the .ipa to that release.
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: Xcode version
+        run: xcodebuild -version
+      - name: Build (no signing)
+        run: |
+          set -o pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Restock.xcarchive" \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            > "$RUNNER_TEMP/xcodebuild.log" 2>&1 || { echo "::error::The iPhone build failed. The end of the log is below; the whole log is in this run's files (ios-build-log)."; tail -n 150 "$RUNNER_TEMP/xcodebuild.log"; exit 1; }
+          tail -n 5 "$RUNNER_TEMP/xcodebuild.log"
+      - name: Package the .ipa
+        run: |
+          APP=$(find "$RUNNER_TEMP/Restock.xcarchive/Products/Applications" -maxdepth 1 -name '*.app' | head -n 1)
+          test -n "$APP"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/ipa/Payload/"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "restock-$VERSION-unsigned.ipa" Payload)
+          mv "$RUNNER_TEMP/ipa/restock-$VERSION-unsigned.ipa" .
+          shasum -a 256 "restock-$VERSION-unsigned.ipa"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: restock-iphone-unsigned
+          path: restock-*-unsigned.ipa
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-build-log
+          path: ${{ runner.temp }}/xcodebuild.log
+          if-no-files-found: ignore
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "restock-$VERSION-unsigned.ipa" --clobber

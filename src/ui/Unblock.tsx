@@ -1,3 +1,5 @@
+import { IosWhy } from './IosWhy';
+import { canOpenShop } from '../stores/http';
 import { useState } from 'react';
 import { RestockNative } from '../lib/sql/native';
 import { getSettings } from '../lib/db';
@@ -189,7 +191,7 @@ export function UnblockSheet({
           Done
         </button>
       ) : (
-        <button className="btn primary block" disabled={!isNative() || stage === 'checking'} onClick={() => void go()}>
+        <button className="btn primary block" disabled={!canOpenShop() || stage === 'checking'} onClick={() => void go()}>
           <Icon name="external" size={18} /> {stage === 'blocked' || stage === 'unread' ? `Open ${name} again` : `Open ${name}`}
         </button>
       )}
@@ -198,6 +200,7 @@ export function UnblockSheet({
           Only in the Android app: the shop’s page opens on your phone.
         </p>
       )}
+      <IosWhy reason="shopPage" />
     </Sheet>
   );
 }
@@ -209,12 +212,13 @@ export function UnblockButton({ chain, onWorked, small, label }: { chain: StoreC
     <>
       <button
         className={`btn primary ${small ? 'small' : 'block'}`}
-        disabled={!isNative()}
-        title={isNative() ? undefined : 'Only in the Android app'}
+        disabled={!canOpenShop()}
+        title={canOpenShop() ? undefined : isNative() ? 'Not on iPhone yet' : 'Only in the Android app'}
         onClick={() => setOpen(true)}
       >
         <Icon name="unlock" size={small ? 16 : 18} /> {label ?? `Unblock ${chainName(chain)}`}
       </button>
+      {isNative() && !canOpenShop() && <IosWhy reason="shopPage" />}
       {open && <UnblockSheet chain={chain} onClose={() => setOpen(false)} onWorked={onWorked} />}
     </>
   );

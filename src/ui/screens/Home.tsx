@@ -1,3 +1,4 @@
+import { isIos } from '../../lib/platform';
 import { greeting, todayText } from '../../lib/greeting';
 import { useState, useSyncExternalStore } from 'react';
 import { askResume, clearTrip, loadTrip, subscribeTrip } from '../../lib/trip';
@@ -387,6 +388,8 @@ export function nextCheck(
 ): string | undefined {
   // 0.11.0: Off (no days) says nothing here, like background activity off
   if (!s.sync.backgroundActivity || (Array.isArray(s.checkDays) && !s.checkDays.length)) return undefined;
+  // iPhone: there's no set time; the next check is when Restock is next opened (lib/check.ts iosCheckDue).
+  if (isIos()) return 'when you next open Restock';
   return nextCheckWords(planOf(s), now);
 }
 
