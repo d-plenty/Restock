@@ -47,7 +47,7 @@ export function aisleLabel(v: AisleAt | undefined): string {
 }
 
 /** The aisle's number for sorting (the first number in it), or undefined for a name like "Freezer". */
-export const aisleNumber = (v: AisleAt | undefined): number | undefined => {
+const aisleNumber = (v: AisleAt | undefined): number | undefined => {
   const m = v?.a ? /\d+/.exec(v.a) : null;
   return m ? Number(m[0]) : undefined;
 };

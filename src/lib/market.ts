@@ -10,12 +10,10 @@ import { SHARED_PRICE_SHOPS } from '../shops';
 // what you track leaves the phone.
 
 export const MARKET_SOURCE = 'restock-prices';
-/** Where the files are, for the words in Setup and Settings. */
-export const MARKET_SOURCE_TEXT = "restock-prices (Restock's own weekly price collection, public on GitHub)";
 const WINDOW_BASE = 'https://raw.githubusercontent.com/d-plenty/restock-prices/main/window/';
 
 /** The three lengths, as Settings shows them. */
-export const MARKET_WINDOWS = [
+const MARKET_WINDOWS = [
   { days: 56, label: '8 weeks' },
   { days: 182, label: '6 months' },
   { days: 365, label: '12 months' },

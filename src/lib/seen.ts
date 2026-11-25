@@ -51,7 +51,7 @@ export function seenShape(p: StoreProduct, day = localDay()): SeenRow | undefine
     brand: p.brand ? p.brand.slice(0, 80) : null,
     size: p.size ? p.size.slice(0, 60) : null,
     barcode: p.barcode && /^\d{8,14}$/.test(p.barcode) ? p.barcode : null,
-    image_url: p.imageUrl && /^https:\/\//.test(p.imageUrl) ? p.imageUrl.slice(0, 300) : null,
+    image_url: p.imageUrl && p.imageUrl.startsWith('https://') ? p.imageUrl.slice(0, 300) : null,
     price: p.price,
     was_price: p.wasPrice && p.wasPrice > p.price ? p.wasPrice : null,
     is_special: p.isSpecial ? 1 : 0,

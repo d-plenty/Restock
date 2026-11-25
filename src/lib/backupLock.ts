@@ -20,8 +20,8 @@ export const ITERATIONS = 600_000;
  * A locked backup only opens if it asks for a sensible number of rounds: not so few that it
  * wasn't made by Restock, not so many that the phone would hang trying.
  */
-export const MIN_ITERATIONS = 100_000;
-export const MAX_ITERATIONS = 5_000_000;
+const MIN_ITERATIONS = 100_000;
+const MAX_ITERATIONS = 5_000_000;
 export const NOT_OURS = 'That backup’s lock isn’t one Restock made.';
 
 async function keyFrom(password: string, salt: Uint8Array, iterations: number): Promise<CryptoKey> {

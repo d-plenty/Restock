@@ -10,7 +10,7 @@ export interface Expect {
 
 const e = (want: RegExp, not?: RegExp): Expect => ({ want, not });
 
-export const EXPECT: Record<string, Expect> = {
+const EXPECT: Record<string, Expect> = {
   // pantry
   milk: e(/\bmilk\b/i, /chocolate|formula|frother|evaporated|condensed|coconut|powder|mouse|biscuit|bar\b/i),
   'full cream milk 2l': e(/full cream.*\bmilk\b.*\b2 ?l\b/i),

@@ -22,7 +22,7 @@ const lum = (d: Uint8ClampedArray, i: number) => (d[i] * 299 + d[i + 1] * 587 + 
 
 /** Otsu's threshold: the grey level that best splits the picture into dark and light. */
 export function otsu(gray: Uint8Array): number {
-  const hist = new Array<number>(256).fill(0);
+  const hist = Array.from<number>({ length: 256 }).fill(0);
   for (const g of gray) hist[g]++;
   const total = gray.length;
   let sum = 0;
@@ -153,7 +153,7 @@ function squareToQuad(q: Quad): number[] {
 }
 
 /** How big the straightened receipt should be: its real proportions, at most `maxSide` px. */
-export function outputSize(q: Quad, maxSide = 2200): { width: number; height: number } {
+function outputSize(q: Quad, maxSide = 2200): { width: number; height: number } {
   const wide = Math.max(dist(q[0], q[1]), dist(q[3], q[2]));
   const tall = Math.max(dist(q[0], q[3]), dist(q[1], q[2]));
   const k = Math.min(1, maxSide / Math.max(wide, tall));

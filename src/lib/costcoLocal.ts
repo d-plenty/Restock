@@ -54,7 +54,7 @@ export function withoutCostco<T extends Part>(s: T): T {
 export const COSTCO_LIST_NOTE = 'Costco prices stay on this phone, so the line is added as Any shop.';
 
 /** A list line (or the change to one) at Costco, or with a Costco product behind it. */
-export const isCostcoListLine = (e: Partial<Pick<ListEntry, 'chain' | 'product'>>): boolean => isLocalOnlyShop(e.chain) || isLocalOnlyShop(e.product?.chain);
+const isCostcoListLine = (e: Partial<Pick<ListEntry, 'chain' | 'product'>>): boolean => isLocalOnlyShop(e.chain) || isLocalOnlyShop(e.product?.chain);
 
 /**
  * The line as it may be saved: a list line is shared with the household and the server, so a Costco

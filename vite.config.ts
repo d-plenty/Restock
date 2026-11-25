@@ -16,7 +16,8 @@ export default defineConfig({
   optimizeDeps: { exclude: ['onnxruntime-web'] },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    // 0.15.0: no source maps in the app (they were 11 MB of its size). Errors still name the file and line.
+    sourcemap: false,
     // The app loads from the phone, not the internet, so one ~600 kB file is fine.
     chunkSizeWarningLimit: 700,
     // React in its own file: the app's code changes every version, React rarely does.

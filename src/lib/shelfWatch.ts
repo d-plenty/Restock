@@ -49,9 +49,9 @@ export interface ShelfEntry {
 export type ShelfWatch = Record<string, ShelfEntry>;
 
 /** The shops watched: each has a way of asking that tells "not there" from "couldn't ask", and one product number is one pack. */
-export const WATCHED = ['woolworths', 'coles', 'aldi'] as const;
+const WATCHED = ['woolworths', 'coles', 'aldi'] as const;
 /** Checks on separate days before "no longer sold" is said. */
-export const MISS_CHECKS = { gone: 2, unlisted: 3 } as const;
+const MISS_CHECKS = { gone: 2, unlisted: 3 } as const;
 /** A change smaller than this is rounding or a relabel, not a different pack. */
 const REAL_CHANGE = 0.03;
 
@@ -118,7 +118,7 @@ export function missWords(chain: Chain | string, m: Miss): { title: string; text
       };
 }
 
-export const readShelf = async (): Promise<ShelfWatch> => (await getKV<ShelfWatch>(KV).catch(() => undefined)) ?? {};
+const readShelf = async (): Promise<ShelfWatch> => (await getKV<ShelfWatch>(KV).catch(() => undefined)) ?? {};
 
 /**
  * Works through what the price check saw: a size that really changed becomes `changed` (and the
@@ -202,13 +202,6 @@ export const ackChange = (productId: string) => patch(productId, (e) => void del
 export const hideMiss = (productId: string) => patch(productId, (e) => void (e.miss && (e.miss.hidden = true)));
 /** Found at the shop after all (Find a replacement turned it up): the count is wiped. */
 export const foundAgain = (productId: string) => patch(productId, (e) => void delete e.miss);
-/** A product swapped out or removed: nothing more to say about it. */
-export const forgetShelf = async (productId: string) => {
-  const watch = await readShelf();
-  if (!watch[productId]) return;
-  delete watch[productId];
-  await putKV(KV, watch);
-};
 
 /** What to say on an item, from its products: the picks whose pack changed, and the ones no longer found. */
 export interface ShelfNotes {

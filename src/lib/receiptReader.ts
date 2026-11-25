@@ -25,7 +25,7 @@ export async function readerInstalled(): Promise<boolean> {
 }
 
 /** Thrown by readText when the reader's files aren't on the device yet. */
-export class ReaderMissing extends Error {
+class ReaderMissing extends Error {
   constructor() {
     super('The photo reader isn’t downloaded yet.');
     this.name = 'ReaderMissing';
@@ -89,7 +89,7 @@ function getWorker(): Worker {
 }
 
 /** Stops the reader to free its memory (it restarts when needed). */
-export function stopReader(): void {
+function stopReader(): void {
   worker?.terminate();
   worker = undefined;
 }

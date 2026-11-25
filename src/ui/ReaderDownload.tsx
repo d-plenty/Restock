@@ -47,7 +47,7 @@ function useDownload(onDone?: () => void) {
 }
 
 /** Asks before downloading, showing the size and what it's for. `onClose(true)` once the reader is ready. */
-export function ReaderDownloadSheet({ onClose }: { onClose: (ready: boolean) => void }) {
+function ReaderDownloadSheet({ onClose }: { onClose: (ready: boolean) => void }) {
   const d = useDownload(() => onClose(true));
   return (
     <Sheet title="Download the photo reader?" onClose={() => onClose(false)}>

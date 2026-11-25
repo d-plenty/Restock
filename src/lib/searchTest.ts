@@ -51,7 +51,7 @@ export async function searchTestSize(sections: Section[], every = false): Promis
   return sections.reduce((n, sec) => n + testShops(s.enabledChains, sec).length * (every ? SEARCH_WORDS : PHONE_WORDS)[sec].length, 0);
 }
 
-export async function runSearchTest(
+async function runSearchTest(
   sections: Section[],
   every: boolean,
   onProgress: (p: SearchTestProgress) => void,

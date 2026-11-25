@@ -15,9 +15,8 @@ import { serverMode } from '../../server-mode/flag';
 import { BetaTag, Icon } from '../components';
 import { useNav } from '../nav';
 
-
 /** 0.10.4: what a tab's tile says: how many things, how many on special, and the shop that's cheapest most often. */
-export function tabSummary(recs: Recommendation[] | undefined, section: Section): { things: number; onSpecial: number; cheapest?: Chain } {
+function tabSummary(recs: Recommendation[] | undefined, section: Section): { things: number; onSpecial: number; cheapest?: Chain } {
   const mine = (recs ?? []).filter((r) => (r.group.section ?? 'pantry') === section);
   const onSpecial = mine.filter((r) => r.action === 'buy' || r.action === 'small' || r.action === 'alt').length;
   const wins = new Map<Chain, number>();
@@ -111,7 +110,7 @@ export function MoreTop({ children }: { children?: ReactNode }) {
 }
 
 /** The rows under the navy top, the same five on the phone and the web page. */
-export function MoreRow({ icon, title, sub, onClick, off }: { icon: string; title: string; sub: string; onClick: () => void; off?: boolean }) {
+function MoreRow({ icon, title, sub, onClick, off }: { icon: string; title: string; sub: string; onClick: () => void; off?: boolean }) {
   return (
     <button className="row" onClick={onClick}>
       <Icon name={icon} size={22} />

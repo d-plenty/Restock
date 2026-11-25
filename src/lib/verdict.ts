@@ -36,7 +36,7 @@ export interface Verdict {
   always?: true;
 }
 
-export const VERDICT_LABEL: Record<VerdictKind, string> = {
+const VERDICT_LABEL: Record<VerdictKind, string> = {
   great: 'GREAT DEAL',
   good: 'ON SPECIAL',
   small: 'SMALL SAVING',
@@ -54,8 +54,8 @@ export const verdictLabel = (v: Pick<Verdict, 'kind' | 'always'>): string => (v.
  * at its "was" price, so the "special" is really its usual price. Any size of claimed discount.
  * Mirrored in Deals.java.
  */
-export const ALWAYS_WINDOW = 21;
-export const ALWAYS_DAYS = 14;
+const ALWAYS_WINDOW = 21;
+const ALWAYS_DAYS = 14;
 export function alwaysOnSpecial(readings: PriceReading[], now: number): { days: number; was: number } | undefined {
   const recent = readings.filter((r) => now - Date.parse(r.date) <= ALWAYS_WINDOW * DAY);
   const special = recent.filter((r) => r.isSpecial);
@@ -508,7 +508,7 @@ export function productQty(p: Product): { qty?: number; unit?: Product['qtyUnit'
 }
 
 const ON_SALE: VerdictKind[] = ['great', 'good', 'small'];
-export const isOnSale = (o?: Option) => !!o && ON_SALE.includes(o.verdict.kind);
+const isOnSale = (o?: Option) => !!o && ON_SALE.includes(o.verdict.kind);
 
 export function recommend(
   group: Group,
@@ -687,12 +687,6 @@ export function describe(o: Option): string {
   return `${name} ${size}`;
 }
 
-/** "$0.87 each" for a pack priced by the litre or kilo, so you can still see the price a can. Per item: for understanding, never for deciding. */
-export function eachText(o?: Option): string {
-  if (!o || o.price === undefined) return '';
-  return priceLine(o.product, o.price).each ?? '';
-}
-
 /** The comparison price, "$2.61 / L" (only this decides the cheapest). */
 function unitText(o: Option): string {
   return o.unitPrice !== undefined ? formatUnitPrice(o.unitPrice, productQty(o.product).unit) : '';
@@ -722,7 +716,7 @@ export function isBulk(o: Option, options: Option[], group: Group): boolean {
 }
 
 /** The option an alert or deal card is about. */
-export function dealOption(rec: Recommendation): Option | undefined {
+function dealOption(rec: Recommendation): Option | undefined {
   if (rec.action === 'alt') return rec.alt;
   if (rec.action === 'buy' || rec.action === 'small') return rec.best;
   return undefined;

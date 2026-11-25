@@ -25,7 +25,7 @@ export const RSE2 = strToU8('RSE2');
 export const LINK_INFO = 'restock-link-v2';
 export const SERVER_KEY_INFO = 'restock-server-files-v1';
 /** The passphrase's PBKDF2 rounds (docs/server-protocol.md). */
-export const PBKDF2_ROUNDS = 600_000;
+const PBKDF2_ROUNDS = 600_000;
 
 // ---------- bytes ----------
 
@@ -253,7 +253,7 @@ export function openWebKeys(webPriv: Uint8Array, bytes: Uint8Array): Record<stri
   if (!startsWith(bytes, RSE2) || bytes.length < 4 + n + 12 + 16) throw new Error('not a webkeys file');
   const pub = bytes.subarray(4, 4 + n);
   const m = openLink<{ keys?: Record<string, string>; keyv?: number | string; key?: string }>(linkKey(webPriv, pub), bytes.subarray(4 + n));
-  const out: Record<string, string> = { ...(m.keys ?? {}) };
+  const out: Record<string, string> = { ...m.keys };
   if (m.key && m.keyv !== undefined) out[String(m.keyv)] = m.key;
   for (const [v, k] of Object.entries(out)) if (!/^\d+$/.test(v) || unb64(k).length !== 32) throw new Error('odd key');
   return out;

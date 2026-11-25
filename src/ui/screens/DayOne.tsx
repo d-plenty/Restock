@@ -89,7 +89,7 @@ export function HistoryLengths({ settings, onPicked }: { settings: Settings; onP
  * results for a different time" (otherwise it follows the price history above). On the web page
  * it's greyed: searching the shops and remembering it happens on the phones.
  */
-export function SearchKeepSettings({ settings }: { settings: Settings }) {
+function SearchKeepSettings({ settings }: { settings: Settings }) {
   const count = useLive(() => seenCount(), []);
   const own = settings.searchKeepWeeks !== undefined;
   const weeks = seenKeepWeeks(settings);

@@ -101,6 +101,13 @@ public class WirePeer {
                             System.out.println("OK " + out);
                             break;
                         }
+                        case "OWNER":
+                            // 0.15.0: this phone's owner, and whether it holds the owner's secrets.
+                            System.out.println("OK " + p.e.householdValue("owner") + " " + (p.e.meta("owner_secrets") != null));
+                            break;
+                        case "TAKEHANDOVER":
+                            System.out.println("OK " + p.h.takeHandover());
+                            break;
                         case "QUIT":
                             System.out.println("OK");
                             System.exit(0);

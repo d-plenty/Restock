@@ -102,4 +102,46 @@ describe('0.14.0: two iPhones syncing over the Wi-Fi', () => {
     await a.house.stop();
     await b.house.stop();
   }, 60_000);
+
+  it('0.15.0: the owner hands the household to another iPhone, which takes over at its next sync', async () => {
+    const air = new Map<string, Found>();
+    const a = await iphone('a3a3a3a3a3a3a3a3', air);
+    const b = await iphone('b4b4b4b4b4b4b4b4', air);
+    const c = await iphone('c5c5c5c5c5c5c5c5', air);
+    a.house.start('Handover house');
+    await b.house.join((await a.house.invite()).code);
+    await b.house.syncAll();
+    await c.house.join((await a.house.invite()).code);
+    await c.house.syncAll();
+
+    // Only the owner can ask, and only for a phone in the household.
+    await expect(b.house.handOver(c.e.device())).rejects.toThrow('Only the phone that started the household');
+    await expect(a.house.handOver('zzzzzzzzzzzzzzzz')).rejects.toThrow("isn't in the household");
+
+    // Asked and then cancelled: nothing changes.
+    await a.house.handOver(b.e.device());
+    expect(a.house.handingOverTo()).toBe(b.e.device());
+    a.house.cancelHandOver();
+    expect(a.house.handingOverTo()).toBeNull();
+    await b.house.syncAll();
+    expect(b.house.isOwner()).toBe(false);
+
+    // Asked again: B takes over when it syncs; A lets go of the owner's secrets.
+    await a.house.handOver(b.e.device());
+    await b.house.syncAll();
+    expect(b.house.isOwner()).toBe(true);
+    expect(b.e.meta('owner_priv')).toBe(a.e.meta('owner_priv'));
+    expect(b.e.meta('owner_secrets')).not.toBeNull();
+    await a.house.syncAll();
+    expect(a.house.isOwner()).toBe(false);
+    expect(a.e.meta('owner_secrets')).toBeNull();
+    expect(a.house.members().find((m) => m.owner)?.device).toBe(b.e.device());
+
+    // The new owner does the owner's jobs: it takes C out, and C finds out at its next sync.
+    await b.house.remove(c.e.device());
+    expect((await c.house.syncAll()).removed).toBe(true);
+    // And the old owner can now leave, keeping what it has.
+    expect(await a.house.leave()).toBe(true);
+    for (const x of [a, b, c]) await x.house.stop();
+  }, 60_000);
 });

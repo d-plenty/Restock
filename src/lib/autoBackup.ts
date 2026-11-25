@@ -40,7 +40,7 @@ export const BACKUP_KEEP = [3, 4, 5, 10, 20]; // 0.9.3: 4, for "weekly, kept for
 export const everyLabel = (d: number) =>
   d === 1 ? 'Every day' : d === 7 ? 'Every week' : d === 14 ? 'Every fortnight' : d === 30 ? 'Every month' : `Every ${d} days`;
 
-export function backupDue(s: Settings, now = Date.now()): boolean {
+function backupDue(s: Settings, now = Date.now()): boolean {
   const b = s.autoBackup;
   if (!b.enabled || !b.folder) return false;
   if (!b.lastAt) return true;
@@ -49,7 +49,7 @@ export function backupDue(s: Settings, now = Date.now()): boolean {
 }
 
 /** "restock-auto-2026-11-07-0915.json": sorts by date, so the oldest are easy to find and remove. */
-export function autoName(d = new Date()): string {
+function autoName(d = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `restock-auto-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.json`;
 }

@@ -191,7 +191,7 @@ export function alike(a: Option, b: Option): [Qty, Qty] {
 }
 
 /** The cost of the amount you usually buy, at this pick's price per gram, litre or item. */
-export function sameAmountCost(pick: Option, ref: Option | undefined, qty: number): number {
+function sameAmountCost(pick: Option, ref: Option | undefined, qty: number): number {
   const cost = lineCost(pick, qty);
   if (!ref) return cost;
   const [p, r] = alike(pick, ref);
@@ -238,7 +238,7 @@ export interface Recommended {
 }
 
 /** A gap smaller than this is too close to call: $2, or 3% of the shop, whichever is more. */
-export const tooClose = (total: number) => Math.max(2, total * 0.03);
+const tooClose = (total: number) => Math.max(2, total * 0.03);
 
 /** One line's cost for comparing stores: like for like (best value) or at the till (lowest price). */
 export const lineMeasure = (l: ShopLine, by: CompareBy) => (by === 'unit' ? l.fair : lineCost(l.pick, l.qty));

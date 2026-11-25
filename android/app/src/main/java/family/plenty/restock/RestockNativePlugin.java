@@ -1812,24 +1812,8 @@ public class RestockNativePlugin extends Plugin {
 
     // ---------- 0.9.2: the Restock server ----------
 
-    /** Join a Restock server with the code from its Add a phone page (scanned or pasted). */
-    @PluginMethod
-    public void syncJoinServer(PluginCall call) {
-        final String code = call.getString("code", "");
-        new Thread(() -> {
-            try {
-                SyncHub hub = SyncHub.get(getContext());
-                hub.joinServer(code);
-                syncThread.execute(() -> {
-                    hub.schedule();
-                    hub.syncAll(); // the server straight away (and any phones on this Wi-Fi)
-                    call.resolve(syncInfoObject(hub));
-                });
-            } catch (Exception e) {
-                call.reject(e.getMessage() == null ? "Couldn't join the Restock server." : e.getMessage(), e);
-            }
-        }, "restock-server-join").start();
-    }
+    // 0.15.0: joining a 0.9.3-style server (syncJoinServer) and handing a household to one
+    // (syncHandOverServer) are gone: servers no longer keep such a household.
 
     // ---------- 0.9.4: a v3 server's house ----------
 
@@ -1935,34 +1919,6 @@ public class RestockNativePlugin extends Plugin {
                 call.reject(e.getMessage(), e);
             }
         });
-    }
-
-    /** The server's mode (for the owner phone's Hand this household to the server), or nothing. */
-    @PluginMethod
-    public void syncServerHealth(PluginCall call) {
-        new Thread(() -> {
-            JSONObject h = SyncHub.get(getContext()).serverHealth();
-            try {
-                call.resolve(h == null ? new JSObject() : new JSObject(h.toString()));
-            } catch (Exception e) {
-                call.resolve(new JSObject());
-            }
-        }, "restock-server-health").start();
-    }
-
-    /** Owner phone: hand the household to the server with the code from its Take this household page. */
-    @PluginMethod
-    public void syncHandOverServer(PluginCall call) {
-        final String code = call.getString("code", "");
-        new Thread(() -> {
-            try {
-                SyncHub hub = SyncHub.get(getContext());
-                hub.handOverToServer(code);
-                call.resolve(syncInfoObject(hub));
-            } catch (Exception e) {
-                call.reject(e.getMessage() == null ? "Couldn't hand the household over." : e.getMessage(), e);
-            }
-        }, "restock-server-handover").start();
     }
 
     /** Stop using the Restock server. bringBack: its receipt photos come back onto this phone first. */

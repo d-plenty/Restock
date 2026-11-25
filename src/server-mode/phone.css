@@ -27,6 +27,13 @@ html.web-phone .screen {
 html.web-phone .app > nav.tabs:not(.pt-tabs) {
   display: none;
 }
+/* 0.15.0: a wide window: App.tsx's bar is the side bar (styles.css .pad-wide), and More isn't needed. */
+html.web-phone .app.pad-wide > nav.tabs:not(.pt-tabs) {
+  display: flex;
+}
+html.web-phone .app.pad-wide {
+  padding-left: var(--pad-side);
+}
 .pt-tabs {
   order: 99;
   flex-shrink: 0;

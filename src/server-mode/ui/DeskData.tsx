@@ -30,7 +30,7 @@ function savedPeriod(): Period {
 }
 
 /** 3 months · 6 months · 12 months · All. */
-export function PeriodPicker({ value, onChange }: { value: Period; onChange: (p: Period) => void }) {
+function PeriodPicker({ value, onChange }: { value: Period; onChange: (p: Period) => void }) {
   return (
     <div className="dk-seg" role="group" aria-label="Time period">
       {PERIODS.map((p) => (

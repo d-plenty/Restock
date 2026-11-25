@@ -143,7 +143,7 @@ export function flattenColes(data: Raw): StoreProduct[] {
  * Coles hands out 24 results at a time; `start` is where the next lot begins (0.8.5). Its own
  * page data says so: `{ noOfResults: 87, start: 0, pageSize: 24 }`.
  */
-export const COLES_PAGE = 24;
+const COLES_PAGE = 24;
 const startOf = (page: number) => String((Math.max(1, page) - 1) * COLES_PAGE);
 
 async function searchOnce(term: string, storeId: string, key: string, page = 1, jar = '') {

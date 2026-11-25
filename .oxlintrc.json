@@ -11,21 +11,12 @@
   ],
   "rules": {
     "no-control-regex": "off",
-    "no-unsafe-optional-chaining": "off",
-    "no-unused-expressions": "off",
-    "oxc/erasing-op": "off",
-    "react-hooks/exhaustive-deps": "off",
-    "react-hooks/rules-of-hooks": "off",
-    "react/immutability": "off",
-    "react/purity": "off",
     "react/refs": "off",
     "react/set-state-in-effect": "off",
-    "react/use-memo": "off",
-    "unicorn/no-new-array": "off",
-    "unicorn/no-single-promise-in-promise-methods": "off",
-    "unicorn/no-useless-fallback-in-spread": "off",
     "unicorn/no-useless-spread": "off",
-    "unicorn/prefer-string-starts-ends-with": "off"
+    "no-unused-expressions": "off",
+    "react/immutability": "off",
+    "react/purity": "off"
   },
   "ignorePatterns": [
     "dist/**",

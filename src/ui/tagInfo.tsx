@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { ShopLine } from '../lib/shopTotals';
 import { money } from '../lib/units';
 import { promoLabel } from '../stores/http';
-import { describe, multiText, verdictLabel, type ActionKind, type Option, type Recommendation } from '../lib/verdict';
+import { describe, multiText, verdictLabel, type Option } from '../lib/verdict';
 import { chainName, GOOD_SALE, GREAT_SALE, type Chain } from '../types';
 import { Icon, memberProgram, Sheet, stockWhere } from './components';
 import { SwapWhy } from './shopTotalsCard';
@@ -15,7 +15,7 @@ import { SwapWhy } from './shopTotalsCard';
  * A tag that opens an explanation. It sits inside tappable rows, so the explanation is drawn at
  * the top of the page and taps, swipes and long presses inside it never reach the row.
  */
-export function InfoTag({
+function InfoTag({
   className,
   label,
   title,
@@ -177,7 +177,7 @@ const lowestSeen = (o: Option) => {
 };
 
 /** What a verdict tag means for this product, with its numbers. */
-export function VerdictBody({ o }: { o: Option }) {
+function VerdictBody({ o }: { o: Option }) {
   const cur = o.stats.current;
   return (
     <>
@@ -217,30 +217,6 @@ export function VerdictInfoTag({ o }: { o: Option }) {
   const label = verdictLabel(o.verdict);
   return (
     <InfoTag className={o.verdict.kind} label={label} title={cap(label)}>
-      <VerdictBody o={o} />
-    </InfoTag>
-  );
-}
-
-/** A pantry item's one status tag, explained using the option it's about. */
-export function ActionInfoTag({ rec, action, great }: { rec: Recommendation; action: ActionKind; great?: boolean }) {
-  const map: Record<ActionKind, [string, string]> = {
-    buy: ['good', great ? 'GREAT DEAL' : 'ON SPECIAL'],
-    alt: ['alt', 'CHEAPER SWAP'],
-    small: ['small', 'SMALL SAVING'],
-    wait: ['wait', 'WAIT'],
-    skip: ['fake', rec.best?.verdict.always ? 'ALWAYS ON SPECIAL' : 'FAKE SPECIAL'],
-    none: ['normal', 'USUAL PRICE'],
-  };
-  const [cls, label] = map[action];
-  const o = action === 'alt' ? rec.alt : rec.best;
-  if (!o) return <span className={`tag ${cls}`}>{label}</span>;
-  if (action === 'alt' && rec.alt) {
-    const line: ShopLine = { item: rec.group.name, groupId: rec.group.id, pick: rec.alt, outOfStock: false, qty: 1, yours: rec.best, fair: 0 };
-    return <InfoTag className={cls} label={label} title={rec.group.name} render={(close) => <SwapWhy line={line} onClose={close} />} />;
-  }
-  return (
-    <InfoTag className={cls} label={label} title={cap(label)}>
       <VerdictBody o={o} />
     </InfoTag>
   );

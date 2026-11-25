@@ -2,9 +2,8 @@ import type { ReactNode } from 'react';
 import { Icon, TopBar } from '../components';
 import { useNav } from '../nav';
 
-// Settings → Coming soon: what's planned, each with a page saying what it'll do. 0.9.5: some have a
-// first part already (spending in the server's Data tab, Restock on iPhone through the server,
-// Restock's own F-Droid repo); each page says what's here and what's still to come.
+// Settings → Coming soon: what's planned, each with a short page saying what it'll do and what's
+// here already. 0.15.0: shared prices (here) came off the list; each page is a sentence or two.
 
 interface Soon {
   id: string;
@@ -14,71 +13,44 @@ interface Soon {
   body: ReactNode;
 }
 
-export const SOON: Soon[] = [
+const SOON: Soon[] = [
   {
     id: 'inventory',
     icon: 'pantry',
-    title: 'What you have at home',
-    short: 'Pantry stock levels and "running low" suggestions',
+    title: 'Running low',
+    short: 'Suggestions to add things before you run out',
     body: (
       <>
-        <p>
-          Tell Restock roughly how much of something you have (a full bottle, two left, nearly out), and it keeps track as you buy and use things.
-        </p>
-        <p>
-          It learns how fast you get through each one, so it can suggest adding things to your shopping list before you run out, and time it with a
-          good price: "You're nearly out of coffee, and it's half price at Coles this week."
-        </p>
-        <p>Scanning a receipt or ticking things off your list in the shop would top your stock up for you.</p>
+        <p>Inventory (Settings) already keeps how much you have. Next, Restock learns how fast you use each thing and suggests adding it to your list before you run out, timed with a good price.</p>
       </>
     ),
   },
   {
     id: 'spending',
     icon: 'chart',
-    title: 'Spending',
-    short: 'Here now in Your data. Receipts for spending later',
+    title: 'Spending from receipts',
+    short: 'Here now in Your data. Receipts as a source later',
     body: (
       <>
-        <p>
-          It's here now: <strong>Settings → Your data</strong> on the phone (and the <strong>Data</strong> tab on a Restock server) shows what you
-          spent each month, where you shop and what you saved on specials. It's worked out from what you tick off your shopping list (the price at
-          the shop you ticked it at, times how many), not from receipts.
-        </p>
-        <p>
-          With a Restock server, your phones share their spending with it unless you turn that off (Settings → Sync and backups), so every phone
-          shows the household's figures.
-        </p>
-        <p>
-          Still to come, when reading receipts is better: a switch to use your receipts for spending instead. Restock isn't a budgeting app, so this
-          stays light.
-        </p>
+        <p>Your data already shows what you spent each month, from what you tick off your list. Later: a switch to work it out from your receipts instead.</p>
       </>
     ),
   },
   {
     id: 'iphone',
     icon: 'phone',
-    title: 'iPhone app',
-    short: 'Restock runs on iPhone and iPad now. Widgets and the App Store are still to come',
+    title: 'iPhone and iPad',
+    short: 'Widgets and the App Store are still to come',
     body: (
       <>
         <p>
-          There is a Restock app for iPhone and iPad now. It isn't in the App Store yet, so it's installed from a computer, and with a
-          free Apple account it has to be installed again every 7 days (your data stays). The steps and the warnings are on{' '}
+          Restock runs on iPhone and iPad, installed from a computer for now:{' '}
           <a href="https://github.com/d-plenty/Restock/blob/main/docs/IPHONE.md" target="_blank" rel="noreferrer">
-            the iPhone page on GitHub
+            how, and the warnings
           </a>
           .
         </p>
-        <p>
-          Restock also works on an iPhone without installing anything, through your own Restock server: open the server's https address in Safari,
-          tap Share, then <strong>Add to Home Screen</strong>. The server's sign-in page has the steps under <strong>On iPhone?</strong>
-        </p>
-        <p>
-          Still to come on iPhone and iPad: home screen widgets, and the App Store and TestFlight. Two things aren't possible on an iPhone because of Apple's restrictions: checking
-          prices at a set time of day (they're checked when you open Restock) and Restock updating itself.
-        </p>
+        <p>Still to come: home screen widgets, and the App Store.</p>
       </>
     ),
   },
@@ -90,48 +62,11 @@ export const SOON: Soon[] = [
     body: (
       <>
         <p>
-          You can already get Restock through F-Droid, from{' '}
+          Restock is already in{' '}
           <a href="https://d-plenty.github.io/Restock/" target="_blank" rel="noreferrer">
-            Restock's own F-Droid repo
+            its own F-Droid repo
           </a>
-          . Add it in F-Droid (or Droid-ify or Neo Store) and it keeps Restock up to date. It has every release, signed with the same key as the
-          APK on GitHub.
-        </p>
-        <p>
-          Still to come: Restock in the main F-Droid repository, built by F-Droid from the public code on{' '}
-          <a href="https://github.com/d-plenty/Restock" target="_blank" rel="noreferrer">
-            GitHub
-          </a>
-          , so you can find it in F-Droid without adding a repo.
-        </p>
-      </>
-    ),
-  },
-  {
-    id: 'sharedprices',
-    icon: 'tag',
-    title: 'Shared prices',
-    short: 'Here now. Restock servers sharing with each other is an idea for later',
-    body: (
-      <>
-        <p>
-          It's here now: <strong>Shared prices</strong> in Settings → Privacy and sharing, on unless you turn it off. New items get a fair verdict
-          from day one, from prices everyone's phones and Restock's own collection have seen, and in return your phone shares the shelf prices it
-          reads from Coles, Woolworths and Aldi.
-        </p>
-        <p>It only ever shares prices and products:</p>
-        <ul>
-          <li>Each product's shop, name, brand, size and barcode.</li>
-          <li>Its prices by day: the shelf price, any special or multi-buy, and the date.</li>
-        </ul>
-        <p>And never anything personal:</p>
-        <ul>
-          <li>Who you are, your cards, your branch or where you live.</li>
-          <li>The words you searched, your pantry, your shopping list or what you ticked off, your receipts, or prices you typed in. No account (a random number per install tells phones apart).</li>
-        </ul>
-        <p>
-          The shared history is public on GitHub (d-plenty/restock-prices), free for anyone to use, and never sold. An idea for later: Restock servers
-          sharing prices with each other directly.
+          , with every release. Still to come: the main F-Droid repository, so you can find it without adding a repo.
         </p>
       </>
     ),

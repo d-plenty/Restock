@@ -11,15 +11,14 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.14.1',
-    about: 'More on iPhone and iPad, a smaller app, and less writing in Settings.',
+    version: '0.15.0',
+    about: 'iPhone and iPad catch up on sync, and the server’s web page looks like the iPad.',
     changes: [
-      'iPhone and iPad: shared prices both ways, recall alerts, app icon colours, and your data saved as a real file with a warning if a save ever fails.',
-      'The photo reader (receipts, and reading a product’s name from a photo) is downloaded the first time you use it, about 21 MB, after asking. Settings can remove it or get it again. The app is about 20 MB smaller.',
-      'Less writing: Settings and its screens say one short line, with the full explanation behind a small ⓘ.',
-      '“Pick my …” on a General list line searches your shops straight away, and an item you add takes over its General line.',
-      'Pharmacy 4 Less is no longer a shop to pick: its website stopped listing products. What you saved from it stays.',
-      'A shop that Unblock can’t fix now offers Turn off, and adding your own shop says up front that not every shop works.',
+      'Update every phone in your household to 0.14.0 or newer: from this version, older ones can’t sync with this one or with a Restock server.',
+      'iPhone and iPad: hand the household’s owner job to another phone, bring a household onto a new Restock server, and keep the household’s folder on Nextcloud or another WebDAV server.',
+      'iPhone and iPad: Join your household on the first screen joins a server straight away, and Home’s shop buttons fit on a narrow screen.',
+      'On a Restock server’s web page, a computer gets the same screens as the phone with a side bar, and Your server holds the server’s own pages in one place.',
+      'The app opens faster, and Diagnostics lists problems from background work that used to go unseen.',
     ],
   },
 ];

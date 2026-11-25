@@ -24,7 +24,7 @@ vi.mock('../components', async (importOriginal) => {
   return { ...real, Sheet: ({ title, children }: { title: string; children: unknown }) => h('section', null, h('h2', null, title), children as never) };
 });
 
-const { leaveServer, LeaveServerSheet, personalShared, shopsText } = await import('./Sync');
+const { leaveServer, LeaveServerSheet, personalShared, shopsText } = await import('./SyncServer');
 const { NavContext } = await import('../nav');
 const nav = { toast: () => undefined, pop: () => undefined, push: () => undefined } as never;
 const render = (info: SyncInfo) =>

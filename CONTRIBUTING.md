@@ -43,7 +43,7 @@ Start a thread in [Discussions → Ideas](../../discussions/categories/ideas). S
 
 ## Know the Apple side?
 
-Restock already works on iPhone through your own server, as a web app on the home screen. It's still looking for someone to build a real iPhone app and publish it on the App Store, ideally someone who already has an Apple developer account and knows Xcode, TestFlight and App Store review. The details are in the README: [Wanted: someone to bring Restock to iPhone](README.md#wanted-someone-to-bring-restock-to-iphone).
+Restock runs on iPhone and iPad as its own app (installed from a computer for now; see [docs/IPHONE.md](docs/IPHONE.md)), and through your own server as a web app on the home screen. It isn't on the App Store yet: help from someone who already has an Apple developer account and knows TestFlight and App Store review is welcome. The details are in the README: [Wanted: someone to bring Restock to iPhone](README.md#wanted-someone-to-bring-restock-to-iphone).
 
 ## Working on the code
 
@@ -57,8 +57,20 @@ VITE_FAKE_STORES=1 npm run dev   # click through in a browser with made-up shops
 npm run typecheck
 npm run lint        # the linter (oxlint, .oxlintrc.json)
 npm test
-npm run build:server-core && (cd server && npm test)   # the Restock server, if you changed it or what it shares
+ORGJSON=~/json.jar bash tools/sync-test/run.sh          # the Android sync tests (org.json jar from github.com/stleary/JSON-java)
 ```
+
+The Restock server is its own repo ([d-plenty/restock-server](https://github.com/d-plenty/restock-server)). If you changed it, or what it shares with this one, clone it next to this repo and run `RESTOCK_DIR=../restock npm test` there (the sync tests above use it too).
+
+### Finding your way around
+
+- **`src/ui/screens/`**: one file per screen. The biggest ones are split, with the parts in files named after them: `List.tsx` and `ShoppingMode.tsx`; `Item.tsx`, `ItemSheets.tsx` and `ItemHistory.tsx`; `Add.tsx` and `AddSheets.tsx`; `Settings.tsx` and `SettingsParts.tsx`; `Sync.tsx`, `SyncCodes.tsx`, `SyncServer.tsx` and `SyncSheets.tsx`. Tests that read a screen's code use `src/lib/readSource.ts`, which reads a split screen as a whole: add a new part to its list there.
+- **`src/lib/`**: everything that isn't a screen (the database, prices and verdicts, sync, backups). `src/lib/sql/schema.ts` has the tables and migrations.
+- **`src/stores/`**: talking to each shop.
+- **`src/ios/`**: the iPhone and iPad app's own parts (its database file, sync, shop pages). **`ios/`** is the Xcode project.
+- **`android/`**: the Android app's Java (background checks, sync, the price helper).
+- **`src/server-mode/`**: the web page a Restock server shows. It uses the phone's own screens; on a wide window they sit beside the iPad's side bar (`src/ui/padWide.ts`).
+- **Errors that background work catches** (a sync round, a price check) are noted with `quiet('where')` from `src/lib/quietErrors.ts`, not dropped, and show in Diagnostics under **Quiet problems**.
 
 ### Good places to start
 
@@ -84,7 +96,9 @@ npm run build:server-core && (cd server && npm test)   # the Restock server, if 
 - **Mind local sync.** Tables that sync between phones are listed in `SYNCED` in `src/lib/sql/schema.ts` and in `TABLES` in `SyncEngine.java`; keep the two in step. Phone-only things (look, receipts, backups, shop sign-ins) must never be added to them.
 - **Be gentle with the shops.** Requests go one at a time with a pause between them, and only for items people track. No bulk scraping, and nothing from paywalled or private price databases.
 - **Plain words.** Interface text should be short, friendly and free of jargon. Australian spelling. Say **shop** (not store), **phone** (not device), **usual price**, **on special**, **Shopping list**, **Add to list**, and **Health** for the tab (chemists for the shops). No em dashes in the interface.
-- **Keep older phones working.** Internal ids stay as they are (the Health tab is still `pharmacy` inside), and new kinds of record must be held, not dropped, by phones and servers that don't know them yet.
+- **Every platform the same.** Android, iPhone and iPad, the web page and the server do the same things the same way. Where an iPhone works differently, the screen just says how it works there; only something Apple doesn't allow at all says so ("not possible on iPhone due to Apple's restrictions").
+- **Colours.** A main button is green on a light background, and gold only on navy.
+- **Keep older phones working.** Internal ids stay as they are (the Health tab is still `pharmacy` inside), and new kinds of record must be held, not dropped, by phones and servers that don't know them yet. The oldest app a server still syncs with is set in `src/lib/minVersion.ts`.
 
 ### Privacy policy and fine print
 

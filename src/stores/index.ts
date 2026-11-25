@@ -13,7 +13,7 @@ import { noteSearchSizes } from '../lib/shelfWatch';
 import { webAdapter } from './web';
 import { woolworths } from './woolworths';
 
-export const ADAPTERS = { woolworths, coles, aldi };
+const ADAPTERS = { woolworths, coles, aldi };
 
 export function adapterFor(chain: StoreChain | 'other'): StoreAdapter | undefined {
   const a = pickAdapter(chain);

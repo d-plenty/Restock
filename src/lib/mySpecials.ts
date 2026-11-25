@@ -110,7 +110,7 @@ const fromProduct = (p: StoreProduct, from: SpecialFrom): Special | undefined =>
       }
     : undefined;
 
-export const seenAsProduct = (r: SeenRow): StoreProduct =>
+const seenAsProduct = (r: SeenRow): StoreProduct =>
   ({
     chain: r.chain,
     storeProductId: r.store_product_id,

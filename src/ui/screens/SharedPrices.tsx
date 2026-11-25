@@ -18,15 +18,15 @@ import { useNav } from '../nav';
 export const SHARED_TITLE = 'Shared prices';
 export const SHARED_ONE_LINE =
   "New items get a fair verdict from day one, from prices everyone's phones and Restock's own collection have seen. In return, your phone shares the shelf prices it reads from the shops.";
-export const SHARED_GOES =
+const SHARED_GOES =
   "What a search or price check reads straight from Coles, Woolworths and Aldi's websites: each product's shop, product number, name, brand, size, barcode and picture link, the price with any special, member price or multi-buy, and the day.";
-export const SHARED_NEVER =
+const SHARED_NEVER =
   'Anything you type in or change yourself, who you are, your account, cards, branch or location, your lists, pantry or what you tick off, receipts, or the words you search. Prices from shops you added yourself and sample items stay here too.';
-export const SHARED_WHERE =
+const SHARED_WHERE =
   "To Restock's shared price service (restock-prices.plenty.family). It checks each price, adds it to the history every night, and publishes it openly on GitHub (d-plenty/restock-prices), free for anyone to use. Nothing in it identifies you or says which phone a price came from.";
-export const SHARED_INSTALL =
+const SHARED_INSTALL =
   "With the prices goes a random number made for this install, so the service can tell phones apart and stop any one sending too much. It isn't linked to you, and your internet address isn't kept.";
-export const SHARED_GET =
+const SHARED_GET =
   'Your phone downloads the shared history for just your shops, for how far back you chose (Prices and deals). Everyone downloads the same files, so nobody can tell what you track.';
 
 /** Settings → Privacy and sharing → Shared prices. */

@@ -80,7 +80,7 @@ export function sharedSectionOf(m: Record<string, unknown>, device: string): Sha
         ...(typeof x.wasPrice === 'number' ? { wasPrice: x.wasPrice } : {}),
         ...(typeof x.promo === 'string' ? { promo: x.promo.slice(0, 80) } : {}),
         ...(typeof x.size === 'string' ? { size: x.size.slice(0, 40) } : {}),
-        ...(typeof x.imageUrl === 'string' && /^https:\/\//.test(x.imageUrl) ? { imageUrl: x.imageUrl.slice(0, 500) } : {}),
+        ...(typeof x.imageUrl === 'string' && x.imageUrl.startsWith('https://') ? { imageUrl: x.imageUrl.slice(0, 500) } : {}),
         isSpecial: true,
         memberOnly: x.memberOnly === true,
       }));
@@ -90,7 +90,7 @@ export function sharedSectionOf(m: Record<string, unknown>, device: string): Sha
   if (isObj(m.catalogues))
     for (const [chain, c] of Object.entries(m.catalogues).slice(0, 80)) {
       if (!CHAIN.test(chain) || !isObj(c)) continue;
-      const url = typeof c.url === 'string' && /^https:\/\//.test(c.url) ? c.url.slice(0, 500) : undefined;
+      const url = typeof c.url === 'string' && c.url.startsWith('https://') ? c.url.slice(0, 500) : undefined;
       catalogues[chain] = { ...(url ? { url } : {}), ...(typeof c.note === 'string' ? { note: c.note.slice(0, 120) } : {}) };
     }
   if (!specials.length && !Object.keys(catalogues).length) return undefined;
@@ -240,7 +240,7 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
     // So only a browser that has the key pair names one: a browser signed in with a phone only
     // knows the webPub the server told it, and passes on the one already in the file instead.
     const webPub = opts.v3 ? null : k.webPriv ? k.webPub : e.meta('own_webpub');
-    const sealed = sealRsf1(unb64(k.keys[String(keyv)]), { ...out.msg, ...(webPub ? { webPub } : {}), ...(opts.extra?.() ?? {}) });
+    const sealed = sealRsf1(unb64(k.keys[String(keyv)]), { ...out.msg, ...(webPub ? { webPub } : {}), ...opts.extra?.() });
     if (attempt > 0 || f) {
       const now2 = await remote.files();
       const g = now2.find((x) => x.name === own);

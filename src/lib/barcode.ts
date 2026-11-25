@@ -53,7 +53,7 @@ export function loadReader(): Promise<Reader> {
   return reader;
 }
 
-export const SCAN_FORMATS = [
+const SCAN_FORMATS = [
   'EAN13',
   'EAN8',
   'UPCA',

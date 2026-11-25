@@ -1,12 +1,13 @@
 // 0.13.2: iCloud sync, on iPhone and iPad (what Sync opens there). A household of iPhones and iPads
 // that shares one folder in iCloud Drive: the first device makes the household, the others join with
 // its code, and each puts its changes in the folder whenever Restock is open (ios/folderHouse.ts).
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { scanBarcode } from '../../lib/barcode';
 import { confirmAction } from '../../lib/confirm';
 import { getSettings } from '../../lib/db';
 import { deviceWord } from '../../lib/platform';
 import { RestockNative } from '../../lib/sql/native';
+import { useSyncStatus } from './useSyncStatus';
 import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { isFolderCode } from '../../ios/folderHouse';
@@ -14,7 +15,7 @@ import { icloud, type IcloudStatus } from '../../ios/sync';
 import { Icon, Sheet, TopBar, More } from '../components';
 import { NotHereBanner } from '../IosWhy';
 import { useNav } from '../nav';
-import { CodeText, PairingQr } from './Sync';
+import { CodeText, PairingQr } from './SyncCodes';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -120,46 +121,11 @@ function AddDeviceSheet({ onClose, onLetIn }: { onClose: () => void; onLetIn: ()
 export function IcloudSyncScreen() {
   const nav = useNav();
   const settings = useLive(getSettings, []);
-  const [st, setSt] = useState<IcloudStatus>();
-  const [busy, setBusy] = useState<string>();
-  const [error, setError] = useState<string>();
+  const { st, busy, error, setError, load, run } = useSyncStatus<IcloudStatus>(() => icloud.status());
   const [adding, setAdding] = useState(false);
   const device = deviceWord();
-  const alive = useRef(true);
 
-  const load = useCallback(() => {
-    try {
-      const s = icloud.status();
-      if (alive.current) setSt(s);
-    } catch {
-      // the data isn't open yet: the next look tries again
-    }
-  }, []);
-  useEffect(() => {
-    alive.current = true;
-    load();
-    const t = setInterval(load, 3000);
-    const h = RestockNative.addListener('syncDone', load);
-    return () => {
-      alive.current = false;
-      clearInterval(t);
-      void h.then((x) => x.remove()).catch(() => undefined);
-    };
-  }, [load]);
-
-  const run = async (what: string, job: () => Promise<void>) => {
-    setError(undefined);
-    setBusy(what);
-    try {
-      await job();
-    } catch (e) {
-      setError(errText(e));
-    } finally {
-      setBusy(undefined);
-      load();
-    }
-  };
-
+  const [dav, setDav] = useState(false);
   const pick = () =>
     run('Opening Files…', async () => {
       if (await icloud.pickFolder()) nav.toast('Folder picked');
@@ -253,14 +219,23 @@ export function IcloudSyncScreen() {
                 <span className="title" style={{ fontSize: 15 }}>
                   {st?.folderName ?? 'No folder picked yet'}
                 </span>
-                <span className="small">{st?.folderName ? 'The folder your household shares' : "Pick the folder your household shares in iCloud Drive"}</span>
+                <span className="small">
+                  {st?.folderName ? (st.folderKind === 'dav' ? 'Your household’s folder on Nextcloud or WebDAV' : 'The folder your household shares') : 'Pick the folder your household shares in iCloud Drive'}
+                </span>
               </span>
               <button className={`btn small${st?.folderName ? '' : ' primary'}`} disabled={!!busy || !st?.available || !!st?.joined} onClick={() => void pick()}>
                 {st?.folderName ? 'Change' : 'Pick the folder'}
               </button>
             </div>
           </div>
-          <FolderHelp />
+          {st?.folderKind !== 'dav' && <FolderHelp />}
+          {/* 0.15.0: or a folder on Nextcloud or another WebDAV server, for households that run one */}
+          {st && !st.joined && !st.joining && (
+            <button className="linkish" style={{ alignSelf: 'flex-start', minHeight: 44 }} disabled={!!busy} onClick={() => setDav(true)}>
+              Use Nextcloud or WebDAV instead
+            </button>
+          )}
+          {dav && <DavSheet onClose={() => setDav(false)} onDone={() => (setDav(false), load(), nav.toast('Folder ready'))} />}
 
           {st && !st.joined && !st.joining && (
             <>
@@ -415,5 +390,86 @@ export function IcloudSyncScreen() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * 0.15.0: the household's folder on Nextcloud (signing in on Nextcloud's own page, which gives
+ * Restock an app password of its own) or any WebDAV server (its address, user name and an app
+ * password). The password stays on this device, in the keychain.
+ */
+function DavSheet({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [kind, setKind] = useState<'nextcloud' | 'webdav'>('nextcloud');
+  const [address, setAddress] = useState('');
+  const [user, setUser] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState<string>();
+  const [error, setError] = useState<string>();
+  const stop = useRef(false);
+  useEffect(() => () => void (stop.current = true), []);
+  const go = async () => {
+    setError(undefined);
+    try {
+      if (kind === 'webdav') {
+        setBusy('Trying the folder…');
+        await icloud.useDav({ url: address, user, password });
+        return onDone();
+      }
+      setBusy('Opening Nextcloud…');
+      const l = await icloud.nextcloudStart(address);
+      window.open(l.login, '_blank');
+      setBusy('Waiting for you to sign in on Nextcloud…');
+      // Up to 20 minutes, asking every 2 seconds, as on Android.
+      for (let i = 0; i < 600 && !stop.current; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        if (await icloud.nextcloudPoll(l)) return onDone();
+      }
+      if (!stop.current) setError('Signing in took too long. Try again.');
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(undefined);
+    }
+  };
+  return (
+    <Sheet title="Nextcloud or WebDAV" onClose={onClose}>
+      <div className="seg" role="tablist" aria-label="Kind of server">
+        <button role="tab" aria-selected={kind === 'nextcloud'} className={kind === 'nextcloud' ? 'on' : ''} onClick={() => setKind('nextcloud')}>
+          Nextcloud
+        </button>
+        <button role="tab" aria-selected={kind === 'webdav'} className={kind === 'webdav' ? 'on' : ''} onClick={() => setKind('webdav')}>
+          Other WebDAV
+        </button>
+      </div>
+      <label className="field">
+        <span>{kind === 'nextcloud' ? 'Your Nextcloud’s address' : 'The folder’s WebDAV address'}</span>
+        <input className="input" inputMode="url" autoCapitalize="off" autoCorrect="off" value={address} onChange={(e) => setAddress(e.target.value)} placeholder={kind === 'nextcloud' ? 'cloud.example.com' : 'https://…/Restock/'} />
+      </label>
+      {kind === 'webdav' && (
+        <>
+          <label className="field">
+            <span>User name</span>
+            <input className="input" autoCapitalize="off" autoCorrect="off" value={user} onChange={(e) => setUser(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>App password</span>
+            <input className="input" type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </label>
+        </>
+      )}
+      <p className="small" style={{ margin: 0 }}>
+        {kind === 'nextcloud'
+          ? 'You sign in on Nextcloud’s own page. Restock gets a password of its own; yours never reaches it. Every device in the household uses the same folder (Restock).'
+          : 'Every device in the household uses the same folder. The password stays on this device only.'}
+      </p>
+      {error && (
+        <div className="banner amber" role="alert">
+          <span style={{ fontSize: 13 }}>{error}</span>
+        </div>
+      )}
+      <button className="btn primary block" disabled={!!busy || !address.trim() || (kind === 'webdav' && !user.trim())} onClick={() => void go()}>
+        {busy ?? (kind === 'nextcloud' ? 'Sign in to Nextcloud' : 'Use this folder')}
+      </button>
+    </Sheet>
   );
 }

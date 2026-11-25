@@ -1,19 +1,20 @@
 // 0.14.0: syncing with another phone over your own Wi-Fi, on iPhone and iPad (ios/wire.ts). The same
 // household of phones the Android app makes: one phone starts it, the others join with its code, and
 // they swap changes straight to each other. An iPhone or iPad does its part while Restock is open.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { scanBarcode } from '../../lib/barcode';
 import { confirmAction } from '../../lib/confirm';
 import { getSettings } from '../../lib/db';
 import { deviceWord } from '../../lib/platform';
 import { RestockNative } from '../../lib/sql/native';
+import { useSyncStatus } from './useSyncStatus';
 import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { isWifiCode } from '../../ios/wire';
 import { wifi, type WifiStatus } from '../../ios/sync';
 import { Icon, Sheet, TopBar, More } from '../components';
 import { useNav } from '../nav';
-import { CodeText, PairingQr } from './Sync';
+import { CodeText, PairingQr } from './SyncCodes';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -93,45 +94,9 @@ function Toggle({ on, label, detail, disabled, onChange }: { on: boolean; label:
 export function WifiSyncScreen({ apple }: { apple?: boolean }) {
   const nav = useNav();
   const settings = useLive(getSettings, []);
-  const [st, setSt] = useState<WifiStatus>();
-  const [busy, setBusy] = useState<string>();
-  const [error, setError] = useState<string>();
+  const { st, busy, error, setError, load, run } = useSyncStatus<WifiStatus>(() => wifi.status());
   const [adding, setAdding] = useState(false);
   const device = deviceWord();
-  const alive = useRef(true);
-
-  const load = useCallback(() => {
-    try {
-      const s = wifi.status();
-      if (alive.current) setSt(s);
-    } catch {
-      // the data isn't open yet: the next look tries again
-    }
-  }, []);
-  useEffect(() => {
-    alive.current = true;
-    load();
-    const t = setInterval(load, 3000);
-    const h = RestockNative.addListener('syncDone', load);
-    return () => {
-      alive.current = false;
-      clearInterval(t);
-      void h.then((x) => x.remove()).catch(() => undefined);
-    };
-  }, [load]);
-
-  const run = async (what: string, job: () => Promise<void>) => {
-    setError(undefined);
-    setBusy(what);
-    try {
-      await job();
-    } catch (e) {
-      setError(errText(e));
-    } finally {
-      setBusy(undefined);
-      load();
-    }
-  };
 
   const start = async () => {
     const name = settings?.household.name || 'Our house';
@@ -184,6 +149,16 @@ export function WifiSyncScreen({ apple }: { apple?: boolean }) {
     if (sure) await run('Taking it out…', () => wifi.remove(d.device));
   };
 
+  // 0.15.0: the owner can hand the household to another phone (it takes over at its next sync).
+  const handOver = async (d: { device: string; name: string }) => {
+    const sure = await confirmAction(`Make ${d.name} the owner?`, {
+      detail: `${d.name} takes over the next time the two of you sync: it adds and takes out phones from then on. Until then this ${device} stays the owner.`,
+      action: 'Make it the owner',
+      danger: false,
+    });
+    if (sure) await run('Asking it to take over…', () => wifi.handOver(d.device));
+  };
+
   const leave = async () => {
     const sure = await confirmAction('Stop syncing with the other phones?', {
       detail: `This ${device} keeps everything it has now. Nothing is deleted on the other phones.`,
@@ -192,7 +167,7 @@ export function WifiSyncScreen({ apple }: { apple?: boolean }) {
     if (!sure) return;
     await run('Stopping…', async () => {
       if (await wifi.leave()) nav.toast('This device no longer syncs with the other phones');
-      else setError(`This ${device} started the household and other phones are still in it. Take them out first (Phones, below), then stop.`);
+      else setError(`This ${device} owns the household and other phones are still in it. Make another phone the owner, or take them out (Phones, below), then stop.`);
     });
   };
 
@@ -287,6 +262,14 @@ export function WifiSyncScreen({ apple }: { apple?: boolean }) {
                 </div>
               </div>
 
+              {st.handingOverTo && (
+                <div className="banner grey" role="status">
+                  <strong>{st.members.find((m) => m.device === st.handingOverTo)?.name ?? 'The other phone'} takes over as the owner at its next sync</strong>
+                  <button className="btn small" style={{ alignSelf: 'flex-start' }} disabled={!!busy} onClick={() => void run('Cancelling…', async () => wifi.cancelHandOver())}>
+                    Stay the owner
+                  </button>
+                </div>
+              )}
               <div className="eyebrow">Phones</div>
               <div className="card flush">
                 {st.members.map((d) => (
@@ -299,9 +282,14 @@ export function WifiSyncScreen({ apple }: { apple?: boolean }) {
                       <span className="small">{d.owner ? 'Started the household: phones are added and taken out on it' : 'In the household'}</span>
                     </span>
                     {st.owner && !d.me && (
-                      <button className="btn small" disabled={!!busy} onClick={() => void remove(d)}>
-                        Take out
-                      </button>
+                      <>
+                        <button className="btn small" disabled={!!busy || st.handingOverTo === d.device} onClick={() => void handOver(d)}>
+                          Make owner
+                        </button>
+                        <button className="btn small" disabled={!!busy} onClick={() => void remove(d)}>
+                          Take out
+                        </button>
+                      </>
                     )}
                   </div>
                 ))}

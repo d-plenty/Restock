@@ -2,8 +2,6 @@
 // 0.9.5: product photos (only from the shops' picture hosts the server's CSP allows), the item's big
 // photo, and Previous / Next for catalogue pages.
 import { useState, type ReactNode } from 'react';
-import type { Group } from '../../types';
-import type { Nav } from '../../ui/nav';
 import { Icon } from '../../ui/components';
 
 /**
@@ -119,21 +117,6 @@ export function PageArrows({ page, count, name, onGo, where }: { page: number; c
       </button>
     </div>
   );
-}
-
-let pendingItem: string | undefined;
-
-/** Opens an item in its tab's table, with its side panel open (from Home, say). */
-export function openItem(nav: Nav, group: Pick<Group, 'id' | 'section'>): void {
-  pendingItem = group.id;
-  nav.setTab(group.section ?? 'pantry');
-}
-
-/** The item a page was asked to open, once. */
-export function takeOpenItem(): string | undefined {
-  const id = pendingItem;
-  pendingItem = undefined;
-  return id;
 }
 
 let start: 'add-phone' | undefined;

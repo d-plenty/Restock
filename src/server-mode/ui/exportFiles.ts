@@ -100,7 +100,7 @@ const withBom = (s: string) => {
 };
 
 /** A file name part: letters, digits, - and _ only. */
-export const safeName = (s: string) =>
+const safeName = (s: string) =>
   s
     .replace(/[^A-Za-z0-9_-]+/g, '-')
     .replace(/^-+|-+$/g, '')

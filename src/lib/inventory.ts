@@ -37,10 +37,10 @@ export interface Have {
 }
 export type HaveState = 'ok' | 'low' | 'out';
 
-export const INV_TAB = 'inv:tab:';
-export const INV_AUTO = 'inv:auto';
-export const INV_TICK = 'inv:tick';
-export const HAVE_PREFIX = 'have:';
+const INV_TAB = 'inv:tab:';
+const INV_AUTO = 'inv:auto';
+const INV_TICK = 'inv:tick';
+const HAVE_PREFIX = 'have:';
 export const INV_BACKUP_KV = 'inventory';
 const DEMO_KV = 'inv.demo';
 const TABLE = 'household_settings';
@@ -248,14 +248,6 @@ export async function saveHave(itemId: string, h: Have | undefined): Promise<voi
     return putKV(DEMO_KV, d);
   }
   await runOps([h ? put(HAVE_PREFIX + itemId, encodeHave(h)) : drop(HAVE_PREFIX + itemId)]);
-}
-
-/** An item deleted: its amount goes with it (inside the delete's own action, so Undo brings both back). */
-export const dropHaveOp = (itemId: string): SqlOp => drop(HAVE_PREFIX + itemId);
-
-/** The sample items' amounts go when the sample items do. */
-export async function clearDemoHave(): Promise<void> {
-  if (Object.keys(await demoHave()).length) await putKV(DEMO_KV, {});
 }
 
 /**

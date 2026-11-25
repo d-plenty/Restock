@@ -1,14 +1,13 @@
-// Server mode: before the app opens. Sign in (passphrase, or with a phone), set the passphrase on
-// first start, and link this browser with the household once.
+// Server mode: before the app opens. Sign in (passphrase, or with a phone).
 // 0.9.4, a house (v3): sign in with a challenge (no vault, no link), and on a fresh server the
 // second setup step, Set up this server (the server's own setup page does the first, the passphrase).
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+// 0.15.0: only a house: the 0.9.3 household's sign-in, passphrase and link screens are gone.
+import { useEffect, useState, type ReactNode } from 'react';
 import { Icon, Logo } from '../../ui/components';
-import { ApiError, isV3, serverInfo } from '../api';
-import { checkPassphrase } from '../passphrase';
-import { login, loginV3, setPassphrase, setUpHouse, startLink, startPhoneLogin, startPhoneLoginV3, signOut, type Session } from '../session';
+import { serverInfo } from '../api';
+import { loginV3, setUpHouse, startPhoneLoginV3, signOut, type Session } from '../session';
 import { Qr } from './Qr';
-import { InstallHelpLink, isInstalled } from '../pwa/InstallHelp'; // 0.9.5 (PWA)
+import { InstallHelpLink, isInstalled } from '../pwa/InstallHelp';
 
 /** 0.9.6: a phone-sized window (under 600 px) (the words say "phone", not "computer"). */
 const phoneSized = () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(max-width: 599px)').matches;
@@ -33,7 +32,7 @@ function Frame({ title, children, foot }: { title: string; children: ReactNode; 
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void; onSetup: (user: string) => void }) {
+export function LoginScreen({ onDone }: { onDone: (s: Session) => void }) {
   const [user, setUser] = useState(() => {
     try {
       return localStorage.getItem('restock-server-user') ?? 'admin';
@@ -45,7 +44,6 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
   const [phone, setPhone] = useState(false);
-  const house = isV3();
   // 0.9.6 (iPhone): from the home screen, Keep me signed in starts ticked: it's what lets the app
   // open with no signal (a session kept for the tab only is gone when iOS closes the app).
   const [keep, setKeep] = useState(() => isInstalled());
@@ -55,15 +53,14 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
     setError(undefined);
     setBusy('Signing in…');
     try {
-      const r = house ? { mustChange: false as const, session: await loginV3(user, pass, keep, setBusy) } : await login(user, pass, setBusy);
+      const s = await loginV3(user, pass, keep, setBusy);
       try {
         localStorage.setItem('restock-server-user', user.trim());
       } catch {
         // fine
       }
       setPass('');
-      if (r.mustChange) onSetup(user.trim());
-      else onDone(r.session);
+      onDone(s);
     } catch (e) {
       setError(message(e));
     } finally {
@@ -73,9 +70,7 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
   return (
     <Frame title="Sign in">
       <p className="small" style={{ margin: 0 }}>
-        {house
-          ? `${serverInfo()?.house ? `${serverInfo()!.house}: your` : 'Your'} house's lists, prices and receipts. Your passphrase never leaves this browser, and what the server sends is sealed for this sign-in only.`
-          : "Your household's lists, prices and receipts, from your phones. They're unlocked here, in this browser; the server only keeps them sealed."}
+        {`${serverInfo()?.house ? `${serverInfo()!.house}: your` : 'Your'} house's lists, prices and receipts. Your passphrase never leaves this browser, and what the server sends is sealed for this sign-in only.`}
       </p>
       <form
         className="card gate-form"
@@ -92,8 +87,7 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
           <span className="small">Passphrase</span>
           <input className="input" type="password" autoComplete="current-password" value={pass} onChange={(e) => setPass(e.target.value)} autoFocus />
         </label>
-        {house && (
-          <label className="check gate-keep">
+        <label className="check gate-keep">
             <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} aria-describedby="gate-keep-help" />
             <span className="grow">
               {onPhone ? 'Keep me signed in on this phone' : 'Keep me signed in on this computer'}
@@ -104,7 +98,6 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
               </span>
             </span>
           </label>
-        )}
         {error && (
           <p className="banner red small" role="alert">
             {error}
@@ -113,21 +106,15 @@ export function LoginScreen({ onDone, onSetup }: { onDone: (s: Session) => void;
         <button className="btn primary block" type="submit" disabled={!!busy || !user.trim() || !pass}>
           {busy ?? 'Sign in'}
         </button>
-        {house ? (
-          <p className="small" style={{ margin: 0 }}>
-            First time? Set the passphrase on the server's <a href="/setup/">setup page</a>, then sign in here with it.
-          </p>
-        ) : (
-          <p className="small" style={{ margin: 0 }}>
-            First time? Sign in with the user name and password the server started with (<code>admin</code> unless it was set up with others).
-          </p>
-        )}
+        <p className="small" style={{ margin: 0 }}>
+          First time? Set the passphrase on the server's <a href="/setup/">setup page</a>, then sign in here with it.
+        </p>
       </form>
       <button className="btn block" onClick={() => setPhone(true)}>
         <Icon name="phone" size={18} /> Sign in with a phone
       </button>
       {/* 0.9.5 (PWA): "On iPhone?" steps. */}
-      {house && <InstallHelpLink className="linkish small gate-install" />}
+      <InstallHelpLink className="linkish small gate-install" />
     </Frame>
   );
 }
@@ -143,7 +130,7 @@ function PhoneLoginScreen({ onDone, onBack }: { onDone: (s: Session) => void; on
     setError(undefined);
     void (async () => {
       try {
-        const l = await (isV3() ? startPhoneLoginV3() : startPhoneLogin());
+        const l = await startPhoneLoginV3();
         if (stopped) return;
         setCode(l.code);
         const s = await l.wait(() => stopped);
@@ -174,9 +161,7 @@ function PhoneLoginScreen({ onDone, onBack }: { onDone: (s: Session) => void; on
         </p>
       )}
       <p className="small">
-        {isV3()
-          ? "Signed in this way, this tab can see the house for 12 hours, or until it's closed. It can't change the passphrase."
-          : "Signed in this way, this tab can see the household until it's closed. It can't change the passphrase."}
+        Signed in this way, this tab can see the house for 12 hours, or until it's closed. It can't change the passphrase.
       </p>
       <div className="two">
         <button className="btn" onClick={onBack}>
@@ -190,151 +175,11 @@ function PhoneLoginScreen({ onDone, onBack }: { onDone: (s: Session) => void; on
   );
 }
 
-export function PassphraseForm({ user, onDone, submit = 'Set the passphrase' }: { user: string; onDone: (s: Session) => void; submit?: string }) {
-  const [a, setA] = useState('');
-  const [b, setB] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-  const c = checkPassphrase(a, user);
-  const same = a === b;
-  const go = async () => {
-    setError(undefined);
-    setBusy(true);
-    try {
-      onDone(await setPassphrase(user, a));
-    } catch (e) {
-      setError(message(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <form
-      className="card gate-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (c.ok && same) void go();
-      }}
-    >
-      <label className="field">
-        <span className="small">New passphrase</span>
-        <input className="input" type="password" autoComplete="new-password" value={a} onChange={(e) => setA(e.target.value)} autoFocus aria-describedby="pp-meter" />
-      </label>
-      <div id="pp-meter" className={`meter s${c.score}`} aria-live="polite">
-        <div className="meter-bar">
-          <span style={{ width: a ? `${(c.score + 1) * 20}%` : 0 }} />
-        </div>
-        <span className="small">
-          {a ? c.label : 'At least 20 characters, or 4 words.'}
-          {c.problem ? ` · ${c.problem}` : ''}
-        </span>
-      </div>
-      <label className="field">
-        <span className="small">The same again</span>
-        <input className="input" type="password" autoComplete="new-password" value={b} onChange={(e) => setB(e.target.value)} />
-      </label>
-      {b && !same && <p className="small">They don't match yet.</p>}
-      {error && (
-        <p className="banner red small" role="alert">
-          {error}
-        </p>
-      )}
-      <button className="btn primary block" type="submit" disabled={busy || !c.ok || !same}>
-        {busy ? 'Saving…' : submit}
-      </button>
-      <p className="small" style={{ margin: 0 }}>
-        A few words only you would put together work well: <i>kettle under the mango tree</i>. It never leaves this browser: the server keeps
-        only a check of it. If it's forgotten, whoever runs the server can reset it (the server's README says how), and you link this
-        browser with a phone again.
-      </p>
-    </form>
-  );
-}
-
-export function SetPassphraseScreen({ user, onDone }: { user: string; onDone: (s: Session) => void }) {
-  return (
-    <Frame title="Set a passphrase" foot={<SignOutLink />}>
-      <p className="small" style={{ margin: 0 }}>
-        The server's first password only works once, to set this. From now on you sign in as <b>{user}</b> with your passphrase.
-      </p>
-      <PassphraseForm user={user} onDone={onDone} />
-    </Frame>
-  );
-}
-
 function SignOutLink() {
   return (
     <button className="linkish small" style={{ alignSelf: 'center' }} onClick={() => void signOut().then(() => location.reload())}>
       Sign out
     </button>
-  );
-}
-
-/** Once, after setting the passphrase: a joined phone hands this browser the household's keys. */
-export function LinkScreen({ onDone, addPhone }: { onDone: (s: Session) => void; addPhone?: ReactNode }) {
-  const [code, setCode] = useState<string>();
-  const [error, setError] = useState<string>();
-  const [round, setRound] = useState(0);
-  const done = useRef(onDone);
-  done.current = onDone;
-  useEffect(() => {
-    let stopped = false;
-    setCode(undefined);
-    setError(undefined);
-    void (async () => {
-      try {
-        const l = await startLink();
-        if (stopped) return;
-        setCode(l.code);
-        const s = await l.wait(() => stopped);
-        if (stopped) return;
-        if (s) done.current(s);
-        else setError('That code ran out. Make a new one.');
-      } catch (e) {
-        if (!stopped) setError(e instanceof ApiError && e.status === 401 ? 'Signed out. Sign in again.' : message(e));
-      }
-    })();
-    return () => {
-      stopped = true;
-    };
-  }, [round]);
-  return (
-    <Frame title="Link with a phone" foot={<SignOutLink />}>
-      <p className="small" style={{ margin: 0 }}>
-        Once only: a phone already using this server lets this browser see the household. It needs to be a phone in the household that's been
-        added to this server.
-      </p>
-      <ol className="small steps">
-        <li>On that phone: Restock → Settings → Sync and backups → Restock server.</li>
-        <li>
-          Tap <b>Scan the web page's code</b> and point it at this code.
-        </li>
-        <li>
-          It asks <i>Let this browser see your household?</i> Say yes.
-        </li>
-      </ol>
-      {code && <Qr text={code} label="Link code for a phone to scan" />}
-      {code && (
-        <details className="small">
-          <summary>Can't scan it?</summary>
-          <code className="sync-code-text">{code}</code>
-        </details>
-      )}
-      {error && (
-        <p className="banner amber small" role="alert">
-          {error}
-        </p>
-      )}
-      <button className="btn" onClick={() => setRound((r) => r + 1)}>
-        New code
-      </button>
-      {addPhone && (
-        <details className="card">
-          <summary className="title">No phone on this server yet? Add one first</summary>
-          {addPhone}
-        </details>
-      )}
-    </Frame>
   );
 }
 
@@ -421,6 +266,18 @@ export function SetUpServerScreen({ session, onDone }: { session: Session; onDon
 }
 
 /** 0.9.4: a phone took the household back with its recovery key; this server no longer owns it. */
+/** 0.15.0: a server still keeping a 0.9.3 household: what to do first (the server says it in words). */
+export function OldHouseholdScreen({ why }: { why?: string }) {
+  return (
+    <Frame title="One step first">
+      <p className="banner amber small" role="alert" style={{ margin: 0 }}>
+        {why ||
+          'This server still keeps a household from Restock 0.9.3, which this version no longer does. Run restock-server 0.14.1 once, hand the household to it from the owner phone, then update to this version.'}
+      </p>
+    </Frame>
+  );
+}
+
 export function ReleasedScreen() {
   return (
     <Frame title="Your household was taken back">

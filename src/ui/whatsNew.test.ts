@@ -1,11 +1,11 @@
 // 0.12.9: what was asked for, held to the source and to the small pieces that do the work.
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import { describe, expect, it } from 'vitest';
 import { version } from '../../package.json';
 import { placedByPage, typesText } from '../lib/keyboard';
 import { shouldOfferWhatsNew, WHATS_NEW } from '../lib/whatsNew';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 const add = read('./screens/Add.tsx');
 const app = read('./App.tsx');
 const refresh = read('./refresh.tsx');

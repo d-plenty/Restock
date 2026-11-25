@@ -27,7 +27,7 @@ function fakeFetch(route: Route) {
   }) as typeof fetch;
   return { fetch: f, seen };
 }
-const json = (v: unknown, init: ResponseInit = {}) => new Response(JSON.stringify(v), { status: 200, headers: { 'content-type': 'application/json', ...(init.headers ?? {}) }, ...init });
+const json = (v: unknown, init: ResponseInit = {}) => new Response(JSON.stringify(v), { status: 200, headers: { 'content-type': 'application/json', ...init.headers }, ...init });
 const html = (s: string, status = 200, headers: Record<string, string> = {}) => new Response(s, { status, headers: { 'content-type': 'text/html', ...headers } });
 
 const MILK = [
@@ -55,7 +55,7 @@ describe('the hosts the server may ask', () => {
     expect(SHOP_HOSTS.get('www.liquorland.com.au')).toBe('liquorland');
     // 0.11.3: four of the new shops' Australian sites aren't on .com.au; every other host is.
     const NOT_COM_AU = ['www.anacondastores.com', 'www.spotlightstores.com', 'www.ikea.com', 'www.mecca.com'];
-    expect([...SHOP_HOSTS.keys()].filter((h) => !/\.com\.au$/.test(h)).sort()).toEqual([...NOT_COM_AU].sort());
+    expect([...SHOP_HOSTS.keys()].filter((h) => !h.endsWith('.com.au')).sort()).toEqual([...NOT_COM_AU].sort());
   });
 
   it('refuses another host, plain http, a port, and any request outside a search', async () => {

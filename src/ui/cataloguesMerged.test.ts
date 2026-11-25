@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import { describe, expect, it } from 'vitest';
 import { listLineKeys, ownSpecials, shopTileNote } from '../lib/ownSpecials';
 import type { CatalogueDeal } from '../lib/myCatalogue';
@@ -6,7 +6,7 @@ import type { SeenRow } from '../lib/seen';
 import type { StoreProduct } from '../stores/types';
 import type { ListEntry } from '../types';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 
 const deal = (id: string, name: string, price: number, was: number) =>
   ({
@@ -48,14 +48,15 @@ describe('0.12.3: My catalogue merged into each shop, only your own things', () 
     expect(shopTileNote(undefined)).toBe('Your specials');
   });
   it('Open my catalogue is gone from Home, More, the iPhone web page and the web', () => {
-    for (const f of ['./screens/Home.tsx', './screens/More.tsx', '../server-mode/ui/PhoneLayout.tsx', '../server-mode/ui/DeskSpecials.tsx']) {
+    for (const f of ['./screens/Home.tsx', './screens/More.tsx', '../server-mode/ui/PhoneLayout.tsx']) {
       const src = read(f);
       expect(src).not.toContain('>Open my catalogue<');
       expect(src).not.toContain('title="Open my catalogue"');
       expect(src).not.toContain("name: 'mycatalogue'");
     }
     for (const f of ['./screens/More.tsx', '../server-mode/ui/PhoneLayout.tsx']) expect(read(f)).toContain('title="Your shops"');
-    expect(read('../server-mode/ui/Desktop.tsx')).toContain("item('specials', 'Your shops'");
+    // 0.15.0: a wide web page's side bar is the iPad's, with Your shops in it.
+    expect(read('./padWide.ts')).toContain("{ screen: 'catalogues', label: 'Your shops', icon: 'shop' }");
   });
   it("a shop's page leads with the whole catalogue and website, and has no All specials chip", () => {
     const src = read('./screens/ShopCatalogue.tsx');

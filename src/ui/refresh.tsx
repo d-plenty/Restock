@@ -36,7 +36,7 @@ const watch = (fn: () => void) => {
   return () => watchers.delete(fn);
 };
 /** What a refresh is doing right now, on any screen. */
-export const useRefreshLive = (): RefreshLive => useSyncExternalStore(watch, () => live);
+const useRefreshLive = (): RefreshLive => useSyncExternalStore(watch, () => live);
 
 /**
  * A price check started somewhere other than Check now (the catch-up when Restock opens): shows

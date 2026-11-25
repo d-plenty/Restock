@@ -227,7 +227,7 @@ export function reachText(e: unknown): string {
  * as sync: plain http only to an address at home or on Tailscale, https everywhere else. `token`:
  * one typed in but not saved yet (Test connection).
  */
-export function phoneTransport(address: string, token?: string): Transport {
+function phoneTransport(address: string, token?: string): Transport {
   return async (method, path, body) => {
     try {
       const r = await RestockNative.haRequest({ address, method, path, body: body === undefined ? undefined : JSON.stringify(body), token });
@@ -438,7 +438,7 @@ export async function runHaSync(opts: { manual?: boolean } = {}): Promise<HaStat
 }
 
 /** A round in a moment ('soon', after a change) or straight away. */
-export function requestHaSync(when: 'soon' | 'now' = 'soon'): void {
+function requestHaSync(when: 'soon' | 'now' = 'soon'): void {
   if (timer) clearTimeout(timer);
   timer = setTimeout(
     () => {

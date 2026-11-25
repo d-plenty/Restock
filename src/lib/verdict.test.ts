@@ -280,10 +280,9 @@ describe('shared price history', () => {
 });
 
 describe('matching shared history to local prices', () => {
-  const day = 86_400_000;
   const r = (price: number, isSpecial = false, wasPrice?: number): PriceReading => ({
     productId: 'p',
-    date: new Date(NOW - 0 * day).toISOString(),
+    date: new Date(NOW).toISOString(),
     price,
     wasPrice,
     isSpecial,

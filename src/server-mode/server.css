@@ -1,61 +1,6 @@
 /* 0.9.2 server mode: the web app on a Restock server. The phone layout stays; on a wide screen it
    sits in the middle as a column, with the page around it a shade darker. */
-
-.server-strip {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: calc(var(--top) + 6px) 12px 4px;
-  background: var(--chrome-bg);
-  color: var(--on-navy);
-  border-bottom: 3px solid var(--gold);
-  position: relative;
-  z-index: 9;
-}
-.server-strip.trouble {
-  border-bottom-color: var(--amber-bg);
-}
-.strip-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.strip-top {
-  flex-wrap: wrap;
-  row-gap: 2px;
-}
 /* 0.9.5 (look): the household's name is never cut; the links go under it when there isn't room. */
-.strip-top .strip-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  white-space: normal;
-  overflow: visible;
-}
-.strip-main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  border: none;
-  background: none;
-  color: inherit;
-  padding: 2px 0;
-  text-align: left;
-}
-.strip-name {
-  font-weight: 700;
-  font-size: var(--fs-body);
-  max-width: 100%;
-}
-.strip-sub {
-  font-size: var(--fs-sm);
-  opacity: 0.88;
-  min-height: 24px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-}
 .strip-dot {
   width: 7px;
   height: 7px;
@@ -69,41 +14,7 @@
     opacity: 0.3;
   }
 }
-.strip-links {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-}
-.strip-links button {
-  border: none;
-  background: var(--on-navy-hover);
-  color: var(--on-navy);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  padding: 6px 10px;
-  border-radius: var(--r-sm);
-  min-height: var(--h-control-sm);
-  position: relative;
-}
-.strip-links button::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: var(--hit);
-  transform: translateY(-50%);
-}
-.strip-main {
-  min-height: var(--hit);
-}
-.strip-links button:hover {
-  background: var(--on-navy-line);
-}
 /* The app's screens already leave room for the phone's status bar; under the strip they don't need to. */
-.server-mode .server-strip ~ .screen {
-  padding-top: 16px;
-}
 
 .phone-only {
   display: flex;
@@ -193,22 +104,6 @@
 }
 
 /* Loyalty cards, as the web shows them: the shop's look, greyed, no number. */
-.card-locked {
-  filter: grayscale(0.85);
-  opacity: 0.75;
-}
-.card-locked-panel {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: center;
-  padding: 18px 12px;
-  border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--fixed-ink);
-  font-weight: 600;
-  font-size: var(--fs-body);
-}
 
 details.card > summary {
   cursor: pointer;
@@ -450,45 +345,8 @@ details.card > summary {
     display: none;
   }
 }
-.cat-pages:focus-visible {
-  outline: 3px solid var(--green);
-  outline-offset: 2px;
-  border-radius: var(--r-md);
-}
-.cat-name-open {
-  border: 0;
-  background: none;
-  padding: 0;
-  margin: 0;
-  color: inherit;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.cat-name-open:hover {
-  text-decoration: underline;
-}
 
 /* A special: its photo and name open it (the item, or its product sheet). */
-.house-special-open {
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: 0;
-  background: none;
-  padding: 0;
-  margin: 0;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.house-special-open:hover .title {
-  text-decoration: underline;
-}
 .dk-sheet-name {
   font-size: var(--fs-lg);
   line-height: 1.3;
@@ -506,11 +364,3 @@ details.card > summary {
 
 /* 0.9.5 (look): a special's Track and Add to list go under its name when the row is narrow, so the
    name is never squeezed to a few letters. */
-.row.house-special {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  row-gap: 8px;
-}
-.row.house-special > .house-special-open {
-  flex: 1 1 220px;
-}

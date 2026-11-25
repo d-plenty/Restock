@@ -19,7 +19,7 @@ export interface CardBrand {
   aka?: string[];
 }
 
-export const CARD_BRANDS: CardBrand[] = [
+const CARD_BRANDS: CardBrand[] = [
   { id: 'flybuys', name: 'Flybuys', program: 'flybuys', use: 'Coles member prices, Liquorland, Kmart, Target', bg: '#0b2d72', ink: '#ffffff', aka: ['coles', 'coles flybuys', 'liquorland', 'kmart', 'target', 'fly buys'] },
   { id: 'everyday', name: 'Everyday Rewards', program: 'everyday', use: 'Woolworths member prices, BWS, Big W', bg: '#ff7d1a', ink: '#0e1b3d', aka: ['woolworths', 'woolworths rewards', 'woolies', 'bws', 'big w', 'everyday'] },
   { id: 'igarewards', name: 'IGA Rewards', program: 'other', use: 'IGA', bg: '#c8102e', ink: '#ffffff', aka: ['iga'] },

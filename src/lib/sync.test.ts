@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pairingCode, serverCode, serverCodeAddresses, webPageCode } from './sync';
-import { qrSvg } from '../ui/screens/Sync';
+import { qrSvg } from '../ui/screens/SyncCodes';
 
 describe('sync pairing codes (0.8.2)', () => {
   const token = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';

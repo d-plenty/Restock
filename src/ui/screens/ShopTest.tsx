@@ -94,7 +94,7 @@ export function shopAnswerCopy(c: Captured, limit = 60_000): string {
 }
 
 /** The report to copy: plain text, nothing personal (no branch, store number, cookies or account). */
-export function shopTestReport(r: Result, version: string): string {
+function shopTestReport(r: Result, version: string): string {
   const lines = [
     `Restock ${version} · Shop test`,
     `Shop: ${chainName(r.shop)} (${r.shop})`,

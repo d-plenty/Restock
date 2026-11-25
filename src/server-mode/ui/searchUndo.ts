@@ -13,7 +13,7 @@ export async function productIdsHere(): Promise<Set<string>> {
 }
 
 /** Takes back what one add made: its line, and its new item with the products that came with it. */
-export async function takeBackAdd(a: Pick<AddAnswer, 'item' | 'line'>, had: Set<string>): Promise<void> {
+async function takeBackAdd(a: Pick<AddAnswer, 'item' | 'line'>, had: Set<string>): Promise<void> {
   if (a.line) await deleteListEntries([a.line.id]);
   if (!a.item) return;
   const g = await getGroup(a.item.id);

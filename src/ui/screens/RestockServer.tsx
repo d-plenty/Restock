@@ -1,8 +1,8 @@
 import { NotHereBanner } from '../IosWhy';
 import { deviceWord, isIos } from '../../lib/platform';
 import { useEffect, useRef, useState } from 'react';
-import { stage } from '../../lib/settingsDraft'; // 0.9.5 (save)
-import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar'; // 0.9.5 (save)
+import { stage } from '../../lib/settingsDraft';
+import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar';
 import { scanBarcode } from '../../lib/barcode';
 import { confirmAction } from '../../lib/confirm';
 import { getSettings, updateSettings } from '../../lib/db';
@@ -12,7 +12,6 @@ import {
   canSync,
   agoText,
   demoSync,
-  handoverCode,
   serverCode,
   serverCodeAddresses,
   serverCodeVersion,
@@ -29,7 +28,8 @@ import { Icon, LoadingBar, Sheet, TopBar, More } from '../components';
 import { useNav } from '../nav';
 import { serverKeepText } from '../../lib/autoDelete';
 import { SuggestLocalBackup } from './Backups';
-import { askAdult, LeaveServerSheet, ServerCard, ShopDataStays, TAKE_BACK_NOTE } from './Sync';
+import { askAdult } from './Sync';
+import { LeaveServerSheet, ServerCard, ShopDataStays, TAKE_BACK_NOTE } from './SyncServer';
 
 /**
  * Settings → Sync and backups → Restock server (0.9.3), and 0.9.4's server-first households: the
@@ -135,7 +135,7 @@ function TurnOffSheet({ kind, onClose, onDone }: { kind: Kind; onClose: () => vo
  * What this phone shares with the server: Groceries, Keg, Pharmacy, Receipts and Loyalty cards.
  * Joining: just the choices. Later: turning one off asks first (TurnOffSheet).
  */
-export function SharesPicker({ value, onChange, joining }: { value: Shares; onChange: (v: Shares, takeBack?: TakeBack) => void; joining?: boolean }) {
+function SharesPicker({ value, onChange, joining }: { value: Shares; onChange: (v: Shares, takeBack?: TakeBack) => void; joining?: boolean }) {
   const nav = useNav();
   const [off, setOff] = useState<Kind>();
   const flip = async (k: Kind, on: boolean) => {
@@ -479,7 +479,7 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
  * What this phone shares, changed later. 0.9.5 (save): held until Save settings, with the "Also
  * take it off the server" question still asked when a switch goes off; both are done on Save.
  */
-export function SharesEditor({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => void }) {
+function SharesEditor({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => void }) {
   const nav = useNav();
   const draft = useDraftState();
   const [value, setValue] = useState<Shares>(sharesOf(info));
@@ -515,74 +515,9 @@ export function SharesEditor({ info, onInfo }: { info: SyncInfo; onInfo: (i: Syn
   );
 }
 
-// ---------- the owner phone on a 0.9.3-style server: hand the household over (section 7) ----------
-
-function HandoverCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => void }) {
-  const nav = useNav();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-  const hh = info.household ?? 'your household';
-  const go = async () => {
-    setError(undefined);
-    const out = await scanBarcode("Scan the code on your server's Take this household page", {
-      accept: handoverCode,
-      qr: true,
-      wrong: "That isn't the server's Take this household code. On the server's page, open Server and phones → Take this household.",
-      typeHint: 'Or paste the code',
-    });
-    if (!out.ok) return;
-    const ok = await confirmAction(`Hand ${hh} to your server?`, {
-      detail:
-        "The server becomes the household's owner: it adds and removes phones, and keeps the household's key, so it can read what the phones share with it (to merge it, keep history and show Restock in a browser). The other phones carry on; each one updates to Restock 0.9.4 or newer to keep syncing with the server.",
-      action: 'Hand it over',
-      danger: false,
-    });
-    if (!ok) return;
-    setBusy(true);
-    try {
-      const i = await RestockNative.syncHandOverServer({ code: out.code });
-      onInfo(i);
-      nav.toast(i.house ? `${hh} is on your server now` : 'Handed over. This phone lets go once the server says so, at the next sync');
-    } catch (e) {
-      setError(errText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="card" style={{ gap: 8, borderColor: 'var(--green)' }}>
-      <span className="eyebrow green" style={{ margin: 0 }}>
-        Your server can do more
-      </span>
-      <strong style={{ fontSize: 15 }}>Hand this household to the server</strong>
-      <span className="small">Your server can be the house: it does the owner phone's job around the clock.{' '}<More title="Making the server the house"><p>Your server can be the house: it does the owner phone's job around the clock, keeps years of prices, and gives you Restock in a browser with no
-        linking. This phone stays the owner until the server has taken over, so nothing is lost if something goes wrong part way.</p></More></span>
-      <ol className="small" style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <li>On a computer, sign in on the server's page.</li>
-        <li>Open Server and phones → Take this household.</li>
-        <li>Scan the code it shows with this phone.</li>
-      </ol>
-      {info.serverHandover && !info.house && (
-        <span className="small" role="status">
-          Handed over {agoText(new Date(Number(info.serverHandover)).toISOString())}. Waiting for the server's change to reach this phone; it does at the next sync.
-        </span>
-      )}
-      <button className="btn primary" disabled={busy || !syncAvailable()} onClick={() => void go()}>
-        <Icon name="scan" size={18} /> {busy ? 'Handing over…' : "Scan the server's code"}
-      </button>
-      {busy && <LoadingBar seconds={10} />}
-      {error && (
-        <div className="banner amber" role="alert">
-          {error}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ---------- the screen ----------
 
-export function RestockServerScreen() {
+export function RestockServerScreen({ code: scanned }: { code?: string } = {}) {
   useSettingsDraft(); // 0.9.5 (save): what this phone shares waits for Save settings
   const nav = useNav();
   const settings = useLive(getSettings, []);
@@ -591,7 +526,6 @@ export function RestockServerScreen() {
   const [choice, setChoice] = useState<HouseChoice>();
   const [working, setWorking] = useState<string>();
   const [error, setError] = useState<string>();
-  const [mode, setMode] = useState<string>();
   useEffect(() => {
     let live = true;
     const load = () => void syncInfo().then((i) => live && setInfo(i));
@@ -602,12 +536,6 @@ export function RestockServerScreen() {
       clearInterval(t);
     };
   }, []);
-  // The owner phone on a 0.9.3-style server: is it a 0.9.4 server waiting for the household?
-  const v2Owner = !!info?.server && info.serverApi === 2 && !!info.isOwner;
-  useEffect(() => {
-    if (!v2Owner || !syncAvailable() || demoSync()) return;
-    void RestockNative.syncServerHealth().then((h) => setMode(h.mode), () => undefined);
-  }, [v2Owner]);
   const p = settings && info ? protection(settings.autoBackup.enabled, info) : undefined;
 
   const run = async (what: string, job: () => Promise<void>) => {
@@ -643,37 +571,11 @@ export function RestockServerScreen() {
         // The household's own sharing carries on; a sync now lets the server see it.
         const s = await RestockNative.syncNow();
         setInfo(s);
-        nav.toast(syncNowMessage(s));
+        // 0.15.0: an iPhone or iPad's household (phones on the Wi-Fi, or iCloud) doesn't pass the news on
+        // by itself: each other phone joins the server with its own Add a phone code.
+        nav.toast(isIos() ? 'Your household is on the server now. Add each other phone from the server\'s Add a phone page.' : syncNowMessage(s));
       } else setJoined({ label: r.label, houseName: r.houseName });
     });
-
-  /** A phone with no household joining a 0.9.3-style (v2) server: it starts one first, as in 0.9.3. */
-  const joinV2 = async (code: string, where: string[]) => {
-    if (!info?.paired) {
-      const name = info?.household ?? settings?.household.name ?? 'Our house';
-      const sure = await confirmAction(`Start your household, "${name}"?`, {
-        detail: "This phone isn't in a household yet, so it becomes the owner. This server is an older one (Restock server 0.9.3); updating it lets the server be the house instead.",
-        action: 'Start it',
-        danger: false,
-      });
-      if (!sure) return;
-      const tabs = settings ? SECTIONS.filter((t) => t === 'pantry' || sectionOn(settings, t)) : (['pantry'] as Section[]);
-      setInfo(await RestockNative.syncStartHousehold({ household: name, shareCards: false, tabs }));
-    }
-    const sure = await confirmAction(`Connect to the Restock server at ${where[0]}?`, {
-      detail:
-        (where[1] ? `Away from home: ${where[1]}. ` : '') +
-        "Your household's list, pantry and recent prices go there, sealed so the server can't read them. Only connect to a server you or your household run.",
-      action: 'Connect',
-      danger: false,
-    });
-    if (!sure) return;
-    await run('Joining your Restock server…', async () => {
-      const i = await RestockNative.syncJoinServer({ code });
-      setInfo(i);
-      nav.toast(i.serverError ?? 'Connected to your Restock server');
-    });
-  };
 
   const scan = async () => {
     setError(undefined);
@@ -684,8 +586,24 @@ export function RestockServerScreen() {
       typeHint: 'Or paste the code',
     });
     if (!out.ok) return;
+    await joinWith(out.code);
+  };
+
+  // 0.15.0: a code scanned on the first screen (Join your household) is used straight away, once.
+  const usedScanned = useRef(false);
+  useEffect(() => {
+    if (!scanned || usedScanned.current || !info) return;
+    usedScanned.current = true;
+    void joinWith(scanned);
+    // Once, when the server's details arrive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanned, info]);
+
+  async function joinWith(code: string) {
+    const out = { code };
     const where = serverCodeAddresses(out.code);
-    if (serverCodeVersion(out.code) === 2) return joinV2(out.code, where.length ? where : ['your server']);
+    // 0.15.0: a 0.9.3-style server's code: that server needs updating first.
+    if (serverCodeVersion(out.code) === 2) return setError('That code is from an older Restock server. Update the server to this version first, then make a new code on its Add a phone page.');
     let check: ServerCodeCheck;
     try {
       setWorking('Checking the code…');
@@ -712,7 +630,7 @@ export function RestockServerScreen() {
       danger: false,
     });
     if (sure) await join3(out.code, 'join');
-  };
+  }
 
   const connectHouse = () =>
     run('Connecting to your server…', async () => {
@@ -725,7 +643,7 @@ export function RestockServerScreen() {
     <div className="screen">
       <TopBar title={joined ? 'Join your server' : v3 ? serverName(info) : 'Restock server'} />
 
-      {!syncAvailable() && <NotHereBanner reason="server" title="The Restock server works in the Android app" />}
+      {!syncAvailable() && <NotHereBanner title="The Restock server works in the Android app" />}
 
       {info?.notice === 'server-removed' && (
         <div className="banner amber" role="status">
@@ -753,8 +671,6 @@ export function RestockServerScreen() {
 
       {info && !joined && info.server && !v3 && (
         <>
-          {v2Owner && (mode === 'v2' || !!info.serverHandover || !!demoSync()) && <HandoverCard info={info} onInfo={setInfo} />}
-          <div className="eyebrow">Connected</div>
           <ServerCard info={info} busy={false} onInfo={setInfo} />
         </>
       )}
@@ -786,7 +702,7 @@ export function RestockServerScreen() {
           {/* 0.14.0: the server is another copy, never the only one. */}
           <div className="card" style={{ gap: 6 }}>
             <strong>Your data stays on this {deviceWord()} too</strong>
-            <span className="small">The server is one more copy. Your data stays on this phone too.{' '}<More title="Your data stays here"><p>The server is one more copy, not the only one. Your pantry, lists, cards and settings stay here in full, with as much price history as
+            <span className="small">The server is one more copy, not the only one.{' '}<More title="Your data stays here"><p>The server is one more copy, not the only one. Your pantry, lists, cards and settings stay here in full, with as much price history as
               "Keep price history for" says (8 weeks unless you change it). Leaving the server, or being taken off it, deletes nothing here: you can
               still export it, import it or send it to another phone.</p></More></span>
           </div>

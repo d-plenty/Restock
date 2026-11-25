@@ -22,7 +22,7 @@ import { sha256hex } from './crypto';
 import { session as currentSession, type Session } from './session';
 
 /** The start of every card store's name (0.9.6 test builds kept one store by this name only). */
-export const CARDS_DB = 'restock-cards';
+const CARDS_DB = 'restock-cards';
 type StoreName = 'loyalty' | 'gift' | 'photos' | 'codes';
 const STORES: StoreName[] = ['loyalty', 'gift', 'photos', 'codes'];
 
@@ -48,7 +48,7 @@ export function memoryBackend(): CardsBackend {
   };
 }
 
-export function indexedDbBackend(name = CARDS_DB): CardsBackend {
+function indexedDbBackend(name = CARDS_DB): CardsBackend {
   let opening: Promise<IDBDatabase> | undefined;
   const open = () =>
     (opening ??= new Promise<IDBDatabase>((resolve, reject) => {
@@ -269,7 +269,7 @@ export interface PlacesStore {
   write(v: Record<string, CardsPlace>): void;
 }
 const PLACES_KEY = 'restock-cards-places';
-export const localPlaces = (): PlacesStore => ({
+const localPlaces = (): PlacesStore => ({
   read() {
     try {
       const v = JSON.parse(localStorage.getItem(PLACES_KEY) ?? '{}') as unknown;

@@ -150,7 +150,7 @@ export async function request(opts: {
 }): Promise<HttpResult> {
   if (transport) return transport(opts);
   if (!isNative()) throw new NativeOnlyError();
-  const headers: Record<string, string> = { 'User-Agent': MOBILE_UA, ...(opts.headers ?? {}) };
+  const headers: Record<string, string> = { 'User-Agent': MOBILE_UA, ...opts.headers };
   if (opts.anonymous) {
     const body = opts.body === undefined ? undefined : typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
     const r = await RestockNative.plainFetch({

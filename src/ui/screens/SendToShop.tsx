@@ -30,7 +30,7 @@ const slug = (s: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
 
-export function productLink(chain: 'woolworths' | 'coles', l: SendLine): string {
+function productLink(chain: 'woolworths' | 'coles', l: SendLine): string {
   if (chain === 'woolworths')
     return l.id
       ? `https://www.woolworths.com.au/shop/productdetails/${l.id}`

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getKV, getSettings, putKV, refresh } from '../../lib/db';
-import * as draft from '../../lib/settingsDraft'; // 0.9.5 (save)
+import * as draft from '../../lib/settingsDraft';
 import { SaveBar, useSettingsDraft } from '../SaveBar';
 import { ensureNotificationPermission } from '../../lib/notify';
 import { RestockNative } from '../../lib/sql/native';
@@ -58,7 +58,7 @@ export function recallLink(r: Pick<FoundRecall, 'url' | 'source'>): string {
 }
 
 /** Possible recalls that haven't been marked "Not my product". */
-export async function openRecalls(): Promise<FoundRecall[]> {
+async function openRecalls(): Promise<FoundRecall[]> {
   const [all, dismissed] = await Promise.all([getKV<FoundRecall[]>('recalls'), getKV<string[]>('recallDismissed')]);
   const gone = new Set(dismissed ?? []);
   return (all ?? []).filter((r) => r && !gone.has(r.id)).sort((a, b) => (b.foundAt ?? '').localeCompare(a.foundAt ?? ''));
@@ -101,7 +101,7 @@ export function RecallSettings({ settings, inSetup }: { settings: Settings; inSe
   );
 }
 
-export function RecallCard({ r, onDismiss }: { r: FoundRecall; onDismiss?: () => void }) {
+function RecallCard({ r, onDismiss }: { r: FoundRecall; onDismiss?: () => void }) {
   return (
     <div className="card recall">
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>

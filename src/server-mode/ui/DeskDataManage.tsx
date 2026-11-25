@@ -37,7 +37,7 @@ import {
 const n = (v: number) => v.toLocaleString('en-AU');
 const MONTH_MS = (365.25 / 12) * 86_400_000;
 /** The cut-off for Auto delete after `months`, now (the server works it out the same way). */
-export const autoCutoff = (months: number, now = Date.now()) => new Date(now - months * MONTH_MS).toISOString();
+const autoCutoff = (months: number, now = Date.now()) => new Date(now - months * MONTH_MS).toISOString();
 
 const KIND_SUB: Partial<Record<DataKind, string>> = {
   prices: 'Older prices. The newest price of each product always stays.',
@@ -66,7 +66,7 @@ function howMuch(s: DataSummary, k: DataKind): { main: string; sub?: string } {
 }
 
 /** "Deleted 9,870 prices, 198 receipts and 12 photos." from what the server says went. */
-export function deletedWords(d: Deleted | null | undefined): string {
+function deletedWords(d: Deleted | null | undefined): string {
   if (!d) return 'Nothing was old enough to delete.';
   const bits = [
     d.prices ? `${n(d.prices)} price${d.prices === 1 ? '' : 's'}` : '',

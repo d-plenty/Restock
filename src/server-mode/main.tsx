@@ -1,21 +1,20 @@
 // Server mode's start: sign in, set the passphrase, link once, then the real Restock app on the
 // browser's own copy of the household.
 // 0.9.4: first ask the server what it is (GET /api/v3/health). A house (v3) signs in with a
-// challenge and needs no passphrase vault or link; a fresh one asks to Set up this server first. A
-// 0.9.3 server, or a 0.9.4 one still in v2 mode, gets the 0.9.3 flow as it was.
+// challenge and needs no passphrase vault or link; a fresh one asks to Set up this server first.
+// 0.15.0: a server still keeping a 0.9.3 household (v2) says what to do first, and that's all.
 import { StrictMode, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../ui/App';
 import { setDatabaseOpener } from '../lib/boot';
-import { api, api3, ApiError, isV3, probeServer, serverInfo, whenSignedOut } from './api';
+import { api3, ApiError, isV3, probeServer, serverInfo, whenSignedOut } from './api';
 import { deleteLocalCopy, openServerDatabase, serverHistory, start, stop, syncNow, syncStatus } from './live';
-import { canChangeVault, forget, recall, session, type Session } from './session';
+import { forget, recall, session, type Session } from './session';
 import { startOn } from './ui/deskShared';
-import { Checking, LinkScreen, LoginScreen, ReleasedScreen, SetPassphraseScreen, SetUpServerScreen } from './ui/Gate';
-import { AddPhonePanel, ServerTab, serverScreen } from './ui/ServerScreens';
+import { Checking, LoginScreen, OldHouseholdScreen, ReleasedScreen, SetUpServerScreen } from './ui/Gate';
+import { ServerTab, serverScreen } from './ui/ServerScreens';
 import { PhoneChrome, SearchNeedsSignal } from './ui/PhoneLayout';
 import { copyKeyStore, keptHistory } from './pwa/offlineData';
-import { Desktop } from './ui/Desktop';
 import { serverUi } from './flag';
 import { atSignIn, noteServer, offlineNow, openOffline, signedOut, startPwa, watchCopy } from './pwa/boot';
 // 0.9.5 (web search): Let the web page search the shops; the Scan button sits by the add box now.
@@ -23,7 +22,7 @@ import { setBarcodeSearch } from './pwa/scan';
 import { webSearchUi } from './ui/WebShopSearch';
 import { barcodeSearch } from './ui/webSearch';
 import { useNetworkWatch } from './pwa/offline';
-import { askAboutOtherCards } from './cardStore'; // 0.9.6 (review M2)
+import { askAboutOtherCards } from './cardStore';
 import { askChoice } from '../lib/confirm';
 import './server.css';
 
@@ -56,8 +55,6 @@ serverUi.current = {
   Strip: PhoneChrome,
   Tab: ServerTab,
   screen: serverScreen,
-  // 0.9.3: the desktop layout, from 1000 px wide.
-  Desktop,
   // 0.9.4: the full item page shows the server's older prices too (as the desktop side panel does).
   olderPrices,
   // 0.9.5 (web search): the Pick sheet's and the phone layout's list's shop search, and its Scan button.
@@ -73,8 +70,7 @@ type Stage =
   | { at: 'checking' }
   | { at: 'offline'; why: string }
   | { at: 'login' }
-  | { at: 'setup'; user: string }
-  | { at: 'link' }
+  | { at: 'old'; why?: string }
   | { at: 'house'; s: Session }
   | { at: 'released' }
   | { at: 'app'; s: Session };
@@ -89,28 +85,20 @@ function ServerRoot() {
     try {
       const info = await probeServer();
       noteServer(info);
-      if (isV3()) {
-        if (info.mode === 'released') return setStage({ at: 'released' });
-        const s = recall();
-        if (s?.v !== 3) {
-          forget();
-          return setStage({ at: 'login' });
-        }
-        // Still signed in? (A 401 here goes to the sign-in page.)
-        const g = await api3.session();
-        if (g === null) await api3.settings();
-        if (info.mode === 'new' && !hasKeys(s)) return setStage({ at: 'house', s });
-        return setStage({ at: 'app', s });
-      }
-      const web = await api.web();
-      if (web.mustChange) return setStage({ at: 'setup', user: web.user ?? 'admin' });
+      if (!isV3()) return setStage({ at: 'old' });
+      if (info.mode === 'released') return setStage({ at: 'released' });
       const s = recall();
-      if (s?.v === 3) forget();
-      else if (s && web.webId && s.webId === web.webId && hasKeys(s)) return setStage({ at: 'app', s });
-      if (s && web.webId && s.webId === web.webId && canChangeVault()) return setStage({ at: 'link' });
-      forget();
-      setStage({ at: 'login' });
+      if (s?.v !== 3) {
+        forget();
+        return setStage({ at: 'login' });
+      }
+      // Still signed in? (A 401 here goes to the sign-in page.)
+      const g = await api3.session();
+      if (g === null) await api3.settings();
+      if (info.mode === 'new' && !hasKeys(s)) return setStage({ at: 'house', s });
+      return setStage({ at: 'app', s });
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'old-household') return setStage({ at: 'old', why: e.message });
       if (e instanceof ApiError && e.status === 401) {
         forget();
         return setStage({ at: 'login' });
@@ -142,12 +130,9 @@ function ServerRoot() {
   }, [check]);
 
   const opened = (s: Session) => {
-    if (s.v === 3) {
-      // A fresh server with no house yet: Set up this server first.
-      if (serverInfo()?.mode === 'new' && !hasKeys(s)) return setStage({ at: 'house', s });
-      return setStage({ at: 'app', s });
-    }
-    setStage(hasKeys(s) ? { at: 'app', s } : canChangeVault() ? { at: 'link' } : { at: 'login' });
+    // A fresh server with no house yet: Set up this server first.
+    if (serverInfo()?.mode === 'new' && !hasKeys(s)) return setStage({ at: 'house', s });
+    setStage({ at: 'app', s });
   };
 
   useEffect(() => {
@@ -155,7 +140,7 @@ function ServerRoot() {
   }, []);
   // 0.9.5: at a house's sign-in page, a copy left by a session that's gone is deleted.
   useEffect(() => {
-    if (stage.at === 'login' && isV3()) void atSignIn();
+    if (stage.at === 'login') void atSignIn();
   }, [stage.at]);
 
   switch (stage.at) {
@@ -164,11 +149,9 @@ function ServerRoot() {
     case 'offline':
       return <Checking error={stage.why} onRetry={() => void check()} />;
     case 'login':
-      return <LoginScreen onDone={opened} onSetup={(user) => setStage({ at: 'setup', user })} />;
-    case 'setup':
-      return <SetPassphraseScreen user={stage.user} onDone={opened} />;
-    case 'link':
-      return <LinkScreen onDone={opened} addPhone={<AddPhonePanel />} />;
+      return <LoginScreen onDone={opened} />;
+    case 'old':
+      return <OldHouseholdScreen why={stage.why} />;
     case 'house':
       return (
         <SetUpServerScreen

@@ -1,8 +1,8 @@
 // 0.12.6: what the update says, read from the source (as homeAndMore.test.ts does).
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import { describe, expect, it } from 'vitest';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 
 describe('0.12.6: nothing is picked for you', () => {
   const add = read('./screens/Add.tsx');
@@ -38,9 +38,6 @@ describe('0.12.6: the General list comes along when you shop', () => {
   it('at one shop: lines with no shop picked, and lines picked for that shop', () => {
     expect(list).toContain("generalShown.filter((e) => v === 'all' || !e.chain || e.chain === v)");
   });
-  it('the web page shows them in a column of their own', () => {
-    expect(read('../server-mode/ui/DeskList.tsx')).toContain("key: 'general-list'");
-  });
 });
 
 describe('0.12.6: a search that finds nothing offers the next step', () => {
@@ -51,9 +48,6 @@ describe('0.12.6: a search that finds nothing offers the next step', () => {
   });
   it("a shop's specials: search that shop for it", () => {
     expect(read('./screens/ShopCatalogue.tsx')).toContain("nav.push({ name: 'add', section: base.section, toPantry: true, chain, query: cleanSearch(typed) })");
-  });
-  it('the web page says where the next step is done', () => {
-    expect(read('../server-mode/ui/DeskPantry.tsx')).toContain('phoneOnly="Adding by shop search is done on a phone."');
   });
 });
 

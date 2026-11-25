@@ -63,10 +63,6 @@ export function clearDone() {
   store(scanLines().filter((l) => l.status === 'new'));
 }
 
-export function removeScanLine(code: string) {
-  store(scanLines().filter((l) => l.code !== code));
-}
-
 /**
  * 0.10.10: barcodes you don't need any more (an old scan, a mistake) can go without matching.
  * Takes the ones still to match with these codes (all of them when none are given) and returns

@@ -2,16 +2,15 @@ import { wasSince } from '../lib/wasSince';
 import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type MutableRefObject, type InputHTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { nameHasSize } from '../lib/naming';
-import { RestockNative } from '../lib/sql/native';
 import { formatUnitPrice, money, tidySize, tidyUnitText } from '../lib/units';
 import { fetchDetails, type ProductDetails } from '../stores/details';
-import { isNative, promoLabel } from '../stores/http';
+import { promoLabel } from '../stores/http';
 import { bothPrices, describe, productQty, type Option } from '../lib/verdict';
 import { sizeLabel } from '../lib/unitPrice';
 import { chainName, stockAtBranch, type Chain, type PriceReading } from '../types';
 import { cachedSettings } from '../lib/db';
 import { confirmAction } from '../lib/confirm';
-import { onSectionIcons, SECTION_NAMES, shopColor, websiteOf, type Section } from '../shops';
+import { onSectionIcons, shopColor } from '../shops';
 import { useNav } from './nav';
 
 // ---------- icons (inline stroke SVG) ----------
@@ -221,7 +220,6 @@ const paths: Record<string, ReactNode> = {
   ),
 };
 
-
 /**
  * 0.10.7: the icon pack for custom sections (shops.ts PACK_ICON_IDS), drawn like the rest: 24 × 24,
  * round 2 px lines in the text colour, so they sit with Keg, Health and the others.
@@ -347,15 +345,8 @@ export function TopBar({ title, right, back = true, tag }: { title: string; righ
   );
 }
 
-/**
- * 0.10.0: "Beta" beside the Keg and Health tabs and their shops, everywhere they're named (phone,
- * web page, iPhone web app): still being worked on. Nothing else about them changes.
- */
-// 0.10.7: Baby and Pets are custom sections now (not beta tabs).
-export const BETA_SECTIONS: readonly string[] = ['keg', 'pharmacy'];
 /** 0.10.2: shops marked Beta where they're picked or set up (it works the same; it's tested less). 0.10.3: and IGA and the new shops (shops.ts). */
 export { BETA_SHOPS } from '../shops';
-export const COSTCO_BETA_NOTE = "Costco is in beta: it works the same way as the other supermarkets, it just hasn't been tested as thoroughly yet.";
 /** What the Beta means, wherever it's explained (setup, Settings, the tab itself, the web page). */
 export const BETA_NOTE =
   "Beta: it works the same way as Groceries, it just hasn't been tested as thoroughly yet. It'll keep being tested before it comes out of beta.";
@@ -372,20 +363,9 @@ export function BetaTag({ compact }: { compact?: boolean }) {
     </span>
   );
 }
-export const betaFor = (section: string | undefined, compact?: boolean) => (section && BETA_SECTIONS.includes(section) ? <BetaTag compact={compact} /> : null);
 
 export function ChainDot({ chain }: { chain: Chain }) {
   return <span className={`dot chain-dot ${chain}`} style={{ background: shopColor(chain) }} aria-hidden="true" />;
-}
-
-/** A small Keg or Pharmacy icon before an item's name, where items from every tab are mixed (Home). */
-export function SectionMark({ section }: { section?: Section }) {
-  if (!section || section === 'pantry') return null;
-  return (
-    <span className="section-mark" title={SECTION_NAMES[section]} aria-label={`${SECTION_NAMES[section]}:`}>
-      <Icon name={section} size={15} />
-    </span>
-  );
 }
 
 export function ChainName({ chain }: { chain: Chain }) {
@@ -979,22 +959,6 @@ export function SelectBar({
   );
 }
 
-/** Opens a store's website so the user can clear its "are you human" check, then calls onDone (e.g. to retry). */
-export function OpenStoreButton({ chain = 'coles', onDone, label }: { chain?: Exclude<Chain, 'other'>; onDone?: () => void; label?: string }) {
-  if (!isNative()) return null;
-  return (
-    <button
-      className="btn small"
-      onClick={async () => {
-        await RestockNative.openStore({ chain, home: websiteOf(chain) }).catch(() => undefined);
-        onDone?.();
-      }}
-    >
-      {label ?? `Open ${chainName(chain)}`}
-    </button>
-  );
-}
-
 /** Light / dark / follow the phone. */
 export function ThemePicker({ value, onChange }: { value: 'system' | 'light' | 'dark'; onChange: (v: 'system' | 'light' | 'dark') => void }) {
   const opts = [
@@ -1214,7 +1178,7 @@ export function SwapBox({ label, option, hi }: { label: string; option?: Option;
  * Press and hold (about half a second) to do something else, like showing a product bigger.
  * A normal tap still works, and moving your finger (scrolling) cancels it.
  */
-export function useLongPress(onLong: () => void, ms = 450) {
+function useLongPress(onLong: () => void, ms = 450) {
   const timer = useRef<number | undefined>(undefined);
   const start = useRef<{ x: number; y: number } | undefined>(undefined);
   const fired = useRef(false);
@@ -1311,7 +1275,7 @@ export function previewFromOption(o: Option): PreviewProduct {
 }
 
 /** The store's bigger version of a product photo, where its address says how. */
-export function biggerImage(url: string): string {
+function biggerImage(url: string): string {
   return url
     .replace('/wowproductimages/medium/', '/wowproductimages/large/')
     .replace('/wowproductimages/small/', '/wowproductimages/large/')

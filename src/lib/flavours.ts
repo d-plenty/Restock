@@ -101,12 +101,6 @@ export function flavourNoteFor(rec: Recommendation): string | undefined {
   );
 }
 
-/** How many of your picks there are at the deal's shop (2 or more is a set of flavours). */
-export function flavourCount(rec: Recommendation): number {
-  const chain = rec.best?.product.chain;
-  return chain ? rec.options.filter((o) => o.role === 'main' && o.product.chain === chain).length : 0;
-}
-
 /** Each shop where you've picked several of the same thing: how many, and what they differ in. */
 export function flavourSets(rec: Pick<Recommendation, 'options'>): { chain: string; n: number; word: ReturnType<typeof flavourWord> }[] {
   const by = new Map<string, string[]>();

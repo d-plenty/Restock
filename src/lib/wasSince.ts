@@ -5,7 +5,7 @@
 // history); the date is just made hard to miss.
 
 /** A special older than this is flagged. */
-export const WAS_OLD_DAYS = 14;
+const WAS_OLD_DAYS = 14;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export interface WasSince {

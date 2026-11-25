@@ -59,7 +59,8 @@ export type Screen =
   | { name: 'sync'; invite?: boolean }
   /** 0.14.0, iPhone and iPad: syncing with another phone over the Wi-Fi (`apple`: opened as iPhone to iPhone). */
   | { name: 'wifiSync'; apple?: boolean }
-  | { name: 'restockServer' }
+  /** 0.15.0: `code`: a server's Add a phone code already scanned (the first screen's Join your household). */
+  | { name: 'restockServer'; code?: string }
   /** 0.9.3: Settings → Home Assistant (the shopping list both ways). */
   | { name: 'homeAssistant' }
   | { name: 'household' }
@@ -73,7 +74,7 @@ export type Screen =
   | { name: 'diagnostics' }
   | { name: 'soon'; id: string }
   /** 0.9.2: the web app on a Restock server: its Phones, Activity and Account pages (0.9.5: and Data; 0.9.6: More, on a phone). */
-  | { name: 'server'; page: 'phones' | 'activity' | 'account' | 'data' | 'data-manage' | 'more' };
+  | { name: 'server'; page?: 'phones' | 'activity' | 'account' | 'data' | 'data-manage' | 'more' }; // 0.15.0: no page is Your server
 
 export interface Nav {
   tab: Tab;

@@ -627,7 +627,7 @@ function PickOnSite({ chain }: { chain: StoreChain }) {
 }
 
 /** Add or edit a shop of your own: a name and a website, tested before saving. */
-export function CustomShopSheet({ section, shop, onClose }: { section: Section; shop?: CustomShop; onClose: () => void }) {
+function CustomShopSheet({ section, shop, onClose }: { section: Section; shop?: CustomShop; onClose: () => void }) {
   const [name, setName] = useState(shop?.name ?? '');
   const [site, setSite] = useState(shop?.website ?? '');
   const [searchAt, setSearchAt] = useState(shop?.search ?? '');
@@ -905,7 +905,7 @@ function branchText(st: StoreChoice, chain: StoreChain): string {
 }
 
 /** 0.10.7: a section's page title in Settings. */
-export const sectionPageTitle = (s: Section): string => (s === 'pantry' ? 'Supermarkets' : SECTION_NAMES[s]);
+const sectionPageTitle = (s: Section): string => (s === 'pantry' ? 'Supermarkets' : SECTION_NAMES[s]);
 
 export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
   useSettingsDraft(); // 0.9.5 (save)

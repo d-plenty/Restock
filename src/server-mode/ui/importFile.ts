@@ -88,7 +88,7 @@ const KNOWN_NAMES: Record<string, string> = {
 };
 
 /** Throws ImportRefused when the file holds a secret anywhere: a field, a table, a photo. */
-export function refuseSecrets(tables: Record<string, unknown>, top: Record<string, unknown> = {}): void {
+function refuseSecrets(tables: Record<string, unknown>, top: Record<string, unknown> = {}): void {
   for (const k of Object.keys(top)) if (SECRET_TABLE.test(k)) throw new ImportRefused(secretWords(k));
   for (const [name, v] of Object.entries(tables)) {
     if (SECRET_TABLE.test(name)) throw new ImportRefused(secretWords(name));
@@ -355,7 +355,7 @@ export function readImport(bytes: Uint8Array, fileName = ''): ReadFile {
     if (!tables.products) throw new ImportRefused('That zip has no Products.csv in it. Use the CSV files (.zip) the Your data page downloads, or a full export file (.json).');
     if (!tables.prices) tables.prices = [];
     const r = productsOf(tables, 'csv');
-    r.notTaken = names.filter((x) => /\.csv$/.test(x) && !['products.csv', 'prices.csv'].includes(x)).map((x) => x.replace(/\.csv$/, '').replace(/[-_]+/g, ' '));
+    r.notTaken = names.filter((x) => x.endsWith('.csv') && !['products.csv', 'prices.csv'].includes(x)).map((x) => x.replace(/\.csv$/, '').replace(/[-_]+/g, ' '));
     return r;
   }
   if (/\.xlsx$/i.test(fileName)) throw new ImportRefused("Spreadsheets (.xlsx) can't be imported. Use the Full export file (.json) or the CSV files (.zip) instead.");
@@ -454,15 +454,15 @@ export interface Tally {
   costco: { products: number; prices: number };
   problems: Record<string, number>;
 }
-export const emptyTally = (read?: ReadFile): Tally => ({
+const emptyTally = (read?: ReadFile): Tally => ({
   products: 0,
   matched: 0,
   prices: 0,
   skipped: 0,
   costco: { products: read?.costco.products ?? 0, prices: read?.costco.prices ?? 0 },
-  problems: { ...(read?.problems ?? {}) },
+  problems: { ...read?.problems },
 });
-export function addCheck(t: Tally, a: CheckAnswer): Tally {
+function addCheck(t: Tally, a: CheckAnswer): Tally {
   const out = { ...t, costco: { ...t.costco }, problems: { ...t.problems } };
   out.products += Number(a.products?.add) || 0;
   out.matched += Number(a.products?.matched) || 0;
@@ -473,7 +473,7 @@ export function addCheck(t: Tally, a: CheckAnswer): Tally {
   for (const [k, v] of Object.entries(a.problems ?? {})) bump(out.problems, k, Number(v) || 0);
   return out;
 }
-export const addChunk = (t: Tally, a: ChunkAnswer): Tally =>
+const addChunk = (t: Tally, a: ChunkAnswer): Tally =>
   addCheck(t, { products: { add: a.products?.added, matched: a.products?.matched }, prices: { add: a.prices?.added, skipped: a.prices?.skipped }, costco: a.costco, problems: a.problems } as CheckAnswer);
 
 /** Notes, not rows left out: the product went in without that barcode or picture. */

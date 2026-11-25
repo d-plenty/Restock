@@ -1,3 +1,4 @@
+import { askChoice } from '../../lib/confirm';
 import { isIos } from '../../lib/platform';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
@@ -30,8 +31,8 @@ import { RecallSettings } from './Recalls';
 import { ReceiptsSettings } from './Receipts';
 import { readBackupFile, RestoreSheet } from './Restore';
 import { StoreFields } from './Stores';
-import { JoinSheet, scanPairingCode } from './Sync';
-import { NotificationSettings, PriceCheckSettings, UpdateRows } from './Settings';
+import { JoinSheet, scanJoinCode } from './Sync';
+import { NotificationSettings, PriceCheckSettings, UpdateRows } from './SettingsParts';
 import { syncSummary } from './Sync';
 import { WidgetSettings } from './WidgetSettings';
 
@@ -244,7 +245,7 @@ const isTabTile = (id: TileId): id is 'keg' | 'pharmacy' => TAB_TILES.includes(i
  * what Restock may use (camera, location, alerts). Setup asks for these; the other ten are
  * "More, when you want it", and Home only reminds you about these three.
  */
-export const ESSENTIAL: readonly TileId[] = ['pantry', 'alerts', 'permissions'];
+const ESSENTIAL: readonly TileId[] = ['pantry', 'alerts', 'permissions'];
 export const isEssential = (id: TileId) => ESSENTIAL.includes(id);
 export const TILES: Tile[] = TILE_ORDER.filter((id) => SELF_UPDATE || id !== 'updates').map((id) => ALL_TILES.find((t) => t.id === id)!);
 
@@ -770,7 +771,7 @@ function TilePage({
 }
 
 /** The page of tiles (in setup, and in Settings → Setup). */
-export function SetupTiles({
+function SetupTiles({
   settings,
   onOpen,
   onLater,
@@ -922,8 +923,7 @@ export function Onboarding() {
     await updateSettings({ onboarded: true });
     // Shared prices on (0.10.0: on to start with): the first download now (it waits for Wi-Fi if asked).
     const md = (await getSettings()).marketData;
-    // (iPhone app: shared price history isn't downloaded there yet, so nothing is said about it)
-    if (md.enabled && isNative() && !isIos()) {
+    if (md.enabled && isNative()) {
       downloadMarket(undefined, { onlyUnmetered: md.wifiOnly })
         .then((r) =>
           nav.toast(
@@ -951,6 +951,33 @@ export function Onboarding() {
     return false;
   });
   if (!settings) return null;
+
+  /**
+   * 0.15.0: Join your household, from the first screen or after a restore. A phone's code joins here
+   * (JoinSheet). A server's code finishes the short setup and opens the server's page, which joins
+   * with it straight away. On iPhone and iPad there's also the household's iCloud folder.
+   */
+  const joinHousehold = async () => {
+    if (!isNative()) return nav.toast('Joining a household works in the app.');
+    if (isIos()) {
+      const how = await askChoice('How does your household sync?', 'Scan a code from your Restock server or an Android phone, or use your household’s iCloud folder.', [
+        { id: 'scan', label: 'Scan a code', kind: 'primary' },
+        { id: 'icloud', label: 'iCloud folder' },
+      ]);
+      if (!how) return;
+      if (how === 'icloud') {
+        // On iPhone and iPad, Sync is iCloud sync.
+        nav.push({ name: 'sync' });
+        await firstFinish();
+        return;
+      }
+    }
+    const got = await scanJoinCode();
+    if (!got) return;
+    if (got.kind === 'phone') return setJoinCode(got.code);
+    nav.push({ name: 'restockServer', code: got.code });
+    await firstFinish();
+  };
 
   const restore = async (file: File) => {
     try {
@@ -1072,9 +1099,7 @@ export function Onboarding() {
             onClick={async () => {
               await updateSettings({ privacyAccepted: legal.updated });
               if (!joiningHousehold) return setStage('notify');
-              if (!isNative()) return nav.toast('Joining a household works in the Android app.');
-              const code = await scanPairingCode();
-              if (code) setJoinCode(code);
+              await joinHousehold();
             }}
           >
             I agree
@@ -1155,10 +1180,7 @@ export function Onboarding() {
               <button
                 className="btn small"
                 style={{ alignSelf: 'flex-start' }}
-                onClick={async () => {
-                  const code = await scanPairingCode();
-                  if (code) setJoinCode(code);
-                }}
+                onClick={() => void joinHousehold()}
               >
                 Join your household
               </button>

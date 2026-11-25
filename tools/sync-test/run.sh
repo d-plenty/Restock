@@ -71,9 +71,10 @@ bash tools/sync-test/market-parity.sh
 # 0.9.4: Home Assistant's round in Java (HaSync.java) against haSync.ts, on shared fixtures.
 bash tools/sync-test/ha-parity.sh
 
-# 0.9.2: phones syncing through a real Restock server, with a stand-in browser (server-web.mjs)
-# that opens what the phones seal with the web app's own code. The server lives in its own repo
+# Phones syncing through a real Restock server. The server lives in its own repo
 # (github.com/d-plenty/restock-server): clone it next to this one, or set RESTOCK_SERVER_DIR.
+# 0.15.0: only as the house (v3): the 0.9.2 server scenarios (a 0.9.3 household kept as sealed files)
+# are gone with that way of keeping one.
 SERVER_DIR=${RESTOCK_SERVER_DIR:-}
 [ -z "$SERVER_DIR" ] && for d in server ../restock-server; do [ -f "$d/src/server.mjs" ] && SERVER_DIR=$d && break; done
 if [ -z "$SERVER_DIR" ]; then
@@ -82,24 +83,17 @@ if [ -z "$SERVER_DIR" ]; then
 fi
 export RESTOCK_SERVER_DIR=$(cd "$SERVER_DIR" && pwd)
 D=$(mktemp -d)
-mkdir -p "$D/data"
 PORT=${RESTOCK_TEST_PORT:-18787}
-(cd "$SERVER_DIR" && DATA_DIR="$D/data" PORT=$PORT HOST=127.0.0.1 RESTOCK_QUIET=1 exec node src/server.mjs >"$D/server.log" 2>&1) &
-SERVER=$!
 V3PIDS=""
-trap 'kill $SERVER $V3PIDS 2>/dev/null; wait $SERVER $V3PIDS 2>/dev/null; rm -rf "$D"' EXIT
-for i in $(seq 100); do curl -sf http://127.0.0.1:$PORT/api/v2/health >/dev/null && break; sleep 0.1; done
-curl -sf http://127.0.0.1:$PORT/api/v2/health >/dev/null || { echo "The Restock server didn't start:"; cat "$D/server.log"; exit 1; }
-node tools/sync-test/server-web.mjs setup http://127.0.0.1:$PORT "$D/browser.json" >/dev/null
-java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncServerTest "$O" http://127.0.0.1:$PORT "$D/browser.json" "$D/data"
+trap 'kill $V3PIDS 2>/dev/null; wait $V3PIDS 2>/dev/null; rm -rf "$D"' EXIT
 
 # 0.9.4: protocol v3, where the server is the household's owner (docs/server-v3-design.md), once the
-# server has it: three fresh servers (one made a house, one left in v2 mode for the handover, one a
-# Wi-Fi household is brought onto), with the server repo's test clients as the web page.
+# server has it: two fresh servers (one made a house, one a Wi-Fi household is brought onto), with
+# the server repo's test clients as the web page.
 if grep -qs "/api/v3/" "$SERVER_DIR"/src/v3/*.mjs; then
   [ -f "$SERVER_DIR/core/restock-core.mjs" ] || (cd "$SERVER_DIR" && RESTOCK_DIR="$(cd - >/dev/null && pwd)" node scripts/core.mjs >/dev/null)
   URLS=()
-  for k in 1 2 3; do
+  for k in 1 2; do
     P3PORT=$((PORT + k))
     mkdir -p "$D/v3-$k"
     (cd "$SERVER_DIR" && DATA_DIR="$D/v3-$k" PORT=$P3PORT HOST=127.0.0.1 RESTOCK_QUIET=1 exec node --disable-warning=ExperimentalWarning src/server.mjs >"$D/v3-$k.log" 2>&1) &
@@ -111,19 +105,7 @@ if grep -qs "/api/v3/" "$SERVER_DIR"/src/v3/*.mjs; then
     curl -sf "$u/api/v3/health" >/dev/null || { echo "A v3 Restock server didn't start:"; cat "$D"/v3-*.log; exit 1; }
   done
   mkdir -p "$D/v3state"
-  # A phone still on 0.9.3 (its own sync code, from the v093 tag) takes part in the handover.
-  OLD093=""
-  if git rev-parse -q --verify "refs/tags/v093" >/dev/null 2>&1; then
-    OS=$O/old-v093
-    rm -rf $OS && mkdir -p $OS/src $OS/classes
-    git archive v093 android/app/src/main/java | tar -x -C $OS/src
-    cp tools/sync-test/bridge.py $O/migrations.json $OS/
-    javac -nowarn -d $OS/classes -cp "$ORGJSON" -sourcepath $OS/src/android/app/src/main/java tools/sync-test/old/OldServerPhone.java tools/sync-test/family/plenty/restock/TestDb.java
-    OLD093="$OS/classes:$ORGJSON;$OS"
-  else
-    echo "Old phone checks for 0.9.3 on a v3 server skipped: no v093 tag here."
-  fi
-  RESTOCK_OLD093="$OLD093" RESTOCK_OLD094="$OLD094" java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncServerV3Test "$O" "${URLS[@]}" "$D/v3state"
+  RESTOCK_OLD094="$OLD094" java -cp "$O/classes:$ORGJSON" family.plenty.restock.SyncServerV3Test "$O" "${URLS[@]}" "$D/v3state"
 else
   echo "Restock server v3 scenarios skipped: this server has no /api/v3 yet."
 fi

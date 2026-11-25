@@ -1,5 +1,5 @@
 // 0.13.0: what was asked for, held to the source and to the small pieces that do the work.
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import initSqlJs from 'sql.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { addGroup, allGroups, allListEntries, ensureDefaults, getGroup, initDb, nowIso, readingsFor } from '../lib/db';
@@ -13,7 +13,7 @@ import { applyCustomSections, CUSTOM_DEFAULTS, customDef, isCustomSection, isMad
 import { addPicks, picksSaid } from './screens/Picks';
 import { ZERO_HOLD_MS } from './Stepper';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 
 beforeEach(async () => {
   const driver = await createSqlJsDriver({ load: () => initSqlJs() });

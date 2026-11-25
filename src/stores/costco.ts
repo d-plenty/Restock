@@ -44,7 +44,7 @@ const MAX_RESULTS = 48;
 /** The longest search words taken. */
 const MAX_TERM = 80;
 
-export const costcoSearchUrl = (term: string) => `${SITE}/search?text=${encodeURIComponent(term)}`;
+const costcoSearchUrl = (term: string) => `${SITE}/search?text=${encodeURIComponent(term)}`;
 /**
  * 0.9.7: the product search Costco's own website uses (SAP Commerce, "australia" site). Not yet seen
  * from a real phone: if it isn't there, the search page above is read instead.
@@ -62,7 +62,7 @@ export class CostcoBlockedError extends Error {
   }
 }
 /** Too many searches in a minute. Nothing was sent to Costco. */
-export class CostcoBusyError extends Error {
+class CostcoBusyError extends Error {
   constructor() {
     super(COSTCO_BUSY_MESSAGE);
     this.name = 'CostcoBusyError';
@@ -110,7 +110,7 @@ export class Gate {
 }
 
 /** The one gate every Costco request on this phone goes through. */
-export const costcoGate = new Gate();
+const costcoGate = new Gate();
 
 // ---------- reading a page ----------
 
@@ -356,7 +356,7 @@ export interface RawCostco {
   text: string;
 }
 
-export function buildProduct(r: RawCostco, state?: string): StoreProduct {
+function buildProduct(r: RawCostco, state?: string): StoreProduct {
   const f = readFacts(r.text);
   const memberOnly = !!f.memberOnlyItem;
   // A member-only item has no price on the page: don't read a delivery fee or a minimum as one.
@@ -525,7 +525,7 @@ function tileName(t: { html: string; links: string[] }): string | undefined {
   const alt = t.html.match(/<img\b[^>]*>/i);
   const a = alt ? attr(alt[0], 'alt') : undefined;
   if (a) names.push(a);
-  const best = names.filter((n) => n.length >= 3 && n.length <= 200 && !/^\$/.test(n)).sort((x, y) => y.length - x.length)[0];
+  const best = names.filter((n) => n.length >= 3 && n.length <= 200 && !n.startsWith('$')).sort((x, y) => y.length - x.length)[0];
   return best?.replace(/\s+/g, ' ');
 }
 

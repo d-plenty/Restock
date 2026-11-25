@@ -1,0 +1,1 @@
+Update every phone to 0.14.0 or newer: older ones can't sync with this one. iPhone and iPad: hand the owner job to another phone, bring a household onto a server, Nextcloud or WebDAV folders, join a server from the first screen. A server's web page now looks like the iPad, with Your server in one place. Opens faster. Diagnostics shows problems from background work. Code tidy-up.

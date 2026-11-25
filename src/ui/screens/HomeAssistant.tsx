@@ -272,7 +272,7 @@ export function HomeAssistantScreen() {
     <div className="screen">
       <TopBar title="Home Assistant" />
 
-      {!haAvailable() && <NotHereBanner reason="homeAssistant" title="Home Assistant works in the Android app" />}
+      {!haAvailable() && <NotHereBanner title="Home Assistant works in the Android app" />}
 
       <div className="card" style={{ gap: 8 }}>
         <strong>Your shopping list in Home Assistant, both ways</strong>

@@ -1,5 +1,5 @@
 // 0.12.8: what was asked for, held to the source and to the small pieces that do the work.
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import { describe, expect, it } from 'vitest';
 import { needsBackupNudge, putOffBackup, remindDays, remindLabel, BACKUP_REMIND } from '../lib/backup';
 import { kiloPrice, looseKilo, perKiloNote } from '../lib/unitPrice';
@@ -7,7 +7,7 @@ import { siteImage } from '../stores/webPage';
 import type { Group } from '../types';
 import { attachPatch, rolesIn, uniqueProducts } from './screens/attachOne';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 const add = read('./screens/Add.tsx');
 const list = read('./screens/List.tsx');
 const item = read('./screens/Item.tsx');

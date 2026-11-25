@@ -80,7 +80,7 @@ export function askLeave(): Promise<'save' | 'discard' | 'keep'> {
  * the server: they go with this browser's copy. True: sign out anyway. Without the in-app sheet,
  * the browser's own confirm.
  */
-export const UNSENT_TITLE = "You have changes that haven't reached the server yet. Sign out anyway and lose them?";
+const UNSENT_TITLE = "You have changes that haven't reached the server yet. Sign out anyway and lose them?";
 export function askSignOutUnsent(): Promise<boolean> {
   return new Promise((resolve) => {
     if (!listener) return resolve(typeof window !== 'undefined' && typeof window.confirm === 'function' ? window.confirm(UNSENT_TITLE) : false);

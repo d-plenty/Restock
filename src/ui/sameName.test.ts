@@ -1,5 +1,5 @@
 // 0.12.10: what was asked for, held to the source and to the small pieces that do the work.
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import { describe, expect, it } from 'vitest';
 import { version } from '../../package.json';
 import { nameKey, sameNameItem, sameNameWords } from '../lib/sameName';
@@ -8,7 +8,7 @@ import { WHATS_NEW } from '../lib/whatsNew';
 import { extractProducts, fromEmbedded, withPhotos } from '../stores/webPage';
 import { tryAgainWords } from './Unblock';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 const list = read('./screens/List.tsx');
 
 describe('0.12.10: no two items with one name', () => {

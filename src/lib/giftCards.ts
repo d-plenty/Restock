@@ -238,7 +238,7 @@ export function cleanLoyaltyCard(raw: unknown, now = new Date().toISOString()): 
 // ---------- 0.14.0: a loyalty card's expiry date ----------
 
 /** A loyalty card is reminded about this many days before it runs out. */
-export const LOYALTY_REMIND_DAYS = 30;
+const LOYALTY_REMIND_DAYS = 30;
 
 /** When a loyalty card's reminder goes (9 am, a month before it expires), or undefined (no date, or already past). */
 export function loyaltyReminderAt(card: Pick<LoyaltyCard, 'expiry'>, now = Date.now()): Date | undefined {
@@ -277,16 +277,16 @@ export function cardsToMention(cards: LoyaltyCard[], later: Record<string, strin
 export function putOffCard(card: Pick<LoyaltyCard, 'id' | 'expiry'>, later: Record<string, string> | undefined, now = Date.now()): Record<string, string> {
   const e = expiryState(card, now);
   const days = e.kind === 'soon' && (e.days ?? 0) <= 7 ? 1 : 7;
-  return { ...(later ?? {}), [card.id]: new Date(now + days * 24 * 3600 * 1000).toISOString() };
+  return { ...later, [card.id]: new Date(now + days * 24 * 3600 * 1000).toISOString() };
 }
 
 // ---------- the cards file (moving cards between a phone and a browser) ----------
 
-export const CARDS_FILE_FORMAT = 'restock-cards';
+const CARDS_FILE_FORMAT = 'restock-cards';
 export const CARDS_FILE_PRIVATE =
   'PRIVATE. This file has your card numbers, barcodes and gift card PINs. Keep it to yourself, open it only in Restock, and delete it once your cards are moved.';
 /** At most this much in a cards file (photos take most of it). */
-export const CARDS_FILE_MAX_BYTES = 25 * 1024 * 1024;
+const CARDS_FILE_MAX_BYTES = 25 * 1024 * 1024;
 const MAX_CARDS = 500;
 /** Base64 of one photo (about 3 MB of JPEG). */
 export const MAX_PHOTO_B64 = 4 * 1024 * 1024;

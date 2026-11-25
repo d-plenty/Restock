@@ -47,7 +47,7 @@ export function useDraftState(): DraftState & { justSaved: boolean } {
 }
 
 /** The big green button. Greyed out with nothing to save; says "Saved" once it has. */
-export function SaveButton({ className = '', label = 'Save settings' }: { className?: string; label?: string }) {
+function SaveButton({ className = '', label = 'Save settings' }: { className?: string; label?: string }) {
   const s = useDraftState();
   return (
     <button
@@ -71,7 +71,7 @@ export function SaveButton({ className = '', label = 'Save settings' }: { classN
 }
 
 /** What the bar says next to the button, and for screen readers. */
-export function saveStatusText(s: DraftState & { justSaved: boolean }): string {
+function saveStatusText(s: DraftState & { justSaved: boolean }): string {
   if (s.error) return `Couldn't save: ${s.error}`;
   if (s.saving) return 'Saving';
   if (s.dirty) return 'Unsaved changes';

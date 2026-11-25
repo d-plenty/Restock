@@ -17,9 +17,22 @@ import { syncDbOf } from '../server-mode/sqldb';
 import type { Section } from '../shops';
 import { appleHere, RestockApple } from './apple';
 import { FolderHouse, FolderProblem, type FolderIo } from './folderHouse';
+import { davAddress, davFolder, DavProblem, nextcloudFolderUrl, pollNextcloud, startNextcloud, type NextcloudLogin } from './dav';
+
+/** "cloud.example.com · Restock" for a folder's address. */
+const davLabel = (url: string): string => {
+  try {
+    const u = new URL(url);
+    const last = decodeURIComponent(u.pathname.replace(/\/+$/, '').split('/').pop() ?? '');
+    return u.host + (last ? ` · ${last}` : '');
+  } catch {
+    return url;
+  }
+};
 import { House, HouseProblem, type Http } from './house';
 import { appleLan, lanHere } from './lan';
 import { WifiHouse, WifiProblem, type Photos } from './wire';
+import { quiet } from '../lib/quietErrors';
 
 const toB64 = (b: Uint8Array): string => {
   let s = '';
@@ -32,7 +45,7 @@ const fromB64 = (s: string): Uint8Array => Uint8Array.from(atob(s), (c) => c.cha
  * Requests through the app's own HTTP (no browser rules between the app and the household's server).
  * Bodies go as bytes; an answer comes back as bytes whatever it is.
  */
-export const appHttp: Http = async (o) => {
+const appHttp: Http = async (o) => {
   // The click-through and the tests run in a browser, where plain fetch does the same job.
   if (!Capacitor.isPluginAvailable('CapacitorHttp')) {
     const r = await fetch(o.url, { method: o.method, headers: o.headers, body: o.body ? (o.body as unknown as BodyInit) : undefined });
@@ -70,15 +83,7 @@ export const appHttp: Http = async (o) => {
 };
 
 let made: { e: WebSyncEngine; house: House; folder: FolderHouse; wifi: WifiHouse; saved: () => void } | undefined;
-/** Where receipt photos are kept on this device (set by ios/native.ts), for sharing them over the Wi-Fi. */
-let photoStore: Photos | undefined;
-export const setPhotoStore = (p: Photos | undefined) => (photoStore = p);
 let http: Http = appHttp;
-/** Tests: another way of making requests. */
-export const setSyncHttp = (h: Http | undefined) => {
-  http = h ?? appHttp;
-  made = undefined;
-};
 
 /**
  * The iCloud Drive folder picked on this device, through the app's native plugin: kept as a bookmark
@@ -119,6 +124,29 @@ function pickedFolder(e: WebSyncEngine, saved: () => void): FolderIo | undefined
   };
 }
 
+/**
+ * 0.15.0: the household's folder on Nextcloud or another WebDAV server (ios/dav.ts), when that's what
+ * this device uses instead of iCloud Drive (sync_meta folder_kind "dav"). The password is in the
+ * keychain; it's fetched the first time the folder is used.
+ */
+function davFolderOf(e: WebSyncEngine): FolderIo | undefined {
+  const url = e.meta('dav_url');
+  if (e.meta('folder_kind') !== 'dav' || !url) return undefined;
+  let open: Promise<FolderIo> | undefined;
+  const get = () =>
+    (open ??= (async () => {
+      const s = appleHere() ? await RestockApple.secretGet({ key: DAV_SECRET }).catch(() => ({ found: false, value: undefined })) : { found: false, value: undefined };
+      return davFolder({ url, user: e.meta('dav_user') ?? '', password: s.found ? (s.value ?? '') : '' }, (o) => http(o as Parameters<Http>[0]));
+    })());
+  return {
+    list: async () => (await get()).list(),
+    read: async (n) => (await get()).read(n),
+    write: async (n, b) => (await get()).write(n, b),
+    remove: async (n) => (await get()).remove(n),
+  };
+}
+const DAV_SECRET = 'restock-dav-password';
+
 /** The engine, the house and the iCloud household on this app's database (made once it's open). */
 export function hub() {
   if (made) return made;
@@ -136,7 +164,7 @@ export function hub() {
   if (e.meta('name') === null) e.setMeta('name', deviceWord() === 'iPad' ? 'iPad' : 'iPhone');
   const saved = sql.saved;
   // Receipt photos go between phones over the Wi-Fi only (as on Android): Restock's own copies, in its own storage.
-  const photos: Photos = photoStore ?? {
+  const photos: Photos = {
     size: async (path) => {
       const d = await readPhoto(path);
       return d === undefined ? -1 : Math.floor((d.length * 3) / 4);
@@ -153,7 +181,7 @@ export function hub() {
     events.changed();
     events.done(info());
   };
-  made = { e, house: new House(e, (o) => http(o)), folder: new FolderHouse(e, () => pickedFolder(e, saved)), wifi, saved };
+  made = { e, house: new House(e, (o) => http(o)), folder: new FolderHouse(e, () => davFolderOf(e) ?? pickedFolder(e, saved)), wifi, saved };
   return made;
 }
 
@@ -387,14 +415,32 @@ export async function checkServer(code: string): Promise<ServerCodeCheck> {
     house: c.house,
     empty: c.empty,
     inHousehold: c.inHousehold || i.paired,
-    ...(c.inHousehold || i.paired ? { isOwner: false, household: i.household ?? 'your household', members: i.members?.length ?? 0, sameHouse: false } : {}),
+    // 0.15.0: the owner of a household on the Wi-Fi or in iCloud can bring it onto an empty server.
+    ...(c.inHousehold || i.paired ? { isOwner: ownsBringable(), household: i.household ?? 'your household', members: i.members?.length ?? 0, sameHouse: false } : {}),
   };
 }
 
-/** Join a house with its Add a phone code. "leave": leave the house this device is in first. */
+/** 0.15.0: this device owns a household that could go onto a server (phones on the Wi-Fi, or an iCloud folder). */
+function ownsBringable(): boolean {
+  const { wifi: w, folder } = hub();
+  return (w.joined() && w.isOwner()) || (folder.joined() && folder.isOwner());
+}
+
+/** Join a house with its Add a phone code. "leave": leave the house this device is in first. "bring": take this device's household onto the server. */
 export async function joinServer3(code: string, how: 'join' | 'bring' | 'leave') {
   const { house, saved } = hub();
-  if (how === 'bring') throw new IosUnavailable('Bringing a household onto a server');
+  if (how === 'bring') {
+    const { wifi: w, folder } = hub();
+    const kind = w.joined() && w.isOwner() ? 'wifi_house' : folder.joined() && folder.isOwner() ? 'folder_house' : null;
+    if (!kind) throw new HouseProblem("Only the household's owner phone can bring it onto a server.");
+    // The Wi-Fi household stops listening: the server is the house from now on.
+    if (kind === 'wifi_house') await w.stop();
+    await house.bring(code, kind);
+    saved();
+    const i = info();
+    events.changed();
+    return { ...i, label: i.serverMemberLabel ?? null, houseName: i.household ?? null, member: false };
+  }
   if (how === 'leave' && house.joined()) await house.leave();
   // In a household of another kind (phones on the Wi-Fi, or iCloud): one at a time.
   const { folder, wifi: w } = hub();
@@ -447,13 +493,6 @@ export async function stopServer(_o: { takeBack?: string[] } = {}): Promise<Sync
   return i;
 }
 
-export async function serverHealth(): Promise<{ mode?: string; api?: number; house?: string }> {
-  const { house } = hub();
-  const i = house.info();
-  const h = await house.health([i.reached, i.home, i.away].filter((x): x is string => !!x));
-  return h ? { mode: typeof h.mode === 'string' ? h.mode : undefined, api: typeof h.api === 'number' ? h.api : undefined, house: typeof h.house === 'string' ? h.house : undefined } : {};
-}
-
 export function dismissNotice(): void {
   const { e, saved } = hub();
   e.setMeta('notice', null);
@@ -479,6 +518,8 @@ export interface IcloudStatus {
   available: boolean;
   /** The folder picked on this device, by name. */
   folderName: string | null;
+  /** 0.15.0: where the folder is: iCloud Drive (or another folder in Files), or Nextcloud / WebDAV. */
+  folderKind: 'icloud' | 'dav';
   joined: boolean;
   joining: boolean;
   owner: boolean;
@@ -498,7 +539,13 @@ export const icloud = {
     const f = folder.info();
     return {
       available: appleHere(),
-      folderName: e.meta('folder_bookmark') ? (e.meta('folder_name') ?? 'A folder in Files') : null,
+      folderName:
+        e.meta('folder_kind') === 'dav' && e.meta('dav_url')
+          ? davLabel(e.meta('dav_url') as string)
+          : e.meta('folder_bookmark')
+            ? (e.meta('folder_name') ?? 'A folder in Files')
+            : null,
+      folderKind: e.meta('folder_kind') === 'dav' ? 'dav' : 'icloud',
       joined: f.joined,
       joining: f.joining,
       owner: f.owner,
@@ -523,8 +570,41 @@ export const icloud = {
     }
     e.setMeta('folder_bookmark', got.bookmark);
     e.setMeta('folder_name', got.name);
+    e.setMeta('folder_kind', null);
     e.setMeta('folder_error', null);
     saved();
+    return true;
+  },
+  /**
+   * 0.15.0: the household's folder on a WebDAV server instead of iCloud Drive. Tried out first (made
+   * if it isn't there, then written, read back and deleted), so a folder Restock can't use is turned
+   * down straight away. The password goes in the keychain, never in the database or a backup.
+   */
+  async useDav(o: { url: string; user: string; password: string }): Promise<void> {
+    const { e, folder, saved } = hub();
+    if (folder.joined()) throw new FolderProblem('Leave the household first, then pick its new folder.');
+    const url = davAddress(o.url);
+    const f = davFolder({ url, user: o.user.trim(), password: o.password }, (x) => http(x as Parameters<Http>[0]));
+    await f.ensure();
+    const probe = `restock-check-${e.device()}.bin`;
+    await f.write(probe, new Uint8Array([1, 2, 3]));
+    const back = await f.read(probe);
+    await f.remove(probe).catch(() => undefined);
+    if (!back || back.length !== 3) throw new DavProblem("The folder took a file but didn't give it back. Restock can't use it.");
+    if (appleHere()) await RestockApple.secretSet({ key: DAV_SECRET, value: o.password });
+    e.setMeta('folder_kind', 'dav');
+    e.setMeta('dav_url', url);
+    e.setMeta('dav_user', o.user.trim());
+    e.setMeta('folder_error', null);
+    saved();
+  },
+  /** Starts a Nextcloud sign-in: the page to open in the browser, and how to ask whether it's done. */
+  nextcloudStart: (server: string) => startNextcloud(server, (x) => http(x as Parameters<Http>[0])),
+  /** Asks once whether the Nextcloud sign-in is finished; when it is, the Restock folder there is used. */
+  async nextcloudPoll(l: NextcloudLogin): Promise<boolean> {
+    const done = await pollNextcloud(l, (x) => http(x as Parameters<Http>[0]));
+    if (!done) return false;
+    await this.useDav({ url: nextcloudFolderUrl(done.server, done.loginName), user: done.loginName, password: done.appPassword });
     return true;
   },
   /** The household's first device: makes the household, then writes its file. */
@@ -583,6 +663,9 @@ export const icloud = {
     if (folder.joined()) throw new FolderProblem('Leave the household first.');
     e.setMeta('folder_bookmark', null);
     e.setMeta('folder_name', null);
+    // 0.15.0: and a Nextcloud or WebDAV folder, with its password.
+    for (const k of ['folder_kind', 'dav_url', 'dav_user']) e.setMeta(k, null);
+    if (appleHere()) void RestockApple.secretDelete({ key: DAV_SECRET }).catch(() => undefined);
     saved();
   },
 };
@@ -606,6 +689,8 @@ export interface WifiStatus {
   cards: boolean;
   /** In another kind of household (a Restock server's, or an iCloud one): one at a time. */
   elsewhere: 'server' | 'icloud' | null;
+  /** 0.15.0: the phone the owner asked to take over, while it hasn't yet. */
+  handingOverTo: string | null;
 }
 
 const ELSEWHERE = 'This device is already in a household. Leave it first: a device belongs to one household at a time.';
@@ -632,6 +717,7 @@ export const wifi = {
       receipts: e.meta('share_receipts') === '1',
       cards: e.shareCards(),
       elsewhere: house.joined() ? 'server' : folder.joined() ? 'icloud' : null,
+      handingOverTo: i.joined && i.owner ? w.handingOverTo() : null,
     };
   },
   /** This device starts a household; the other phones join with its code. */
@@ -641,7 +727,7 @@ export const wifi = {
     w.start(name, tabs);
     saved();
     events.changed();
-    await w.listen().catch(() => {});
+    await w.listen().catch(quiet('Wi-Fi sync'));
     events.done(info());
   },
   async invite(): Promise<{ code: string; until: number }> {
@@ -674,6 +760,20 @@ export const wifi = {
     events.changed();
     events.done(info());
   },
+  /** 0.15.0: asks another phone to take over as the owner (it does at its next sync). */
+  async handOver(device: string): Promise<void> {
+    const { wifi: w, saved } = hub();
+    await w.handOver(device);
+    saved();
+    events.changed();
+    await syncNow();
+  },
+  cancelHandOver(): void {
+    const { wifi: w, saved } = hub();
+    w.cancelHandOver();
+    saved();
+    events.changed();
+  },
   /** False: this phone started the household and others are still in it. */
   async leave(): Promise<boolean> {
     const { wifi: w, saved } = hub();
@@ -696,7 +796,7 @@ export const wifi = {
     const { wifi: w } = hub();
     if (!w.joined()) return;
     await w.stop();
-    await w.listen().catch(() => {});
+    await w.listen().catch(quiet('Wi-Fi sync'));
   },
   async paused(): Promise<void> {
     await hub().wifi.stop();

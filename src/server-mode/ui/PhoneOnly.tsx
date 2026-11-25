@@ -5,7 +5,7 @@ import { Icon, TopBar } from '../../ui/components';
 import { useNav } from '../../ui/nav';
 import { productCode } from '../../lib/barcode';
 
-export const PHONE_ONLY = "Do this on a phone: shops don't let a web page check prices or search.";
+const PHONE_ONLY = "Do this on a phone: shops don't let a web page check prices or search.";
 
 export function PhoneOnlyNote({ compact, text = PHONE_ONLY }: { compact?: boolean; text?: string }) {
   return (

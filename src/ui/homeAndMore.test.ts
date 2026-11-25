@@ -1,8 +1,8 @@
 // 0.12.5: what the update says, read from the source (as navyTop.test.ts does).
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import { describe, expect, it } from 'vitest';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 
 describe('0.12.5: Home and More', () => {
   it('Home has no Settings cog', () => {

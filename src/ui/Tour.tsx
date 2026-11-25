@@ -70,7 +70,7 @@ export async function startTour() {
   await updateSettings({ tour: { ...s.tour, active: true, step: 0, addedSamples: added || s.tour.addedSamples } });
 }
 
-export async function endTour() {
+async function endTour() {
   const s = await getSettings();
   if (s.tour.addedSamples) await removeDemo();
   await updateSettings({ tour: { seen: true, active: false, step: 0, addedSamples: false } });

@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import { describe, expect, it } from 'vitest';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 
 describe('0.12.4: one navy top on every screen', () => {
   const css = read('./styles.css');

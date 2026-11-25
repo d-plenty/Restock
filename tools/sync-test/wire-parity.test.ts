@@ -138,6 +138,19 @@ it.skipIf(!CP)('an Android phone joins a household an iPhone started, syncs, and
     expect(await android.say(`SYNC 127.0.0.1 ${port}`)).toMatch(/rekey=false/);
     expect(await android.say('KEYV')).toBe('2');
     expect(await android.say('ITEMS')).toBe('Rice|Salt|Tea');
+
+    // 0.15.0: the iPhone hands the household to the Android phone, which takes over after its sync
+    // (the Java code's own takeHandover), and the iPhone lets the owner's secrets go at its next.
+    await ios.house.handOver('b2b2b2b2b2b2b2b2');
+    await android.say(`SYNC 127.0.0.1 ${port}`);
+    expect(await android.say('TAKEHANDOVER')).toBe('true');
+    expect(await android.say('OWNER')).toBe('b2b2b2b2b2b2b2b2 true');
+    const androidPort = Number(await android.say('PORT'));
+    await ios.house.listen();
+    ios.e.setMeta('invite', `127.0.0.1:${androidPort}`);
+    await ios.house.syncAll();
+    expect(ios.house.isOwner()).toBe(false);
+    expect(ios.e.meta('owner_secrets')).toBeNull();
     await ios.house.stop();
     await two.house.stop();
   } finally {

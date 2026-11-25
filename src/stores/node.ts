@@ -13,7 +13,7 @@
 // - an answer of at most maxBytes (3 MB), and each shop's whole search within timeoutMs (10 s);
 // - cookies only for the length of one search (a new jar each time, dropped when it ends), so no shop
 //   session, and never any shop sign-in, is kept on the server.
-import { SHOPS, isLocalOnlyShop, priceSource, shopDef, type StoreChain } from '../shops';
+import { SHOPS, isLocalOnlyShop, priceSource, type StoreChain } from '../shops';
 import { setTransport, type HttpResult, type RequestOptions } from './http';
 
 /** The shops' API hosts, besides their websites (aldi.ts API, endeavour.ts ENDEAVOUR.api). */
@@ -220,7 +220,7 @@ export async function nodeRequest(opts: RequestOptions): Promise<HttpResult> {
   if (shop.done) throw new ShopTimeoutError(shop.name);
   let method: 'GET' | 'POST' = opts.method ?? 'GET';
   let body: string | undefined = opts.body === undefined ? undefined : typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
-  let headers: Record<string, string> = { 'User-Agent': cfg.userAgent, ...(opts.headers ?? {}) };
+  let headers: Record<string, string> = { 'User-Agent': cfg.userAgent, ...opts.headers };
   for (let hop = 0; ; hop++) {
     const host = url.host.toLowerCase();
     const h: Record<string, string> = { ...headers };
@@ -268,5 +268,3 @@ export async function nodeRequest(opts: RequestOptions): Promise<HttpResult> {
   }
 }
 
-/** A shop's name for messages (the built-in name; this file never sees shops people added). */
-export const nameOfChain = (c: StoreChain) => shopDef(c)?.name ?? c;

@@ -126,7 +126,7 @@ export function ListButton({ rec, listed }: { rec: Recommendation; listed?: stri
 }
 
 /** What the "i" opens for one of your items: is it a real special, and the numbers behind that. */
-export function PriceInfoSheet({ rec, listed, onClose }: { rec: Recommendation; listed?: string; onClose: () => void }) {
+function PriceInfoSheet({ rec, listed, onClose }: { rec: Recommendation; listed?: string; onClose: () => void }) {
   const nav = useNav();
   const o = shownOption(rec);
   const cur = o?.stats.current;

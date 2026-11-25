@@ -13,13 +13,13 @@ import org.json.JSONObject;
  * ServerFolder, SyncFolder, SyncHousehold, ServerOffload, ServerLink). The server's web page is
  * tools/sync-test/server-v3.mjs, with the server repo's own test clients.
  *
- * Arguments: out dir, then three servers: a fresh one (made a house here), one in v2 mode (a 0.9.3
- * household handed over), and another fresh one (a Wi-Fi household brought onto it); then a state
- * folder for the stand-in browser.
+ * Arguments: out dir, then two servers: a fresh one (made a house here), and another fresh one (a
+ * Wi-Fi household brought onto it); then a state folder for the stand-in browser. (0.15.0: the
+ * server in v2 mode, for the 0.9.3 household's handover, is gone.)
  */
 public class SyncServerV3Test {
     static int fails = 0;
-    static String house, v2, fresh, stateDir;
+    static String house, fresh, stateDir;
     static final long DAY = 86_400_000L;
 
     static void report(String name, boolean problem, String detail) {
@@ -72,16 +72,14 @@ public class SyncServerV3Test {
     public static void main(String[] args) throws Exception {
         SyncFamily.dir = args[0];
         house = args[1];
-        v2 = args[2];
-        fresh = args[3];
-        stateDir = args[4];
-        String only = args.length > 5 ? args[5] : "";
+        fresh = args[2];
+        stateDir = args[3];
+        String only = args.length > 4 ? args[4] : "";
         if (only.isEmpty() || only.contains("H")) {
             houseScenarios();
             generalScenarios();
             moveScenarios(); // 0.9.6
         }
-        if (only.isEmpty() || only.contains("O")) handoverScenarios();
         if (only.isEmpty() || only.contains("B")) bringScenarios();
         System.out.println(fails == 0 ? "server v3 scenarios: all passed" : "server v3 scenarios: " + fails + " failed");
         System.exit(fails == 0 ? 0 : 1);
@@ -480,118 +478,12 @@ public class SyncServerV3Test {
         return false;
     }
 
-    /** A phone on 0.9.3 (tools/sync-test/old/OldServerPhone.java, compiled against the v093 tag), driven over stdin. */
-    static final class Old implements AutoCloseable {
-        final Process p;
-        final java.io.BufferedReader r;
-        final java.io.Writer w;
-
-        Old(String classes, String dir) throws Exception {
-            p = new ProcessBuilder("java", "-cp", classes, "family.plenty.restock.OldServerPhone", dir).redirectError(ProcessBuilder.Redirect.INHERIT).start();
-            r = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8));
-            w = new java.io.OutputStreamWriter(p.getOutputStream(), StandardCharsets.UTF_8);
-        }
-
-        JSONObject send(String cmd) throws Exception {
-            w.write(cmd + "\n");
-            w.flush();
-            String line;
-            while ((line = r.readLine()) != null) if (line.startsWith("{")) return new JSONObject(line);
-            throw new Exception("the old phone stopped");
-        }
-
-        public void close() {
-            p.destroy();
-        }
-    }
-
     /** A phone's Wi-Fi listener, as SyncHub runs it (on this computer's own address). */
     static SyncWire.Server listen(SyncFamily.Phone p) throws Exception {
         return new SyncWire.Server(p.h::serverKeys, (m, host, which) -> p.h.handle(m, host, which), java.net.InetAddress.getLoopbackAddress());
     }
 
-    // ---------- a 0.9.3 household on a server in v2 mode, handed over ----------
-
-    static void handoverScenarios() throws Exception {
-        web(v2, "setup2");
-        SyncFamily.Phone o = phone("o1"), m = phone("m2");
-        o.h.create("The Plenty house", "Declan");
-        o.h.setHouseholdTabs(new java.util.LinkedHashSet<>(Arrays.asList("pantry")));
-        SyncFamily.join(o, m);
-        s(o).join(web(v2, "invite2"));
-        s(m).join(web(v2, "invite2"));
-        // 0.9.3: a phone still on 0.9.3 in the same household and on the same server (when it's been built).
-        String oldPath = System.getenv("RESTOCK_OLD093");
-        Old q = null;
-        if (oldPath != null && !oldPath.isEmpty()) {
-            String[] op = oldPath.split(";");
-            q = new Old(op[0], op[1]);
-            SyncWire.Server lo = listen(o);
-            JSONObject paired = q.send("pair " + o.h.invite("127.0.0.1", lo.port()));
-            JSONObject joined = q.send("server " + web(v2, "invite2"));
-            q.send("item q-own Honey");
-            JSONObject qr = q.send("round");
-            lo.stop();
-            report("O1 a phone on 0.9.3 joins the household and the v2 server", !paired.optBoolean("paired") || joined.has("problem") || !qr.isNull("error"), paired + " " + joined + " " + qr);
-        }
-        item(m, "m-own", "Milk", "pantry");
-        // m runs the household's Home Assistant (0.9.3's ha:phone row names it): only that phone's
-        // upgrade may hand Home Assistant to the server (H9).
-        m.e.db.exec("INSERT OR REPLACE INTO household_settings (k, v) VALUES ('ha:phone', ?)", JSONObject.quote(m.e.device()));
-        rounds(o, m);
-        report("H1 a 0.9.3-style household syncs through the v2 server", !"Milk".equals(has(o, "m-own")), "o has " + has(o, "m-own"));
-        JSONObject hl = s(o).health();
-        report("H2 the owner phone sees a 0.9.4 server waiting for its household (mode v2)", hl == null || !"v2".equals(hl.optString("mode")), String.valueOf(hl));
-
-        String wrong = null;
-        try {
-            s(o).handOver(web(v2, "handover").replace("t=", "t=AAAA"));
-        } catch (Exception e) {
-            wrong = e.getMessage();
-        }
-        report("H3 a damaged code: nothing changes, this phone is still the owner", wrong == null || !o.h.isOwner() || o.e.meta("owner_secrets") == null, String.valueOf(wrong));
-
-        s(o).handOver(web(v2, "handover"));
-        report("H4 after the server's 200 the phone is still the owner (it lets go only on the server's signed change)", !o.h.isOwner() || o.e.meta("owner_priv") == null, "owner " + o.h.owner());
-        ServerSync.Round r = round(o);
-        report("H5 the owner phone upgrades to v3, reads the server's owner change and lets go of the owner's secrets",
-            !r.upgraded || !o.h.isHouse() || o.e.meta("owner_secrets") != null || o.e.meta("owner_priv") != null || !"3".equals(o.e.meta("server_api")),
-            "upgraded " + r.upgraded + ", owner " + o.h.owner() + ", secrets " + (o.e.meta("owner_secrets") != null) + (r.error != null ? " (" + r.error + ")" : ""));
-        // m is the household's Home Assistant phone (what HomeAssistant.java would hand over), and never scanned a v3 code.
-        ServerSync.haSource = () -> new JSONObject().put("address", "http://127.0.0.1:9").put("entity", "todo.shopping_list").put("enabled", true)
-            .put("token", "abcdefghijklmnopqrstuvwxyz0123456789").put("state", new JSONObject().put("pairs", new JSONArray()));
-        ServerSync.Round rm;
-        try {
-            rm = round(m);
-        } finally {
-            ServerSync.haSource = null;
-        }
-        report("H6 another phone already on the server upgrades without a code, and keeps sharing what it shared",
-            !rm.upgraded || !"3".equals(m.e.meta("server_api")) || !m.h.isHouse() || !"Milk".equals(has(m, "m-own")) || !"0".equals(m.e.meta("share_receipts")),
-            "upgraded " + rm.upgraded + ", api " + m.e.meta("server_api") + ", receipts " + m.e.meta("share_receipts") + (rm.error != null ? " (" + rm.error + ")" : ""));
-        report("H8 a phone that carried on keeps sharing only what the household shared (so widening later adds nothing by itself)",
-            !"pantry".equals(m.e.meta("tabs")) || !"pantry".equals(o.e.meta("tabs")), "m " + m.e.meta("tabs") + ", o " + o.e.meta("tabs"));
-        item(o, "o-after", "Bread", "pantry");
-        rounds(o, m);
-        report("H7 after the handover the phones sync through the house", !"Bread".equals(has(m, "o-after")), "m has " + has(m, "o-after"));
-        String haRow = m.one("SELECT v FROM household_settings WHERE k = 'ha:phone'");
-        report("H9 the Home Assistant phone's upgrade hands it to the server (sealed, once the server's key is shown to be the house's)",
-            haRow == null || !haRow.contains("srv-"), "ha:phone " + haRow);
-        if (q != null) {
-            JSONObject qr = q.send("round");
-            String err = qr.optString("error", "");
-            report("O2 the 0.9.3 phone is paused with the update words, and nothing is forgotten",
-                !err.contains("Update Restock to keep syncing with your server") || !qr.optBoolean("on") || !qr.optBoolean("paired"), qr.toString());
-            SyncWire.Server lm = listen(m);
-            item(m, "m-wifi", "Tea", "pantry");
-            JSONObject wq = q.send("wifi 127.0.0.1 " + lm.port());
-            String got = q.send("has m-wifi").optString("name", null);
-            lm.stop();
-            report("O3 it still syncs over the Wi-Fi with a 0.9.4 phone (same key, same SyncWire)", wq.has("problem") || !"Tea".equals(got) || !"Honey".equals(has(m, "q-own")),
-                wq + "; old phone has " + got + ", m has " + has(m, "q-own"));
-            q.close();
-        }
-    }
+    // 0.15.0: a 0.9.3 household on a server in v2 mode, handed over: gone (servers no longer keep one).
 
     // ---------- a Wi-Fi household brought onto a new, empty server; its other phone joins through the household ----------
 

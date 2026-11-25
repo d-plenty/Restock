@@ -81,7 +81,7 @@ export const isBlockedError = (error: string | undefined): boolean => isBlockMes
 // 0.10.4: "Hide for a day" on a shop's warning. Kept on this phone only. After a day the warning
 // comes back if the shop is still failing.
 const HIDDEN_KEY = 'hiddenShopWarnings';
-export const HIDE_FOR_MS = 24 * 3_600_000;
+const HIDE_FOR_MS = 24 * 3_600_000;
 export type HiddenWarnings = Partial<Record<StoreChain, string>>;
 
 export async function getHiddenWarnings(): Promise<HiddenWarnings> {
@@ -154,7 +154,7 @@ export function offerUnblock(chain: StoreChain | string, error: string | undefin
 }
 
 /** 0.10.5: how many shops are tested at once (the phone's hidden browser opens this many pages at once). */
-export const TEST_AT_ONCE = 3;
+const TEST_AT_ONCE = 3;
 
 /** How long one shop gets, counted from when its own test starts (not from pressing Test). */
 export function testTimeoutMs(chain: StoreChain): number {
@@ -164,7 +164,7 @@ export function testTimeoutMs(chain: StoreChain): number {
 
 /** Run `jobs` with at most `n` going at once, in order. */
 export async function inTurns<T, R>(items: T[], n: number, job: (item: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
+  const out = Array.from<R>({ length: items.length });
   let next = 0;
   const worker = async () => {
     while (next < items.length) {

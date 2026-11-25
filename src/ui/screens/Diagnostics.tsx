@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { shareTextFile } from '../../lib/backup';
 import { getSettings } from '../../lib/db';
 import { captureWhile, clearProblems, problems, problemsText } from '../../lib/diagnostics';
@@ -25,6 +25,7 @@ import { getCheckLog, missedSlot, missedWords, OUTCOME_WORDS, whenWords } from '
 import { syncInfo } from '../../lib/sync';
 import { RestockNative } from '../../lib/sql/native';
 
+import { clearQuiet, onQuiet, quietErrors, type QuietError } from '../../lib/quietErrors';
 // Settings → Diagnostics: what went wrong lately, shop by shop, and "Send search details" to
 // capture exactly what a shop sends back, so its connection can be fixed.
 
@@ -156,6 +157,8 @@ export function DiagnosticsScreen() {
           <Icon name="trash" size={17} /> Clear
         </button>
       </div>
+
+      <QuietProblems />
 
       <SearchTest />
 
@@ -411,3 +414,58 @@ function BackgroundChecks() {
     </>
   );
 }
+
+/**
+ * 0.15.0: errors background work caught and carried on from (lib/quietErrors.ts): a sync round, a
+ * price check, saving the database. Shown so one that keeps coming back can be seen and sent.
+ */
+function QuietProblems() {
+  const nav = useNav();
+  const list = useSyncExternalStore(onQuiet, quietErrorsSnapshot);
+  const text = () => list.map((e) => `${e.at}  ${e.where}: ${e.message}`).join('\n');
+  return (
+    <>
+      <div className="eyebrow">Quiet problems</div>
+      <div className="card flush">
+        {list.slice(0, 20).map((e) => (
+          <div key={e.at + e.where + e.message} className="row" style={{ alignItems: 'flex-start' }}>
+            <span className="grow">
+              <span className="small" style={{ fontWeight: 700 }}>
+                {e.where} · {new Date(e.at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+              </span>
+              <span className="small">{e.message}</span>
+            </span>
+          </div>
+        ))}
+        {!list.length && (
+          <p className="small" style={{ padding: 14, margin: 0 }}>
+            Nothing has gone wrong in the background.
+          </p>
+        )}
+      </div>
+      {!!list.length && (
+        <div className="two">
+          <button
+            className="btn"
+            onClick={() =>
+              void navigator.clipboard.writeText(text()).then(
+                () => nav.toast('Copied'),
+                () => shareTextFile(`restock-quiet-problems-${today()}.txt`, text(), 'text/plain'),
+              )
+            }
+          >
+            <Icon name="share" size={17} /> Copy
+          </button>
+          <button className="btn" onClick={() => clearQuiet()}>
+            <Icon name="trash" size={17} /> Clear
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+// useSyncExternalStore needs the same array until something changes.
+let quietSnap: QuietError[] | undefined;
+onQuiet(() => (quietSnap = undefined));
+const quietErrorsSnapshot = () => (quietSnap ??= quietErrors());

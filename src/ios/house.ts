@@ -16,13 +16,13 @@
 // the real server.
 import { sha256 } from '@noble/hashes/sha2';
 import { strToU8 } from 'fflate';
-import { b64u, hex, joinKey, keysFileKey, newEcdhKey, newJavaKeyPair, openJoin, openKeysFile, openWithAny, pointOf, random, sealRsf1, serverKeyOf, signWithPkcs8, spkiOf, unb64 } from '../server-mode/crypto';
+import { b64u, handoverKey, hex, joinKey, keysFileKey, newEcdhKey, newJavaKeyPair, openJoin, openKeysFile, openWithAny, pointOf, random, sealHandover, sealRsf1, serverKeyOf, signWithPkcs8, spkiOf, unb64 } from '../server-mode/crypto';
 import { ALL_TABS, joinTabs, parseTabs, type WebSyncEngine } from '../server-mode/engine';
 import { syncRound, type Remote, type RoundResult } from '../server-mode/round';
 import { forgetHousehold, myKeys } from './household';
 
 /** One request: what was sent back, as bytes. Throws only when the server couldn't be reached at all. */
-export type Http = (o: { method: 'GET' | 'POST' | 'PUT' | 'DELETE'; url: string; headers: Record<string, string>; body?: Uint8Array }) => Promise<{ status: number; headers: Record<string, string>; bytes: Uint8Array }>;
+export type Http = (o: { method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PROPFIND' | 'MKCOL'; url: string; headers: Record<string, string>; body?: Uint8Array }) => Promise<{ status: number; headers: Record<string, string>; bytes: Uint8Array }>;
 
 /** Something the person can act on, in words (SyncDav.Problem). */
 export class HouseProblem extends Error {
@@ -36,8 +36,8 @@ export class HouseProblem extends Error {
   }
 }
 
-export const GONE = "This phone isn't on your Restock server's list any more (it was removed there). To use the server again, scan a new code from its Add a phone page.";
-export const CLOCK = "This phone's date or time looks wrong, so the server turned it down. Turn on Set Automatically in Settings → General → Date & Time.";
+const GONE = "This phone isn't on your Restock server's list any more (it was removed there). To use the server again, scan a new code from its Add a phone page.";
+const CLOCK = "This phone's date or time looks wrong, so the server turned it down. Turn on Set Automatically in Settings → General → Date & Time.";
 const SEALED = 'application/x-restock-sealed';
 const DAMAGED = "That code is damaged. Make a new one on the server's Add a phone page.";
 
@@ -290,6 +290,96 @@ export class House {
     }
   }
 
+  /**
+   * 0.15.0, ServerSync.join3 (bring): this device owns a household (phones on the Wi-Fi, or an iCloud
+   * folder) and the server's house is new and empty, so the household goes onto the server: the join
+   * carries the handover payload, sealed to the server's key. The household carries on as the house,
+   * with the same key, members and things. Throws with words; nothing changes on this device then.
+   */
+  async bring(code: string, kind: 'wifi_house' | 'folder_house'): Promise<void> {
+    const inv = parseInvite(code);
+    if (inv.v !== 3 || !inv.kex) throw new HouseProblem('That code is from an older Restock server. Update the server first.');
+    const e = this.e;
+    const me = e.device();
+    if (e.householdValue('owner') !== me || !e.meta('owner_priv')) throw new HouseProblem("Only the household's owner phone can bring it onto a server.");
+    const key = e.meta('key');
+    const keyv = Number(e.meta('keyv') ?? 1) || 1;
+    if (!key) throw new HouseProblem('This device isn\'t in a household.');
+    // SyncHousehold.handoverPayload.
+    const secrets = (() => {
+      try {
+        const o = JSON.parse(e.meta('owner_secrets') ?? '{}') as Record<string, unknown>;
+        const out: Record<string, string> = {};
+        for (const [d, v] of Object.entries(o)) if (typeof v === 'string' && e.householdValue('member:' + d) !== null) out[d] = v;
+        return out;
+      } catch {
+        return {};
+      }
+    })();
+    const serverKeys: Record<string, string> = { [String(keyv)]: b64u(serverKeyOf(unb64(key))) };
+    const payload: Record<string, unknown> = {
+      format: 'restock-handover',
+      v: 3,
+      key,
+      keyv,
+      serverKeys,
+      owner_priv: e.meta('owner_priv'),
+      owner_pubkey: e.meta('owner_pubkey') ?? e.householdValue('owner_pub'),
+      owner_secrets: secrets,
+      secret: e.meta('secret'),
+      hid: e.householdValue('hid'),
+      name: e.householdValue('name') ?? e.meta('household') ?? 'Our house',
+    };
+    if (e.meta('oldkey') && e.meta('oldkey_until')) {
+      payload.oldkey = e.meta('oldkey');
+      payload.oldkey_until = e.meta('oldkey_until');
+    }
+    if (e.meta('recovery')) {
+      payload.recovery = e.meta('recovery');
+      payload.recovery_saved = e.meta('recovery_saved') === '1';
+    }
+    const eph = newEcdhKey();
+    const bring = { epub: b64u(eph.pub), sealed: b64u(sealHandover(handoverKey(eph.priv, unb64(inv.kex), unb64(inv.invite)), payload)) };
+    const dev = newJavaKeyPair();
+    const kex = newEcdhKey();
+    const mine = this.myKeys();
+    const n = b64u(random(16));
+    const body = { invite: inv.invite, device: me, name: e.meta('name') ?? 'iPhone', pub: dev.pub, kex: b64u(kex.pub), myPub: mine.pub, n, bring };
+    const { answer, base } = await this.postJoin([inv.home, inv.away].filter((x): x is string => !!x), body);
+    let gift: Gift;
+    try {
+      gift = openJoin(joinKey(kex.priv, unb64(inv.kex), unb64(n)), me, unb64(String(answer.sealed ?? ''))) as unknown as Gift;
+    } catch {
+      throw new HouseProblem("That server's answer couldn't be opened with the key in its code. Only connect to your own server.");
+    }
+    const hh = gift.household ?? {};
+    if (str(hh.hid) !== e.householdValue('hid')) throw new HouseProblem("The server didn't take your household. Try again, or leave it and join the server's house.");
+    const gotV = Number(gift.keyv);
+    const cur = gift.keys?.[String(gotV)];
+    // ServerSync.install ("keep"): the household carries on as the house; this device keeps sharing what it shares now.
+    e.db.transaction(() => {
+      e.setMeta(kind, null);
+      e.setMeta('tabs', joinTabs(e.tabs()));
+      if (e.meta('share_receipts') === null) e.setMeta('share_receipts', e.meta('receipts_eff') === '1' ? '1' : '0');
+      if (typeof cur === 'string' && unb64(cur).length === 32 && gotV > keyv) {
+        e.setMeta('key', cur);
+        e.setMeta('keyv', String(gotV));
+      }
+      e.setMeta('server_dev_priv', dev.priv);
+      e.setMeta('server_kex_priv', b64u(kex.priv));
+      e.setMeta('server_kex', inv.kex);
+      e.setMeta('server_api', '3');
+      e.setMeta('server_sid', str(hh.sid));
+      if (e.meta('server_label') === null) e.setMeta('server_label', 'Home');
+      e.setMeta('server_member_label', str(gift.label));
+      e.setMeta('server_home', safeAddress(str(gift.server?.home)) ?? inv.home);
+      e.setMeta('server_away', safeAddress(str(gift.server?.away)) ?? inv.away);
+      e.setMeta('server_reached', base);
+      this.addServerKeys(str(hh.hid) ?? '', gift.serverKeys);
+      this.addServerKeys(str(hh.hid) ?? '', { [String(keyv)]: b64u(serverKeyOf(unb64(key))) });
+    });
+  }
+
   private myKeys(): { priv: string; pub: string } {
     return myKeys(this.e);
   }
@@ -389,7 +479,11 @@ export class House {
 
   private async sendOnce(base: string, method: 'GET' | 'PUT' | 'DELETE' | 'POST', path: string, body?: Uint8Array, sealedN?: string): Promise<Awaited<ReturnType<Http>>> {
     const u = new URL(base + path);
-    const headers: Record<string, string> = { Authorization: this.authorization(method, u.pathname + u.search, this.now() + (this.skew.get(base) ?? 0), body, sealedN) };
+    const headers: Record<string, string> = {
+      Authorization: this.authorization(method, u.pathname + u.search, this.now() + (this.skew.get(base) ?? 0), body, sealedN),
+      // 0.15.0: this device's Restock version, so a server can tell one that's too old to update.
+      'X-Restock-App': typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '',
+    };
     // A sealed call (Your data): the body and the answer go sealed with the household's server key.
     if (sealedN) headers['X-Restock-Seal'] = 'rsf1';
     if (body) headers['Content-Type'] = sealedN ? SEALED : path.startsWith('/api/v3/files/') ? 'application/octet-stream' : 'application/json';

@@ -3,7 +3,7 @@
 // request MACs, sealed answers and sealed bodies, a passphrase change, sign-in with a phone, the
 // clock retry, and the round over v3 (no webkeys/, no archives, no webPub, the phones' shared
 // specials). A stand-in server is made of the same P1 helpers the real one uses (crypto.ts), so
-// this checks the web's side of each byte; tools/sync-test/server-web.mjs runs it against P2's.
+// this checks the web's side of each byte; the server repo's own tests check the server's side.
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import initSqlJs, { type SqlJsStatic } from 'sql.js';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -163,7 +163,7 @@ describe('signing in to a house (v3)', () => {
     await api3.putHomeAssistant({ address: 'http://ha.local:8123', token: 'secret-token' }).catch(() => undefined);
     const put = h.seen.find((x) => x.path === '/api/v3/homeassistant');
     expect(put?.sealed).toBe(true);
-    expect((put?.body as { token: string }).token).toBe('secret-token');
+    expect((put!.body as { token: string }).token).toBe('secret-token');
   }, 30_000);
 
   it('a clock refusal is retried once with the server’s time', async () => {

@@ -24,7 +24,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const key = (chain: string) => `shop-${chain}`;
 
 /** How many shops' pages are kept open at once (each is a whole browser page in the phone's memory). */
-export const MAX_PAGES = 3;
+const MAX_PAGES = 3;
 const usedAt = new Map<string, number>();
 let tick = 0;
 

@@ -84,8 +84,7 @@ export function FeedbackScreen() {
       <TopBar title="Feedback" />
       <div className="card">
         <p style={{ marginTop: 0 }}>
-          <strong>Thank you so much for taking the time.</strong> We really appreciate your feedback. Good or bad, it always helps us make Restock a better app for
-          you.
+          <strong>Thanks for taking the time.</strong> Good or bad, it helps make Restock better.
         </p>
         <p className="small" style={{ marginBottom: 0 }}>
           It goes to the people who make Restock, and only when you press Send. We only write back if you leave an email.

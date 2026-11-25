@@ -1,15 +1,14 @@
 // 0.12.7: what was asked for, held to the source so it can't quietly come back.
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import { describe, expect, it } from 'vitest';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 const add = read('./screens/Add.tsx');
 const list = read('./screens/List.tsx');
 const item = read('./screens/Item.tsx');
 const sizes = read('./OtherSizes.tsx');
 const comps = read('./components.tsx');
 const web = read('../server-mode/ui/WebShopSearch.tsx');
-const desk = read('../server-mode/ui/DeskList.tsx');
 const tokens = read('./tokens.css');
 const css = read('./styles.css');
 
@@ -44,9 +43,8 @@ describe('0.12.7: Also happy with, while adding', () => {
 });
 
 describe('0.12.7: shopping', () => {
-  it('General comes along from every list, on the phone and the web', () => {
+  it('General comes along from every list (the web page uses the same list screen)', () => {
     expect(list).not.toMatch(/section === 'pantry' \? general/);
-    expect(desk).toMatch(/section !== 'general'/);
   });
   it('Start shopping asks which shops, with none chosen, then where first', () => {
     expect(list).toMatch(/Which shops today\?/);

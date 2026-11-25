@@ -75,7 +75,7 @@ export function flattenWoolworths(data: Raw): StoreProduct[] {
 }
 
 /** Results per page; "Show more" asks for the next page (0.8.5). */
-export const WOOLWORTHS_PAGE = 36;
+const WOOLWORTHS_PAGE = 36;
 
 function searchBody(term: string, page = 1) {
   const location = `/shop/search/products?searchTerm=${encodeURIComponent(term)}`;

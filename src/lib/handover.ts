@@ -17,7 +17,7 @@ import { open, seal, type Lan } from '../ios/wire';
 import { isIos } from './platform';
 import { RestockNative } from './sql/native';
 
-export const SEND_LIFE_MS = 10 * 60_000;
+const SEND_LIFE_MS = 10 * 60_000;
 const CHUNK = 512 * 1024;
 const CODE = /^RESTOCK-SEND:1:([A-Z2-7]{20,40}):(\d{1,3}(?:\.\d{1,3}){3}):(\d{2,5})$/;
 

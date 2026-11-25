@@ -1,3 +1,4 @@
+import { andList, appTooOld, MIN_APP } from '../../lib/minVersion';
 // 0.9.4: Server and phones for a house (protocol v3), as on the approved concept (WebPhones): the
 // phones on the server with Rename and Remove (removed and left ones listed, greyed), Add a phone
 // (name it, then the code), what's kept on the server, the browsers signed in, and Activity and
@@ -52,7 +53,7 @@ export function HousePage({ title, sub, actions, narrow, children }: { title: st
 }
 
 /** Add a phone: name it ("Sister's phone"), then the code it scans (works once, for 10 minutes). */
-export function AddPhoneV3({ onAdded, onClose, known }: { onAdded: () => void; onClose?: () => void; known: Phone[] | undefined }) {
+function AddPhoneV3({ onAdded, onClose, known }: { onAdded: () => void; onClose?: () => void; known: Phone[] | undefined }) {
   const [label, setLabel] = useState('');
   const [code, setCode] = useState<{ code: string; until: number; label: string }>();
   const [busy, setBusy] = useState(false);
@@ -241,15 +242,25 @@ function PhonesCard({ phones, error, reload }: { phones?: Phone[]; error?: strin
       </h2>
       {phones === undefined && !error && <p className="dk-row small">Loading…</p>}
       {phones && active.length === 0 && <p className="dk-row small">No phones on this server yet. Add one with Add a phone.</p>}
+      {/* 0.15.0: phones on a version this server no longer syncs with, named, with what to do */}
+      {active.some((p) => appTooOld(p.version)) && (
+        <div className="banner amber" role="alert" style={{ margin: '0 14px 10px' }}>
+          <strong>Update Restock on {andList(active.filter((p) => appTooOld(p.version)).map(phoneName))}</strong>
+          <span style={{ fontSize: 13 }}>
+            It's on a version older than {MIN_APP}, which can't sync with this server any more. Update Restock on it, and it carries on where it left off.
+          </span>
+        </div>
+      )}
       {active.map((p) => (
         <div key={p.device} className="dk-row">
           <span className="grow">
             <span className="dk-row-title">{phoneName(p)}</span>
             <span className="dk-sub">
               {[
+                appTooOld(p.version) ? `needs updating to Restock ${MIN_APP} or newer` : undefined,
                 sharesText(p),
                 p.lastSeen ? `synced ${timeAgo(p.lastSeen)}` : 'not synced yet',
-                p.api === 2 ? 'needs Restock 0.9.4 or newer' : p.version ? `Restock ${p.version}` : undefined,
+                p.version ? `Restock ${p.version}` : undefined,
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -474,56 +485,5 @@ export function ServerAndPhones({ narrow }: { narrow?: boolean }) {
         </div>
       </div>
     </HousePage>
-  );
-}
-
-/** Before the handover (a 0.9.4 server in v2 mode): the code the owner phone scans to hand the household over. */
-export function HandoverCard() {
-  const [code, setCode] = useState<string>();
-  const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState(false);
-  const make = async () => {
-    setBusy(true);
-    setError(undefined);
-    try {
-      const r = await api3.handover();
-      const kex = r.kex ? `&k=${r.kex}` : '';
-      setCode(r.code ?? `restock-handover:3?u=${encodeURIComponent(location.origin)}&t=${encodeURIComponent(r.token)}${kex}`);
-    } catch (e) {
-      setError(errText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <section className="card house-add" aria-labelledby="house-take">
-      <h2 id="house-take">Take this household</h2>
-      <p className="small house-tight">
-        Make this server the household's owner: it then keeps everything, adds and removes phones itself, and runs Home Assistant. Your phones keep what they
-        have.
-      </p>
-      {!code ? (
-        <button className="btn primary dk-self-start" disabled={busy} onClick={() => void make()}>
-          {busy ? 'Making a code…' : 'Show the handover code'}
-        </button>
-      ) : (
-        <>
-          <ol className="small steps">
-            <li>On the owner phone (Restock 0.9.4 or newer): Settings → Sync and backups → Your server → Hand this household to the server.</li>
-            <li>Scan this code. It works once, for 10 minutes.</li>
-            <li>When the phone says it's done, reload this page and sign in again.</li>
-          </ol>
-          <Qr text={code} label="Handover code for the owner phone to scan" />
-          <button className="btn small" onClick={() => location.reload()}>
-            It's done: reload
-          </button>
-        </>
-      )}
-      {error && (
-        <p className="banner red small" role="alert">
-          {error}
-        </p>
-      )}
-    </section>
   );
 }

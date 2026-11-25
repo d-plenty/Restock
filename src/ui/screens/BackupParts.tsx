@@ -7,7 +7,7 @@ import { historyLabel, type Settings } from '../../types';
 import { cardsCount } from '../../lib/giftCards';
 import { canSendDirect, deviceLan, offerData, type Offer } from '../../lib/handover';
 import { Icon, Sheet } from '../components';
-import { PairingQr } from './Sync';
+import { PairingQr } from './SyncCodes';
 
 /** What can be picked in a backup, and how many of each there are. */
 export interface PartCounts {

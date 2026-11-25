@@ -431,7 +431,7 @@ describe('Costco prices never leave the phone: copies of the data', () => {
 
 describe('Costco prices never leave the phone: backup files', () => {
   beforeEach(async () => {
-    const [{ initDb, ensureDefaults }] = await Promise.all([import('../lib/db')]);
+    const { initDb, ensureDefaults } = await import('../lib/db');
     await initDb(await createSqlJsDriver({ load: () => initSqlJs() }));
     await ensureDefaults();
   });

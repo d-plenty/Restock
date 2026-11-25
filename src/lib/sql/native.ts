@@ -165,8 +165,6 @@ export interface RestockNativePlugin {
    */
   syncNextcloud(opts: { server: string; folder?: string }): Promise<SyncInfo & { cancelled?: boolean }>;
   syncNextcloudCancel(): Promise<void>;
-  /** 0.9.2: join a Restock server with the code from its Add a phone page (restock-server:2?…). */
-  syncJoinServer(opts: { code: string }): Promise<SyncInfo>;
   /**
    * 0.9.2: stop using the Restock server. bringBack: its receipt photos come back first (rejects if they can't).
    * 0.9.4, a house: takeBack: those kinds come off the server first, as turning them off with "Also take
@@ -215,10 +213,6 @@ export interface RestockNativePlugin {
   syncSetServer(opts: { label?: string; tabs?: Section[]; receipts?: boolean; cards?: boolean; takeBack?: TakeBack[] }): Promise<SyncInfo>;
   /** Phone-to-phone sync on the Wi-Fi, on or off. */
   syncSetWifi(opts: { on: boolean }): Promise<SyncInfo>;
-  /** The phone's server, asked what it is: { mode: "new" | "v2" | "v3" | "released", api, house }, or {} for a 0.9.3 server. */
-  syncServerHealth(): Promise<{ mode?: string; api?: number; house?: string }>;
-  /** Owner phone on a v2 server: hand the household to the server with its Take this household code. */
-  syncHandOverServer(opts: { code: string }): Promise<SyncInfo>;
   /** The search test with the screen off (0.8.6): a notification with progress and a Stop button. */
   searchTestStart(opts: { total: number }): Promise<void>;
   searchTestProgress(opts: { done: number; total: number; text: string }): Promise<{ stop: boolean }>;

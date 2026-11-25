@@ -28,7 +28,7 @@ import {
   type Tally,
 } from './importFile';
 
-export const IMPORT_HELP = 'https://github.com/d-plenty/Restock/blob/HEAD/docs/restock-import.md';
+const IMPORT_HELP = 'https://github.com/d-plenty/Restock/blob/HEAD/docs/restock-import.md';
 
 const fmt = (v: number) => v.toLocaleString('en-AU');
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));

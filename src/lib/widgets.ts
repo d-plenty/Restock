@@ -44,7 +44,7 @@ export function widgetList(
   return { open, label };
 }
 
-export async function widgetData(): Promise<WidgetData> {
+async function widgetData(): Promise<WidgetData> {
   const [s, recs, entries, groups] = await Promise.all([getSettings(), loadRecommendations(), allListEntries(), allGroups()]);
   const on = activeSections(s);
   const deals = recs

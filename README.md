@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.14.0" src="https://img.shields.io/badge/status-release%20candidate%200.14.0-ffcd00">
+  <img alt="Release candidate 0.15.0" src="https://img.shields.io/badge/status-release%20candidate%200.15.0-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0141">New in 0.14.1</a> ·
+  <a href="#new-in-0150">New in 0.15.0</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -141,7 +141,37 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 ## iPhone and iPad
 
-Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder. Two things aren't possible because of Apple's restrictions: checking prices at a set time of day (they're checked when you open Restock) and the app updating itself. Still to come there: widgets, recall alerts and shared price history. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Two things aren't possible because of Apple's restrictions: checking prices at a set time of day (they're checked when you open Restock) and the app updating itself. Still to come there: home screen widgets, and the App Store. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.15.0
+
+> **Update every phone to 0.14.0 or newer.** From this version, phones and Restock servers don't sync with Restock older than 0.14.0. An older phone is told to update, keeps everything it has, and works on its own until it is. If you run a Restock server, update it to 0.15.0 too.
+
+The iPhone and iPad catch up on sync, the server's web page looks like the iPad, and a big tidy-up.
+
+**iPhone and iPad**
+- **Make owner:** an iPhone that started a household on the Wi-Fi can hand that job to another phone, Android or iPhone.
+- **Bring a household onto a server:** an iPhone that owns a household on the Wi-Fi or in iCloud can bring it onto a new Restock server. The other phones join with their own Add a phone codes.
+- **Nextcloud or WebDAV:** on the iCloud sync screen, **Use Nextcloud or WebDAV instead** keeps the household's folder on your own Nextcloud (it signs you in on its own page) or any WebDAV server. The password stays in the iPhone's keychain.
+- **Joining from the first screen:** **Join your household** on a brand-new iPhone now asks Scan a code or iCloud folder, and a server's code joins the server straight away.
+- **Home's shop buttons fit:** long shop names and "29 on special" no longer break across lines on a narrow screen.
+- Shared prices are kept in their own file, so the rest of your data saves faster.
+
+**A Restock server's web page**
+- **Looks like the iPad:** on a computer it uses the same screens as the phone, with the tabs, Your shops, Receipts, Cards and Settings down the left side.
+- **Your server** holds everything about the server in one place: Server and phones, Your data, Activity, Home Assistant and Signing in. On a phone-sized window it's one row in More.
+- **Server and phones** lists any phone that needs updating to 0.14.0 or newer.
+
+**Old versions**
+- A server that still keeps a household from Restock 0.9.3 says what to do first: run server 0.14.1 once and hand the household over, then update. Phones can no longer join or hand a household to such a server.
+
+**Fixes and the rest**
+- The app opens faster: screens load when they're first opened.
+- **Coming soon** and a few other screens say less.
+- On iPhone, **Why is this unavailable?** no longer shows under a shop's page when the page does open.
+- **Diagnostics** has a new **Quiet problems** list: errors from background work (a sync, a price check, saving) that used to vanish, so one that keeps coming back can be seen and sent.
+
+**For people who work on Restock:** the biggest screens are split into smaller files, unused code and styles are gone, more linter rules are on, and the contributor guide says where things are.
 
 ## New in 0.14.1
 

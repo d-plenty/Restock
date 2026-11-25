@@ -15,7 +15,6 @@ describe('shops and tabs', () => {
       'Cellarbrations',
       'Thirsty Camel',
       'Porters Liquor',
-      // 0.11.3
       'Liquor Legends',
       'Bottlemart',
     ]);

@@ -29,7 +29,7 @@ import { useNav } from '../nav';
 /** Ready-made starts: a name, a colour and an icon (the shops are picked next). */
 // 0.13.0: Chemist and Bottle shop are two starts like the rest (they were tabs Restock came with,
 // each with a switch). `more`: offered from More and Settings, not in first-time setup.
-export const CUSTOM_PRESETS: { def: CustomDef; about: string; slot?: MadeSection; more?: boolean; adult?: boolean }[] = [
+const CUSTOM_PRESETS: { def: CustomDef; about: string; slot?: MadeSection; more?: boolean; adult?: boolean }[] = [
   { def: { name: 'Chemist', colour: 'green', icon: 'pack:cross' }, about: 'Medicine, first aid and personal care', slot: 'pharmacy', more: true },
   { def: { name: 'Bottle shop', colour: 'amber', icon: 'pack:keg' }, about: 'Beer, wine and spirits (18+)', slot: 'keg', more: true, adult: true },
   { def: { name: 'Baby', colour: 'pink', icon: 'pack:bottle' }, about: 'Nappies, wipes and formula', slot: 'baby' },
@@ -114,7 +114,7 @@ export async function leavePendingCustom(): Promise<boolean> {
 }
 
 /** Makes a section and opens its page in Settings to pick its shops (0.10.11: kept once you tap Save section there). */
-export async function makeCustomSection(def: CustomDef, want?: MadeSection): Promise<MadeSection | undefined> {
+async function makeCustomSection(def: CustomDef, want?: MadeSection): Promise<MadeSection | undefined> {
   const s = await getSaved();
   // 0.13.0: Bottle shop and Chemist have places of their own (they don't use one of the eight)
   const own = want === 'keg' || want === 'pharmacy';

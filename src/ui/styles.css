@@ -2854,10 +2854,6 @@ details.fold-inline {
   text-transform: uppercase;
   pointer-events: none;
 }
-.dk-nav-item .beta-mark {
-  position: static;
-  margin-left: auto;
-}
 .tag.beta {
   margin-left: 10px;
   vertical-align: middle;
@@ -3816,63 +3812,10 @@ button.sync-choice:disabled {
 }
 
 /* The web's big white Undo in the sidebar foot (DeskUndo.tsx). White in every theme. */
-.dk-undo {
-  width: 100%;
-  min-height: 56px;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
-  border: none;
-  border-radius: var(--r-md);
-  background: var(--white);
-  color: var(--brand-navy);
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
-  animation: dk-undo-in 0.2s ease-out;
-  transition: opacity 0.7s ease;
-}
-.dk-undo:hover {
-  background: var(--fixed-hover);
-}
-.dk-undo:focus-visible {
-  outline: 3px solid var(--gold);
-  outline-offset: 2px;
-}
-.dk-undo.fading {
-  opacity: 0;
-}
-.dk-undo-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.dk-undo-text strong {
-  font-size: var(--fs-lg);
-  font-weight: 800;
-}
-.dk-undo-what {
-  font-size: var(--fs-sm);
-  color: var(--fixed-ink-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
 @keyframes dk-undo-in {
   from {
     opacity: 0;
     transform: translateY(6px);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dk-undo {
-    animation: none;
-    transition: none;
   }
 }
 
@@ -3961,19 +3904,6 @@ button.sync-choice:disabled {
 /* Tap areas: anything small (chips, small buttons, segments, round icon buttons, tags you tap)
    keeps its look but takes a 44 px tap. :where() keeps this from beating a rule that places
    the control itself. */
-:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .ph-src, .dk-name, .dk-line-open, .dk-linkish, .linkish, .shoprow-open) {
-  position: relative;
-}
-:where(.chip, .btn.small, .seg button, .dk-seg button, .icon-btn, .info-btn, .dk-name, .dk-line-open, .dk-linkish, .linkish)::after {
-  /* 0.9.12: .linkish too ("Expand all", "Change" in a sentence). */
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: max(100%, var(--hit));
-  height: max(100%, var(--hit));
-  transform: translate(-50%, -50%);
-}
 .tag.tag-btn::after {
   left: 50%;
   right: auto;
@@ -6215,9 +6145,10 @@ span.plus-btn:not(.on) {
   gap: 10px;
 }
 .shop-tile {
-  aspect-ratio: 1 / 1;
+  /* As tall as its words need, so a two-line note never runs into the edge. */
+  container-type: inline-size;
   min-width: 0;
-  min-height: 96px;
+  min-height: 104px;
   padding: var(--sp-3);
   border: 1px solid var(--line-2);
   border-radius: var(--r-lg);
@@ -6241,48 +6172,51 @@ span.plus-btn:not(.on) {
   align-items: center;
   justify-content: space-between;
 }
+/*
+ * The name breaks only between words ("Dan / Murphy's"), never inside one ("Woolworth / s"). It
+ * shrinks to fit its longest word: --w is that word's width at a 1px text size, measured in the
+ * phone's own font (Home.tsx FitName), so the size is the tile's inner width (100cqi) over it. Never
+ * bigger than usual, and never under the smallest text size (a longer word ends in "…").
+ */
 .shop-tile-name {
   max-width: 100%;
-  font-size: var(--fs-md);
+  font-size: clamp(var(--fs-xs), calc(100cqi / var(--w, 6)), var(--fs-md));
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 800;
   line-height: 1.2;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  hyphens: none;
 }
 .shop-tile-note {
   font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--muted);
-  /* 0.12.4: "None this week" wraps on a narrow button (it ran off the edge) */
+  /* Two lines at most, broken between words ("29 on special", "None this week"). */
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  line-height: 1.25;
 }
 /* 0.12.3: a shop with your things on special says how many, in the deal green; the rest stay grey. */
 .shop-tile.has-deals .shop-tile-note {
   color: var(--green-ink);
 }
-/* Narrower phones: a little less padding and smaller names, so "Woolworths" stays on one line. */
 @media (max-width: 379px) {
   .shop-tile {
     padding: 10px;
   }
   .shop-tile-name {
-    font-size: var(--fs-sm);
+    font-size: clamp(var(--fs-xs), calc(100cqi / var(--w, 6)), var(--fs-sm));
   }
   .shop-tile-note {
     font-size: var(--fs-xs);
-  }
-  /* 0.12.4: tall enough for a two-line name over a two-line note (the words ran out of the square) */
-  .shop-tile {
-    aspect-ratio: auto;
-    min-height: 116px;
   }
 }
 @media (max-width: 340px) {
   .shop-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .shop-tile {
-    aspect-ratio: auto;
   }
 }
 /* Your shops: the two buttons drop under a long shop name instead of squeezing it. */
@@ -6636,44 +6570,6 @@ span.plus-btn:not(.on) {
 }
 /* The web page on a computer has its navy down the side (the sidebar), so a page's title there
    stays a plain title: everything the navy top changes is put back. */
-.dk-main :is(.navy-top, .navy-cont, .screen > .topbar) {
-  margin: 0;
-  padding: 0;
-  border-radius: 0;
-  background: none;
-  color: inherit;
-}
-.dk-main :is(.navy-top, .navy-cont, .screen > .topbar) h1 {
-  color: var(--ink);
-}
-.dk-main :is(.navy-top, .navy-cont) :is(.sub, .small, .checkline, .eyebrow),
-.dk-main .navy-kicker,
-.dk-main .navy-tools {
-  color: var(--muted);
-}
-.dk-main :is(.navy-top, .navy-cont, .screen > .topbar) :is(.icon-btn, .btn:not(.primary)) {
-  background: var(--surface);
-  border-color: var(--line-2);
-  color: var(--ink);
-}
-.dk-main :is(.navy-top, .navy-cont, .screen > .topbar) .btn.primary {
-  background: var(--green-solid);
-  border-color: var(--green-solid);
-  color: var(--on-accent);
-}
-.dk-main :is(.navy-top, .navy-cont) .linkish {
-  color: var(--green);
-}
-.dk-main :is(.navy-top, .navy-cont) .list-switch {
-  color: var(--ink);
-}
-.dk-main :is(.navy-top, .navy-cont) .list-switch-pill {
-  border-color: var(--line-2);
-  color: var(--ink);
-}
-.dk-main .navy-sum-big {
-  color: var(--green-ink);
-}
 /* Add: the end of one shop's results. */
 .shop-done {
   display: flex;
@@ -7032,9 +6928,6 @@ button.fold-go {
   font-size: var(--fs-lg);
   font-weight: 700;
   color: var(--gold);
-}
-.dk-main .list-switch.which-list .list-switch-name {
-  color: var(--ink-2);
 }
 .list-switch.which-list.still {
   cursor: default;
@@ -7639,20 +7532,7 @@ span.inv-num {
   }
 }
 /* The web page: the Have box under an item's words, and the Inventory view in the page's width. */
-.dk-item-words .inv-have {
-  margin-top: 6px;
-}
-.dk-page.dk-inv {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  max-width: 760px;
-}
-.dk-inv .dk-inv-back {
-  align-self: flex-start;
-}
-.dk-phone-page .save-bar.inv-save,
-.dk-inv .save-bar.inv-save {
+.dk-phone-page .save-bar.inv-save {
   position: static;
   margin: 12px 0 0;
   padding: 10px 0 0;

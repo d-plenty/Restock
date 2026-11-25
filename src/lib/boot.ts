@@ -1,11 +1,14 @@
 import { Capacitor } from '@capacitor/core';
-import { ensureDefaults, initDb } from './db';
+import { ensureDefaults, initDb, setMarketDriver } from './db';
 import { createNativeDriver } from './sql/native';
 import { MIGRATIONS } from './sql/schema';
 import type { SqlDriver } from './sql/driver';
-import { createSqlJsDriver } from './sql/sqljs';
+import { createSqlJsDriver, type SqlJsDriver } from './sql/sqljs';
+import { MARKET_TABLE } from './sql/schema';
+import type { SqlValue } from './sql/driver';
 import { isIos } from './platform';
 import { noteSaved, noteSaveFailed, saveState, setSaveFlusher } from './saveState';
+import { quiet } from './quietErrors';
 
 /** A save writes the whole file: with the shared price history in it (several megabytes) it waits a little longer after a change. */
 const BIG_DB = 4_000_000;
@@ -46,10 +49,10 @@ export async function openDatabase(): Promise<void> {
       // A new version: look at the household record afresh at the next sync (just that, not
       // everything), so anything an older version turned away (a takeover with the recovery key,
       // say) counts now; and read the folder's files again.
-      await d.run("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('rehousehold', '1')").catch(() => undefined);
-      await d.run("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'").catch(() => undefined);
+      await d.run("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('rehousehold', '1')").catch(quiet('database'));
+      await d.run("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'").catch(quiet('database'));
     }
-    await d.run("INSERT OR REPLACE INTO kv (key, value) VALUES ('appVersion', ?)", [JSON.stringify(__APP_VERSION__)]).catch(() => undefined);
+    await d.run("INSERT OR REPLACE INTO kv (key, value) VALUES ('appVersion', ?)", [JSON.stringify(__APP_VERSION__)]).catch(quiet('database'));
   } else {
     // The one-file preview uses the pure-JavaScript SQLite build (no WebAssembly needed).
     const load =
@@ -101,7 +104,14 @@ export async function openDatabase(): Promise<void> {
     // 0.13.2: the iPhone and iPad app's sync works on the database itself (ios/sync.ts), as the web app's does.
     sqlJs = { db: driver.raw, saved: () => driver.touched() };
     if (ios) {
-      setSaveFlusher(() => driver.flush());
+      // 0.15.0: the shared price history in a database (and file) of its own, written only when it's
+      // downloaded, so the main file written after every change stays small.
+      const market = await openMarketDb(load, driver);
+      setMarketDriver(market);
+      setSaveFlusher(async () => {
+        await driver.flush();
+        await market.flush();
+      });
       // Moved over from the web view's storage, or upgraded just now: write the file straight away.
       driver.touched();
       if (store?.needsFirstWrite()) void driver.flush();
@@ -112,6 +122,35 @@ export async function openDatabase(): Promise<void> {
     }
   }
   await ensureDefaults();
+}
+
+/**
+ * iPhone and iPad: the shared price history's own database. The first time, the rows already in the
+ * main database move over to it (and leave the main one), so nothing is downloaded again.
+ */
+async function openMarketDb(load: () => Promise<import('sql.js').SqlJsStatic>, main: SqlJsDriver): Promise<SqlJsDriver> {
+  const { databaseStore, fileStore, MARKET_FILE } = await import('../ios/store');
+  const web = {
+    get: (key: string) => idb<unknown>('readonly', (s) => s.get(key)),
+    put: async (key: string, value: unknown) => void (await idb('readwrite', (s) => s.put(value, key))),
+  };
+  const store = databaseStore(await fileStore().catch(() => undefined), web, undefined, { file: MARKET_FILE, key: 'market', behind: 'marketBehind' });
+  const m = await createSqlJsDriver({ load, restore: () => store.restore(), persist: (b) => store.persist(b), saveAfterMs: 1500, onSaved: (e) => (e ? noteSaveFailed(e) : undefined) });
+  await m.run(MARKET_TABLE);
+  const moving = await main.query<Record<string, SqlValue>>('SELECT chain, store_product_id, normal, sale, sale_share, low, cycle_weeks, days, source, updated_at, latest FROM market').catch(() => []);
+  if (moving.length) {
+    await m.batch(
+      moving.map((r) => ({
+        sql: 'INSERT OR REPLACE INTO market (chain, store_product_id, normal, sale, sale_share, low, cycle_weeks, days, source, updated_at, latest) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        params: [r.chain, r.store_product_id, r.normal, r.sale, r.sale_share, r.low, r.cycle_weeks, r.days, r.source, r.updated_at, r.latest],
+      })),
+    );
+    await m.flush();
+    await main.run('DELETE FROM market');
+    // The space the rows took is given back, so the main file really is smaller.
+    await main.run('VACUUM').catch(quiet('database'));
+  }
+  return m;
 }
 
 /** The sql.js database itself, where that's what this app runs on (not Android), and a nudge to save it after writing to it directly. */

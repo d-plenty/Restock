@@ -107,16 +107,3 @@ export async function loadSpecials(fresh = false): Promise<SpecialsList[]> {
   return lists;
 }
 
-const STOP = new Set(['the', 'and', 'with', 'for', 'pack', 'each', 'original', 'classic', 'coles', 'woolworths', 'aldi', 'macro', 'select']);
-const words = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length > 2 && !STOP.has(w) && !/^\d/.test(w));
-
-/** Specials that look like something you buy: they share a word with one of your pantry items. */
-export function likeYourPantry(items: StoreProduct[], pantryNames: string[]): StoreProduct[] {
-  const mine = new Set(pantryNames.flatMap(words));
-  return items.filter((p) => words(p.name).some((w) => mine.has(w)));
-}

@@ -2,11 +2,11 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { allCategories, allGroups, getSettings } from '../../lib/db';
 import { searchItems } from '../../lib/haMatch';
 import { keepAsWords, pickItemFor, pickWord } from '../../lib/homeAssistant';
-import { act } from '../../lib/undo'; // 0.9.5 (undo)
+import { act } from '../../lib/undo';
 import { useLive } from '../../lib/useLive';
 import { enabledIn, SECTION_PLACE, type Section } from '../../shops';
 import { isNative } from '../../stores/http';
-import { serverMode, serverUi } from '../../server-mode/flag'; // 0.9.5 (web search)
+import { serverMode, serverUi } from '../../server-mode/flag';
 import type { ListEntry } from '../../types';
 import { Icon, Sheet, useBackLayer, SearchField } from '../components';
 import { useNav } from '../nav';
@@ -17,7 +17,7 @@ import { pickedWords } from './addSave';
 // Loaded when first needed: the web app on a Restock server uses this sheet too, and never searches
 // the shops from it.
 const AddScreen = lazy(() => import('./Add').then((m) => ({ default: m.AddScreen })));
-const ManualSheet = lazy(() => import('./Add').then((m) => ({ default: m.ManualSheet })));
+const ManualSheet = lazy(() => import('./AddSheets').then((m) => ({ default: m.ManualSheet })));
 
 /** Whether the phone thinks it's online (searching the shops needs the internet; nothing else here does). */
 function useOnline(): boolean {

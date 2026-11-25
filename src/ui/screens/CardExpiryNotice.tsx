@@ -7,7 +7,7 @@ import { phoneCards, type CardStore } from '../../lib/cardStore';
 import { useLive } from '../../lib/useLive';
 import { useNav } from '../nav';
 
-export const CARD_LATER_KV = 'cardExpiryLater';
+const CARD_LATER_KV = 'cardExpiryLater';
 
 export function CardExpiryNotice({ store = phoneCards }: { store?: CardStore }) {
   const nav = useNav();

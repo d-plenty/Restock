@@ -57,7 +57,7 @@ function idb<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<
   });
 }
 /** The app's own storage (IndexedDB), apart from the database. */
-export const deviceStore: ModelStore = {
+const deviceStore: ModelStore = {
   get: async (key) => {
     const v = await idb<unknown>('readonly', (s) => s.get(key));
     return v instanceof ArrayBuffer ? v : undefined;

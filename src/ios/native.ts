@@ -17,7 +17,7 @@ import * as sync from './sync';
 import type { Section } from '../shops';
 import { forgetPage, FRESH_MS, looksBlocked, pageFetch, pageRender } from './shopWeb';
 import type { NativePermissions, SyncInfo } from '../lib/sql/native';
-import { allGroups, allListEntries, allProducts, allReceipts, getKV, getSettings, putKV, queryRows, runOps, uid, updateSettings } from '../lib/db';
+import { allGroups, allListEntries, allProducts, allReceipts, getKV, getSettings, marketWrite, putKV, queryRows, uid, updateSettings } from '../lib/db';
 import { sendPrices } from './share';
 import { importAll, MAX_BYTES, readIndex, refreshDue, type LastImport } from './market';
 import { recallCheckDue, recallNotice, receiptLines, runRecallCheck, type RecallStore, type SavedRecall, type Thing } from './recalls';
@@ -155,7 +155,7 @@ async function plainShopFetch(chain: string, home: string, method: 'GET' | 'POST
 const text = (d: unknown): string => (typeof d === 'string' ? d : d === undefined || d === null ? '' : JSON.stringify(d));
 
 async function http(opts: { method: 'GET' | 'POST'; url: string; headers?: Record<string, string>; body?: string; timeoutMs?: number }) {
-  const headers: Record<string, string> = { 'User-Agent': UA, Accept: 'text/html,application/json;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-AU,en;q=0.9', ...(opts.headers ?? {}) };
+  const headers: Record<string, string> = { 'User-Agent': UA, Accept: 'text/html,application/json;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-AU,en;q=0.9', ...opts.headers };
   if (opts.body !== undefined && !Object.keys(headers).some((h) => h.toLowerCase() === 'content-type')) headers['Content-Type'] = 'application/json';
   const r = await CapacitorHttp.request({
     method: opts.method,
@@ -334,7 +334,7 @@ export class RestockIos extends WebPlugin {
     const s = await getSettings();
     return importAll(s, {
       get: marketFile,
-      write: (ops) => runOps(ops.map((x) => ({ sql: x.sql, params: x.params }))),
+      write: (ops) => marketWrite(ops.map((x) => ({ sql: x.sql, params: x.params }))),
       putKV,
       progress: (chain, bytes, products) => this.notifyListeners('marketProgress', { chain, bytes, products }),
     });
@@ -614,9 +614,6 @@ export class RestockIos extends WebPlugin {
     const r = await sync.stopServer({});
     return { ...r, left: r.left !== false };
   }
-  async syncServerHealth() {
-    return sync.serverHealth().catch(() => ({}));
-  }
   async syncDismissNotice() {
     try {
       sync.dismissNotice();
@@ -633,16 +630,13 @@ export class RestockIos extends WebPlugin {
   }
   async syncCloseInvite() {}
   async syncNextcloudCancel() {}
-  async syncJoinServer(): Promise<never> {
-    throw new Error('That code is from an older Restock server. On iPhone and iPad, Restock joins a server that is the house: update the server, choose "Make this server the house" on its page, then scan a new Add a phone code.');
-  }
 }
 
 // Everything else to do with sync says the same thing.
 for (const m of [
   'syncInvite', 'syncStartHousehold', 'syncRemove', 'syncHandOver', 'syncCancelHandOver', 'syncRecovery', 'syncRecoverySaved', 'syncTakeOver',
   'syncSetFolder', 'syncSetWebDav', 'syncNextcloud', 'syncServerPhoto',
-  'syncJoinHouse', 'syncSetWifi', 'syncHandOverServer', 'syncPeek', 'syncJoin',
+  'syncJoinHouse', 'syncSetWifi', 'syncPeek', 'syncJoin',
 ]) {
   (RestockIos.prototype as unknown as Record<string, () => Promise<never>>)[m] = async () => {
     throw new IosUnavailable('That way of sharing');

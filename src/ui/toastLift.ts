@@ -5,7 +5,7 @@
 // and has no such bars, so it's left alone there.
 
 /** The bars a toast must clear. */
-export const BOTTOM_BARS = '.sticky-cta, .save-bar, .selectbar, .add-mini, nav.tabs, .setup-foot.sticky';
+const BOTTOM_BARS = '.sticky-cta, .save-bar, .selectbar, .add-mini, nav.tabs, .setup-foot.sticky';
 
 export type Box = { top: number; bottom: number; left: number; right: number };
 
@@ -22,7 +22,7 @@ export function liftFor(bars: Box[], windowHeight: number, fallback: number, gap
 }
 
 /** The visible bars on the page now (a screen pushed over the tabs hides them). */
-export function visibleBars(doc: Document = document): Box[] {
+function visibleBars(doc: Document = document): Box[] {
   const overlays = [...doc.querySelectorAll<HTMLElement>('.overlay')];
   return [...doc.querySelectorAll<HTMLElement>(BOTTOM_BARS)]
     .filter((el) => {

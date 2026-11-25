@@ -4,71 +4,22 @@ import { useState, type ReactNode } from 'react';
 import { isIos } from '../lib/platform';
 import { Icon, Sheet } from './components';
 
-export type IosReason = 'importData' | 'updates' | 'serverExtras' | 'webSignIn' | 'icloud' | 'sync' | 'server' | 'homeAssistant' | 'shopPage' | 'appIcon' | 'widgets' | 'priceHelper' | 'background';
+// 0.15.0: only what an iPhone build can still be without: the Files folder (an old build) and the
+// shop's own page (a build without the Apple part). Everything else works on iPhone now, or says how
+// it works there in its own words.
+export type IosReason = 'icloud' | 'shopPage';
 
-/** Why each thing is greyed on an iPhone: a heading and what to do instead. */
+/** Why something is greyed on an iPhone: a heading and what to do instead. */
 export const IOS_REASONS: Record<IosReason, { title: string; why: string; instead?: string }> = {
-  // 0.13.2: the one reason that's the same on every phone (shown on Android too).
-  importData: {
-    title: 'Import runs on a Restock server',
-    why: "Import adds products and price history from an export file, such as one from another household. It's done on a Restock server's web page (Your data, then Import), where the whole household gets what's added.",
-    instead: 'To bring your own data onto this phone, use Restore from a backup, just above.',
-  },
-  updates: {
-    title: "Restock can't update itself on an iPhone",
-    why: "Apple doesn't allow an app to download and install its own updates. On an iPhone, updates only come through the App Store or TestFlight, or by installing the new version from a computer.",
-    instead: 'Each new version is on the Restock page on GitHub, with how to install it.',
-  },
-  serverExtras: {
-    title: "Receipts and loyalty cards aren't shared from an iPhone yet",
-    why: 'On Android, Restock can move receipt photos to your server and share loyalty cards with the house. That part is being rebuilt for iPhone and iPad. Until then they stay on this device, and nothing about them is sent.',
-    instead: 'Your pantry, shopping list, inventory and prices are shared now.',
-  },
-  webSignIn: {
-    title: "Signing in on a computer by scanning isn't on iPhone yet",
-    why: "On Android, scanning the code on your server's sign-in page signs that computer in without typing the passphrase. That is being rebuilt for iPhone and iPad.",
-    instead: "Until then, sign in on the computer with the server's user name and passphrase.",
-  },
   icloud: {
     title: "This build of Restock can't open a folder in Files",
     why: 'iCloud sync keeps your household in a folder in iCloud Drive, and opening that folder needs a part of the app this build was made without.',
     instead: 'Install the newest Restock for iPhone and iPad and it will be here.',
   },
-  sync: {
-    title: "Syncing with an Android phone isn't in this build yet",
-    why: "An Android phone can keep listening for the household's other phones in the background. iOS doesn't let an app do that, so an iPhone can only reach out to an Android phone while Restock is open. That part is being built for iPhone and iPad.",
-    instead: 'Two iPhones can never share straight over Wi-Fi this way, because neither can listen. For iPhones, iCloud sync is the way.',
-  },
-  server: {
-    title: "Joining a Restock server isn't in this build yet",
-    why: "The part of Restock that talks to your server was written for Android and is being rebuilt for iPhone and iPad.",
-    instead: "Until then, your server's own web page works on an iPhone: open its address in Safari and add it to your home screen.",
-  },
-  homeAssistant: {
-    title: "Home Assistant isn't on iPhone yet",
-    why: 'Home Assistant sync was written for Android and is being rebuilt for iPhone, after sync with a Restock server.',
-  },
   shopPage: {
-    title: "A shop's own page can't open inside Restock on an iPhone yet",
-    why: "On Android, Restock opens the shop's website in its own built-in browser, so you can sign in, pick your branch or pass the shop's \"are you a person\" check, and Restock can then use that visit. That built-in browser is being rebuilt for iPhone.",
-    instead: 'Searching and price checks still work for shops that answer without it.',
-  },
-  appIcon: {
-    title: "The app icon can't be changed here yet",
-    why: 'Changing the icon works differently on an iPhone and is being rebuilt for it.',
-  },
-  widgets: {
-    title: "Home screen widgets aren't on iPhone yet",
-    why: 'iPhone widgets are a separate small program that has to be written for iOS. They are planned for after the main app is finished.',
-  },
-  priceHelper: {
-    title: 'A price helper phone has to be an Android phone',
-    why: 'A price helper searches the shops through the week while it sits on its charger. iOS stops apps doing that kind of work in the background.',
-  },
-  background: {
-    title: "An iPhone can't check prices at a set time",
-    why: "iOS decides when an app may do anything in the background, and doesn't let it choose a time. So Restock checks prices when you open it, when the last check is more than 12 hours old.",
-    instead: 'Check now on Home checks straight away, any time.',
+    title: "This build of Restock can't open a shop's own page",
+    why: "Opening the shop's website inside Restock, to sign in, pick your branch or pass the shop's \"are you a person\" check, needs a part of the app this build was made without.",
+    instead: 'Install the newest Restock for iPhone and iPad and it will be here. Searching and price checks still work for shops that answer without it.',
   },
 };
 
@@ -123,8 +74,9 @@ export function IosBox({ reason, children, always }: { reason: IosReason; childr
  * A banner for a whole screen that isn't on iPhone yet ("Phone sharing isn't on iPhone yet"), with the
  * why. Off an iPhone it's the words the screen already had for the web preview.
  */
-export function NotHereBanner({ reason, title, preview }: { reason: IosReason; /** Off an iPhone: "Sync works in the Android app". */ title: string; preview?: ReactNode }) {
-  if (!isIos())
+export function NotHereBanner({ reason, title, preview }: { /** 0.15.0: none when it always works on an iPhone. */ reason?: IosReason; /** Off an iPhone: "Sync works in the Android app". */ title: string; preview?: ReactNode }) {
+  if (isIos() && !reason) return null;
+  if (!isIos() || !reason)
     return (
       <div className="banner grey">
         <strong>{title}</strong>

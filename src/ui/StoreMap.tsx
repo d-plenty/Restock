@@ -8,7 +8,7 @@ import { Icon } from './components';
 // area the map shows, as any map does. The list under it stays the main way to pick: the map is
 // there to see where things are.
 
-export const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
 type MapLib = typeof import('maplibre-gl');
 let lib: Promise<MapLib> | undefined;

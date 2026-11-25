@@ -5,11 +5,6 @@ import { Capacitor } from '@capacitor/core';
 
 /** The iPhone app (not the iPhone web app from a Restock server, which is a web page). */
 export const isIos = (): boolean => Capacitor.getPlatform() === 'ios';
-/** The Android app. */
-export const isAndroid = (): boolean => Capacitor.getPlatform() === 'android';
-
-/** "the Android app" / "the iPhone app": for a line that says where something works. */
-export const appWords = (): string => (isIos() ? 'the iPhone app' : 'the Android app');
 
 /** Thrown by the iPhone side for something only Android can do, or that isn't built for iPhone yet. */
 export class IosUnavailable extends Error {

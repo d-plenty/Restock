@@ -9,7 +9,7 @@ import { RestockNative } from './sql/native';
 
 const darkQuery = () => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : undefined);
 
-export function isDark(theme: Settings['theme']): boolean {
+function isDark(theme: Settings['theme']): boolean {
   return theme === 'dark' || (theme === 'system' && !!darkQuery()?.matches);
 }
 

@@ -5,11 +5,6 @@
 // shared price history, at its next weekly run, so every phone's "Judge deals from day one" gets
 // them. The searching itself is done by PriceHelper.java in the background, while charging on Wi-Fi.
 
-export const HELPER_CHAINS = ['coles', 'woolworths'] as const;
-
-/** About one search (both shops) every 10 minutes while charging: three every half hour or so. */
-export const HELPER_PER_RUN = 3;
-
 export interface PriceHelperSettings {
   enabled: boolean;
   /** The collector's helper address, e.g. http://192.168.1.20:8790 */

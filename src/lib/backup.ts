@@ -18,13 +18,14 @@ import { genericName } from './naming';
 import { isPhotoPath, readPhoto, writePhoto } from './receiptFiles';
 import { lockBackup } from './backupLock';
 import { localDay } from './verdict';
-import { base64ToText, textToBase64 } from './base64';
+import { textToBase64 } from './base64';
 import { shareTextFile } from './shareFile';
 import { LIST_ALIASES, LOCAL_ONLY_KV } from './haKeys';
 import { aliasesForBackup } from './listPicks';
 import { INV_BACKUP_KV, inventoryForBackup, restoreInventory } from './inventory';
-import { isCardPhotoPath, readCardPhoto, writeCardPhoto } from './cardPhotos'; // 0.9.6 (cards)
+import { isCardPhotoPath, readCardPhoto, writeCardPhoto } from './cardPhotos';
 import { costcoOf, withCostcoKept, withoutCostco } from './costcoLocal';
+import { quiet } from './quietErrors';
 
 export { shareTextFile };
 
@@ -119,10 +120,10 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
   const all = parts.keepCostco ? snap : withoutCostco(snap);
   // 0.9.3: "Always use this for …" are the household's rows now (listPicks.ts); a backup still has
   // them where it always did (a restore moves them back into rows).
-  const aliases = await aliasesForBackup().catch(() => undefined);
+  const aliases = await aliasesForBackup().catch(quiet('backup'));
   if (aliases) all.kv = [...all.kv.filter((k) => k.key !== LIST_ALIASES), { key: LIST_ALIASES, value: aliases }];
   // 0.13.1: the inventory is the household's rows too (inventory.ts); a backup carries it the same way.
-  const inventory = parts.pantry ? await inventoryForBackup().catch(() => undefined) : undefined;
+  const inventory = parts.pantry ? await inventoryForBackup().catch(quiet('backup')) : undefined;
   all.kv = all.kv.filter((k) => k.key !== INV_BACKUP_KV);
   const picked: ExportParts = { ...parts, sections: parts.pantry ? (parts.sections ?? SECTIONS) : [] };
   const file: BackupFile = {
@@ -234,16 +235,6 @@ export async function saveCopyInApp(path: string): Promise<string> {
   const json = await backupJson({ ...EVERYTHING, receiptPhotos: false, keepCostco: true });
   await RestockNative.writeAppFile({ path, data: textToBase64(json) });
   return json;
-}
-
-/** A copy saved by saveCopyInApp, or undefined if there isn't one. */
-export async function readCopyInApp(path: string): Promise<string | undefined> {
-  try {
-    const { data } = await RestockNative.readAppFile({ path });
-    return base64ToText(data);
-  } catch {
-    return undefined;
-  }
 }
 
 /** A backup file of the parts picked (everything by default), shared through Android's share menu. */
@@ -453,14 +444,14 @@ export async function restoreBackup(
 async function restoreCardPhotos(photos: Record<string, string> | undefined, snap: Pick<Snapshot, 'giftCards'>): Promise<void> {
   const wanted = new Set((snap.giftCards ?? []).flatMap((g) => [g?.photoFront, g?.photoBack]).filter(isCardPhotoPath));
   for (const [path, data] of Object.entries(photos ?? {})) {
-    if (wanted.has(path) && typeof data === 'string') await writeCardPhoto(path, data).catch(() => undefined);
+    if (wanted.has(path) && typeof data === 'string') await writeCardPhoto(path, data).catch(quiet('backup'));
   }
 }
 
 /** Puts receipt photos from a backup back into Restock's storage (only at receipt photo paths, receiptPaths.ts). */
 async function restorePhotos(photos: Record<string, string> | undefined): Promise<void> {
   for (const [path, data] of Object.entries(photos ?? {})) {
-    if (isPhotoPath(path) && typeof data === 'string') await writePhoto(path, data).catch(() => undefined);
+    if (isPhotoPath(path) && typeof data === 'string') await writePhoto(path, data).catch(quiet('backup'));
   }
 }
 

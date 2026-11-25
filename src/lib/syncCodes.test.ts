@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyRows, checkBranch, settingChangeOk, settingTab, type SettingsRoom } from './sharedSettings';
 import { syncStatus } from './protection';
-import { dayAndTime, handoverCode, serverCode, serverCodeVersion, syncNowMessage, webPageCode } from './sync';
+import { dayAndTime, serverCode, serverCodeVersion, syncNowMessage, webPageCode } from './sync';
 import type { SyncNowResult } from './sql/native';
 
 // 0.9.4 (docs/server-v3-design.md): the phone's side of a server-first household, the parts in TypeScript.
@@ -17,9 +17,7 @@ describe('v3 codes', () => {
     expect(serverCode(`restock-server:3?h=x&i=${invite}`)).toBeUndefined();
     expect(serverCodeVersion(`restock-server:2?h=x&i=${invite}`)).toBe(2);
   });
-  it('reads the Take this household code and a v3 sign-in code', () => {
-    expect(handoverCode(`restock-handover:3?u=http%3A%2F%2F192.168.1.20%3A8787&t=${invite}&k=${kex}`)).toBeDefined();
-    expect(handoverCode(`restock-handover:3?u=x&t=short&k=${kex}`)).toBeUndefined();
+  it('reads a v3 sign-in code', () => {
     expect(webPageCode(`restock-login:3?u=http%3A%2F%2Fx&s=abcdefgh12&k=${kex}`)).toBeDefined();
     expect(webPageCode(`restock-link:3?u=http%3A%2F%2Fx&s=abcdefgh12&k=${kex}`)).toBeUndefined();
   });

@@ -10,8 +10,6 @@
 // clocks go forward (2:30 am) is run later by the length of the gap; one that happens twice is run
 // the first time. A manual "Check now" is never a slot and never moves the schedule.
 
-export const DEFAULT_CHECK_TIME = '05:00';
-
 export interface CheckPlan {
   /** 6, 12, 24, 48 or 168 (weekly). Anything else is treated as once a day. */
   intervalHours: number;
@@ -28,7 +26,7 @@ export interface CheckPlan {
 }
 
 /** 0.11.0: the plan's days as a clean list (0-6, no repeats, in order), or undefined on an older plan. */
-export function planDays(plan: Pick<CheckPlan, 'days'>): number[] | undefined {
+function planDays(plan: Pick<CheckPlan, 'days'>): number[] | undefined {
   if (!Array.isArray(plan.days)) return undefined;
   return [...new Set(plan.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b);
 }

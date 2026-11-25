@@ -6,7 +6,7 @@
 //   the List here). More holds what the strip had (Server, Activity, Data, Account), Settings,
 //   Specials and catalogues, Cards and Receipts, the way the phone keeps them off the bar.
 // - the notices (new version, offline, home screen) at the top, below the notch.
-// Wide windows (from 1000 px) keep the desktop layout (Desktop.tsx); nothing here shows there.
+// 0.15.0: wide windows (from 1000 px) have the side bar instead of the tab bar (ui/padWide.ts).
 import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { getSettings } from '../../lib/db';
 import { agoText } from '../../lib/sync';
@@ -15,7 +15,6 @@ import { activeSections } from '../../shops';
 import { Icon, TopBar } from '../../ui/components';
 import { isMoreTab, isSectionTab, useNav, type Screen, type Tab } from '../../ui/nav';
 import { MoreTop } from '../../ui/screens/More';
-import { isV3 } from '../api';
 import { syncNow, unsentChanges } from '../live';
 import { session } from '../session';
 import { PwaBanners, useIsOffline } from '../pwa/Banners';
@@ -23,6 +22,7 @@ import { InstallHelpLink } from '../pwa/InstallHelp';
 import { NEEDS_SIGNAL, type SignalPage } from '../pwa/offlineData';
 import { useNow, useStatus } from './ServerScreens';
 import { peekStartOn } from './deskShared';
+import { usePadWide } from '../../ui/padWide';
 import '../phone.css';
 
 // ---------- is More the screen showing? (for the tab bar) ----------
@@ -130,12 +130,14 @@ export function PhoneChrome() {
       root.style.removeProperty('--pt-bar-h');
     };
   }, []);
+  // 0.15.0: a wide window has the side bar (App.tsx, as on an iPad held sideways) instead.
+  const wide = usePadWide();
   return (
     <>
       <div className="pt-top" ref={top}>
         <PwaBanners />
       </div>
-      <PhoneTabs />
+      {!wide && <PhoneTabs />}
     </>
   );
 }
@@ -194,13 +196,11 @@ export function MorePage() {
   const nav = useNav();
   const settings = useLive(getSettings, []);
   const offline = useIsOffline();
-  const house = isV3();
   useEffect(() => {
     setMore(1);
     return () => setMore(-1);
   }, []);
   const go = (s: Screen) => nav.push(s);
-  const signal = (sub: string) => (offline ? 'Needs signal' : sub);
   return (
     <div className="screen pt-more">
       {/* 0.10.4: the phone's navy top: Keg, Health, Baby and Pets as tiles, the others to add. */}
@@ -219,20 +219,47 @@ export function MorePage() {
           onClick={() => go(settings?.receipts.enabled ? { name: 'receipts' } : { name: 'settings' })}
         />
       </div>
-      <div className="eyebrow">Your household</div>
+      {/* 0.15.0: the server's own pages are one row, as on the wide page's side bar */}
       <div className="card flush">
-        <Row icon="server" title={house ? 'Server and phones' : 'Phones'} sub={signal('The phones using this server')} warn={offline} onClick={() => go({ name: 'server', page: 'phones' })} />
-        {house && <Row icon="chart" title="Your data" sub={signal('Spending, prices, export and import')} warn={offline} onClick={() => go({ name: 'server', page: 'data' })} />}
-        <Row icon="list" title="Activity" sub={signal("What's been sent and fetched")} warn={offline} onClick={() => go({ name: 'server', page: 'activity' })} />
+        <Row icon="server" title="Your server" sub="Phones, your data, activity and signing in" onClick={() => go({ name: 'server' })} />
       </div>
-      <div className="eyebrow">This phone</div>
+      <p className="small pt-version">Restock {__APP_VERSION__} · web</p>
+    </div>
+  );
+}
+
+/**
+ * 0.15.0: Your server: everything that belongs to the server rather than the household's lists, in
+ * one place (it was spread over the desktop's sidebar, More, and the old strip along the top).
+ */
+export function YourServerPage() {
+  const nav = useNav();
+  const offline = useIsOffline();
+  const st = useStatus();
+  const now = useNow();
+  const go = (s: Screen) => nav.push(s);
+  const signal = (sub: string) => (offline ? 'Needs signal' : sub);
+  const fresh = st.phoneAt ?? st.at;
+  return (
+    <div className="screen">
+      <TopBar title="Your server" />
+      <div className={`card${st.error ? ' warn' : ''}`}>
+        <span className="title">{st.household ?? session()?.household ?? 'Your household'}</span>
+        <span className="small">{st.error ? `Can't reach the server · ${st.error}` : fresh ? `Synced ${agoText(fresh, now)}` : st.busy ? 'Getting your household…' : 'Not synced yet'}</span>
+        <button className="btn" style={{ alignSelf: 'flex-start' }} disabled={st.busy || offline} onClick={() => void syncNow()}>
+          <Icon name="refresh" size={18} /> {st.busy ? 'Syncing…' : 'Sync now'}
+        </button>
+      </div>
       <div className="card flush">
-        <Row icon="lock" title="Account" sub="Passphrase, sign out" onClick={() => go({ name: 'server', page: 'account' })} />
+        <Row icon="server" title="Server and phones" sub={signal('The phones using it, adding one, its settings')} warn={offline} onClick={() => go({ name: 'server', page: 'phones' })} />
+        <Row icon="chart" title="Your data" sub={signal('Spending, prices, export and import')} warn={offline} onClick={() => go({ name: 'server', page: 'data' })} />
+        <Row icon="list" title="Activity" sub={signal("What's been sent and fetched")} warn={offline} onClick={() => go({ name: 'server', page: 'activity' })} />
+        <Row icon="home" title="Home Assistant" sub="Your shopping list in Home Assistant" onClick={() => go({ name: 'homeAssistant' })} />
+        <Row icon="lock" title="Signing in" sub="This browser's passphrase, sign out" onClick={() => go({ name: 'server', page: 'account' })} />
         <div className="row pt-help">
           <InstallHelpLink className="linkish pt-help-link" />
         </div>
       </div>
-      <p className="small pt-version">Restock {__APP_VERSION__} · web</p>
     </div>
   );
 }
@@ -240,7 +267,7 @@ export function MorePage() {
 // ---------- pages that need signal ----------
 
 /** In place of a page that asks the server each time, while offline. */
-export function NeedsSignal({ title, page }: { title: string; page: SignalPage }) {
+function NeedsSignal({ title, page }: { title: string; page: SignalPage }) {
   const st = useStatus();
   return (
     <div className="screen">

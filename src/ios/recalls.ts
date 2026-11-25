@@ -297,7 +297,7 @@ export function recallNotice(o: SavedRecall): { title: string; body: string } {
 }
 
 /** Checked when Restock is opened, at most this often. */
-export const RECALL_EVERY_MS = 20 * 3_600_000;
+const RECALL_EVERY_MS = 20 * 3_600_000;
 export const recallCheckDue = (lastCheck: string | undefined, now = Date.now()): boolean => {
   const t = Date.parse(lastCheck ?? '');
   return !Number.isFinite(t) || now - t >= RECALL_EVERY_MS || t > now;

@@ -158,7 +158,7 @@ export async function identifyBarcode(code: string, section: Section): Promise<I
 }
 
 /** Woolworths and Coles, in that order, if they're among the shops you've switched on. */
-export async function supermarketsOn(): Promise<('woolworths' | 'coles')[]> {
+async function supermarketsOn(): Promise<('woolworths' | 'coles')[]> {
   const s = await getSettings().catch(() => undefined);
   const on = s ? enabledIn(s.enabledChains, 'pantry') : [];
   return (['woolworths', 'coles'] as const).filter((c) => on.includes(c));
@@ -178,7 +178,7 @@ export function productKind(generic?: string, categories?: string): string | und
     if (!/[a-z]{3}/i.test(t)) return undefined;
     return t;
   };
-  return plain(generic) ?? [...(categories ?? '').split(',')].reverse().map(plain).find(Boolean);
+  return plain(generic) ?? (categories ?? '').split(',').reverse().map(plain).find(Boolean);
 }
 
 /** "Earth Choice Earth Choice" → "Earth Choice": a name with the same words twice in a row. */

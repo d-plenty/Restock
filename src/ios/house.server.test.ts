@@ -8,8 +8,10 @@ import { initDb, updateSettings } from '../lib/db';
 import { createSqlJsDriver } from '../lib/sql/sqljs';
 import { WebSyncEngine } from '../server-mode/engine';
 import { syncDbOf } from '../server-mode/sqldb';
-import { b64u, newEcdhKey, signedText, verifySig } from '../server-mode/crypto';
+import { b64u, newEcdhKey, signedText, signWithPkcs8, verifySig } from '../server-mode/crypto';
 import { House, HouseProblem, type Http } from './house';
+import { nodeLan } from './nodeLan';
+import { WifiHouse, type Found } from './wire';
 
 const SERVER = process.env.RESTOCK_SERVER_REPO ?? '';
 const http: Http = async (o) => {
@@ -23,7 +25,10 @@ async function phoneDb() {
   const driver = await createSqlJsDriver({ load: () => initSqlJs() });
   await initDb(driver);
   await updateSettings({ onboarded: true }, { local: true });
-  const e = new WebSyncEngine(syncDbOf(driver.raw), verifySig, signedText, () => Date.now(), { role: 'phone' });
+  // eslint-disable-next-line prefer-const
+  let e: WebSyncEngine;
+  const sign = (text: string) => signWithPkcs8(e.meta('owner_priv') ?? '', text);
+  e = new WebSyncEngine(syncDbOf(driver.raw), verifySig, signedText, () => Date.now(), { role: 'phone', sign });
   return { driver, e, raw: driver.raw };
 }
 
@@ -182,4 +187,46 @@ describe.skipIf(!SERVER)('an iPhone in a Restock server house (real server)', ()
     await expect(new House(e2, other).join('restock-server:3?' + p.toString())).rejects.toThrow(/tunnel\.test answered 404/);
     await t.close?.();
   });
+
+  it('0.15.0: the owner of an iPhone household on the Wi-Fi brings it onto a new server, which carries it on as the house', async () => {
+    const H = await import(/* @vite-ignore */ `${SERVER}/test/helpers.mjs`);
+    const t = await H.house({}, { name: 'Server name' });
+    try {
+      const { e, raw } = await phoneDb();
+      e.setMeta('device', 'f6f6f6f6f6f6f6f6');
+      e.setMeta('name', 'iPhone f6');
+      raw.run("INSERT INTO items (id, name, created_at, section) VALUES ('i-jam', 'Jam', '2026-11-01T00:00:00.000Z', 'pantry')");
+      const air = new Map<string, Found>();
+      const lan = nodeLan(air);
+      const wifi = new WifiHouse(e, () => lan, () => ({ size: async () => -1, read: async () => null, write: async () => undefined }));
+      wifi.start('Our phones');
+      const hid = e.householdValue('hid');
+      const house = new House(e, http);
+      const code = (await t.web.post('/api/v3/phones', { label: 'Owner iPhone' })).body.code as string;
+      expect(await house.check(code)).toMatchObject({ v: 3, mode: 'v3', inHousehold: false });
+
+      // Only the owner can.
+      const { e: other } = await phoneDb();
+      await expect(new House(other, http).bring(code, 'wifi_house')).rejects.toThrow("Only the household's owner phone");
+
+      await house.bring(code, 'wifi_house');
+      expect(house.joined()).toBe(true);
+      expect(wifi.joined()).toBe(false);
+      // The same household, with its own name, id and key.
+      expect(e.householdValue('hid')).toBe(hid);
+      const r = await house.sync();
+      expect(r.wrote).toBe(true);
+      await t.settle();
+      expect(H.rows(t, 'SELECT name FROM items').map((x: { name: string }) => x.name)).toContain('Jam');
+      // The house's name is the one it was given on the server's page (as when an Android phone brings one).
+      expect(e.householdValue('name')).toBe('Server name');
+
+      // A phone added afterwards gets the household's things.
+      const android = await H.addPhone(t, 'Later');
+      const own = await android.serverFile(t.sid);
+      expect(own.entries.some((x: { tbl: string; pk: string }) => x.tbl === 'items' && x.pk === 'i-jam')).toBe(true);
+    } finally {
+      await H.stop(t);
+    }
+  }, 60_000);
 });

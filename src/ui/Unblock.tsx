@@ -17,7 +17,7 @@ import { useNav } from './nav';
 // the person (openStore takes the shop's website as `home`).
 
 /** What the shop's page says along the top while it's open (StoreWeb.java's bar). */
-export const UNBLOCK_BAR = 'Do the tick box or puzzle if the page shows one. When you see its normal page with products, tap Done.';
+const UNBLOCK_BAR = 'Do the tick box or puzzle if the page shows one. When you see its normal page with products, tap Done.';
 
 // 0.12.8: 'unread': the shop's page opened and nothing turned Restock away, but no products could be
 // read from its search (it said "Still blocked" for that too, which sent people round in circles).
@@ -30,7 +30,7 @@ export function resultOf(r: { ok: boolean; blocked?: boolean } | undefined): Unb
 }
 
 /** Test one shop now, as Test connections does. */
-export async function testShop(chain: StoreChain): Promise<{ result: UnblockResult; error?: string }> {
+async function testShop(chain: StoreChain): Promise<{ result: UnblockResult; error?: string }> {
   if (isPressOnlyShop(chain)) return { result: 'unknown' };
   const settings = await getSettings();
   const [r] = await testConnections([chain], { [chain]: settings.stores[chain]?.storeId });
@@ -39,7 +39,7 @@ export async function testShop(chain: StoreChain): Promise<{ result: UnblockResu
 }
 
 /** Open the shop's page, then check it once. */
-export async function unblockShop(chain: StoreChain): Promise<UnblockResult> {
+async function unblockShop(chain: StoreChain): Promise<UnblockResult> {
   await RestockNative.openStore({ chain, home: websiteOf(chain), message: UNBLOCK_BAR });
   // A search page worked out from a "checking your browser" page could be wrong: look again.
   if ((kindOf(chain) ?? 'web') === 'web') await forgetSearchInfo(chain).catch(() => undefined);
@@ -50,7 +50,7 @@ export async function unblockShop(chain: StoreChain): Promise<UnblockResult> {
 }
 
 /** Takes a shop (and any shop priced from its website) off the shops you use. Its saved items stay. */
-export async function turnOffShop(chain: StoreChain): Promise<void> {
+async function turnOffShop(chain: StoreChain): Promise<void> {
   const s = await getSettings();
   await updateSettings({ enabledChains: s.enabledChains.filter((c) => c !== chain && priceSource(c as StoreChain) !== chain) });
 }
@@ -136,7 +136,7 @@ export function TryAgain({ chain, onWorked }: { chain: StoreChain; onWorked?: ()
 }
 
 /** The steps, then the shop's page, then whether it worked. */
-export function UnblockSheet({
+function UnblockSheet({
   chain,
   onClose,
   onWorked,
@@ -237,7 +237,8 @@ export function UnblockSheet({
           Only in the Android app: the shop’s page opens on your phone.
         </p>
       )}
-      <IosWhy reason="shopPage" label="Why is this unavailable?" />
+      {/* 0.15.0: only when this iPhone build can't open the page (it said so even when it could) */}
+      {isNative() && !canOpenShop() && <IosWhy reason="shopPage" label="Why is this unavailable?" />}
     </Sheet>
   );
 }

@@ -6,11 +6,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getSettings, queryRows, runOps } from '../../lib/db';
 import { decode } from '../../lib/sharedSettings';
-import { useLive } from '../../lib/useLive';
-import { activeSections, chainName, enabledIn, SECTION_NAMES, shopDef, websiteOf, type Section, type StoreChain } from '../../shops';
+import { activeSections, chainName, enabledIn, SECTION_NAMES, type Section, type StoreChain } from '../../shops';
 import { askPassword } from '../../lib/confirm';
-import { api3, ApiError, isV3, serverInfo, v3Get, v3Send, type Activity, type Browser, type Confirm, type HaConfig, type HouseSettings, type Phone } from '../api';
-import { sharedSpecials, type SharedSpecials } from '../live';
+import { api3, ApiError, isV3, v3Get, v3Send, type Activity, type Browser, type Confirm, type HaConfig, type HouseSettings, type Phone } from '../api';
 import { confirmPassphrase, session } from '../session';
 
 export const house = () => isV3() && session()?.v === 3;
@@ -23,7 +21,7 @@ export const errText = (e: unknown) => (e instanceof Error ? e.message : String(
  * 0.9.4: the dangerous admin actions ask for the passphrase again: proves it (confirmPassphrase,
  * a few seconds) and does `run` with the proof. A wrong passphrase says so.
  */
-export async function withConfirm<T>(passphrase: string, run: (c: Confirm) => Promise<T>): Promise<T> {
+async function withConfirm<T>(passphrase: string, run: (c: Confirm) => Promise<T>): Promise<T> {
   try {
     return await run(await confirmPassphrase(passphrase));
   } catch (e) {
@@ -81,7 +79,7 @@ export function dayText(iso?: string): string {
 }
 
 /** Active ones first (by name), then removed and left ones, newest first. */
-export function sortPhones(list: Phone[]): Phone[] {
+function sortPhones(list: Phone[]): Phone[] {
   const active = (p: Phone) => !p.status || p.status === 'active';
   return [...list].sort((a, b) => Number(active(b)) - Number(active(a)) || (active(a) ? phoneName(a).localeCompare(phoneName(b)) : (b.statusAt ?? '').localeCompare(a.statusAt ?? '')));
 }
@@ -114,9 +112,9 @@ type Detail = Record<string, unknown>;
 const str = (v: unknown) => (typeof v === 'string' && v.length < 120 ? v : undefined);
 const fileWord = (f: unknown) => {
   const n = str(f) ?? '';
-  if (/^restock-sync-srv-/.test(n)) return "the server's file";
-  if (/^restock-sync-web-/.test(n)) return "the web page's changes";
-  if (/^restock-sync-/.test(n)) return 'its changes';
+  if (n.startsWith('restock-sync-srv-')) return "the server's file";
+  if (n.startsWith('restock-sync-web-')) return "the web page's changes";
+  if (n.startsWith('restock-sync-')) return 'its changes';
   if (n.startsWith('archive/')) return 'older prices';
   if (n.startsWith('photos/')) return 'a photo';
   if (n.startsWith('keys/')) return 'new keys';
@@ -232,8 +230,6 @@ export const useActivity = (logs: boolean) => useServer(() => (logs ? api3.logs(
 export const useHouseSettings = () => useServer<HouseSettings>(() => api3.settings());
 /** `confirm`: keeping less (data is deleted) needs the passphrase again. */
 export const saveHouseSettings = (s: HouseSettings, confirm?: Confirm) => api3.putSettings(s, confirm);
-/** "Delete older data now" (Until I delete): prices, receipts and logs before this day. */
-export const pruneBefore = (iso: string, confirm: Confirm) => api3.prune(iso, confirm);
 
 /** The recovery key, to save (shown once the admin asks, with the passphrase again). */
 export async function recoveryKey(passphrase: string): Promise<string> {
@@ -285,7 +281,7 @@ export function checkBranch(v: unknown): DefaultBranch | undefined {
   return { name: o.name.trim(), ...(storeNo ? { storeNo } : {}) };
 }
 
-export async function defaultBranches(): Promise<Map<string, DefaultBranch>> {
+async function defaultBranches(): Promise<Map<string, DefaultBranch>> {
   const rows = await queryRows<{ k: string; v: string }>(`SELECT k, v FROM household_settings WHERE k LIKE 'branch:%'`).catch(() => []);
   const out = new Map<string, DefaultBranch>();
   for (const r of rows) {
@@ -317,13 +313,6 @@ export async function branchShops(): Promise<{ section: Section; title: string; 
 
 // ---------- specials and catalogues, from what the phones shared ----------
 
-/** The shops' own specials pages, where Restock knows them for sure. */
-export const SPECIALS_URL: Partial<Record<string, string>> = {
-  woolworths: 'https://www.woolworths.com.au/shop/browse/specials',
-  coles: 'https://www.coles.com.au/on-special',
-  aldi: 'https://www.aldi.com.au/special-buys',
-};
-
 export const https = (url: string | undefined) => {
   if (!url) return undefined;
   try {
@@ -341,32 +330,6 @@ export interface ShopLinks {
   catalogue?: string;
   catalogueNote?: string;
 }
-
-/** Every shop the household follows, by tab, with its website, specials and catalogue links (like the phone). */
-export async function followedShops(): Promise<{ section: Section; title: string; shops: ShopLinks[] }[]> {
-  const [s, shared] = await Promise.all([getSettings(), sharedSpecials()]);
-  return activeSections(s)
-    .map((section) => ({
-      section,
-      title: section === 'pantry' ? 'Groceries' : SECTION_NAMES[section],
-      shops: enabledIn(s.enabledChains, section).map((chain) => {
-        const known = shopDef(chain)?.catalogue;
-        const found = shared.catalogues[chain];
-        return {
-          chain,
-          name: chainName(chain),
-          website: https(websiteOf(chain)),
-          specials: SPECIALS_URL[chain],
-          catalogue: https(known?.url) ?? https(found?.url),
-          catalogueNote: known?.note ?? found?.note,
-        };
-      }),
-    }))
-    .filter((g) => g.shops.length > 0);
-}
-
-export const useShared = () => useLive<SharedSpecials>(sharedSpecials, []);
-export const useFollowed = () => useLive(followedShops, []);
 
 // ---------- 0.9.5: the Data tab (docs/server-protocol.md "v3, 0.9.5: Data") ----------
 
@@ -561,8 +524,3 @@ export function deleteError(e: unknown): string {
   return errText(e);
 }
 
-/** "Restock 0.9.4 server · v3", for About. */
-export const serverLine = () => {
-  const i = serverInfo();
-  return i?.version ? `Restock server ${i.version}` : 'Restock server';
-};

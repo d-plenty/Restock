@@ -70,7 +70,7 @@ export function applyUpdate(): void {
 }
 
 /** Can this page have a service worker? (https, or localhost while testing.) */
-export const canUseWorker = () => typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof window !== 'undefined' && window.isSecureContext;
+const canUseWorker = () => typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof window !== 'undefined' && window.isSecureContext;
 
 /** Registers the worker once the page has loaded. Built pages only (the dev server has no sw.js). */
 export function registerServiceWorker(): void {

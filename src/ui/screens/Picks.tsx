@@ -77,7 +77,7 @@ export async function addPicks(picks: MakerPick[]): Promise<{ added: number; ski
 
 export function PicksScreen() {
   const nav = useNav();
-  const picks = useMemo(allPicks, []);
+  const picks = useMemo(() => allPicks(), []);
   const groups = useLive(allGroups, []);
   const [ticked, setTicked] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);

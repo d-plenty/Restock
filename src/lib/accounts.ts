@@ -48,7 +48,7 @@ export async function checkWoolworths(): Promise<ShopAccount> {
   if (r.status >= 400 || !text.startsWith('{')) throw new Error(`Woolworths didn't answer (${r.status || 'no connection'})`);
   const account = readShopper(JSON.parse(text));
   const s = await getSettings();
-  await updateSettings({ accounts: { ...(s.accounts ?? {}), woolworths: account } });
+  await updateSettings({ accounts: { ...s.accounts, woolworths: account } });
   return account;
 }
 
@@ -72,7 +72,7 @@ export async function openWoolworths(message: string): Promise<void> {
 /** Stops Restock using your Woolworths account (sign out on the website too, to end the session there). */
 export async function stopUsingWoolworths(): Promise<void> {
   const s = await getSettings();
-  await updateSettings({ accounts: { ...(s.accounts ?? {}), woolworths: { signedIn: false, checkedAt: new Date().toISOString() } } });
+  await updateSettings({ accounts: { ...s.accounts, woolworths: { signedIn: false, checkedAt: new Date().toISOString() } } });
 }
 
 // ---------- Coles ----------
@@ -88,13 +88,13 @@ export async function signInColes(confirmed: () => Promise<boolean>): Promise<Sh
   if (!(await confirmed())) return undefined;
   const account: ShopAccount = { signedIn: true, checkedAt: new Date().toISOString() };
   const s = await getSettings();
-  await updateSettings({ accounts: { ...(s.accounts ?? {}), coles: account } });
+  await updateSettings({ accounts: { ...s.accounts, coles: account } });
   return account;
 }
 
 export async function stopUsingColes(): Promise<void> {
   const s = await getSettings();
-  await updateSettings({ accounts: { ...(s.accounts ?? {}), coles: { signedIn: false, checkedAt: new Date().toISOString() } } });
+  await updateSettings({ accounts: { ...s.accounts, coles: { signedIn: false, checkedAt: new Date().toISOString() } } });
 }
 
 // ---------- Costco (0.9.7) ----------
@@ -109,13 +109,13 @@ export async function signInCostco(confirmed: () => Promise<boolean>): Promise<S
   if (!(await confirmed())) return undefined;
   const account: ShopAccount = { signedIn: true, checkedAt: new Date().toISOString() };
   const s = await getSettings();
-  await updateSettings({ accounts: { ...(s.accounts ?? {}), costco: account } });
+  await updateSettings({ accounts: { ...s.accounts, costco: account } });
   return account;
 }
 
 export async function stopUsingCostco(): Promise<void> {
   const s = await getSettings();
-  await updateSettings({ accounts: { ...(s.accounts ?? {}), costco: { signedIn: false, checkedAt: new Date().toISOString() } } });
+  await updateSettings({ accounts: { ...s.accounts, costco: { signedIn: false, checkedAt: new Date().toISOString() } } });
 }
 
 // ---------- recording a trolley ----------

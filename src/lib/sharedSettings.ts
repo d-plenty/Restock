@@ -227,8 +227,8 @@ export function checkListRow(k: string, v: unknown): string | true | undefined {
 // ---------- what another device's change to the table may be ----------
 
 /** The longest key, and value (its JSON text), a row may have (a shop someone added is well under). */
-export const ROW_KEY_MAX = 200;
-export const ROW_VALUE_MAX = 4000;
+const ROW_KEY_MAX = 200;
+const ROW_VALUE_MAX = 4000;
 /** How many alias: rows, and how many keep: rows, a device takes in; and how many rows in all. */
 export const LIST_ROWS_MAX = 2000;
 export const ROWS_MAX = 5000;

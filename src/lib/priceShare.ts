@@ -50,7 +50,7 @@ export function shareShape(p: StoreProduct, day = today()) {
     ...(p.brand ? { brand: p.brand.slice(0, 80) } : {}),
     ...(p.size ? { size: p.size.slice(0, 60) } : {}),
     ...(p.barcode && /^\d{8,14}$/.test(p.barcode) ? { barcode: p.barcode } : {}),
-    ...(p.imageUrl && /^https:\/\//.test(p.imageUrl) ? { image_url: p.imageUrl.slice(0, 300) } : {}),
+    ...(p.imageUrl && p.imageUrl.startsWith('https://') ? { image_url: p.imageUrl.slice(0, 300) } : {}),
     day,
     price: {
       price: p.price,

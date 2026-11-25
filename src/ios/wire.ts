@@ -22,7 +22,7 @@ const PAGE = 400;
 const MAX_PHOTO = 8 * 1024 * 1024;
 const PHOTOS_PER_SYNC = 30;
 export const MAX_PHONES = 6;
-export const CODE_LIFE_MS = 10 * 60_000;
+const CODE_LIFE_MS = 10 * 60_000;
 const OLD_KEY_LIFE_MS = 60 * 24 * 3600 * 1000;
 const FULL = `A household can have up to ${MAX_PHONES} phones. Remove one first.`;
 /** Which key opened a connection's first message (SyncHousehold.CURRENT…): from MEMBER on, a phone's own secret. */
@@ -378,6 +378,100 @@ export class WifiHouse {
     await this.readvertise();
   }
 
+  // ---------- 0.15.0: handing the household to another phone (SyncHousehold.handOver) ----------
+
+  /**
+   * Owner: asks another phone to be the owner. This device stays the owner until that one takes over
+   * at its next sync, so nothing is stuck if it never does (cancelHandOver undoes it). The phones'
+   * secrets, the owner key and the recovery key go to it sealed with its own secret, in the household.
+   */
+  async handOver(device: string): Promise<void> {
+    if (!this.isOwner()) throw new WifiProblem('Only the phone that started the household can do that.');
+    const s = this.secrets();
+    const theirs = s[device];
+    if (!theirs || this.e.householdValue('member:' + device) === null) throw new WifiProblem("That phone isn't in the household.");
+    const e = this.e;
+    const rest: Record<string, string> = { ...s };
+    delete rest[device];
+    rest[e.device()] = e.meta('secret') ?? '';
+    const give: Record<string, unknown> = { secrets: rest };
+    if (e.meta('oldkey') !== null) {
+      give.oldkey = e.meta('oldkey');
+      give.oldkey_until = e.meta('oldkey_until');
+    }
+    if (e.meta('owner_priv') !== null) {
+      give.owner_priv = e.meta('owner_priv');
+      give.owner_pubkey = e.meta('owner_pubkey');
+    }
+    if (e.meta('recovery') !== null) {
+      give.recovery = e.meta('recovery');
+      give.recovery_saved = e.meta('recovery_saved') === '1';
+    }
+    const blob = b64u(seal(unb64(theirs), give));
+    e.db.transaction(() => {
+      for (const r of e.db.query("SELECT k FROM household WHERE k LIKE 'handover:%'")) this.row(String(r.k), null);
+      this.row('handover:' + device, blob);
+    });
+    await this.closeInvite();
+  }
+
+  /** The phone the owner asked to take over, while it hasn't yet. */
+  handingOverTo(): string | null {
+    const r = this.e.db.query("SELECT k FROM household WHERE k LIKE 'handover:%' LIMIT 1")[0];
+    return r ? String(r.k).slice('handover:'.length) : null;
+  }
+
+  /** Owner: never mind, stay the owner. */
+  cancelHandOver(): void {
+    if (!this.isOwner()) throw new WifiProblem('Only the phone that started the household can do that.');
+    for (const r of this.e.db.query("SELECT k FROM household WHERE k LIKE 'handover:%'")) this.row(String(r.k), null);
+  }
+
+  /**
+   * After a sync (SyncHousehold.takeHandover): if the owner asked this device to take over, take the
+   * phones' secrets and become the owner; and a device that was the owner lets them go once another
+   * took over. True when anything changed.
+   */
+  takeHandover(): boolean {
+    const e = this.e;
+    const me = e.device();
+    const owner = e.householdValue('owner');
+    let blob = e.householdValue('handover:' + me);
+    // Only a request from the owner as it is now (not one left over from before a takeover).
+    if (blob !== null && me !== owner) {
+      const by = e.db.query("SELECT device FROM sync_log WHERE tbl = 'household' AND pk = ?", ['handover:' + me])[0];
+      if (by && String(by.device ?? '') !== owner) blob = null;
+    }
+    if (blob === null || me === owner) {
+      if (me !== owner && e.meta('owner_secrets') !== null && owner) {
+        for (const k of ['owner_secrets', 'oldkey', 'oldkey_until', 'recovery', 'recovery_saved', 'owner_priv', 'owner_pubkey']) e.setMeta(k, null);
+        return true;
+      }
+      return false;
+    }
+    const secret = e.meta('secret');
+    if (!secret) return false;
+    const give = open(unb64(secret), unb64(blob)) as Record<string, unknown>;
+    e.db.transaction(() => {
+      e.setMeta('owner_secrets', JSON.stringify(give.secrets ?? {}));
+      if (typeof give.oldkey === 'string') {
+        e.setMeta('oldkey', give.oldkey);
+        e.setMeta('oldkey_until', String(give.oldkey_until ?? ''));
+      }
+      if (typeof give.owner_priv === 'string') {
+        e.setMeta('owner_priv', give.owner_priv);
+        e.setMeta('owner_pubkey', typeof give.owner_pubkey === 'string' ? give.owner_pubkey : null);
+      }
+      if (typeof give.recovery === 'string') {
+        e.setMeta('recovery', give.recovery);
+        e.setMeta('recovery_saved', give.recovery_saved ? '1' : null);
+      }
+      this.row('owner', me);
+      this.row('handover:' + me, null);
+    });
+    return true;
+  }
+
   // ---------- joining with a code ----------
 
   private async withOwner<T>(code: string, step: (c: Client) => Promise<T>): Promise<{ got: T; reached: string }> {
@@ -676,6 +770,8 @@ export class WifiHouse {
         }
       }
     }
+    // 0.15.0: the owner may have handed the household to this device (or another took over from it).
+    if (!s.removed && this.joined() && this.takeHandover()) await this.readvertise();
     this.lastError = s.reached > 0 || s.removed ? null : where.size === 0 ? 'No other phones found on this Wi-Fi. Open Restock on the other phone.' : `Couldn't reach the other phone${error ? `: ${error}` : '.'} Open Restock on it.`;
     s.error = this.lastError;
     return s;

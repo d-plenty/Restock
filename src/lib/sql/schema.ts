@@ -528,3 +528,23 @@ export async function migrate(driver: SqlDriver): Promise<void> {
     await driver.batch([...MIGRATIONS[v].map((sql) => ({ sql })), ...data, { sql: `PRAGMA user_version = ${v + 1}` }]);
   }
 }
+
+/**
+ * 0.15.0: the market table as it stands after the migrations, for a database that holds only the
+ * shared price history (the iPhone and iPad app's own file for it, lib/boot.ts). A migration that
+ * changes the market table must change this too.
+ */
+export const MARKET_TABLE = `CREATE TABLE IF NOT EXISTS market (
+  chain TEXT NOT NULL,
+  store_product_id TEXT NOT NULL,
+  normal REAL NOT NULL,
+  sale REAL,
+  sale_share REAL NOT NULL,
+  low REAL NOT NULL,
+  cycle_weeks INTEGER,
+  days INTEGER NOT NULL,
+  source TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  latest REAL,
+  PRIMARY KEY (chain, store_product_id)
+)`;

@@ -1,12 +1,12 @@
 // The iPhone app: the pieces that can be held to account without an iPhone.
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import { describe, expect, it } from 'vitest';
 import { IOS_CHECK_EVERY_HOURS, iosCheckDue } from '../lib/check';
 import { IosUnavailable } from '../lib/platform';
 import { IOS_REASONS } from '../ui/IosWhy';
 import { RestockIos } from './native';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 
 describe('iPhone app: price checks happen when Restock is opened', () => {
   const base = { sync: { backgroundActivity: true } } as Parameters<typeof iosCheckDue>[0];
@@ -64,7 +64,7 @@ describe('iPhone app: greyed out, with why', () => {
       expect(r.title.length, k).toBeGreaterThan(10);
       expect(r.why.length, k).toBeGreaterThan(40);
     }
-    expect(IOS_REASONS.updates.why).toContain("Apple doesn't allow an app to download and install its own updates");
+    expect(Object.keys(IOS_REASONS).sort()).toEqual(['icloud', 'shopPage']);
   });
   it('0.14.0: only what Apple makes impossible keeps a note, and it says exactly that', () => {
     const settings = read('../ui/screens/Settings.tsx');
@@ -72,9 +72,11 @@ describe('iPhone app: greyed out, with why', () => {
     expect(settings).toContain("Picking a time of day: not possible on iPhone due to Apple's restrictions.");
     // Nothing else on an iPhone is greyed with a "why" box any more.
     for (const f of ['Settings', 'Look', 'RestockServer', 'SyncOverview']) expect(read(`../ui/screens/${f}.tsx`), f).not.toMatch(/<IosBox reason="(updates|widgets|appIcon|serverExtras|importData)"/);
-    expect(read('../ui/screens/Soon.tsx')).toContain('Still to come on iPhone and iPad: home screen widgets, and the App Store and TestFlight.');
-    expect(read('../ui/screens/Sync.tsx')).toContain('<NotHereBanner reason="sync"');
-    expect(read('../ui/screens/RestockServer.tsx')).toContain('<NotHereBanner reason="server"');
+    expect(read('../ui/screens/Soon.tsx')).toContain('Still to come: home screen widgets, and the App Store.');
+    // 0.15.0: sync, the server and Home Assistant always work on an iPhone: their banners are for the web preview only.
+    expect(read('../ui/screens/Sync.tsx')).toContain('<NotHereBanner title="Sync works in the Android app"');
+    expect(read('../ui/screens/RestockServer.tsx')).toContain('<NotHereBanner title="The Restock server works in the Android app"');
+    expect(read('../ui/IosWhy.tsx')).toContain('if (isIos() && !reason) return null;');
     const why = read('../ui/IosWhy.tsx');
     expect(why).toContain("{label ?? 'Why is this unavailable?'}");
     expect(why).not.toContain('greyed out?');

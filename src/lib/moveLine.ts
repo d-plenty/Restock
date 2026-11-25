@@ -80,7 +80,7 @@ export function listOfLine(e: ListEntry, groups: Group[]): ListSection {
 
 /** Whether a shop is one of a list's (General: any shop; "other", typed by hand, goes anywhere). */
 // 0.10.3: a shop picked for that tab fits it too (Woolworths nappies on the Baby list).
-export const shopFits = (chain: string, to: ListSection) => to === 'general' || chain === 'other' || shopOnTab(chain, to);
+const shopFits = (chain: string, to: ListSection) => to === 'general' || chain === 'other' || shopOnTab(chain, to);
 
 /** What moving `e` to `to` would do, or undefined when it's on that list already. */
 export function planMove(e: ListEntry, to: ListSection, f: MoveFacts): MovePlan | undefined {
@@ -129,7 +129,7 @@ export function planMove(e: ListEntry, to: ListSection, f: MoveFacts): MovePlan 
 }
 
 /** The statements for a move (one write, so the list reloads once and Undo has it all). */
-export function moveOps(e: ListEntry, p: MovePlan): SqlOp[] {
+function moveOps(e: ListEntry, p: MovePlan): SqlOp[] {
   if (p.joins) {
     const op = updateEntryOp(p.joins.id, { qty: Math.max(1, p.joins.qty ?? 1) + p.line.qty! });
     return [...(op ? [op] : []), { sql: 'DELETE FROM list_entries WHERE id = ?', params: [e.id] }];
@@ -168,7 +168,7 @@ export async function moveLine(entryId: string, to: ListSection, facts?: MoveFac
 }
 
 /** "Ice moved to Keg" (the toast, with Undo). */
-export function movedWords(name: string, p: MovePlan): string {
+function movedWords(name: string, p: MovePlan): string {
   const list = LIST_NAMES[p.to];
   if (p.joins) return `${name} moved to ${list}, added to the ${p.item!.name} already there`;
   if (p.item && p.item.name !== name) return `${name} moved to ${list} as ${p.item.name}`;

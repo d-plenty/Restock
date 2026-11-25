@@ -23,12 +23,11 @@ import { useLive } from '../../lib/useLive';
 import { activeSections, BETA_SHOPS, chainName, isCustomSection, SECTION_NAMES, SECTIONS, searchChainsIn, shopsByGroup, type Section, type StoreChain, withCustom } from '../../shops';
 import { historyLabel, type Category, type ProductOrder, type Settings } from '../../types';
 import { PROGRAMS } from '../../ui/screens/Cards';
-import { api, api3, isV3, serverInfo, type Device } from '../api';
+import { api, api3, serverInfo, type Device } from '../api';
 import { downloadBackup, householdInfo, memberNames } from '../live';
-import { canChangeVault, session, signOut, signOutEverywhere } from '../session';
+import { session, signOut, signOutEverywhere } from '../session';
 import { leave } from './ServerScreens';
 import { askThenConfirm } from './houseData';
-import { confirmAction } from '../../lib/confirm';
 
 /** Who can change a setting: here on the web, only on the owner phone, or on each phone. */
 export type ChangedOn = 'web' | 'owner' | 'phone';
@@ -168,11 +167,6 @@ export async function changeHousehold(patch: HouseholdSettingsPatch): Promise<vo
   await setHouseholdSettings(patch);
 }
 
-export const setShopAroundMin = (v: number) => changeHousehold({ shopAroundMin: v });
-export const setNewItemPct = (pct: number) => changeHousehold({ defaultThresholdPct: pct });
-export const setListCompare = (v: 'unit' | 'price') => changeHousehold({ listCompare: v });
-export const setProductOrder = (v: ProductOrder) => changeHousehold({ productOrder: v });
-export const setRecalls = (on: boolean) => changeHousehold({ recallsEnabled: on });
 /** A tab's shops: the whole list of the ones picked (and, for Keg and Pharmacy, the tab on or off). */
 export const setTabShops = (section: Section, chains: StoreChain[], on?: boolean) =>
   changeHousehold({ tabs: { [section]: { chains, ...(on === undefined || section === 'pantry' ? {} : { on }) } } });
@@ -202,7 +196,7 @@ export interface ServerAccount {
 
 export function serverAccount(): ServerAccount {
   const s = session();
-  return { user: s?.user ?? 'admin', viaPhone: !!s?.viaPhone, canChangePassphrase: canChangeVault() };
+  return { user: s?.user ?? 'admin', viaPhone: !!s?.viaPhone, canChangePassphrase: !!s && !s.viaPhone };
 }
 
 /** "Download a backup": this browser's copy as a Restock backup file (never card numbers: the web doesn't have them). */
@@ -249,7 +243,7 @@ export interface PhoneSettings {
   groups: PhoneSettingGroup[];
 }
 
-export const NOT_SENT = 'Not sent yet';
+const NOT_SENT = 'Not sent yet';
 
 const onOff = (v: boolean | undefined) => (v === undefined ? NOT_SENT : v ? 'On' : 'Off');
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -266,7 +260,7 @@ const AWAY: Record<string, string> = { none: 'Not away from home', folder: 'A sh
 const THEME: Record<string, string> = { system: 'Follows the phone', light: 'Light', dark: 'Dark' };
 
 /** A phone's own settings, from the summary it sent (none yet: "Not sent yet" everywhere). Never card numbers. */
-export function phoneGroups(name: string, s: SentSummary | undefined, haPhone = false): PhoneSettingGroup[] {
+function phoneGroups(name: string, s: SentSummary | undefined, haPhone = false): PhoneSettingGroup[] {
   const on = `Change this on ${name}`;
   const tabNames = s?.tabs?.map((t) => (t === 'pantry' ? 'Groceries' : SECTION_NAMES[t]));
   return [
@@ -362,7 +356,7 @@ function settingsOf(d: Device, names: Map<string, string>, owner: string | undef
  * 0.9.3: which phone syncs the shopping list with Home Assistant, from the household's row (read
  * only here: it's moved by turning Home Assistant on on a phone). Null: none does.
  */
-export async function homeAssistantPhone(): Promise<{ device: string; name: string } | null> {
+async function homeAssistantPhone(): Promise<{ device: string; name: string } | null> {
   const who = await haPhone();
   return who.device && !who.left ? { device: who.device, name: who.name ?? 'another phone' } : null;
 }
@@ -380,13 +374,9 @@ export function usePhones(): { phones?: PhoneSettings[]; error?: string; reload:
   useEffect(() => {
     let live = true;
     // 0.9.4, a house: the server's phones (the active ones; removed and left ones are on Server and phones).
-    const load: Promise<Device[]> = isV3()
-      ? api3.phones().then((list) =>
-          list
-            .filter((p) => !p.status || p.status === 'active')
-            .map((p) => ({ device: p.device, name: p.label || p.name, added: p.added, lastSeen: p.lastSeen })),
-        )
-      : api.devices();
+    const load: Promise<Device[]> = api3.phones().then((list) =>
+      list.filter((p) => !p.status || p.status === 'active').map((p) => ({ device: p.device, name: p.label || p.name, added: p.added, lastSeen: p.lastSeen })),
+    );
     load
       .then((d) => {
         if (!live) return;
@@ -406,16 +396,9 @@ export function usePhones(): { phones?: PhoneSettings[]; error?: string; reload:
   return { phones, error, reload: () => setTick((t) => t + 1) };
 }
 
-/**
- * Takes a phone off this server (it stops syncing here), after asking: in a house (v3) with the
- * passphrase again (0.9.4), otherwise a plain confirm. False if it wasn't. Taking it out of the
- * household is the owner phone's on a 0.9.3-style server.
- */
+/** Takes a phone off this server (it stops syncing here), after asking with the passphrase again. False if it wasn't. */
 export async function removePhone(device: string, ask: { title: string; detail: string; action: string }): Promise<boolean> {
-  if (isV3()) return (await askThenConfirm(ask.title, ask.detail, ask.action, (c) => api3.removePhone(device, c).then(() => true))) === true;
-  if (!(await confirmAction(ask.title, { detail: ask.detail, action: ask.action, danger: true }))) return false;
-  await api.removeDevice(device);
-  return true;
+  return (await askThenConfirm(ask.title, ask.detail, ask.action, (c) => api3.removePhone(device, c).then(() => true))) === true;
 }
 
 /** The loyalty cards the phones share, as the web knows them: the shop's name, never the number. */

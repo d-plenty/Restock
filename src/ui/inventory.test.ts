@@ -1,5 +1,5 @@
 // 0.13.1: inventory (lib/inventory.ts, ui/Inventory.tsx): the rules, held to the code and to the database.
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import initSqlJs from 'sql.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { backupJson, importBackup } from '../lib/backup';
@@ -34,7 +34,7 @@ import { createSqlJsDriver } from '../lib/sql/sqljs';
 import type { Group } from '../types';
 import { inventorySummary, inventoryTabs } from './Inventory';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 const group = (id: string, name: string, section?: Group['section']): Group => ({ id, name, sameProductIds: [], altProductIds: [], alertLevel: 'good', section, createdAt: nowIso() });
 const rows = () => queryRows<{ k: string; v: string }>("SELECT k, v FROM household_settings WHERE k LIKE 'inv:%' OR k LIKE 'have:%' ORDER BY k");
 
@@ -269,10 +269,7 @@ describe('0.13.1 inventory: on the screen', () => {
     expect(ui).toMatch(/await act\('Inventory settings saved', \(\) => saveInventorySettings\(d\)\)/);
     expect(read('./screens/Settings.tsx')).toMatch(/row\('Inventory', inventorySummary\(inv\), \(\) => nav\.push\(\{ name: 'inventorySettings' \}\)\)/);
   });
-  it('the web page has the same button, box, page and Settings row', () => {
-    const desk = read('../server-mode/ui/DeskPantry.tsx');
-    expect(desk).toContain('<InventoryBody');
-    expect(desk).toMatch(/\{invOn && <HaveChip name=\{r\.group\.name\}/);
+  it('the web page has the same Settings row (0.15.0: and the phone screens themselves)', () => {
     expect(read('../server-mode/ui/DeskSettings.tsx')).toContain('<InventoryLine />');
   });
   it("the welcome's Restore is a file box you tap, not a hidden one pressed from code", () => {

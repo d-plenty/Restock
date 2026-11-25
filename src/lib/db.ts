@@ -17,7 +17,7 @@ import { listLineWithoutCostco } from './costcoLocal';
 import { applyCustomSections, asListSection, isCustomSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, setShopTabs, shareTab, shopDef, isGoneShop, withoutGone, type ListSection, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
 import { GIFT_CARDS_TABLE, migrate, SEEN_INDEX, SEEN_TABLE, SPEND_TABLE } from './sql/schema';
-import { cleanGiftCard } from './giftCards'; // 0.9.6 (cards)
+import { cleanGiftCard } from './giftCards';
 import { toPicks } from './picks';
 import { checkSettings } from './settingsCheck';
 import { siteImage } from './site';
@@ -41,14 +41,24 @@ export async function initDb(d: SqlDriver): Promise<void> {
   await d.run(SEEN_INDEX);
 }
 
-/** Use a database without upgrading it yet (to back it up first, 0.8.0). */
-export function useDriver(d: SqlDriver): void {
-  driver = d;
-}
-
 function sql(): SqlDriver {
   if (!driver) throw new Error('Database not ready');
   return driver;
+}
+
+// 0.15.0: the shared price history (the market table) can live in a database of its own. The iPhone
+// and iPad app keeps it there (lib/boot.ts), so the main file it writes after every change stays
+// small; Android and the server keep the table in the main database as before.
+let marketDriver: SqlDriver | undefined;
+export const setMarketDriver = (d: SqlDriver | undefined) => (marketDriver = d);
+const msql = (): SqlDriver => marketDriver ?? sql();
+/** Reads the shared price history, wherever it's kept. */
+export const marketQuery = <T = Record<string, unknown>>(text: string, params: SqlValue[] = []): Promise<T[]> => msql().query<T>(text, params);
+/** Writes to the shared price history, in one transaction. */
+export async function marketWrite(ops: SqlOp[]): Promise<void> {
+  if (!ops.length) return;
+  await msql().batch(ops);
+  changed();
 }
 
 // 0.9.5 (undo): while an undoable action runs, undo.ts sees each write first, to remember the rows
@@ -275,7 +285,7 @@ const insertCardOp = (c: LoyaltyCard): SqlOp => ({
   params: [c.id, c.program, c.label, c.number, c.createdAt, c.expiry && /^\d{4}-\d{2}-\d{2}$/.test(c.expiry) ? c.expiry : null],
 });
 
-export const insertReceiptOp = (r: Receipt): SqlOp => ({
+const insertReceiptOp = (r: Receipt): SqlOp => ({
   sql: `INSERT OR REPLACE INTO receipts (id, scanned_at, shop, chain, receipt_date, total, section, note, text, photo, pages, pinned) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
   params: [
     r.id,
@@ -508,7 +518,7 @@ export async function getProducts(ids: string[]): Promise<Product[]> {
 async function attachMarket(products: Product[]): Promise<Product[]> {
   const keyed = products.filter((p) => p.storeProductId && p.chain !== 'other');
   if (!keyed.length) return products;
-  const rows = await sql().query(
+  const rows = await msql().query(
     `SELECT * FROM market WHERE store_product_id IN (${placeholders(keyed.length)})`,
     keyed.map((p) => p.storeProductId!),
   );
@@ -537,7 +547,7 @@ async function attachMarket(products: Product[]): Promise<Product[]> {
 
 /** How much shared price history is on the phone. */
 export async function marketStatus(): Promise<{ count: number; updatedAt?: string; byChain: Record<string, number> }> {
-  const rows = await sql().query<{ chain: string; n: number; u: string | null }>(
+  const rows = await msql().query<{ chain: string; n: number; u: string | null }>(
     'SELECT chain, COUNT(*) AS n, MAX(updated_at) AS u FROM market GROUP BY chain',
   );
   const byChain: Record<string, number> = {};
@@ -552,7 +562,8 @@ export async function marketStatus(): Promise<{ count: number; updatedAt?: strin
 }
 
 export async function clearMarket(): Promise<void> {
-  await write([{ sql: 'DELETE FROM market' }]);
+  if (marketDriver) await marketWrite([{ sql: 'DELETE FROM market' }]);
+  else await write([{ sql: 'DELETE FROM market' }]);
 }
 
 export async function allProducts(): Promise<Product[]> {
@@ -884,28 +895,6 @@ export interface RowSet {
 }
 export type SavedRows = (RowSet & { rows: Record<string, SqlValue>[] })[];
 
-export async function saveRows(sets: RowSet[]): Promise<SavedRows> {
-  const out: SavedRows = [];
-  for (const s of sets) out.push({ ...s, rows: await sql().query<Record<string, SqlValue>>(`SELECT * FROM ${s.table} WHERE ${s.where}`, s.params) });
-  return out;
-}
-
-/** Put remembered rows back exactly as they were. */
-export async function putBackRows(saved: SavedRows): Promise<void> {
-  const ops: SqlOp[] = [];
-  for (const s of saved) {
-    ops.push({ sql: `DELETE FROM ${s.table} WHERE ${s.where}`, params: s.params });
-    for (const r of s.rows) {
-      const cols = Object.keys(r);
-      ops.push({
-        sql: `INSERT OR REPLACE INTO ${s.table} (${cols.join(', ')}) VALUES (${placeholders(cols.length)})`,
-        params: cols.map((c) => r[c]),
-      });
-    }
-  }
-  if (ops.length) await write(ops);
-}
-
 /** The rows deleting these pantry items touches: the items, their products, prices and list lines. */
 export async function rowsForGroups(ids: string[]): Promise<RowSet[]> {
   if (!ids.length) return [];
@@ -1040,7 +1029,7 @@ function fromBackup(g: Group, s: Snapshot): Group {
  * 0.9.0: a receipt from a backup keeps only photo paths a receipt really has (receiptPaths.ts).
  * Any other path is left out, so a backup can't point Restock at another of its files.
  */
-export function withSafePhotos(r: Receipt): Receipt {
+function withSafePhotos(r: Receipt): Receipt {
   const photo = isPhotoPath(r.photo) ? r.photo : undefined;
   const pages = Array.isArray(r.pages) ? r.pages.filter(isPhotoPath) : [];
   return { ...r, photo, pages: pages.length ? pages : undefined };
@@ -1122,7 +1111,7 @@ export interface RestoreParts {
 }
 
 /** Settings that are about your shops. */
-export const SHOP_SETTINGS = ['stores', 'enabledChains', 'sections', 'shopTabs', 'hiddenTabs', 'customShops', 'adultConfirmed', 'area'] as const;
+const SHOP_SETTINGS = ['stores', 'enabledChains', 'sections', 'shopTabs', 'hiddenTabs', 'customShops', 'adultConfirmed', 'area'] as const;
 /** Settings that belong to this phone, never taken from a backup. */
 const DEVICE_SETTINGS = [
   'onboarded',

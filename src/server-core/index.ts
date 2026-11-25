@@ -220,3 +220,5 @@ export function sqlDriverOfNode(db: NodeSqlite): SqlDriver {
 export async function migrate(db: NodeSqlite): Promise<void> {
   await migrateDriver(sqlDriverOfNode(db));
 }
+// 0.15.0: the oldest Restock the server syncs with.
+export { MIN_APP, OLD_APP_ERROR, appTooOld, oldAppWords } from '../lib/minVersion';

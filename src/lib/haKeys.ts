@@ -15,7 +15,7 @@ export const HA_STATUS = 'homeAssistantStatus';
 export const LIST_ALIASES = 'listAliases';
 
 /** 0.9.3: how many products the last price check looked at, and when (PriceChecker.java; the phone's summary for the web). */
-export const LAST_CHECK_INFO = 'lastCheckInfo';
+const LAST_CHECK_INFO = 'lastCheckInfo';
 
 /** This phone's own: never in a backup, and a restore keeps this phone's (the token isn't in the database at all). */
 /** 0.9.11: "priceHelper" (what the price helper did this week, PriceHelper.java) stays on this phone too. */

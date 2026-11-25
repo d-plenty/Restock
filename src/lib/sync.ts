@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { cachedSettings, getSettings, reapplyHouseholdSettings } from './db';
 import { changed, onChange } from './live';
 import { RestockNative, type SyncInfo, type SyncNowResult } from './sql/native';
+import { quiet } from './quietErrors';
 
 // Phone-to-phone sync (0.8.0). The work is done in Java (SyncHub, SyncEngine), so it also runs
 // while Restock is closed; this is the screens' side of it.
@@ -35,12 +36,6 @@ export function serverCode(text: string): string | undefined {
 
 /** 0.9.4: which protocol an Add a phone code is for (3: the server is the house). */
 export const serverCodeVersion = (code: string): 2 | 3 => (/^restock-server:3\?/i.test(code.trim()) ? 3 : 2);
-
-/** 0.9.4: the code on a v2 server's Take this household page (restock-handover:3?u=&t=&k=), or undefined. */
-export function handoverCode(text: string): string | undefined {
-  const t = text.trim();
-  return /^restock-handover:3\?/i.test(t) && /[?&]t=[A-Za-z0-9_-]{20,128}(&|$)/.test(t) && /[?&]k=/.test(t) && /[?&]u=/.test(t) ? t : undefined;
-}
 
 /**
  * 0.9.2: the server addresses in an Add a phone code, as they're shown before joining ("192.168.1.10:8787"),
@@ -124,7 +119,7 @@ let applying = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 /** 0.9.3: how often a phone on a Restock server checks it while Restock is open. */
-export const SERVER_POLL_MS = 60_000;
+const SERVER_POLL_MS = 60_000;
 
 /**
  * 0.9.3: while Restock is open and the phone uses a Restock server, a quick check every 60 s (and
@@ -179,12 +174,12 @@ async function usesServer(): Promise<boolean> {
 export function wireSync(): void {
   if (wired || !syncAvailable() || !Capacitor.isNativePlatform()) return;
   wired = true;
-  void reapplyHouseholdSettings().catch(() => undefined);
+  void reapplyHouseholdSettings().catch(quiet('sync'));
   // 0.13.2: an iPhone or iPad has no background sync, so it syncs as soon as Restock opens.
   if (isIos())
     void syncInfo()
       .then((i) => (i.paired ? RestockNative.syncNow() : undefined))
-      .catch(() => undefined);
+      .catch(quiet('sync'));
   void RestockNative.addListener('syncChanged', () => {
     applying = true;
     serverKnown = undefined;
@@ -194,7 +189,7 @@ export function wireSync(): void {
     // 0.9.3: the household turned recall alerts on or off: schedule (or stop) the daily check here.
     void getSettings()
       .then((s) => (before !== undefined && s.recalls.enabled !== before ? RestockNative.scheduleRecalls({ enabled: s.recalls.enabled }) : undefined))
-      .catch(() => undefined);
+      .catch(quiet('sync'));
   });
   pollServer({
     usesServer,
@@ -216,12 +211,12 @@ export function wireSync(): void {
   // syncing with another phone starts listening again each time Restock comes back.
   if (isIos()) {
     const lan = () => import('../ios/sync').then((m) => m.wifi);
-    void App.addListener('resume', () => void lan().then((w) => w.resumed()).catch(() => undefined));
-    void App.addListener('pause', () => void lan().then((w) => w.paused()).catch(() => undefined));
+    void App.addListener('resume', () => void lan().then((w) => w.resumed()).catch(quiet('sync')));
+    void App.addListener('pause', () => void lan().then((w) => w.paused()).catch(quiet('sync')));
     // And a short sync now and then while Restock isn't on screen, when iOS allows one (RestockBackground.swift).
     void import('../ios/apple').then(({ appleHere, RestockApple }) => {
       if (!appleHere()) return;
-      void App.addListener('pause', () => void RestockApple.backgroundSchedule().catch(() => undefined));
+      void App.addListener('pause', () => void RestockApple.backgroundSchedule().catch(quiet('sync')));
       void RestockApple.addListener('backgroundRefresh', () => {
         void syncInfo()
           .then((i) => (i.paired ? RestockNative.syncNow() : undefined))
@@ -229,10 +224,10 @@ export function wireSync(): void {
             () => RestockApple.backgroundDone({ ok: true }),
             () => RestockApple.backgroundDone({ ok: false }),
           )
-          .catch(() => undefined);
-      }).catch(() => undefined);
-    }).catch(() => undefined);
-    void lan().then((w) => w.resumed()).catch(() => undefined);
+          .catch(quiet('sync'));
+      }).catch(quiet('sync'));
+    }).catch(quiet('sync'));
+    void lan().then((w) => w.resumed()).catch(quiet('sync'));
   }
   onChange(() => {
     if (applying) return;
@@ -241,7 +236,7 @@ export function wireSync(): void {
       timer = undefined;
       void syncInfo()
         .then((i) => (i.paired ? RestockNative.syncNow() : undefined))
-        .catch(() => undefined);
+        .catch(quiet('sync'));
     }, 20_000);
   });
 }

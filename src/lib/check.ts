@@ -8,6 +8,7 @@ import { isIos } from './platform';
 import { RestockNative } from './sql/native';
 import { localDay } from './verdict';
 import { background } from './undo';
+import { quiet } from './quietErrors';
 
 // Price checks run in the app's native Android code (PriceCheckWorker.java), both for
 // "Check now" and for the background schedule, so there's one implementation.
@@ -27,8 +28,8 @@ export function checkPrices(onProgress?: (done: number, total: number) => void, 
 }
 
 async function afterIosCheck(): Promise<void> {
-  await RestockNative.sharePrices().catch(() => undefined);
-  await (RestockNative as unknown as { marketMaybeRefresh?: () => Promise<void> }).marketMaybeRefresh?.().catch(() => undefined);
+  await RestockNative.sharePrices().catch(quiet('price check'));
+  await (RestockNative as unknown as { marketMaybeRefresh?: () => Promise<void> }).marketMaybeRefresh?.().catch(quiet('price check'));
   refresh();
 }
 
@@ -38,7 +39,7 @@ async function doCheck(onProgress?: (done: number, total: number) => void, opts?
   if (isIos()) {
     try {
       const r = await checkBySearch(onProgress);
-      await updateSettings({ lastCheck: nowIso() }).catch(() => undefined);
+      await updateSettings({ lastCheck: nowIso() }).catch(quiet('price check'));
       // As Android does after its background check: send what was read, and get the shared history if there's something new.
       void afterIosCheck();
       return { ...r, nativeOnly: false };
@@ -70,7 +71,7 @@ export async function syncBackgroundSchedule(settings: Settings): Promise<{ due:
   if (isIos()) return { due: iosCheckDue(settings) };
   const r = await RestockNative.scheduleChecks({ enabled: settings.sync.backgroundActivity, intervalHours: settings.checkIntervalHours });
   // 0.9.11: and the price helper's half-hourly job (on only on a phone set up as one).
-  await RestockNative.priceHelperSchedule?.().catch(() => undefined);
+  await RestockNative.priceHelperSchedule?.().catch(quiet('price check'));
   return { due: !!r.due };
 }
 
@@ -117,7 +118,7 @@ export async function checkBySearch(onProgress?: (done: number, total: number) =
       const hit = (await adapterFor(p.chain)!.search(p.name)).find((x) => x.storeProductId === p.storeProductId);
       failed.set(p.chain, 0);
       checked++;
-      if (hit?.imageUrl && !p.imageUrl) await background(() => updateProduct(p.id, { imageUrl: hit.imageUrl })).catch(() => undefined);
+      if (hit?.imageUrl && !p.imageUrl) await background(() => updateProduct(p.id, { imageUrl: hit.imageUrl })).catch(quiet('price check'));
       if (hit && hit.price !== undefined) {
         const prev = (last.get(p.id) ?? []).slice(-1)[0];
         if (!(prev && localDay(prev.date) === localDay(nowIso()) && prev.price === hit.price)) {
@@ -165,7 +166,7 @@ async function refreshPagelessProducts(limit = 30): Promise<{ checked: number; u
       const hit = (await adapterFor(p.chain)!.search(p.name)).find((x) => x.storeProductId === p.storeProductId);
       checked++;
       // 0.12.10: a product saved before its shop's photos could be read gets its photo now.
-      if (hit?.imageUrl && !p.imageUrl) await background(() => updateProduct(p.id, { imageUrl: hit.imageUrl })).catch(() => undefined);
+      if (hit?.imageUrl && !p.imageUrl) await background(() => updateProduct(p.id, { imageUrl: hit.imageUrl })).catch(quiet('price check'));
       if (!hit || hit.price === undefined) continue;
       const prev = (last.get(p.id) ?? []).slice(-1)[0];
       // Same day on the phone's own calendar, not UTC's (verdict.ts localDay).

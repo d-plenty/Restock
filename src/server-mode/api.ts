@@ -7,7 +7,7 @@
 //   and no CSRF), answers with household data come sealed with that key (RSF1,
 //   `application/x-restock-sealed`), and request bodies with secrets go sealed the same way.
 
-import { openRsf1, sealRsf1, unb64, webAuthorization } from './crypto';
+import { openRsf1, sealRsf1, webAuthorization } from './crypto';
 
 export class ApiError extends Error {
   constructor(
@@ -23,7 +23,6 @@ export class ApiError extends Error {
 
 /** Where the API lives: the page's own server (the app is served from it). */
 let base = '';
-export const setApiBase = (b: string) => (base = b.replace(/\/+$/, ''));
 
 export const SEALED = 'application/x-restock-sealed';
 
@@ -38,13 +37,12 @@ let skew = 0;
 export function setV3Auth(a: { session: string; key: Uint8Array } | undefined): void {
   v3 = a;
 }
-export const hasV3Auth = () => !!v3;
 
 /** What the server said about itself (GET /api/v3/health; a 0.9.3 server has no such path). */
 export interface ServerInfo {
   /** 2: a 0.9.3 server, or a 0.9.4 one in v2 mode for browsers; 3: a house. */
   api: 2 | 3;
-  /** 0.9.4 servers: 'new' (not set up), 'v2' (a phone household on it, before the handover), 'v3', 'released'. */
+  /** 0.9.4 servers: 'new' (not set up), 'v2' (a 0.9.3 household on it, no longer served from 0.15.0), 'v3', 'released'. */
   mode?: 'new' | 'v2' | 'v3' | 'released' | string;
   version?: string;
   house?: string;
@@ -176,44 +174,9 @@ export interface Activity {
   detail?: string | Record<string, unknown>;
 }
 
-export interface WebInfo {
-  user?: string;
-  webId?: string | null;
-  webPub?: string | null;
-  mustChange?: boolean;
-}
-
+/** 0.15.0: the 0.9.3 household's routes are gone; signing in is v3 (api3). Only the plain health check is left here. */
 export const api = {
   health: () => json<{ ok?: boolean; app?: string; version?: string; api?: number }>(call('GET', '/api/v2/health')),
-  salt: (user: string) => json<{ salt: string }>(call('GET', `/api/v2/login/salt?user=${encodeURIComponent(user)}`)),
-  login: (body: { user: string; password?: string; auth?: string }) =>
-    json<{ mustChange?: boolean; vault?: string | null }>(call('POST', '/api/v2/login', body, undefined, undefined, { quiet401: true })),
-  logout: (everywhere = false) => call('POST', '/api/v2/logout', everywhere ? { everywhere: true } : {}),
-  /** `current`: the current passphrase's authKey (needed once a passphrase is set). */
-  setPassphrase: (body: { salt: string; auth: string; vault: string; webId: string; webPub: string; current?: string }) => call('POST', '/api/v2/passphrase', body),
-  getVault: () => json<{ vault?: string | null }>(call('GET', '/api/v2/vault')),
-  putVault: (body: { vault: string; webId: string; webPub: string }) => call('PUT', '/api/v2/vault', body),
-  web: () => json<WebInfo>(call('GET', '/api/v2/web')),
-  invite: () => json<{ invite: string; expires?: string | number; expiresIn?: number; code?: string; home?: string; away?: string }>(call('POST', '/api/v2/invites', {})),
-  devices: async () => (await json<{ devices?: Device[] }>(call('GET', '/api/v2/devices'))).devices ?? [],
-  removeDevice: (id: string) => call('DELETE', `/api/v2/devices/${encodeURIComponent(id)}`),
-  linkStart: () => json<{ id: string }>(call('POST', '/api/v2/link', {})),
-  linkPoll: (id: string) => json<{ pending?: boolean; pub?: string; sealed?: string }>(call('GET', `/api/v2/link/${encodeURIComponent(id)}`)),
-  qrStart: () => json<{ id: string }>(call('POST', '/api/v2/qrlogin', {})),
-  qrPoll: (id: string) => json<{ pending?: boolean; pub?: string; sealed?: string; mustChange?: boolean }>(call('GET', `/api/v2/qrlogin/${encodeURIComponent(id)}`)),
-  files: async () => (await json<{ files?: FileInfo[] }>(call('GET', '/api/v2/files'))).files ?? [],
-  /** A file's bytes, or null when it isn't there. Names go in the path as they are (slashes too). */
-  read: async (name: string): Promise<Uint8Array | null> => {
-    try {
-      return new Uint8Array(await (await call('GET', `/api/v2/files/${name}`)).arrayBuffer());
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 404) return null;
-      throw e;
-    }
-  },
-  write: (name: string, bytes: Uint8Array, ifMatch?: string) =>
-    json<{ name?: string; size?: number; version?: string }>(call('PUT', `/api/v2/files/${name}`, undefined, bytes, ifMatch ? { 'If-Match': `"${ifMatch}"` } : undefined)),
-  activity: async () => (await json<{ activity?: Activity[] }>(call('GET', '/api/v2/activity'))).activity ?? [],
 };
 
 /**
@@ -388,8 +351,6 @@ export const api3 = {
   /** Per month (oldest first, every month in the window): receipt totals per tab, receipts, products with a price, specials seen. */
   stats: (months = 12) =>
     v3get<{ months?: { month: string; receipts?: Record<string, number>; receiptCount?: number; productsTracked?: number; specialsSeen?: number }[] }>(`/api/v3/stats?months=${months}`),
-  /** v2 mode only: the code the owner phone scans to hand the household to the server. */
-  handover: () => json<{ token: string; code?: string; kex?: string; expires?: string | number }>(call('POST', '/api/v3/handover', {})),
 
   files: async () => listOf<FileInfo>(await answer<unknown>(call('GET', '/api/v3/files')), 'files'),
   read: async (name: string): Promise<Uint8Array | null> => {
@@ -404,5 +365,3 @@ export const api3 = {
     answer<{ name?: string; size?: number; version?: string }>(call('PUT', `/api/v3/files/${name}`, undefined, bytes, ifMatch ? { 'If-Match': `"${ifMatch}"` } : undefined)),
 };
 
-/** For tests: the session key a request is signed with, from base64url. */
-export const v3AuthOf = (session: string, key: string) => ({ session, key: unb64(key) });

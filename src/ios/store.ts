@@ -5,10 +5,13 @@
 // a save that is cut short never leaves half a file. Before this it was kept in the web view's
 // storage; that copy is read once, written to the file, and left where it is.
 import { appleHere, RestockApple } from './apple';
+import { quiet } from '../lib/quietErrors';
 
 export const DB_FILE = 'restock.sqlite';
+/** 0.15.0: the shared price history, in a file of its own (written only when it's downloaded). */
+export const MARKET_FILE = 'restock-market.sqlite';
 /** The plugin version that has the file store. */
-export const STORE_VERSION = 3;
+const STORE_VERSION = 3;
 
 export const bytesToB64 = (b: Uint8Array): string => {
   let s = '';
@@ -73,22 +76,27 @@ export interface WebCopy {
  * Writing: the file. If that fails, the web view's storage, marked as the newer one, and the failure
  * is still reported (the caller hears the error) so it isn't silent.
  */
-export function databaseStore(file: FileStore | undefined, web: WebCopy, heard: { saved: (where: 'file' | 'web', bytes: number) => void } = { saved: () => undefined }) {
+export function databaseStore(
+  file: FileStore | undefined,
+  web: WebCopy,
+  heard: { saved: (where: 'file' | 'web', bytes: number) => void } = { saved: () => undefined },
+  names: { file: string; key: string; behind: string } = { file: DB_FILE, key: 'db', behind: 'fileBehind' },
+) {
   const webBytes = async () => {
-    const v = await web.get('db').catch(() => undefined);
+    const v = await web.get(names.key).catch(quiet('iPhone database'));
     return v instanceof Uint8Array ? v : undefined;
   };
   let needsFirstWrite = false;
   return {
     async restore(): Promise<Uint8Array | undefined> {
       if (!file) return webBytes();
-      const behind = !!(await web.get('fileBehind').catch(() => undefined));
+      const behind = !!(await web.get(names.behind).catch(quiet('iPhone database')));
       const fromWeb = await webBytes();
       if (behind && looksLikeSqlite(fromWeb)) {
         needsFirstWrite = true;
         return fromWeb;
       }
-      const fromFile = await file.read(DB_FILE).catch(() => undefined);
+      const fromFile = await file.read(names.file).catch(quiet('iPhone database'));
       if (looksLikeSqlite(fromFile)) return fromFile;
       needsFirstWrite = looksLikeSqlite(fromWeb);
       return fromWeb;
@@ -97,21 +105,21 @@ export function databaseStore(file: FileStore | undefined, web: WebCopy, heard: 
     needsFirstWrite: () => needsFirstWrite,
     async persist(bytes: Uint8Array): Promise<void> {
       if (!file) {
-        await web.put('db', bytes);
+        await web.put(names.key, bytes);
         heard.saved('web', bytes.length);
         return;
       }
       try {
-        await file.write(DB_FILE, bytes);
+        await file.write(names.file, bytes);
       } catch (e) {
         // Keep the change somewhere, and remember that the file is the older copy now.
-        await web.put('db', bytes);
-        await web.put('fileBehind', 1);
+        await web.put(names.key, bytes);
+        await web.put(names.behind, 1);
         throw e;
       }
       needsFirstWrite = false;
       heard.saved('file', bytes.length);
-      if (await web.get('fileBehind').catch(() => undefined)) await web.put('fileBehind', 0).catch(() => undefined);
+      if (await web.get(names.behind).catch(quiet('iPhone database'))) await web.put(names.behind, 0).catch(quiet('iPhone database'));
     },
   };
 }

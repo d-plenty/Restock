@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { itemsToSort, sortTargets } from '../../lib/categoryGuess';
 import { allCategories, allListEntries, cachedSettings, deleteGroup, updateGroup } from '../../lib/db';
 import { addAllToList, addToList, buzz, takeOffList } from '../../lib/listActions';
-import { act } from '../../lib/undo'; // 0.9.5 (undo)
+import { act } from '../../lib/undo';
 import { loadRecommendations } from '../../lib/recs';
 import { useLive } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
@@ -27,7 +27,7 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'recent', label: 'Recently added' },
 ];
 // Deals first: the order Home uses, best saving at the top.
-export const DEAL_RANK: Record<string, number> = { buy: 0, alt: 1, small: 2, wait: 3, skip: 4, none: 5 };
+const DEAL_RANK: Record<string, number> = { buy: 0, alt: 1, small: 2, wait: 3, skip: 4, none: 5 };
 
 function loadSort(): Sort {
   try {
@@ -77,10 +77,6 @@ const SEARCH_HINT: Record<Section, string> = {
   pets: 'Search this tab',
   ...slots('Search this tab'),
 };
-
-/** At or under the item's "alert me under $X" price at its cheapest shop. */
-export const underTarget = (r: Recommendation) =>
-  r.group.targetPrice !== undefined && r.best?.price !== undefined && r.best.price <= r.group.targetPrice + 0.004 && !r.best.verdict.stale;
 
 /** The Pantry, Keg or Pharmacy tab: the things you buy from that kind of shop. */
 export function PantryScreen({ section = 'pantry' }: { section?: Section }) {

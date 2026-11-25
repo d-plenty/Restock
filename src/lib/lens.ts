@@ -8,13 +8,13 @@ import { isNative } from '../stores/http';
 // browser can share a photo). Google can't send its answer back to Restock: the name comes back by
 // "Restock: Search shops" in the share menu, or copied and pasted.
 
-export const LENS_PAGE = 'https://lens.google.com/';
+const LENS_PAGE = 'https://lens.google.com/';
 const KEY = 'restock.lensFor';
 /** A name shared back within this long is for the barcode Lens was asked about. */
 const FRESH_MS = 20 * 60_000;
 
 /** The barcode Lens was last asked about, if it was recent: what a shared-back name is for. */
-export function lensBarcode(): string | undefined {
+function lensBarcode(): string | undefined {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return undefined;

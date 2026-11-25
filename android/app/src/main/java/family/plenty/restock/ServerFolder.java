@@ -593,6 +593,8 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         Map<String, String> h = new LinkedHashMap<>();
         String auth = authorization(device, key, method, target, now() + (skew == null ? 0 : skew), body);
         h.put("Authorization", auth);
+        // 0.15.0: this phone's Restock version, so a server can tell a phone that's too old to update.
+        if (PhoneSummary.appVersion != null) h.put("X-Restock-App", PhoneSummary.appVersion);
         if (sealed) {
             h.put("X-Restock-Seal", "rsf1");
             java.util.regex.Matcher m = java.util.regex.Pattern.compile("n=([A-Za-z0-9_=-]+)").matcher(auth);

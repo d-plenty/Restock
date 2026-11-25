@@ -8,8 +8,8 @@ import { readerInstalled, readText, removeOldDownload } from '../../lib/receiptR
 import { useReaderGate } from '../ReaderDownload';
 import { useLeaveGuard } from '../leaveGuard';
 import { deleteOn, expired, itemLines, joinPages, KEEP_MONTHS, keepLabel, parseReceipt, removeReceipts, removeReceiptsUndoable } from '../../lib/receipts';
-import { act } from '../../lib/undo'; // 0.9.5 (undo)
-import * as draft from '../../lib/settingsDraft'; // 0.9.5 (save)
+import { act } from '../../lib/undo';
+import * as draft from '../../lib/settingsDraft';
 import { blackAndWhite, findPaper, fullQuad, greyscale, rotate, shrink, warp, type Img, type Quad } from '../../lib/scan';
 import { money } from '../../lib/units';
 import { useLive } from '../../lib/useLive';
@@ -583,7 +583,6 @@ export function ReceiptScreen({ id }: { id?: string }) {
         if (!extra.length) extra = undefined;
       }
       const total = parseFloat(fields.total.replace(/[$,\s]/g, ''));
-      // 0.9.5 (undo)
       await act(existing ? 'Receipt saved' : 'Receipt added', () => saveReceipt({
         id: rid,
         scannedAt: existing?.scannedAt ?? nowIso(),

@@ -7,7 +7,7 @@ import { syncNow, unsentChanges } from '../live';
 import { useStatus } from '../ui/ServerScreens';
 import { InstallSheet, isInstalled, isIos } from './InstallHelp';
 import { isOfflineError, usePwaState, whenText } from './offline';
-import { offlineText, waitingText } from './offlineData'; // 0.9.6 (iPhone offline)
+import { offlineText, waitingText } from './offlineData';
 import { applyUpdate, useUpdateWaiting } from './register';
 import './pwa.css';
 
@@ -40,7 +40,7 @@ export function PwaBanners() {
   const [helping, setHelping] = useState(false);
   const last = whenText(p.last ?? st.at);
   // The server answered, but didn't take the changes (not a 401: that signs out).
-  const refused = !offline && st.error && !/^Signed out/.test(st.error) ? st.error : undefined;
+  const refused = !offline && st.error && !st.error.startsWith('Signed out') ? st.error : undefined;
   // The top strip's own "Can't reach the server" line steps aside while this notice says it.
   useEffect(() => {
     document.documentElement.classList.toggle('pwa-offline', offline);

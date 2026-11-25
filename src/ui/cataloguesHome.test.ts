@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { readSource } from '../lib/readSource';
 import { describe, expect, it } from 'vitest';
 import { dealWord } from '../lib/mySpecials';
 import { tileBadge, possessive, FULL_LIST } from './screens/ShopCatalogue';
 
-const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const read = (p: string) => readSource(new URL(p, import.meta.url));
 
 describe('0.12.2: catalogues from Home, Your shops', () => {
   it('the map never lets the map server write HTML into the page', () => {

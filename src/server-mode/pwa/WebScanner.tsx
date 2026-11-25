@@ -104,6 +104,8 @@ export function WebScanner({ title, onDone }: { title: string; onDone: (code: st
       window.clearTimeout(timer);
       stream?.getTracks().forEach((t) => t.stop());
     };
+    // The scanner starts once; finish stays the same.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return createPortal(

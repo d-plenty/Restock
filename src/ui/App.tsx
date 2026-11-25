@@ -25,54 +25,57 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { ScannerHost } from './Scanner';
 import { placeToast } from './toastLift';
 import { AddScreen } from './screens/Add';
-import { CardsScreen } from './screens/Cards';
-import { CataloguesScreen } from './screens/Catalogues';
-import { PermissionsScreen } from './screens/Permissions';
 import { HomeScreen } from './screens/Home';
-import { HouseholdScreen } from './screens/Household';
-import { CategoriesScreen } from './screens/Categories';
 import { ItemScreen } from './screens/Item';
 import { ListScreen } from './screens/List';
 import { Onboarding } from './screens/Onboarding';
-import { WhatsNewPrompt, WhatsNewScreen } from './screens/WhatsNew';
-import { PicksScreen } from './screens/Picks';
+import { WhatsNewPrompt } from './screens/WhatsNew';
 import { InventoryScreen, InventorySettingsScreen } from './Inventory';
 import { noteSeenVersion, seenVersion, shouldOfferWhatsNew } from '../lib/whatsNew';
-import { SetupScreen } from './screens/Setup';
 import { addShared, nameFromLink, splitShared } from '../lib/shared';
 import { takeLensBarcode } from '../lib/lens';
-import { ScannedScreen } from './screens/Scanned';
 import { leavePendingCustom, pendingCustom } from './screens/CustomSections';
 import { okToLeave, unsavedWork } from './leaveGuard';
 import { rescueOldScans } from '../lib/scanQueue';
 import { scanBarcode } from '../lib/barcode';
 import { RestockNative } from '../lib/sql/native';
-import { DiagnosticsScreen } from './screens/Diagnostics';
-import { ShopCatalogueScreen } from './screens/ShopCatalogue';
-import { ReceiptScreen, ReceiptsScreen } from './screens/Receipts';
-import { RecallsScreen } from './screens/Recalls';
-import { SoonScreen } from './screens/Soon';
 import { TourHost } from './Tour';
 import { maybeAutoBackup } from '../lib/autoBackup';
 import { watchWidgets } from '../lib/widgets';
 import { tidyReceipts } from '../lib/receipts';
 import { PantryScreen } from './screens/Pantry';
-import { SettingsScreen } from './screens/Settings';
-import { FeedbackScreen } from './screens/Feedback';
-import { StoresScreen } from './screens/Stores';
-import { SyncScreen } from './screens/Sync';
 // Only ever shown on iPhone and iPad, so it (and the sync engine it brings) is loaded only there.
 const WifiSyncScreen = lazy(() => import('./screens/WifiSync').then((m) => ({ default: m.WifiSyncScreen })));
+// 0.15.0: screens opened now and then load when first opened, so Restock starts quicker.
+const CardsScreen = lazy(() => import('./screens/Cards').then((m) => ({ default: m.CardsScreen })));
+const CataloguesScreen = lazy(() => import('./screens/Catalogues').then((m) => ({ default: m.CataloguesScreen })));
+const PermissionsScreen = lazy(() => import('./screens/Permissions').then((m) => ({ default: m.PermissionsScreen })));
+const HouseholdScreen = lazy(() => import('./screens/Household').then((m) => ({ default: m.HouseholdScreen })));
+const CategoriesScreen = lazy(() => import('./screens/Categories').then((m) => ({ default: m.CategoriesScreen })));
+const PicksScreen = lazy(() => import('./screens/Picks').then((m) => ({ default: m.PicksScreen })));
+const SetupScreen = lazy(() => import('./screens/Setup').then((m) => ({ default: m.SetupScreen })));
+const ScannedScreen = lazy(() => import('./screens/Scanned').then((m) => ({ default: m.ScannedScreen })));
+const DiagnosticsScreen = lazy(() => import('./screens/Diagnostics').then((m) => ({ default: m.DiagnosticsScreen })));
+const ShopCatalogueScreen = lazy(() => import('./screens/ShopCatalogue').then((m) => ({ default: m.ShopCatalogueScreen })));
+const RecallsScreen = lazy(() => import('./screens/Recalls').then((m) => ({ default: m.RecallsScreen })));
+const SoonScreen = lazy(() => import('./screens/Soon').then((m) => ({ default: m.SoonScreen })));
+const SettingsScreen = lazy(() => import('./screens/Settings').then((m) => ({ default: m.SettingsScreen })));
+const FeedbackScreen = lazy(() => import('./screens/Feedback').then((m) => ({ default: m.FeedbackScreen })));
+const StoresScreen = lazy(() => import('./screens/Stores').then((m) => ({ default: m.StoresScreen })));
+const SyncScreen = lazy(() => import('./screens/Sync').then((m) => ({ default: m.SyncScreen })));
+const RestockServerScreen = lazy(() => import('./screens/RestockServer').then((m) => ({ default: m.RestockServerScreen })));
+const HomeAssistantScreen = lazy(() => import('./screens/HomeAssistant').then((m) => ({ default: m.HomeAssistantScreen })));
+const ReceiptScreen = lazy(() => import('./screens/Receipts').then((m) => ({ default: m.ReceiptScreen })));
+const ReceiptsScreen = lazy(() => import('./screens/Receipts').then((m) => ({ default: m.ReceiptsScreen })));
+const WhatsNewScreen = lazy(() => import('./screens/WhatsNew').then((m) => ({ default: m.WhatsNewScreen })));
 const IcloudSyncScreen = lazy(() => import('./screens/IcloudSync').then((m) => ({ default: m.IcloudSyncScreen })));
-import { RestockServerScreen } from './screens/RestockServer';
-import { HomeAssistantScreen } from './screens/HomeAssistant';
 import { wireHomeAssistant } from '../lib/homeAssistant';
-import { serverMode, serverUi, useDesktopWidth } from '../server-mode/flag';
-import { PAD_SIDE, usePadWide, type PadSide } from './padWide';
+import { serverMode, serverUi } from '../server-mode/flag';
+import { padSide, usePadWide, type PadSide } from './padWide';
 import { isIos } from '../lib/platform';
-import { onUndo, undo as undoStep, undoneText } from '../lib/undo'; // 0.9.5 (undo)
-import { canLeave, getSettings as shownSettings, hasUnsaved } from '../lib/settingsDraft'; // 0.9.5 (save)
-import { askChoice, askLeave } from '../lib/confirm'; // 0.9.5 (save), 0.10.0
+import { onUndo, undo as undoStep, undoneText } from '../lib/undo';
+import { canLeave, getSettings as shownSettings, hasUnsaved } from '../lib/settingsDraft';
+import { askChoice, askLeave } from '../lib/confirm';
 
 // 0.12.0: Home, Pantry, List and More. Adding is a button on each of them (it was a fifth tab in
 // the middle, 0.10.3). Keg, Health, Baby and Pets are in More, so the bar never gets crowded.
@@ -113,8 +116,6 @@ function RestockApp() {
   const settings = useLive(() => (ready ? getSettings() : Promise.resolve(undefined)), [ready]);
   // 0.9.5 (save): the look and colours show while they're being changed, before Save (and go back on Discard).
   const look = useLive(() => (ready ? shownSettings() : Promise.resolve(undefined)), [ready]);
-  // 0.9.3: the web app on a Restock server, in a wide window: the desktop layout. Always false on a phone.
-  const desk = useDesktopWidth();
 
   // 0.12.9: the keyboard opens where the page puts the cursor (lib/keyboard.ts)
   useEffect(() => wireKeyboard(), []);
@@ -205,19 +206,15 @@ function RestockApp() {
     },
     [startToastTimer],
   );
-  // 0.9.5 (undo): every undoable action (undo.ts) offers Undo here. In the wide web layout the
-  // sidebar has its own big Undo button instead (Desktop.tsx UndoFoot).
-  const deskRef = useRef(desk);
-  deskRef.current = desk;
+  // 0.9.5 (undo): every undoable action (undo.ts) offers Undo here.
   useEffect(
     () =>
       onUndo((e) => {
-        if (e.kind === 'added' && !deskRef.current)
+        if (e.kind === 'added')
           toast(e.step.label, async () => {
             const r = await undoStep(e.step.id);
             if (r) toast(undoneText(r));
           });
-        else if (e.kind === 'undone' && deskRef.current) toast(undoneText(e));
       }),
     [toast],
   );
@@ -232,7 +229,7 @@ function RestockApp() {
       if (typing) return;
       e.preventDefault();
       void undoStep().then((r) => {
-        if (r && !deskRef.current) toast(undoneText(r));
+        if (r) toast(undoneText(r));
       });
     };
     window.addEventListener('keydown', onKey);
@@ -301,7 +298,7 @@ function RestockApp() {
       setTab('more');
       setStack([{ name } as Screen]);
     });
-  const sideAt = padWide && tab === 'more' ? PAD_SIDE.find((x) => x.screen === stack[0]?.name)?.screen : undefined;
+  const sideAt = padWide && tab === 'more' ? padSide().find((x) => x.screen === stack[0]?.name)?.screen : undefined;
   const popRef = useRef(popScreen);
   popRef.current = popScreen;
   const exitArmed = useRef(0);
@@ -356,6 +353,8 @@ function RestockApp() {
     return () => {
       sub.then((s) => s.remove());
     };
+    // The back button is listened for once; it reads the latest through refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Check prices when the app opens or comes back, if it's been a while.
@@ -568,15 +567,24 @@ function RestockApp() {
           {/* Setup tiles can open these (cards, shop accounts, sync) before setup is finished. */}
           {stack.length > 0 && (
             <div className="overlay">
+              <Suspense fallback={<div className="screen" />}>
               {stack[stack.length - 1].name === 'stores' && <StoresScreen section={(stack[stack.length - 1] as { section?: Section }).section} />}
               {stack[stack.length - 1].name === 'cards' && <CardsScreen />}
-              {stack[stack.length - 1].name === 'sync' && <SyncScreen invite={(stack[stack.length - 1] as { invite?: boolean }).invite} />}
-              {stack[stack.length - 1].name === 'restockServer' && <RestockServerScreen />}
+              {stack[stack.length - 1].name === 'sync' &&
+                (isIos() ? (
+                  <Suspense fallback={<div className="screen" />}>
+                    <IcloudSyncScreen />
+                  </Suspense>
+                ) : (
+                  <SyncScreen invite={(stack[stack.length - 1] as { invite?: boolean }).invite} />
+                ))}
+              {stack[stack.length - 1].name === 'restockServer' && <RestockServerScreen code={(stack[stack.length - 1] as { code?: string }).code} />}
               {stack[stack.length - 1].name === 'homeAssistant' && <HomeAssistantScreen />}
               {stack[stack.length - 1].name === 'household' && <HouseholdScreen />}
               {stack[stack.length - 1].name === 'categories' && <CategoriesScreen section={(stack[stack.length - 1] as { section: Section }).section} />}
               {stack[stack.length - 1].name === 'diagnostics' && <DiagnosticsScreen />}
               {stack[stack.length - 1].name === 'soon' && <SoonScreen id={(stack[stack.length - 1] as { id: string }).id} />}
+              </Suspense>
             </div>
           )}
           <ConfirmHost />
@@ -601,8 +609,6 @@ function RestockApp() {
   const top = stack[stack.length - 1];
   // Keg and Pharmacy only show when they're switched on and have a shop picked.
   const on = activeSections(settings);
-  // A tab can also be left out of the bar while its shops stay in use (Add, shopping list).
-  const inBar = on; // 0.13.0: no tab is hidden any more (settingsCheck.ts)
   const tabs = ALL_TABS;
   // A tab that's off shows Pantry instead (0.10.3: a hidden one still opens, from Add or a link).
   const shownTab: Tab = isSectionTab(tab) && !on.includes(tab) ? 'pantry' : tab;
@@ -611,7 +617,7 @@ function RestockApp() {
   // The screen opened on top of the tab, if any (the server's own version where it has one).
   const overlay = top ? (
     (serverMode && serverUi.current?.screen(top)) || (
-      <>
+      <Suspense fallback={<div className="screen" />}>
         {top.name === 'item' && <ItemScreen key={top.groupId} groupId={top.groupId} />}
         {top.name === 'add' && (
           <AddScreen
@@ -659,7 +665,7 @@ function RestockApp() {
             <WifiSyncScreen apple={top.apple} />
           </Suspense>
         )}
-        {top.name === 'restockServer' && <RestockServerScreen />}
+        {top.name === 'restockServer' && <RestockServerScreen code={top.code} />}
         {top.name === 'homeAssistant' && <HomeAssistantScreen />}
         {top.name === 'household' && <HouseholdScreen />}
         {top.name === 'categories' && <CategoriesScreen section={top.section} />}
@@ -672,7 +678,7 @@ function RestockApp() {
         {top.name === 'receipt' && <ReceiptScreen key={top.id ?? 'new'} id={top.id} />}
         {top.name === 'recalls' && <RecallsScreen />}
         {top.name === 'soon' && <SoonScreen id={top.id} />}
-      </>
+      </Suspense>
     )
   ) : undefined;
   // 0.9.1: in the layer on <body>, so the scanner, the toast and its Undo, and what screen readers
@@ -720,28 +726,6 @@ function RestockApp() {
     layerHost(),
   );
 
-  // 0.9.3: a Restock server's web app in a wide window: a sidebar and wide pages (server-mode/ui/Desktop.tsx).
-  if (serverMode && desk && serverUi.current?.Desktop) {
-    const Desktop = serverUi.current.Desktop;
-    return (
-      <NavContext.Provider value={nav}>
-        {/* 0.10.3: a wide window's sidebar has room for every tab that's on (no More there). */}
-        <Desktop tabs={['home', ...inBar, 'list'] as Tab[]} tab={shownTab === 'more' ? 'home' : shownTab} stack={stack} overlay={overlay} />
-        <ConfirmHost />
-        {whatsNew && (
-          <WhatsNewPrompt
-            onRead={() => {
-              closeWhatsNew();
-              nav.push({ name: 'whatsnew' });
-            }}
-            onSkip={closeWhatsNew}
-          />
-        )}
-        {layers}
-      </NavContext.Provider>
-    );
-  }
-
   return (
     <NavContext.Provider value={nav}>
       <div className={`app${padWide ? ' pad-wide' : ''}`}>
@@ -779,7 +763,7 @@ function RestockApp() {
           {padWide && (
             <>
               <span className="pad-rule" aria-hidden="true" />
-              {PAD_SIDE.map((x) => (
+              {padSide().map((x) => (
                 <button key={x.screen} className="tab" aria-current={sideAt === x.screen ? 'page' : undefined} onClick={() => openFromSide(x.screen)}>
                   <Icon name={x.icon} />
                   {x.label}

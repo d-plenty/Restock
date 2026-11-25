@@ -5,8 +5,6 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { firstPhoto, IMAGE_HOSTS, ItemPhoto, PageArrows, pageForKey, photoLetter, photoUrl, stepPage } from './ui/deskShared';
-import { AISLE_TIP_MIN, aisleTip } from './ui/DeskAisleTip';
-import { trackedGroup, trackedIndex } from './ui/DeskSpecials';
 
 const W = 'https://cdn0.woolworths.media/content/wowproductimages/medium/123456.jpg';
 
@@ -100,42 +98,5 @@ describe('catalogue pages', () => {
     expect(last.replace(/<!-- -->/g, '')).toContain('Page 7 of 7');
     expect(last).toMatch(/<button[^>]*disabled[^>]*>Next/);
     expect(renderToStaticMarkup(createElement(PageArrows, { page: 0, count: 1, onGo: go, where: 'top' }))).toBe('');
-  });
-});
-
-describe('the Aisle group tip', () => {
-  const cats = new Set(['dairy', 'bakery']);
-  const lines = (cs: (string | undefined)[]) => cs.map((c, i) => ({ id: String(i), c }));
-  const of = (l: { c?: string }) => l.c;
-  it('shows when more than half the lines are in Other', () => {
-    expect(aisleTip(lines([undefined, undefined, 'dairy']), of, cats).show).toBe(true);
-    expect(aisleTip(lines([undefined, 'gone', 'dairy', undefined, 'bakery']), of, cats).show).toBe(true); // a deleted category is Other
-  });
-  it('not when half or fewer are, or the list is short', () => {
-    expect(aisleTip(lines([undefined, undefined, 'dairy', 'bakery']), of, cats).show).toBe(false);
-    expect(aisleTip(lines(['dairy', 'bakery', 'dairy']), of, cats).show).toBe(false);
-    expect(aisleTip(lines([undefined, undefined]), of, cats).show).toBe(false);
-    expect(AISLE_TIP_MIN).toBe(3);
-    expect(aisleTip([], of, cats)).toEqual({ other: [], show: false });
-  });
-  it('lists the lines in Other', () => {
-    expect(aisleTip(lines([undefined, 'dairy', 'x']), of, cats).other.map((l) => l.id)).toEqual(['0', '2']);
-  });
-});
-
-describe('a special you track opens its item', () => {
-  const recs = [
-    { group: { id: 'g-beans' }, options: [{ product: { chain: 'woolworths', storeProductId: '102', name: 'Heinz Baked Beanz 4 x 220g' } }] },
-    { group: { id: 'g-milk' }, options: [{ product: { chain: 'coles', name: 'Coles Full Cream Milk 3L' } }] },
-  ];
-  const index = trackedIndex(recs);
-  it('by the shop’s product number, or the same name at the same shop', () => {
-    expect(trackedGroup(index, { chain: 'woolworths', storeProductId: '102', name: 'anything' })).toBe('g-beans');
-    expect(trackedGroup(index, { chain: 'woolworths', storeProductId: '999', name: 'Heinz Baked Beanz 4 × 220g' })).toBe('g-beans');
-    expect(trackedGroup(index, { chain: 'coles', storeProductId: 'c9', name: 'coles full cream milk 3l' })).toBe('g-milk');
-  });
-  it('not at another shop, or another product', () => {
-    expect(trackedGroup(index, { chain: 'coles', storeProductId: '102', name: 'Heinz Baked Beanz 4 x 220g' })).toBeUndefined();
-    expect(trackedGroup(index, { chain: 'woolworths', storeProductId: '101', name: "Arnott's Tim Tam Original 200g" })).toBeUndefined();
   });
 });

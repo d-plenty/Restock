@@ -22,7 +22,7 @@ export const WEBID_KEY = 'restock-server-webid';
 /** What the server said it is, kept so the app can open offline (no household data in it). */
 export const INFO_KEY = 'restock-pwa-server';
 /** Inside the copy's own IndexedDB database (so it goes with it): when the list last came from the server. */
-export const LAST_KEY = 'pwa-last-sync';
+const LAST_KEY = 'pwa-last-sync';
 
 /** The message api.ts gives when the server can't be reached. */
 const OFFLINE_TEXT = /^Can't reach your Restock server/;

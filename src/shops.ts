@@ -294,7 +294,6 @@ export interface ShopDef {
 /** 0.10.3: the headings in the shop picker, every tab's picker listing every shop under them. */
 export type ShopGroup =
   | 'supermarket' | 'pharmacy' | 'bottle' | 'baby' | 'pet' | 'bigbox'
-  // 0.11.3
   | 'auto' | 'hardware' | 'outdoors' | 'sport' | 'electronics' | 'home' | 'beauty' | 'variety'
   | 'other';
 export const SHOP_GROUPS: { id: ShopGroup; name: string }[] = [
@@ -630,7 +629,6 @@ export const SHOPS: ShopDef[] = [
 
 /** 0.10.3: the shops marked Beta in the picker (besides every shop on a Beta tab). */
 export const BETA_SHOPS: readonly string[] = ['costco', 'iga', 'babybunting', 'petbarn', 'petstock', 'petcircle', 'bigw', 'kmart', 'target', 'bunnings',
-  // 0.11.3
   'foodworks', 'drakes', 'harrisfarm', 'spudshed', 'foodland', 'nqr', 'supabarn', 'liquorlegends', 'bottlemart', 'babykingdom', 'babyland', 'babyvillage', 'bestfriendspets', 'peto', 'budgetpet', 'petquarters', 'supercheap', 'repco', 'autobarn', 'autopro', 'burson', 'mitre10', 'totaltools', 'sydneytools', 'homehardware', 'bcf', 'anaconda', 'kings', 'tentworld', 'kathmandu', 'rebel', 'decathlon', 'jbhifi', 'officeworks', 'goodguys', 'harveynorman', 'binglee', 'spotlight', 'lincraft', 'ikea', 'adairs', 'pillowtalk', 'mecca', 'adorebeauty', 'rejectshop', 'cheapaschips', 'reddot',
 ];
 
@@ -642,7 +640,6 @@ export const BETA_SHOPS: readonly string[] = ['costco', 'iga', 'babybunting', 'p
 export const SHARED_PRICE_SHOPS = ['coles', 'woolworths', 'aldi'] as const;
 
 const BY_ID = new Map<string, ShopDef>(SHOPS.map((s) => [s.id, s]));
-export const GROCERY: GroceryChain[] = ['woolworths', 'coles', 'aldi'];
 
 /**
  * 0.9.6: shops that live on one phone only. Costco is switched on in that phone's own Settings

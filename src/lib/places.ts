@@ -38,7 +38,7 @@ export interface NearbyStore {
 
 const DIRS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
 /** Compass direction from one point to another, in words. */
-export function directionWord(aLat: number, aLon: number, bLat: number, bLon: number): string {
+function directionWord(aLat: number, aLon: number, bLat: number, bLon: number): string {
   const y = Math.sin(((bLon - aLon) * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180);
   const x =
     Math.cos((aLat * Math.PI) / 180) * Math.sin((bLat * Math.PI) / 180) -
@@ -233,7 +233,6 @@ const GROUP_TAGS: Record<ShopGroup, string[]> = {
   baby: ['["shop"="baby_goods"]'],
   pet: ['["shop"="pet"]'],
   bigbox: ['["shop"~"^(department_store|variety_store)$"]'],
-  // 0.11.3
   auto: ['["shop"~"^(car_parts|car_repair|tyres)$"]'],
   hardware: ['["shop"~"^(doityourself|hardware|garden_centre|trade)$"]'],
   outdoors: ['["shop"~"^(outdoor|fishing|hunting|camping)$"]'],
@@ -341,7 +340,7 @@ async function overpassFrom(base: string, lat: number, lon: number, section: Sec
 }
 
 /** Backup: ask Nominatim for each chain's name inside a box around you. */
-export async function nominatimStores(lat: number, lon: number, section: Section = 'pantry', chains?: StoreChain[]): Promise<NearbyStore[]> {
+async function nominatimStores(lat: number, lon: number, section: Section = 'pantry', chains?: StoreChain[]): Promise<NearbyStore[]> {
   const d = 0.25; // about 25 km
   // 0.9.0: the box is drawn around your position rounded to about 100 m (roundCoord).
   const [cLat, cLon] = [roundCoord(lat), roundCoord(lon)];

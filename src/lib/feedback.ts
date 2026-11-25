@@ -4,13 +4,12 @@ import { serverMode } from '../server-mode/flag';
 import { getKV, getSettings, marketStatus, putKV, uid } from './db';
 import { problems } from './diagnostics';
 
-
 // 0.9.13: Settings → Feedback. A message goes to Restock's own server (the restock-prices
 // collector, lib/feedback.mjs there), with up to 3 screenshots and diagnostics (on unless turned
 // off), and an email only if the person wants a reply. With no connection it waits on this phone
 // and goes the next time Feedback is opened or Restock starts.
 
-export const FEEDBACK_URL = 'https://restock-prices.plenty.family/feedback';
+const FEEDBACK_URL = 'https://restock-prices.plenty.family/feedback';
 export const FEEDBACK_KINDS = [
   { id: 'wrong', label: "Something's wrong" },
   { id: 'idea', label: 'An idea' },

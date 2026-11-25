@@ -35,7 +35,7 @@ export function noteSaveFailed(error: unknown): void {
   set({ ...state, failed: state.failed + 1, error: error instanceof Error ? error.message : String(error) });
 }
 /** Home says so once this many saves in a row have failed (one failure can be a blip). */
-export const SAVE_WARN_AFTER = 2;
+const SAVE_WARN_AFTER = 2;
 export const saveNeedsWarning = (s: SaveState = state): boolean => s.failed >= SAVE_WARN_AFTER;
 
 /** Set by the app's start-up where there is something to flush: saves now, and says how it went. */

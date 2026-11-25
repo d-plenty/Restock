@@ -40,7 +40,7 @@ export const useInventory = (): Inventory => useLive(loadInventory, []) ?? NO_IN
 
 /** "your pantry", "Baby". */
 const tabWords = (s: Section) => (s === 'pantry' ? 'your pantry' : SECTION_NAMES[s]);
-export const INVENTORY_ABOUT =
+const INVENTORY_ABOUT =
   'Keep track of how much you have at home. Count things by number, by weight or volume, or roughly (a quarter, half or three quarters of a pack). Ticking something off while you shop adds it, and Restock can tell you when you are running low.';
 
 type HaveGroup = Pick<Group, 'id' | 'name' | 'section' | 'categoryId'>;
@@ -49,7 +49,7 @@ type HaveGroup = Pick<Group, 'id' | 'name' | 'section' | 'categoryId'>;
  * A new amount, saved with an Undo. When that takes it to "running low" or "out" and it isn't on the
  * shopping list yet: on the list it goes by itself (when that's switched on), or Restock asks.
  */
-export async function changeHave(group: HaveGroup, before: Have | undefined, next: Have | undefined, inv: Pick<Inventory, 'auto'>): Promise<void> {
+async function changeHave(group: HaveGroup, before: Have | undefined, next: Have | undefined, inv: Pick<Inventory, 'auto'>): Promise<void> {
   await act(next ? `${group.name}: you have ${haveText(next)}` : `${group.name} is no longer counted`, () => saveHave(group.id, next), { merge: `have:${group.id}` });
   const how = next ? ranLow(before, next) : undefined;
   if (!how || (await openEntryForGroup(group.id))) return;
@@ -315,7 +315,7 @@ type Show = 'all' | 'low' | 'out';
  * On: everything in the tab by category with how much there is; minus and plus for counted things,
  * a tap on any amount to change it; and Turn off at the bottom (the amounts are kept).
  */
-export function InventoryBody({ section, back }: { section: Section; /** The web page: a way back to the tab. */ back?: ReactNode }) {
+function InventoryBody({ section, back }: { section: Section; /** The web page: a way back to the tab. */ back?: ReactNode }) {
   const live = useLive(loadInventory, []);
   const inv = live ?? NO_INVENTORY;
   const loaded = !!live;
@@ -466,7 +466,7 @@ export const inventoryTabs = (s: { sections?: Partial<Record<string, boolean>> }
  * Settings → Inventory: a switch for Pantry and for each tab you made (none on to start with), and
  * what happens when something runs out. Nothing changes until Save settings.
  */
-export function InventorySettingsBody({ onSaved }: { onSaved?: () => void }) {
+function InventorySettingsBody({ onSaved }: { onSaved?: () => void }) {
   const live = useLive(loadInventory, []);
   const inv = live ?? NO_INVENTORY;
   const loaded = !!live;

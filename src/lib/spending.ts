@@ -1,6 +1,6 @@
 import type { DataSeries, DataStats, Period, TopItem, TopPage } from '../server-mode/ui/houseData';
 import type { SqlValue } from './sql/driver';
-import { getKV, onBeforeListDelete, putKV, queryRows, runSql } from './db';
+import { getKV, onBeforeListDelete, putKV, queryRows, runSql, marketQuery } from './db';
 import { RestockNative } from './sql/native';
 import { serverMode } from '../server-mode/flag';
 
@@ -62,7 +62,8 @@ const ids = (v: unknown): string[] => {
   return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [];
 };
 
-export function makeSpending(q: Q, run: Run, now: () => number = Date.now) {
+/** `mq`: where the shared price history is read (its own database on iPhone; the same one elsewhere). */
+export function makeSpending(q: Q, run: Run, now: () => number = Date.now, mq: Q = q) {
   async function priceAt(pid: string, at: number): Promise<Row | null> {
     const sql = 'SELECT date, price, was_price, is_special, member_only FROM prices WHERE product_id = ?';
     return (await q(sql + ' AND date <= ? ORDER BY date DESC LIMIT 1', [pid, iso(at)]))[0] ?? (await q(sql + ' ORDER BY date DESC LIMIT 1', [pid]))[0] ?? null;
@@ -79,7 +80,8 @@ export function makeSpending(q: Q, run: Run, now: () => number = Date.now) {
     let u = median(readings.filter((r) => !Number(r.is_special)).map((r) => Number(r.price)));
     if (u === undefined) u = median(readings.map((r) => num(r.was_price)).filter((v): v is number => v !== null && v > 0));
     if (u === undefined) {
-      const m = (await q('SELECT m.normal FROM market m JOIN products p ON p.chain = m.chain AND p.store_product_id = m.store_product_id WHERE p.id = ? LIMIT 1', [pid]))[0];
+      const p = (await q('SELECT chain, store_product_id FROM products WHERE id = ?', [pid]))[0];
+      const m = p?.store_product_id ? (await mq('SELECT normal FROM market WHERE chain = ? AND store_product_id = ? LIMIT 1', [p.chain as string, p.store_product_id as string]))[0] : undefined;
       u = m && Number(m.normal) > 0 ? Number(m.normal) : undefined;
     }
     const out = u === undefined ? null : round2(u);
@@ -366,7 +368,7 @@ export function makeSpending(q: Q, run: Run, now: () => number = Date.now) {
       receipts: await one("SELECT COUNT(*) AS n FROM receipts WHERE id NOT LIKE 'demo-%'"),
       cards: await one('SELECT COUNT(*) AS n FROM cards'),
       purchases: await one('SELECT COUNT(*) AS n FROM spend_log'),
-      shared: await one('SELECT COUNT(*) AS n FROM market'),
+      shared: Number((await mq('SELECT COUNT(*) AS n FROM market'))[0]?.n ?? 0),
     };
   }
 
@@ -378,6 +380,8 @@ export const phoneSpending = () =>
   makeSpending(
     (sql, params = []) => queryRows<Row>(sql, params),
     (sql, params = []) => runSql(sql, params),
+    Date.now,
+    (sql, params = []) => marketQuery<Row>(sql, params),
   );
 
 /** Notes ticks now (after ticking, before clearing the list, when Restock opens). Quiet on failure. */

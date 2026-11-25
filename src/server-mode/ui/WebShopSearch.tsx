@@ -32,38 +32,7 @@ import { act } from '../../lib/undo';
 import { offerUndo, productIdsHere } from './searchUndo';
 import { ItemPhoto, photoUrl } from './deskShared';
 import { ADMIN_NOTE } from './houseData';
-import {
-  addBody,
-  addedText,
-  addFromSearch,
-  askShops,
-  canChangeWebSearch,
-  findProduct,
-  isGone,
-  listChoices,
-  listLabel,
-  saveWebSearch,
-  picksForYou,
-  searchErrorText,
-  searchTabFor,
-  tabOfChain,
-  searchingText,
-  searchShops,
-  shopNote,
-  shownItems,
-  suggestedName,
-  tickedShops,
-  type AddAnswer,
-  type FoundProduct,
-  type SearchAnswer,
-  type Target,
-  useShopAsk,
-  useWebSearchOn,
-  TURN_ON_LINK,
-  PICK_OFF_TEXT,
-  WEB_SEARCH_TEXT,
-  WEB_SEARCH_TITLE,
-} from './webSearch';
+import { addBody, addedText, addFromSearch, askShops, canChangeWebSearch, isGone, listChoices, listLabel, saveWebSearch, picksForYou, searchErrorText, searchTabFor, searchingText, searchShops, shopNote, shownItems, suggestedName, tickedShops, type AddAnswer, type FoundProduct, type SearchAnswer, type Target, useShopAsk, useWebSearchOn, TURN_ON_LINK, PICK_OFF_TEXT, WEB_SEARCH_TEXT, WEB_SEARCH_TITLE } from './webSearch';
 
 const FIRST_PAGE = 5;
 const MORE_PAGE = 10;
@@ -698,7 +667,7 @@ export function WebSearchSwitch({ Line }: { Line: (p: { title: string; sub?: Rea
  * Under the add box: "Search the shops for "honey"" when the setting is on; when it's off, a small
  * link to Settings. Nothing while nothing's typed (or the household isn't a v3 house).
  */
-export function ShopSearchButton({ text, list, className = 'btn', short }: { text: string; list: ListSection; className?: string; short?: boolean }) {
+function ShopSearchButton({ text, list, className = 'btn', short }: { text: string; list: ListSection; className?: string; short?: boolean }) {
   const nav = useNav();
   const on = useWebSearchOn();
   const t = text.trim();
@@ -717,7 +686,7 @@ export function ShopSearchButton({ text, list, className = 'btn', short }: { tex
 }
 
 /** The results of what was asked (typed or scanned), under the add box, until added or closed. */
-export function ShopSearchPanel({ list, wide, onAdded }: { list: ListSection; wide?: boolean; onAdded?: () => void }) {
+function ShopSearchPanel({ list, wide, onAdded }: { list: ListSection; wide?: boolean; onAdded?: () => void }) {
   const nav = useNav();
   const ask = useShopAsk();
   const on = useWebSearchOn();
@@ -754,7 +723,7 @@ export function ShopSearchPanel({ list, wide, onAdded }: { list: ListSection; wi
 }
 
 /** The Pick sheet on the web: Search the shops for "chopsticks" (setting on), or where to do it (off). */
-export function PickSearchButton({
+function PickSearchButton({
   typed,
   pantryShown,
   busy,
@@ -791,7 +760,7 @@ export function PickSearchButton({
 }
 
 /** The Pick sheet's shop results on the web: adding makes the pantry item and the line becomes it. */
-export function PickSearchResults({
+function PickSearchResults({
   query,
   entry,
   word,
@@ -816,7 +785,7 @@ export function PickSearchResults({
 }
 
 /** The phone layout's Shopping list on the web: Scan, as on the desktop list's add box (0.10.7: and Find from a photo). */
-export function ListScan({ section }: { section: Section }) {
+function ListScan({ section }: { section: Section }) {
   const nav = useNav();
   return (
     <>
@@ -831,7 +800,7 @@ export function ListScan({ section }: { section: Section }) {
  * browser (nothing is sent anywhere), then the shops are searched for them. Google Lens is the
  * backup, only when tapped.
  */
-export function PhotoFindButton({ section, className = 'btn' }: { section: Section; className?: string }) {
+function PhotoFindButton({ section, className = 'btn' }: { section: Section; className?: string }) {
   const [open, setOpen] = useState(false);
   const [words, setWords] = useState('');
   return (
@@ -868,54 +837,3 @@ export const webSearchUi = {
   Scan: ListScan,
 };
 
-/**
- * 0.9.5 (web search): Track for a special you don't track yet (as the phone's). The server searches
- * the special's shop for its name and saves that product from its own search (prices come from the
- * server's search, never from this page). When the shop's answer doesn't have that very product,
- * what it found shows, to tick the right one.
- */
-export function useTrackSpecial() {
-  const nav = useNav();
-  const on = useWebSearchOn();
-  const [busy, setBusy] = useState<string>();
-  const [choose, setChoose] = useState<{ p: StoreProduct; a: SearchAnswer; tab: Section }>();
-  const track = async (p: StoreProduct) => {
-    const k = keyOf(p);
-    if (busy) return;
-    setBusy(k);
-    try {
-      const tab = tabOfChain(p.chain);
-      const a = await searchShops({ q: p.name.slice(0, 100), section: tab, chain: p.chain as StoreChain });
-      const hit = findProduct(a, p.chain, p.storeProductId);
-      if (!hit) return setChoose({ p, a, tab });
-      const name = suggestedName([hit]);
-      const had = await productIdsHere();
-      const done = await addFromSearch(addBody(a.search, [hit], { target: 'pantry', tab, list: tab, name }));
-      await fetchIt();
-      // 0.9.5 (final review): "… · Undo" (searchUndo.ts).
-      await offerUndo(done, had, async () => addedText(done, done.item?.name ?? name, tab));
-    } catch (e) {
-      nav.toast(searchErrorText(e));
-    } finally {
-      setBusy(undefined);
-    }
-  };
-  const sheet = choose && (
-    <Sheet title={`Track it: ${chainName(choose.p.chain)}`} onClose={() => setChoose(undefined)}>
-      <p className="small" style={{ margin: 0 }}>
-        {chainName(choose.p.chain)} didn't send back "{choose.p.name}" itself. Tick it among what it found, then tap the bar at the bottom.
-      </p>
-      <WebShopSearch
-        query={choose.p.name.slice(0, 100)}
-        tab={choose.tab}
-        only={choose.p.chain as StoreChain}
-        initial={choose.a}
-        onDone={(said) => {
-          setChoose(undefined);
-          if (said) nav.toast(said);
-        }}
-      />
-    </Sheet>
-  );
-  return { on: on === true, track, busy, sheet };
-}

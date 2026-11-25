@@ -67,7 +67,7 @@ export function SwapWhy({
 type ShopLineT = import('../lib/shopTotals').ShopLine;
 
 /** 0.10.1: both ways of counting, always in this order and with these words, on every row and sheet. */
-export const bothWays = (same: number, till: number, approx = false) =>
+const bothWays = (same: number, till: number, approx = false) =>
   // 0.10.8: once when they're the same ("Same shopping $21.80 · at the till $21.80" said it twice)
   Math.abs(same - till) < 0.25
     ? `${approx ? 'about ' : ''}${money(till)} either way`

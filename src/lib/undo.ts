@@ -49,7 +49,7 @@ export type UndoEvent = { kind: 'added'; step: UndoStep } | { kind: 'undone'; st
 
 const MAX_STEPS = 20;
 /** How long an action can still be undone (Ctrl+Z on the web; the button shows for a few seconds). */
-export const UNDO_KEEP_MS = 30 * 60_000;
+const UNDO_KEEP_MS = 30 * 60_000;
 const MERGE_MS = 6000;
 
 let steps: Held[] = [];
@@ -306,7 +306,7 @@ function push(rec: Recorded, label: string, merge?: string) {
 }
 
 /** The statements that put one step back, and how many rows were left because they changed since. */
-export async function undoOps(step: Pick<Held, 'before' | 'after'>, now = Date.now()): Promise<{ ops: SqlOp[]; kept: number; back: number }> {
+async function undoOps(step: Pick<Held, 'before' | 'after'>, now = Date.now()): Promise<{ ops: SqlOp[]; kept: number; back: number }> {
   const ops: SqlOp[] = [];
   let kept = 0;
   let back = 0;
@@ -413,7 +413,6 @@ export async function undoable(change: () => Promise<void>, _rows?: RowSet[] | P
 export const groupRows = (ids: string[]) => rowsForGroups(ids);
 export const entryRows = (ids: string[]): RowSet[] =>
   ids.length ? [{ table: 'list_entries', where: `id IN (${ids.map(() => '?').join(',')})`, params: ids }] : [];
-export const cardRows = (id: string): RowSet[] => [{ table: 'cards', where: 'id = ?', params: [id] }];
 export const productRows = (groupId: string, productId: string): RowSet[] => [
   { table: 'items', where: 'id = ?', params: [groupId] },
   { table: 'products', where: 'id = ?', params: [productId] },

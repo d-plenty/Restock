@@ -8,7 +8,8 @@ import type { Settings } from '../../types';
 import { Icon, More } from '../components';
 import { useNav } from '../nav';
 import { SuggestLocalBackup } from './Backups';
-import { AddPhoneSheet, serverSummary } from './Sync';
+import { serverSummary } from './Sync';
+import { AddPhoneSheet } from './SyncServer';
 
 /**
  * The top of Settings → Sync and backups (0.9.3; 0.9.4: the "Restock sync redesign" canvas). Not set
@@ -190,10 +191,11 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
                   <span className="small">{ios ? 'For iPhones and iPads. One shared folder in iCloud Drive, at home or away.' : 'A folder your drive app keeps in step, like Google Drive or Dropbox. Slower.'}</span>
                 </button>
               );
+            // 0.15.0: every way works on an iPhone now; a build without the Files part says so.
             return can || !ios ? (
               choice
             ) : (
-              <IosBox key={kind} reason={kind === 'server' ? 'server' : kind === 'wifi' ? 'sync' : 'icloud'}>
+              <IosBox key={kind} reason="icloud">
                 {choice}
               </IosBox>
             );

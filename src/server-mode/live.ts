@@ -16,12 +16,13 @@ import { createSqlJsDriver } from '../lib/sql/sqljs';
 import { setPhotoSource } from '../lib/receiptFiles';
 import { SECTIONS, shopDef, shopsIn, type Section, type StoreChain } from '../shops';
 import type { PriceReading, Settings } from '../types';
-import { api, api3, type HistoryRow } from './api';
+import { api3, type HistoryRow } from './api';
 import { openWithAny, signedText, verifySig } from './crypto';
 import { WebSyncEngine } from './engine';
 import { syncRound, type RoundResult, type SharedSection } from './round';
-import { addKeys, refreshHouseKeys, session, type Session } from './session';
+import { refreshHouseKeys, session, type Session } from './session';
 import { syncDbOf } from './sqldb';
+import { quiet } from '../lib/quietErrors';
 
 const STORE = 'files';
 const dbName = (webId: string) => `restock-server-${webId}`;
@@ -177,7 +178,7 @@ async function serverPhoto(path: string): Promise<string | undefined> {
   const s = session();
   const sum = engine?.meta('photo:' + path);
   if (!s || !sum) return undefined;
-  const bytes = await (s.v === 3 ? api3 : api).read(`photos/${sum}.bin`).catch(() => null);
+  const bytes = await api3.read(`photos/${sum}.bin`).catch(() => null);
   if (!bytes) return undefined;
   try {
     const m = openWithAny<{ data?: string }>(s.keys, bytes).msg;
@@ -232,13 +233,10 @@ export function syncNow(): Promise<RoundResult | undefined> {
     if (copyIsOtherHousehold(engine.meta('owner_pin'), s.ownerPub)) return dropOtherCopy(s);
     setStatus({ busy: true });
     try {
-      const house = s.v === 3;
-      // syncRound adds a vouched-for new key (v2, webkeys/) to the keys it's handed.
       let keys = { webId: s.webId, webPriv: s.webPriv, webPub: s.webPub, keys: { ...s.keys } };
-      let r = await syncRound(engine, house ? api3 : api, keys, undefined, { v3: house });
-      if (!house && r.newKeys) await addKeys({ keys: keys.keys });
+      let r = await syncRound(engine, api3, keys, undefined, { v3: true });
       // A house rekeys when a phone is removed: the server has the new key for this session.
-      if (house && r.unread > 0 && Date.now() - keysAskedAt > 5 * 60_000) {
+      if (r.unread > 0 && Date.now() - keysAskedAt > 5 * 60_000) {
         keysAskedAt = Date.now();
         const now = (await refreshHouseKeys().catch(() => false)) ? session() : undefined;
         if (now && copyIsOtherHousehold(engine.meta('owner_pin'), now.ownerPub)) return dropOtherCopy(now);
@@ -247,7 +245,7 @@ export function syncNow(): Promise<RoundResult | undefined> {
           r = await syncRound(engine, api3, keys, undefined, { v3: true });
         }
       }
-      if (r.shared.length) await keepShared(r.shared).catch(() => undefined);
+      if (r.shared.length) await keepShared(r.shared).catch(quiet('web sync'));
       if (!firstDone) {
         firstDone = true;
         await background(() => ensureDefaults());

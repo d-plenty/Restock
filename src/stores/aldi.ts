@@ -55,7 +55,7 @@ export function flattenAldi(data: Raw): StoreProduct[] {
 }
 
 /** Results per page, as Aldi's own website asks (0.8.5: was 24). */
-export const ALDI_PAGE = 30;
+const ALDI_PAGE = 30;
 
 function searchUrl(term: string, storeId?: string, page = 1): string {
   const params = new URLSearchParams({

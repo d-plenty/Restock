@@ -1,7 +1,7 @@
 import { deviceWord, isIos, isPad } from '../../lib/platform';
 import { saveNeedsWarning, saveNow, saveState, subscribeSaveState } from '../../lib/saveState';
 import { greeting, todayText } from '../../lib/greeting';
-import { useState, useSyncExternalStore } from 'react';
+import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { askResume, clearTrip, loadTrip, subscribeTrip } from '../../lib/trip';
 import { refreshText, useFullRefresh } from '../refresh';
 import { allCards, allListEntries, getSettings, updateSettings } from '../../lib/db';
@@ -32,7 +32,7 @@ import { ownCounts } from '../../lib/ownSpecialsLive';
 import { TabOffer } from './SetupNudges';
 import { UpdateBanner } from '../UpdateBanner';
 import { serverMode } from '../../server-mode/flag';
-import { ConnectionsSheet } from './Settings';
+import { ConnectionsSheet } from './SettingsParts';
 import { nextCheckWords, planOf } from '../../lib/checkSchedule';
 import { getCheckLog, missedSlot, missedWords, whenWords } from '../../lib/checkLog';
 
@@ -263,7 +263,8 @@ export function HomeScreen() {
                   <Icon name="shop" size={24} />
                   <ChainDot chain={c} />
                 </span>
-                <span className="shop-tile-name">{chainName(c)}</span>
+                {/* The name never breaks inside a word: it gets smaller to fit its longest word (styles.css). */}
+                <FitName name={chainName(c)} />
                 <span className="shop-tile-note num">{shopTileNote(counts?.get(c))}</span>
               </button>
             ))}
@@ -294,7 +295,7 @@ export function HomeScreen() {
  * This week on Home: the deals from every tab that's switched on, and the grocery list's totals.
  * `picked`: only deals at these shops (none: every shop). 0.9.3: also what the web's desktop Home shows.
  */
-export function weekDeals(allRecs: Recommendation[], settings: Settings, allEntries: ListEntry[], picked: string[] = []) {
+function weekDeals(allRecs: Recommendation[], settings: Settings, allEntries: ListEntry[], picked: string[] = []) {
   // Deals from every tab that's switched on; the list summary is the grocery list.
   const on = activeSections(settings);
   const recs = allRecs.filter((r) => on.includes(r.group.section ?? 'pantry'));
@@ -390,7 +391,7 @@ function FirstHome({ tourSeen }: { tourSeen?: boolean }) {
 }
 
 /** When the next background check should run, in words ("tonight 5:00 pm", "tomorrow 5:00 am"). 0.9.6: the set time of day. */
-export function nextCheck(
+function nextCheck(
   s: { checkIntervalHours: number; checkTime?: string; checkWeekday?: number; checkDays?: number[]; sync: { backgroundActivity: boolean } },
   now = Date.now(),
 ): string | undefined {
@@ -427,6 +428,35 @@ function BlockedCard({ chain, onWorked, hide, maybe, days }: { chain: StoreChain
         {hide && <HideForADay chain={chain} />}
       </div>
     </div>
+  );
+}
+
+/** The longest word's length, in letters (at least 6, so a short name keeps the usual size). */
+const longestWord = (name: string): number => Math.max(6, ...name.split(/\s+/).map((w) => w.length));
+
+/**
+ * A shop's name on its tile. It breaks only between words and gets smaller to fit its longest word:
+ * styles.css sizes it from --w, that word's width at a 1px text size, measured in the font the phone
+ * actually uses (an iPhone's letters are wider than most). Until it's measured, a guess from the length.
+ */
+function FitName({ name }: { name: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [w, setW] = useState(() => longestWord(name) * 0.62);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return;
+    const cs = getComputedStyle(el);
+    ctx.font = `${cs.fontStyle} ${cs.fontWeight} 100px ${cs.fontFamily}`;
+    const widest = Math.max(...name.split(/\s+/).map((word) => ctx.measureText(word).width)) / 100;
+    // A little room for rounding, and never bigger than a six-letter word would make it.
+    if (widest > 0) setW(Math.max(widest * 1.04, 6 * 0.55));
+  }, [name]);
+  return (
+    <span ref={ref} className="shop-tile-name" style={{ '--w': w } as CSSProperties}>
+      {name}
+    </span>
   );
 }
 
