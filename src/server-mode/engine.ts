@@ -86,6 +86,90 @@ export interface SyncDb {
   transaction(body: () => void): void;
 }
 
+/**
+ * 0.15.1: the same database, answered later: the iPhone and iPad app's own SQLite, over the bridge
+ * to Swift. A transaction holds the database: nothing else is written to it until it ends.
+ */
+export interface AsyncSyncDb {
+  query(sql: string, args?: unknown[]): Promise<Row[]>;
+  exec(sql: string, args?: unknown[]): Promise<void>;
+  transaction(body: () => Promise<void>): Promise<void>;
+  /** Holds the database while the engine does one thing (nothing else reads or writes it meanwhile). */
+  exclusive?<T>(fn: () => Promise<T>): Promise<T>;
+}
+
+// 0.15.1: the engine's work is written once, as steps that each ask the database one thing (DbOp),
+// and run on either kind of database: straight away (SyncDb: the server, the web) or awaited
+// (AsyncSyncDb: the iPhone and iPad app). WebSyncEngine and AsyncSyncEngine run them.
+export type DbOp = { k: 'q'; sql: string; args?: unknown[] } | { k: 'x'; sql: string; args?: unknown[] } | { k: 'tx'; body: Gen<void> };
+export type Gen<T> = Generator<DbOp, T, unknown>;
+
+function* qry(sql: string, args?: unknown[]): Gen<Row[]> {
+  return (yield { k: 'q', sql, args }) as Row[];
+}
+function* run(sql: string, args?: unknown[]): Gen<void> {
+  yield { k: 'x', sql, args };
+}
+function* txn(body: Gen<void>): Gen<void> {
+  yield { k: 'tx', body };
+}
+
+/** Runs the steps on a database that answers straight away. */
+export function runOn<T>(db: SyncDb, g: Gen<T>): T {
+  let next = g.next();
+  while (!next.done) {
+    const op = next.value;
+    let answer: unknown;
+    try {
+      if (op.k === 'q') answer = db.query(op.sql, op.args);
+      else if (op.k === 'x') db.exec(op.sql, op.args);
+      else db.transaction(() => runOn(db, op.body));
+    } catch (e) {
+      next = g.throw(e);
+      continue;
+    }
+    next = g.next(answer);
+  }
+  return next.value;
+}
+
+/** Runs the steps on a database that answers later. */
+export async function runOnAsync<T>(db: AsyncSyncDb, g: Gen<T>): Promise<T> {
+  let next = g.next();
+  while (!next.done) {
+    const op = next.value;
+    let answer: unknown;
+    try {
+      if (op.k === 'q') answer = await db.query(op.sql, op.args);
+      else if (op.k === 'x') await db.exec(op.sql, op.args);
+      else await db.transaction(() => runOnAsync(db, op.body));
+    } catch (e) {
+      next = g.throw(e);
+      continue;
+    }
+    next = g.next(answer);
+  }
+  return next.value;
+}
+
+const isSteps = (f: unknown): boolean => typeof f === 'function' && Object.prototype.toString.call(f) === '[object GeneratorFunction]';
+
+/** SyncCore's steps as plain methods, on a database that answers straight away. */
+type Straight<T> = { [K in keyof T]: T[K] extends (...a: infer A) => Gen<infer R> ? (...a: A) => R : T[K] };
+/** SyncCore's steps as methods that answer later. */
+type Later<T> = { [K in keyof T]: T[K] extends (...a: infer A) => Gen<infer R> ? (...a: A) => Promise<R> : T[K] };
+
+function facade<T extends object>(core: T, run: (g: Gen<unknown>) => unknown, own: Record<string, unknown>): unknown {
+  return new Proxy(core, {
+    get(target, prop, receiver) {
+      if (typeof prop === 'string' && prop in own) return own[prop];
+      const v = Reflect.get(target, prop, receiver) as unknown;
+      if (isSteps(v)) return (...a: unknown[]) => run((v as (...a: unknown[]) => Gen<unknown>).apply(target, a));
+      return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(target) : v;
+    },
+  });
+}
+
 export interface Entry {
   tbl: string;
   pk: string;
@@ -135,7 +219,7 @@ export interface EngineOptions {
    */
   role?: 'web' | 'server' | 'phone';
   /** Server: signs a household change's text (signedText) with the owner key; base64url DER. */
-  sign?: (text: string) => string;
+  sign?: (text: string, ownerPriv: string | null) => string;
   /**
    * Server: the oldest date kept ("Keep data for"), an ISO time (keepCutoff), or null to keep
    * everything. Asked each time a file comes in, so a changed setting counts from the next file.
@@ -264,12 +348,11 @@ export const joinTabs = (tabs: Set<string>) => ALL_TABS.filter((t) => tabs.has(t
 /** The one way the web asks whether a household change may come in (SyncHousehold.allowed). */
 export type SigCheck = (pub: string, text: string, sig: string) => boolean;
 
-export class WebSyncEngine {
+export class SyncCore {
   private customTabs?: Map<string, string>;
   readonly role: 'web' | 'server' | 'phone';
 
   constructor(
-    readonly db: SyncDb,
     private readonly verify: SigCheck,
     private readonly signedText: (e: Entry) => string,
     private readonly now: () => number = () => Date.now(),
@@ -280,50 +363,50 @@ export class WebSyncEngine {
 
   // ---------- this browser ----------
 
-  meta(key: string): string | null {
-    const r = this.db.query('SELECT value FROM sync_meta WHERE key = ?', [key]);
+  *meta(key: string): Gen<string | null> {
+    const r = (yield* qry('SELECT value FROM sync_meta WHERE key = ?', [key]));
     return r.length ? (r[0].value as string | null) : null;
   }
 
-  setMeta(key: string, value: string | null): void {
-    if (value === null) this.db.exec('DELETE FROM sync_meta WHERE key = ?', [key]);
-    else this.db.exec('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)', [key, value]);
+  *setMeta(key: string, value: string | null): Gen<void> {
+    if (value === null) (yield* run('DELETE FROM sync_meta WHERE key = ?', [key]));
+    else (yield* run('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)', [key, value]));
   }
 
-  device(): string {
-    return this.meta('device') ?? '';
+  *device(): Gen<string> {
+    return (yield* this.meta('device')) ?? '';
   }
 
-  householdValue(k: string): string | null {
-    const r = this.db.query('SELECT v FROM household WHERE k = ?', [k]);
+  *householdValue(k: string): Gen<string | null> {
+    const r = (yield* qry('SELECT v FROM household WHERE k = ?', [k]));
     return r.length ? (r[0].v as string | null) : null;
   }
 
-  shareCards(): boolean {
-    return this.meta('share_cards') === '1';
+  *shareCards(): Gen<boolean> {
+    return (yield* this.meta('share_cards')) === '1';
   }
 
   /** 0.9.4: the household shares receipts and this device hasn't turned them off (share_receipts "0"). */
-  shareReceipts(): boolean {
-    return this.householdValue('receipts') === '1' && this.meta('share_receipts') !== '0';
+  *shareReceipts(): Gen<boolean> {
+    return (yield* this.householdValue('receipts')) === '1' && (yield* this.meta('share_receipts')) !== '0';
   }
 
-  householdTabs(): Set<string> {
-    return parseTabs(this.householdValue('tabs'));
+  *householdTabs(): Gen<Set<string>> {
+    return parseTabs((yield* this.householdValue('tabs')));
   }
 
-  tabs(): Set<string> {
-    const t = parseTabs(this.meta('tabs'));
-    const h = this.householdTabs();
+  *tabs(): Gen<Set<string>> {
+    const t = parseTabs((yield* this.meta('tabs')));
+    const h = (yield* this.householdTabs());
     return new Set([...t].filter((x) => h.has(x)));
   }
 
   /** SyncEngine.releaseHeld: the plain deletes held back for a tab not synced, taken in once it is. */
-  releaseHeld(): number {
-    const mine = this.tabs();
+  *releaseHeld(): Gen<number> {
+    const mine = (yield* this.tabs());
     const go: Entry[] = [];
     const done: [string, string][] = [];
-    for (const r of this.db.query('SELECT tbl, pk, entry FROM sync_held')) {
+    for (const r of (yield* qry('SELECT tbl, pk, entry FROM sync_held'))) {
       const tbl = String(r.tbl);
       const pk = String(r.pk);
       const key = keyOf(tbl);
@@ -334,15 +417,15 @@ export class WebSyncEngine {
         e = null;
       }
       if (key && e && typeof e === 'object') {
-        const cur = this.db.query(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]);
-        const tab = cur.length ? this.tabOf(tbl, cur[0]) : null;
+        const cur = (yield* qry(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]));
+        const tab = cur.length ? (yield* this.tabOf(tbl, cur[0])) : null;
         if (tab !== null && !mine.has(tab)) continue;
         go.push(e);
       }
       done.push([tbl, pk]);
     }
-    const n = go.length ? this.apply(go) : 0;
-    for (const [tbl, pk] of done) this.db.exec('DELETE FROM sync_held WHERE tbl = ? AND pk = ?', [tbl, pk]);
+    const n = go.length ? (yield* this.apply(go)) : 0;
+    for (const [tbl, pk] of done) (yield* run('DELETE FROM sync_held WHERE tbl = ? AND pk = ?', [tbl, pk]));
     return n;
   }
 
@@ -356,21 +439,21 @@ export class WebSyncEngine {
    * long ago, a stale cloud copy) still holds records deleted so long ago that the delete was tidied
    * away, and must not bring them back. A file that changed since is read as always.
    */
-  catchUpLists(): boolean {
-    if (this.meta('lists_v') === LISTS_V) return false;
-    const any = this.db.query("SELECT 1 FROM sync_meta WHERE key LIKE 'folder_seen:%' LIMIT 1").length > 0;
+  *catchUpLists(): Gen<boolean> {
+    if ((yield* this.meta('lists_v')) === LISTS_V) return false;
+    const any = (yield* qry("SELECT 1 FROM sync_meta WHERE key LIKE 'folder_seen:%' LIMIT 1")).length > 0;
     if (any)
-      this.db.transaction(() => {
-        this.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) SELECT 'catchup:' || key, value FROM sync_meta WHERE key LIKE 'folder_seen:%'");
-        this.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'");
-      });
-    this.setMeta('lists_v', LISTS_V);
+      (yield* txn((function* (this: SyncCore) {
+        (yield* run("INSERT OR REPLACE INTO sync_meta (key, value) SELECT 'catchup:' || key, value FROM sync_meta WHERE key LIKE 'folder_seen:%'"));
+        (yield* run("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'"));
+      }).call(this)));
+    (yield* this.setMeta('lists_v', LISTS_V));
     return any;
   }
 
   /** 0.9.5 (review): is this file being read again by catchUpLists, unchanged (`sum` as it was)? */
-  catchingUp(name: string, sum: string): boolean {
-    const was = this.meta('catchup:folder_seen:' + name);
+  *catchingUp(name: string, sum: string): Gen<boolean> {
+    const was = (yield* this.meta('catchup:folder_seen:' + name));
     return was !== null && was === sum;
   }
 
@@ -378,51 +461,51 @@ export class WebSyncEngine {
    * 0.9.5 (review), SyncEngine.catchUpEntries: what a catch-up read takes from a file: only General
    * list lines (section 'general') this device has never had (no row, no change noted). Nothing else.
    */
-  catchUpEntries(entries: Entry[] | null | undefined): Entry[] {
+  *catchUpEntries(entries: Entry[] | null | undefined): Gen<Entry[]> {
     const out: Entry[] = [];
     for (const x of Array.isArray(entries) ? entries : []) {
       if (!x || typeof x !== 'object' || x.tbl !== 'list_entries' || typeof x.pk !== 'string' || truthy(x.deleted)) continue;
       const row = x.row && typeof x.row === 'object' ? x.row : null;
       if (!row || str(row, 'section') !== 'general' || String(row.id ?? '') !== x.pk) continue;
-      if (this.db.query('SELECT 1 FROM list_entries WHERE id = ?', [x.pk]).length) continue;
-      if (this.db.query("SELECT 1 FROM sync_log WHERE tbl = 'list_entries' AND pk = ?", [x.pk]).length) continue;
+      if ((yield* qry('SELECT 1 FROM list_entries WHERE id = ?', [x.pk])).length) continue;
+      if ((yield* qry("SELECT 1 FROM sync_log WHERE tbl = 'list_entries' AND pk = ?", [x.pk])).length) continue;
       out.push(x);
     }
     return out;
   }
 
   /** SyncEngine.noteTabs: sharing more now? Go through everything again. */
-  noteTabs(): boolean {
-    this.resendCostcoLines();
-    const caught = this.catchUpLists();
-    const now = this.tabs();
-    const was = this.meta('tabs_eff');
+  *noteTabs(): Gen<boolean> {
+    (yield* this.resendCostcoLines());
+    const caught = (yield* this.catchUpLists());
+    const now = (yield* this.tabs());
+    const was = (yield* this.meta('tabs_eff'));
     const before = was === null ? null : parseTabs(was);
-    const receipts = this.shareReceipts();
-    const rwas = this.meta('receipts_eff');
+    const receipts = (yield* this.shareReceipts());
+    const rwas = (yield* this.meta('receipts_eff'));
     const receiptsOn = receipts && rwas !== '1';
     const again = (before !== null && ![...now].every((t) => before.has(t))) || receiptsOn;
     if (again) {
-      this.db.transaction(() => {
-        this.db.exec('UPDATE sync_peers SET got = 0');
-        this.db.exec('UPDATE sync_log SET seq = seq + (SELECT COALESCE(MAX(seq), 0) FROM sync_log)');
+      (yield* txn((function* (this: SyncCore) {
+        (yield* run('UPDATE sync_peers SET got = 0'));
+        (yield* run('UPDATE sync_log SET seq = seq + (SELECT COALESCE(MAX(seq), 0) FROM sync_log)'));
         // 0.9.5 (review): a full read again (catch-up markers too: everything is read as always).
-        this.db.exec("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'catchup:%'");
-      });
-      this.releaseHeld();
+        (yield* run("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%' OR key LIKE 'catchup:%'"));
+      }).call(this)));
+      (yield* this.releaseHeld());
     }
     const j = joinTabs(now);
     if (j !== was) {
-      this.setMeta('tabs_eff', j);
+      (yield* this.setMeta('tabs_eff', j));
       // 0.9.3: syncing another tab (or one fewer): its household settings apply from now.
-      this.applySharedSettings();
+      (yield* this.applySharedSettings());
     }
     const r = receipts ? '1' : '0';
-    if (r !== rwas) this.setMeta('receipts_eff', r);
+    if (r !== rwas) (yield* this.setMeta('receipts_eff', r));
     return again || caught;
   }
 
-  chainTab(chain: string | null): string | null {
+  *chainTab(chain: string | null): Gen<string | null> {
     if (!chain) return null;
     // 0.9.6: Costco is one phone's own: a "tab" no device ever shares (SyncEngine.LOCAL_TAB).
     if (isLocalOnlyShop(chain)) return LOCAL_TAB;
@@ -432,7 +515,7 @@ export class WebSyncEngine {
     if (!this.customTabs) {
       this.customTabs = new Map();
       try {
-        const r = this.db.query("SELECT value FROM kv WHERE key = 'settings'");
+        const r = (yield* qry("SELECT value FROM kv WHERE key = 'settings'"));
         const list = r.length ? (JSON.parse(String(r[0].value)) as { customShops?: { id?: string; section?: string }[] }).customShops : undefined;
         if (Array.isArray(list)) for (const c of list) if (c && typeof c === 'object') this.customTabs.set(String(c.id ?? ''), c.section ?? 'pantry');
       } catch {
@@ -443,12 +526,12 @@ export class WebSyncEngine {
     return t === undefined ? null : sharedTab(t);
   }
 
-  tabOf(tbl: string, row: Row | null | undefined): string | null {
-    const t = this.tabOfRaw(tbl, row);
+  *tabOf(tbl: string, row: Row | null | undefined): Gen<string | null> {
+    const t = (yield* this.tabOfRaw(tbl, row));
     return t === null ? null : sharedTab(t);
   }
 
-  private tabOfRaw(tbl: string, row: Row | null | undefined): string | null {
+  private *tabOfRaw(tbl: string, row: Row | null | undefined): Gen<string | null> {
     switch (tbl) {
       case 'categories':
       case 'items':
@@ -461,19 +544,19 @@ export class WebSyncEngine {
         if (s !== null) return s === 'general' ? 'pantry' : s;
         const item = str(row, 'item_id');
         if (item !== null) {
-          const r = this.db.query('SELECT section FROM items WHERE id = ?', [item]);
+          const r = (yield* qry('SELECT section FROM items WHERE id = ?', [item]));
           return r.length ? str(r[0], 'section') : null;
         }
         const chain = str(row, 'chain');
-        return chain !== null && !isLocalOnlyShop(chain) ? this.chainTab(chain) : 'pantry';
+        return chain !== null && !isLocalOnlyShop(chain) ? (yield* this.chainTab(chain)) : 'pantry';
       }
       case 'products':
-        return this.chainTab(str(row, 'chain'));
+        return (yield* this.chainTab(str(row, 'chain')));
       case 'receipts':
         return str(row, 'section') ?? 'pantry';
       case 'prices': {
-        const r = this.db.query('SELECT chain FROM products WHERE id = ?', [str(row, 'product_id')]);
-        return r.length ? this.chainTab(str(r[0], 'chain')) : null;
+        const r = (yield* qry('SELECT chain FROM products WHERE id = ?', [str(row, 'product_id')]));
+        return r.length ? (yield* this.chainTab(str(r[0], 'chain'))) : null;
       }
       case 'household_settings':
         return settingTab(str(row, 'k') ?? '', str(row, 'v'));
@@ -484,34 +567,34 @@ export class WebSyncEngine {
 
   // ---------- other devices ----------
 
-  notePeer(peer: string, name: string | null): void {
+  *notePeer(peer: string, name: string | null): Gen<void> {
     if (!peer) return;
-    this.db.exec('INSERT OR IGNORE INTO sync_peers (device, got) VALUES (?, 0)', [peer]);
-    if (name !== null) this.db.exec('UPDATE sync_peers SET name = ? WHERE device = ?', [name, peer]);
+    (yield* run('INSERT OR IGNORE INTO sync_peers (device, got) VALUES (?, 0)', [peer]));
+    if (name !== null) (yield* run('UPDATE sync_peers SET name = ? WHERE device = ?', [name, peer]));
   }
 
-  setSeen(peer: string, seen: number): void {
+  *setSeen(peer: string, seen: number): Gen<void> {
     if (!peer || seen <= 0) return;
-    const max = num(this.db.query('SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log')[0].top);
+    const max = num((yield* qry('SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log'))[0].top);
     const v = Math.min(seen, max);
-    this.db.exec('INSERT OR IGNORE INTO sync_peers (device, got) VALUES (?, 0)', [peer]);
-    this.db.exec('UPDATE sync_peers SET seen = ? WHERE device = ? AND seen < ?', [v, peer, v]);
+    (yield* run('INSERT OR IGNORE INTO sync_peers (device, got) VALUES (?, 0)', [peer]));
+    (yield* run('UPDATE sync_peers SET seen = ? WHERE device = ? AND seen < ?', [v, peer, v]));
   }
 
-  markSynced(peer: string, when: string): void {
-    this.db.exec('UPDATE sync_peers SET synced_at = ? WHERE device = ?', [when, peer]);
+  *markSynced(peer: string, when: string): Gen<void> {
+    (yield* run('UPDATE sync_peers SET synced_at = ? WHERE device = ?', [when, peer]));
   }
 
   // ---------- what changed here ----------
 
   /** SyncEngine.collect (the full version). */
-  collect(since: number, exclude: string | null, limit: number, allowed: Set<string> | null, where: string, moves: boolean, oldestDelete: number) {
-    if (!allowed) allowed = this.tabs();
-    let rows = this.db.query(`SELECT tbl, pk, stamp, device, deleted, seq, sig, created, origin FROM sync_log WHERE seq > ?${where} ORDER BY seq LIMIT ?`, [since, limit + 1]);
+  *collect(since: number, exclude: string | null, limit: number, allowed: Set<string> | null, where: string, moves: boolean, oldestDelete: number) {
+    if (!allowed) allowed = (yield* this.tabs());
+    let rows = (yield* qry(`SELECT tbl, pk, stamp, device, deleted, seq, sig, created, origin FROM sync_log WHERE seq > ?${where} ORDER BY seq LIMIT ?`, [since, limit + 1]));
     const more = rows.length > limit;
     if (more) rows = rows.slice(0, limit);
-    const cards = this.shareCards();
-    const receipts = this.shareReceipts();
+    const cards = (yield* this.shareCards());
+    const receipts = (yield* this.shareReceipts());
     const entries: Entry[] = [];
     let top = since;
     for (const r of rows) {
@@ -529,10 +612,10 @@ export class WebSyncEngine {
       if (deleted && oldestDelete > 0 && num(r.stamp) < oldestDelete) continue;
       e.deleted = deleted;
       if (!deleted) {
-        const row = this.db.query(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]);
+        const row = (yield* qry(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]));
         if (!row.length) continue;
         const data = { ...row[0] };
-        const tab = this.tabOf(tbl, data);
+        const tab = (yield* this.tabOf(tbl, data));
         if (tab === LOCAL_TAB) continue; // 0.9.6: Costco stays on its phone, not even as a "moved" record
         if (tab !== null && !allowed.has(tab)) {
           // 0.9.3: a household setting of a tab this pair doesn't share is left out, never sent as moved.
@@ -544,7 +627,7 @@ export class WebSyncEngine {
         }
         if (tbl === 'prices') delete data.id;
         if (tbl === 'products') for (const c of LOCAL_PRODUCT_COLUMNS) delete data[c];
-        if (tbl === 'items') this.stripCostcoPicks(data);
+        if (tbl === 'items') (yield* this.stripCostcoPicks(data));
         if (tbl === 'list_entries') stripCostcoLine(data);
         e.row = data;
       }
@@ -557,11 +640,11 @@ export class WebSyncEngine {
     return { entries, top, more };
   }
 
-  private logEntry(tbl: string, pk: string, stamp: number, device: string, deleted: boolean, sig: string | null, created: number, origin: string | null): void {
-    this.db.exec(
+  private *logEntry(tbl: string, pk: string, stamp: number, device: string, deleted: boolean, sig: string | null, created: number, origin: string | null): Gen<void> {
+    (yield* run(
       'INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq, sig, created, origin) VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log), ?, ?, ?)',
       [tbl, pk, stamp, device, deleted ? 1 : 0, sig, created, origin],
-    );
+    ));
   }
 
   /**
@@ -587,17 +670,17 @@ export class WebSyncEngine {
   // ---------- taking in another device's changes ----------
 
   /** SyncEngine.apply. Returns how many records changed here. */
-  apply(entries: Entry[] | null | undefined): number {
+  *apply(entries: Entry[] | null | undefined): Gen<number> {
     let changed = 0;
     if (!entries || !entries.length) return 0;
     const columns = new Map<string, Set<string>>();
-    const mine = this.tabs();
+    const mine = (yield* this.tabs());
     const now = this.now();
-    const receipts = this.shareReceipts();
+    const receipts = (yield* this.shareReceipts());
     let settings = false;
-    const room = this.settingsRoom();
-    this.db.transaction(() => {
-      this.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
+    const room = (yield* this.settingsRoom());
+    (yield* txn((function* (this: SyncCore) {
+      (yield* run("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')"));
       let clock = 0;
       for (const e of entries) {
         if (!e || typeof e !== 'object') continue;
@@ -611,15 +694,15 @@ export class WebSyncEngine {
         if (!Number.isFinite(stamp)) throw new Error('an entry without stamp');
         const device = typeof e.device === 'string' ? e.device : e.device === undefined || e.device === null ? '' : String(e.device);
         const deleted = truthy(e.deleted);
-        if (tbl === 'household' && !this.householdChangeAllowed(pk, device, e)) continue;
+        if (tbl === 'household' && !(yield* this.householdChangeAllowed(pk, device, e))) continue;
         if (tbl === 'receipts' && !receipts) continue;
         // 0.13.2, a phone: loyalty cards only when this phone shares its own (SyncEngine.apply).
-        if (tbl === 'cards' && this.role === 'phone' && !this.shareCards()) continue;
+        if (tbl === 'cards' && this.role === 'phone' && !(yield* this.shareCards())) continue;
         // 0.9.3: household settings only of a sensible size and shape, and not without end.
         if (tbl === 'household_settings' && !settingChangeOk(pk, e.row, deleted, room)) continue;
-        if (stamp > now + CLOCK_SLACK_MS) this.setMeta('clock_warn', device);
+        if (stamp > now + CLOCK_SLACK_MS) (yield* this.setMeta('clock_warn', device));
         else clock = Math.max(clock, stamp);
-        const hadRows = this.db.query('SELECT stamp, device, deleted, created, origin FROM sync_log WHERE tbl = ? AND pk = ?', [tbl, pk]);
+        const hadRows = (yield* qry('SELECT stamp, device, deleted, created, origin FROM sync_log WHERE tbl = ? AND pk = ?', [tbl, pk]));
         const had = hadRows.length ? hadRows[0] : null;
         let wins = had === null || newer(stamp, device, num(had.stamp), String(had.device ?? ''));
         const created = Math.trunc(num(e.created));
@@ -630,62 +713,62 @@ export class WebSyncEngine {
           else if (!deleted && hadDeleted) wins = created > num(had.stamp);
         }
         if (tbl === 'list_entries' && !deleted && had !== null && !hadDeleted) {
-          if (this.mergeListLine(e, stamp, device, created, wins, had, mine, columns)) changed++;
+          if ((yield* this.mergeListLine(e, stamp, device, created, wins, had, mine, columns))) changed++;
           continue;
         }
         if (!wins) continue;
         if (deleted && truthy(e.moved)) {
           if (tbl === 'household_settings') continue;
-          const cur = this.db.query(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]);
+          const cur = (yield* qry(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]));
           if (!cur.length) continue;
-          const tab = this.tabOf(tbl, cur[0]);
+          const tab = (yield* this.tabOf(tbl, cur[0]));
           if (tab === null || !mine.has(tab)) continue;
         } else if (deleted) {
           // 0.9.4: a plain delete of a record here on a tab this device doesn't sync stays out, like
           // the tab's changes (SyncEngine.apply): what someone took off the server is only for the
           // devices sharing that tab.
-          const cur = this.db.query(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]);
-          const tab = cur.length ? this.tabOf(tbl, cur[0]) : null;
+          const cur = (yield* qry(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]));
+          const tab = cur.length ? (yield* this.tabOf(tbl, cur[0])) : null;
           if (tab === LOCAL_TAB) continue; // 0.9.6: nobody else has Costco's records to delete
           if (tab !== null && !mine.has(tab)) {
             // Held until this device syncs that tab again (releaseHeld), so it still goes then, even
             // if the others have tidied the delete away by then (review fix).
-            this.db.exec('INSERT OR REPLACE INTO sync_held (tbl, pk, entry) VALUES (?, ?, ?)', [tbl, pk, JSON.stringify(e)]);
+            (yield* run('INSERT OR REPLACE INTO sync_held (tbl, pk, entry) VALUES (?, ?, ?)', [tbl, pk, JSON.stringify(e)]));
             continue;
           }
         }
         const row = e.row && typeof e.row === 'object' ? e.row : null;
         if (!deleted) {
-          const tab = this.tabOf(tbl, row);
+          const tab = (yield* this.tabOf(tbl, row));
           if (tab !== null && !mine.has(tab)) continue;
         }
         if (deleted) {
-          this.db.exec(`DELETE FROM ${tbl} WHERE ${key} = ?`, [pk]);
+          (yield* run(`DELETE FROM ${tbl} WHERE ${key} = ?`, [pk]));
         } else {
           if (row === null) continue;
-          if (tbl === 'items') this.keepLocalCostcoPicks(pk, row);
-          this.writeRow(tbl, tbl === 'cards' && this.role !== 'phone' ? stripCard(row) : row, this.columnsOf(tbl, columns));
+          if (tbl === 'items') (yield* this.keepLocalCostcoPicks(pk, row));
+          (yield* this.writeRow(tbl, tbl === 'cards' && this.role !== 'phone' ? stripCard(row) : row, (yield* this.columnsOf(tbl, columns))));
         }
-        this.logEntry(tbl, pk, stamp, device, deleted, e.sig === null || e.sig === undefined ? null : String(e.sig), created, this.originOf(e, stamp, device, deleted, created, had, this.applyingFrom));
+        (yield* this.logEntry(tbl, pk, stamp, device, deleted, e.sig === null || e.sig === undefined ? null : String(e.sig), created, this.originOf(e, stamp, device, deleted, created, had, this.applyingFrom)));
         if (tbl === 'household_settings') settings = true;
         changed++;
       }
-      const was = this.meta('clock');
+      const was = (yield* this.meta('clock'));
       let cur = was === null ? 0 : Number(was) || 0;
       if (cur > now + CLOCK_SLACK_MS) cur = 0;
-      this.setMeta('clock', String(Math.min(Math.max(clock, cur), now + CLOCK_SLACK_MS)));
+      (yield* this.setMeta('clock', String(Math.min(Math.max(clock, cur), now + CLOCK_SLACK_MS))));
       // 0.9.3: household settings that came in change the settings here (SyncEngine.apply).
-      if (settings) this.applySharedSettings();
-      this.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
-    });
+      if (settings) (yield* this.applySharedSettings());
+      (yield* run("DELETE FROM sync_meta WHERE key = 'applying'"));
+    }).call(this)));
     return changed;
   }
 
   // ---------- 0.9.6: picks at Costco stay on their phone (SyncEngine.stripCostcoPicks) ----------
 
-  private costcoIds(): Set<string> {
+  private *costcoIds(): Gen<Set<string>> {
     if (!LOCAL_ONLY_SHOPS.length) return new Set(); // 0.9.7: Costco is shared like any shop
-    return new Set(this.db.query("SELECT id FROM products WHERE chain = 'costco'").map((r) => String(r.id)));
+    return new Set((yield* qry("SELECT id FROM products WHERE chain = 'costco'")).map((r) => String(r.id)));
   }
 
   private idList(v: unknown): string[] {
@@ -698,8 +781,8 @@ export class WebSyncEngine {
   }
 
   /** An item sent to another device goes without its Costco picks (those products never leave this phone). */
-  stripCostcoPicks(data: Row): void {
-    const gone = this.costcoIds();
+  *stripCostcoPicks(data: Row): Gen<void> {
+    const gone = (yield* this.costcoIds());
     if (!gone.size) return;
     // 0.9.6 (review L2): only the Costco part goes. A usual pick at Costco is left out of the record
     // altogether (items are updated in place), so every other phone keeps its own usual pick; lists
@@ -712,10 +795,10 @@ export class WebSyncEngine {
   }
 
   /** An item that came in keeps this phone's own Costco picks (what the sender has never had). */
-  keepLocalCostcoPicks(pk: string, row: Row): void {
-    const mine = this.costcoIds();
+  *keepLocalCostcoPicks(pk: string, row: Row): Gen<void> {
+    const mine = (yield* this.costcoIds());
     if (!mine.size) return;
-    const cur = this.db.query('SELECT usual_product_id, same_product_ids, alt_product_ids FROM items WHERE id = ?', [pk])[0];
+    const cur = (yield* qry('SELECT usual_product_id, same_product_ids, alt_product_ids FROM items WHERE id = ?', [pk]))[0];
     if (!cur) return;
     if (typeof cur.usual_product_id === 'string' && mine.has(cur.usual_product_id) && (row.usual_product_id === null || row.usual_product_id === undefined)) row.usual_product_id = cur.usual_product_id;
     for (const col of ['same_product_ids', 'alt_product_ids']) {
@@ -727,30 +810,37 @@ export class WebSyncEngine {
   }
 
   /** 0.9.3: the household_settings table as it is, for settingChangeOk (counted once, when first asked). */
-  private settingsRoom(): SettingsRoom {
+  private *settingsRoom(): Gen<SettingsRoom> {
+    // 0.15.1: the keys are read once, up front (the checks themselves can't wait for the database);
+    // each row taken in is added to them, so they stay what the table holds.
+    const keys = new Set((yield* qry('SELECT k FROM household_settings')).map((r) => String(r.k)));
     const counts = new Map<string, number>();
     return {
-      has: (k) => this.db.query('SELECT 1 FROM household_settings WHERE k = ?', [k]).length > 0,
+      has: (k) => keys.has(k),
       count: (prefix) => {
         let n = counts.get(prefix);
         if (n === undefined) {
-          n = num(this.db.query('SELECT COUNT(*) AS n FROM household_settings WHERE substr(k, 1, ?) = ?', [prefix.length, prefix])[0].n);
+          n = 0;
+          for (const k of keys) if (k.startsWith(prefix)) n++;
           counts.set(prefix, n);
         }
         return n;
       },
       added: (k) => {
+        if (keys.has(k)) return;
+        keys.add(k);
         for (const [p, n] of counts) if (k.startsWith(p)) counts.set(p, n + 1);
       },
     };
   }
 
+
   /**
    * 0.9.3: the household's settings rows, applied to the stored settings for the tabs synced here
    * (SharedSettings.apply). Nothing when there are no settings yet. True when they changed.
    */
-  applySharedSettings(): boolean {
-    const r = this.db.query("SELECT value FROM kv WHERE key = 'settings'");
+  *applySharedSettings(): Gen<boolean> {
+    const r = (yield* qry("SELECT value FROM kv WHERE key = 'settings'"));
     if (!r.length) return false;
     let s: Record<string, unknown>;
     try {
@@ -760,18 +850,18 @@ export class WebSyncEngine {
     } catch {
       return false;
     }
-    const rows = this.db.query('SELECT k, v FROM household_settings ORDER BY k').map((x) => ({ k: String(x.k), v: String(x.v) }));
+    const rows = (yield* qry('SELECT k, v FROM household_settings ORDER BY k')).map((x) => ({ k: String(x.k), v: String(x.v) }));
     // The web app takes the household's Keg tab as it is (fitSettings confirms 18+ for it).
-    if (!rows.length || !applyRows(s, rows, this.tabs(), { adult: true })) return false;
-    this.db.exec("INSERT OR REPLACE INTO kv (key, value) VALUES ('settings', ?)", [JSON.stringify(s)]);
+    if (!rows.length || !applyRows(s, rows, (yield* this.tabs()), { adult: true })) return false;
+    (yield* run("INSERT OR REPLACE INTO kv (key, value) VALUES ('settings', ?)", [JSON.stringify(s)]));
     this.customTabs = undefined;
     return true;
   }
 
-  private columnsOf(tbl: string, cache: Map<string, Set<string>>): Set<string> {
+  private *columnsOf(tbl: string, cache: Map<string, Set<string>>): Gen<Set<string>> {
     let cols = cache.get(tbl);
     if (!cols) {
-      cols = new Set(this.db.query(`PRAGMA table_info(${tbl})`).map((c) => String(c.name)));
+      cols = new Set((yield* qry(`PRAGMA table_info(${tbl})`)).map((c) => String(c.name)));
       cache.set(tbl, cols);
     }
     return cols;
@@ -782,25 +872,25 @@ export class WebSyncEngine {
    * because they were at Costco go out again (as "Any shop", stripCostcoLine), with the change that
    * was kept back, so the others catch up with ticks and edits made since.
    */
-  resendCostcoLines(): void {
-    if (this.meta('costco_lines') !== null) return;
-    this.db.transaction(() => {
-      const ids = this.db.query("SELECT id FROM list_entries WHERE chain = 'costco' OR product LIKE '%\"chain\":\"costco\"%'").map((r) => String(r.id));
+  *resendCostcoLines(): Gen<void> {
+    if ((yield* this.meta('costco_lines')) !== null) return;
+    (yield* txn((function* (this: SyncCore) {
+      const ids = (yield* qry("SELECT id FROM list_entries WHERE chain = 'costco' OR product LIKE '%\"chain\":\"costco\"%'")).map((r) => String(r.id));
       for (const id of ids)
-        this.db.exec("UPDATE sync_log SET seq = (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log) WHERE tbl = 'list_entries' AND pk = ? AND deleted = 0", [id]);
-      this.setMeta('costco_lines', '1');
-    });
+        (yield* run("UPDATE sync_log SET seq = (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_log) WHERE tbl = 'list_entries' AND pk = ? AND deleted = 0", [id]));
+      (yield* this.setMeta('costco_lines', '1'));
+    }).call(this)));
   }
 
   /** SyncEngine.mergeListLine: the tick and the quantity each keep whichever changed last. */
-  private mergeListLine(e: Entry, stamp: number, device: string, created: number, wins: boolean, had: Row, mine: Set<string>, columns: Map<string, Set<string>>): boolean {
+  private *mergeListLine(e: Entry, stamp: number, device: string, created: number, wins: boolean, had: Row, mine: Set<string>, columns: Map<string, Set<string>>): Gen<boolean> {
     const inRow = e.row && typeof e.row === 'object' ? e.row : null;
     if (!inRow) return false;
     const pk = e.pk;
-    const curRows = this.db.query('SELECT * FROM list_entries WHERE id = ?', [pk]);
+    const curRows = (yield* qry('SELECT * FROM list_entries WHERE id = ?', [pk]));
     if (!curRows.length) return false;
     const cur = curRows[0];
-    const tab = this.tabOf('list_entries', inRow);
+    const tab = (yield* this.tabOf('list_entries', inRow));
     if (tab !== null && !mine.has(tab)) return false;
     const lc = num(cur.checked_at),
       ic = num(inRow.checked_at),
@@ -838,34 +928,34 @@ export class WebSyncEngine {
       if (!any) return false;
       ours = true;
     }
-    this.writeRow('list_entries', merged, this.columnsOf('list_entries', columns));
+    (yield* this.writeRow('list_entries', merged, (yield* this.columnsOf('list_entries', columns))));
     const origin = typeof had.origin === 'string' && had.origin ? had.origin : null;
-    if (!ours) this.logEntry('list_entries', pk, stamp, device, false, null, created, origin);
-    else this.logEntry('list_entries', pk, Math.max(stamp, num(had.stamp)) + 1, this.device(), false, null, Math.max(created, num(had.created)), origin);
+    if (!ours) (yield* this.logEntry('list_entries', pk, stamp, device, false, null, created, origin));
+    else (yield* this.logEntry('list_entries', pk, Math.max(stamp, num(had.stamp)) + 1, (yield* this.device()), false, null, Math.max(created, num(had.created)), origin));
     return true;
   }
 
   /** SyncEngine.householdChangeAllowed with SyncHousehold.allowed: signatures checked once the owner key is known. */
-  householdChangeAllowed(pk: string, byDevice: string, entry: Entry): boolean {
-    const pin = this.meta('owner_pin');
+  *householdChangeAllowed(pk: string, byDevice: string, entry: Entry): Gen<boolean> {
+    const pin = (yield* this.meta('owner_pin'));
     const deleted = truthy(entry.deleted);
     const row = entry.row && typeof entry.row === 'object' ? entry.row : null;
     const v = row === null || row.v === null || row.v === undefined ? null : String(row.v);
     if (pin === null) {
-      const ok = this.legacyAllowed(pk, byDevice, entry);
-      if (ok && pk === 'owner_pub' && !deleted && v !== null) this.setMeta('owner_pin', v);
+      const ok = (yield* this.legacyAllowed(pk, byDevice, entry));
+      if (ok && pk === 'owner_pub' && !deleted && v !== null) (yield* this.setMeta('owner_pin', v));
       return ok;
     }
     const sig = entry.sig === null || entry.sig === undefined ? null : String(entry.sig);
     const byOwner = sig !== null && this.verify(pin, this.signedText(entry), sig);
     if (ownerOnly(pk)) {
       if (!byOwner) return false;
-      if (pk === 'owner_pub' && !deleted && v !== null) this.setMeta('owner_pin', v);
+      if (pk === 'owner_pub' && !deleted && v !== null) (yield* this.setMeta('owner_pin', v));
       return true;
     }
     if (pk.startsWith('member:')) {
       if (byOwner) return true;
-      const cur = this.householdValue(pk);
+      const cur = (yield* this.householdValue(pk));
       let pub: string | null = null;
       if (cur !== null) {
         try {
@@ -878,7 +968,7 @@ export class WebSyncEngine {
       if (pub) return sig !== null && this.verify(pub, this.signedText(entry), sig);
       return byDevice === pk.slice('member:'.length);
     }
-    return this.legacyAllowed(pk, byDevice, entry);
+    return (yield* this.legacyAllowed(pk, byDevice, entry));
   }
 
   /**
@@ -888,11 +978,11 @@ export class WebSyncEngine {
    * the household's data can make either, so a new serverKey that opens such a file is the real one
    * (webkeys/ files are sealed to the web's public key, which anyone can do).
    */
-  vouches(m: SyncFileMessage, name: string): boolean {
+  *vouches(m: SyncFileMessage, name: string): Gen<boolean> {
     const device = typeof m.device === 'string' ? m.device : '';
     // 0.9.3: only a phone's own file (its name says whose it is).
-    if (!device || fileDevice(name) !== device || device.startsWith('web-') || this.householdValue('removed:' + device) !== null) return false;
-    const pin = this.meta('owner_pin');
+    if (!device || fileDevice(name) !== device || device.startsWith('web-') || (yield* this.householdValue('removed:' + device)) !== null) return false;
+    const pin = (yield* this.meta('owner_pin'));
     for (const x of Array.isArray(m.entries) ? m.entries : []) {
       if (!x || typeof x !== 'object' || x.tbl !== 'household' || typeof x.pk !== 'string') continue;
       if (pin !== null) {
@@ -900,23 +990,23 @@ export class WebSyncEngine {
         if (sig !== null && this.verify(pin, this.signedText(x), sig)) return true;
         continue;
       }
-      const had = this.db.query("SELECT stamp, device FROM sync_log WHERE tbl = 'household' AND pk = ?", [x.pk]);
+      const had = (yield* qry("SELECT stamp, device FROM sync_log WHERE tbl = 'household' AND pk = ?", [x.pk]));
       if (had.length && num(had[0].stamp) === Math.trunc(Number(x.stamp)) && String(had[0].device ?? '') === String(x.device ?? '')) return true;
     }
     return false;
   }
 
-  legacyAllowed(pk: string, byDevice: string, entry: Entry): boolean {
-    const owner = this.householdValue('owner');
+  *legacyAllowed(pk: string, byDevice: string, entry: Entry): Gen<boolean> {
+    const owner = (yield* this.householdValue('owner'));
     if (owner === null || owner === byDevice || pk === 'member:' + byDevice) return true;
-    if (this.householdValue('handover:' + byDevice) === null) return false;
+    if ((yield* this.householdValue('handover:' + byDevice)) === null) return false;
     if (pk === 'handover:' + byDevice) return true;
     if (pk !== 'owner' || truthy(entry.deleted)) return false;
     const row = entry.row && typeof entry.row === 'object' ? entry.row : null;
     return row !== null && byDevice === String(row.v ?? '');
   }
 
-  private writeRow(tbl: string, row: Row, cols: Set<string>): void {
+  private *writeRow(tbl: string, row: Row, cols: Set<string>): Gen<void> {
     const names: string[] = [];
     const values: unknown[] = [];
     for (const c of Object.keys(row)) {
@@ -928,11 +1018,11 @@ export class WebSyncEngine {
     const q = names.map(() => '?').join(', ');
     const list = names.join(', ');
     if (tbl === 'prices') {
-      this.db.exec(`INSERT INTO prices (${list}) SELECT ${q} WHERE NOT EXISTS (SELECT 1 FROM prices WHERE product_id = ? AND date = ?)`, [
+      (yield* run(`INSERT INTO prices (${list}) SELECT ${q} WHERE NOT EXISTS (SELECT 1 FROM prices WHERE product_id = ? AND date = ?)`, [
         ...values,
         String(row.product_id ?? ''),
         String(row.date ?? ''),
-      ]);
+      ]));
     } else if (tbl === 'products') {
       const sets: string[] = [];
       const vals: unknown[] = [];
@@ -942,8 +1032,8 @@ export class WebSyncEngine {
         vals.push(values[i]);
       });
       const id = String(row.id ?? '');
-      if (this.db.query('SELECT 1 FROM products WHERE id = ?', [id]).length) {
-        if (sets.length) this.db.exec(`UPDATE products SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
+      if ((yield* qry('SELECT 1 FROM products WHERE id = ?', [id])).length) {
+        if (sets.length) (yield* run(`UPDATE products SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]));
       } else {
         const n2: string[] = [];
         const v2: unknown[] = [];
@@ -952,9 +1042,9 @@ export class WebSyncEngine {
           n2.push(n);
           v2.push(values[i]);
         });
-        this.db.exec(`INSERT INTO products (${n2.join(', ')}) VALUES (${n2.map(() => '?').join(', ')})`, v2);
+        (yield* run(`INSERT INTO products (${n2.join(', ')}) VALUES (${n2.map(() => '?').join(', ')})`, v2));
       }
-    } else if (tbl === 'items' && this.db.query('SELECT 1 FROM items WHERE id = ?', [String(row.id ?? '')]).length) {
+    } else if (tbl === 'items' && (yield* qry('SELECT 1 FROM items WHERE id = ?', [String(row.id ?? '')])).length) {
       const sets: string[] = [];
       const vals: unknown[] = [];
       names.forEach((n, i) => {
@@ -963,17 +1053,17 @@ export class WebSyncEngine {
         vals.push(values[i]);
       });
       if (!sets.length) return;
-      this.db.exec(`UPDATE items SET ${sets.join(', ')} WHERE id = ?`, [...vals, String(row.id ?? '')]);
+      (yield* run(`UPDATE items SET ${sets.join(', ')} WHERE id = ?`, [...vals, String(row.id ?? '')]));
     } else {
-      this.db.exec(`INSERT OR REPLACE INTO ${tbl} (${list}) VALUES (${q})`, values);
+      (yield* run(`INSERT OR REPLACE INTO ${tbl} (${list}) VALUES (${q})`, values));
     }
   }
 
   /** SyncEngine.tidyCategories: one of each name per tab (the smaller id), as ordinary changes. */
-  tidyCategories(): number {
+  *tidyCategories(): Gen<number> {
     let merged = 0;
-    this.db.transaction(() => {
-      const rows = this.db.query('SELECT id, name, section FROM categories ORDER BY section, lower(trim(name)), id');
+    (yield* txn((function* (this: SyncCore) {
+      const rows = (yield* qry('SELECT id, name, section FROM categories ORDER BY section, lower(trim(name)), id'));
       let lastKey: string | null = null;
       let keep: string | null = null;
       for (const r of rows) {
@@ -985,12 +1075,12 @@ export class WebSyncEngine {
           continue;
         }
         const gone = String(r.id);
-        this.db.exec('UPDATE items SET category_id = ? WHERE category_id = ?', [keep, gone]);
-        this.db.exec('UPDATE list_entries SET category_id = ? WHERE category_id = ?', [keep, gone]);
-        this.db.exec('DELETE FROM categories WHERE id = ?', [gone]);
+        (yield* run('UPDATE items SET category_id = ? WHERE category_id = ?', [keep, gone]));
+        (yield* run('UPDATE list_entries SET category_id = ? WHERE category_id = ?', [keep, gone]));
+        (yield* run('DELETE FROM categories WHERE id = ?', [gone]));
         merged++;
       }
-    });
+    }).call(this)));
     return merged;
   }
 
@@ -1002,34 +1092,34 @@ export class WebSyncEngine {
    * when the file was passed over (this browser's own, a removed phone, or one that names another
    * device inside than its name says).
    */
-  takeFile(name: string, sum: string, m: SyncFileMessage, at: string): number {
-    const me = this.device();
+  *takeFile(name: string, sum: string, m: SyncFileMessage, at: string): Gen<number> {
+    const me = (yield* this.device());
     const seenKey = 'folder_seen:' + name;
     // 0.9.3: who wrote it is the file's name (the server lets each device write only its own), as on
     // a phone: a file that names another device inside is passed over, so nobody can pose as a phone
     // (or another browser) by what they put in their file.
     const device = fileDevice(name) ?? '';
-    if (!device || m.device !== device || device === me || this.householdValue('removed:' + device) !== null) {
-      this.setMeta(seenKey, sum);
+    if (!device || m.device !== device || device === me || (yield* this.householdValue('removed:' + device)) !== null) {
+      (yield* this.setMeta(seenKey, sum));
       return -1;
     }
     // 0.9.5 (review): read again unchanged by catchUpLists: only General lines never had here.
     const catchKey = 'catchup:' + seenKey;
-    if (this.meta(catchKey) !== null) {
-      const unchanged = this.meta(catchKey) === sum;
-      this.setMeta(catchKey, null);
+    if ((yield* this.meta(catchKey)) !== null) {
+      const unchanged = (yield* this.meta(catchKey)) === sum;
+      (yield* this.setMeta(catchKey, null));
       if (unchanged) {
         let n = 0;
-        let few = this.catchUpEntries(m.entries);
-        if (this.role === 'server' && few.length) few = this.serverFilter(few, device, device.startsWith('web-') ? null : parseShares(m.shares));
+        let few = (yield* this.catchUpEntries(m.entries));
+        if (this.role === 'server' && few.length) few = (yield* this.serverFilter(few, device, device.startsWith('web-') ? null : parseShares(m.shares)));
         this.applyingFrom = this.role === 'server' ? device : null;
         try {
-          n = few.length ? this.apply(few) : 0;
+          n = few.length ? (yield* this.apply(few)) : 0;
         } finally {
           this.applyingFrom = null;
         }
         this.lastDropped = 0;
-        this.setMeta(seenKey, sum);
+        (yield* this.setMeta(seenKey, sum));
         return n;
       }
     }
@@ -1038,34 +1128,34 @@ export class WebSyncEngine {
     // 0.9.4, the server: only what that phone shares (D9), and nothing older than Keep data for (D14).
     if (this.role === 'server' && Array.isArray(entries)) {
       const shares = device.startsWith('web-') ? null : parseShares(m.shares);
-      if (shares) this.setMeta('phone_shares:' + device, JSON.stringify(shares));
+      if (shares) (yield* this.setMeta('phone_shares:' + device, JSON.stringify(shares)));
       const before = entries.length;
-      entries = this.serverFilter(entries, device, shares);
+      entries = (yield* this.serverFilter(entries, device, shares));
       this.lastDropped = before - entries.length;
     }
     let n: number;
     this.applyingFrom = this.role === 'server' ? device : null;
     try {
-      n = this.apply(entries);
+      n = (yield* this.apply(entries));
     } finally {
       this.applyingFrom = null;
     }
-    if (n > 0) this.tidyCategories();
-    this.notePeer(device, typeof m.name === 'string' ? m.name : null);
+    if (n > 0) (yield* this.tidyCategories());
+    (yield* this.notePeer(device, typeof m.name === 'string' ? m.name : null));
     // 0.9.3: a phone's own settings, for Settings → Phones (only phones on a server send one), from
     // that phone's own file (checked above), so another browser can't put words in a phone's mouth.
     const summary = device.startsWith('web-') ? null : cleanSummary((m as { summary?: unknown }).summary);
     const sentAt = typeof m.at === 'string' && m.at.length <= 40 && !Number.isNaN(Date.parse(m.at)) ? m.at : null;
-    if (summary) this.setMeta('phone_summary:' + device, JSON.stringify({ name: typeof m.name === 'string' ? m.name.slice(0, 80) : null, at: sentAt, summary }));
+    if (summary) (yield* this.setMeta('phone_summary:' + device, JSON.stringify({ name: typeof m.name === 'string' ? m.name.slice(0, 80) : null, at: sentAt, summary })));
     const theirTop = Math.trunc(num(m.top));
     if (theirTop > 0) {
       const gotKey = 'folder_got:' + device;
-      const had = this.meta(gotKey);
-      if (had === null || Number(had) < theirTop) this.setMeta(gotKey, String(theirTop));
+      const had = (yield* this.meta(gotKey));
+      if (had === null || Number(had) < theirTop) (yield* this.setMeta(gotKey, String(theirTop)));
     }
-    if (m.seen && typeof m.seen === 'object') this.setSeen(device, Math.trunc(num(m.seen[me])));
-    this.markSynced(device, at);
-    this.setMeta(seenKey, sum);
+    if (m.seen && typeof m.seen === 'object') (yield* this.setSeen(device, Math.trunc(num(m.seen[me]))));
+    (yield* this.markSynced(device, at));
+    (yield* this.setMeta(seenKey, sum));
     return n;
   }
 
@@ -1083,7 +1173,7 @@ export class WebSyncEngine {
    * - Prices dated before the cut-off, unless the product has no price here as new (the latest stays,
    *   as pruneHistory keeps it), and receipts scanned before it, unless pinned.
    */
-  serverFilter(entries: Entry[], device: string, shares: Shares | null): Entry[] {
+  *serverFilter(entries: Entry[], device: string, shares: Shares | null): Gen<Entry[]> {
     const cut = this.opts.keepFrom?.() ?? null;
     const tabs = shares ? new Set(shares.tabs) : null;
     const out: Entry[] = [];
@@ -1109,16 +1199,16 @@ export class WebSyncEngine {
         const flag = tbl === 'receipts' ? shares.receipts : tbl === 'cards' ? shares.cards : true;
         let tab: string | null;
         let cur: Row | null = null;
-        if (!deleted) tab = this.tabOf(tbl, row);
+        if (!deleted) tab = (yield* this.tabOf(tbl, row));
         else {
-          const r = this.db.query(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [x.pk]);
+          const r = (yield* qry(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [x.pk]));
           cur = r.length ? r[0] : null;
-          tab = cur ? this.tabOf(tbl, cur) : null;
+          tab = cur ? (yield* this.tabOf(tbl, cur)) : null;
         }
         const ok = flag && (tab === null || tabs.has(tab));
         if (!ok) {
           if (!deleted || truthy(x.moved)) continue;
-          const log = this.db.query('SELECT origin FROM sync_log WHERE tbl = ? AND pk = ?', [tbl, x.pk]);
+          const log = (yield* qry('SELECT origin FROM sync_log WHERE tbl = ? AND pk = ?', [tbl, x.pk]));
           if (!log.length || typeof log[0].origin !== 'string' || log[0].origin !== device) continue;
         }
       }
@@ -1128,7 +1218,7 @@ export class WebSyncEngine {
           const pid = str(row, 'product_id');
           if (date !== null && date < cut) {
             if (pid !== null && (newest.get(pid) ?? '') > date) continue;
-            if (this.db.query('SELECT 1 FROM prices WHERE product_id = ? AND date >= ? LIMIT 1', [pid, date]).length) continue;
+            if ((yield* qry('SELECT 1 FROM prices WHERE product_id = ? AND date >= ? LIMIT 1', [pid, date])).length) continue;
           }
         } else if (tbl === 'receipts') {
           const at = str(row, 'scanned_at');
@@ -1148,29 +1238,30 @@ export class WebSyncEngine {
    * covers the stamp the change was noted with (SyncHousehold.signed), as a phone's collect signs.
    * Returns the entry as it goes out in the server's file.
    */
-  writeHousehold(k: string, v: string | null): Entry | null {
+  *writeHousehold(k: string, v: string | null): Gen<Entry | null> {
     // 0.13.2: and a phone that is its household's owner (an iCloud household's first device: ios/folderHouse.ts).
     if ((this.role !== 'server' && this.role !== 'phone') || !this.opts.sign) throw new Error('Only the household\'s owner signs household changes.');
     const sign = this.opts.sign;
     let out: Entry | null = null;
-    this.db.transaction(() => {
-      if (this.meta('applying') !== null) throw new Error('writeHousehold while taking changes in');
-      const had = this.householdValue(k);
+    (yield* txn((function* (this: SyncCore) {
+      if ((yield* this.meta('applying')) !== null) throw new Error('writeHousehold while taking changes in');
+      const had = (yield* this.householdValue(k));
       if (v === null) {
         if (had === null) return;
-        this.db.exec('DELETE FROM household WHERE k = ?', [k]);
+        (yield* run('DELETE FROM household WHERE k = ?', [k]));
       } else {
         if (had === v) return;
-        this.db.exec('INSERT OR REPLACE INTO household (k, v) VALUES (?, ?)', [k, v]);
+        (yield* run('INSERT OR REPLACE INTO household (k, v) VALUES (?, ?)', [k, v]));
       }
-      const log = this.db.query("SELECT stamp, created FROM sync_log WHERE tbl = 'household' AND pk = ?", [k]);
+      const log = (yield* qry("SELECT stamp, created FROM sync_log WHERE tbl = 'household' AND pk = ?", [k]));
       if (!log.length) throw new Error('the change was not noted');
       const stamp = num(log[0].stamp);
-      const e: Entry = { tbl: 'household', pk: k, stamp, device: this.device(), deleted: v === null, created: num(log[0].created), ...(v === null ? {} : { row: { k, v } }) };
-      e.sig = sign(this.signedText(e));
-      this.db.exec("UPDATE sync_log SET sig = ? WHERE tbl = 'household' AND pk = ?", [e.sig, k]);
+      const e: Entry = { tbl: 'household', pk: k, stamp, device: (yield* this.device()), deleted: v === null, created: num(log[0].created), ...(v === null ? {} : { row: { k, v } }) };
+      // 0.15.1: with this device's owner key, when it keeps one (an iCloud household's first device).
+      e.sig = sign(this.signedText(e), yield* this.meta('owner_priv'));
+      (yield* run("UPDATE sync_log SET sig = ? WHERE tbl = 'household' AND pk = ?", [e.sig, k]));
       out = e;
-    });
+    }).call(this)));
     return out;
   }
 
@@ -1179,12 +1270,12 @@ export class WebSyncEngine {
    * where the household has none yet. Only the household's owner phone does it, or the first phone of
    * a new house (sync_meta seed_settings). Stamped 1, so any row another phone already wrote wins.
    */
-  seedSettings(): number {
-    const owner = this.householdValue('owner');
-    if (!((owner !== null && owner === this.device()) || this.meta('seed_settings') === '1')) return 0;
+  *seedSettings(): Gen<number> {
+    const owner = (yield* this.householdValue('owner'));
+    if (!((owner !== null && owner === (yield* this.device())) || (yield* this.meta('seed_settings')) === '1')) return 0;
     let s: Record<string, unknown> | null = null;
     try {
-      const r = this.db.query("SELECT value FROM kv WHERE key = 'settings'");
+      const r = (yield* qry("SELECT value FROM kv WHERE key = 'settings'"));
       const v: unknown = r.length ? JSON.parse(String(r[0].value)) : null;
       s = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
     } catch {
@@ -1192,37 +1283,37 @@ export class WebSyncEngine {
     }
     if (!s) return 0;
     const have = new Set<string>();
-    for (const r of this.db.query('SELECT k FROM household_settings')) have.add(String(r.k));
+    for (const r of (yield* qry('SELECT k FROM household_settings'))) have.add(String(r.k));
     // Rows already noted (another phone's, or a delete) count as there too.
-    for (const r of this.db.query("SELECT pk FROM sync_log WHERE tbl = 'household_settings'")) have.add(String(r.pk));
+    for (const r of (yield* qry("SELECT pk FROM sync_log WHERE tbl = 'household_settings'"))) have.add(String(r.pk));
     const add: [string, string][] = [];
-    for (const k of keysFor(s, this.tabs())) {
+    for (const k of keysFor(s, (yield* this.tabs()))) {
       if (have.has(k)) continue;
       const v = settingValueOf(s, k);
       if (v === undefined || v === null || checkValue(k, v) === undefined) continue;
       add.push([k, JSON.stringify(v)]);
     }
     if (!add.length) return 0;
-    const me = this.device();
-    this.db.transaction(() => {
-      this.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
+    const me = (yield* this.device());
+    (yield* txn((function* (this: SyncCore) {
+      (yield* run("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')"));
       for (const [k, v] of add) {
-        this.db.exec('INSERT OR IGNORE INTO household_settings (k, v) VALUES (?, ?)', [k, v]);
-        this.logEntry('household_settings', k, 1, me, false, null, 1, null);
+        (yield* run('INSERT OR IGNORE INTO household_settings (k, v) VALUES (?, ?)', [k, v]));
+        (yield* this.logEntry('household_settings', k, 1, me, false, null, 1, null));
       }
-      this.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
-    });
+      (yield* run("DELETE FROM sync_meta WHERE key = 'applying'"));
+    }).call(this)));
     return add.length;
   }
 
   /** 0.9.4: the household's `server` row, checked (null without one). */
-  serverRow(): ServerRow | null {
-    return parseServerRow(this.householdValue('server'));
+  *serverRow(): Gen<ServerRow | null> {
+    return parseServerRow((yield* this.householdValue('server')));
   }
 
   /** 0.9.4: what a phone last said it shares (from its file on a v3 server), or null. */
-  sharesOf(device: string): Shares | null {
-    const v = this.meta('phone_shares:' + device);
+  *sharesOf(device: string): Gen<Shares | null> {
+    const v = (yield* this.meta('phone_shares:' + device));
     if (v === null) return null;
     try {
       return parseShares(JSON.parse(v));
@@ -1237,22 +1328,22 @@ export class WebSyncEngine {
    * anyone (no deletes go out: each phone keeps its own window). Returns what went, so the server can
    * move the receipts' photos to the trash.
    */
-  prune(cutoff: string): { prices: number; receipts: { id: string; photo: string | null; pages: string | null }[] } {
+  *prune(cutoff: string): Gen<{ prices: number; receipts: { id: string; photo: string | null; pages: string | null }[] }> {
     const out = { prices: 0, receipts: [] as { id: string; photo: string | null; pages: string | null }[] };
-    this.db.transaction(() => {
-      this.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
+    (yield* txn((function* (this: SyncCore) {
+      (yield* run("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')"));
       const where = `date < ? AND source <> 'demo' AND date < (SELECT MAX(q.date) FROM prices q WHERE q.product_id = prices.product_id)`;
-      out.prices = num(this.db.query(`SELECT COUNT(*) AS n FROM prices WHERE ${where}`, [cutoff])[0].n);
-      if (out.prices) this.db.exec(`DELETE FROM prices WHERE ${where}`, [cutoff]);
-      for (const r of this.db.query("SELECT id, photo, pages FROM receipts WHERE scanned_at < ? AND pinned = 0 AND id NOT LIKE 'demo-%'", [cutoff])) {
+      out.prices = num((yield* qry(`SELECT COUNT(*) AS n FROM prices WHERE ${where}`, [cutoff]))[0].n);
+      if (out.prices) (yield* run(`DELETE FROM prices WHERE ${where}`, [cutoff]));
+      for (const r of (yield* qry("SELECT id, photo, pages FROM receipts WHERE scanned_at < ? AND pinned = 0 AND id NOT LIKE 'demo-%'", [cutoff]))) {
         out.receipts.push({ id: String(r.id), photo: str(r, 'photo'), pages: str(r, 'pages') });
       }
       for (const r of out.receipts) {
-        this.db.exec('DELETE FROM receipts WHERE id = ?', [r.id]);
-        this.db.exec("DELETE FROM sync_log WHERE tbl = 'receipts' AND pk = ?", [r.id]);
+        (yield* run('DELETE FROM receipts WHERE id = ?', [r.id]));
+        (yield* run("DELETE FROM sync_log WHERE tbl = 'receipts' AND pk = ?", [r.id]));
       }
-      this.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
-    });
+      (yield* run("DELETE FROM sync_meta WHERE key = 'applying'"));
+    }).call(this)));
     return out;
   }
 
@@ -1261,53 +1352,53 @@ export class WebSyncEngine {
    * seen (household member: rows, which only active phones have; this device left out), never the
    * household's own. Returns how many went.
    */
-  compact(now: number = this.now()): number {
-    const me = this.device();
-    const top = num(this.db.query('SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log')[0].top);
+  *compact(now: number = this.now()): Gen<number> {
+    const me = (yield* this.device());
+    const top = num((yield* qry('SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log'))[0].top);
     let upTo = top;
-    for (const m of this.db.query("SELECT k FROM household WHERE k LIKE 'member:%'")) {
+    for (const m of (yield* qry("SELECT k FROM household WHERE k LIKE 'member:%'"))) {
       const d = String(m.k).slice('member:'.length);
       if (d === me) continue;
-      const r = this.db.query('SELECT seen FROM sync_peers WHERE device = ?', [d]);
+      const r = (yield* qry('SELECT seen FROM sync_peers WHERE device = ?', [d]));
       upTo = Math.min(upTo, r.length ? num(r[0].seen) : 0);
     }
     if (upTo <= 0) return 0;
     const skip = ["'_seq'", "'household'"];
-    if (!this.shareCards()) skip.push("'cards'");
-    if (!this.shareReceipts()) skip.push("'receipts'");
+    if (!(yield* this.shareCards())) skip.push("'cards'");
+    if (!(yield* this.shareReceipts())) skip.push("'receipts'");
     const where = `deleted = 1 AND tbl NOT IN (${skip.join(', ')}) AND stamp < ? AND seq <= ?`;
     const before = now - COMPACT_AFTER_MS;
     let gone = 0;
-    this.db.transaction(() => {
-      gone = num(this.db.query(`SELECT COUNT(*) AS n FROM sync_log WHERE ${where}`, [before, upTo])[0].n);
+    (yield* txn((function* (this: SyncCore) {
+      gone = num((yield* qry(`SELECT COUNT(*) AS n FROM sync_log WHERE ${where}`, [before, upTo]))[0].n);
       if (!gone) return;
-      this.db.exec("INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq) VALUES ('_seq', 'floor', 0, '', 1, ?)", [top]);
-      this.db.exec(`DELETE FROM sync_log WHERE ${where}`, [before, upTo]);
-    });
+      (yield* run("INSERT OR REPLACE INTO sync_log (tbl, pk, stamp, device, deleted, seq) VALUES ('_seq', 'floor', 0, '', 1, ?)", [top]));
+      (yield* run(`DELETE FROM sync_log WHERE ${where}`, [before, upTo]));
+    }).call(this)));
     return gone;
   }
 
   /** Whether a file needs reading again (SyncFolder: same version or same contents as last time: no). */
-  fresh(name: string, version: string | null): boolean {
-    return version === null || version !== this.meta('folder_ver:' + name);
+  *fresh(name: string, version: string | null): Gen<boolean> {
+    return version === null || version !== (yield* this.meta('folder_ver:' + name));
   }
 
-  noteVersion(name: string, version: string | null): void {
-    if (version !== null) this.setMeta('folder_ver:' + name, version);
+  *noteVersion(name: string, version: string | null): Gen<void> {
+    if (version !== null) (yield* this.setMeta('folder_ver:' + name, version));
   }
 
-  seenSum(name: string): string | null {
-    return this.meta('folder_seen:' + name);
+  *seenSum(name: string): Gen<string | null> {
+    return (yield* this.meta('folder_seen:' + name));
   }
 
   /**
    * This browser's own file, when something changed since it was last written (SyncFolder.writeOwn),
    * or null. `keyv` is the key version it will be sealed with.
    */
-  ownFile(keyv: number, at: string, present: boolean): { msg: SyncFileMessage; mark: string } | null {
-    const top = num(this.db.query('SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log')[0].top);
-    const mark = `${top}/${keyv}/${[...this.tabs()].join(',')}/${this.shareCards()}/${this.shareReceipts()}`;
-    if (mark === this.meta('folder_top') && present) return null;
+  *ownFile(keyv: number, at: string, present: boolean): Gen<{ msg: SyncFileMessage; mark: string } | null> {
+    const top = num((yield* qry('SELECT COALESCE(MAX(seq), 0) AS top FROM sync_log'))[0].top);
+    const mark = `${top}/${keyv}/${[...(yield* this.tabs())].join(',')}/${(yield* this.shareCards())}/${(yield* this.shareReceipts())}`;
+    if (mark === (yield* this.meta('folder_top')) && present) return null;
     const oldest = this.now() - OLD_DELETE_MS;
     const server = this.role === 'server';
     const phone = this.role === 'phone';
@@ -1318,12 +1409,12 @@ export class WebSyncEngine {
     if (server || (phone && this.opts.prices !== false)) where += ` AND (tbl <> 'prices' OR stamp > ${Math.trunc(this.now() - SERVER_PRICES_MS)})`;
     // A phone's file in a picked folder (iCloud Drive) carries no prices, to stay small (SyncFolder.writeOwn).
     else if (phone) where += ` AND tbl <> 'prices'`;
-    const c = this.collect(0, null, 5_000_000, null, where, true, oldest);
+    const c = (yield* this.collect(0, null, 5_000_000, null, where, true, oldest));
     let fileTop = top;
-    const left = this.db.query("SELECT MIN(seq) AS s FROM sync_log WHERE deleted = 1 AND tbl <> '_seq' AND stamp < ?", [oldest]);
+    const left = (yield* qry("SELECT MIN(seq) AS s FROM sync_log WHERE deleted = 1 AND tbl <> '_seq' AND stamp < ?", [oldest]));
     if (left.length && left[0].s !== null && left[0].s !== undefined) fileTop = Math.min(fileTop, num(left[0].s) - 1);
     const seen: Record<string, number> = {};
-    for (const r of this.db.query("SELECT key, value FROM sync_meta WHERE key LIKE 'folder_got:%'")) {
+    for (const r of (yield* qry("SELECT key, value FROM sync_meta WHERE key LIKE 'folder_got:%'"))) {
       const v = Number(r.value);
       if (Number.isFinite(v) && /^-?\d+$/.test(String(r.value))) seen[String(r.key).slice('folder_got:'.length)] = v;
     }
@@ -1332,8 +1423,8 @@ export class WebSyncEngine {
       seen,
       format: 'restock-sync',
       v: 1,
-      device: this.device(),
-      name: this.meta('name') ?? (server ? 'Server' : phone ? 'iPhone' : 'Web'),
+      device: (yield* this.device()),
+      name: (yield* this.meta('name')) ?? (server ? 'Server' : phone ? 'iPhone' : 'Web'),
       keyv,
       at,
       entries: c.entries,
@@ -1345,21 +1436,21 @@ export class WebSyncEngine {
    * 0.9.5 (review): how many of this browser's own changes no file it wrote has carried yet (made
    * since ownFile's last mark): what Sign out would lose (the PWA, offline).
    */
-  unsent(): number {
-    const sent = Number(String(this.meta('folder_top') ?? '0').split('/')[0]) || 0;
-    return num(this.db.query("SELECT COUNT(*) AS n FROM sync_log WHERE seq > ? AND device = ? AND tbl NOT IN ('_seq', 'prices', 'household', 'cards')", [sent, this.device()])[0]?.n);
+  *unsent(): Gen<number> {
+    const sent = Number(String((yield* this.meta('folder_top')) ?? '0').split('/')[0]) || 0;
+    return num((yield* qry("SELECT COUNT(*) AS n FROM sync_log WHERE seq > ? AND device = ? AND tbl NOT IN ('_seq', 'prices', 'household', 'cards')", [sent, (yield* this.device())]))[0]?.n);
   }
 
   /** After the own file was written (the mark ownFile gave, so edits made meanwhile still go next time). */
-  wroteOwn(mark: string): void {
-    this.setMeta('folder_top', mark);
+  *wroteOwn(mark: string): Gen<void> {
+    (yield* this.setMeta('folder_top', mark));
   }
 
   /**
    * archive/<device>/<month>.bin: prices (only added, once per product and time) and receipts a
    * phone moved off itself. Not noted as changes here: they belong to the phone that kept them.
    */
-  takeArchive(m: { prices?: Row[]; receipts?: Row[] }): number {
+  *takeArchive(m: { prices?: Row[]; receipts?: Row[] }): Gen<number> {
     let n = 0;
     const columns = new Map<string, Set<string>>();
     // 0.9.4, the server: nothing older than Keep data for (each product's latest price aside).
@@ -1368,31 +1459,83 @@ export class WebSyncEngine {
     if (cut !== null)
       for (const p of Array.isArray(m.prices) ? m.prices : [])
         if (p && typeof p === 'object' && typeof p.product_id === 'string' && typeof p.date === 'string' && p.date > (newest.get(p.product_id) ?? '')) newest.set(p.product_id, p.date);
-    this.db.transaction(() => {
-      this.db.exec("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')");
+    (yield* txn((function* (this: SyncCore) {
+      (yield* run("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')"));
       for (const p of Array.isArray(m.prices) ? m.prices : []) {
         if (!p || typeof p !== 'object' || typeof p.product_id !== 'string' || typeof p.date !== 'string') continue;
-        const before = this.db.query('SELECT 1 FROM prices WHERE product_id = ? AND date = ?', [p.product_id, p.date]).length;
+        const before = (yield* qry('SELECT 1 FROM prices WHERE product_id = ? AND date = ?', [p.product_id, p.date])).length;
         if (before) continue;
-        if (cut !== null && p.date < cut && ((newest.get(p.product_id) ?? '') > p.date || this.db.query('SELECT 1 FROM prices WHERE product_id = ? AND date >= ? LIMIT 1', [p.product_id, p.date]).length)) continue;
-        this.writeRow('prices', p, this.columnsOf('prices', columns));
+        if (cut !== null && p.date < cut && ((newest.get(p.product_id) ?? '') > p.date || (yield* qry('SELECT 1 FROM prices WHERE product_id = ? AND date >= ? LIMIT 1', [p.product_id, p.date])).length)) continue;
+        (yield* this.writeRow('prices', p, (yield* this.columnsOf('prices', columns))));
         n++;
       }
       for (const r of Array.isArray(m.receipts) ? m.receipts : []) {
         if (!r || typeof r !== 'object' || typeof r.id !== 'string' || r.id.startsWith('demo-')) continue;
-        if (this.db.query('SELECT 1 FROM receipts WHERE id = ?', [r.id]).length) continue;
+        if ((yield* qry('SELECT 1 FROM receipts WHERE id = ?', [r.id])).length) continue;
         if (cut !== null && typeof r.scanned_at === 'string' && r.scanned_at < cut && num(r.pinned) === 0) continue;
         // A receipt deleted on a phone since stays deleted.
-        const log = this.db.query("SELECT deleted FROM sync_log WHERE tbl = 'receipts' AND pk = ?", [r.id]);
+        const log = (yield* qry("SELECT deleted FROM sync_log WHERE tbl = 'receipts' AND pk = ?", [r.id]));
         if (log.length && num(log[0].deleted) !== 0) continue;
-        this.writeRow('receipts', r, this.columnsOf('receipts', columns));
+        (yield* this.writeRow('receipts', r, (yield* this.columnsOf('receipts', columns))));
         n++;
       }
-      this.db.exec("DELETE FROM sync_meta WHERE key = 'applying'");
-    });
+      (yield* run("DELETE FROM sync_meta WHERE key = 'applying'"));
+    }).call(this)));
     return n;
   }
 }
+
+/** The engine on a database that answers straight away (the server, the web): every method answers at once. */
+export interface WebSyncEngine extends Straight<SyncCore> {
+  readonly db: SyncDb;
+  /** The engine's own steps, for running inside another one. */
+  readonly core: SyncCore;
+}
+type EngineArgs<D> = [db: D, verify: SigCheck, signedText: (e: Entry) => string, now?: () => number, opts?: EngineOptions];
+// A function called with `new` that answers an object gives that object: the facade over the engine.
+export const WebSyncEngine = function (...[db, verify, signedText, now = () => Date.now(), opts = {}]: EngineArgs<SyncDb>) {
+  const core = new SyncCore(verify, signedText, now, opts);
+  return facade(core, (g) => runOn(db, g), { db, core });
+} as unknown as new (...a: EngineArgs<SyncDb>) => WebSyncEngine;
+
+/**
+ * 0.15.1: the engine on a database that answers later (the iPhone and iPad app's own SQLite). Each
+ * thing it does holds the database; `db.transaction` (and `hold`) holds it for several, all or nothing.
+ * While something holds it, the engine's calls go straight through (they're part of it); the app's own
+ * reads and writes wait.
+ */
+export interface AsyncSyncEngine extends Later<SyncCore> {
+  readonly db: AsyncSyncDb;
+  readonly core: SyncCore;
+  /** Several things as one: nothing else writes meanwhile, and if one fails none of them stays. */
+  hold<T>(fn: () => Promise<T>): Promise<T>;
+}
+export const AsyncSyncEngine = function (...[db, verify, signedText, now = () => Date.now(), opts = {}]: EngineArgs<AsyncSyncDb>) {
+  {
+    const core = new SyncCore(verify, signedText, now, opts);
+    let holding = 0;
+    const alone = <T>(fn: () => Promise<T>): Promise<T> => (holding || !db.exclusive ? fn() : db.exclusive(fn));
+    const hold = <T>(fn: () => Promise<T>): Promise<T> =>
+      alone(async () => {
+        holding++;
+        try {
+          let out: T | undefined;
+          await db.transaction(async () => {
+            out = await fn();
+          });
+          return out as T;
+        } finally {
+          holding--;
+        }
+      });
+    const own: AsyncSyncDb = {
+      query: (sql, args) => alone(() => db.query(sql, args)),
+      exec: (sql, args) => alone(() => db.exec(sql, args)),
+      transaction: (body) => hold(body),
+    };
+    return facade(core, (g) => alone(() => runOnAsync(db, g)), { db: own, core, hold });
+  }
+} as unknown as new (...a: EngineArgs<AsyncSyncDb>) => AsyncSyncEngine;
 
 /** SyncHousehold.ownerOnly. */
 export function ownerOnly(pk: string): boolean {

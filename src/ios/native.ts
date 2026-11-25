@@ -16,7 +16,7 @@ import { appleHere, RestockApple } from './apple';
 import * as sync from './sync';
 import type { Section } from '../shops';
 import { forgetPage, FRESH_MS, looksBlocked, pageFetch, pageRender } from './shopWeb';
-import type { NativePermissions, SyncInfo } from '../lib/sql/native';
+import type { AppChannel, NativePermissions, SyncInfo } from '../lib/sql/native';
 import { allGroups, allListEntries, allProducts, allReceipts, getKV, getSettings, marketWrite, putKV, queryRows, uid, updateSettings } from '../lib/db';
 import { sendPrices } from './share';
 import { importAll, MAX_BYTES, readIndex, refreshDue, type LastImport } from './market';
@@ -249,7 +249,17 @@ const permission = async (name: 'camera' | 'geolocation'): Promise<NativePermiss
 };
 
 export class RestockIos extends WebPlugin {
-  // ---------- the database: sql.js in the web view (lib/boot.ts), so nothing here ----------
+  // ---------- the database: 0.15.1, the system's SQLite (ios/nativeDb.ts, opened by lib/boot.ts), so nothing here ----------
+
+  /** 0.15.1: the App Store's version, or one installed from a computer (the RestockChannel key in Info.plist). */
+  async channel(): Promise<{ channel: AppChannel; selfUpdate: boolean }> {
+    try {
+      if (appleHere() && (await RestockApple.info()).channel === 'appstore') return { channel: 'appstore', selfUpdate: false };
+    } catch {
+      // an older build of the native side
+    }
+    return { channel: 'sideload', selfUpdate: false };
+  }
 
   // ---------- shops ----------
   /**
@@ -558,7 +568,7 @@ export class RestockIos extends WebPlugin {
   async syncInfo(): Promise<SyncInfo> {
     this.wireSyncEvents();
     try {
-      return sync.info();
+      return (await sync.info());
     } catch {
       return NO_SYNC;
     }
@@ -583,26 +593,26 @@ export class RestockIos extends WebPlugin {
     return sync.joinServer3(o.code, o.how);
   }
   async syncSetServer(o: { label?: string; tabs?: Section[]; receipts?: boolean; cards?: boolean; takeBack?: string[] }) {
-    return sync.setServer(o);
+    return (await sync.setServer(o));
   }
   /** What this device shares, from the household's own screen: only its tabs here. */
   async syncSet(o: { name?: string; household?: string; tabs?: Section[]; shareCards?: boolean }) {
-    if (o.shareCards !== undefined) sync.setServer({ cards: o.shareCards });
+    if (o.shareCards !== undefined) (await sync.setServer({ cards: o.shareCards }));
     // The household's name: an iCloud household's first device changes it (a server's house is named on the server).
     if (o.household !== undefined) {
-      const { house, folder, saved } = sync.hub();
-      if (house.joined()) throw new Error("Your household's name is changed on your Restock server's page.");
-      if (folder.joined()) {
-        folder.rename(o.household);
+      const { house, folder, saved } = (await sync.hub());
+      if ((await house.joined())) throw new Error("Your household's name is changed on your Restock server's page.");
+      if ((await folder.joined())) {
+        (await folder.rename(o.household));
         saved();
       }
     }
     if (o.name !== undefined) {
-      const { e, saved } = sync.hub();
-      e.setMeta('name', o.name.trim().slice(0, 40) || 'iPhone');
+      const { e, saved } = (await sync.hub());
+      (await e.setMeta('name', o.name.trim().slice(0, 40) || 'iPhone'));
       saved();
     }
-    return o.tabs ? sync.setServer({ tabs: o.tabs }) : sync.info();
+    return o.tabs ? (await sync.setServer({ tabs: o.tabs })) : (await sync.info());
   }
   async syncStopServer(o: { bringBack?: boolean; takeBack?: string[] }) {
     this.wireSyncEvents();
@@ -616,17 +626,17 @@ export class RestockIos extends WebPlugin {
   }
   async syncDismissNotice() {
     try {
-      sync.dismissNotice();
+      (await sync.dismissNotice());
     } catch {
       // nothing open yet: nothing to dismiss
     }
   }
   /** 0.14.0: Sign in on a computer: the code on the server's sign-in page. */
   async syncWebCode(o: { code: string }) {
-    return sync.webCode(o.code);
+    return (await sync.webCode(o.code));
   }
   async syncWebApprove(o: { code: string }) {
-    return sync.webApprove(o.code);
+    return (await sync.webApprove(o.code));
   }
   async syncCloseInvite() {}
   async syncNextcloudCancel() {}

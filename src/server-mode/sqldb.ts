@@ -1,6 +1,6 @@
 // Server mode: the sync engine's database (engine.ts SyncDb) on a sql.js Database, synchronously.
 import type { Database } from 'sql.js';
-import type { Row, SyncDb } from './engine';
+import type { AsyncSyncDb, Row, SyncDb } from './engine';
 
 type Bindable = string | number | null | Uint8Array;
 
@@ -44,4 +44,35 @@ export function syncDbOf(db: Database): SyncDb {
     },
   };
   return self;
+}
+
+/**
+ * 0.15.1: the same database for the engine that answers later (AsyncSyncEngine): each thing the engine
+ * does holds it, one at a time, as it would on the iPhone's own SQLite.
+ */
+export function asyncSyncDbOf(sync: SyncDb): AsyncSyncDb {
+  let tail: Promise<unknown> = Promise.resolve();
+  let depth = 0;
+  return {
+    query: async (sql, args) => sync.query(sql, args),
+    exec: async (sql, args) => sync.exec(sql, args),
+    async transaction(body) {
+      // sql.js can't wait inside its own transaction: BEGIN and COMMIT around what's awaited.
+      if (depth++ === 0) sync.exec('BEGIN');
+      try {
+        await body();
+        if (depth === 1) sync.exec('COMMIT');
+      } catch (e) {
+        if (depth === 1) sync.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+    exclusive(fn) {
+      const go = tail.then(fn, fn);
+      tail = go.catch(() => undefined);
+      return go;
+    },
+  };
 }

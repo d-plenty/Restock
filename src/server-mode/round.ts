@@ -10,7 +10,10 @@
 
 import { b64u, openRsf1, openWebKeys, openWithAny, sealRsf1, unb64 } from './crypto';
 import { sha256 } from '@noble/hashes/sha2';
-import { isSyncFile, webFileName, type SyncFileMessage, type WebSyncEngine } from './engine';
+import { isSyncFile, webFileName, type AsyncSyncEngine, type SyncFileMessage, type WebSyncEngine } from './engine';
+
+/** 0.15.1: the round runs on either engine: one that answers straight away, or the iPhone's, which answers later. */
+export type AnyEngine = WebSyncEngine | AsyncSyncEngine;
 
 export interface Remote {
   files(): Promise<{ name: string; size: number; version?: string; modified?: string }[]>;
@@ -52,7 +55,7 @@ export interface RoundOptions {
   v3?: boolean;
   /** 0.13.2, a phone (the iPhone and iPad app): its own file's name, and what goes in it besides the entries (`shares`). */
   ownName?: string;
-  extra?: () => Record<string, unknown>;
+  extra?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
 }
 
 const CHAIN = /^[a-z0-9-]{1,60}$/;
@@ -99,7 +102,7 @@ export function sharedSectionOf(m: Record<string, unknown>, device: string): Sha
 
 const ARCHIVE = /^archive\/[A-Za-z0-9_-]+\/\d{4}-\d{2}\.bin$/;
 
-export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now = () => new Date().toISOString(), opts: RoundOptions = {}): Promise<RoundResult> {
+export async function syncRound(e: AnyEngine, remote: Remote, k: Keys, now = () => new Date().toISOString(), opts: RoundOptions = {}): Promise<RoundResult> {
   const res: RoundResult = { received: 0, phones: 0, unread: 0, archived: 0, wrote: false, newKeys: false, shared: [] };
   const list = await remote.files();
   const names = list.map((f) => f.name);
@@ -112,24 +115,24 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
   // A newer household key, sealed to this browser by a phone (after a phone was removed). Anyone
   // can seal a webkeys/ file to the web's public key (it's no secret), so what's in it is only a
   // candidate: a key version this browser already has is never replaced, and a new one is taken
-  // only once it opens a phone's file that vouches for it (WebSyncEngine.vouches). Until then the
+  // only once it opens a phone's file that vouches for it (SyncCore.vouches). Until then the
   // file is read again every round.
   const wk = `webkeys/${k.webId}.bin`;
   const candidates = new Map<string, string>();
-  if (!opts.v3 && names.includes(wk) && e.fresh(wk, version(wk)) && k.webPriv) {
+  if (!opts.v3 && names.includes(wk) && (await e.fresh(wk, version(wk))) && k.webPriv) {
     const bytes = await remote.read(wk);
     if (bytes) {
       try {
         const got = openWebKeys(unb64(k.webPriv), bytes);
         for (const [v, key] of Object.entries(got)) if (k.keys[v] === undefined) candidates.set(v, key);
-        if (!candidates.size) e.noteVersion(wk, version(wk));
+        if (!candidates.size) (await e.noteVersion(wk, version(wk)));
       } catch {
         // not for this browser's key (an old one): leave it
       }
     }
   }
   /** A file none of the keys open: does a candidate open it, and does the file vouch for it? */
-  const tryCandidates = (bytes: Uint8Array, name: string): SyncFileMessage | undefined => {
+  const tryCandidates = async (bytes: Uint8Array, name: string): Promise<SyncFileMessage | undefined> => {
     for (const [v, key] of candidates) {
       let m: SyncFileMessage;
       try {
@@ -137,11 +140,11 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
       } catch {
         continue;
       }
-      if (!e.vouches(m, name)) continue;
+      if (!(await e.vouches(m, name))) continue;
       k.keys[v] = key;
       candidates.delete(v);
       res.newKeys = true;
-      if (!candidates.size) e.noteVersion(wk, version(wk));
+      if (!candidates.size) (await e.noteVersion(wk, version(wk)));
       return m;
     }
     return undefined;
@@ -154,54 +157,54 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
       const name = f.name;
       if (!isSyncFile(name) || name === own) continue;
       const ver = version(name);
-      if (!e.fresh(name, ver)) continue;
+      if (!(await e.fresh(name, ver))) continue;
       const bytes = await remote.read(name);
       if (!bytes) continue;
       const sum = b64u(sha256(bytes));
-      if (sum === e.seenSum(name)) {
-        e.noteVersion(name, ver);
+      if (sum === (await e.seenSum(name))) {
+        (await e.noteVersion(name, ver));
         continue;
       }
       let m: SyncFileMessage;
       try {
         m = openWithAny<SyncFileMessage>(k.keys, bytes).msg;
       } catch {
-        const got = candidates.size ? tryCandidates(bytes, name) : undefined;
+        const got = candidates.size ? await tryCandidates(bytes, name) : undefined;
         if (!got) {
           res.unread++;
           continue;
         }
         m = got;
       }
-      e.noteVersion(name, ver);
-      notePhotos(e, m.photos);
+      (await e.noteVersion(name, ver));
+      await notePhotos(e, m.photos);
       const dev = /^restock-sync-(.+)\.bin$/.exec(name)?.[1];
       const sh = dev && (m as { device?: unknown }).device === dev ? sharedSectionOf(m as unknown as Record<string, unknown>, dev) : undefined;
       if (sh) res.shared.push(sh);
-      const n = e.takeFile(name, sum, m, at);
+      const n = (await e.takeFile(name, sum, m, at));
       if (n < 0) continue;
       res.received += n;
       res.phones++;
       if (f.modified && (!res.lastPhone || f.modified > res.lastPhone)) res.lastPhone = f.modified;
     }
   };
-  e.noteTabs();
+  (await e.noteTabs());
   await readAll();
-  if (e.noteTabs()) await readAll();
+  if ((await e.noteTabs())) await readAll();
 
   // Prices and receipts the phones moved off themselves.
   for (const name of opts.v3 ? [] : names) {
     if (!ARCHIVE.test(name)) continue;
     const ver = version(name);
     const vk = 'archive:' + name;
-    if (ver !== null && e.meta('folder_ver:' + vk) === ver) continue;
+    if (ver !== null && (await e.meta('folder_ver:' + vk)) === ver) continue;
     const bytes = await remote.read(name);
     if (!bytes) continue;
     try {
       const m = openWithAny<{ prices?: Record<string, unknown>[]; receipts?: Record<string, unknown>[]; photos?: Record<string, string> }>(k.keys, bytes).msg;
-      notePhotos(e, m.photos);
-      res.archived += e.takeArchive(m);
-      e.noteVersion(vk, ver);
+      await notePhotos(e, m.photos);
+      res.archived += (await e.takeArchive(m));
+      (await e.noteVersion(vk, ver));
     } catch {
       res.unread++;
     }
@@ -216,16 +219,16 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
     const f = listed.find((x) => x.name === own);
     const ownVer = f ? (f.version ?? `${f.size}/${f.modified ?? ''}`) : null;
     // Written last round, but the server didn't say which version that made: this is it.
-    if (e.meta('own_ver') === 'pending') e.setMeta('own_ver', ownVer);
-    if (f && ownVer !== e.meta('own_ver')) {
+    if ((await e.meta('own_ver')) === 'pending') (await e.setMeta('own_ver', ownVer));
+    if (f && ownVer !== (await e.meta('own_ver'))) {
       const bytes = await remote.read(own);
       if (bytes) {
         try {
           const m = openWithAny<SyncFileMessage & { webPub?: unknown }>(k.keys, bytes).msg;
           // The web key the passphrase browser named in it (sealed, so the server can't change it).
-          if (typeof m.webPub === 'string' && m.webPub) e.setMeta('own_webpub', m.webPub);
-          const n = e.apply(m.entries);
-          if (n > 0) e.tidyCategories();
+          if (typeof m.webPub === 'string' && m.webPub) (await e.setMeta('own_webpub', m.webPub));
+          const n = (await e.apply(m.entries));
+          if (n > 0) (await e.tidyCategories());
           res.received += n;
         } catch {
           // sealed with a key this browser doesn't have: it's overwritten below
@@ -234,13 +237,13 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
     }
     const keyv = Math.max(...Object.keys(k.keys).map(Number).filter(Number.isFinite));
     if (!Number.isFinite(keyv) || keyv <= 0) break;
-    const out = e.ownFile(keyv, at, !!f && ownVer === e.meta('own_ver'));
+    const out = (await e.ownFile(keyv, at, !!f && ownVer === (await e.meta('own_ver'))));
     if (!out) break;
     // Phones only seal new keys to a webPub found inside a web's own sealed file (docs, Changes).
     // So only a browser that has the key pair names one: a browser signed in with a phone only
     // knows the webPub the server told it, and passes on the one already in the file instead.
-    const webPub = opts.v3 ? null : k.webPriv ? k.webPub : e.meta('own_webpub');
-    const sealed = sealRsf1(unb64(k.keys[String(keyv)]), { ...out.msg, ...(webPub ? { webPub } : {}), ...opts.extra?.() });
+    const webPub = opts.v3 ? null : k.webPriv ? k.webPub : (await e.meta('own_webpub'));
+    const sealed = sealRsf1(unb64(k.keys[String(keyv)]), { ...out.msg, ...(webPub ? { webPub } : {}), ...(await opts.extra?.()) });
     if (attempt > 0 || f) {
       const now2 = await remote.files();
       const g = now2.find((x) => x.name === own);
@@ -260,19 +263,19 @@ export async function syncRound(e: WebSyncEngine, remote: Remote, k: Keys, now =
       }
       throw err;
     }
-    e.wroteOwn(out.mark);
-    e.setMeta('own_ver', answer && typeof answer === 'object' && typeof answer.version === 'string' ? answer.version : 'pending');
+    (await e.wroteOwn(out.mark));
+    (await e.setMeta('own_ver', answer && typeof answer === 'object' && typeof answer.version === 'string' ? answer.version : 'pending'));
     res.wrote = true;
     break;
   }
-  if (res.phones > 0) e.setMeta('folder_at', at);
-  e.setMeta('folder_unread', res.unread > 0 ? String(res.unread) : null);
+  if (res.phones > 0) (await e.setMeta('folder_at', at));
+  (await e.setMeta('folder_unread', res.unread > 0 ? String(res.unread) : null));
   return res;
 }
 
 /** Remembers where a receipt photo is on the server (path → sha256), from a file's `photos` map. */
-function notePhotos(e: WebSyncEngine, photos: Record<string, string> | undefined): void {
+async function notePhotos(e: AnyEngine, photos: Record<string, string> | undefined): Promise<void> {
   if (!photos || typeof photos !== 'object') return;
   for (const [path, sum] of Object.entries(photos))
-    if (/^receipts\/[A-Za-z0-9_-]{1,80}\.jpg$/.test(path) && typeof sum === 'string' && /^[0-9a-f]{64}$/.test(sum)) e.setMeta('photo:' + path, sum);
+    if (/^receipts\/[A-Za-z0-9_-]{1,80}\.jpg$/.test(path) && typeof sum === 'string' && /^[0-9a-f]{64}$/.test(sum)) (await e.setMeta('photo:' + path, sum));
 }

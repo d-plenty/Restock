@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { initDb, updateSettings } from '../lib/db';
 import { createSqlJsDriver } from '../lib/sql/sqljs';
 import { signedText, signWithPkcs8, verifySig } from '../server-mode/crypto';
-import { WebSyncEngine } from '../server-mode/engine';
-import { syncDbOf } from '../server-mode/sqldb';
+import { AsyncSyncEngine } from '../server-mode/engine';
+import { asyncSyncDbOf, syncDbOf } from '../server-mode/sqldb';
 import { davAddress, davFolder, DavProblem, isHomeHost, nextcloudFolderUrl, nextcloudServer, parseListing, pollNextcloud, startNextcloud, type DavHttp } from './dav';
 import { FolderHouse } from './folderHouse';
 
@@ -155,13 +155,11 @@ async function device(name: string, id: string, io: () => ReturnType<typeof davF
   await updateSettings({ onboarded: true }, { local: true });
   const raw = driver.raw;
   raw.run('UPDATE sync_meta SET value = ? WHERE key = ?', [id, 'device']);
-  // eslint-disable-next-line prefer-const
-  let e: WebSyncEngine;
-  const sign = (t: string) => signWithPkcs8(e.meta('owner_priv') ?? '', t);
-  e = new WebSyncEngine(syncDbOf(raw), verifySig, signedText, () => Date.now(), { role: 'phone', sign });
-  e.setMeta('name', name);
+  const sign = (t: string, priv: string | null) => signWithPkcs8(priv ?? '', t);
+  const e = new AsyncSyncEngine(asyncSyncDbOf(syncDbOf(raw)), verifySig, signedText, () => Date.now(), { role: 'phone', sign });
+  await e.setMeta('name', name);
   const q = (sql: string) => raw.exec(sql)[0]?.values ?? [];
-  return { e, raw, q, house: new FolderHouse(e, io, () => Date.now()) };
+  return { e, raw, q, house: new FolderHouse(e, async () => io(), () => Date.now()) };
 }
 
 describe('0.15.0: two iPhones in a household folder on WebDAV', () => {
@@ -173,9 +171,9 @@ describe('0.15.0: two iPhones in a household folder on WebDAV', () => {
     const b = await device("Sarah's iPhone", 'bbbb000000000002', () => folder);
     a.raw.run("INSERT INTO items (id, name, created_at, section) VALUES ('i-milk', 'Milk', '2026-11-01T00:00:00.000Z', 'pantry')");
     b.raw.run("INSERT INTO items (id, name, created_at, section) VALUES ('i-bread', 'Bread', '2026-11-01T00:00:00.000Z', 'pantry')");
-    a.house.start('Declan and Sarah');
+    (await a.house.start('Declan and Sarah'));
     await a.house.sync();
-    await b.house.askToJoin(a.house.invite().code);
+    await b.house.askToJoin((await a.house.invite()).code);
     await a.house.sync();
     expect((await b.house.sync()).justJoined).toBe(true);
     await a.house.sync();

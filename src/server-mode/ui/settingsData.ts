@@ -208,10 +208,9 @@ export const signOutAll = () => leave(() => signOutEverywhere());
 
 /** The server's own version ("0.9.3"), for About. */
 export function useServerVersion(): string | undefined {
-  const [v, setV] = useState<string>();
+  const [v, setV] = useState<string | undefined>(() => serverInfo()?.version);
   useEffect(() => {
-    const known = serverInfo()?.version;
-    if (known) return setV(known);
+    if (serverInfo()?.version) return;
     api
       .health()
       .then((h) => setV(h.version))

@@ -10,7 +10,7 @@ import { serverMode, serverUi } from '../../server-mode/flag';
 import type { ListEntry } from '../../types';
 import { Icon, Sheet, useBackLayer, SearchField } from '../components';
 import { useNav } from '../nav';
-import type { ForLine } from './Add';
+import type { ForLine } from './addShared';
 import { alwaysWords } from './addPickWords';
 import { pickedWords } from './addSave';
 
@@ -94,13 +94,12 @@ export function PickItemSheet({
   const top = useRef<HTMLDivElement>(null);
   // Nothing of yours matches the line's words: straight to the shop search for them, already filled in
   // (it used to stop at an empty list of your items). Once only, so Back still shows the list.
-  const sentToShops = useRef(false);
+  const [sentToShops, setSentToShops] = useState(false);
   const noneOfMine = !!pantry && !searchItems(word, pantry).length;
-  useEffect(() => {
-    if (!noneOfMine || sentToShops.current || toPantry) return;
-    sentToShops.current = true;
+  if (noneOfMine && !sentToShops && !toPantry) {
+    setSentToShops(true);
     if (native && online) setShopsFor(word);
-  }, [noneOfMine, native, online, toPantry, word]);
+  }
 
   // Back from the shop search goes back to the pantry list, not out of the sheet.
   useBackLayer(() => setShopsFor(undefined), shopsFor !== undefined);

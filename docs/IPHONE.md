@@ -79,7 +79,7 @@ Apple Account. Don't delete Restock from the phone first.
 | **Updates** | Not possible on iPhone due to Apple's restrictions: an app can't update itself. Install the newer `.ipa` the same way. |
 | **Shared price history** (judging a new item from day one) and **sending prices back** | Works, with the same rules as Android. The history downloads after a price check when there's something new (on Wi-Fi unless you allow mobile data). |
 | **Recall alerts** | Works. Android checks once a day in the background; an iPhone or iPad checks when you open Restock, at most once a day, and from Check now. |
-| **The database** | A real SQLite file in the app's own storage (`Application Support/Restock/restock.sqlite`), part of the device's backups. It runs in memory while Restock is open and is written out after each change and when the app goes to the background; a save that fails is shown on Home and in Diagnostics. |
+| **The database** | The system's own SQLite (since 0.15.1, as on Android), on a file in the app's own storage (`Application Support/Restock/restock.sqlite`, and the price history in `restock-market.sqlite`), part of the device's backups. Each change is on the disk as soon as it's made. The first time 0.15.1 opens them, a copy of each is kept beside it (`restock-before-0.15.1.sqlite`). |
 | **Changing the app icon's colour** | Works: the same 16 colours. iOS shows its own "You have changed the icon" message each time. |
 | **Home screen widgets** | Not yet: coming. The row is in Settings, greyed. |
 | **Price helper phone** | Android only. |

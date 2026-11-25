@@ -62,18 +62,17 @@ function AddDeviceSheet({ onClose, onLetIn }: { onClose: () => void; onLetIn: ()
   const [invite, setInvite] = useState<{ code: string; until: number }>();
   const [error, setError] = useState<string>();
   useEffect(() => {
-    try {
-      setInvite(icloud.invite());
-    } catch (e) {
-      setError(errText(e));
-    }
     let alive = true;
+    icloud
+      .invite()
+      .then((i) => alive && setInvite(i))
+      .catch((e: unknown) => alive && setError(errText(e)));
     const look = setInterval(() => {
       void RestockNative.syncNow()
-        .then(() => {
+        .then(async () => {
           if (!alive) return;
           // The code is used up once a device has been let in.
-          if (!icloud.status().invite) {
+          if (!(await icloud.status()).invite) {
             nav.toast('That device is in. It syncs from now on.');
             onLetIn();
           }
@@ -83,11 +82,7 @@ function AddDeviceSheet({ onClose, onLetIn }: { onClose: () => void; onLetIn: ()
     return () => {
       alive = false;
       clearInterval(look);
-      try {
-        icloud.closeInvite();
-      } catch {
-        // nothing open
-      }
+      void icloud.closeInvite().catch(() => undefined); // nothing open
     };
     // Once, when the sheet opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -265,8 +260,7 @@ export function IcloudSyncScreen() {
                   className="btn small"
                   disabled={!!busy}
                   onClick={() => {
-                    icloud.cancelJoin();
-                    load();
+                    void icloud.cancelJoin().then(load, load);
                   }}
                 >
                   Stop waiting

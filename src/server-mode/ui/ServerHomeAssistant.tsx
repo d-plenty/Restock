@@ -2,7 +2,8 @@
 // token, around the clock. Address, Test connection, which list, the token (write-only: it goes
 // sealed and never comes back), on or off, and Sync now. If Home Assistant still runs on a phone
 // with Restock 0.9.3, the server waits until that phone is updated or the admin ticks that it's off.
-import { useEffect, useState } from 'react';
+import { useResetOn } from '../../ui/useResetOn';
+import { useState } from 'react';
 import { timeAgo } from '../../ui/components';
 import { api3, type HaConfig } from '../api';
 import { HousePage } from './DeskServer';
@@ -24,13 +25,18 @@ export function ServerHomeAssistant({ narrow }: { narrow?: boolean }) {
   const [busy, setBusy] = useState<string>();
   const [msg, setMsg] = useState<{ text: string; bad?: boolean }>();
   const [phoneOff, setPhoneOff] = useState(false);
-  useEffect(() => {
-    if (!data) return;
-    setAddress(data.address ?? '');
-    setEntity(data.entity ?? '');
-    setEnabled(!!data.enabled);
-    setPhoneOff(!!data.phone && data.offOn === data.phone);
-  }, [data]);
+  // What the server has, once it's known (and again after a save).
+  useResetOn(
+    [data],
+    () => {
+      if (!data) return;
+      setAddress(data.address ?? '');
+      setEntity(data.entity ?? '');
+      setEnabled(!!data.enabled);
+      setPhoneOff(!!data.phone && data.offOn === data.phone);
+    },
+    true,
+  );
 
   const body = (): HaConfig & { token?: string } => ({ address: address.trim(), entity: entity.trim(), enabled, ...(token.trim() ? { token: token.trim() } : {}), ...(data?.phone ? { offOn: phoneOff ? data.phone : null } : {}) });
   const run = async (what: string, fn: () => Promise<{ text: string; bad?: boolean } | void>) => {

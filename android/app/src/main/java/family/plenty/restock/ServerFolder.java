@@ -161,49 +161,6 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
 
     // ---------- joining ----------
 
-    /**
-     * Joins the server with an invite: the first of `bases` that answers gets this phone's public key.
-     * Answers the address that took it. Throws with words for the person.
-     */
-    static String join(List<String> bases, String invite, String device, String name, PublicKey pub) throws Exception {
-        JSONObject body = new JSONObject();
-        body.put("invite", invite);
-        body.put("device", device);
-        body.put("name", name);
-        body.put("pub", ServerLink.b64u(pub.getEncoded()));
-        byte[] b = body.toString().getBytes(StandardCharsets.UTF_8);
-        Exception last = null;
-        for (String a : bases) {
-            if (a == null) continue;
-            SyncDav.Response r;
-            try {
-                Map<String, String> h = new LinkedHashMap<>();
-                h.put("Content-Type", "application/json");
-                r = SyncDav.request("POST", URI.create(a + API + "/devices"), h, b, SyncDav.MAX_SMALL);
-            } catch (Exception e) {
-                last = e;
-                continue; // not reachable from here: the other address
-            }
-            if (r.status >= 200 && r.status < 300) return a;
-            String err = errorOf(r);
-            // The server already has this phone, with another key (it didn't come off the list at Stop, or
-            // this phone lost its keys): the server says what to do, as it says it.
-            if ("device-taken".equals(err) || r.status == 409) {
-                String said = messageOf(r);
-                throw new SyncDav.Problem(said.isEmpty() ? "That phone is already on this server. Remove it on the Phones page first, then add it again." : said);
-            }
-            if ("invite".equals(err)) throw new SyncDav.Problem("That code isn't from this server. Make a new one on the server's Add a phone page.");
-            if (r.status == 403 || r.status == 410 || "used".equals(err) || "expired".equals(err))
-                throw new SyncDav.Problem("That code has been used or has run out. Make a new one on the server's Add a phone page (each code works once, for 10 minutes).");
-            if (r.status == 507) throw new SyncDav.Problem("The server already has as many phones as it takes.");
-            if (r.status == 404) throw new SyncDav.Problem("That address isn't a Restock server (or the server needs updating).");
-            if (r.status == 429) throw new SyncDav.Problem("The server is busy. Try again in a minute.");
-            last = SyncDav.problem(r.status, "join");
-        }
-        if (last instanceof SyncDav.Problem) throw last;
-        throw new SyncDav.Problem("Couldn't reach the Restock server. Check this phone is on the same network as the server (or the server's away address works), then try again.", last);
-    }
-
     // ---------- the folder ----------
 
     @Override

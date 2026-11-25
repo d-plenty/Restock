@@ -1,5 +1,6 @@
 // 0.15.0: the item screen's sheets (moved out of Item.tsx): alerts, editing the item, a price, and
 // picking an option.
+import { useNow } from '../useNow';
 import { tidyItemName } from '../../lib/itemName';
 import { useState } from 'react';
 import { act } from '../../lib/undo';
@@ -263,7 +264,7 @@ export function PriceSheet({ options, productId: first, onClose }: { options: Op
   const [was, setWas] = useState('');
   const [special, setSpecial] = useState(false);
   const [member, setMember] = useState(false);
-  const today = dayOf(new Date());
+  const today = dayOf(new Date(useNow(60_000)));
   const [day, setDay] = useState(today);
   // "$4.50" and "4.50" both work (0.9.0).
   const p = parseMoney(price);

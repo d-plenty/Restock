@@ -1,4 +1,5 @@
 // Server mode: a QR code drawn in the page (zxing's writer, bundled; nothing is sent anywhere).
+import { useResetOn } from '../../ui/useResetOn';
 import { useEffect, useState } from 'react';
 import { LoadingBar } from '../../ui/components';
 
@@ -15,9 +16,9 @@ export function qrSvg(symbol: { data: ArrayLike<number>; width: number; height: 
 export function Qr({ text, label }: { text: string; label: string }) {
   const [svg, setSvg] = useState<string>();
   const [failed, setFailed] = useState(false);
+  useResetOn([text], () => setSvg(undefined));
   useEffect(() => {
     let alive = true;
-    setSvg(undefined);
     void (async () => {
       const [mod, { default: wasmUrl }] = await Promise.all([import('zxing-wasm/writer'), import('zxing-wasm/writer/zxing_writer.wasm?url')]);
       mod.prepareZXingModule({ overrides: { locateFile: (path: string, prefix: string) => (path.endsWith('.wasm') ? wasmUrl : prefix + path) } });

@@ -111,6 +111,8 @@ function ServerRoot() {
   }, []);
 
   useEffect(() => {
+    // Asks the server which page to show (it answers later; some answers are known straight away).
+    // eslint-disable-next-line react/set-state-in-effect
     void check();
     whenSignedOut(() => {
       const s = session();
@@ -191,6 +193,8 @@ function Household({ s }: { s: Session }) {
       await openServerDatabase(s);
       start();
     });
+    // The database opener is set up outside React: the page can open now.
+    // eslint-disable-next-line react/set-state-in-effect
     setReady(true);
     // 0.9.6 (review M2): cards this browser keeps from a sign-in to another household or server
     // are never shown here; ask once per sign-in whether to keep them (after the page is up).

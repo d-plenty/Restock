@@ -4,6 +4,8 @@
 // held until Save settings, Refresh (Recount now, Ask phones to resend) and Delete everything on this
 // server. Everything that deletes, turning Auto delete on or shorter too, goes through the two checks
 // (DeskDataDialog.tsx). Nothing here deletes the shopping list, the pantry or each product's newest price.
+import { useResetOn } from '../../ui/useResetOn';
+import { useNow } from '../../ui/useNow';
 import { useEffect, useMemo, useState } from 'react';
 import { confirmAction } from '../../lib/confirm';
 import { Icon, useBackHandler } from '../../ui/components';
@@ -97,11 +99,15 @@ function AutoDelete({ summary, onAsk, onSaved }: { summary?: DataSummary; onAsk:
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; bad?: boolean }>();
   // What the server has, once it's known (and again after a save).
-  useEffect(() => {
-    if (!summary) return;
-    setChoice(choiceOf(summary.autoDelete.months));
-    if (choiceOf(summary.autoDelete.months) === 'custom') setCustom(String(summary.autoDelete.months));
-  }, [summary]);
+  useResetOn(
+    [summary],
+    () => {
+      if (!summary) return;
+      setChoice(choiceOf(summary.autoDelete.months));
+      if (choiceOf(summary.autoDelete.months) === 'custom') setCustom(String(summary.autoDelete.months));
+    },
+    true,
+  );
   const customN = Number(custom);
   const customOk = Number.isInteger(customN) && customN >= 1 && customN <= 120;
   const months: number | null | undefined = choice === 'off' ? null : choice === 'custom' ? (customOk ? customN : undefined) : Number(choice);
@@ -294,6 +300,7 @@ const ASK_TITLE: Record<DataKind, string> = {
 };
 
 export function DeskDataManage({ narrow }: { narrow?: boolean }) {
+  const now = useNow();
   const nav = useNav();
   const summary = useServer(() => data.summary());
   const phones = usePhonesV3();
@@ -335,7 +342,7 @@ export function DeskDataManage({ narrow }: { narrow?: boolean }) {
       setBusy(undefined);
     }
   };
-  const nextResend = s?.resend.next && Date.parse(s.resend.next) > Date.now() ? s.resend.next : undefined;
+  const nextResend = s?.resend.next && Date.parse(s.resend.next) > now ? s.resend.next : undefined;
 
   const dialog = useMemo((): Omit<TwoChecksProps, 'onDone' | 'onCancel'> | undefined => {
     if (!ask || !s) return undefined;

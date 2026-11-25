@@ -1,6 +1,7 @@
 // The Cards screen (0.9.6: was "Loyalty cards"): loyalty cards and gift cards, with each card's
 // barcode drawn big for the till. The same screen on the phone and the web; `store` says where the
 // cards live (lib/cardStore.ts: the phone's database, or on the web this browser only).
+import { useResetOn } from '../useResetOn';
 import { isLocked, lockBackup, unlockBackup } from '../../lib/backupLock';
 import JsBarcode from 'jsbarcode';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -34,14 +35,17 @@ export { PROGRAMS };
 /** A loyalty card's barcode (Code 128), as shop mode on the Shopping list shows it too. */
 export function CardBarcode({ value }: { value: string }) {
   const ref = useRef<SVGSVGElement>(null);
-  const [failed, setFailed] = useState(false);
+  // The number that couldn't be drawn (a new number gets its own try).
+  const [failedFor, setFailedFor] = useState<string>();
+  const failed = failedFor === value;
   useEffect(() => {
     if (!ref.current) return;
     try {
       JsBarcode(ref.current, value, { format: 'CODE128', displayValue: false, height: 90, margin: 0, width: 2.2 });
-      setFailed(false);
     } catch {
-      setFailed(true);
+      // The drawing library is what says the number can't be drawn.
+      // eslint-disable-next-line react/set-state-in-effect
+      setFailedFor(value);
     }
   }, [value]);
   return failed ? (
@@ -333,7 +337,7 @@ export function CardsScreen({
 function LoyaltyView({ store, card }: { store: CardStore; card: LoyaltyCard }) {
   const [reveal, setReveal] = useState(false);
   const [types, setTypes] = useState<Partial<Record<string, GiftBarcodeType>>>();
-  useEffect(() => setReveal(false), [card.id]);
+  useResetOn([card.id], () => setReveal(false));
   useEffect(() => {
     let alive = true;
     void (store.codeTypes?.() ?? Promise.resolve({})).then((t) => alive && setTypes(t)).catch(() => alive && setTypes({}));

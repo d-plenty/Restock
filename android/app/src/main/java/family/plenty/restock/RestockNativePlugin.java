@@ -59,6 +59,17 @@ public class RestockNativePlugin extends Plugin {
 
     // ---------- SQL ----------
 
+    // ---------- 0.15.1: which version of the app this is ----------
+
+    /** "github" (the APK: it updates itself) or "play" (Google Play updates it). See productFlavors. */
+    @PluginMethod
+    public void channel(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("channel", BuildConfig.CHANNEL);
+        ret.put("selfUpdate", BuildConfig.SELF_UPDATE);
+        call.resolve(ret);
+    }
+
     // ---------- the search test, with the screen off (0.8.6) ----------
 
     @PluginMethod
@@ -786,6 +797,11 @@ public class RestockNativePlugin extends Plugin {
      */
     @PluginMethod
     public void installUpdate(final PluginCall call) {
+        // 0.15.1: the Google Play version is updated by Google Play only.
+        if (!BuildConfig.SELF_UPDATE) {
+            call.reject("This version of Restock is updated by Google Play.");
+            return;
+        }
         final String url = call.getString("url");
         final java.net.URI release = updateAddress(url, true);
         if (release == null) {
@@ -2135,7 +2151,11 @@ public class RestockNativePlugin extends Plugin {
     public void requestBatteryExemption(PluginCall call) {
         try {
             if (!SyncHub.get(getContext()).batteryExempt()) {
-                Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getContext().getPackageName()));
+                // 0.15.1: the Google Play version opens Android's battery list (find Restock, choose
+                // "Don't optimise"); Play doesn't allow the direct question for an app like this one.
+                Intent i = BuildConfig.SELF_UPDATE
+                    ? new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getContext().getPackageName()))
+                    : new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 getContext().startActivity(i);
             }

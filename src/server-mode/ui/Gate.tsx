@@ -2,6 +2,7 @@
 // 0.9.4, a house (v3): sign in with a challenge (no vault, no link), and on a fresh server the
 // second setup step, Set up this server (the server's own setup page does the first, the passphrase).
 // 0.15.0: only a house: the 0.9.3 household's sign-in, passphrase and link screens are gone.
+import { useResetOn } from '../../ui/useResetOn';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Icon, Logo } from '../../ui/components';
 import { serverInfo } from '../api';
@@ -124,10 +125,12 @@ function PhoneLoginScreen({ onDone, onBack }: { onDone: (s: Session) => void; on
   const [code, setCode] = useState<string>();
   const [error, setError] = useState<string>();
   const [round, setRound] = useState(0);
-  useEffect(() => {
-    let stopped = false;
+  useResetOn([round], () => {
     setCode(undefined);
     setError(undefined);
+  });
+  useEffect(() => {
+    let stopped = false;
     void (async () => {
       try {
         const l = await startPhoneLoginV3();

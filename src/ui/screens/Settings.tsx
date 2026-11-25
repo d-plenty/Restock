@@ -1,3 +1,4 @@
+import { useResetOn } from '../useResetOn';
 import { isIos } from '../../lib/platform';
 import { cleanSearch } from '../../lib/searchText';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -200,7 +201,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
   // 0.10.7: More → Custom's sheet, from Settings too
   const [newCustom, setNewCustom] = useState(false);
   // …until the next look: then what's live again (leaving the household, say, shows straight away).
-  useEffect(() => setSyncShown(undefined), [sync]);
+  useResetOn([sync], () => setSyncShown(undefined));
   // 0.9.1: how much price history a backup holds.
   const span = useLive(priceHistorySpan, []);
   const [reading, setReading] = useState<'privacy' | 'disclaimer'>();

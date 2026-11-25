@@ -2,7 +2,7 @@
 
 This builds the Restock APK from the terminal. You don't need Android Studio. Steps 1–4 are a one-off setup (about 20 minutes); after that, building again takes about a minute.
 
-You'll end up with `app-release.apk`, which installs on any Android 8.0 or newer phone, including de-Googled ones.
+You'll end up with `app-github-release.apk`, which installs on any Android 8.0 or newer phone, including de-Googled ones.
 
 - [Linux](#1-install-nodejs-and-java-21) (Fedora, Ubuntu, Debian and friends): the main path, every step below
 - [macOS](#macos)
@@ -107,17 +107,17 @@ npm run android:apk
 The first build downloads Gradle and the Android libraries, so give it 5–10 minutes. It should finish with **BUILD SUCCESSFUL**. The APK is at:
 
 ```
-~/restock/android/app/build/outputs/apk/release/app-release.apk
+~/restock/android/app/build/outputs/apk/github/release/app-github-release.apk
 ```
 
 ## 7. Put it on your phone
 
-**Without a cable:** send `app-release.apk` to your phone (LocalSend, Nextcloud, email, anything), tap it, allow the install when Android asks, and tap **Install**.
+**Without a cable:** send `app-github-release.apk` to your phone (LocalSend, Nextcloud, email, anything), tap it, allow the install when Android asks, and tap **Install**.
 
 **With a USB cable:** turn on Settings → System → Developer options → USB debugging on the phone, plug it in, and run:
 
 ```bash
-adb install -r ~/restock/android/app/build/outputs/apk/release/app-release.apk
+adb install -r ~/restock/android/app/build/outputs/apk/github/release/app-github-release.apk
 ```
 
 > **Already have the official Restock installed?** Your build is signed with your own computer's key, so Android won't install it over the official one (or the other way round). Export a backup in Settings first, uninstall, install yours, and restore.
@@ -154,7 +154,7 @@ wsl --install -d Ubuntu
 Restart, open **Ubuntu** from the Start menu, and follow the Linux steps from step 1 (the Ubuntu lines). When the APK is built, copy it to Windows to send it to your phone:
 
 ```bash
-cp ~/restock/android/app/build/outputs/apk/release/app-release.apk /mnt/c/Users/Public/
+cp ~/restock/android/app/build/outputs/apk/github/release/app-github-release.apk /mnt/c/Users/Public/
 ```
 
 ---
@@ -172,7 +172,7 @@ Installing over the top keeps your data. To test setup like a brand-new user, un
 
 ```bash
 adb uninstall family.plenty.restock
-adb install ~/restock/android/app/build/outputs/apk/release/app-release.apk
+adb install ~/restock/android/app/build/outputs/apk/github/release/app-github-release.apk
 ```
 
 ## Testing your changes
@@ -190,7 +190,7 @@ npm test
 VITE_FAKE_STORES=1 npm run dev
 ```
 
-**On the phone**, build a debug APK first (`npm run android:apk-debug`, which lands in `android/app/build/outputs/apk/debug/app-debug.apk`; release builds can't be inspected). It installs as a separate app (`family.plenty.restock.debug`, with its own data), so it never replaces the real Restock. Then, plug it in with USB debugging on, open `chrome://inspect` in Chrome or Chromium on your computer and click **inspect** under Restock: the Console shows errors from the app. Background checks log with:
+**On the phone**, build a debug APK first (`npm run android:apk-debug`, which lands in `android/app/build/outputs/apk/github/debug/app-github-debug.apk`; release builds can't be inspected). It installs as a separate app (`family.plenty.restock.debug`, with its own data), so it never replaces the real Restock. Then, plug it in with USB debugging on, open `chrome://inspect` in Chrome or Chromium on your computer and click **inspect** under Restock: the Console shows errors from the app. Background checks log with:
 
 ```bash
 adb logcat -s RestockCheck
@@ -211,6 +211,10 @@ cd server && npm test        # the server's tests, with that core
 ```
 
 The server needs Node 22.13 or newer. How to run it is in [its README](https://github.com/d-plenty/restock-server#readme).
+
+## The Google Play version
+
+`npm run android:play` builds the version for Google Play: an App Bundle at `android/app/build/outputs/bundle/playRelease/app-play-release.aab`. It's the same app without the updater, and without the two permissions Google Play doesn't allow for it. Restock isn't on Google Play yet; [docs/STORES.md](docs/STORES.md) has what's needed and what's left. The APK above is the one to install yourself.
 
 ## Signing
 

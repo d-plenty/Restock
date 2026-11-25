@@ -6,7 +6,7 @@ import { flavourSets } from '../../lib/flavours';
 import { aisleLabel, aisleOf, byAisle as sortByAisle, getAisles, type AisleAt } from '../../lib/aisles';
 import { countTicks } from '../../lib/inventory';
 import { branchAdvice, branchName, stockRows } from '../../lib/stock';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { clearTrip, saveTrip, type SavedTrip } from '../../lib/trip';
 import { scanBarcode } from '../../lib/barcode';
 import { serverMode } from '../../server-mode/flag';
@@ -421,9 +421,11 @@ export function ShoppingMode({
   const entries = allEntries.filter((e) => !skip.has(e.id));
   const skipped = allEntries.filter((e) => skip.has(e.id));
   // 0.12.6: General lines still to get, and the ones ticked on this trip (they stay showing, ticked).
-  const generalSeen = useRef<Set<string>>(new Set());
-  for (const e of general) if (!e.checked) generalSeen.current.add(e.id);
-  const generalShown = general.filter((e) => generalSeen.current.has(e.id));
+  // 0.15.1: kept as state, added to while drawing (React's way to remember what was seen before).
+  const [generalSeen, setGeneralSeen] = useState<Set<string>>(() => new Set(general.filter((e) => !e.checked).map((e) => e.id)));
+  const newGeneral = general.filter((e) => !e.checked && !generalSeen.has(e.id));
+  if (newGeneral.length) setGeneralSeen((seen) => new Set([...seen, ...newGeneral.map((e) => e.id)]));
+  const generalShown = general.filter((e) => !e.checked || generalSeen.has(e.id));
   /** At one shop: the ones with no shop picked, and the ones picked for that shop. In one list: all of them. */
   const generalAt = (v: ShopKey | 'all') => generalShown.filter((e) => v === 'all' || !e.chain || e.chain === v);
   // 0.10.9: one shop at a time (see below). 0.12.7: declared here, because what each shop shows now
@@ -433,7 +435,7 @@ export function ShoppingMode({
   );
   const [doneAt, setDoneAt] = useState<ShopKey[]>(() => (resume?.doneAt ?? []) as ShopKey[]);
   /** Where each thing was ticked on this trip, so a ticked line keeps that shop and its price. */
-  const gotAt = useRef<Map<string, ShopKey>>(new Map((resume?.gotAt ?? []) as [string, ShopKey][]));
+  const [gotAt, setGotAt] = useState<Map<string, ShopKey>>(() => new Map((resume?.gotAt ?? []) as [string, ShopKey][]));
   // 0.12.10: adding to the list without leaving the shop.
   const [adding, setAdding] = useState(false);
   // 0.12.7 (lib/tripPlan): each item is offered at the cheapest shop still to visit that has one of
@@ -458,12 +460,13 @@ export function ShoppingMode({
   const c = ctxOf(chosen, doneAt);
   /** The whole trip, as it started: where each thing is cheapest today. */
   const whole = ctxOf(chosen, []);
-  const oneShop = new Map<string, ReturnType<typeof ctxOf>>();
-  const atShop = (shop: StoreChain) => oneShop.get(shop) ?? (oneShop.set(shop, ctxOf([shop], [])), oneShop.get(shop)!);
+  // Each shop a line was ticked at, priced on its own (only those shops: working one out isn't free).
+  const oneShop = new Map([...new Set(gotAt.values())].filter((w) => chosen.includes(w as StoreChain)).map((w) => [w, ctxOf([w as StoreChain], [])] as const));
+  const atShop = (shop: StoreChain) => oneShop.get(shop) ?? whole;
   /** The context a line is priced and placed by: where it was ticked, else the shops still to visit. */
   const cx = (e: ListEntry) => {
     if (!e.checked) return c;
-    const where = gotAt.current.get(e.id);
+    const where = gotAt.get(e.id);
     return where && chosen.includes(where as StoreChain) ? atShop(where as StoreChain) : whole;
   };
   const isAlternative = (e: ListEntry) => {
@@ -481,8 +484,13 @@ export function ShoppingMode({
     return was !== undefined && is !== undefined && was < is - 0.004 ? `Cheaper at ${chainName(first.product.chain)} (${money(was)})` : undefined;
   };
   const noteTick = (e: ListEntry, on: boolean) => {
-    if (on) gotAt.current.set(e.id, shopOf(c, e));
-    else gotAt.current.delete(e.id);
+    const where = on ? shopOf(c, e) : undefined;
+    setGotAt((m) => {
+      const next = new Map(m);
+      if (where !== undefined) next.set(e.id, where);
+      else next.delete(e.id);
+      return next;
+    });
   };
   const elsewhere = (e: ListEntry) => (e.groupId ? !dealFor(cx(e), e) : !!e.chain && e.chain !== 'other' && !chosen.includes(e.chain as StoreChain));
   const cards = useLive(allCards, []);
@@ -493,9 +501,6 @@ export function ShoppingMode({
   // goes back to the shops, with the done ones greyed. "See everything in one list" is the old view.
   // (`at` and `doneAt` are declared above, with the trip's plan.)
 
-  // Back (or Escape) goes back to the shops from one shop, else closes shopping mode, unless a sheet
-  // is open on top of it.
-  useBackLayer(() => (at ? setAt(undefined) : leave()));
 
   // Keep the screen on while shopping: asked for once, let go when shopping mode closes.
   useEffect(() => {
@@ -593,17 +598,20 @@ export function ShoppingMode({
   const nav = useNav();
   const toast = nav.toast;
   // 0.12.10: the trip is kept as it goes, so leaving the app (or Android closing it) doesn't lose it.
-  const tripNow = (isOpen: boolean) => ({ section, chosen, skip: [...skip], at, doneAt, gotAt: [...gotAt.current], open: isOpen });
+  const tripNow = (isOpen: boolean) => ({ section, chosen, skip: [...skip], at, doneAt, gotAt: [...gotAt], open: isOpen });
   const ticked = entries.filter((e) => e.checked).length;
   useEffect(() => {
     saveTrip(tripNow(true));
-  }, [at, doneAt, ticked, chosen.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [at, doneAt, ticked, gotAt, chosen.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Step out: with things still to get the trip is kept ("Resume shopping"); with none it's over. */
   function leave() {
     if (left.length) saveTrip(tripNow(false));
     else clearTrip();
     onClose();
   }
+  // Back (or Escape) goes back to the shops from one shop, else closes shopping mode, unless a sheet
+  // is open on top of it.
+  useBackLayer(() => (at ? setAt(undefined) : leave()));
   const finish = () => {
     clearTrip();
     onClose();

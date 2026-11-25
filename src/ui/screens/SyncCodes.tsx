@@ -107,7 +107,7 @@ export function CardsQuestion({ onAnswer }: { onAnswer: (share: boolean) => void
 
 /** "9:41 left" until a code runs out. */
 function useCountdown(until: number | undefined) {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!until) return;
     const t = setInterval(() => setNow(Date.now()), 1000);

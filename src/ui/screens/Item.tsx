@@ -1,3 +1,4 @@
+import { useNow } from '../useNow';
 import { ShelfNotices } from './ShelfNotices';
 import { useEffect, useRef, useState } from 'react';
 import { flavourNoteFor, flavourSets } from '../../lib/flavours';
@@ -136,6 +137,7 @@ export function unitText(o: Option, style?: CompareStyle) {
 }
 
 export function ItemScreen({ groupId }: { groupId: string }) {
+  const now = useNow(60_000);
   const nav = useNav();
   const data = useLive(async () => {
     const group = await getGroup(groupId);
@@ -217,13 +219,13 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   // The chart shows the range picked above it (up to the history you keep, or the server keeps).
   const keepWeeks = fromServer.length ? Math.max(...HISTORY_WEEKS) : (appSettings?.historyWeeks ?? 8);
   const weeks = Math.min(rangeWeeks ?? keepWeeks, keepWeeks);
-  const from = Date.now() - weeks * 7 * 86_400_000;
+  const from = now - weeks * 7 * 86_400_000;
   const chartReadings = allReadings.filter((r) => Date.parse(r.date) >= from);
   // Member prices only count towards normal and lowest with the shop's card (0.9.0), as in the verdict.
   const stats = chartOption
     ? withMarket(
         // 0.9.1: with 12 months picked, Lowest, Normal and Usual sale cover the whole chart, not just its last 6 months.
-        computeStats(chartReadings, Date.now(), cards.has(chartOption.product.chain), Math.max(HISTORY_DAYS, weeks * 7 + 1)),
+        computeStats(chartReadings, now, cards.has(chartOption.product.chain), Math.max(HISTORY_DAYS, weeks * 7 + 1)),
         chartOption.product.market,
       )
     : undefined;

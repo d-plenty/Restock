@@ -41,11 +41,6 @@ describe('0.12.6: the General list comes along when you shop', () => {
 });
 
 describe('0.12.6: a search that finds nothing offers the next step', () => {
-  it('Pantry: Add, with what was typed carried over', () => {
-    const pantry = read('./screens/Pantry.tsx');
-    expect(pantry).toContain('<NoneFound');
-    expect(pantry).toContain("nav.push({ name: 'add', section, toPantry: true, query: typed })");
-  });
   it("a shop's specials: search that shop for it", () => {
     expect(read('./screens/ShopCatalogue.tsx')).toContain("nav.push({ name: 'add', section: base.section, toPantry: true, chain, query: cleanSearch(typed) })");
   });

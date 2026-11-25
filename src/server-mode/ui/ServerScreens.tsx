@@ -2,7 +2,7 @@
 // server's own pages (Your server, Server and phones, Your data, Activity, Account), the
 // household's settings, and a plain note where a phone-only screen would be.
 // 0.15.0: only a house (v3); the 0.9.3 household's pages are gone.
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { TopBar } from '../../ui/components';
 import { type Screen } from '../../ui/nav';
 import { deleteLocalCopy, onStatus, syncNow, syncStatus, unsentChanges } from '../live';
@@ -23,15 +23,6 @@ import '../desk.css'; // the server's own pages (dk- styles)
 
 export const useStatus = () => useSyncExternalStore(onStatus, syncStatus);
 
-/** Ticks every 20 s, so "2 min ago" moves on by itself. */
-export function useNow(ms = 20_000) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(t);
-  }, [ms]);
-  return now;
-}
 
 /** The Add tab on a server. */
 export function ServerTab() {

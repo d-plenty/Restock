@@ -7,6 +7,8 @@ export interface RestockNativePlugin {
   sqlQuery(opts: { sql: string; values: SqlValue[] }): Promise<{ rows: Record<string, unknown>[] }>;
   sqlRun(opts: { sql: string; values: SqlValue[] }): Promise<RunResult>;
   sqlBatch(opts: { ops: { sql: string; values: SqlValue[] }[] }): Promise<void>;
+  /** 0.15.1: which version of the app this is (Android: productFlavors; iPhone: the RestockChannel key in Info.plist). */
+  channel(): Promise<{ channel: AppChannel; selfUpdate: boolean }>;
   /**
    * Turn the background price check on or off (Android WorkManager). 0.9.6: it runs at the set time
    * of day from the phone's settings (checkTime, checkIntervalHours, checkWeekday), so this only
@@ -379,6 +381,13 @@ export interface ServerCodeCheck {
   /** The household is already this server's house (the code's key is the one in its server row). */
   sameHouse?: boolean;
 }
+
+/**
+ * 0.15.1: where this copy of Restock came from. 'github': the APK (GitHub and Restock's own F-Droid repo),
+ * which updates itself; 'play': Google Play's; 'sideload': the iPhone app installed from a computer;
+ * 'appstore': the App Store's (and TestFlight's); 'fdroid': a build for the main F-Droid repository.
+ */
+export type AppChannel = 'github' | 'play' | 'sideload' | 'appstore' | 'fdroid';
 
 /** Why Restock was opened: a share, an app icon shortcut, a widget or a notification. */
 export type LaunchAction = 'scan' | 'list' | 'receipt' | 'share' | 'search' | 'recalls' | 'deals';

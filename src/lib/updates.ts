@@ -1,5 +1,5 @@
 import { isIos } from './platform';
-import { RestockNative } from './sql/native';
+import { RestockNative, type AppChannel } from './sql/native';
 import { isNative } from '../stores/http';
 
 /**
@@ -7,7 +7,29 @@ import { isNative } from '../stores/http';
  * build (VITE_FDROID=1) leaves "Check for updates" out entirely.
  */
 // iPhone app: nor on an iPhone: Apple doesn't let an app update itself (Settings says so, greyed).
-export const SELF_UPDATE = !import.meta.env.VITE_FDROID && !isIos();
+// 0.15.1: nor the Google Play version: Google Play updates it. Which version this is, is asked of the
+// app's native side as it starts (learnChannel); until then (and in the web preview) it's guessed.
+let channel: AppChannel = import.meta.env.VITE_FDROID ? 'fdroid' : isIos() ? 'sideload' : 'github';
+export let SELF_UPDATE = channel === 'github';
+/** Where this copy of Restock came from (AppChannel). */
+export const appChannel = (): AppChannel => channel;
+export function setChannel(c: AppChannel): void {
+  channel = c;
+  SELF_UPDATE = c === 'github' && !isIos() && !import.meta.env.VITE_FDROID;
+}
+/** Asks the app's native side which version it is (an older native side, or the web: kept as guessed). */
+export async function learnChannel(): Promise<void> {
+  if (!isNative()) return;
+  try {
+    const r = await RestockNative.channel();
+    if (r && typeof r.channel === 'string') setChannel(r.channel);
+  } catch {
+    // an older build: what was guessed
+  }
+}
+
+/** 0.15.1: Restock's own F-Droid repo (GitHub Pages), with every release. */
+export const FDROID_REPO = 'https://d-plenty.github.io/Restock/';
 
 /** Where official Restock releases are published. */
 export const RELEASES = 'https://github.com/d-plenty/Restock/releases';

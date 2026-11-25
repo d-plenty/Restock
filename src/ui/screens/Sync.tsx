@@ -1,3 +1,4 @@
+import { useResetOn } from '../useResetOn';
 import { NotHereBanner } from '../IosWhy';
 import { useEffect, useState } from 'react';
 import { scanBarcode } from '../../lib/barcode';
@@ -385,10 +386,10 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
   const draft = useDraftState();
   const [pending, setPending] = useState<SyncPatch>({});
   const [wifiPending, setWifiPending] = useState<boolean>();
-  useEffect(() => {
+  useResetOn([draft.epoch], () => {
     setPending({});
     setWifiPending(undefined);
-  }, [draft.epoch]);
+  });
   const sh = (i: SyncInfo): SyncInfo => ({
     ...i,
     ...(pending.name !== undefined ? { name: pending.name } : {}),

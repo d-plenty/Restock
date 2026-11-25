@@ -1,0 +1,117 @@
+name: Store builds
+
+# 0.15.1: the Google Play and App Store versions of Restock, built for each release and attached to
+# it UNSIGNED, labelled so. They aren't on either store yet (docs/STORES.md says what's left to do):
+# these are what would be uploaded, for anyone who wants to look at or test them. Nothing here
+# needs an account or a key, and none is ever kept here.
+#
+# - restock-<version>-play-unsigned.aab: the Google Play App Bundle (productFlavors "play": Google
+#   Play updates it, so no updater). Sign it with your upload key, or let Play Console do it.
+# - restock-<version>-appstore-unsigned.xcarchive.zip: the App Store and TestFlight build (RestockChannel
+#   "appstore" in Info.plist). Open it in Xcode's Organizer, which signs it as it uploads.
+#
+# The APK and the iPhone .ipa from a computer stay as they are (the release itself and ios.yml).
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stores-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  play:
+    name: Google Play App Bundle (unsigned)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: npm run android:sync
+      - name: Bundle (no key)
+        working-directory: android
+        run: RESTOCK_UNSIGNED=1 ./gradlew bundlePlayRelease
+      - name: Name it
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          cp android/app/build/outputs/bundle/playRelease/app-play-release.aab "restock-$VERSION-play-unsigned.aab"
+          sha256sum "restock-$VERSION-play-unsigned.aab"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: restock-play-unsigned
+          path: restock-*-play-unsigned.aab
+          if-no-files-found: error
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "restock-$VERSION-play-unsigned.aab" --clobber
+
+  appstore:
+    name: App Store and TestFlight archive (unsigned)
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: The App Store's version (no word about installing from a computer)
+        run: /usr/libexec/PlistBuddy -c "Add :RestockChannel string appstore" ios/App/App/Info.plist
+      - name: Archive (no signing)
+        run: |
+          set -o pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Restock.xcarchive" \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            > "$RUNNER_TEMP/xcodebuild.log" 2>&1 || { echo "::error::The App Store build failed. The end of the log is below."; tail -n 150 "$RUNNER_TEMP/xcodebuild.log"; exit 1; }
+          tail -n 5 "$RUNNER_TEMP/xcodebuild.log"
+      - name: Zip the archive
+        run: |
+          (cd "$RUNNER_TEMP" && ditto -c -k --keepParent Restock.xcarchive "restock-$VERSION-appstore-unsigned.xcarchive.zip")
+          mv "$RUNNER_TEMP/restock-$VERSION-appstore-unsigned.xcarchive.zip" .
+          shasum -a 256 "restock-$VERSION-appstore-unsigned.xcarchive.zip"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: restock-appstore-unsigned
+          path: restock-*-appstore-unsigned.xcarchive.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: appstore-build-log
+          path: ${{ runner.temp }}/xcodebuild.log
+          if-no-files-found: ignore
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "restock-$VERSION-appstore-unsigned.xcarchive.zip" --clobber

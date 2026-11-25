@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 
 /** Each split screen, and the files its parts moved to (in src/ui/screens). */
 const SCREEN_PARTS: Record<string, string[]> = {
-  'Add.tsx': ['AddSheets.tsx'],
+  'Add.tsx': ['AddSheets.tsx', 'addShared.ts', 'AddTop.tsx', 'AddScanned.tsx', 'AddResults.tsx', 'AddWays.tsx', 'AddPanel.tsx'],
   'Item.tsx': ['ItemSheets.tsx', 'ItemHistory.tsx'],
   'List.tsx': ['ShoppingMode.tsx'],
   'Settings.tsx': ['SettingsParts.tsx'],

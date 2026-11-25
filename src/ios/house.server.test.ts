@@ -6,8 +6,8 @@ import initSqlJs from 'sql.js';
 import { describe, expect, it } from 'vitest';
 import { initDb, updateSettings } from '../lib/db';
 import { createSqlJsDriver } from '../lib/sql/sqljs';
-import { WebSyncEngine } from '../server-mode/engine';
-import { syncDbOf } from '../server-mode/sqldb';
+import { AsyncSyncEngine } from '../server-mode/engine';
+import { asyncSyncDbOf, syncDbOf } from '../server-mode/sqldb';
 import { b64u, newEcdhKey, signedText, signWithPkcs8, verifySig } from '../server-mode/crypto';
 import { House, HouseProblem, type Http } from './house';
 import { nodeLan } from './nodeLan';
@@ -25,10 +25,8 @@ async function phoneDb() {
   const driver = await createSqlJsDriver({ load: () => initSqlJs() });
   await initDb(driver);
   await updateSettings({ onboarded: true }, { local: true });
-  // eslint-disable-next-line prefer-const
-  let e: WebSyncEngine;
-  const sign = (text: string) => signWithPkcs8(e.meta('owner_priv') ?? '', text);
-  e = new WebSyncEngine(syncDbOf(driver.raw), verifySig, signedText, () => Date.now(), { role: 'phone', sign });
+  const sign = (text: string, priv: string | null) => signWithPkcs8(priv ?? '', text);
+  const e = new AsyncSyncEngine(asyncSyncDbOf(syncDbOf(driver.raw)), verifySig, signedText, () => Date.now(), { role: 'phone', sign });
   return { driver, e, raw: driver.raw };
 }
 
@@ -49,14 +47,14 @@ describe.skipIf(!SERVER)('an iPhone in a Restock server house (real server)', ()
     raw.run("INSERT INTO items (id, name, created_at, section) VALUES ('i-bread', 'Bread', '2026-11-01T00:00:00.000Z', 'pantry')");
     expect(q("SELECT stamp > 0 FROM sync_log WHERE tbl = 'items' AND pk = 'i-bread'")[0][0]).toBe(1);
     const house = new House(e, http);
-    expect(house.joined()).toBe(false);
+    expect((await house.joined())).toBe(false);
 
     const code = (await t.web.post('/api/v3/phones', { label: "Sarah's iPhone" })).body.code as string;
     const chk = await house.check(code);
     expect(chk).toMatchObject({ v: 3, inHousehold: false, mode: 'v3' });
     await house.join(code);
-    expect(house.joined()).toBe(true);
-    expect(house.info()).toMatchObject({ joined: true, label: 'Home', memberLabel: "Sarah's iPhone" });
+    expect((await house.joined())).toBe(true);
+    expect((await house.info())).toMatchObject({ joined: true, label: 'Home', memberLabel: "Sarah's iPhone" });
     // Its own things give way.
     expect(q("SELECT stamp FROM sync_log WHERE tbl = 'items' AND pk = 'i-bread'")[0][0]).toBe(-1);
     // A used code can't be used again.
@@ -67,16 +65,16 @@ describe.skipIf(!SERVER)('an iPhone in a Restock server house (real server)', ()
     expect(r1.wrote).toBe(true);
     expect(r1.received).toBeGreaterThan(0);
     expect(q("SELECT name FROM items ORDER BY id").map((r) => r[0])).toEqual(['Bread', 'Milk']);
-    expect(e.householdValue('name')).toBe('Declan and Sarah');
-    expect(e.householdValue('member:' + e.device())).toContain("Sarah's iPhone");
+    expect((await e.householdValue('name'))).toBe('Declan and Sarah');
+    expect((await e.householdValue('member:' + (await e.device())))).toContain("Sarah's iPhone");
     await t.settle();
     // The server took the iPhone's bread (its file opened, shares read).
     expect(H.rows(t, 'SELECT id, name FROM items ORDER BY id').map((r: { name: string }) => r.name)).toEqual(['Bread', 'Milk']);
     // …and the Android-style phone can read the iPhone's file with the house's key.
-    const mine = await android.getFile(`restock-sync-${e.device()}.bin`);
+    const mine = await android.getFile(`restock-sync-${(await e.device())}.bin`);
     expect(mine.status).toBe(200);
     const opened = H.core.openWithAny(android.serverKeys, mine.body).msg;
-    expect(opened.device).toBe(e.device());
+    expect(opened.device).toBe((await e.device()));
     expect(opened.shares).toEqual({ tabs: ['pantry'], receipts: false, cards: false });
     expect(opened.entries.some((x: { tbl: string; pk: string }) => x.tbl === 'items' && x.pk === 'i-bread')).toBe(true);
     expect(opened.entries.some((x: { tbl: string }) => x.tbl === 'cards')).toBe(false);
@@ -110,11 +108,11 @@ describe.skipIf(!SERVER)('an iPhone in a Restock server house (real server)', ()
     expect((await late.sync()).unread).toBe(0);
 
     // Removed on the server: the phone forgets the household and keeps everything.
-    const del = await t.web.removePhone(e.device());
+    const del = await t.web.removePhone((await e.device()));
     expect([200, 204]).toContain(del.status);
     await expect(house.sync()).rejects.toMatchObject({ removed: true });
-    expect(house.joined()).toBe(false);
-    expect(e.meta('notice')).toBe('server-removed');
+    expect((await house.joined())).toBe(false);
+    expect((await e.meta('notice'))).toBe('server-removed');
     expect(q("SELECT name FROM items ORDER BY id").map((r) => r[0])).toEqual(['Sourdough', 'Full cream milk']);
 
     // Joining again with a new code works, and leaving takes it off the server's list.
@@ -122,9 +120,9 @@ describe.skipIf(!SERVER)('an iPhone in a Restock server house (real server)', ()
     await house.join(code2);
     await house.sync();
     await house.leave();
-    expect(house.joined()).toBe(false);
+    expect((await house.joined())).toBe(false);
     const list = (await t.web.get('/api/v3/phones')).body;
-    expect(JSON.stringify(list)).not.toContain(`"${e.device()}","status":"active"`);
+    expect(JSON.stringify(list)).not.toContain(`"${(await e.device())}","status":"active"`);
   }, 60_000);
   // 0.14.0: Sign in on a computer, from an iPhone: the phone says yes to the browser whose code it scanned.
   it('signs a browser in by scanning its code, and refuses a code from somewhere else', async () => {
@@ -137,9 +135,9 @@ describe.skipIf(!SERVER)('an iPhone in a Restock server house (real server)', ()
     const pub = b64u(browser.pub);
     const start = (await (await fetch(t.base + '/api/v3/qrlogin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ epub: pub }) })).json()) as { id: string };
     const code = `restock-login:3?u=${encodeURIComponent(t.base)}&s=${start.id}&k=${pub}`;
-    expect(house.webCode(code)).toMatchObject({ kind: 'login', host: '127.0.0.1' });
-    expect(() => house.webCode(code.replace(encodeURIComponent(t.base), encodeURIComponent('https://evil.example')))).toThrow(/not your Restock server/);
-    expect(() => house.webCode('restock-login:2?u=x&s=y&k=z')).toThrow(/older Restock web page/);
+    expect((await house.webCode(code))).toMatchObject({ kind: 'login', host: '127.0.0.1' });
+    await expect(house.webCode(code.replace(encodeURIComponent(t.base), encodeURIComponent('https://evil.example')))).rejects.toThrow(/not your Restock server/);
+    await expect(house.webCode('restock-login:2?u=x&s=y&k=z')).rejects.toThrow(/older Restock web page/);
     await house.approveWeb(code);
     const done = (await (await fetch(t.base + '/api/v3/qrlogin/' + start.id)).json()) as { pending: boolean; session?: string };
     expect(done.pending).toBe(false);
@@ -169,14 +167,14 @@ describe.skipIf(!SERVER)('an iPhone in a Restock server house (real server)', ()
     const { e } = await phoneDb();
     const house = new House(e, tunnel);
     await house.join('restock-server:3?' + p.toString());
-    expect(house.joined()).toBe(true);
+    expect((await house.joined())).toBe(true);
     expect(seen.slice(0, 2)).toEqual(['POST http://tunnel.test/api/v3/join', 'POST https://tunnel.test/api/v3/join']);
-    e.setMeta('server_home', 'http://tunnel.test');
-    e.setMeta('server_reached', null);
+    (await e.setMeta('server_home', 'http://tunnel.test'));
+    (await e.setMeta('server_reached', null));
     seen.length = 0;
     await house.sync();
-    expect(e.meta('server_home')).toBe('https://tunnel.test');
-    expect(e.meta('server_reached')).toBe('https://tunnel.test');
+    expect((await e.meta('server_home'))).toBe('https://tunnel.test');
+    expect((await e.meta('server_reached'))).toBe('https://tunnel.test');
     seen.length = 0;
     await house.sync();
     expect(seen.every((x) => x.includes('https://tunnel.test'))).toBe(true);
@@ -193,14 +191,14 @@ describe.skipIf(!SERVER)('an iPhone in a Restock server house (real server)', ()
     const t = await H.house({}, { name: 'Server name' });
     try {
       const { e, raw } = await phoneDb();
-      e.setMeta('device', 'f6f6f6f6f6f6f6f6');
-      e.setMeta('name', 'iPhone f6');
+      (await e.setMeta('device', 'f6f6f6f6f6f6f6f6'));
+      (await e.setMeta('name', 'iPhone f6'));
       raw.run("INSERT INTO items (id, name, created_at, section) VALUES ('i-jam', 'Jam', '2026-11-01T00:00:00.000Z', 'pantry')");
       const air = new Map<string, Found>();
       const lan = nodeLan(air);
       const wifi = new WifiHouse(e, () => lan, () => ({ size: async () => -1, read: async () => null, write: async () => undefined }));
-      wifi.start('Our phones');
-      const hid = e.householdValue('hid');
+      (await wifi.start('Our phones'));
+      const hid = (await e.householdValue('hid'));
       const house = new House(e, http);
       const code = (await t.web.post('/api/v3/phones', { label: 'Owner iPhone' })).body.code as string;
       expect(await house.check(code)).toMatchObject({ v: 3, mode: 'v3', inHousehold: false });
@@ -210,16 +208,16 @@ describe.skipIf(!SERVER)('an iPhone in a Restock server house (real server)', ()
       await expect(new House(other, http).bring(code, 'wifi_house')).rejects.toThrow("Only the household's owner phone");
 
       await house.bring(code, 'wifi_house');
-      expect(house.joined()).toBe(true);
-      expect(wifi.joined()).toBe(false);
+      expect((await house.joined())).toBe(true);
+      expect((await wifi.joined())).toBe(false);
       // The same household, with its own name, id and key.
-      expect(e.householdValue('hid')).toBe(hid);
+      expect((await e.householdValue('hid'))).toBe(hid);
       const r = await house.sync();
       expect(r.wrote).toBe(true);
       await t.settle();
       expect(H.rows(t, 'SELECT name FROM items').map((x: { name: string }) => x.name)).toContain('Jam');
       // The house's name is the one it was given on the server's page (as when an Android phone brings one).
-      expect(e.householdValue('name')).toBe('Server name');
+      expect((await e.householdValue('name'))).toBe('Server name');
 
       // A phone added afterwards gets the household's things.
       const android = await H.addPhone(t, 'Later');

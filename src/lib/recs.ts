@@ -5,6 +5,7 @@ import { allGroups, cardChains, getProducts, getProductsByBarcode, getSettings, 
 import { hasSize } from './unitPrice';
 import { recommend, type Recommendation } from './verdict';
 import { processShelf, shelfNotes, type ShelfWatch } from './shelfWatch';
+import { changeCount } from './live';
 
 /**
  * The shops whose prices count (0.9.0): the ones switched on, on a tab that's switched on, and the
@@ -26,8 +27,28 @@ export function shopsOn(settings: Pick<Settings, 'enabledChains' | 'sections'> &
   return on;
 }
 
+// 0.15.1: worked out once per change to the database and shared: Home, the tabs, the list, an item's
+// page and More each asked for them on every change, and Home asked twice.
+// A minute at most, as well: what's on special, what's stale and this week's specials go by the clock too.
+let shared: { at: number; when: number; run: Promise<Recommendation[]> } | undefined;
+const SHARE_MS = 60_000;
+
+/** The recommendation for every pantry item (shared by every screen until the database changes). Don't change what it answers. */
+export function loadRecommendations(): Promise<Recommendation[]> {
+  const at = changeCount();
+  const now = Date.now();
+  if (shared && shared.at === at && now - shared.when >= 0 && now - shared.when < SHARE_MS) return shared.run;
+  const run = workOutRecommendations();
+  shared = { at, when: now, run };
+  // A failed run isn't kept: the next ask tries again.
+  run.catch(() => {
+    if (shared?.run === run) shared = undefined;
+  });
+  return run;
+}
+
 /** Work out the recommendation for every pantry item. */
-export async function loadRecommendations(): Promise<Recommendation[]> {
+async function workOutRecommendations(): Promise<Recommendation[]> {
   const [groups, cards, settings] = await Promise.all([allGroups(), cardChains(), getSettings()]);
   const ids = [...new Set(groups.flatMap(groupProductIds))];
   const [productRows, readings] = await Promise.all([getProducts(ids), readingsFor(ids)]);

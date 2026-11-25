@@ -30,8 +30,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -66,12 +66,12 @@ jobs:
           (cd "$RUNNER_TEMP/ipa" && zip -qry "restock-$VERSION-unsigned.ipa" Payload)
           mv "$RUNNER_TEMP/ipa/restock-$VERSION-unsigned.ipa" .
           shasum -a 256 "restock-$VERSION-unsigned.ipa"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: restock-iphone-unsigned
           path: restock-*-unsigned.ipa
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: ios-build-log

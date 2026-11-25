@@ -11,14 +11,14 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.15.0',
-    about: 'iPhone and iPad catch up on sync, and the server’s web page looks like the iPad.',
+    version: '0.15.1',
+    about: 'A tidy-up, and the iPhone and iPad keep their data in their own database.',
     changes: [
-      'Update every phone in your household to 0.14.0 or newer: from this version, older ones can’t sync with this one or with a Restock server.',
-      'iPhone and iPad: hand the household’s owner job to another phone, bring a household onto a new Restock server, and keep the household’s folder on Nextcloud or another WebDAV server.',
-      'iPhone and iPad: Join your household on the first screen joins a server straight away, and Home’s shop buttons fit on a narrow screen.',
-      'On a Restock server’s web page, a computer gets the same screens as the phone with a side bar, and Your server holds the server’s own pages in one place.',
-      'The app opens faster, and Diagnostics lists problems from background work that used to go unseen.',
+      'iPhone and iPad: Restock’s data is now in the system’s own database, as on Android. Each change is saved as it’s made. The first time, a copy of the old file is kept beside it.',
+      'A shop you took off Your shops no longer stays on Home.',
+      'Check for updates also offers Restock’s own F-Droid repo.',
+      'If you run a Restock server, update it to 0.15.1 too. Its setup page’s sign-in moved.',
+      'Lots of behind-the-scenes tidying, and many more tests.',
     ],
   },
 ];

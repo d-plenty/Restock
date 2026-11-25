@@ -1,3 +1,4 @@
+import { useNow } from '../useNow';
 import { deviceWord, isIos, isPad } from '../../lib/platform';
 import { saveNeedsWarning, saveNow, saveState, subscribeSaveState } from '../../lib/saveState';
 import { greeting, todayText } from '../../lib/greeting';
@@ -39,6 +40,7 @@ import { getCheckLog, missedSlot, missedWords, whenWords } from '../../lib/check
 import { startTour } from '../Tour';
 
 export function HomeScreen() {
+  const now = useNow(60_000);
   const nav = useNav();
   const allRecs = useLive(loadRecommendations, []);
   const settings = useLive(getSettings, []);
@@ -200,7 +202,7 @@ export function HomeScreen() {
       {/* 0.14.0: a loyalty card about to run out (Cards → its expiry date). */}
       <CardExpiryNotice />
 
-      {!serverMode && sync && recs.length > 0 && needsBackupNudge(settings, recs.length, oldest, Date.now(), protection(false, sync).covered) && (
+      {!serverMode && sync && recs.length > 0 && needsBackupNudge(settings, recs.length, oldest, now, protection(false, sync).covered) && (
         <div className="card hint" style={{ flexDirection: 'column', gap: 8 }}>
           <strong>Back up your pantry</strong>
           {/* 0.12.0: two lines (it was a paragraph) */}
@@ -451,6 +453,8 @@ function FitName({ name }: { name: string }) {
     ctx.font = `${cs.fontStyle} ${cs.fontWeight} 100px ${cs.fontFamily}`;
     const widest = Math.max(...name.split(/\s+/).map((word) => ctx.measureText(word).width)) / 100;
     // A little room for rounding, and never bigger than a six-letter word would make it.
+    // Measured from the drawn text, so it can only be set once it's on the screen.
+    // eslint-disable-next-line react/set-state-in-effect
     if (widest > 0) setW(Math.max(widest * 1.04, 6 * 0.55));
   }, [name]);
   return (

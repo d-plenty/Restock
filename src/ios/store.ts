@@ -1,9 +1,11 @@
-// The iPhone and iPad app's database file. The database runs in memory (sql.js: the sync engine the
-// app shares with the Restock server needs to read and write it without waiting), and after each
-// change it is written out as one real SQLite file in the app's own storage (Application Support,
-// "Restock/restock.sqlite"), by the app's native side: written beside the old file and swapped in, so
-// a save that is cut short never leaves half a file. Before this it was kept in the web view's
-// storage; that copy is read once, written to the file, and left where it is.
+// The iPhone and iPad app's database file. 0.15.1: the app opens it in the system's own SQLite
+// (ios/nativeDb.ts, RestockSql.swift); this is how it was kept before, still used to bring over an
+// install whose newest copy is in the web view's storage, and by a build without that (the tests).
+// Then the database ran in memory (sql.js), and after each change it was written out as one real
+// SQLite file in the app's own storage (Application Support, "Restock/restock.sqlite"), by the app's
+// native side: written beside the old file and swapped in, so a save that is cut short never leaves
+// half a file. Before 0.13.2 it was kept in the web view's storage; that copy is read once, written to
+// the file, and left where it is.
 import { appleHere, RestockApple } from './apple';
 import { quiet } from '../lib/quietErrors';
 

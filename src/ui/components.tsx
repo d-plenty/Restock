@@ -1,5 +1,7 @@
+import { useLatest } from './useLatest';
+import { useNow } from './useNow';
 import { wasSince } from '../lib/wasSince';
-import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type MutableRefObject, type InputHTMLAttributes, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { nameHasSize } from '../lib/naming';
 import { formatUnitPrice, money, tidySize, tidyUnitText } from '../lib/units';
@@ -538,8 +540,7 @@ interface BackEntry {
 const backEntries: BackEntry[] = [];
 
 function useBackEntry(fn: () => boolean, layer: boolean, active: boolean) {
-  const ref = useRef(fn);
-  ref.current = fn;
+  const ref = useLatest(fn);
   useEffect(() => {
     if (!active) return;
     const entry: BackEntry = { fn: () => ref.current(), layer };
@@ -555,7 +556,7 @@ function useBackEntry(fn: () => boolean, layer: boolean, active: boolean) {
       const i = backEntries.indexOf(entry);
       if (i >= 0) backEntries.splice(i, 1);
     };
-  }, [layer, active]);
+  }, [layer, active, ref]);
 }
 
 /** An overlay (a sheet, shopping mode) that back or Escape closes, but only while it's the top one. */
@@ -631,29 +632,29 @@ function updateBehindSheets() {
 // 0.10.11: "You haven't saved". A sheet with a form in it (a card being typed, a shop being added)
 // says when something's been changed (useSheetGuard), and closing it by X, Back or a tap outside asks
 // first. Its own Save and Cancel buttons close it straight away, as they always did.
-const SheetGuard = createContext<MutableRefObject<(() => boolean) | undefined> | null>(null);
+// The sheet's own way to be told (it answers the way to stop telling it).
+const SheetGuard = createContext<((fn: () => boolean) => () => void) | null>(null);
 /** Inside a Sheet: while `dirty` is true, closing the sheet without saving asks first. */
 export function useSheetGuard(dirty: boolean | (() => boolean)): void {
   const ctx = useContext(SheetGuard);
-  const ref = useRef(dirty);
-  ref.current = dirty;
+  const ref = useLatest(dirty);
   useEffect(() => {
     if (!ctx) return;
-    const fn = () => (typeof ref.current === 'function' ? ref.current() : ref.current);
-    ctx.current = fn;
-    return () => {
-      if (ctx.current === fn) ctx.current = undefined;
-    };
-  }, [ctx]);
+    return ctx(() => (typeof ref.current === 'function' ? ref.current() : ref.current));
+  }, [ctx, ref]);
 }
 
 export function Sheet({ title, titleTag, onClose, children, action, unsaved }: { title: string; /** 0.10.12: a small tag beside the title (Beta). */ titleTag?: ReactNode; onClose: () => void; children: ReactNode; /** 0.10.11: something's been changed and not saved: closing by X, Back or a tap outside asks first. */ unsaved?: boolean; /** 0.10.2: a button beside the title (a line's "Add to pantry"). */ action?: ReactNode }) {
   const guard = useRef<(() => boolean) | undefined>(undefined);
+  const [tellGuard] = useState(() => (fn: () => boolean) => {
+    guard.current = fn;
+    return () => {
+      if (guard.current === fn) guard.current = undefined;
+    };
+  });
   const asking = useRef(false);
-  const close = useRef(onClose);
-  close.current = onClose;
-  const unsavedRef = useRef(unsaved);
-  unsavedRef.current = unsaved;
+  const close = useLatest(onClose);
+  const unsavedRef = useLatest(unsaved);
   const [dismiss] = useState(() => () => {
     if (!unsavedRef.current && !guard.current?.()) return close.current();
     if (asking.current) return;
@@ -728,7 +729,7 @@ export function Sheet({ title, titleTag, onClose, children, action, unsaved }: {
             <Icon name="close" size={20} />
           </button>
         </div>
-        <SheetGuard.Provider value={guard}>{children}</SheetGuard.Provider>
+        <SheetGuard.Provider value={tellGuard}>{children}</SheetGuard.Provider>
       </div>
     </div>,
     layerHost(),
@@ -1100,7 +1101,7 @@ export function SwipeRow({
       )}
       <div
         className={className}
-        style={{ ...style, transform: dx ? `translateX(${dx}px)` : undefined, transition: start.current ? 'none' : 'transform 0.18s' }}
+        style={{ ...style, transform: dx ? `translateX(${dx}px)` : undefined, transition: dx ? 'none' : 'transform 0.18s' }}
         onTouchStart={(e) => {
           if (disabled) return;
           const t = e.touches[0];
@@ -1487,8 +1488,9 @@ export function LoadingBar({ seconds }: { seconds: number }) {
  * more, so an old price (a shop that's been failing) isn't trusted by mistake.
  */
 export function CheckedAgo({ date, source }: { date?: string; source?: string }) {
+  const now = useNow(60_000);
   if (!date) return null;
-  const days = Math.floor((Date.now() - Date.parse(date)) / 86_400_000);
+  const days = Math.floor((now - Date.parse(date)) / 86_400_000);
   const word = source === 'manual' ? 'added by hand' : source === 'imported' ? 'imported' : 'checked';
   const when = days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
   const old = days >= 3;

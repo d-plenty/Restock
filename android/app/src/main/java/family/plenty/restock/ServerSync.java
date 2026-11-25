@@ -99,28 +99,6 @@ final class ServerSync {
     }
 
     /**
-     * Joins a Restock server with the code from its Add a phone page: this phone makes its own key
-     * for the server and the server takes its public half (once per code). Answers the address that
-     * answered. Throws with words.
-     */
-    String join(String code) throws Exception {
-        if (key() == null) throw new IllegalStateException("Start or join a household first: the server keeps the household's things.");
-        ServerFolder.Invite in = ServerFolder.parseInvite(code);
-        KeyPair kp = ServerLink.newKey();
-        List<String> where = new ArrayList<>();
-        if (in.home != null) where.add(in.home);
-        if (in.away != null) where.add(in.away);
-        String reached = ServerFolder.join(where, in.invite, e.device(), e.name(), kp.getPublic());
-        clearNotes();
-        e.setMeta("server_webs", null);
-        e.setMeta("server_dev_priv", ServerLink.b64u(kp.getPrivate().getEncoded()));
-        e.setMeta("server_home", in.home);
-        e.setMeta("server_away", in.away);
-        noteFileKey();
-        return reached;
-    }
-
-    /**
      * Stop using the server. bringBack: the receipt photos this phone moved there come back first
      * (throws, and stays connected, if they can't); without it they stay on the server, and the
      * phone remembers where. Older prices stay on the server either way.
@@ -967,62 +945,6 @@ final class ServerSync {
         out.put("epub", ServerLink.b64u(eph.getPublic().getEncoded()));
         out.put("sealed", ServerLink.b64u(ServerLink.sealAad(ServerLink.v3Key(eph.getPrivate(), kex, salt, ServerLink.HANDOVER_INFO), "RSH3", payload, null)));
         return out;
-    }
-
-    /**
-     * 0.9.4: GET /api/v3/health of this phone's (v2) server: { mode, api, house }, or null when it's a
-     * 0.9.3 server or can't be reached. The owner phone offers Hand this household to the server when
-     * mode is "v2".
-     */
-    JSONObject health() {
-        JSONObject hl = ServerFolder.health(addresses());
-        try {
-            if (hl != null) e.setMeta("server_mode", hl.optString("mode", null));
-        } catch (Exception ignored) {
-            // just a note
-        }
-        return hl;
-    }
-
-    /**
-     * 0.9.4, owner phone on a v2 server: hands the household to the server with the code from the
-     * server's Take this household page (restock-handover:3?u=&t=&k=). Signed with this phone's v2
-     * key. The phone stays the owner until it reads the server's file with the signed owner change
-     * (takeHandover); a lost answer, or a crash on either side, just means trying again or a round.
-     * Throws with words.
-     */
-    JSONObject handOver(String code) throws Exception {
-        if (!on() || v3()) throw new IllegalStateException("This phone isn't on a Restock server that's waiting for its household.");
-        if (!h.isOwner()) throw new IllegalStateException("Only the owner phone can hand the household to the server.");
-        ServerLink.Code c = ServerLink.parse(code);
-        if (!"handover".equals(c.kind)) throw new IllegalArgumentException("That isn't the code from your server's Take this household page.");
-        Set<String> hosts = new java.util.LinkedHashSet<>();
-        for (String a : addresses()) {
-            String x = ServerLink.hostOf(a);
-            if (x != null) hosts.add(x);
-        }
-        if (!hosts.contains(c.host))
-            throw new IllegalArgumentException("That code is from a page at " + c.host + ", not your Restock server (" + String.join(" or ", hosts) + "). Only scan codes from your own server's page.");
-        if (!c.id.matches("[A-Za-z0-9_-]{20,128}")) throw new IllegalArgumentException("That code is damaged. Refresh the server's page and scan it again.");
-        JSONObject body = sealHandover(c.browser, ServerLink.unb64(c.id));
-        ServerFolder f = new ServerFolder(addresses(), e.device(), ServerLink.privateKey(e.meta("server_dev_priv")), ServerFolder.API);
-        SyncDav.Response r = f.first("POST", ServerFolder.API3 + "/handover/" + c.id, body);
-        String err = ServerFolder.errorOf(r);
-        if (r.status == 409 && !"done".equals(err)) {
-            String said = ServerFolder.messageOf(r);
-            throw new IllegalStateException(said.isEmpty() ? "The server didn't take the household. Nothing changed; this phone is still the owner." : said);
-        }
-        if ((r.status < 200 || r.status >= 300) && r.status != 409) {
-            if (r.status == 404 || r.status == 410) throw new IllegalStateException("That code has run out. Refresh the server's page and scan the new code.");
-            throw SyncDav.problem(r.status, "hand the household over");
-        }
-        // Pinned from the code: the upgrade that follows opens the server's answer with it.
-        e.setMeta("server_kex", ServerLink.b64u(c.browser.getEncoded()));
-        e.setMeta("server_handover", String.valueOf(System.currentTimeMillis()));
-        JSONObject o = new JSONObject();
-        o.put("host", c.host);
-        o.put("done", true);
-        return o;
     }
 
     // ---------- the web page's codes ----------

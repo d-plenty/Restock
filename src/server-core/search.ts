@@ -15,7 +15,7 @@ import { aldi } from '../stores/aldi';
 import { coles } from '../stores/coles';
 import { endeavourAdapter } from '../stores/endeavour';
 import { BlockedError, NativeOnlyError, request } from '../stores/http';
-import { NODE_DEFAULTS, runSearch, runShop, ShopRefusedError, ShopTimeoutError, ShopTooBigError, useNodeTransport, type NodeConfig } from '../stores/node';
+import { NODE_DEFAULTS, runSearch, runShop, ShopRefusedError, ShopTimeoutError, ShopTooBigError, setNodeTransport, type NodeConfig } from '../stores/node';
 import type { StoreProduct } from '../stores/types';
 import { looksLikeBotCheck } from '../stores/web';
 import { extractProducts, searchUrl } from '../stores/webPage';
@@ -37,7 +37,7 @@ export { genericName };
 
 /** Sets how the server asks the shops (its fetch, for tests; the limits). Call once at start. */
 export function configureShopSearch(c: Partial<NodeConfig> = {}) {
-  useNodeTransport(c);
+  setNodeTransport(c);
 }
 
 /** One shop to search, at a branch (Coles: the household's branch store number). */

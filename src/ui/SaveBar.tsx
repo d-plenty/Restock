@@ -35,12 +35,12 @@ export function useDraftPart(part: DraftPart, deps: unknown[]): void {
 
 export function useDraftState(): DraftState & { justSaved: boolean } {
   const [s, setS] = useState(draftState);
-  const [, tick] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => onDraft(() => setS(draftState())), []);
-  const justSaved = !s.dirty && s.savedAt !== undefined && Date.now() - s.savedAt < SAVED_MS;
+  const justSaved = !s.dirty && s.savedAt !== undefined && now - s.savedAt < SAVED_MS;
   useEffect(() => {
     if (!justSaved || s.savedAt === undefined) return;
-    const t = window.setTimeout(() => tick((n) => n + 1), SAVED_MS - (Date.now() - s.savedAt) + 20);
+    const t = window.setTimeout(() => setNow(Date.now()), SAVED_MS - (Date.now() - s.savedAt) + 20);
     return () => window.clearTimeout(t);
   }, [justSaved, s.savedAt]);
   return { ...s, justSaved };

@@ -1215,17 +1215,6 @@ final class SyncHub {
         if (!got) throw new IllegalStateException("Restock is still syncing. Try again in a minute.");
     }
 
-    /** Joins a Restock server with the code from its Add a phone page. Throws with words. */
-    void joinServer(String code) throws Exception {
-        lockForServer();
-        try {
-            serverReached = server().join(code);
-            serverError = null;
-        } finally {
-            syncing.unlock();
-        }
-    }
-
     /** Stop using the server (bringBack: its receipt photos come back first; throws if they can't). */
     void stopServer(boolean bringBack) throws Exception {
         lockForServer();
@@ -1470,26 +1459,6 @@ final class SyncHub {
         engine.noteTabs();
         engine.setMeta("server_top", null);
         new Thread(this::syncAll).start();
-    }
-
-    /** The owner phone's (v2) server: { mode, api, house }, or null (a 0.9.3 server, or out of reach). */
-    JSONObject serverHealth() {
-        return serverOn() ? server().health() : null;
-    }
-
-    /** Owner phone: hands the household to the server with its Take this household code, then syncs. */
-    JSONObject handOverToServer(String code) throws Exception {
-        lockForServer();
-        JSONObject r;
-        try {
-            r = server().handOver(code);
-        } finally {
-            syncing.unlock();
-        }
-        // The server's answer counts once its file says so: a round now (it upgrades this phone, and
-        // reads the signed owner change, which lets go of the owner's secrets here).
-        syncAll();
-        return r;
     }
 
     JSONObject approveWeb(String code) throws Exception {

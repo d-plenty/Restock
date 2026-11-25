@@ -3,6 +3,7 @@
 // marked with a diamond), and the storage bar. Each one is an image with a summary in words, its
 // numbers written on it or in a table beside it, and one accent colour (the theme's own tokens, so
 // light, dark and true black all work).
+import { useNow } from '../../ui/useNow';
 import '../dataCharts.css';
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { chainName } from '../../shops';
@@ -101,7 +102,9 @@ const BARS: Box = {
   left: 44,
 };
 
-export function SpendingChart({ months, now = Date.now() }: { months: DataStats['spending']['months']; now?: number }) {
+export function SpendingChart({ months, now: at }: { months: DataStats['spending']['months']; now?: number }) {
+  const ticking = useNow(60_000);
+  const now = at ?? ticking;
   const cur = thisMonth(now);
   const [ref, width] = useChartWidth();
   const box: Box = { ...BARS, width, left: width < 420 ? 38 : BARS.left };

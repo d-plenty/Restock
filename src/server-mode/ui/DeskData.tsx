@@ -4,7 +4,8 @@
 // price over time, what you buy most (with a spreadsheet), storage on the server and disk free, and
 // the downloads (spreadsheet, CSV, the full export file). Manage data (DeskDataManage.tsx) deletes.
 // 0.9.6: Import beside the downloads (DeskDataImport.tsx); imported prices counted and tagged.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useResetOn } from '../../ui/useResetOn';
+import { useMemo, useRef, useState } from 'react';
 import { allGroups } from '../../lib/db';
 import { useLive } from '../../lib/useLive';
 import { money } from '../../lib/units';
@@ -191,7 +192,7 @@ function BuyMost({ period, onPick }: { period: Period; onPick: (id: string) => v
   const [offset, setOffset] = useState(0);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; bad?: boolean }>();
-  useEffect(() => setOffset(0), [period]);
+  useResetOn([period], () => setOffset(0));
   const { data: page, error } = useServer(() => data.top(period, offset, PAGE), [period, offset]);
   const download = async () => {
     setBusy(true);

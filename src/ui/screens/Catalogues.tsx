@@ -19,10 +19,18 @@ export function catalogueShops(settings: Settings): { section: Section; chains: 
   const withStore = (Object.keys(settings.stores) as StoreChain[]).filter(
     (c) => storeChoice(settings, c).primary || storeChoice(settings, c).secondary,
   );
+  // 0.15.1: only shops still picked for the tab (its own shop list, shopTabs, counts too). A shop
+  // taken off a tab, or turned off, keeps its saved branch, but that no longer brings it back here.
+  const tabs = settings.shopTabs ?? {};
   return activeSections(settings)
     .map((section) => ({
       section,
-      chains: [...new Set([...enabledIn(settings.enabledChains, section), ...withStore.filter((c) => shopOnTab(c, section) && websiteOf(c))])],
+      chains: [
+        ...new Set([
+          ...enabledIn(settings.enabledChains, section, tabs),
+          ...withStore.filter((c) => settings.enabledChains.includes(c) && shopOnTab(c, section, tabs) && websiteOf(c)),
+        ]),
+      ],
     }))
     .filter((g) => g.chains.length > 0);
 }

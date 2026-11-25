@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Icon, TopBar } from '../components';
 import { useNav } from '../nav';
+import { appChannel } from '../../lib/updates';
 
 // Settings → Coming soon: what's planned, each with a short page saying what it'll do and what's
 // here already. 0.15.0: shared prices (here) came off the list; each page is a sentence or two.
@@ -13,7 +14,7 @@ interface Soon {
   body: ReactNode;
 }
 
-const SOON: Soon[] = [
+const ALL_SOON: Soon[] = [
   {
     id: 'inventory',
     icon: 'pantry',
@@ -40,7 +41,7 @@ const SOON: Soon[] = [
     id: 'iphone',
     icon: 'phone',
     title: 'iPhone and iPad',
-    short: 'Widgets and the App Store are still to come',
+    short: 'Widgets, Google Lens and the App Store are still to come',
     body: (
       <>
         <p>
@@ -50,7 +51,19 @@ const SOON: Soon[] = [
           </a>
           .
         </p>
-        <p>Still to come: home screen widgets, and the App Store.</p>
+        <p>Still to come: home screen widgets, Search with Google Lens straight from Restock (it opens in the browser for now), and the App Store.</p>
+      </>
+    ),
+  },
+  {
+    // 0.15.1: the App Store's version says this one instead (nothing about installing from a computer).
+    id: 'iphone-store',
+    icon: 'phone',
+    title: 'iPhone and iPad',
+    short: 'Widgets and Google Lens are still to come',
+    body: (
+      <>
+        <p>Still to come: home screen widgets, and Search with Google Lens straight from Restock (it opens in the browser for now).</p>
       </>
     ),
   },
@@ -73,13 +86,28 @@ const SOON: Soon[] = [
   },
 ];
 
+/**
+ * 0.15.1: what's coming, for this version of the app: the store versions say nothing about installing
+ * from a computer or about Restock's own F-Droid repo (each store installs and updates its own).
+ */
+function soonHere(): Soon[] {
+  const c = appChannel();
+  return ALL_SOON.filter((s) => {
+    const store = c === 'play' || c === 'appstore';
+    if (s.id === 'iphone') return c !== 'appstore';
+    if (s.id === 'iphone-store') return c === 'appstore';
+    if (s.id === 'github') return !store;
+    return true;
+  });
+}
+
 /** The last section of Settings. */
 export function ComingSoon() {
   const nav = useNav();
   return (
     <>
       <div className="card flush">
-        {SOON.map((s) => (
+        {soonHere().map((s) => (
           <button key={s.id} className="row" onClick={() => nav.push({ name: 'soon', id: s.id })} aria-label={`${s.title}: more about it`}>
             <Icon name={s.icon} size={18} />
             <span className="grow">
@@ -98,7 +126,7 @@ export function ComingSoon() {
 }
 
 export function SoonScreen({ id }: { id: string }) {
-  const s = SOON.find((x) => x.id === id);
+  const s = soonHere().find((x) => x.id === id);
   if (!s) return <div className="screen" />;
   return (
     <div className="screen">

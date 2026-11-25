@@ -12,7 +12,8 @@ import { api3, type Phone } from '../api';
 import { refreshHouseKeys, session } from '../session';
 import { syncNow } from '../live';
 import { Qr } from './Qr';
-import { useNow, useStatus } from './ServerScreens';
+import { useStatus } from './ServerScreens';
+import { useNow } from '../../ui/useNow';
 import { DeskHead, takeStartOn } from './deskShared';
 import {
   askThenConfirm,

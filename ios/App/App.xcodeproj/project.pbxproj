@@ -20,6 +20,8 @@
 		A1D2014000000000000000B2 /* RestockLan.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D2014000000000000000A2 /* RestockLan.swift */; };
 		A1D2014000000000000000B3 /* RestockBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D2014000000000000000A3 /* RestockBackground.swift */; };
 		A1D2014100000000000000B4 /* RestockStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D2014100000000000000A4 /* RestockStore.swift */; };
+		A1D2015200000000000000B6 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1D2015200000000000000A6 /* PrivacyInfo.xcprivacy */; };
+		A1D2015100000000000000B5 /* RestockSql.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D2015100000000000000A5 /* RestockSql.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +39,8 @@
 		A1D2014000000000000000A2 /* RestockLan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestockLan.swift; sourceTree = "<group>"; };
 		A1D2014000000000000000A3 /* RestockBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestockBackground.swift; sourceTree = "<group>"; };
 		A1D2014100000000000000A4 /* RestockStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestockStore.swift; sourceTree = "<group>"; };
+		A1D2015200000000000000A6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A1D2015100000000000000A5 /* RestockSql.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestockSql.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -77,6 +81,7 @@
 				A1D2014000000000000000A2 /* RestockLan.swift */,
 				A1D2014000000000000000A3 /* RestockBackground.swift */,
 				A1D2014100000000000000A4 /* RestockStore.swift */,
+				A1D2015100000000000000A5 /* RestockSql.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -84,6 +89,7 @@
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
+				A1D2015200000000000000A6 /* PrivacyInfo.xcprivacy */,
 				50B271D01FEDC1A000F3C39B /* public */,
 			);
 			path = App;
@@ -160,6 +166,7 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+				A1D2015200000000000000B6 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -176,6 +183,7 @@
 				A1D2014000000000000000B2 /* RestockLan.swift in Sources */,
 				A1D2014000000000000000B3 /* RestockBackground.swift in Sources */,
 				A1D2014100000000000000B4 /* RestockStore.swift in Sources */,
+				A1D2015100000000000000B5 /* RestockSql.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

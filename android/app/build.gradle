@@ -23,13 +23,35 @@ android {
         applicationId "family.plenty.restock"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 108
-        versionName "0.15.0"
+        versionCode 109
+        versionName "0.15.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    // 0.15.1: two versions of the same app (one applicationId: one or the other is on a phone).
+    // - github: the APK on GitHub and in Restock's own F-Droid repo. It checks for updates and
+    //   installs them itself (you tap Install), and asks Android to let it sync in the background.
+    // - play: the App Bundle for Google Play (not published there yet). Google Play updates it, so it
+    //   has no updater and not the permission to install apps; the background question is
+    //   Android's own battery list instead (Play's rules). Nothing from Google is added to either.
+    buildFeatures {
+        buildConfig true
+    }
+    flavorDimensions = ["channel"]
+    productFlavors {
+        github {
+            dimension "channel"
+            buildConfigField "boolean", "SELF_UPDATE", "true"
+            buildConfigField "String", "CHANNEL", '"github"'
+        }
+        play {
+            dimension "channel"
+            buildConfigField "boolean", "SELF_UPDATE", "false"
+            buildConfigField "String", "CHANNEL", '"play"'
         }
     }
     signingConfigs {
@@ -57,7 +79,8 @@ android {
             // key signs it, so a home build still installs.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingFile.exists() ? signingConfigs.restock : signingConfigs.debug
+            // 0.15.1: RESTOCK_UNSIGNED (the release workflow's Google Play bundle): no key at all.
+            signingConfig signingFile.exists() ? signingConfigs.restock : (System.getenv('RESTOCK_UNSIGNED') ? null : signingConfigs.debug)
         }
     }
     lint {

@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { initDb, updateSettings } from '../lib/db';
 import { createSqlJsDriver } from '../lib/sql/sqljs';
 import { signedText, signWithPkcs8, verifySig } from '../server-mode/crypto';
-import { WebSyncEngine } from '../server-mode/engine';
-import { syncDbOf } from '../server-mode/sqldb';
+import { AsyncSyncEngine } from '../server-mode/engine';
+import { asyncSyncDbOf, syncDbOf } from '../server-mode/sqldb';
 import { nodeLan } from './nodeLan';
 import { dayTag, isWifiCode, pairingTag, parseCode, WifiHouse, type Found, type Photos } from './wire';
 
@@ -17,12 +17,10 @@ async function iphone(device: string, air: Map<string, Found>) {
   const driver = await createSqlJsDriver({ load: () => initSqlJs() });
   await initDb(driver);
   await updateSettings({ onboarded: true }, { local: true });
-  // eslint-disable-next-line prefer-const
-  let e: WebSyncEngine;
-  const sign = (text: string) => signWithPkcs8(e.meta('owner_priv') ?? '', text);
-  e = new WebSyncEngine(syncDbOf(driver.raw), verifySig, signedText, () => Date.now(), { role: 'phone', sign });
-  e.setMeta('device', device);
-  e.setMeta('name', 'iPhone ' + device.slice(0, 2));
+  const sign = (text: string, priv: string | null) => signWithPkcs8(priv ?? '', text);
+  const e = new AsyncSyncEngine(asyncSyncDbOf(syncDbOf(driver.raw)), verifySig, signedText, () => Date.now(), { role: 'phone', sign });
+  (await e.setMeta('device', device));
+  (await e.setMeta('name', 'iPhone ' + device.slice(0, 2)));
   const files = new Map<string, Uint8Array>();
   const photos: Photos = { size: async (p) => files.get(p)?.length ?? -1, read: async (p) => files.get(p) ?? null, write: async (p, b) => void files.set(p, b) };
   const lan = nodeLan(air);
@@ -52,20 +50,20 @@ describe('0.14.0: two iPhones syncing over the Wi-Fi', () => {
     const b = await iphone('b2b2b2b2b2b2b2b2', air);
     a.raw.run("INSERT INTO items (id, name, created_at, section) VALUES ('i-rice', 'Rice', 'x', 'pantry')");
     b.raw.run("INSERT INTO items (id, name, created_at, section) VALUES ('i-tea', 'Tea', 'x', 'pantry')");
-    a.house.start('Our house');
-    expect(a.house.info()).toMatchObject({ joined: true, owner: true, household: 'Our house' });
+    (await a.house.start('Our house'));
+    expect((await a.house.info())).toMatchObject({ joined: true, owner: true, household: 'Our house' });
     const { code } = await a.house.invite();
     expect(isWifiCode(code)).toBe(true);
     expect(await b.house.peek(code)).toMatchObject({ household: 'Our house', ownerName: 'iPhone a1' });
     await b.house.join(code);
-    expect(a.house.info().invite).toBeNull();
+    expect((await a.house.info()).invite).toBeNull();
     expect((await b.house.syncAll()).reached).toBe(1);
     expect(a.names()).toBe('Rice|Tea');
     expect(b.names()).toBe('Rice|Tea');
-    expect(b.house.members().map((m) => `${m.name}${m.owner ? '*' : ''}`)).toEqual(['iPhone a1*', 'iPhone b2']);
+    expect((await b.house.members()).map((m) => `${m.name}${m.owner ? '*' : ''}`)).toEqual(['iPhone a1*', 'iPhone b2']);
 
     // Later, with the code's address forgotten: they find each other by the household's tag.
-    b.e.setMeta('invite', null);
+    (await b.e.setMeta('invite', null));
     b.raw.run('UPDATE sync_peers SET host = NULL, port = NULL');
     await b.house.listen();
     a.raw.run("INSERT INTO items (id, name, created_at, section) VALUES ('i-salt', 'Salt', 'x', 'pantry')");
@@ -76,14 +74,14 @@ describe('0.14.0: two iPhones syncing over the Wi-Fi', () => {
     a.raw.run("INSERT INTO cards (id, program, label, number, created_at, expiry) VALUES ('c1', 'flybuys', 'Flybuys', '2793', 'x', '2027-03-01')");
     await b.house.syncAll();
     expect(b.q('SELECT COUNT(*) FROM cards')).toEqual(['0']);
-    a.house.setCards(true);
-    b.house.setCards(true);
+    (await a.house.setCards(true));
+    (await b.house.setCards(true));
     a.raw.run("UPDATE cards SET label = 'Flybuys card' WHERE id = 'c1'");
     await b.house.syncAll();
     expect(b.q('SELECT number, expiry FROM cards')).toEqual(['2793']);
     expect(b.q('SELECT expiry FROM cards')).toEqual(['2027-03-01']);
-    a.house.setReceipts(true);
-    b.house.setReceipts(true);
+    (await a.house.setReceipts(true));
+    (await b.house.setReceipts(true));
     a.files.set('receipts/r1.jpg', JPEG);
     a.raw.run("INSERT INTO receipts (id, scanned_at, shop, section, photo) VALUES ('r1', '2026-11-20T00:00:00Z', 'Coles', 'pantry', 'receipts/r1.jpg')");
     await b.house.syncAll();
@@ -94,9 +92,9 @@ describe('0.14.0: two iPhones syncing over the Wi-Fi', () => {
     // The phone that started it can't leave while another is in; the other can, and keeps everything.
     expect(await a.house.leave()).toBe(false);
     expect(await b.house.leave()).toBe(true);
-    expect(b.house.joined()).toBe(false);
+    expect((await b.house.joined())).toBe(false);
     expect(b.names()).toBe('Rice|Salt|Tea');
-    expect(a.house.members().map((m) => m.device)).toEqual(['a1a1a1a1a1a1a1a1']);
+    expect((await a.house.members()).map((m) => m.device)).toEqual(['a1a1a1a1a1a1a1a1']);
     expect(await a.house.leave()).toBe(true);
     expect(a.names()).toBe('Rice|Salt|Tea');
     await a.house.stop();
@@ -108,37 +106,37 @@ describe('0.14.0: two iPhones syncing over the Wi-Fi', () => {
     const a = await iphone('a3a3a3a3a3a3a3a3', air);
     const b = await iphone('b4b4b4b4b4b4b4b4', air);
     const c = await iphone('c5c5c5c5c5c5c5c5', air);
-    a.house.start('Handover house');
+    (await a.house.start('Handover house'));
     await b.house.join((await a.house.invite()).code);
     await b.house.syncAll();
     await c.house.join((await a.house.invite()).code);
     await c.house.syncAll();
 
     // Only the owner can ask, and only for a phone in the household.
-    await expect(b.house.handOver(c.e.device())).rejects.toThrow('Only the phone that started the household');
+    await expect(b.house.handOver((await c.e.device()))).rejects.toThrow('Only the phone that started the household');
     await expect(a.house.handOver('zzzzzzzzzzzzzzzz')).rejects.toThrow("isn't in the household");
 
     // Asked and then cancelled: nothing changes.
-    await a.house.handOver(b.e.device());
-    expect(a.house.handingOverTo()).toBe(b.e.device());
-    a.house.cancelHandOver();
-    expect(a.house.handingOverTo()).toBeNull();
+    await a.house.handOver((await b.e.device()));
+    expect((await a.house.handingOverTo())).toBe((await b.e.device()));
+    (await a.house.cancelHandOver());
+    expect((await a.house.handingOverTo())).toBeNull();
     await b.house.syncAll();
-    expect(b.house.isOwner()).toBe(false);
+    expect((await b.house.isOwner())).toBe(false);
 
     // Asked again: B takes over when it syncs; A lets go of the owner's secrets.
-    await a.house.handOver(b.e.device());
+    await a.house.handOver((await b.e.device()));
     await b.house.syncAll();
-    expect(b.house.isOwner()).toBe(true);
-    expect(b.e.meta('owner_priv')).toBe(a.e.meta('owner_priv'));
-    expect(b.e.meta('owner_secrets')).not.toBeNull();
+    expect((await b.house.isOwner())).toBe(true);
+    expect((await b.e.meta('owner_priv'))).toBe((await a.e.meta('owner_priv')));
+    expect((await b.e.meta('owner_secrets'))).not.toBeNull();
     await a.house.syncAll();
-    expect(a.house.isOwner()).toBe(false);
-    expect(a.e.meta('owner_secrets')).toBeNull();
-    expect(a.house.members().find((m) => m.owner)?.device).toBe(b.e.device());
+    expect((await a.house.isOwner())).toBe(false);
+    expect((await a.e.meta('owner_secrets'))).toBeNull();
+    expect((await a.house.members()).find((m) => m.owner)?.device).toBe((await b.e.device()));
 
     // The new owner does the owner's jobs: it takes C out, and C finds out at its next sync.
-    await b.house.remove(c.e.device());
+    await b.house.remove((await c.e.device()));
     expect((await c.house.syncAll()).removed).toBe(true);
     // And the old owner can now leave, keeping what it has.
     expect(await a.house.leave()).toBe(true);

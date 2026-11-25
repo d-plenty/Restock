@@ -1,3 +1,5 @@
+import { useResetOn } from '../useResetOn';
+import { useNow } from '../useNow';
 import { More } from '../components';
 import { useEffect, useState } from 'react';
 import { getKV, updateSettings } from '../../lib/db';
@@ -24,6 +26,7 @@ import { useNav } from '../nav';
  * collector on your own network (PriceHelper.java). Phone only: the web page shows why not.
  */
 export function PriceHelperSettings({ settings }: { settings: Settings }) {
+  const now = useNow();
   const nav = useNav();
   const ph: PriceHelperSettings = settings.priceHelper ?? DEFAULT_PRICE_HELPER;
   const [url, setUrl] = useState(ph.url ?? '');
@@ -48,8 +51,8 @@ export function PriceHelperSettings({ settings }: { settings: Settings }) {
       clearInterval(t);
     };
   }, []);
-  useEffect(() => setUrl(ph.url ?? ''), [ph.url]);
-  useEffect(() => setKey(ph.key ?? ''), [ph.key]);
+  useResetOn([ph.url], () => setUrl(ph.url ?? ''));
+  useResetOn([ph.key], () => setKey(ph.key ?? ''));
 
   if (!isNative())
     return (
@@ -205,7 +208,7 @@ export function PriceHelperSettings({ settings }: { settings: Settings }) {
         </button>
       )}
       <div className="small" role="status" aria-live="polite">
-        {helperStatus({ state, enabled: ph.enabled, of: searches.length, asked, now: Date.now() }).map((line) => (
+        {helperStatus({ state, enabled: ph.enabled, of: searches.length, asked, now }).map((line) => (
           <span key={line} style={{ display: 'block' }}>
             {line}
           </span>

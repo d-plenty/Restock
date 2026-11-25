@@ -1,7 +1,7 @@
 // 0.9.5: how the Restock server asks a shop, for "Let the web page search the shops" (a server
 // setting, off unless someone turns it on). The same shop connections as the phone (woolworths.ts,
 // coles.ts, aldi.ts, endeavour.ts) run on the server through http.ts `request`, which hands every
-// request here once the server's core has called `useNodeTransport` (src/server-core/search.ts).
+// request here once the server's core has called `setNodeTransport` (src/server-core/search.ts).
 // A phone and the web app never load this file.
 //
 // What it allows, and nothing else:
@@ -90,7 +90,7 @@ let cfg: NodeConfig = {
 };
 
 /** Hands http.ts `request` to this file (the server's core, once, at start). */
-export function useNodeTransport(c: Partial<NodeConfig> = {}) {
+export function setNodeTransport(c: Partial<NodeConfig> = {}) {
   cfg = { ...cfg, ...c };
   setTransport(nodeRequest);
 }

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useResetOn } from '../useResetOn';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import { confirmAction } from '../../lib/confirm';
 import { allReceipts, getReceipt, getSettings, nowIso, photosOnServer, saveReceipt, uid, updateSettings } from '../../lib/db';
 import { serverPhoto } from '../../lib/sync';
@@ -366,10 +367,7 @@ function CornerEditor({ img, quad, onChange }: { img: Img; quad: Quad; onChange:
 }
 
 function ImgView({ img, label }: { img: Img; label: string }) {
-  const [url, setUrl] = useState<string>();
-  useEffect(() => {
-    setUrl(canvasOf(img).toDataURL('image/jpeg', 0.8));
-  }, [img]);
+  const url = useMemo(() => canvasOf(img).toDataURL('image/jpeg', 0.8), [img]);
   return url ? <img src={url} alt={label} className="receipt-photo" /> : null;
 }
 
@@ -480,9 +478,10 @@ export function ReceiptScreen({ id }: { id?: string }) {
     });
   }, [id]);
 
-  useEffect(() => {
+  // The finished photo, worked out again whenever what it's made from changes (Turn and Retake change it too).
+  useResetOn([src, quad, look, step], () => {
     if (src && quad && step === 'look') setResult(finish(src, quad, look));
-  }, [src, quad, look, step]);
+  });
 
   if (!settings) return <div className="screen" />;
   const tabs = activeSections(settings);

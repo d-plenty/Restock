@@ -1,3 +1,4 @@
+import { useResetOn } from '../useResetOn';
 import { CheckStockButton } from '../CheckStock';
 import type { StockItem } from '../../lib/stockWhere';
 import { noteTicksSoon } from '../../lib/spending';
@@ -254,7 +255,7 @@ export function ListScreen() {
   const settings = useLive(getSettings, []);
   const [picked0, setSection] = useState<ListSection>(nav.section);
   // Opening the list from Home picks the grocery list even when the List tab is already open.
-  useEffect(() => setSection(nav.section), [nav.section]);
+  useResetOn([nav.section], () => setSection(nav.section));
   const [view, setView] = useState<'all' | 'shop' | 'aisle'>('shop');
   const [sending, setSending] = useState<'woolworths' | 'coles'>();
   const [editing, setEditing] = useState<ListEntry>();
@@ -278,6 +279,8 @@ export function ListScreen() {
   const trip = useSyncExternalStore(subscribeTrip, () => loadTrip(), () => undefined);
   const wantResume = useSyncExternalStore(subscribeTrip, resumeAsked, () => false);
   const [resumed, setResumed] = useState<SavedTrip>();
+  // The list has to be showing the trip's own list before the trip opens on it.
+  const [pendingTrip, setPendingTrip] = useState<SavedTrip>();
   const reopened = useRef(false);
   const ready = !!(allEntries && allRecs && allCats && settings);
   useEffect(() => {
@@ -292,8 +295,6 @@ export function ListScreen() {
     setSection(t.section as ListSection);
     setPendingTrip(t);
   }, [ready, wantResume]); // eslint-disable-line react-hooks/exhaustive-deps
-  // The list has to be showing the trip's own list before the trip opens on it.
-  const [pendingTrip, setPendingTrip] = useState<SavedTrip>();
   const [preview, setPreview] = useState<ListEntry>();
   // Shops opened on the list (0.9.0): each starts folded down to one line.
   const [openShops, setOpenShops] = useState<Set<ShopKey>>(new Set());
@@ -325,6 +326,8 @@ export function ListScreen() {
   };
   useEffect(() => {
     if (!pendingTrip || !sums || picked0 !== pendingTrip.section) return;
+    // Taken once: resuming may also end the kept trip (stored outside React).
+    // eslint-disable-next-line react/set-state-in-effect
     setPendingTrip(undefined);
     resumeWith(pendingTrip, sums);
   }, [pendingTrip, sums, picked0]); // eslint-disable-line react-hooks/exhaustive-deps

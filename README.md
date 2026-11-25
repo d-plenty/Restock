@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.15.0" src="https://img.shields.io/badge/status-release%20candidate%200.15.0-ffcd00">
+  <img alt="Release candidate 0.15.1" src="https://img.shields.io/badge/status-release%20candidate%200.15.1-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,10 +25,10 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0150">New in 0.15.0</a> ·
+  <a href="#new-in-0151">New in 0.15.1</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
-  <a href="#restock-on-iphone">On iPhone</a> ·
+  <a href="#iphone-and-ipad">On iPhone</a> ·
   <a href="#questions">Questions</a> ·
   <a href="#how-you-can-help">How you can help</a> ·
   <a href="BUILD.md">Build it</a> ·
@@ -39,11 +39,12 @@
 
 | | | | |
 |:---:|:---:|:---:|:---:|
-| ![Home: a greeting and the date, your Shopping list total, and what's on special now](docs/screenshots/home-0111.png) | ![Pantry: everything you buy, with where it's cheapest](docs/screenshots/pantry-0111.png) | ![An item: the verdict, its usual price, and your product at each shop](docs/screenshots/item-0111.png) | ![Add: search results at a shop, ready to tick](docs/screenshots/add-0111.png) |
-| ![Shopping list by shop, with one shop open](docs/screenshots/list-by-shop-0111.png) | ![Compare shops: Shop around, and what it costs if you only go to one shop](docs/screenshots/compare-shops-0111.png) | ![My specials: what's on special at each shop you use](docs/screenshots/my-specials-0111.png) | ![My catalogue: specials on the things you buy, a page for each shop](docs/screenshots/my-catalogue-0111.png) |
-| ![Price history: the chart, where today's price sits, and how often it's on special](docs/screenshots/price-chart-0111.png) | ![Shopping at one shop, in dark mode: tick things off as they go in the trolley](docs/screenshots/shopping-dark-0111.png) | ![Dark mode in true black: Home](docs/screenshots/dark-home-0111.png) | |
+| ![Home: the date, your specials, Resume shopping and your shops](docs/screenshots/home-0151.png) | ![Pantry: everything you buy, with its price and shop](docs/screenshots/pantry-0151.png) | ![Shopping list: your list by shop, with what it costs and Compare shops](docs/screenshots/list-0151.png) | ![Shopping at one shop: tick things off as they go in the trolley](docs/screenshots/shopping-0151.png) |
+| ![Add, in dark mode: the closest matches at your shops, ready to tick](docs/screenshots/add-dark-0151.png) | ![Add manually, in dark mode: name, shop, price and category](docs/screenshots/add-manually-dark-0151.png) | ![Compare shops, in dark mode: Shop around, or what it costs at only one shop](docs/screenshots/compare-shops-dark-0151.png) | ![An item: the verdict, its usual price, and your product at each shop](docs/screenshots/item-0111.png) |
+| ![Price history: the chart, where today's price sits, and how often it's on special](docs/screenshots/price-chart-0111.png) | ![My specials: what's on special at each shop you use](docs/screenshots/my-specials-0111.png) | ![My catalogue: specials on the things you buy, a page for each shop](docs/screenshots/my-catalogue-0111.png) | ![More: your tabs (Bottle shop, Chemist, Tools) and everything else](docs/screenshots/your-tabs-0151.png) |
+| ![Settings: search, setup and your shops](docs/screenshots/settings-0151.png) | ![Sync and backups: your household on your own Restock server](docs/screenshots/sync-0151.png) | ![Dark mode in true black: Home](docs/screenshots/dark-home-0151.png) | ![Shopping at one shop, in dark mode](docs/screenshots/shopping-dark-0151.png) |
 
-The phone pictures are real screenshots from a phone running Restock.
+The phone pictures are real screenshots from a phone running Restock (shop branches and names blurred).
 
 | | |
 |:---:|:---:|
@@ -141,7 +142,27 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 ## iPhone and iPad
 
-Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Two things aren't possible because of Apple's restrictions: checking prices at a set time of day (they're checked when you open Restock) and the app updating itself. Still to come there: home screen widgets, and the App Store. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Two things aren't possible because of Apple's restrictions: checking prices at a set time of day (they're checked when you open Restock) and the app updating itself. Still to come there: home screen widgets, Search with Google Lens straight from the app, and the App Store. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.15.1
+
+A tidy-up, the iPhone's own database, and the versions Google Play and the App Store would take.
+
+**iPhone and iPad**
+- **Restock's data is now in the iPhone's own database** (the system's SQLite, as on Android). Each change is on the disk as soon as it's made, instead of the whole file being written again after every change. Nothing moves: the same files are opened as they are, and the first time, a copy of each is kept beside it.
+
+**Fixes**
+- A shop you took off Your shops no longer stays on Home because it had a saved branch.
+- Home, the tabs, the list and an item's page work out their prices once and share them (Home did it twice).
+
+**Updates and the stores**
+- **Check for updates** now also offers Restock's own F-Droid repo.
+- **Google Play and the App Store:** Restock isn't on either yet. Each release now has their versions attached, unsigned: an App Bundle for Google Play (it has no updater, as Play requires) and an archive for the App Store and TestFlight. [What each store needs, and what's left](docs/STORES.md). The APK stays exactly as it is.
+
+**A Restock server**
+- The setup page's first sign-in moved to the server's current address. A setup page left open from before needs reloading. Update the server to 0.15.1 with the app.
+
+**For people who work on Restock:** the Add screen is split into its parts, the React linter rules are on and everything they found is fixed, there are tests that use the screens the way a person does, and the sync engine runs on a database that answers later (the iPhone's) as well as one that answers straight away.
 
 ## New in 0.15.0
 
@@ -757,7 +778,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 - **Download the APK:** **[restock.apk](https://github.com/d-plenty/Restock/releases/latest/download/restock.apk)** is always the newest version, or pick one from **[Releases](../../releases)**. Open it on your phone and allow the install. Restock can then update itself: **Settings → About and updates → Check for updates** (or turn on *Tell me when there's an update*).
 - **F-Droid (Restock's own repo):** open **[d-plenty.github.io/Restock](https://d-plenty.github.io/Restock/)** on your phone and tap *Add to F-Droid*, or scan its QR code in F-Droid → Settings → Repositories. Then install Restock from F-Droid and it keeps it up to date. Works with F-Droid, Droid-ify and Neo Store. Restock isn't in the main F-Droid repository yet.
 - **Obtainium:** tap the Obtainium badge at the top on your phone, or add `https://github.com/d-plenty/Restock` in [Obtainium](https://github.com/ImranR98/Obtainium).
-- **iPhone:** there's no iPhone app, but with your own Restock server you can use Restock on iPhone from the home screen. See [Restock on iPhone](#restock-on-iphone).
+- **iPhone and iPad:** the app is installed from a computer for now. See [iPhone and iPad](#iphone-and-ipad). With your own Restock server you can also use its web page from the home screen: see [Restock on iPhone](#restock-on-iphone).
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
@@ -791,7 +812,7 @@ The server can read what your phones share with it, so it can do all this. It's 
 
 ## Restock on iPhone
 
-There's no iPhone app, but with your own Restock server you can put Restock on your iPhone's home screen. It opens like an app, and your Shopping list works with no signal.
+There's an iPhone and iPad app ([iPhone and iPad](#iphone-and-ipad)). Without it, with your own Restock server you can put the server's web page on your iPhone's home screen. It opens like an app, and your Shopping list works with no signal.
 
 **It needs the server's https address.** iPhones only keep a web app for offline use, and only let it use the camera, on https. A Cloudflare tunnel or Tailscale's https (`tailscale serve`) both work. See [at home and away](https://github.com/d-plenty/restock-server#at-home-and-away) in the server's README.
 
@@ -844,7 +865,7 @@ No. Restock is local first: it works fully on your phone, with no account and no
 <details>
 <summary><strong>Is it on Google Play or the App Store?</strong></summary>
 
-Not at the moment. Android phones can install it from [GitHub](https://github.com/d-plenty/Restock/releases/latest/download/restock.apk), [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium (see [Get it](#get-it)). It isn't in the main F-Droid repository yet. On iPhone, use it through your own Restock server: see [Restock on iPhone](#restock-on-iphone).
+Not yet. Android phones can install it from [GitHub](https://github.com/d-plenty/Restock/releases/latest/download/restock.apk), [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium (see [Get it](#get-it)). It isn't in the main F-Droid repository yet. The iPhone and iPad app is installed from a computer: see [iPhone and iPad](#iphone-and-ipad). The versions for Google Play and the App Store are built with every release: [what's left before they can go on the stores](docs/STORES.md).
 </details>
 
 <details>
@@ -935,6 +956,8 @@ Please don't post anything private (card numbers, PINs, backup files, export fil
 
 ## Wanted: someone to bring Restock to iPhone
 
+0.15.1 update: there is an iPhone and iPad app now ([iPhone and iPad](#iphone-and-ipad)), installed from a computer, and its App Store version is built with every release ([docs/STORES.md](docs/STORES.md)). What's still wanted is help with the App Store side. The rest of this section is from before the app.
+
 Restock already works on iPhone through your own server ([Restock on iPhone](#restock-on-iphone)). A real iPhone app would add what a web app can't do: background price checks, alerts, widgets and Wi-Fi sync between phones, with no server needed. I'm looking for a developer who knows their way around the Apple side and is willing to build it and put it on the App Store.
 
 Why I'm asking: publishing on the App Store means paying Apple every year for a developer account, and beta testing means getting everyone onto TestFlight. As one person doing this for free, I'm not keen to take that on myself. If you already have an Apple developer account (or are happy to), this could be a good fit.
@@ -1011,7 +1034,7 @@ android/app/src/main/java/family/plenty/restock/
                 background checks, the SQLite bridge, recalls, widgets, local sync (Sync*.java),
                 and Java twins of the verdict and shop code
 tools/          search test tools for a computer (see tools/README.md), and the sync scenarios
-docs/           screenshots, the F-Droid recipe, the release guide, the server's protocol and design
+docs/           screenshots, the F-Droid recipe, the release guide, the stores (STORES.md), the server's protocol and design
 ```
 
 **Local sync**, briefly: every change to a synced table is logged in the phone's database with a time and the phone it came from. Phones find each other on the Wi-Fi with Android's network service discovery (under a random name and a tag that changes every day, so a phone can't be followed from place to place), swap whatever the other hasn't seen over a direct connection encrypted with AES-256-GCM, and the later change wins; ticks and amounts are merged separately, and a delete wins over an edit that didn't know about it. The household key is made on the owner phone and handed over only through a one-time, 10-minute pairing code, with a fresh key exchange (ECDH) so even someone who saw the code can't read the hand-over; removing a phone changes the key. Changes only the owner may make are signed by the owner phone, and each phone checks the signature. Folder and WebDAV sync use the same sealed format, one file per phone, through Restock's own small WebDAV client (https only, except for servers at home or on Tailscale). The household's keys and any drive password are sealed with a key in Android's Keystore. `tools/sync-test` runs whole households of phones through the real Java code.

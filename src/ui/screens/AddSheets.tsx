@@ -16,7 +16,7 @@ import { ChainDot, Icon, Sheet } from '../components';
 import { pickedWords } from './addSave';
 import { CategoryPick } from './Categories';
 import { AddBtn, AddPair, addButtonsNote, AlwaysTick, pickButtonsNote, toPantryNote } from './addPickWords';
-import { TAP, ForLine, Target, FIRST_SHOPS } from './Add';
+import { TAP, type ForLine, type Target, FIRST_SHOPS } from './addShared';
 
 /** 0.12.0: "Where do you shop?", asked by a new phone's first search in place of the setup step. */
 export function WhereShopSheet({

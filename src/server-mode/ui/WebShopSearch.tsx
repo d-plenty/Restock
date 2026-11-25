@@ -226,7 +226,7 @@ export function WebShopSearch({
   };
 
   /** Pick sheet: a ticked product already in the pantry: the line can just be that item. */
-  const useTracked = async (p: FoundProduct) => {
+  const pickTracked = async (p: FoundProduct) => {
     if (!forLine || !p.itemId) return;
     setSaving(true);
     try {
@@ -507,7 +507,7 @@ export function WebShopSearch({
                   <span>
                     You already have this in your pantry as <strong>{trackedPick.itemName ?? trackedPick.name}</strong>.
                   </span>
-                  <button className="btn small" style={TAP} disabled={saving} onClick={() => void useTracked(trackedPick)}>
+                  <button className="btn small" style={TAP} disabled={saving} onClick={() => void pickTracked(trackedPick)}>
                     Use {trackedPick.itemName ?? trackedPick.name}
                   </button>
                 </div>

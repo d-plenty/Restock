@@ -1,6 +1,8 @@
 // 0.15.0: an item's price history (moved out of Item.tsx, which had grown to nearly 2,000 lines):
 // the chart and its picker, when it was last updated, and the stock-up tip.
-import { useEffect, useState, type ReactNode } from 'react';
+import { useResetOn } from '../useResetOn';
+import { useNow } from '../useNow';
+import { useState, type ReactNode } from 'react';
 import { MARKET_SOURCE } from '../../lib/market';
 import { shopRank } from '../../lib/productOrder';
 import { money } from '../../lib/units';
@@ -25,6 +27,7 @@ function LastUpdated({ readings }: { readings: readonly PriceReading[] }) {
  * or "next sale likely around 18 Nov: maybe hold off".
  */
 function StockUpTip({ stats, readings }: { stats: PriceStats; readings: { date: string; isSpecial: boolean }[] }) {
+  const now = useNow(60_000);
   if (!stats.cycleWeeks || stats.cycleWeeks < 3) return null;
   if (stats.current?.isSpecial) {
     return (
@@ -37,7 +40,7 @@ function StockUpTip({ stats, readings }: { stats: PriceStats; readings: { date: 
   const lastSale = [...readings].reverse().find((r) => r.isSpecial)?.date;
   if (!lastSale) return null;
   const next = Date.parse(lastSale) + stats.cycleWeeks * 7 * 86_400_000;
-  const days = Math.round((next - Date.now()) / 86_400_000);
+  const days = Math.round((next - now) / 86_400_000);
   const when = new Date(next).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
   return (
     <div className="banner blue" style={{ padding: '10px 12px' }}>
@@ -59,7 +62,7 @@ function StockUpTip({ stats, readings }: { stats: PriceStats; readings: { date: 
 function HistoryPicker({ options, picked, onPick }: { options: Option[]; picked: Option; onPick: (id: string) => void }) {
   const chains = [...new Set(options.map((x) => x.product.chain))].sort((a, b) => shopRank(a) - shopRank(b));
   const [shop, setShop] = useState(picked.product.chain);
-  useEffect(() => setShop(picked.product.chain), [picked.product.chain]);
+  useResetOn([picked.product.chain], () => setShop(picked.product.chain));
   const rows = options.filter((x) => x.product.chain === shop);
   // 0.11.2: "Cheapest" is by the comparison price only when every pick is measured the same way (all per
   // 100 g, say); grams against a count can't be compared, so the shelf price decides, as in Products I buy.
@@ -229,7 +232,7 @@ export function PriceHistory({
   const hidden = labels.filter((l) => !shown.includes(l) && !near(l.value, today));
 
   // How often it's on sale: this phone's weeks once there are enough, else the shared history.
-  const now = Date.now();
+  const now = useNow(60_000);
   const strip = Array.from({ length: 13 }, (_, i) => {
     const end = now - (12 - i) * WEEK;
     const inWeek = allReadings.filter((r) => Date.parse(r.date) > end - WEEK && Date.parse(r.date) <= end);

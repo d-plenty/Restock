@@ -2,6 +2,7 @@
 // QR codes with zxing's writer (bundled; on the web, a drawn QR is kept in this browser so it shows
 // offline, as the web's offline files leave the QR maker out). Black on white, with a quiet zone,
 // at a size a till's scanner reads. Nothing is sent anywhere.
+import { useResetOn } from '../useResetOn';
 import JsBarcode from 'jsbarcode';
 import { useEffect, useRef, useState } from 'react';
 import { barcodeProblem, eanFormat } from '../../lib/giftCards';
@@ -24,10 +25,12 @@ const CANT = "This can't be drawn as a barcode. Show the number at the till.";
 function QrCode({ value, cache }: { value: string; cache?: CardStore['codeCache'] }) {
   const [svg, setSvg] = useState<string>();
   const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let alive = true;
+  useResetOn([value], () => {
     setSvg(undefined);
     setFailed(false);
+  });
+  useEffect(() => {
+    let alive = true;
     const key = `qr:${value}`;
     void (async () => {
       const kept = await cache?.get(key);
@@ -54,7 +57,9 @@ function QrCode({ value, cache }: { value: string; cache?: CardStore['codeCache'
 
 function LineCode({ value, type }: { value: string; type: Exclude<GiftBarcodeType, 'QR'> }) {
   const ref = useRef<SVGSVGElement>(null);
-  const [failed, setFailed] = useState(false);
+  // What couldn't be drawn (a new number or kind gets its own try).
+  const [failedFor, setFailedFor] = useState<string>();
+  const failed = failedFor === `${type}:${value}`;
   useEffect(() => {
     if (!ref.current) return;
     try {
@@ -67,9 +72,10 @@ function LineCode({ value, type }: { value: string; type: Exclude<GiftBarcodeTyp
         background: '#ffffff',
         lineColor: '#000000',
       });
-      setFailed(false);
     } catch {
-      setFailed(true);
+      // The drawing library is what says it can't be drawn.
+      // eslint-disable-next-line react/set-state-in-effect
+      setFailedFor(`${type}:${value}`);
     }
   }, [value, type]);
   return failed ? <p className="small">{CANT}</p> : <svg ref={ref} role="img" aria-label="Card barcode" />;

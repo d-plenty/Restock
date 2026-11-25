@@ -72,7 +72,7 @@ describe('iPhone app: greyed out, with why', () => {
     expect(settings).toContain("Picking a time of day: not possible on iPhone due to Apple's restrictions.");
     // Nothing else on an iPhone is greyed with a "why" box any more.
     for (const f of ['Settings', 'Look', 'RestockServer', 'SyncOverview']) expect(read(`../ui/screens/${f}.tsx`), f).not.toMatch(/<IosBox reason="(updates|widgets|appIcon|serverExtras|importData)"/);
-    expect(read('../ui/screens/Soon.tsx')).toContain('Still to come: home screen widgets, and the App Store.');
+    expect(read('../ui/screens/Soon.tsx')).toContain('Still to come: home screen widgets, Search with Google Lens straight from Restock (it opens in the browser for now), and the App Store.');
     // 0.15.0: sync, the server and Home Assistant always work on an iPhone: their banners are for the web preview only.
     expect(read('../ui/screens/Sync.tsx')).toContain('<NotHereBanner title="Sync works in the Android app"');
     expect(read('../ui/screens/RestockServer.tsx')).toContain('<NotHereBanner title="The Restock server works in the Android app"');
@@ -90,7 +90,8 @@ describe('iPhone app: greyed out, with why', () => {
   it('nothing changes off an iPhone: sync, updates and Home Assistant are where they were on Android', () => {
     expect(read('../lib/sync.ts')).toContain('export const syncAvailable = () => (Capacitor.isNativePlatform() && (!isIos() || Object.values(IOS_SYNC).some(Boolean))) || !!demoSync();');
     expect(read('../lib/sync.ts')).toContain('(Capacitor.isNativePlatform() ? !isIos() || IOS_SYNC[way] : !!demoSync())');
-    expect(read('../lib/updates.ts')).toContain('export const SELF_UPDATE = !import.meta.env.VITE_FDROID && !isIos();');
+    // 0.15.1: and not in the store versions (stores.behaviour.test.tsx checks each one).
+    expect(read('../lib/updates.ts')).toContain("SELF_UPDATE = c === 'github' && !isIos() && !import.meta.env.VITE_FDROID;");
   });
 });
 
@@ -274,9 +275,17 @@ describe('0.13.2: the screens', () => {
   });
   it('every method the TypeScript side calls is one the Swift side has', () => {
     const swift = read('../../ios/App/App/RestockApple.swift');
-    const every = swift + read('../../ios/App/App/RestockLan.swift') + read('../../ios/App/App/RestockBackground.swift') + read('../../ios/App/App/RestockStore.swift');
+    const every = swift + read('../../ios/App/App/RestockLan.swift') + read('../../ios/App/App/RestockBackground.swift') + read('../../ios/App/App/RestockStore.swift') + read('../../ios/App/App/RestockSql.swift');
     const iface = read('./apple.ts');
-    const methods = [...iface.slice(iface.indexOf('export interface RestockApplePlugin'), iface.indexOf('/** A stand-in')).matchAll(/^\s{2}(\w+)\(/gm)].map((m) => m[1]).filter((m) => m !== 'addListener');
+    // 0.15.1: and the database's (ios/nativeDb.ts, RestockSql.swift).
+    const sql = read('./nativeDb.ts');
+    const methods = [
+      ...iface.slice(iface.indexOf('export interface RestockApplePlugin'), iface.indexOf('/** A stand-in')).matchAll(/^\s{2}(\w+)\(/gm),
+      ...sql.slice(sql.indexOf('export interface AppleSqlPlugin'), sql.indexOf('const plugin = ')).matchAll(/^\s{2}(\w+)\(/gm),
+    ]
+      .map((m) => m[1])
+      .filter((m) => m !== 'addListener');
+    expect(methods).toEqual(expect.arrayContaining(['sqlQuery', 'sqlRun', 'sqlBatch', 'sqlKeepCopy', 'sqlClose']));
     expect(methods.length).toBeGreaterThan(20);
     for (const m of methods) {
       expect(swift, m).toContain(`CAPPluginMethod(name: "${m}", returnType: CAPPluginReturnPromise)`);
@@ -292,8 +301,8 @@ import initSqlJs from 'sql.js';
 import { initDb, updateSettings } from '../lib/db';
 import { createSqlJsDriver } from '../lib/sql/sqljs';
 import { b64u as b64, newEcdhKey, signedText, verifySig } from '../server-mode/crypto';
-import { WebSyncEngine } from '../server-mode/engine';
-import { syncDbOf } from '../server-mode/sqldb';
+import { AsyncSyncEngine } from '../server-mode/engine';
+import { asyncSyncDbOf, syncDbOf } from '../server-mode/sqldb';
 import { cleanAddress, House, HouseProblem, parseInvite, type Http } from './house';
 import { IOS_SYNC } from '../lib/sync';
 
@@ -327,7 +336,7 @@ describe('0.13.2: the iPhone as a phone of a house', () => {
     const driver = await createSqlJsDriver({ load: () => initSqlJs() });
     await initDb(driver);
     await updateSettings({ onboarded: true }, { local: true });
-    const e = new WebSyncEngine(syncDbOf(driver.raw), verifySig, signedText, () => Date.now(), { role: 'phone' });
+    const e = new AsyncSyncEngine(asyncSyncDbOf(syncDbOf(driver.raw)), verifySig, signedText, () => Date.now(), { role: 'phone' });
     return { e, raw: driver.raw, house: new House(e, http) };
   }
   const refuse = (status: number, body: unknown): Http => async () => ({ status, headers: {}, bytes: new TextEncoder().encode(JSON.stringify(body)) });
@@ -338,15 +347,15 @@ describe('0.13.2: the iPhone as a phone of a house', () => {
     p.raw.run("INSERT INTO items (id, name, created_at, section) VALUES ('i-bread', 'Bread', '2026-11-01T00:00:00.000Z', 'pantry')");
     const before = p.raw.exec("SELECT stamp FROM sync_log WHERE pk = 'i-bread'")[0].values[0][0];
     await expect(p.house.join(code)).rejects.toThrow(/has been used or has run out/);
-    expect(p.house.joined()).toBe(false);
+    expect((await p.house.joined())).toBe(false);
     expect(p.raw.exec("SELECT stamp FROM sync_log WHERE pk = 'i-bread'")[0].values[0][0]).toBe(before);
-    expect(p.e.meta('key')).toBeNull();
+    expect((await p.e.meta('key'))).toBeNull();
     await expect(p.house.sync()).rejects.toThrow(/isn't on a Restock server/);
   });
   it("an answer that wasn't sealed for this phone with the code's key is never taken", async () => {
     const p = await phone(refuse(200, { sealed: b64(new Uint8Array(80)) }));
     await expect(p.house.join(code)).rejects.toThrow(/couldn't be opened with the key in its code/);
-    expect(p.house.joined()).toBe(false);
+    expect((await p.house.joined())).toBe(false);
   });
   it('an older (v2) server is turned down in words, and so is a server that cannot be reached', async () => {
     const p = await phone(async () => {
@@ -358,28 +367,28 @@ describe('0.13.2: the iPhone as a phone of a house', () => {
   it("a phone's file carries recent prices and no loyalty cards unless it shares them", async () => {
     const p = await phone(refuse(500, {}));
     p.raw.run("INSERT INTO household (k, v) VALUES ('tabs', 'pantry,keg,pharmacy')");
-    p.e.setMeta('tabs', 'pantry');
+    (await p.e.setMeta('tabs', 'pantry'));
     p.raw.run("INSERT INTO items (id, name, created_at, section) VALUES ('i-milk', 'Milk', '2026-11-01T00:00:00.000Z', 'pantry')");
     p.raw.run("INSERT INTO products (id, chain, store_product_id, name, created_at) VALUES ('p1', 'coles', '123', 'Milk 2L', '2026-11-01T00:00:00.000Z')");
     p.raw.run("INSERT INTO prices (product_id, date, price, source) VALUES ('p1', '2026-11-20T00:00:00.000Z', 3.1, 'check')");
     p.raw.run("INSERT INTO cards (id, program, label, number, created_at) VALUES ('c1', 'flybuys', 'Flybuys', '6008123', '2026-11-01T00:00:00.000Z')");
-    const tables = () => new Set(p.e.ownFile(1, '2026-11-24T00:00:00.000Z', false)!.msg.entries!.map((x) => x.tbl));
-    expect(tables().has('items')).toBe(true);
-    expect(tables().has('prices')).toBe(true);
-    expect(tables().has('cards')).toBe(false);
-    p.e.setMeta('share_cards', '1');
-    expect(tables().has('cards')).toBe(true);
+    const tables = async () => new Set((await p.e.ownFile(1, '2026-11-24T00:00:00.000Z', false))!.msg.entries!.map((x) => x.tbl));
+    expect((await tables()).has('items')).toBe(true);
+    expect((await tables()).has('prices')).toBe(true);
+    expect((await tables()).has('cards')).toBe(false);
+    (await p.e.setMeta('share_cards', '1'));
+    expect((await tables()).has('cards')).toBe(true);
   });
   it('leaving a household keeps the device\'s own inventory amounts and "Always use this for" choices', async () => {
     const p = await phone(refuse(500, {}));
     p.raw.run("INSERT INTO household_settings (k, v) VALUES ('have:i1', '{\"m\":\"c\",\"a\":4}'), ('inv:tab:pantry', 'true'), ('alias:milk', '\"i1\"'), ('keep:bread', 'true'), ('shopAroundMin', '3'), ('shop:coles', '{\"on\":true}')");
     p.raw.run("INSERT INTO household (k, v) VALUES ('name', 'A house')");
-    p.e.setMeta('key', 'x');
+    (await p.e.setMeta('key', 'x'));
     const before = Number(p.raw.exec('SELECT MAX(seq) FROM sync_log')[0].values[0][0]);
-    p.house.forget();
+    (await p.house.forget());
     expect(p.raw.exec('SELECT k FROM household_settings ORDER BY k')[0].values.map((r) => r[0])).toEqual(['alias:milk', 'have:i1', 'inv:tab:pantry', 'keep:bread']);
     expect(p.raw.exec('SELECT COUNT(*) FROM household')[0].values[0][0]).toBe(0);
-    expect(p.e.meta('key')).toBeNull();
+    expect((await p.e.meta('key'))).toBeNull();
     // The numbers never go backwards for a household joined later.
     expect(Number(p.raw.exec("SELECT seq FROM sync_log WHERE tbl = '_seq'")[0].values[0][0])).toBe(before);
     expect(read('./household.ts')).toContain("\"(k LIKE 'alias:%' OR k LIKE 'keep:%' OR k LIKE 'inv:%' OR k LIKE 'have:%')\"");

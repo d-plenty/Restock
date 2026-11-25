@@ -13,7 +13,8 @@ export interface FolderFile {
 }
 
 export interface RestockApplePlugin {
-  info(): Promise<{ version: number; pad: boolean; system: string }>;
+  /** 0.15.1: `channel`, the RestockChannel key in Info.plist ("appstore" in the App Store build). */
+  info(): Promise<{ version: number; pad: boolean; system: string; channel?: string }>;
   /** Loads `url` in the hidden page called `key`. Resolves when it has loaded, failed (status 0) or timed out. */
   webLoad(o: { key: string; url: string; timeoutMs?: number }): Promise<{ status: number; url: string }>;
   /** Runs `js` (a function body; it may await and must return a string) in that page. */

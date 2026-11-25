@@ -7,8 +7,8 @@ import { expect, it } from 'vitest';
 import { createSqlJsDriver } from '../../src/lib/sql/sqljs';
 import { initDb, updateSettings } from '../../src/lib/db';
 import { signedText, verifySig, signWithPkcs8 } from '../../src/server-mode/crypto';
-import { WebSyncEngine } from '../../src/server-mode/engine';
-import { syncDbOf } from '../../src/server-mode/sqldb';
+import { AsyncSyncEngine } from '../../src/server-mode/engine';
+import { asyncSyncDbOf, syncDbOf } from '../../src/server-mode/sqldb';
 import { nodeLan } from '../../src/ios/nodeLan';
 import { WifiHouse } from '../../src/ios/wire';
 
@@ -42,12 +42,10 @@ async function iphone(device: string) {
   const driver = await createSqlJsDriver({ load: () => initSqlJs() });
   await initDb(driver);
   await updateSettings({ onboarded: true }, { local: true });
-  // eslint-disable-next-line prefer-const
-  let e: WebSyncEngine;
-  const sign = (text: string) => signWithPkcs8(e.meta('owner_priv') ?? '', text);
-  e = new WebSyncEngine(syncDbOf(driver.raw), verifySig, signedText, () => Date.now(), { role: 'phone', sign });
-  e.setMeta('device', device);
-  e.setMeta('name', 'iPhone ' + device);
+  const sign = (text: string, priv: string | null) => signWithPkcs8(priv ?? '', text);
+  const e = new AsyncSyncEngine(asyncSyncDbOf(syncDbOf(driver.raw)), verifySig, signedText, () => Date.now(), { role: 'phone', sign });
+  await e.setMeta('device', device);
+  await e.setMeta('name', 'iPhone ' + device);
   const lan = nodeLan();
   const house = new WifiHouse(e, () => lan);
   const names = () => (driver.raw.exec('SELECT name FROM items ORDER BY name')[0]?.values ?? []).map((r) => String(r[0])).join('|');
@@ -67,8 +65,8 @@ it.skipIf(!CP)('an iPhone joins an Android phone\'s household with its code, and
     ios.add('i-bread', 'Bread');
     expect(await ios.house.peek(code)).toMatchObject({ household: 'Java house', ownerName: 'Android a1a1a1a1a1a1a1a1' });
     await ios.house.join(code);
-    expect(ios.house.joined()).toBe(true);
-    expect(ios.house.isOwner()).toBe(false);
+    expect((await ios.house.joined())).toBe(true);
+    expect((await ios.house.isOwner())).toBe(false);
     expect(await android.say('MEMBERS')).toBe('a1a1a1a1a1a1a1a1|f0f0f0f0f0f0f0f0');
 
     // The iPhone asks the Android phone (the address it joined at).
@@ -76,7 +74,7 @@ it.skipIf(!CP)('an iPhone joins an Android phone\'s household with its code, and
     expect(s).toMatchObject({ reached: 1, removed: false, error: null });
     expect(ios.names()).toBe('Bread|Milk');
     expect(await android.say('ITEMS')).toBe('Bread|Milk');
-    expect(ios.house.members().map((m) => m.device).sort()).toEqual(['a1a1a1a1a1a1a1a1', 'f0f0f0f0f0f0f0f0']);
+    expect((await ios.house.members()).map((m) => m.device).sort()).toEqual(['a1a1a1a1a1a1a1a1', 'f0f0f0f0f0f0f0f0']);
     // A used code can't be used again (the owner hangs up on it, as it does for an Android phone).
     const other = await iphone('e1e1e1e1e1e1e1e1');
     await expect(other.house.join(code)).rejects.toThrow(/Couldn't reach the other phone/);
@@ -85,7 +83,7 @@ it.skipIf(!CP)('an iPhone joins an Android phone\'s household with its code, and
     await android.say('ITEM i-eggs Eggs');
     ios.add('i-jam', 'Jam');
     await ios.house.listen();
-    const port = ios.house.info().listening ? (ios.house as unknown as { listener: { port: number } }).listener.port : 0;
+    const port = (await ios.house.info()).listening ? (ios.house as unknown as { listener: { port: number } }).listener.port : 0;
     expect(await android.say(`SYNC 127.0.0.1 ${port}`)).toMatch(/received=1 sent=\d+ removed=false/);
     expect(ios.names()).toBe('Bread|Eggs|Jam|Milk');
     expect(await android.say('ITEMS')).toBe('Bread|Eggs|Jam|Milk');
@@ -94,8 +92,8 @@ it.skipIf(!CP)('an iPhone joins an Android phone\'s household with its code, and
     await android.say('REMOVE f0f0f0f0f0f0f0f0');
     const gone = await ios.house.syncAll();
     expect(gone.removed).toBe(true);
-    expect(ios.house.joined()).toBe(false);
-    expect(ios.e.meta('notice')).toBe('removed');
+    expect((await ios.house.joined())).toBe(false);
+    expect((await ios.e.meta('notice'))).toBe('removed');
     expect(ios.names()).toBe('Bread|Eggs|Jam|Milk');
     await ios.house.stop();
   } finally {
@@ -109,13 +107,13 @@ it.skipIf(!CP)('an Android phone joins a household an iPhone started, syncs, and
     expect(await android.ready()).toBe('READY');
     const ios = await iphone('c3c3c3c3c3c3c3c3');
     ios.add('i-rice', 'Rice');
-    ios.house.start('Apple house');
-    expect(ios.house.isOwner()).toBe(true);
+    (await ios.house.start('Apple house'));
+    expect((await ios.house.isOwner())).toBe(true);
     const { code } = await ios.house.invite();
     await android.say('ITEM i-tea Tea');
     await android.say(`JOIN ${code}`);
-    expect(ios.house.members().map((m) => m.device).sort()).toEqual(['b2b2b2b2b2b2b2b2', 'c3c3c3c3c3c3c3c3']);
-    expect(ios.house.info().invite).toBeNull();
+    expect((await ios.house.members()).map((m) => m.device).sort()).toEqual(['b2b2b2b2b2b2b2b2', 'c3c3c3c3c3c3c3c3']);
+    expect((await ios.house.info()).invite).toBeNull();
     const port = Number(code.split(':').pop());
     await android.say(`SYNC 127.0.0.1 ${port}`);
     expect(await android.say('ITEMS')).toBe('Rice|Tea');
@@ -147,10 +145,10 @@ it.skipIf(!CP)('an Android phone joins a household an iPhone started, syncs, and
     expect(await android.say('OWNER')).toBe('b2b2b2b2b2b2b2b2 true');
     const androidPort = Number(await android.say('PORT'));
     await ios.house.listen();
-    ios.e.setMeta('invite', `127.0.0.1:${androidPort}`);
+    (await ios.e.setMeta('invite', `127.0.0.1:${androidPort}`));
     await ios.house.syncAll();
-    expect(ios.house.isOwner()).toBe(false);
-    expect(ios.e.meta('owner_secrets')).toBeNull();
+    expect((await ios.house.isOwner())).toBe(false);
+    expect((await ios.e.meta('owner_secrets'))).toBeNull();
     await ios.house.stop();
     await two.house.stop();
   } finally {

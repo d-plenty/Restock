@@ -1,4 +1,5 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useLatest } from './useLatest';
+import { useEffect, useSyncExternalStore } from 'react';
 import { checkPrices, type CheckResult } from '../lib/check';
 import { useLive } from '../lib/useLive';
 import { RestockNative } from '../lib/sql/native';
@@ -104,8 +105,7 @@ export function useFullRefresh(onChecked?: (res: CheckResult) => void) {
   const setProgress = (p: [number, number] | undefined) => setLive({ progress: p });
   // Only mention sync when this phone is in a household.
   const paired = !!useLive(() => syncInfo().catch(() => undefined), [])?.paired || serverMode;
-  const checkedRef = useRef(onChecked);
-  checkedRef.current = onChecked;
+  const checkedRef = useLatest(onChecked);
 
   const run = () => {
     if (running) return;

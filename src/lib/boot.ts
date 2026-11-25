@@ -39,6 +39,8 @@ export const setDatabaseOpener = (fn: () => Promise<void>) => (opener = fn);
 
 export async function openDatabase(): Promise<void> {
   if (opener) return opener();
+  // 0.15.1: the iPhone and iPad app in the system's own SQLite (ios/nativeDb.ts), as Android is in its own.
+  if (Capacitor.isNativePlatform() && isIos() && (await import('../ios/nativeDb').then((m) => m.nativeSqlHere()))) return openAppleDatabase();
   // iPhone app: Android has its own SQLite. The iPhone app keeps the same database with sql.js, in the
   // app's own web storage (it isn't Safari's, so iOS doesn't clear it after a week unused).
   if (Capacitor.isNativePlatform() && !isIos()) {
@@ -156,6 +158,49 @@ async function openMarketDb(load: () => Promise<import('sql.js').SqlJsStatic>, m
 /** The sql.js database itself, where that's what this app runs on (not Android), and a nudge to save it after writing to it directly. */
 let sqlJs: { db: import('sql.js').Database; saved: () => void } | undefined;
 export const sqlJsDatabase = () => sqlJs;
+
+/**
+ * 0.15.1: the database the iPhone and iPad app's sync engine works on (ios/sync.ts): the system's
+ * SQLite, or (a build of the app's native side without it, and the tests) the sql.js one.
+ */
+let syncDb: { db: import('../server-mode/engine').AsyncSyncDb; saved: () => void } | undefined;
+export async function syncDatabase(): Promise<typeof syncDb> {
+  if (syncDb) return syncDb;
+  if (!sqlJs) return undefined;
+  const { asyncSyncDbOf, syncDbOf } = await import('../server-mode/sqldb');
+  syncDb = { db: asyncSyncDbOf(syncDbOf(sqlJs.db)), saved: sqlJs.saved };
+  return syncDb;
+}
+/** Set once the database is open (and by the tests). */
+export const setSyncDatabase = (d: typeof syncDb) => (syncDb = d);
+
+/** The iPhone and iPad app on the system's SQLite: the same two files, kept as they were first (ios/nativeDb.ts). */
+async function openAppleDatabase(): Promise<void> {
+  const { AppleDb, readyFile } = await import('../ios/nativeDb');
+  const { DB_FILE, MARKET_FILE } = await import('../ios/store');
+  const web = {
+    get: (key: string) => idb<unknown>('readonly', (s) => s.get(key)),
+    put: async (key: string, value: unknown) => void (await idb('readwrite', (s) => s.put(value, key))),
+  };
+  await readyFile(DB_FILE, web).catch(quiet('iPhone database'));
+  await readyFile(MARKET_FILE, web).catch(quiet('iPhone database'));
+  const main = new AppleDb(DB_FILE);
+  const updated = await versionChanged(main);
+  await initDb(main);
+  if (updated) {
+    await main.run("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('rehousehold', '1')").catch(quiet('database'));
+    await main.run("DELETE FROM sync_meta WHERE key LIKE 'folder_seen:%' OR key LIKE 'folder_ver:%'").catch(quiet('database'));
+  }
+  await main.run("INSERT OR REPLACE INTO kv (key, value) VALUES ('appVersion', ?)", [JSON.stringify(__APP_VERSION__)]).catch(quiet('database'));
+  // The shared price history keeps its own file (0.15.0), so the main one stays small.
+  const market = new AppleDb(MARKET_FILE);
+  await market.run(MARKET_TABLE);
+  setMarketDriver(market);
+  // Every change is on the disk once it answers: nothing waits to be saved.
+  setSaveFlusher(async () => undefined);
+  syncDb = { db: main.forEngine(), saved: () => undefined };
+  await ensureDefaults();
+}
 
 /**
  * Whether this is a different version from last time (or the database needs upgrading). 0.9.6: Restock

@@ -10,7 +10,7 @@ import { syncBackgroundSchedule } from '../lib/check';
 import { CheckLine, trackCheck } from './refresh';
 import { wireKeyboard } from '../lib/keyboard';
 import { cachedSettings, getKV, getSettings, pruneHistory, putKV, refresh, updateSettings } from '../lib/db';
-import { checkForUpdate, SELF_UPDATE, weeklyCheckDue } from '../lib/updates';
+import { checkForUpdate, learnChannel, SELF_UPDATE, weeklyCheckDue } from '../lib/updates';
 import { version as appVersion } from '../../package.json';
 import { setConnectionMode } from '../stores/http';
 import { applyTheme, syncInsets } from '../lib/theme';
@@ -153,6 +153,8 @@ function RestockApp() {
 
   useEffect(() => {
     openDatabase()
+      // 0.15.1: which version of the app this is (the Google Play and App Store ones don't update themselves).
+      .then(() => learnChannel())
       .then(() => {
         wireSync();
         setReady(true);

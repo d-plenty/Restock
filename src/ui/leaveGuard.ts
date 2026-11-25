@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useLatest } from './useLatest';
+import { useEffect } from 'react';
 import { confirmAction } from '../lib/confirm';
 
 // 0.10.7: "Leave without saving?" Screens with work under way that isn't saved yet (products ticked
@@ -14,13 +15,19 @@ const guards = new Set<Guard>();
  * function is asked at the moment of leaving (so a screen that has just saved can say it's done).
  */
 export function useLeaveGuard(dirty: boolean | (() => boolean), what: string): void {
-  const ref = useRef({ dirty, what });
-  ref.current = { dirty, what };
+  const ref = useLatest({ dirty, what });
   useEffect(() => {
-    const g: Guard = { dirty: () => (typeof ref.current.dirty === 'function' ? ref.current.dirty() : ref.current.dirty), what: () => ref.current.what };
+    const now = () => ref.current;
+    const g: Guard = {
+      dirty: () => {
+        const d = now().dirty;
+        return typeof d === 'function' ? d() : d;
+      },
+      what: () => now().what,
+    };
     guards.add(g);
     return () => void guards.delete(g);
-  }, []);
+  }, [ref]);
 }
 
 /** The work that would be lost, or undefined when nothing would be. */

@@ -2,6 +2,7 @@
 // List.tsx; a tab's rows (Pantry, your own tabs) show it too once an item is on the list, so it
 // lives here. Minus at 1 goes to 0, waits a moment, then takes the line off the list (with Undo):
 // the quick way to say "actually, I don't want it" while shopping. Plus in that moment keeps it.
+import { useLatest } from './useLatest';
 import { useEffect, useRef, useState } from 'react';
 import { deleteListEntries, updateListEntry } from '../lib/db';
 import { act } from '../lib/undo';
@@ -19,11 +20,10 @@ export function Stepper({ e, name, small }: { e: ListEntry; /** What it's called
   const label = name ?? e.text;
   const [zero, setZero] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const go = useRef<(() => void) | undefined>(undefined);
-  go.current = () => {
+  const go = useLatest<(() => void) | undefined>(() => {
     timer.current = undefined;
     void act(`${label} taken off your shopping list`, () => deleteListEntries([e.id]));
-  };
+  });
   // Leaving the screen while it sits at 0 still takes it off (that's what was asked for).
   useEffect(
     () => () => {
@@ -31,7 +31,7 @@ export function Stepper({ e, name, small }: { e: ListEntry; /** What it's called
       clearTimeout(timer.current);
       go.current?.();
     },
-    [],
+    [go],
   );
   const minus = () => {
     if (zero) return;

@@ -17,7 +17,7 @@
 import { sha256 } from '@noble/hashes/sha2';
 import { strToU8 } from 'fflate';
 import { b64u, handoverKey, hex, joinKey, keysFileKey, newEcdhKey, newJavaKeyPair, openJoin, openKeysFile, openWithAny, pointOf, random, sealHandover, sealRsf1, serverKeyOf, signWithPkcs8, spkiOf, unb64 } from '../server-mode/crypto';
-import { ALL_TABS, joinTabs, parseTabs, type WebSyncEngine } from '../server-mode/engine';
+import { ALL_TABS, joinTabs, parseTabs, type AsyncSyncEngine } from '../server-mode/engine';
 import { syncRound, type Remote, type RoundResult } from '../server-mode/round';
 import { forgetHousehold, myKeys } from './household';
 
@@ -164,28 +164,28 @@ export class House {
   private readonly skew = new Map<string, number>();
 
   constructor(
-    readonly e: WebSyncEngine,
+    readonly e: AsyncSyncEngine,
     private readonly http: Http,
     private readonly now: () => number = () => Date.now(),
   ) {}
 
   // ---------- what's kept (the names ServerSync.java uses in sync_meta) ----------
 
-  joined(): boolean {
-    return this.e.meta('server_api') === '3' && this.e.meta('server_dev_priv') !== null && this.e.meta('key') !== null;
+  async joined(): Promise<boolean> {
+    return (await this.e.meta('server_api')) === '3' && (await this.e.meta('server_dev_priv')) !== null && (await this.e.meta('key')) !== null;
   }
 
-  private bases(): string[] {
+  private async bases(): Promise<string[]> {
     const out: string[] = [];
     // The address that answered last goes first.
-    for (const a of [this.e.meta('server_reached'), this.e.meta('server_home'), this.e.meta('server_away')]) if (a && !out.includes(a)) out.push(a);
+    for (const a of [(await this.e.meta('server_reached')), (await this.e.meta('server_home')), (await this.e.meta('server_away'))]) if (a && !out.includes(a)) out.push(a);
     return out;
   }
 
-  private serverKeys(): Record<string, string> {
+  private async serverKeys(): Promise<Record<string, string>> {
     const out: Record<string, string> = {};
     try {
-      for (const x of JSON.parse(this.e.meta('server_filekeys') ?? '[]') as { keyv?: unknown; key?: unknown }[])
+      for (const x of JSON.parse((await this.e.meta('server_filekeys')) ?? '[]') as { keyv?: unknown; key?: unknown }[])
         if (x && typeof x.key === 'string' && Number.isInteger(x.keyv)) out[String(x.keyv)] = x.key;
     } catch {
       // nothing kept yet
@@ -193,10 +193,10 @@ export class House {
     return out;
   }
 
-  private addServerKeys(hid: string, keys: Record<string, string> | undefined): void {
+  private async addServerKeys(hid: string, keys: Record<string, string> | undefined): Promise<void> {
     let all: { hid: string; keyv: number; key: string }[] = [];
     try {
-      all = JSON.parse(this.e.meta('server_filekeys') ?? '[]') as typeof all;
+      all = JSON.parse((await this.e.meta('server_filekeys')) ?? '[]') as typeof all;
     } catch {
       all = [];
     }
@@ -206,23 +206,23 @@ export class House {
       all.push({ hid, keyv: Number(v), key });
       have.add(key);
     }
-    this.e.setMeta('server_filekeys', JSON.stringify(all));
+    (await this.e.setMeta('server_filekeys', JSON.stringify(all)));
   }
 
-  info(): HouseInfo {
-    const joined = this.joined();
+  async info(): Promise<HouseInfo> {
+    const joined = (await this.joined());
     return {
       joined,
-      home: this.e.meta('server_home'),
-      away: this.e.meta('server_away'),
-      reached: this.e.meta('server_reached'),
-      at: this.e.meta('folder_at'),
-      error: this.e.meta('server_error'),
-      unread: Number(this.e.meta('folder_unread') ?? 0) || 0,
-      files: Number(this.e.meta('server_files') ?? 0) || 0,
-      label: this.e.meta('server_label'),
-      memberLabel: this.e.meta('server_member_label'),
-      household: joined ? (this.e.householdValue('name') ?? this.e.meta('household')) : null,
+      home: (await this.e.meta('server_home')),
+      away: (await this.e.meta('server_away')),
+      reached: (await this.e.meta('server_reached')),
+      at: (await this.e.meta('folder_at')),
+      error: (await this.e.meta('server_error')),
+      unread: Number((await this.e.meta('folder_unread')) ?? 0) || 0,
+      files: Number((await this.e.meta('server_files')) ?? 0) || 0,
+      label: (await this.e.meta('server_label')),
+      memberLabel: (await this.e.meta('server_member_label')),
+      household: joined ? ((await this.e.householdValue('name')) ?? (await this.e.meta('household'))) : null,
     };
   }
 
@@ -244,7 +244,7 @@ export class House {
   /** ServerSync.check: a scanned code, before joining. */
   async check(code: string): Promise<{ v: 2 | 3; home: string | null; away: string | null; mode?: string; house?: string; empty?: boolean; inHousehold: boolean }> {
     const inv = parseInvite(code);
-    const out: { v: 2 | 3; home: string | null; away: string | null; mode?: string; house?: string; empty?: boolean; inHousehold: boolean } = { v: inv.v, home: inv.home, away: inv.away, inHousehold: this.joined() };
+    const out: { v: 2 | 3; home: string | null; away: string | null; mode?: string; house?: string; empty?: boolean; inHousehold: boolean } = { v: inv.v, home: inv.home, away: inv.away, inHousehold: (await this.joined()) };
     if (inv.v === 3) {
       const h = await this.health([inv.home, inv.away].filter((x): x is string => !!x));
       if (h) {
@@ -266,13 +266,13 @@ export class House {
   async join(code: string): Promise<void> {
     const inv = parseInvite(code);
     if (inv.v !== 3 || !inv.kex) throw new HouseProblem('That code is from an older Restock server (one that hasn\'t been made the house yet). On iPhone and iPad, Restock joins a server that is the house: update the server and choose "Make this server the house" on its page first.');
-    if (this.joined()) throw new HouseProblem('Leave your household first: a phone belongs to one house at a time.');
+    if ((await this.joined())) throw new HouseProblem('Leave your household first: a phone belongs to one house at a time.');
     const dev = newJavaKeyPair();
     const kex = newEcdhKey();
-    const mine = this.myKeys();
+    const mine = (await this.myKeys());
     const n = b64u(random(16));
-    const me = this.e.device();
-    const body = { invite: inv.invite, device: me, name: this.e.meta('name') ?? 'iPhone', pub: dev.pub, kex: b64u(kex.pub), myPub: mine.pub, n };
+    const me = (await this.e.device());
+    const body = { invite: inv.invite, device: me, name: (await this.e.meta('name')) ?? 'iPhone', pub: dev.pub, kex: b64u(kex.pub), myPub: mine.pub, n };
     const where = [inv.home, inv.away].filter((x): x is string => !!x);
     const { answer, base } = await this.postJoin(where, body);
     let gift: Gift;
@@ -282,11 +282,11 @@ export class House {
       throw new HouseProblem("That server's answer couldn't be opened with the key in its code. Only connect to your own server.");
     }
     if (gift.format !== 'restock-join' || gift.v !== 3 || gift.device !== me || !gift.household || !gift.keys || !(Number(gift.keyv) >= 1)) throw new HouseProblem("That server's answer isn't one this phone understands.");
-    this.install(gift, inv, dev.priv, b64u(kex.priv), base);
+    (await this.install(gift, inv, dev.priv, b64u(kex.priv), base));
     // An address the server gave as http:// that only answers over https:// is kept as https://.
     for (const k of ['server_home', 'server_away']) {
-      const a = this.e.meta(k);
-      if (a && a !== base && a.replace(/^http:\/\//i, 'https://') === base) this.e.setMeta(k, base);
+      const a = (await this.e.meta(k));
+      if (a && a !== base && a.replace(/^http:\/\//i, 'https://') === base) (await this.e.setMeta(k, base));
     }
   }
 
@@ -300,17 +300,17 @@ export class House {
     const inv = parseInvite(code);
     if (inv.v !== 3 || !inv.kex) throw new HouseProblem('That code is from an older Restock server. Update the server first.');
     const e = this.e;
-    const me = e.device();
-    if (e.householdValue('owner') !== me || !e.meta('owner_priv')) throw new HouseProblem("Only the household's owner phone can bring it onto a server.");
-    const key = e.meta('key');
-    const keyv = Number(e.meta('keyv') ?? 1) || 1;
+    const me = (await e.device());
+    if ((await e.householdValue('owner')) !== me || !(await e.meta('owner_priv'))) throw new HouseProblem("Only the household's owner phone can bring it onto a server.");
+    const key = (await e.meta('key'));
+    const keyv = Number((await e.meta('keyv')) ?? 1) || 1;
     if (!key) throw new HouseProblem('This device isn\'t in a household.');
     // SyncHousehold.handoverPayload.
-    const secrets = (() => {
+    const secrets = (async () => {
       try {
-        const o = JSON.parse(e.meta('owner_secrets') ?? '{}') as Record<string, unknown>;
+        const o = JSON.parse((await e.meta('owner_secrets')) ?? '{}') as Record<string, unknown>;
         const out: Record<string, string> = {};
-        for (const [d, v] of Object.entries(o)) if (typeof v === 'string' && e.householdValue('member:' + d) !== null) out[d] = v;
+        for (const [d, v] of Object.entries(o)) if (typeof v === 'string' && (await e.householdValue('member:' + d)) !== null) out[d] = v;
         return out;
       } catch {
         return {};
@@ -323,28 +323,28 @@ export class House {
       key,
       keyv,
       serverKeys,
-      owner_priv: e.meta('owner_priv'),
-      owner_pubkey: e.meta('owner_pubkey') ?? e.householdValue('owner_pub'),
+      owner_priv: (await e.meta('owner_priv')),
+      owner_pubkey: (await e.meta('owner_pubkey')) ?? (await e.householdValue('owner_pub')),
       owner_secrets: secrets,
-      secret: e.meta('secret'),
-      hid: e.householdValue('hid'),
-      name: e.householdValue('name') ?? e.meta('household') ?? 'Our house',
+      secret: (await e.meta('secret')),
+      hid: (await e.householdValue('hid')),
+      name: (await e.householdValue('name')) ?? (await e.meta('household')) ?? 'Our house',
     };
-    if (e.meta('oldkey') && e.meta('oldkey_until')) {
-      payload.oldkey = e.meta('oldkey');
-      payload.oldkey_until = e.meta('oldkey_until');
+    if ((await e.meta('oldkey')) && (await e.meta('oldkey_until'))) {
+      payload.oldkey = (await e.meta('oldkey'));
+      payload.oldkey_until = (await e.meta('oldkey_until'));
     }
-    if (e.meta('recovery')) {
-      payload.recovery = e.meta('recovery');
-      payload.recovery_saved = e.meta('recovery_saved') === '1';
+    if ((await e.meta('recovery'))) {
+      payload.recovery = (await e.meta('recovery'));
+      payload.recovery_saved = (await e.meta('recovery_saved')) === '1';
     }
     const eph = newEcdhKey();
     const bring = { epub: b64u(eph.pub), sealed: b64u(sealHandover(handoverKey(eph.priv, unb64(inv.kex), unb64(inv.invite)), payload)) };
     const dev = newJavaKeyPair();
     const kex = newEcdhKey();
-    const mine = this.myKeys();
+    const mine = (await this.myKeys());
     const n = b64u(random(16));
-    const body = { invite: inv.invite, device: me, name: e.meta('name') ?? 'iPhone', pub: dev.pub, kex: b64u(kex.pub), myPub: mine.pub, n, bring };
+    const body = { invite: inv.invite, device: me, name: (await e.meta('name')) ?? 'iPhone', pub: dev.pub, kex: b64u(kex.pub), myPub: mine.pub, n, bring };
     const { answer, base } = await this.postJoin([inv.home, inv.away].filter((x): x is string => !!x), body);
     let gift: Gift;
     try {
@@ -353,35 +353,35 @@ export class House {
       throw new HouseProblem("That server's answer couldn't be opened with the key in its code. Only connect to your own server.");
     }
     const hh = gift.household ?? {};
-    if (str(hh.hid) !== e.householdValue('hid')) throw new HouseProblem("The server didn't take your household. Try again, or leave it and join the server's house.");
+    if (str(hh.hid) !== (await e.householdValue('hid'))) throw new HouseProblem("The server didn't take your household. Try again, or leave it and join the server's house.");
     const gotV = Number(gift.keyv);
     const cur = gift.keys?.[String(gotV)];
     // ServerSync.install ("keep"): the household carries on as the house; this device keeps sharing what it shares now.
-    e.db.transaction(() => {
-      e.setMeta(kind, null);
-      e.setMeta('tabs', joinTabs(e.tabs()));
-      if (e.meta('share_receipts') === null) e.setMeta('share_receipts', e.meta('receipts_eff') === '1' ? '1' : '0');
+    await e.hold(async () => {
+      (await e.setMeta(kind, null));
+      (await e.setMeta('tabs', joinTabs((await e.tabs()))));
+      if ((await e.meta('share_receipts')) === null) (await e.setMeta('share_receipts', (await e.meta('receipts_eff')) === '1' ? '1' : '0'));
       if (typeof cur === 'string' && unb64(cur).length === 32 && gotV > keyv) {
-        e.setMeta('key', cur);
-        e.setMeta('keyv', String(gotV));
+        (await e.setMeta('key', cur));
+        (await e.setMeta('keyv', String(gotV)));
       }
-      e.setMeta('server_dev_priv', dev.priv);
-      e.setMeta('server_kex_priv', b64u(kex.priv));
-      e.setMeta('server_kex', inv.kex);
-      e.setMeta('server_api', '3');
-      e.setMeta('server_sid', str(hh.sid));
-      if (e.meta('server_label') === null) e.setMeta('server_label', 'Home');
-      e.setMeta('server_member_label', str(gift.label));
-      e.setMeta('server_home', safeAddress(str(gift.server?.home)) ?? inv.home);
-      e.setMeta('server_away', safeAddress(str(gift.server?.away)) ?? inv.away);
-      e.setMeta('server_reached', base);
-      this.addServerKeys(str(hh.hid) ?? '', gift.serverKeys);
-      this.addServerKeys(str(hh.hid) ?? '', { [String(keyv)]: b64u(serverKeyOf(unb64(key))) });
+      (await e.setMeta('server_dev_priv', dev.priv));
+      (await e.setMeta('server_kex_priv', b64u(kex.priv)));
+      (await e.setMeta('server_kex', inv.kex));
+      (await e.setMeta('server_api', '3'));
+      (await e.setMeta('server_sid', str(hh.sid)));
+      if ((await e.meta('server_label')) === null) (await e.setMeta('server_label', 'Home'));
+      (await e.setMeta('server_member_label', str(gift.label)));
+      (await e.setMeta('server_home', safeAddress(str(gift.server?.home)) ?? inv.home));
+      (await e.setMeta('server_away', safeAddress(str(gift.server?.away)) ?? inv.away));
+      (await e.setMeta('server_reached', base));
+      (await this.addServerKeys(str(hh.hid) ?? '', gift.serverKeys));
+      (await this.addServerKeys(str(hh.hid) ?? '', { [String(keyv)]: b64u(serverKeyOf(unb64(key))) }));
     });
   }
 
-  private myKeys(): { priv: string; pub: string } {
-    return myKeys(this.e);
+  private async myKeys(): Promise<{ priv: string; pub: string }> {
+    return (await myKeys(this.e));
   }
 
   /** POST /api/v3/join at the first address that answers (ServerFolder.join3). */
@@ -419,68 +419,68 @@ export class House {
   }
 
   /** ServerSync.install ("fresh"): keeps what the join gave this phone. */
-  private install(gift: Gift, inv: Invite, devPriv: string, kexPriv: string, base: string): void {
+  private async install(gift: Gift, inv: Invite, devPriv: string, kexPriv: string, base: string): Promise<void> {
     const keyv = Number(gift.keyv);
     const cur = gift.keys?.[String(keyv)];
     if (typeof cur !== 'string' || unb64(cur).length !== 32) throw new HouseProblem("That server's answer has no key for this household.");
     const hh = gift.household ?? {};
     const e = this.e;
     const seed = gift.seed === true;
-    e.db.transaction(() => {
-      this.forget();
-      e.setMeta('key', cur);
-      e.setMeta('keyv', String(keyv));
-      e.setMeta('secret', str(gift.secret) ?? b64u(new Uint8Array(32)));
-      e.setMeta('owner_pin', str(hh.owner_pub));
-      e.setMeta('household', str(hh.name));
+    await e.hold(async () => {
+      (await this.forget());
+      (await e.setMeta('key', cur));
+      (await e.setMeta('keyv', String(keyv)));
+      (await e.setMeta('secret', str(gift.secret) ?? b64u(new Uint8Array(32))));
+      (await e.setMeta('owner_pin', str(hh.owner_pub)));
+      (await e.setMeta('household', str(hh.name)));
       // What this phone shares with the house: groceries only, no receipts, no cards (it can change it after).
-      e.setMeta('tabs', 'pantry');
-      e.setMeta('tabs_eff', null);
-      e.setMeta('share_receipts', '0');
-      e.setMeta('share_cards', '0');
-      e.setMeta('wifi_sync', '0');
-      e.setMeta('seed_settings', seed ? '1' : null);
+      (await e.setMeta('tabs', 'pantry'));
+      (await e.setMeta('tabs_eff', null));
+      (await e.setMeta('share_receipts', '0'));
+      (await e.setMeta('share_cards', '0'));
+      (await e.setMeta('wifi_sync', '0'));
+      (await e.setMeta('seed_settings', seed ? '1' : null));
       // Its own records give way to the house's (stamped below any other phone's), and a record only
       // this phone has still goes up. Prices keep their stamps (they're only ever added). The first
       // phone of a new house has nothing to give way to.
-      if (!seed) e.db.exec("UPDATE sync_log SET stamp = -1, created = 0 WHERE tbl NOT IN ('household', 'prices')");
-      e.setMeta('server_dev_priv', devPriv);
-      e.setMeta('server_kex_priv', kexPriv);
-      e.setMeta('server_kex', inv.kex);
-      e.setMeta('server_api', '3');
-      e.setMeta('server_sid', str(hh.sid));
-      e.setMeta('server_label', 'Home');
-      e.setMeta('server_member_label', str(gift.label));
+      if (!seed) await e.db.exec("UPDATE sync_log SET stamp = -1, created = 0 WHERE tbl NOT IN ('household', 'prices')");
+      (await e.setMeta('server_dev_priv', devPriv));
+      (await e.setMeta('server_kex_priv', kexPriv));
+      (await e.setMeta('server_kex', inv.kex));
+      (await e.setMeta('server_api', '3'));
+      (await e.setMeta('server_sid', str(hh.sid)));
+      (await e.setMeta('server_label', 'Home'));
+      (await e.setMeta('server_member_label', str(gift.label)));
       const home = str(gift.server?.home);
       const away = str(gift.server?.away);
-      e.setMeta('server_home', safeAddress(home) ?? inv.home);
-      e.setMeta('server_away', safeAddress(away) ?? inv.away);
-      e.setMeta('server_reached', base);
-      this.addServerKeys(str(hh.hid) ?? '', gift.serverKeys);
+      (await e.setMeta('server_home', safeAddress(home) ?? inv.home));
+      (await e.setMeta('server_away', safeAddress(away) ?? inv.away));
+      (await e.setMeta('server_reached', base));
+      (await this.addServerKeys(str(hh.hid) ?? '', gift.serverKeys));
       // Always able to read what's sealed with the current key, whatever the answer listed.
-      this.addServerKeys(str(hh.hid) ?? '', { [String(keyv)]: b64u(serverKeyOf(unb64(cur))) });
+      (await this.addServerKeys(str(hh.hid) ?? '', { [String(keyv)]: b64u(serverKeyOf(unb64(cur))) }));
     });
   }
 
   /** SyncHousehold.forget: the household and everything about its sync is forgotten; the phone's own things stay (ios/household.ts). */
-  forget(): void {
-    forgetHousehold(this.e, ['server_dev_priv', 'server_home', 'server_away', 'server_reached', 'server_files', 'server_error', 'server_api', 'server_kex', 'server_kex_priv', 'server_label', 'server_sid', 'server_keysfile', 'server_member_label']);
+  async forget(): Promise<void> {
+    (await forgetHousehold(this.e, ['server_dev_priv', 'server_home', 'server_away', 'server_reached', 'server_files', 'server_error', 'server_api', 'server_kex', 'server_kex_priv', 'server_label', 'server_sid', 'server_keysfile', 'server_member_label']));
   }
 
   // ---------- signed requests (docs/server-protocol.md, Signed requests) ----------
 
   /** The Authorization header for a request (ServerFolder.authorization). */
-  authorization(method: string, pathAndQuery: string, t: number, body?: Uint8Array, n: string = b64u(random(16))): string {
+  async authorization(method: string, pathAndQuery: string, t: number, body?: Uint8Array, n: string = b64u(random(16))): Promise<string> {
     const msg = `${method}\n${pathAndQuery}\n${t}\n${n}\n${hex(sha256(body ?? new Uint8Array(0)))}`;
     // The server takes plain base64 or base64url for the signature; Android sends plain base64.
-    const sig = btoa(String.fromCharCode(...unb64(signWithPkcs8(this.e.meta('server_dev_priv') ?? '', msg))));
-    return `Restock2 d=${this.e.device()}, t=${t}, n=${n}, s=${sig}`;
+    const sig = btoa(String.fromCharCode(...unb64(signWithPkcs8((await this.e.meta('server_dev_priv')) ?? '', msg))));
+    return `Restock2 d=${(await this.e.device())}, t=${t}, n=${n}, s=${sig}`;
   }
 
   private async sendOnce(base: string, method: 'GET' | 'PUT' | 'DELETE' | 'POST', path: string, body?: Uint8Array, sealedN?: string): Promise<Awaited<ReturnType<Http>>> {
     const u = new URL(base + path);
     const headers: Record<string, string> = {
-      Authorization: this.authorization(method, u.pathname + u.search, this.now() + (this.skew.get(base) ?? 0), body, sealedN),
+      Authorization: (await this.authorization(method, u.pathname + u.search, this.now() + (this.skew.get(base) ?? 0), body, sealedN)),
       // 0.15.0: this device's Restock version, so a server can tell one that's too old to update.
       'X-Restock-App': typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '',
     };
@@ -489,7 +489,7 @@ export class House {
     if (body) headers['Content-Type'] = sealedN ? SEALED : path.startsWith('/api/v3/files/') ? 'application/octet-stream' : 'application/json';
     const got = await this.ask(base, { method, path, headers, body });
     const r = got.r;
-    if (got.base !== base) this.moved(base, got.base);
+    if (got.base !== base) (await this.moved(base, got.base));
     if (r.status === 401 || r.status === 403) {
       const err = errorOf(r.bytes);
       if (err === 'clock') return r;
@@ -523,16 +523,16 @@ export class House {
   }
 
   /** An address that turned out to be https: kept that way from now on. */
-  private moved(from: string, to: string): void {
+  private async moved(from: string, to: string): Promise<void> {
     this.movedTo.set(from, to);
-    for (const k of ['server_home', 'server_away', 'server_reached']) if (this.e.meta(k) === from) this.e.setMeta(k, to);
+    for (const k of ['server_home', 'server_away', 'server_reached']) if ((await this.e.meta(k)) === from) (await this.e.setMeta(k, to));
   }
   private movedTo = new Map<string, string>();
 
   /** A signed request at the first address that answers; a wrong clock is put right once with the server's time. */
   private async send(method: 'GET' | 'PUT' | 'DELETE' | 'POST', path: string, body?: Uint8Array, sealedN?: string): Promise<Awaited<ReturnType<Http>>> {
     let last: unknown;
-    for (const base of this.bases()) {
+    for (const base of (await this.bases())) {
       let r: Awaited<ReturnType<Http>>;
       try {
         r = await this.sendOnce(base, method, path, body, sealedN);
@@ -549,7 +549,7 @@ export class House {
         continue; // not reachable from here: the other address
       }
       const at = this.movedTo.get(base) ?? base;
-      if (this.e.meta('server_reached') !== at) this.e.setMeta('server_reached', at);
+      if ((await this.e.meta('server_reached')) !== at) (await this.e.setMeta('server_reached', at));
       return r;
     }
     throw new HouseProblem(`Couldn't reach your Restock server${last instanceof Error && last.message ? ` (${last.message})` : ''}.`);
@@ -561,9 +561,9 @@ export class House {
    * The answer has to name this request's own nonce, so an old answer can't be played back.
    */
   async sealed(method: 'GET' | 'POST', path: string, body?: unknown): Promise<Record<string, unknown>> {
-    if (!this.joined()) throw new HouseProblem("This phone isn't in a household on a Restock server.");
-    const keys = this.serverKeys();
-    const keyv = Number(this.e.meta('keyv') ?? 0) || 0;
+    if (!(await this.joined())) throw new HouseProblem("This phone isn't in a household on a Restock server.");
+    const keys = (await this.serverKeys());
+    const keyv = Number((await this.e.meta('keyv')) ?? 0) || 0;
     const mine = keys[String(keyv)];
     if (!mine) throw new HouseProblem("This phone isn't in a household on a Restock server.");
     const n = b64u(random(16));
@@ -588,7 +588,7 @@ export class House {
         if (r.status !== 200) throw failure(r.status, 'listing its files');
         const files = json(r.bytes).files;
         const list = Array.isArray(files) ? (files as { name?: unknown; size?: unknown; version?: unknown; modified?: unknown }[]) : [];
-        this.e.setMeta('server_files', String(list.length));
+        (await this.e.setMeta('server_files', String(list.length)));
         return list
           .filter((f) => f && typeof f.name === 'string')
           .map((f) => ({ name: String(f.name), size: Number(f.size) || 0, version: typeof f.version === 'string' ? f.version : undefined, modified: typeof f.modified === 'string' ? f.modified : undefined }));
@@ -610,92 +610,94 @@ export class House {
   // ---------- syncing ----------
 
   /** What this phone shares with the house (SyncFolder.shares): its tabs, receipts and loyalty cards. */
-  shares(): { tabs: string[]; receipts: boolean; cards: boolean } {
-    const mine = parseTabs(this.e.meta('tabs'));
-    return { tabs: ALL_TABS.filter((t) => mine.has(t)), receipts: this.e.meta('share_receipts') === '1', cards: this.e.meta('share_cards') === '1' };
+  async shares(): Promise<{ tabs: string[]; receipts: boolean; cards: boolean }> {
+    const mine = parseTabs((await this.e.meta('tabs')));
+    return { tabs: ALL_TABS.filter((t) => mine.has(t)), receipts: (await this.e.meta('share_receipts')) === '1', cards: (await this.e.meta('share_cards')) === '1' };
   }
 
   /** A newer household key from keys/<device>.bin (ServerSync.takeKeysFile), if there is one. True when one was taken. */
   private async takeKeysFile(remote: Remote, names: string[]): Promise<boolean> {
-    const name = `keys/${this.e.device()}.bin`;
+    const name = `keys/${(await this.e.device())}.bin`;
     if (!names.includes(name)) return false;
     const bytes = await remote.read(name);
-    const kexPriv = this.e.meta('server_kex_priv');
-    const kex = this.e.meta('server_kex');
+    const kexPriv = (await this.e.meta('server_kex_priv'));
+    const kex = (await this.e.meta('server_kex'));
     if (!bytes || !kexPriv || !kex) return false;
     let got: { keyv: number; keys: Record<string, string> };
     try {
-      got = openKeysFile(keysFileKey(unb64(kexPriv), unb64(kex)), this.e.device(), bytes);
+      got = openKeysFile(keysFileKey(unb64(kexPriv), unb64(kex)), (await this.e.device()), bytes);
     } catch {
       return false; // not for this phone's key
     }
-    const have = Number(this.e.meta('keyv') ?? 0) || 0;
+    const have = Number((await this.e.meta('keyv')) ?? 0) || 0;
     const key = got.keys?.[String(got.keyv)];
     if (!(got.keyv > have) || typeof key !== 'string' || unb64(key).length !== 32) return false;
     // A phone only ever takes a newer key than it has (an old keys file put back can't set it back).
     const more: Record<string, string> = {};
     for (const [v, k] of Object.entries(got.keys)) if (typeof k === 'string' && /^\d+$/.test(v)) more[v] = b64u(serverKeyOf(unb64(k)));
-    this.e.db.transaction(() => {
-      this.e.setMeta('key', key);
-      this.e.setMeta('keyv', String(got.keyv));
-      this.addServerKeys('', more);
+    await this.e.hold(async () => {
+      (await this.e.setMeta('key', key));
+      (await this.e.setMeta('keyv', String(got.keyv)));
+      (await this.addServerKeys('', more));
     });
     return true;
   }
 
   /** One round: a newer key, the others' files, then this phone's own. Notes when and how it went. */
   async sync(): Promise<RoundResult & { rekeyed: boolean }> {
-    if (!this.joined()) throw new HouseProblem('This phone isn\'t on a Restock server.');
+    if (!(await this.joined())) throw new HouseProblem('This phone isn\'t on a Restock server.');
     try {
       const remote = this.remote();
       const first = await remote.files();
       const rekeyed = await this.takeKeysFile(remote, first.map((f) => f.name));
-      const me = this.e.device();
+      const me = (await this.e.device());
       // The first phone of a new house gives the household its settings (SharedSettings.seed).
-      this.e.seedSettings();
-      const keys = { webId: me, webPriv: '', webPub: '', keys: this.serverKeys() };
+      (await this.e.seedSettings());
+      const keys = { webId: me, webPriv: '', webPub: '', keys: (await this.serverKeys()) };
       const res = await syncRound(this.e, { ...remote, files: once(first, remote.files) }, keys, () => new Date(this.now()).toISOString(), {
         v3: true,
         ownName: `restock-sync-${me}.bin`,
-        extra: () => ({ shares: this.shares() }),
+        extra: async () => ({ shares: (await this.shares()) }),
       });
-      this.e.setMeta('server_error', null);
+      (await this.e.setMeta('server_error', null));
       return { ...res, rekeyed };
     } catch (err) {
       if (err instanceof HouseProblem && err.removed) {
         // 401 removed: the phone forgets the household and keeps everything.
-        this.forget();
-        this.e.setMeta('notice', 'server-removed');
-      } else this.e.setMeta('server_error', err instanceof Error ? err.message : String(err));
+        (await this.forget());
+        (await this.e.setMeta('notice', 'server-removed'));
+      } else (await this.e.setMeta('server_error', err instanceof Error ? err.message : String(err)));
       throw err;
     }
   }
 
   /** Has anything changed on the server since the last round? (A cheap look: the list only.) */
   async anythingNew(): Promise<boolean> {
-    if (!this.joined()) return false;
+    if (!(await this.joined())) return false;
     const list = await this.remote().files();
-    const me = `restock-sync-${this.e.device()}.bin`;
-    return list.some((f) => f.name !== me && (/^restock-sync-.*\.bin$/.test(f.name) || f.name === `keys/${this.e.device()}.bin`) && this.e.fresh(f.name, f.version ?? `${f.size}/${f.modified ?? ''}`));
+    const me = `restock-sync-${(await this.e.device())}.bin`;
+    const device = await this.e.device();
+    for (const f of list) if (f.name !== me && (/^restock-sync-.*\.bin$/.test(f.name) || f.name === `keys/${device}.bin`) && (await this.e.fresh(f.name, f.version ?? `${f.size}/${f.modified ?? ''}`))) return true;
+    return false;
   }
 
   /** What this phone shares: tabs (groceries can't be turned off), receipts, cards, and what it calls the server. */
-  setShares(o: { tabs?: string[]; receipts?: boolean; cards?: boolean; label?: string }): void {
+  async setShares(o: { tabs?: string[]; receipts?: boolean; cards?: boolean; label?: string }): Promise<void> {
     if (o.tabs) {
       const t = new Set(o.tabs.filter((x) => ALL_TABS.includes(x)));
       t.add('pantry');
-      this.e.setMeta('tabs', joinTabs(t));
+      (await this.e.setMeta('tabs', joinTabs(t)));
     }
-    if (o.receipts !== undefined) this.e.setMeta('share_receipts', o.receipts ? '1' : '0');
-    if (o.cards !== undefined) this.e.setMeta('share_cards', o.cards ? '1' : '0');
-    if (o.label !== undefined) this.e.setMeta('server_label', o.label.trim().slice(0, 40) || 'Home');
+    if (o.receipts !== undefined) (await this.e.setMeta('share_receipts', o.receipts ? '1' : '0'));
+    if (o.cards !== undefined) (await this.e.setMeta('share_cards', o.cards ? '1' : '0'));
+    if (o.label !== undefined) (await this.e.setMeta('server_label', o.label.trim().slice(0, 40) || 'Home'));
   }
 
   // ---------- signing a browser in (ServerSync.webCode, approveWeb) ----------
 
   /** A scanned code from the server's sign-in page: which page it is. Throws with words when it isn't this house's. */
-  webCode(code: string): { kind: 'login'; host: string; id: string; k: string } {
-    if (!this.joined()) throw new HouseProblem('Connect this phone to your Restock server first.');
+  async webCode(code: string): Promise<{ kind: 'login'; host: string; id: string; k: string }> {
+    if (!(await this.joined())) throw new HouseProblem('Connect this phone to your Restock server first.');
     const t = (code ?? '').trim();
     if (/^restock-handover:/i.test(t)) throw new HouseProblem("That's the server's Take this household code, not a sign-in code.");
     if (/^restock-(login|link):2\?/i.test(t)) throw new HouseProblem('That code is from an older Restock web page. Reload the page and scan the new code.');
@@ -724,7 +726,7 @@ export class House {
     }
     if (!f.s || !/^[A-Za-z0-9_-]{8,128}$/.test(f.s)) throw new HouseProblem(DAMAGED_PAGE);
     const mine = new Set<string>();
-    for (const a of this.bases()) {
+    for (const a of (await this.bases())) {
       try {
         mine.add(new URL(a).hostname.toLowerCase().replace(/^\[|\]$/g, ''));
       } catch {
@@ -737,7 +739,7 @@ export class House {
 
   /** Says yes to the browser showing that code (signed by this phone); the server then gives that browser its keys. */
   async approveWeb(code: string): Promise<{ kind: 'login'; host: string }> {
-    const w = this.webCode(code);
+    const w = (await this.webCode(code));
     const r = await this.send('POST', `/api/v3/qrlogin/${w.id}`, strToU8(JSON.stringify({ approve: true, k: w.k })));
     if (r.status === 404 || r.status === 410) throw new HouseProblem('That code has run out. Refresh the web page and scan the new code.');
     if (r.status === 409) throw new HouseProblem('That code has already been used, or is for another browser. Refresh the web page and scan the new code.');
@@ -747,13 +749,13 @@ export class House {
 
   /** Leave: DELETE /api/v3/devices/<me> (best effort), then the household is forgotten; everything on the phone stays. */
   async leave(): Promise<void> {
-    if (!this.joined()) return;
+    if (!(await this.joined())) return;
     try {
-      await this.send('DELETE', `/api/v3/devices/${this.e.device()}`);
+      await this.send('DELETE', `/api/v3/devices/${(await this.e.device())}`);
     } catch {
       // The server can't be reached, or has already forgotten this phone: leaving carries on.
     }
-    this.forget();
+    (await this.forget());
   }
 }
 

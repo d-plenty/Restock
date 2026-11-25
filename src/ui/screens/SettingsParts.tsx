@@ -15,7 +15,7 @@ import { ChainDot, Icon, Sheet, timeAgo, More } from '../components';
 import { UnblockButton } from '../Unblock';
 import { getHealth, testConnections, type ConnectionTest, type StoreChain } from '../../lib/health';
 import { useNav } from '../nav';
-import { checkForUpdate, installUpdate, RELEASES, SELF_UPDATE, type UpdateInfo } from '../../lib/updates';
+import { checkForUpdate, FDROID_REPO, installUpdate, RELEASES, SELF_UPDATE, type UpdateInfo } from '../../lib/updates';
 import { webLink } from '../../lib/site';
 import { GROUP_LABEL, shopGroups } from './Settings';
 
@@ -467,6 +467,14 @@ function UpdateRowsOn({ settings }: { settings: Settings }) {
           </select>
         </label>
       )}
+      {/* 0.15.1: the other way to keep it up to date, said where updates are. */}
+      <p className="small" style={{ margin: '4px 16px 12px' }}>
+        Or let F-Droid keep Restock up to date:{' '}
+        <a href={FDROID_REPO} target="_blank" rel="noreferrer">
+          add Restock's own F-Droid repo
+        </a>
+        .
+      </p>
       {notes && found && (
         <Sheet title={`What's new in ${found.version}`} onClose={() => setNotes(false)}>
           <div className="small release-notes">{found.notes}</div>

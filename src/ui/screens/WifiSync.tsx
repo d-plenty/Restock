@@ -26,21 +26,22 @@ function AddPhoneSheet({ onClose, onIn }: { onClose: () => void; onIn: () => voi
   const [error, setError] = useState<string>();
   useEffect(() => {
     let alive = true;
-    const before = wifi.status().members.length;
+    // How many are in before the code is shown: one more is the phone that used it.
+    const before = wifi.status().then((s) => s.members.length);
     wifi
       .invite()
       .then((i) => alive && setInvite(i))
-      .catch((e) => alive && setError(errText(e)));
+      .catch((e: unknown) => alive && setError(errText(e)));
     const look = setInterval(() => {
       if (!alive) return;
-      try {
-        if (wifi.status().members.length > before) {
-          nav.toast('That phone is in. They sync from now on.');
-          onIn();
-        }
-      } catch {
-        // the next look
-      }
+      void Promise.all([before, wifi.status()])
+        .then(([was, now]) => {
+          if (alive && now.members.length > was) {
+            nav.toast('That phone is in. They sync from now on.');
+            onIn();
+          }
+        })
+        .catch(() => undefined); // the next look
     }, 1500);
     return () => {
       alive = false;
@@ -311,8 +312,7 @@ export function WifiSyncScreen({ apple }: { apple?: boolean }) {
                   detail={st.owner ? 'Receipts and their photos, for the whole household' : "Receipts and their photos, when the household's first phone shares them too"}
                   disabled={!!busy}
                   onChange={(on) => {
-                    wifi.setShares({ receipts: on });
-                    load();
+                    void wifi.setShares({ receipts: on }).then(load, load);
                   }}
                 />
                 <Toggle
@@ -321,8 +321,7 @@ export function WifiSyncScreen({ apple }: { apple?: boolean }) {
                   detail="Your loyalty cards go to the household's other phones. Gift cards never do."
                   disabled={!!busy}
                   onChange={(on) => {
-                    wifi.setShares({ cards: on });
-                    load();
+                    void wifi.setShares({ cards: on }).then(load, load);
                   }}
                 />
               </div>
