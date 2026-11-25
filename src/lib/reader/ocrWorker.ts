@@ -6,8 +6,9 @@ import * as ort from 'onnxruntime-web/wasm';
 import { PaddleOcrService, parseRecognitionDictionary, type OrtModule } from 'paddleocr';
 
 export interface WorkerFiles {
-  det: string;
-  rec: string;
+  /** The model files: an address (built into the page), the file itself (downloaded), or nothing once the worker has them. */
+  det?: string | ArrayBuffer;
+  rec?: string | ArrayBuffer;
   dict: string;
   wasm: string;
   mjs: string;
@@ -18,8 +19,10 @@ export type FromWorker = { id: number; lines?: RawLine[]; error?: string };
 
 let service: Promise<PaddleOcrService> | undefined;
 
-async function bytes(url: string): Promise<ArrayBuffer> {
-  const r = await fetch(url);
+async function bytes(from: string | ArrayBuffer | undefined): Promise<ArrayBuffer> {
+  if (from === undefined) throw new Error('The text reader needs starting again.');
+  if (typeof from !== 'string') return from;
+  const r = await fetch(from);
   if (!r.ok) throw new Error(`Couldn't load the text reader (${r.status}).`);
   return r.arrayBuffer();
 }

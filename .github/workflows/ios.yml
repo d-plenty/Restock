@@ -10,6 +10,13 @@ on:
   workflow_dispatch:
   release:
     types: [published]
+  # And as a check: whenever the iPhone app's own code changes on main or in a pull request, so a
+  # Swift mistake shows up then and not at release time.
+  push:
+    branches: [main]
+    paths: ['ios/**', 'src/ios/**', 'package.json', 'package-lock.json', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['ios/**', 'src/ios/**', 'package.json', 'package-lock.json', '.github/workflows/ios.yml']
 
 permissions:
   contents: write

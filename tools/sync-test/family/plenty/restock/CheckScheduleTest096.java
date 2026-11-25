@@ -9,7 +9,7 @@ import org.json.JSONObject;
 
 /**
  * 0.9.6: CheckSchedule.java (price checks at a set time of day) against the shared answers in
- * tools/sync-test/schedule-fixtures.json, which src/lib/checkSchedule096.test.ts checks on the
+ * tools/sync-test/schedule-fixtures.json, which src/lib/checkSchedule.test.ts checks on the
  * TypeScript side. Run through tools/sync-test/schedule-parity.sh. Pass "gen" as the second
  * argument to print the answers for the fixture inputs instead of checking them.
  */

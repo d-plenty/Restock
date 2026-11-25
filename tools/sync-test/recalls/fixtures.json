@@ -1,0 +1,18 @@
+{
+  "fsanz": "<div class=\"views-row\"><a class=\"x\" href=\"/food-recalls/recall-alert/acme-foods-creamy-peanut-butter-375g\"> Acme Foods &amp; Co Creamy Peanut Butter 375g </a><span>12 November 2026</span></div><div><a href=\"/food-recalls/recall-alert/acme-foods-creamy-peanut-butter-375g\">Acme Foods &amp; Co Creamy Peanut Butter 375g</a></div><div><a href=\"/food-recalls/recall-alert/old-one\">Dairy Dell Vanilla Custard 1kg</a> 3 January 2020</div><a href=\"/food-recalls/recall-alert/x\">Hi</a><a href=\"/other/page\">Not a recall alert at all</a>",
+  "rss": "<rss><channel><item><title><![CDATA[Bright Home — Lavender Dishwashing Liquid 500mL]]></title><link>https://www.productsafety.gov.au/recalls/bright-home-lavender</link><pubDate>Tue, 10 Nov 2026 09:00:00 +1100</pubDate><description><![CDATA[<p>The bottle may contain bacteria. Consumers should stop using the product immediately and return it to the place of purchase for a full refund. Do not pour the liquid down the drain without diluting it first, and wash your hands after handling the bottle. For more information contact the company during business hours on the number printed on the label of the product.</p>]]></description></item><item><title>Sneaky &lt;b&gt;Toy&lt;/b&gt; Robot</title><link>http://evil.example/productsafety.gov.au/x</link><pubDate>Mon, 9 Nov 2026 10:00:00 +1100</pubDate></item><item><title></title><link>https://www.productsafety.gov.au/y</link></item></channel></rss>",
+  "page": "<html><style>.a{}</style><script>var x='Problem: not this';</script><body><h1>Recall</h1><p>Problem: The recall is due to the presence of an undeclared allergen (peanut). Food safety hazard: Any consumers who have a peanut allergy may have a reaction. Date markings: Best Before 12 MAR 2027 and 19 MAR 2027 What to do: Consumers should not eat this product and should return it for a refund. Country of origin: Australia</p></body></html>",
+  "links": [["https://www.tga.gov.au/safety/x", "TGA"], ["https://sub.foodstandards.gov.au/a?b=1", "FSANZ"], ["http://www.tga.gov.au/x", "TGA"], ["https://tga.gov.au.evil.com/x", "TGA"], ["https://user@www.tga.gov.au/x", "TGA"], ["https://www.tga.gov.au\\\\x", "TGA"], ["notalink", "FSANZ"], ["", "Product Safety Australia"]],
+  "tokens": ["Acme Foods & Co’s Creamy Peanut Butter 375g", "The Original 12pk cans of ACME Cola 24x375ml", "Woolworths Full Cream Milk 2L", "a b cd", ""],
+  "match": [
+    ["Acme Foods & Co Creamy Peanut Butter 375g", "Acme Creamy Peanut Butter", "Acme"],
+    ["Acme Foods & Co Creamy Peanut Butter 375g", "Acme Strawberry Jam", "Acme"],
+    ["Acme Foods & Co Creamy Peanut Butter 375g", "Peanut butter", null],
+    ["Acme Foods & Co Creamy Peanut Butter 375g", "Creamy peanut butter crunchy", null],
+    ["Acme Foods & Co Creamy Peanut Butter 375g", "Acme", "Acme"],
+    ["Bright Home — Lavender Dishwashing Liquid 500mL", "Lavender dishwashing liquid", "Bright Home"],
+    ["Bright Home — Lavender Dishwashing Liquid 500mL", "Bright light bulbs", null],
+    ["Dairy Dell Vanilla Custard 1kg", "Dairy Dell Custard Vanilla 1kg", ""],
+    ["Dairy Dell Vanilla Custard 1kg", "12 345", null]
+  ]
+}

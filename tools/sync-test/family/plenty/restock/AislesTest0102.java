@@ -5,7 +5,7 @@ import java.nio.file.Paths;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-/** 0.10.2: Aisles.coles against tools/sync-test/aisle-fixtures-0102.json (aisles0102.test.ts checks the TypeScript). */
+/** 0.10.2: Aisles.coles against tools/sync-test/aisle-fixtures-0102.json (aisles.test.ts checks the TypeScript). */
 public class AislesTest0102 {
     public static void main(String[] args) throws Exception {
         JSONArray cases = new JSONObject(new String(Files.readAllBytes(Paths.get(args[0])), "UTF-8")).getJSONArray("cases");

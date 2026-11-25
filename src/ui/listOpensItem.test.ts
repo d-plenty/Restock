@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { needsBackupNudge, putOffBackup, remindDays, remindLabel, BACKUP_REMIND } from '../lib/backup';
 import { kiloPrice, looseKilo, perKiloNote } from '../lib/unitPrice';
-import { shopDef } from '../shops';
 import { siteImage } from '../stores/webPage';
 import type { Group } from '../types';
 import { attachPatch, rolesIn, uniqueProducts } from './screens/attachOne';
@@ -160,7 +159,7 @@ describe('0.12.8: shops that stopped working', () => {
   it('Try again tests that one shop and says what happened', () => {
     expect(unblock).toMatch(/export function TryAgain/);
     expect(unblock).toMatch(/Checking \$\{name\}…/);
-    expect((home.match(/<TryAgain /g) ?? []).length).toBe(3);
+    expect((home.match(/<TryAgain /g) ?? []).length).toBe(4);
   });
   it('a page that opened but could not be read is not called blocked', async () => {
     const { resultOf, tryAgainWords } = await import('./Unblock');
@@ -182,8 +181,5 @@ describe('0.12.8: shops that stopped working', () => {
     expect(siteImage(undefined)).toBeUndefined();
     // one saved before it had a photo gets it when it's read back
     expect(read('../lib/db.ts')).toMatch(/imageUrl: opt\(r\.image_url as string \| null\) \?\? siteImage\(/);
-  });
-  it("Pharmacy 4 Less is searched at its shop's new address", () => {
-    expect(shopDef('pharmacy4less')?.search).toBe('https://pharmacy4less.com.au/search.php?search_query={q}&section=product');
   });
 });

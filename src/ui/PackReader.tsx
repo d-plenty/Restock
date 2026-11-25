@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { searchWithLens } from '../lib/lens';
 import { readText, type ReadLine } from '../lib/receiptReader';
+import { useReaderGate } from './ReaderDownload';
 import { packPick } from '../lib/receipts';
 import { Icon, LoadingBar } from './components';
 
@@ -37,6 +38,7 @@ export function PackReader({
     el.value = '';
     await go(f);
   };
+  const reader = useReaderGate();
   const [busy, setBusy] = useState<string>();
   const [note, setNote] = useState<string>();
   const [photo, setPhoto] = useState<File>();
@@ -57,6 +59,11 @@ export function PackReader({
     setAllWords(false);
     setPhoto(file);
     setPhotoUrl(URL.createObjectURL(file));
+    // The reader's files are downloaded the first time it's wanted, after asking.
+    if (!(await reader.ensure())) {
+      setNote('The photo reader isn’t downloaded, so the name can’t be read from the photo. Type it in instead.');
+      return;
+    }
     setBusy('Reading the pack…');
     try {
       const out = await readText(file, setBusy);
@@ -117,6 +124,7 @@ export function PackReader({
 
   return (
     <>
+      {reader.sheet}
       <input ref={input} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void pickFrom(e.target)} />
       {/* 0.10.11: or a photo you already have (no capture, so the phone offers its photo library) */}
       <input ref={library} type="file" accept="image/*" hidden onChange={(e) => void pickFrom(e.target)} />

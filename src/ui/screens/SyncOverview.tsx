@@ -5,7 +5,7 @@ import { RestockNative } from '../../lib/sql/native';
 import { protection, suggestLocalText, syncStatus, wifiSyncOn } from '../../lib/protection';
 import { agoText, canSync, dayAndTime, serverName, syncAvailable, syncNowMessage, type SyncInfo } from '../../lib/sync';
 import type { Settings } from '../../types';
-import { Icon } from '../components';
+import { Icon, More } from '../components';
 import { useNav } from '../nav';
 import { SuggestLocalBackup } from './Backups';
 import { AddPhoneSheet, serverSummary } from './Sync';
@@ -143,10 +143,7 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
                       </span>
                     </span>
                   </span>
-                  <span className="small">
-                    For households that host their own Restock server (on a NAS, mini PC, Raspberry Pi or Home Assistant). Phones join it, it syncs
-                    around the clock at home and away, and it gives you Restock on your computer.
-                  </span>
+                  <span className="small">For households that run their own Restock server. Syncs at home and away, and gives you Restock on your computer.</span>
                   <span className="sync-choice-go">Join your server ›</span>
                 </button>
               ) : kind === 'wifi' ? (
@@ -167,11 +164,7 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
                       </span>
                     </span>
                   </span>
-                  <span className="small">
-                    {ios
-                      ? `For a household with an Android phone in it. The Android phone keeps listening on your Wi-Fi, and this ${device} swaps changes with it whenever you open Restock at home. Nothing leaves your home.`
-                      : "No server and no account. Phones swap changes straight to each other when they're on the same Wi-Fi, in the background. Nothing leaves your home."}
-                  </span>
+                  <span className="small">{ios ? 'For a household with an Android phone. Swaps changes on your Wi-Fi when you open Restock.' : 'No server, no account. Phones swap changes on your Wi-Fi. Nothing leaves your home.'}</span>
                   <span className="small sync-eg">Android phones: Samsung, Google Pixel, Oppo, Motorola, Nokia and most phones that aren't iPhones.</span>
                 </button>
               ) : (
@@ -194,11 +187,7 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
                       )}
                     </span>
                   </span>
-                  <span className="small">
-                    {ios
-                      ? `For iPhones and iPads. Your household shares one folder in iCloud Drive. Each ${device} puts its changes there when you open Restock and picks up everyone else's, at home or away. Only your household can read what's in it.`
-                      : 'Use a folder your drive app keeps in step, like Google Drive, Dropbox, OneDrive, Syncthing or Nextcloud, or a WebDAV server. Each phone writes there and reads the others. Slower, and depends on the drive app.'}
-                  </span>
+                  <span className="small">{ios ? 'For iPhones and iPads. One shared folder in iCloud Drive, at home or away.' : 'A folder your drive app keeps in step, like Google Drive or Dropbox. Slower.'}</span>
                 </button>
               );
             return can || !ios ? (
@@ -232,11 +221,9 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
               </div>
             </details>
           )}
-          <p className="small" style={{ margin: 0 }}>
-            {ios
+          <p className="small" style={{ margin: 0 }}>Whichever you choose, keep a backup too.{' '}<More title="Sync and backups"><p>{ios
               ? `Whichever you choose, also keep a backup on this ${device} (Backups, below). And on an iPhone or iPad, Restock syncs when it's open, not while it's closed.`
-              : 'Whichever you choose, also keep a backup on this phone (Backups, below). On Android, Restock syncs in the background too.'}
-          </p>
+              : 'Whichever you choose, also keep a backup on this phone (Backups, below). On Android, Restock syncs in the background too.'}</p></More></p>
           {/* 0.9.11: Home Assistant sits with the other ways of sharing. */}
           {haSummary !== undefined && (
             <button className="sync-choice" onClick={() => nav.push({ name: 'homeAssistant' })}>
@@ -246,12 +233,7 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
                 </span>
                 <strong style={{ fontSize: 17 }}>Home Assistant</strong>
               </span>
-              <span className="small">
-                Your shopping list in Home Assistant, both ways: tick things off on a dashboard, or say "add milk to the shopping list" to a voice
-                assistant and it shows up here.
-                {/* 0.10.10: not set up, the summary was this same sentence again */}
-                {haSummary && !haSummary.startsWith('Your shopping list') ? ` ${haSummary}.` : ''}
-              </span>
+              <span className="small">Your shopping list in Home Assistant, both ways.{haSummary && !haSummary.startsWith('Your shopping list') ? ` ${haSummary}.` : ''}</span>
             </button>
           )}
         </>

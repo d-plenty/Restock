@@ -55,6 +55,7 @@ cd restock
 npm ci
 VITE_FAKE_STORES=1 npm run dev   # click through in a browser with made-up shops
 npm run typecheck
+npm run lint        # the linter (oxlint, .oxlintrc.json)
 npm test
 npm run build:server-core && (cd server && npm test)   # the Restock server, if you changed it or what it shares
 ```
@@ -70,7 +71,7 @@ npm run build:server-core && (cd server && npm test)   # the Restock server, if 
 
 1. Fork the repo and make a branch: `git checkout -b fix-bws-search`.
 2. Keep each pull request to one change, with a plain-words description of what it fixes and how you tested it.
-3. `npm run typecheck` and `npm test` must pass.
+3. `npm run typecheck`, `npm run lint` and `npm test` must pass. GitHub runs them on every pull request, along with the Android sync tests and an Android build (`.github/workflows/ci.yml`). Tests are named for what they cover (`shopAround.test.ts`), not for a version.
 4. If you changed anything a user sees, add a screenshot.
 
 ### House rules
@@ -87,7 +88,7 @@ npm run build:server-core && (cd server && npm test)   # the Restock server, if 
 
 ### Privacy policy and fine print
 
-Both are written once in `src/lib/legal.json`, which the app shows in setup and Settings. `PRIVACY.md` and `DISCLAIMER.md` are that file written out, word for word; `src/lib/privacy090.test.ts` checks `PRIVACY.md` and shows how it's laid out. If you change one, change the `updated` date too.
+Both are written once in `src/lib/legal.json`, which the app shows in setup and Settings. `PRIVACY.md` and `DISCLAIMER.md` are that file written out, word for word; `src/lib/privacy.test.ts` checks `PRIVACY.md` and shows how it's laid out. If you change one, change the `updated` date too.
 
 ## Licence
 

@@ -14,7 +14,7 @@ import {
 } from '../types';
 import { changed } from './live';
 import { listLineWithoutCostco } from './costcoLocal';
-import { applyCustomSections, asListSection, isCustomSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, setShopTabs, shareTab, shopDef, type ListSection, type Section } from '../shops';
+import { applyCustomSections, asListSection, isCustomSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, setShopTabs, shareTab, shopDef, isGoneShop, withoutGone, type ListSection, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
 import { GIFT_CARDS_TABLE, migrate, SEEN_INDEX, SEEN_TABLE, SPEND_TABLE } from './sql/schema';
 import { cleanGiftCard } from './giftCards'; // 0.9.6 (cards)
@@ -332,7 +332,9 @@ export async function putKV(key: string, value: unknown): Promise<void> {
  * another phone.
  */
 export function mergeSettings(stored: Partial<Settings> | undefined, opts: { strict?: boolean } = {}): Settings {
-  return checkSettings(stored, opts);
+  const s = checkSettings(stored, opts);
+  // A shop that stopped listing products online comes off the picked shops (nothing to turn off by hand).
+  return s.enabledChains.some(isGoneShop) ? { ...s, enabledChains: withoutGone(s.enabledChains) } : s;
 }
 
 /** The settings as last read or saved, for wording that can't wait for the database (stock: "online" or "at Coles Kirwan"). */

@@ -5,6 +5,10 @@ import { MIGRATIONS } from './sql/schema';
 import type { SqlDriver } from './sql/driver';
 import { createSqlJsDriver } from './sql/sqljs';
 import { isIos } from './platform';
+import { noteSaved, noteSaveFailed, saveState, setSaveFlusher } from './saveState';
+
+/** A save writes the whole file: with the shared price history in it (several megabytes) it waits a little longer after a change. */
+const BIG_DB = 4_000_000;
 
 // Opens the database: the phone's SQLite on Android, or sql.js (kept in the browser's
 // storage) in the web preview.
@@ -58,26 +62,54 @@ export async function openDatabase(): Promise<void> {
             ]);
             return initSqlJs({ locateFile: () => wasmUrl });
           };
+    const ios = Capacitor.isNativePlatform() && isIos();
+    // The iPhone and iPad app keeps its database as a real file in the app's own storage (ios/store.ts).
+    const store = ios
+      ? await (async () => {
+          const { databaseStore, fileStore } = await import('../ios/store');
+          const web = {
+            get: (key: string) => idb<unknown>('readonly', (s) => s.get(key)),
+            put: async (key: string, value: unknown) => void (await idb('readwrite', (s) => s.put(value, key))),
+          };
+          return databaseStore(await fileStore().catch(() => undefined), web, { saved: noteSaved });
+        })()
+      : undefined;
     const driver = await createSqlJsDriver({
       load,
-      restore: async () => {
-        try {
-          return (await idb<Uint8Array | undefined>('readonly', (s) => s.get('db'))) ?? undefined;
-        } catch {
-          return undefined;
-        }
-      },
-      persist: async (bytes) => {
-        try {
-          await idb('readwrite', (s) => s.put(bytes, 'db'));
-        } catch {
-          // Preview only; losing this is harmless.
-        }
-      },
+      restore: store
+        ? () => store.restore()
+        : async () => {
+            try {
+              return (await idb<Uint8Array | undefined>('readonly', (s) => s.get('db'))) ?? undefined;
+            } catch {
+              return undefined;
+            }
+          },
+      persist: store
+        ? (bytes) => store.persist(bytes)
+        : async (bytes) => {
+            try {
+              await idb('readwrite', (s) => s.put(bytes, 'db'));
+            } catch {
+              // Preview only; losing this is harmless.
+            }
+          },
+      // On the iPhone a save writes the whole file: a little later, and never put off for long.
+      ...(ios ? { saveAfterMs: () => ((saveState().bytes ?? 0) > BIG_DB ? 2000 : 600), saveWithinMs: 6000, onSaved: (e?: unknown) => (e ? noteSaveFailed(e) : undefined) } : {}),
     });
     await initDb(driver);
     // 0.13.2: the iPhone and iPad app's sync works on the database itself (ios/sync.ts), as the web app's does.
-    sqlJs = { db: driver.raw, saved: () => void driver.run('SELECT 1').catch(() => undefined) };
+    sqlJs = { db: driver.raw, saved: () => driver.touched() };
+    if (ios) {
+      setSaveFlusher(() => driver.flush());
+      // Moved over from the web view's storage, or upgraded just now: write the file straight away.
+      driver.touched();
+      if (store?.needsFirstWrite()) void driver.flush();
+      // Going to the background: whatever is waiting is written now (iOS may stop the app any time after).
+      const leaving = () => void driver.flush();
+      document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && leaving());
+      window.addEventListener('pagehide', leaving);
+    }
   }
   await ensureDefaults();
 }

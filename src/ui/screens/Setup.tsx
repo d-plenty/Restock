@@ -19,7 +19,7 @@ import { SELF_UPDATE } from '../../lib/updates';
 import { DEFAULT_SETTINGS } from '../../types';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
-import { BETA_NOTE, CUSTOM_BETA_NOTE, Icon, Logo, TopBar, useBackHandler } from '../components';
+import { BETA_NOTE, CUSTOM_BETA_NOTE, Icon, Logo, TopBar, useBackHandler, More } from '../components';
 import { useNav } from '../nav';
 import { AutoBackupSettings, SuggestLocalBackup } from './Backups';
 import { protection, suggestLocalText } from '../../lib/protection';
@@ -661,11 +661,9 @@ function TileBody({ id, settings }: { id: TileId; settings: Settings }): ReactNo
       return (
         <>
           <PermissionList hideNote />
-          <p className="small">
-            Each one is only used for what it says. For location, "While using the app" is plenty. Allow all asks for alarms last: Android opens its
+          <p className="small">Each one is only used for what it says.{' '}<More title="Permissions"><p>Each one is only used for what it says. For location, "While using the app" is plenty. Allow all asks for alarms last: Android opens its
             settings page, so turn on "Allow setting alarms and reminders" and come back. Change these later in Settings → Privacy and
-            sharing → Permissions.
-          </p>
+            sharing → Permissions.</p></More></p>
         </>
       );
     case 'receipts':

@@ -1,4 +1,4 @@
-// 0.12.6: what the update says, read from the source (as ways0125.test.ts does).
+// 0.12.6: what the update says, read from the source (as homeAndMore.test.ts does).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 

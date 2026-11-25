@@ -29,7 +29,7 @@ describe('0.12.4: one navy top on every screen', () => {
 
 describe('0.12.4: the Add screen is search or scan', () => {
   const add = read('./screens/Add.tsx');
-  it('has no Change shops (0.12.5 brought More ways to add back as one drop-down: see ways0125.test.ts)', () => {
+  it('has no Change shops (0.12.5 brought More ways to add back as one drop-down: see homeAndMore.test.ts)', () => {
     expect(add).not.toMatch(/>\s*Change shops\s*</);
   });
   it('offers Add manually only once you have searched or scanned', () => {

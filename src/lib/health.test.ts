@@ -8,7 +8,7 @@ describe('store health', () => {
     expect(h.coles?.failingSince).toBe('2026-11-01T00:00:00Z');
     expect(h.coles?.lastFail).toBe('2026-11-03T00:00:00Z');
     const now = Date.parse('2026-11-04T00:00:00Z');
-    expect(failingStores(h, now)).toEqual([{ chain: 'coles', since: '2026-11-01T00:00:00Z', days: 3, error: 'HTTP 403' }]);
+    expect(failingStores(h, now)).toEqual([{ chain: 'coles', since: '2026-11-01T00:00:00Z', days: 3, error: 'HTTP 403', stuck: false }]);
     h = nextHealth(h, { coles: null }, '2026-11-04T00:00:00Z');
     expect(h.coles?.failingSince).toBeUndefined();
     expect(failingStores(h, now)).toEqual([]);

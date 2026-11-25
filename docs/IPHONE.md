@@ -63,7 +63,7 @@ Apple Account. Don't delete Restock from the phone first.
 |---|---|
 | **Your pantry, tabs, shopping list, inventory, cards, receipts** | The same. Everything is kept on the device. |
 | **Searching the shops, adding items** | The same. Restock asks each shop from inside the shop's own page in a hidden browser, as on Android. |
-| **A shop's own page inside Restock** (signing in to Woolworths, Coles or Costco, picking a Coles branch, Unblock) | Works. Recording a trolley (in Diagnostics) is Android only. |
+| **A shop's own page inside Restock** (signing in to Woolworths, Coles or Costco, picking a Coles branch, Unblock) | Works, including recording a trolley (in Diagnostics). |
 | **Barcode scanner, notifications** | Work. |
 | **Backups** | Work. Automatic backups are made **when you open Restock** and the last one is old enough, and go to **Files → On My iPhone → Restock → Restock backups**. There is no folder to pick. |
 | **Export data and Import data** | The same as Android: save to a file or send straight to another phone with a QR code; import from a file, a scanned code or a photo of the code, adding alongside or replacing. A file is saved or picked through the Files app. |
@@ -76,8 +76,11 @@ Apple Account. Don't delete Restock from the phone first.
 | **iCloud sync** (a shared folder in iCloud Drive) | Works, and is the recommended way for a household of iPhones and iPads to share. No server and no account with Restock. See below. |
 | **Home Assistant** | Works while Restock is open (a voice add shows up a moment after you open Restock, not within 15 minutes with it closed). The token is kept in the app's own storage. |
 | **Updates** | Not possible on iPhone due to Apple's restrictions: an app can't update itself. Install the newer `.ipa` the same way. |
-| **Shared price history** (judging a new item from day one), **sending prices back**, **recall alerts** | Not yet: coming. Restock builds each item's history from its own checks, and the Recall alerts page links the official lists. |
-| **Home screen widgets, changing the app icon** | Not yet: coming. |
+| **Shared price history** (judging a new item from day one) and **sending prices back** | Works, with the same rules as Android. The history downloads after a price check when there's something new (on Wi-Fi unless you allow mobile data). |
+| **Recall alerts** | Works. Android checks once a day in the background; an iPhone or iPad checks when you open Restock, at most once a day, and from Check now. |
+| **The database** | A real SQLite file in the app's own storage (`Application Support/Restock/restock.sqlite`), part of the device's backups. It runs in memory while Restock is open and is written out after each change and when the app goes to the background; a save that fails is shown on Home and in Diagnostics. |
+| **Changing the app icon's colour** | Works: the same 16 colours. iOS shows its own "You have changed the icon" message each time. |
+| **Home screen widgets** | Not yet: coming. The row is in Settings, greyed. |
 | **Price helper phone** | Android only. |
 | **Deal and catalogue-day notifications from a background check** | Only after a check that ran while Restock was open. |
 | **iPad** | Held sideways, the tabs are down the left side with Your shops, Receipts, Cards and Settings under them. Held upright it's the iPhone layout. |

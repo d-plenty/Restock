@@ -15,7 +15,7 @@ import type { StoreProduct } from '../../stores/types';
 import { looksLikeBotCheck, searchInfo } from '../../stores/web';
 import { getKV, putKV } from '../../lib/db';
 import { useLive } from '../../lib/useLive';
-import { BETA_SHOPS, BetaTag, Icon, LoadingBar, timeAgo } from '../components';
+import { BETA_SHOPS, BetaTag, Icon, LoadingBar, timeAgo, More } from '../components';
 import { useNav } from '../nav';
 import { UnblockButton } from '../Unblock';
 
@@ -223,11 +223,9 @@ export function ShopTest() {
         Shop test
       </div>
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <p className="small" style={{ margin: 0 }}>
-          Try any shop, even one you haven't picked: Restock searches it once, the way it would on a tab, and shows what came back and how it was
+        <p className="small" style={{ margin: 0 }}>Try any shop: Restock searches it once and shows what came back.{' '}<More title="Shop test"><p>Try any shop, even one you haven't picked: Restock searches it once, the way it would on a tab, and shows what came back and how it was
           read, or why it didn't work. Copy the report and send it, so a shop that doesn't work yet can be fixed. The report has the shop, the
-          word and the first results: nothing from your pantry, lists, settings or branches.
-        </p>
+          word and the first results: nothing from your pantry, lists, settings or branches.</p></More></p>
         <label className="field">
           <span>Shop</span>
           <select className="input" value={shop} onChange={(e) => (setShop(e.target.value as StoreChain), setR(undefined))}>

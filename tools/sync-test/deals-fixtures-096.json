@@ -1,5 +1,5 @@
 {
- "note": "0.9.6 shared answers for Deals.java and verdict.ts: which product is the cheapest pick (and what to do) when a size is unknown. Checked by src/lib/dealsParity096.test.ts and DealsTest096 (tools/sync-test/deals-parity.sh).",
+ "note": "0.9.6 shared answers for Deals.java and verdict.ts: which product is the cheapest pick (and what to do) when a size is unknown. Checked by src/lib/dealsParity.test.ts and DealsTest096 (tools/sync-test/deals-parity.sh).",
  "now": "2026-11-12T09:00:00+10:00",
  "cases": [
   {"name": "unknown size sits out: sized 30 x 375ml at $20 beats an unsized 24 Pack at $14",

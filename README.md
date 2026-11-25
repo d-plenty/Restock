@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0140">New in 0.14.0</a> ·
+  <a href="#new-in-0141">New in 0.14.1</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#restock-on-iphone">On iPhone</a> ·
@@ -97,7 +97,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Three tabs, kept apart**: **Pantry** for supermarkets, **Keg** for bottle shops and **Health** for chemists. Keg and Health only appear if you switch them on, and are marked **Beta**: they work the same way as Groceries, they just haven't been tested as thoroughly yet. Each tab has its own items, categories, list and shops, and a search only goes to that tab's shops. Keg asks once that you're 18 or over.
 - **General list**: a fourth shopping list, with no pantry of its own. A Home Assistant add that matches nothing in your Pantry, Keg or Health goes there. You can add to it yourself too. Adding by hand to Groceries, Keg or Health works as before, even for words that match nothing (like "chips", to buy whatever's on special). Nothing else moves to General by itself. It's shared with the groceries.
 - **Bottle shops**: Dan Murphy's, BWS, Liquorland, Liquorland Warehouse, Liquorland Cellars, The Bottle-O, Cellarbrations, Thirsty Camel and Porters Liquor. Beers say whether they're a single, a 6 pack or a case.
-- **Chemists**: Chemist Warehouse, My Chemist (with Chemist Warehouse's prices), Amcal, Discount Drug Stores, Guardian / PharmaSave, Priceline Pharmacy, Soul Pattinson, TerryWhite Chemmart, Blooms The Chemist, Good Price Pharmacy, Pharmacy 4 Less, Direct Chemist Outlet, Star Discount Chemist, Capital Chemist, National Pharmacies and Chempro.
+- **Chemists**: Chemist Warehouse, My Chemist (with Chemist Warehouse's prices), Amcal, Discount Drug Stores, Guardian / PharmaSave, Priceline Pharmacy, Soul Pattinson, TerryWhite Chemmart, Blooms The Chemist, Good Price Pharmacy, Direct Chemist Outlet, Star Discount Chemist, Capital Chemist, National Pharmacies and Chempro.
 - **Costco** (off until you pick it with your supermarkets): everything Costco sells online, next to Woolworths, Coles and Aldi, shared with your household and server like any shop. Sign in to Costco in the app for member prices (optional). Restock only checks Costco when you search, one page at a time, like you browsing its website. Costco's website terms don't allow automated collection, so it's your choice to switch it on. Prices are Costco's online prices, which include delivery, so the warehouse can differ. If Costco changes or blocks its website, its prices stop until that's sorted. The shelf price in the warehouse can be typed in by hand.
 - **Any other shop**: add its website and Restock finds its search page and reads the products and prices, with Save and test to check it works.
 - **Pantry**: each item has My picks (what you buy at each shop, which can differ shop to shop) and Would also take (others you'd buy when they're cheaper, for Swap & save), on This size or Any size, and shops marked Not at this shop. Listed by shop then size, cheapest first, or A to Z. Swipe to add to your list or delete.
@@ -119,7 +119,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Near me**: find every supermarket, bottle shop or chemist nearby from OpenStreetMap and pick your branch.
 - **Shop health**: Home tells you if a shop hasn't worked for a day, and Settings → Help → Check my shops are working shows what went wrong.
 - **Diagnostics**: what went wrong lately, shop by shop, **Send search details** to capture exactly what a shop sent back, and a recording of what a shop's website does when you add something to its trolley yourself (sign-in and personal details left out), so connections can be fixed.
-- **Receipts** (optional): finds the receipt's edges, straightens it, makes it crisp black and white, and reads the shop, date and total with PaddleOCR on the phone. The reader is built in and works offline. Photos stay inside Restock, not in your gallery.
+- **Receipts** (optional): finds the receipt's edges, straightens it, makes it crisp black and white, and reads the shop, date and total with PaddleOCR on the phone. The photo reader (about 21 MB) is downloaded the first time you use it, after asking, and then works offline; Settings can remove it or get it again. The same reader reads a product's name from a photo when you add something without a barcode. Photos stay inside Restock, not in your gallery.
 - **Recall alerts**: on by default, checked every 24 hours separately from price checks, matched against your Pantry, Keg, Health, lists and kept receipts, with the official notice one tap away.
 - **Cards**: loyalty cards (member prices only count if you've added the card) and gift cards, with the barcode, card number, a PIN that stays hidden until you tap it, the balance and what you spent, an expiry reminder and photos. Cards stay on your phone.
 - **Your shops**: a button on Home for every shop you use. Each opens your own things on special there this week (items you track, and one-off lines on your list), with the shop's whole catalogue and its website one tap away.
@@ -142,6 +142,35 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 ## iPhone and iPad
 
 Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder. Two things aren't possible because of Apple's restrictions: checking prices at a set time of day (they're checked when you open Restock) and the app updating itself. Still to come there: widgets, recall alerts and shared price history. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.14.1
+
+More on iPhone and iPad, a smaller app, less writing in Settings, and fixes.
+
+**iPhone and iPad**
+- **Shared prices both ways:** the shared price history downloads, and the prices this device reads from Coles, Woolworths and Aldi are sent back, with the same rules as Android.
+- **Recall alerts:** checked when you open Restock (at most once a day) and from Check now, with a notification.
+- **App icon colours:** the same 16 as Android.
+- **Your data as a real file:** the database is saved as a SQLite file in the app's own storage, written safely after each change and when the app goes to the background. If a save ever fails, Home says so with Try again.
+- **Recording a trolley** works in Diagnostics. **Home screen widgets** are still to come (the row is greyed).
+
+**The photo reader downloads on first use**
+- The reader's two model files (about 21 MB) are no longer inside the app. The first time you read a receipt or add something from a photo, Restock shows the size and asks. It reads receipts, and reads a product's name from a photo when you add something without a barcode.
+- **Not now** still lets you keep a receipt: you fill in its details yourself.
+- **Settings, Photo reader** removes it or downloads it again. Each file is checked against its fingerprint before it's kept, and photos are still read on your phone.
+- The app is about 20 MB smaller. A Restock server's web page keeps the reader built in.
+
+**Less writing**
+- Settings and its screens (Sync and backups, Phone sharing, My shops, Home Assistant, Restock server, Shared prices and more) say one short line. The full explanation is behind a small **ⓘ**. Warnings stay on screen.
+
+**Fixes**
+- **Pick my …** on a General list line searches your shops for it straight away when nothing in your pantry matches, with the words already filled in.
+- **An item you add takes over its General line.** A line waiting on General under the same words becomes that item's line. Nothing is left behind.
+- **Pharmacy 4 Less is no longer a shop to pick.** Its website stopped listing products, so there is nothing to read. Items you saved from it stay in your pantry.
+- **A shop that Unblock can't fix offers Turn off.** Once you've opened a shop's page and it still gives nothing, or after a week of nothing, the card says Restock can't find products on its website and the main button turns the shop off.
+- **Adding your own shop** says up front that not every shop works or puts prices online. Save and test says plainly when a website lists nothing, with Remove this shop.
+
+**For people who work on Restock:** a linter (`npm run lint`), tests named for what they cover, and GitHub now also runs the Android sync tests, builds the Android app, and builds the iPhone app whenever its code changes.
 
 ## New in 0.14.0
 

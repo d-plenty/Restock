@@ -3,7 +3,9 @@ import { confirmAction } from '../../lib/confirm';
 import { allReceipts, getReceipt, getSettings, nowIso, photosOnServer, saveReceipt, uid, updateSettings } from '../../lib/db';
 import { serverPhoto } from '../../lib/sync';
 import { dataUrl, photoPath, photosSize, readPhoto, writePhoto } from '../../lib/receiptFiles';
+import { deviceWord } from '../../lib/platform';
 import { readerInstalled, readText, removeOldDownload } from '../../lib/receiptReader';
+import { useReaderGate } from '../ReaderDownload';
 import { useLeaveGuard } from '../leaveGuard';
 import { deleteOn, expired, itemLines, joinPages, KEEP_MONTHS, keepLabel, parseReceipt, removeReceipts, removeReceiptsUndoable } from '../../lib/receipts';
 import { act } from '../../lib/undo'; // 0.9.5 (undo)
@@ -28,7 +30,7 @@ const dayText = (d: Date | string) =>
     year: new Date(d).getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
   });
 
-/** The receipt reader is built in since 0.7.4: switching on just marks it ready (and clears any old download). */
+/** Switching receipts on marks them ready (and clears a copy of the reader from before 0.7.4). The reader itself is asked for when a photo is first read. */
 function useReader() {
   const install = async () => {
     await removeOldDownload();
@@ -100,7 +102,7 @@ export function ReceiptsSettings({ settings, inSetup }: { settings: Settings; in
           </li>
           <li>
             <Icon name="download" size={16} />
-            <span>The reader is built into Restock and works offline. Reading happens on your phone; receipts are never sent anywhere.</span>
+            <span>Reading happens on your {deviceWord()} and works offline. Receipts are never sent anywhere.</span>
           </li>
         </ul>
       )}
@@ -426,6 +428,7 @@ function ReceiptLines({ text, items, onChange }: { text: string; items: number; 
 }
 
 export function ReceiptScreen({ id }: { id?: string }) {
+  const gate = useReaderGate();
   const nav = useNav();
   const settings = useLive(getSettings, []);
   const [existing, setExisting] = useState<Receipt>();
@@ -522,7 +525,10 @@ export function ReceiptScreen({ id }: { id?: string }) {
       return;
     }
     setError(undefined);
-    if (!(await readerInstalled())) {
+    // The reader's files are downloaded the first time it's wanted, after asking. Without it the
+    // receipt is still kept: its details are typed in.
+    if (!(await readerInstalled()) && !(await gate.ensure())) {
+      setError('The photo reader isn’t downloaded, so fill the details in yourself. Your photo is kept.');
       setFields(fields ?? blank);
       setStep('details');
       return;
@@ -610,6 +616,7 @@ export function ReceiptScreen({ id }: { id?: string }) {
 
   const inputs = (
     <>
+      {gate.sheet}
       <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void picked(e.target.files?.[0])} />
       <input ref={gallery} type="file" accept="image/*" hidden onChange={(e) => void picked(e.target.files?.[0])} />
     </>

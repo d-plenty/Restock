@@ -31,12 +31,13 @@ import { useLive } from '../../lib/useLive';
 import { money } from '../../lib/units';
 import { STALE_DAYS } from '../../lib/verdict';
 import { chainName, GOOD_SALE, GREAT_SALE, historyLabel, WEEKDAYS, type Settings } from '../../types';
-import { ChainDot, Explain, Icon, Logo, Sheet, timeAgo, TopBar, SearchField } from '../components';
+import { ChainDot, Explain, Icon, Logo, Sheet, timeAgo, TopBar, SearchField, More } from '../components';
 import { UnblockButton } from '../Unblock';
 import { AccessibilitySettings, LookSettings } from './Look';
 import { AutoBackupSettings } from './Backups';
 import { SyncOverview } from './SyncOverview';
 import { ReceiptsSettings } from './Receipts';
+import { ReaderSettings } from '../ReaderDownload';
 import { recallSummary } from './Recalls';
 import { ComingSoon } from './Soon';
 import { WidgetSettings } from './WidgetSettings';
@@ -401,6 +402,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             Receipts
           </div>
           <ReceiptsSettings settings={settings} />
+          <ReaderSettings />
         </>
       )}
       {on('prices') && (
@@ -501,10 +503,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             <button className="row" onClick={() => setExporting(true)}>
               <span className="grow">
                 <span className="title">Export data</span>
-                <span className="small">
-                  Pick what goes in: everything, or just some tabs, lists, cards or settings. Save it as a file, or send it straight to another phone.{' '}
-                  {pricesIn(settings, span)} Keep it private.
-                </span>
+                <span className="small">A file, or straight to another phone. {pricesIn(settings, span)}</span>
               </span>
             </button>
             <button className="row" onClick={() => setImporting(true)}>
@@ -546,11 +545,11 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             Home screen widgets
           </div>
           {isIos() ? (
-            // 0.14.0: widgets for iPhone are on the Coming soon list.
-            <button className="card" style={{ textAlign: 'left' }} onClick={() => nav.push({ name: 'soon', id: 'iphone' })}>
+            // Not on iPhone and iPad yet: the row is there, greyed.
+            <div className="card" aria-disabled="true" style={{ opacity: 0.55 }}>
               <span className="title">Home screen widgets</span>
-              <span className="small">Coming to iPhone and iPad. See Coming soon.</span>
-            </button>
+              <span className="small">Coming to iPhone and iPad.</span>
+            </div>
           ) : (
             <Fold title="Home screen widgets" sub="Deals, shopping list and quick actions">
               <WidgetSettings settings={settings} />
@@ -802,10 +801,8 @@ function PrivacySharing({ settings }: { settings: Settings }) {
         What stays on this phone
       </div>
       <div className="card">
-        <p className="small" style={{ margin: 0 }}>
-          Your pantry, shopping lists, cards, receipts, what you spend, the prices you type in and the items you track stay on this phone. They only go
-          to your own household's phones, your own Restock server or Home Assistant if you set those up (Sync and backups), and into backups you make.
-        </p>
+        <p className="small" style={{ margin: 0 }}>Everything stays on this phone unless you set up sharing.{' '}<More title="What stays on this phone"><p>Your pantry, shopping lists, cards, receipts, what you spend, the prices you type in and the items you track stay on this phone. They only go
+          to your own household's phones, your own Restock server or Home Assistant if you set those up (Sync and backups), and into backups you make.</p></More></p>
       </div>
       {/* 0.10.0: one switch for getting and sending shared prices (SharedPrices.tsx). */}
       <SharedPricesSection settings={settings} />
@@ -825,10 +822,8 @@ function BetaGate({ settings, searching, children }: { settings: Settings; searc
   return (
     <>
       <div className="card">
-        <p className="small" style={{ margin: 0 }}>
-          Testing features and tools for fixing problems. They may not always work right, and some are for people comfortable with the technical
-          side: diagnostics, shop connections and the price helper phone. You don't need any of them to use Restock. Turn them off again any time.
-        </p>
+        <p className="small" style={{ margin: 0 }}>Testing features and repair tools. You don't need them to use Restock.{' '}<More title="Advanced tools"><p>Testing features and tools for fixing problems. They may not always work right, and some are for people comfortable with the technical
+          side: diagnostics, shop connections and the price helper phone. You don't need any of them to use Restock. Turn them off again any time.</p></More></p>
         {!on && (
           <button className="btn primary" style={{ marginTop: 12 }} onClick={() => set(true)}>
             Turn on testing features
@@ -878,10 +873,8 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
   }, []);
   return (
     <Sheet title="Test connections" onClose={onClose}>
-      <p className="small">
-        Restock searches each shop the same way it does when you add an item: supermarkets for "milk", bottle shops for "beer" and chemists for
-        "paracetamol".
-      </p>
+      <p className="small">Restock searches each shop for a test word.{' '}<More title="Test connections"><p>Restock searches each shop the same way it does when you add an item: supermarkets for "milk", bottle shops for "beer" and chemists for
+        "paracetamol".</p></More></p>
       {groups.map(({ section, chains: list }) => (
         <div key={section} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -928,14 +921,12 @@ export function ConnectionsSheet({ settings, onClose }: { settings: Settings; on
       <button className="btn" disabled={running} onClick={run}>
         <Icon name="refresh" size={18} /> Test again
       </button>
-      <p className="small">
-        Still failing? Try Shop connections → Always use the browser, or Unblock the shop and do its check if it asks. If a shop keeps
+      <p className="small">Still failing? Try Unblock, or report it on GitHub.{' '}<More title="If a shop keeps failing"><p>Still failing? Try Shop connections → Always use the browser, or Unblock the shop and do its check if it asks. If a shop keeps
         failing, please{' '}
         <a href="https://github.com/d-plenty/Restock/issues/new/choose" target="_blank" rel="noreferrer">
           report it on GitHub
         </a>{' '}
-        with the error above.
-      </p>
+        with the error above.</p></More></p>
     </Sheet>
   );
 }
@@ -992,7 +983,7 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
               <span className="title" style={{ fontSize: 15 }}>
                 Check prices when I open Restock
               </span>
-              <span className="small">Only the items in your pantry and your tabs. A check runs when you open Restock and the last one is more than {IOS_CHECK_EVERY_HOURS} hours old.</span>
+              <span className="small">Checks when you open Restock, at most every {IOS_CHECK_EVERY_HOURS} hours.{' '}<More title="Check prices when I open Restock"><p>Only the items in your pantry and your tabs. A check runs when you open Restock and the last one is more than {IOS_CHECK_EVERY_HOURS} hours old.</p></More></span>
             </span>
           </label>
           <div className="check" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
@@ -1110,10 +1101,8 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
             <span className="title" style={{ fontSize: 15 }}>
               Weekly deals summary
             </span>
-            <span className="small">
-              Which of your items are on special and roughly what you'd save, after the first price check that day. Wednesday is when new specials
-              start.
-            </span>
+            <span className="small">Your items on special and what you'd save, each week.{' '}<More title="Weekly deals summary"><p>Which of your items are on special and roughly what you'd save, after the first price check that day. Wednesday is when new specials
+              start.</p></More></span>
           </span>
           <select
             className="input"

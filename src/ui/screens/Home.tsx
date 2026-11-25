@@ -1,4 +1,5 @@
-import { isIos, isPad } from '../../lib/platform';
+import { deviceWord, isIos, isPad } from '../../lib/platform';
+import { saveNeedsWarning, saveNow, saveState, subscribeSaveState } from '../../lib/saveState';
 import { greeting, todayText } from '../../lib/greeting';
 import { useState, useSyncExternalStore } from 'react';
 import { askResume, clearTrip, loadTrip, subscribeTrip } from '../../lib/trip';
@@ -16,7 +17,7 @@ import { chainName, stockKnown, type ListEntry, type Settings } from '../../type
 import { ChainDot, Icon, LoadingBar } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { failingStores, getHealth, getHiddenWarnings, isBlockedError, isHidden, offerUnblock } from '../../lib/health';
-import { HideForADay, TryAgain, UnblockButton } from '../Unblock';
+import { HideForADay, TryAgain, TurnOffShop, UnblockButton } from '../Unblock';
 import { exportBackup, needsBackupNudge, putOffBackup } from '../../lib/backup';
 import { syncInfo } from '../../lib/sync';
 import { protection } from '../../lib/protection';
@@ -171,6 +172,7 @@ export function HomeScreen() {
       {/* 0.10.12: a newer Restock is out: first thing on Home, until it's installed */}
       <UpdateBanner settings={settings} />
       <RecallBanner />
+      <SaveWarning />
 
       {/* 0.12.0: the "finish setting up" and tour cards are gone from Home (each thing is asked when it's first needed; both are in Settings). The household's offer of a tab it now shares stays. */}
       {!serverMode && <TabOffer settings={settings} />}
@@ -217,7 +219,9 @@ export function HomeScreen() {
       {failing
         .filter((f) => !errors[f.chain])
         .map((f) =>
-          offerUnblock(f.chain, f.error) ? (
+          f.stuck ? (
+            <NoProductsCard key={f.chain} chain={f.chain} days={f.days} onWorked={runCheck} />
+          ) : offerUnblock(f.chain, f.error) ? (
             <BlockedCard key={f.chain} chain={f.chain} onWorked={runCheck} hide maybe={!isBlockedError(f.error)} days={f.days} />
           ) : (
             <div key={f.chain} className="banner amber" role="alert">
@@ -421,6 +425,51 @@ function BlockedCard({ chain, onWorked, hide, maybe, days }: { chain: StoreChain
         {!isNative() && <span className="small">Unblock is in the Android app: the shop’s page opens on your phone.</span>}
         {maybe && <TryAgain chain={chain} onWorked={onWorked} />}
         {hide && <HideForADay chain={chain} />}
+      </div>
+    </div>
+  );
+}
+
+/** The iPhone and iPad app couldn't write its database file (lib/saveState): said plainly, with Try again. */
+function SaveWarning() {
+  const s = useSyncExternalStore(subscribeSaveState, saveState, saveState);
+  const [busy, setBusy] = useState(false);
+  if (!saveNeedsWarning(s)) return null;
+  return (
+    <div className="banner amber" role="alert">
+      <strong>Restock couldn’t save your changes</strong>
+      <span style={{ fontSize: 13 }}>They’re kept while Restock stays open. Free up some storage on this {deviceWord()}, then try again.</span>
+      <button
+        className={`btn small${busy ? ' is-busy' : ''}`}
+        style={{ alignSelf: 'flex-start' }}
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          void saveNow().finally(() => setBusy(false));
+        }}
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
+/**
+ * A shop that Unblock can't fix (health.isStuck): opening its page didn't help, or it's given nothing
+ * for a week. Its website has most likely stopped listing products, so the main button turns it off.
+ */
+function NoProductsCard({ chain, days, onWorked }: { chain: StoreChain; days: number; onWorked: () => void }) {
+  const name = chainName(chain);
+  return (
+    <div className="banner amber" role="alert">
+      <strong>
+        {name} hasn't worked for {days} day{days === 1 ? '' : 's'}
+      </strong>
+      <span style={{ fontSize: 13 }}>Restock can’t find products on its website. It may not list them online any more.</span>
+      <div className="unblock-actions">
+        <TurnOffShop chain={chain} primary />
+        <TryAgain chain={chain} onWorked={onWorked} />
+        <HideForADay chain={chain} />
       </div>
     </div>
   );

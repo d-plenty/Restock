@@ -26,7 +26,7 @@ import {
 import { useLive } from '../../lib/useLive';
 import { syncBackgroundSchedule } from '../../lib/check';
 import { scheduleReminders } from '../../lib/notify';
-import { Icon, LoadingBar, Sheet, TopBar } from '../components';
+import { Icon, LoadingBar, Sheet, TopBar, More } from '../components';
 import { useNav } from '../nav';
 // 0.9.5 (save): the sharing switches and this phone's name wait for Save settings.
 import { stage } from '../../lib/settingsDraft';
@@ -97,10 +97,8 @@ export function CodeText({ code }: { code: string }) {
   return (
     <details className="sync-code">
       <summary className="small">Can't scan it? Send the code instead</summary>
-      <p className="small">
-        Send this to the other phone (a text message to yourself is fine), copy it, then on that phone tap Join a household and paste it into "Or
-        paste the code". Keep it private, like a Wi-Fi password.
-      </p>
+      <p className="small">Send this code to the other phone, then paste it into Join a household there. Keep it private.{' '}<More title="Sending the code"><p>Send this to the other phone (a text message to yourself is fine), copy it, then on that phone tap Join a household and paste it into "Or
+        paste the code". Keep it private, like a Wi-Fi password.</p></More></p>
       <code className="sync-code-text">{code}</code>
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn small" onClick={() => void copy()}>
@@ -119,10 +117,8 @@ function CardsQuestion({ onAnswer }: { onAnswer: (share: boolean) => void }) {
   return (
     <div className="card" style={{ gap: 10 }}>
       <strong>Share your loyalty cards with the household's other phones?</strong>
-      <span className="small">
-        Your Flybuys and Everyday Rewards numbers would be copied to them, so member prices count on every phone and anyone can show the card at the
-        checkout. You can change this any time on this screen.
-      </span>
+      <span className="small">Your Flybuys and Everyday Rewards numbers would be copied to them.{' '}<More title="Sharing loyalty cards"><p>Your Flybuys and Everyday Rewards numbers would be copied to them, so member prices count on every phone and anyone can show the card at the
+        checkout. You can change this any time on this screen.</p></More></span>
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn primary" style={{ flex: 1 }} onClick={() => onAnswer(true)}>
           Yes, share them
@@ -218,9 +214,7 @@ function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void })
           </label>
           <div className="eyebrow">What the household shares</div>
           <TabsPicker offered={SECTIONS} value={shared} onChange={setTabs} />
-          <p className="small" style={{ marginTop: -4 }}>
-            Each phone that joins picks from these. Not shared stays on each phone, like bottle shops in a share house. You can change it later.
-          </p>
+          <p className="small" style={{ marginTop: -4 }}>Each phone that joins picks from these. You can change it later.</p>
           {shared.length ? <CardsQuestion onAnswer={(share) => void make(share)} /> : <div className="banner amber">Pick at least one thing to share.</div>}
         </>
       )}
@@ -521,10 +515,7 @@ export function JoinSheet({
                 <span className="title" style={{ fontSize: 15, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                   Use the household's things <span className="tag great">Recommended</span>
                 </span>
-                <span className="small">
-                  No doubles. This phone's items, lists and prices in what it shares are swapped for the household's. A backup is saved first, and
-                  the other phones aren't changed. Loyalty cards stay.
-                </span>
+                <span className="small">No doubles: this phone's items in what it shares are swapped for the household's. A backup is saved first.</span>
               </span>
               {replace && <Icon name="check" size={18} stroke={3} />}
             </button>
@@ -606,10 +597,8 @@ function RecoverySheet({ saved, onClose, onDone }: { saved: boolean; onClose: ()
   };
   return (
     <Sheet title="Recovery key" onClose={onClose}>
-      <p className="small">
-        If this phone is lost, broken or wiped, another phone in the household can take over as the owner with this key, and then add and remove
-        phones again. Keep it somewhere safe that isn't this phone: a password manager, or written down at home.
-      </p>
+      <p className="small">With this key, another phone can take over as owner if this one is lost. Keep it somewhere safe that isn't this phone.{' '}<More title="Recovery key"><p>If this phone is lost, broken or wiped, another phone in the household can take over as the owner with this key, and then add and remove
+        phones again. Keep it somewhere safe that isn't this phone: a password manager, or written down at home.</p></More></p>
       <div className="banner amber" style={{ gap: 4 }}>
         <strong>Keep it private</strong>
         <span style={{ fontSize: 13 }}>Anyone with it and a phone in your household can take the household over.</span>
@@ -676,10 +665,8 @@ function TakeOverSheet({ ownerName, onClose, onDone }: { ownerName?: string; onC
   };
   return (
     <Sheet title="Take over as the owner" onClose={onClose}>
-      <p className="small">
-        For when the owner phone{ownerName ? ` (${ownerName})` : ''} is lost, broken or wiped. Enter the household's recovery key and this phone
-        becomes the owner: it can add and remove phones. Then remove the lost phone, so it can't sync again.
-      </p>
+      <p className="small">For when the owner phone{ownerName ? ` (${ownerName})` : ''} is lost. Enter the recovery key and this phone becomes the owner.{' '}<More title="Taking over as owner"><p>For when the owner phone{ownerName ? ` (${ownerName})` : ''} is lost, broken or wiped. Enter the household's recovery key and this phone
+        becomes the owner: it can add and remove phones. Then remove the lost phone, so it can't sync again.</p></More></p>
       <p className="small">Every phone in the household needs Restock 0.9.0 or newer to see the change.</p>
       <label className="field">
         <span>Recovery key</span>
@@ -854,10 +841,8 @@ function NextcloudSheet({ onClose, onDone }: { onClose: () => void; onDone: (inf
         </div>
       ) : (
         <>
-          <p className="small" style={{ margin: 0 }}>
-            Restock opens your Nextcloud's sign-in page in your browser. Nextcloud then gives Restock a password of its own, so your own password
-            never reaches Restock. You can take it away any time in Nextcloud's settings, under Security.
-          </p>
+          <p className="small" style={{ margin: 0 }}>You sign in on Nextcloud's own page. Your password never reaches Restock.{' '}<More title="Signing in to Nextcloud"><p>Restock opens your Nextcloud's sign-in page in your browser. Nextcloud then gives Restock a password of its own, so your own password
+            never reaches Restock. You can take it away any time in Nextcloud's settings, under Security.</p></More></p>
           <label className="field">
             <span>Your Nextcloud's address</span>
             <input
@@ -872,10 +857,8 @@ function NextcloudSheet({ onClose, onDone }: { onClose: () => void; onDone: (inf
             />
           </label>
           <FolderField value={folder} onChange={setFolder} />
-          <p className="small" style={{ marginTop: -4 }}>
-            Made if it isn't there. Every phone in the household needs the same folder: sign in with the same Nextcloud account, or share the folder
-            with each other in Nextcloud.
-          </p>
+          <p className="small" style={{ marginTop: -4 }}>Every phone in the household needs the same folder.{' '}<More title="The Nextcloud folder"><p>Made if it isn't there. Every phone in the household needs the same folder: sign in with the same Nextcloud account, or share the folder
+            with each other in Nextcloud.</p></More></p>
           {error && (
             <div className="banner amber" role="alert">
               {error}
@@ -910,10 +893,8 @@ function WebDavSheet({ onClose, onDone }: { onClose: () => void; onDone: (info: 
   };
   return (
     <Sheet title="Other WebDAV server" onClose={busy ? () => undefined : onClose}>
-      <p className="small" style={{ margin: 0 }}>
-        For ownCloud, Synology, QNAP, TrueNAS, Koofr, pCloud, kDrive, Box and other servers with WebDAV. Your server's or provider's help pages give
-        its WebDAV address.
-      </p>
+      <p className="small" style={{ margin: 0 }}>For ownCloud, Synology, QNAP, TrueNAS and other servers with WebDAV.{' '}<More title="WebDAV servers"><p>For ownCloud, Synology, QNAP, TrueNAS, Koofr, pCloud, kDrive, Box and other servers with WebDAV. Your server's or provider's help pages give
+        its WebDAV address.</p></More></p>
       <label className="field">
         <span>WebDAV address</span>
         <input
@@ -943,10 +924,8 @@ function WebDavSheet({ onClose, onDone }: { onClose: () => void; onDone: (info: 
         <span>Password</span>
         <input className="input" type="password" value={password} autoComplete="current-password" onChange={(e) => setPassword(e.target.value)} />
       </label>
-      <p className="small" style={{ marginTop: -4 }}>
-        Many providers want an app password here (you make one in their settings), not your main one. It stays on this phone only, locked away,
-        and is never synced or put in a backup.
-      </p>
+      <p className="small" style={{ marginTop: -4 }}>Many providers want an app password here. It stays on this phone only.{' '}<More title="The password"><p>Many providers want an app password here (you make one in their settings), not your main one. It stays on this phone only, locked away,
+        and is never synced or put in a backup.</p></More></p>
       <FolderField value={folder} onChange={setFolder} />
       <p className="small" style={{ marginTop: -4 }}>
         Made if it isn't there. Use https:// unless the server is at home (like 192.168.1.20) or on Tailscale.
@@ -1128,13 +1107,11 @@ export function ServerCard({ info, busy, onInfo }: { info: SyncInfo; busy: boole
             {info.serverAway ? ` · Away: ${addressText(info.serverAway)}` : ''}
             {info.serverFiles ? ` · ${plural(info.serverFiles, 'file')} there` : ''}
           </span>
-          <span className="small">
-            {moved
+          <span className="small">{moved ? `${moved} moved there from this phone. ` : ''}Older prices and receipt photos move to the server.{' '}<More title="What moves to the server"><p>{moved
               ? `${moved} moved there from this phone. `
               : ''}
             Prices and receipt photos older than your "Keep price history for" setting move to the server, and only come off this phone once
-            the server has them. Receipts stay here.
-          </span>
+            the server has them. Receipts stay here.</p></More></span>
           {!!info.serverWaiting && !info.serverError && (
             <span className="small">{plural(info.serverWaiting, 'item')} saved on the server, waiting for it to confirm before they come off this phone.</span>
           )}
@@ -1152,27 +1129,21 @@ export function ServerCard({ info, busy, onInfo }: { info: SyncInfo; busy: boole
               Stop
             </button>
           </div>
-          <span className="small">
-            On a computer, open your server's page. To see your household there, link it once with this phone; any time after, you can sign in by
-            scanning its code instead of typing your passphrase.
-          </span>
+          <span className="small">On a computer, open your server's page and link it once with this phone.{' '}<More title="Restock on a computer"><p>On a computer, open your server's page. To see your household there, link it once with this phone; any time after, you can sign in by
+            scanning its code instead of typing your passphrase.</p></More></span>
         </>
       ) : (
         <>
           <span className="title" style={{ fontSize: 15 }}>
             Restock server
           </span>
-          <span className="small">
-            A small server you run yourself (in Docker on a NAS or home server, or as an app in Home Assistant). Phones sync through it at home and away,
+          <span className="small">A small server you run yourself. Phones sync through it at home and away.{' '}<More title="A Restock server"><p>A small server you run yourself (in Docker on a NAS or home server, or as an app in Home Assistant). Phones sync through it at home and away,
             prices included, and you can use Restock in a browser too. It only ever keeps sealed files: still no account, and the makers of
-            Restock never see any of it. It works alongside Phone sharing and sync away from home.
-          </span>
+            Restock never see any of it. It works alongside Phone sharing and sync away from home.</p></More></span>
           {!info.paired && (
             <ol className="small" style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <li>
-                <strong>Start your household.</strong> This phone isn't in one yet, so it becomes the owner of "{householdName}". The server uses the
-                household's key to seal everything.
-              </li>
+              <li>This phone becomes the owner of "{householdName}".{' '}<More title="Starting your household"><p><strong>Start your household.</strong> This phone isn't in one yet, so it becomes the owner of "{householdName}". The server uses the
+                household's key to seal everything.</p></More></li>
               <li>
                 <strong>Scan the server's code.</strong> On a computer, open your server's page, sign in and choose Add a phone.
               </li>
@@ -1190,10 +1161,8 @@ export function ServerCard({ info, busy, onInfo }: { info: SyncInfo; busy: boole
               : 'Connect does steps 1 and 2, asking first. Each code works once, for 10 minutes.'}
           </span>
           {!info.paired && (
-            <span className="small">
-              Adding more phones later: each one joins the household from this phone first (Sync and backups → Add a phone), then scans its own code
-              from the server's page.
-            </span>
+            <span className="small">More phones join from this phone first, then scan the server's code.{' '}<More title="Adding more phones"><p>Adding more phones later: each one joins the household from this phone first (Sync and backups → Add a phone), then scans its own code
+              from the server's page.</p></More></span>
           )}
         </>
       )}
@@ -1247,10 +1216,8 @@ export function AddPhoneSheet({ info, onClose, onWifi }: { info: SyncInfo; onClo
             To your Restock server
           </span>
           <strong style={{ fontSize: 17 }}>Add it on the server's page</strong>
-          <span className="small">
-            Your server decides who's in the house. On a computer, open the server's page, choose <strong>Add a phone</strong>, name it (like
-            "Sister's phone"), and scan the code with the new phone. Works anywhere, around the clock.
-          </span>
+          <span className="small">Your server decides who's in the house. Add a phone from the server's page.{' '}<More title="Adding a phone with a server"><p>Your server decides who's in the house. On a computer, open the server's page, choose <strong>Add a phone</strong>, name it (like
+            "Sister's phone"), and scan the code with the new phone. Works anywhere, around the clock.</p></More></span>
           {page && (
             <a href={page} target="_blank" rel="noreferrer" style={{ minHeight: 40, display: 'flex', alignItems: 'center' }}>
               Open the server's page
@@ -1266,10 +1233,7 @@ export function AddPhoneSheet({ info, onClose, onWifi }: { info: SyncInfo; onClo
       {wifiOk ? (
         <button className="sync-choice" disabled={!syncAvailable()} onClick={onWifi}>
           <strong style={{ fontSize: 17 }}>On this Wi-Fi only</strong>
-          <span className="small">
-            No server. Phones swap changes straight to each other, only at home. Both phones need to be on this Wi-Fi now. This phone shows a code
-            for the other to scan.
-          </span>
+          <span className="small">No server. Phones swap changes on this Wi-Fi. This phone shows a code for the other to scan.</span>
         </button>
       ) : (
         !house &&
@@ -1281,9 +1245,7 @@ export function AddPhoneSheet({ info, onClose, onWifi }: { info: SyncInfo; onClo
         )
       )}
       {house && (
-        <p className="small" style={{ margin: 0 }}>
-          Phone sharing (phones swapping changes straight to each other at home) is separate and off. You can set it up on the Phone sharing screen.
-        </p>
+        <p className="small" style={{ margin: 0 }}>Phone sharing is separate and off. Set it up on the Phone sharing screen.</p>
       )}
       <button className="btn block" onClick={onClose}>
         Cancel
@@ -1326,10 +1288,8 @@ export function shopsText(s: Settings | undefined): string {
 export function ShopDataStays() {
   const settings = useLive(getSettings, []);
   return (
-    <span className="small">
-      <strong style={{ color: 'var(--ink)' }}>Prices and product details</strong> your phone found at your shops ({shopsText(settings)}) stay on the server
-      for the household, with the shared shopping list and pantry. They're about the shops, not about you.
-    </span>
+    <span className="small"><strong style={{ color: 'var(--ink)' }}>Prices and product details</strong> your phone found at your shops ({shopsText(settings)}) stay on the server
+      for the household, with the shared shopping list and pantry. They're about the shops, not about you.</span>
   );
 }
 
@@ -1654,10 +1614,8 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
   {!info.batteryExempt && (
     <div className="banner amber" style={{ gap: 8 }}>
       <strong>Let Restock sync in the background</strong>
-      <span style={{ fontSize: 13 }}>
-        Android saves battery by stopping apps in the background, which stops sync while Restock is closed. Tap Allow and choose "Allow" (or
-        "Don't optimise"). It hardly uses any battery: Restock just waits quietly for the other phones.
-      </span>
+      <span style={{ fontSize: 13 }}>Android stops apps in the background, which stops sync. Tap Allow.{' '}<More title="Background sync"><p>Android saves battery by stopping apps in the background, which stops sync while Restock is closed. Tap Allow and choose "Allow" (or
+        "Don't optimise"). It hardly uses any battery: Restock just waits quietly for the other phones.</p></More></span>
       <button
         className="btn small"
         style={{ alignSelf: 'flex-start' }}
@@ -1729,11 +1687,9 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
       {!isHouse && (
       <div className="card" style={{ gap: 8 }}>
         <strong>Phone sharing (no server, local Wi-Fi): one pantry and list for the whole house</strong>
-        <span className="small">
-          Phones in your household swap changes <strong>straight from one phone to another</strong> on your own Wi-Fi: pantry, shopping list (ticks
+        <span className="small">Phones in your household swap changes straight to each other on your Wi-Fi.{' '}<More title="Phone sharing"><p>Phones in your household swap changes <strong>straight from one phone to another</strong> on your own Wi-Fi: pantry, shopping list (ticks
           too), prices, categories and alerts. With your own Restock server they also sync anywhere, around the clock; without one, a cloud drive
-          folder works away from home.
-        </span>
+          folder works away from home.</p></More></span>
         <ul className="ticks">
           <li>
             <Icon name="check" size={16} />
@@ -1807,13 +1763,9 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
           {!wifiOn ? (
             <div className="card" style={{ gap: 8 }}>
               <strong>Phone to phone on your Wi-Fi</strong>
-              <span className="small">
-                Your server already syncs this phone at home and away. Phone sharing is a separate extra: phones swap changes straight to each other on the
-                same Wi-Fi, even when the internet or the server is down.
-              </span>
-              <span className="small">
-                It is off. This phone isn't announcing itself or looking for other phones on your network, and it won't until you set it up.
-              </span>
+              <span className="small">Your server already syncs this phone. Phone sharing is an extra for when the internet or the server is down.{' '}<More title="Phone sharing with a server"><p>Your server already syncs this phone at home and away. Phone sharing is a separate extra: phones swap changes straight to each other on the
+                same Wi-Fi, even when the internet or the server is down.</p></More></span>
+              <span className="small">It's off: this phone isn't announcing itself or looking for other phones.</span>
               <button className="btn primary block" disabled={!syncAvailable() || busy} onClick={() => void wifiNow(true)}>
                 Set up Phone sharing
               </button>
@@ -1876,18 +1828,14 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                     <span className="title" style={{ fontSize: 15 }}>
                       Stay ready to sync
                     </span>
-                    <span className="small">
-                      Lets the other phones sync with this one while Restock is closed. Android shows a quiet "Ready to sync" notification for it. Off:
-                      syncs only while Restock is open.
-                    </span>
+                    <span className="small">Lets other phones sync with this one while Restock is closed.{' '}<More title="Sync while closed"><p>Lets the other phones sync with this one while Restock is closed. Android shows a quiet "Ready to sync" notification for it. Off:
+                      syncs only while Restock is open.</p></More></span>
                   </span>
                 </label>
               </div>
               {batteryBlock}
-              <p className="small">
-                Some routers and guest networks keep devices from seeing each other ("client isolation" or "AP isolation"). If the phones never find
-                each other, that's the usual reason. Phones only look for each other on Wi-Fi, never over mobile data.
-              </p>
+              <p className="small">If the phones never find each other, your router may be keeping devices apart.{' '}<More title="Phones can't find each other"><p>Some routers and guest networks keep devices from seeing each other ("client isolation" or "AP isolation"). If the phones never find
+                each other, that's the usual reason. Phones only look for each other on Wi-Fi, never over mobile data.</p></More></p>
             </>
           )}
         </>
@@ -1947,10 +1895,8 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
           {info.clockWarning && (
             <div className="banner amber" role="status" style={{ gap: 8 }}>
               <strong>{info.clockWarning}'s date looks wrong</strong>
-              <span style={{ fontSize: 13 }}>
-                Its changes are stamped more than a day ahead, so they'd beat everyone else's. On that phone, open Android's Settings → System → Date and
-                time and turn on the automatic date and time.
-              </span>
+              <span style={{ fontSize: 13 }}>Its clock is more than a day ahead. Turn on automatic date and time on that phone.{' '}<More title="A phone's clock is wrong"><p>Its changes are stamped more than a day ahead, so they'd beat everyone else's. On that phone, open Android's Settings → System → Date and
+                time and turn on the automatic date and time.</p></More></span>
               <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => void RestockNative.syncDismissNotice().then(refresh)}>
                 OK
               </button>
@@ -2111,11 +2057,9 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                 </div>
               </>
             ) : (
-              <span className="small">
-                For phones away from home, without a server: a folder your drive app keeps in step, like Google Drive, Dropbox, OneDrive, Syncthing or
+              <span className="small">For phones away from home, without a server: a shared folder in your drive app.{' '}<More title="Syncing away from home"><p>For phones away from home, without a server: a folder your drive app keeps in step, like Google Drive, Dropbox, OneDrive, Syncthing or
                 Nextcloud, or a WebDAV server. Each phone leaves its changes there, sealed with the household's key, and picks up the others'. Your list,
-                pantry and ticks go this way; prices and photos stay on the Wi-Fi to keep it small. Slower, and depends on the drive app.
-              </span>
+                pantry and ticks go this way; prices and photos stay on the Wi-Fi to keep it small. Slower, and depends on the drive app.</p></More></span>
             )}
             {awayError && (
               <div className="banner amber" role="alert">
@@ -2240,10 +2184,8 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                 <span className="title" style={{ fontSize: 15 }}>
                   Stay ready to sync
                 </span>
-                <span className="small">
-                  Lets the other phones sync with this one while Restock is closed. Android shows a quiet "Ready to sync" notification for it, which
-                  you can hide in Android's notification settings. Off: syncs only while Restock is open.
-                </span>
+                <span className="small">Lets other phones sync with this one while Restock is closed.{' '}<More title="Sync while closed"><p>Lets the other phones sync with this one while Restock is closed. Android shows a quiet "Ready to sync" notification for it, which
+                  you can hide in Android's notification settings. Off: syncs only while Restock is open.</p></More></span>
               </span>
             </label>
           </div>
@@ -2255,19 +2197,13 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
       {!isHouse && (
       <div className="card" style={{ gap: 6 }}>
         <strong>Good to know</strong>
-        <span className="small">
-          On the Wi-Fi, both phones need to be there at the same time; whatever changed while apart catches up then (or away from home, if you've
+        <span className="small">On the Wi-Fi, both phones need to be there at the same time.{' '}<More title="How phones find each other"><p>On the Wi-Fi, both phones need to be there at the same time; whatever changed while apart catches up then (or away from home, if you've
           set that up). Phones only look for each other on Wi-Fi (or a network cable), never over mobile data. Some routers and guest networks
-          keep devices from seeing each other ("client isolation" or "AP isolation"); if the phones never find each other, that's the usual reason.
-        </span>
-        <span className="small">
-          Codes work once and only for 10 minutes, and never contain the household's key, so a code that's been seen or shared can't be used later.
-          Backups never include the household either: a phone restored from a backup joins again with a new code.
-        </span>
-        <span className="small">
-          If both phones change the same thing while apart, the later change wins. Restoring a backup on one phone changes the household's things to
-          match it.
-        </span>
+          keep devices from seeing each other ("client isolation" or "AP isolation"); if the phones never find each other, that's the usual reason.</p></More></span>
+        <span className="small">Codes work once, for 10 minutes, and never contain the household's key.{' '}<More title="Codes and backups"><p>Codes work once and only for 10 minutes, and never contain the household's key, so a code that's been seen or shared can't be used later.
+          Backups never include the household either: a phone restored from a backup joins again with a new code.</p></More></span>
+        <span className="small">If both phones change the same thing, the later change wins.{' '}<More title="When two phones disagree"><p>If both phones change the same thing while apart, the later change wins. Restoring a backup on one phone changes the household's things to
+          match it.</p></More></span>
       </div>
       )}
 

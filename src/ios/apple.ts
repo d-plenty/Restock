@@ -20,7 +20,7 @@ export interface RestockApplePlugin {
   webEval(o: { key: string; js: string }): Promise<{ value: string }>;
   webClose(o: { key?: string }): Promise<void>;
   /** The page on screen until Done, or until its address matches `closeOn` (a regular expression). */
-  webOpen(o: { url: string; message?: string; allowed?: string[]; closeOn?: string }): Promise<{ url: string; matched: boolean }>;
+  webOpen(o: { url: string; message?: string; allowed?: string[]; closeOn?: string; script?: string; readOnDone?: string }): Promise<{ url: string; matched: boolean; value?: string }>;
   folderPick(): Promise<{ bookmark: string; name: string }>;
   folderList(o: { bookmark: string }): Promise<{ files: FolderFile[]; bookmark?: string }>;
   folderRead(o: { bookmark: string; name: string }): Promise<{ data: string; bookmark?: string }>;
@@ -40,6 +40,16 @@ export interface RestockApplePlugin {
   lanAdvertise(o: { key: string; name: string; type: string; txt: Record<string, string> }): Promise<void>;
   lanUnadvertise(o: { key: string }): Promise<void>;
   lanBrowse(o: { type: string; ms: number }): Promise<{ found: { name?: string; host: string; port: number; txt?: Record<string, string> }[] }>;
+  /** A file in the app's own storage (Application Support/Restock), whole, as base64. Names are fixed words from the app. */
+  storeRead(o: { name: string }): Promise<{ found: boolean; data?: string; bytes?: number }>;
+  /** Written beside the old file and swapped in, so a cut-short save never leaves half a file. */
+  storeWrite(o: { name: string; data: string }): Promise<{ bytes: number }>;
+  storeDelete(o: { name: string }): Promise<void>;
+  /** The app's icon: one of the alternate icons in the app, or '' for the main one. */
+  iconSet(o: { name: string }): Promise<{ ok: boolean }>;
+  iconGet(): Promise<{ name: string; supported: boolean }>;
+  /** Whether the connection is one iOS calls expensive (mobile data, a hotspot). */
+  netInfo(): Promise<{ online: boolean; expensive: boolean }>;
   /** 0.14.0: asks iOS to wake the app later for a short sync (it tells the app with a "backgroundRefresh" event). */
   backgroundSchedule(): Promise<void>;
   backgroundDone(o: { ok: boolean }): Promise<void>;

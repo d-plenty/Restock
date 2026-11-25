@@ -48,7 +48,7 @@ describe("iPhone app: its side of the phone's interface", () => {
     expect(await ios.getInsets()).toEqual({ top: 0, bottom: 0 });
     expect(await ios.haHasToken()).toEqual({ saved: false });
     expect(await ios.syncServerPoll()).toEqual({ received: 0 });
-    await expect(ios.scheduleRecalls()).resolves.toBeUndefined();
+    await expect(ios.scheduleRecalls({ enabled: false })).resolves.toBeUndefined();
     await expect(ios.updateWidgets()).resolves.toBeUndefined();
   });
   it('is only loaded on an iPhone, and Android still finds its own by name', () => {
@@ -72,7 +72,7 @@ describe('iPhone app: greyed out, with why', () => {
     expect(settings).toContain("Picking a time of day: not possible on iPhone due to Apple's restrictions.");
     // Nothing else on an iPhone is greyed with a "why" box any more.
     for (const f of ['Settings', 'Look', 'RestockServer', 'SyncOverview']) expect(read(`../ui/screens/${f}.tsx`), f).not.toMatch(/<IosBox reason="(updates|widgets|appIcon|serverExtras|importData)"/);
-    expect(read('../ui/screens/Soon.tsx')).toContain('Still to come on iPhone and iPad: home screen widgets, recall alerts, shared price history');
+    expect(read('../ui/screens/Soon.tsx')).toContain('Still to come on iPhone and iPad: home screen widgets, and the App Store and TestFlight.');
     expect(read('../ui/screens/Sync.tsx')).toContain('<NotHereBanner reason="sync"');
     expect(read('../ui/screens/RestockServer.tsx')).toContain('<NotHereBanner reason="server"');
     const why = read('../ui/IosWhy.tsx');
@@ -272,7 +272,7 @@ describe('0.13.2: the screens', () => {
   });
   it('every method the TypeScript side calls is one the Swift side has', () => {
     const swift = read('../../ios/App/App/RestockApple.swift');
-    const every = swift + read('../../ios/App/App/RestockLan.swift') + read('../../ios/App/App/RestockBackground.swift');
+    const every = swift + read('../../ios/App/App/RestockLan.swift') + read('../../ios/App/App/RestockBackground.swift') + read('../../ios/App/App/RestockStore.swift');
     const iface = read('./apple.ts');
     const methods = [...iface.slice(iface.indexOf('export interface RestockApplePlugin'), iface.indexOf('/** A stand-in')).matchAll(/^\s{2}(\w+)\(/gm)].map((m) => m[1]).filter((m) => m !== 'addListener');
     expect(methods.length).toBeGreaterThan(20);

@@ -1,4 +1,4 @@
-// 0.12.5: what the update says, read from the source (as navy0124.test.ts does).
+// 0.12.5: what the update says, read from the source (as navyTop.test.ts does).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 

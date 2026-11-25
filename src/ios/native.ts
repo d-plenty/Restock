@@ -17,9 +17,29 @@ import * as sync from './sync';
 import type { Section } from '../shops';
 import { forgetPage, FRESH_MS, looksBlocked, pageFetch, pageRender } from './shopWeb';
 import type { NativePermissions, SyncInfo } from '../lib/sql/native';
+import { allGroups, allListEntries, allProducts, allReceipts, getKV, getSettings, putKV, queryRows, runOps, uid, updateSettings } from '../lib/db';
+import { sendPrices } from './share';
+import { importAll, MAX_BYTES, readIndex, refreshDue, type LastImport } from './market';
+import { recallCheckDue, recallNotice, receiptLines, runRecallCheck, type RecallStore, type SavedRecall, type Thing } from './recalls';
 
 const NO_SYNC: SyncInfo = { paired: false, batteryExempt: true };
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+/** As Android's (StoreClient.APP_UA + " share"), saying iPhone. */
+const SHARE_UA = 'Restock/0.3 (iPhone; grocery price tracker) share';
+/**
+ * Records what the shop's own page asks its servers while you use it, for working out how its
+ * trolley works from one item you add yourself. The same script as Android's (StoreWeb.RECORDER).
+ * Nothing is sent anywhere, and the app trims and checks it before you share it.
+ */
+export const RECORDER =
+  '(function(){if(window.__rsRec)return;window.__rsRec=1;var K=\'__restockRec\';' +
+  'function save(e){try{var a=JSON.parse(sessionStorage.getItem(K)||\'[]\');e.at=Date.now();e.page=location.pathname;a.push(e);if(a.length>300)a.shift();sessionStorage.setItem(K,JSON.stringify(a));}catch(x){}}' +
+  'function cut(s,n){s=s==null?\'\':String(s);return s.length>n?s.slice(0,n)+\'...\':s;}' +
+  'var f=window.fetch;if(f){window.fetch=function(i,o){var u=(typeof i===\'string\')?i:(i&&i.url)||\'\';var m=(o&&o.method)||(i&&i.method)||\'GET\';var b=o&&o.body;' +
+  'return f.apply(this,arguments).then(function(r){try{r.clone().text().then(function(t){save({kind:\'fetch\',method:m,url:u,status:r.status,body:cut(typeof b===\'string\'?b:\'\',3000),response:cut(t,4000)});});}catch(x){}return r;});};}' +
+  'var X=XMLHttpRequest.prototype,op=X.open,sd=X.send;X.open=function(m,u){this.__m=m;this.__u=u;return op.apply(this,arguments);};' +
+  'X.send=function(b){var x=this;x.addEventListener(\'loadend\',function(){try{save({kind:\'xhr\',method:x.__m,url:String(x.__u),status:x.status,body:cut(typeof b===\'string\'?b:\'\',3000),response:cut((x.responseType===\'\'||x.responseType===\'text\')?x.responseText:\'\',4000)});}catch(e){}});return sd.apply(this,arguments);};' +
+  '})();';
 const BACKUP_DIR = 'Restock backups';
 const BACKUP_URI = 'ios-documents:';
 const HA_FILE = 'restock-private/home-assistant.json';
@@ -149,6 +169,76 @@ async function http(opts: { method: 'GET' | 'POST'; url: string; headers?: Recor
   return { status: r.status, body: text(r.data), headers: (r.headers ?? {}) as Record<string, string>, url: r.url ?? opts.url };
 }
 
+/** A file from restock-prices on GitHub, as bytes. */
+async function marketFile(url: string): Promise<{ status: number; bytes: Uint8Array }> {
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) return { status: r.status, bytes: new Uint8Array() };
+  const size = Number(r.headers.get('content-length') ?? 0);
+  if (size > MAX_BYTES) throw new Error('the file is unexpectedly large');
+  return { status: r.status, bytes: new Uint8Array(await r.arrayBuffer()) };
+}
+
+/** On mobile data or a hotspot (what iOS calls an expensive connection)? Unknown counts as no. */
+async function onMobileData(): Promise<boolean> {
+  if (!appleHere()) return false;
+  try {
+    return !!(await RestockApple.netInfo()).expensive;
+  } catch {
+    return false;
+  }
+}
+
+/** A recall list, as text. An error status is an error (the app says which list didn't answer). */
+async function recallPage(url: string): Promise<string> {
+  const r = await http({ method: 'GET', url, headers: { Accept: 'text/html,application/rss+xml,application/xml;q=0.9,*/*;q=0.8' }, timeoutMs: 25000 });
+  if (r.status >= 400 || r.status === 0) throw new Error(`HTTP ${r.status}`);
+  return r.body.slice(0, 4_000_000);
+}
+
+const recallStore: RecallStore = {
+  async load() {
+    const [saved, dismissed, notified] = await Promise.all([getKV<SavedRecall[]>('recalls'), getKV<string[]>('recallDismissed'), getKV<string[]>('recallNotified')]);
+    const list = <T,>(v: T[] | undefined): T[] => (Array.isArray(v) ? v : []);
+    return { saved: list(saved), dismissed: list(dismissed), notified: list(notified) };
+  },
+  async save(found, notified, checkedAt) {
+    await putKV('recalls', found);
+    await putKV('recallNotified', [...new Set(notified)]);
+    const s = await getSettings();
+    await updateSettings({ recalls: { ...s.recalls, lastCheck: checkedAt } }, { local: true });
+  },
+  /** Everything to match against: items on tabs that are on, their products, the shopping list and kept receipts. */
+  async things() {
+    const [s, groups, products, list, receipts] = await Promise.all([getSettings(), allGroups(), allProducts(), allListEntries(), allReceipts().catch(() => [])]);
+    const out: Thing[] = [];
+    const ids = new Set<string>();
+    for (const g of groups) {
+      const section = g.section ?? 'pantry';
+      if (section !== 'pantry' && !s.sections?.[section]) continue;
+      out.push({ kind: section, name: g.name });
+      if (g.usualProductId) ids.add(g.usualProductId);
+      for (const id of [...(g.sameProductIds ?? []), ...(g.altProductIds ?? [])]) ids.add(id);
+    }
+    for (const p of products) if (ids.has(p.id)) out.push({ kind: 'product', name: p.name, brand: p.brand || undefined });
+    for (const e of list) if (!e.checked) out.push({ kind: 'list', name: e.text });
+    for (const r of receipts) if (r.text) for (const line of receiptLines(r.text)) out.push({ kind: 'receipt', name: line });
+    return out;
+  },
+};
+
+/** One recall check. `notify`: tell the person about new ones (the check at opening; "Check now" shows them on the page). */
+async function recallCheck(notify: boolean) {
+  const s = await getSettings();
+  if (!s.recalls.enabled) return { checked: 0, found: 0, fresh: 0, errors: {}, news: [] as SavedRecall[] };
+  const r = await runRecallCheck(recallPage, recallStore);
+  if (notify && r.news.length) {
+    await LocalNotifications.schedule({
+      notifications: r.news.slice(0, 3).map((o, i) => ({ id: 5100 + i, ...recallNotice(o), extra: { action: 'recalls' } })),
+    }).catch(() => undefined);
+  }
+  return r;
+}
+
 const permission = async (name: 'camera' | 'geolocation'): Promise<NativePermissions['camera']> => {
   try {
     const p = await navigator.permissions.query({ name: name as PermissionName });
@@ -189,14 +279,21 @@ export class RestockIos extends WebPlugin {
   /** The shop's website on screen (signing in, picking a branch, passing its "are you a person" check). */
   async openStore(o: { chain: string; home?: string; path?: string; message?: string; record?: boolean; pickStore?: boolean }) {
     if (!appleHere()) throw new IosUnavailable("Opening a shop's page inside Restock");
-    if (o.record) throw new IosUnavailable('Recording a trolley');
     const home = shopHome(o.chain, o.home);
     if (!home) throw new Error('Not a shop Restock uses');
     const url = o.path ? onSite(o.chain, o.path, home) : home;
     if (!url) throw new Error("Not a page on that shop's website");
-    const out = await RestockApple.webOpen({ url, message: o.message, allowed: shopHosts(o.chain, home), closeOn: o.pickStore ? COLES_STORE_PAGE : undefined });
+    const out = await RestockApple.webOpen({
+      url,
+      message: o.message,
+      allowed: shopHosts(o.chain, home),
+      closeOn: o.pickStore && !o.record ? COLES_STORE_PAGE : undefined,
+      // Recording a trolley: the recorder goes into the shop's own pages only, and is read back at Done.
+      ...(o.record ? { script: RECORDER, readOnDone: "sessionStorage.getItem('__restockRec')||'[]'" } : {}),
+    });
     // What the visit left (a sign-in, a passed check) is used by the hidden page from its next load.
     forgetPage(o.chain);
+    if (o.record) return out.value ? { recording: out.value } : {};
     return o.pickStore && out.matched ? { storePage: out.url } : {};
   }
 
@@ -218,15 +315,50 @@ export class RestockIos extends WebPlugin {
   async priceHelperTest() {
     return { ok: false, error: new IosUnavailable('A price helper phone').message };
   }
+  /** Shared prices, sending: ios/share.ts (PriceShare.java in TypeScript). Off: nothing goes. */
   async sharePrices() {
-    return { sent: 0 };
+    const s = await getSettings();
+    if (s.sharePrices === 'no') return { sent: 0 };
+    const sent = await sendPrices({
+      getKV,
+      putKV,
+      query: (sql, params) => queryRows(sql, params),
+      uid,
+      post: async (url, body) => (await http({ method: 'POST', url, headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': SHARE_UA }, body, timeoutMs: 30000 })).status,
+    });
+    return { sent };
   }
-  async importMarket(): Promise<never> {
-    throw new IosUnavailable('Shared price history');
+  /** Shared prices, downloading: ios/market.ts (MarketData.java in TypeScript). */
+  async importMarket(o?: { onlyUnmetered?: boolean }) {
+    if (o?.onlyUnmetered && (await onMobileData())) return { products: 0, bytes: 0, byChain: {}, errors: {}, waitingForWifi: true };
+    const s = await getSettings();
+    return importAll(s, {
+      get: marketFile,
+      write: (ops) => runOps(ops.map((x) => ({ sql: x.sql, params: x.params }))),
+      putKV,
+      progress: (chain, bytes, products) => this.notifyListeners('marketProgress', { chain, bytes, products }),
+    });
   }
-  async scheduleRecalls() {}
+  /** After a price check: downloads when there's something new (MarketData.maybeRefresh). */
+  async marketMaybeRefresh(): Promise<void> {
+    const s = await getSettings();
+    if (!s.marketData?.enabled || s.sharePrices === 'no') return;
+    if (s.marketData.wifiOnly !== false && (await onMobileData())) return;
+    const last = await getKV<LastImport>('marketImport');
+    if (!(await refreshDue(s, last, () => readIndex({ get: marketFile })))) return;
+    await this.importMarket();
+  }
+  // ---------- recall alerts: ios/recalls.ts (Android's check, in TypeScript) ----------
+  /** Android checks once a day in the background. Here: when Restock is opened, at most once a day. */
+  async scheduleRecalls(o: { enabled: boolean }) {
+    if (!o?.enabled) return;
+    const s = await getSettings();
+    if (!s.recalls.enabled || !recallCheckDue(s.recalls.lastCheck)) return;
+    void recallCheck(true).catch((e) => console.error('recall check failed', e));
+  }
   async checkRecalls() {
-    return { checked: 0, found: 0, fresh: 0, errors: {} };
+    const { news: _news, ...r } = await recallCheck(false);
+    return r;
   }
   // 0.13.2: the server's Your data, as on Android (sealed with the household's server key: ios/house.ts).
   async serverSpend(o: { rows: Record<string, unknown>[] }) {
@@ -273,8 +405,14 @@ export class RestockIos extends WebPlugin {
   async getInsets() {
     return { top: 0, bottom: 0 };
   }
-  async setAppIcon() {
-    return { ok: false };
+  /** The icon's colour: one of the alternate icons in the app (ios/App/App/Assets.xcassets), green being the main one. */
+  async setAppIcon(o: { id: string }) {
+    if (!appleHere()) return { ok: false };
+    try {
+      return await RestockApple.iconSet({ name: o?.id === 'green' ? '' : (o?.id ?? '') });
+    } catch {
+      return { ok: false };
+    }
   }
   /** iOS opens the keyboard itself when a box takes the cursor from a tap. */
   async showKeyboard() {}

@@ -1,7 +1,7 @@
 {
   "name": "restock",
   "private": true,
-  "version": "0.14.0",
+  "version": "0.14.1",
   "type": "module",
   "description": "Restock: a local-first price tracker for supermarkets, bottle shops and chemists in Australia. Works fully on your phone, with no account and no ads. Your own Restock server is optional.",
   "scripts": {
@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "lint": "oxlint --deny-warnings src tools",
     "android:sync": "npm run build && npx cap sync android",
     "ios:sync": "npm run build && npx cap sync ios",
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleRelease",
@@ -46,6 +47,7 @@
     "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-react": "6.2.1",
     "linkedom": "^0.18.12",
+    "oxlint": "1.93.0",
     "typescript": "5.9.3",
     "vite": "8.3.5",
     "vite-plugin-singlefile": "^2.3.4",

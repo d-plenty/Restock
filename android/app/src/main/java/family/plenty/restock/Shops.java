@@ -217,6 +217,13 @@ final class Shops {
         return get(id) != null;
     }
 
+    /** Shops that stopped listing products online (shops.ts `gone`): still known by name, never checked. */
+    private static final java.util.Set<String> GONE = new java.util.HashSet<>(java.util.Arrays.asList("pharmacy4less"));
+
+    static boolean gone(String id) {
+        return id != null && GONE.contains(id);
+    }
+
     /** Is `url` on the same website as the shop (so the hidden browser only ever opens that shop's pages)? */
     static boolean sameSite(String id, String url) {
         String site = website(id);

@@ -25,7 +25,7 @@ import {
 } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { SECTION_NAMES, SECTIONS, sectionOn, type Section } from '../../shops';
-import { Icon, LoadingBar, Sheet, TopBar } from '../components';
+import { Icon, LoadingBar, Sheet, TopBar, More } from '../components';
 import { useNav } from '../nav';
 import { serverKeepText } from '../../lib/autoDelete';
 import { SuggestLocalBackup } from './Backups';
@@ -510,9 +510,7 @@ export function SharesEditor({ info, onInfo }: { info: SyncInfo; onInfo: (i: Syn
     <>
       <div className="eyebrow">What this phone shares</div>
       <SharesPicker value={value} onChange={(v, t) => void change(v, t)} />
-      <p className="small group-note">
-        Not shared stays on this phone only. Turning something off keeps what it already shared on the server, unless you also take it off there.
-      </p>
+      <p className="small group-note">Not shared stays on this phone only.{' '}<More title="Turning sharing off"><p>Not shared stays on this phone only. Turning something off keeps what it already shared on the server, unless you also take it off there.</p></More></p>
     </>
   );
 }
@@ -557,10 +555,8 @@ function HandoverCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) 
         Your server can do more
       </span>
       <strong style={{ fontSize: 15 }}>Hand this household to the server</strong>
-      <span className="small">
-        Your server can be the house: it does the owner phone's job around the clock, keeps years of prices, and gives you Restock in a browser with no
-        linking. This phone stays the owner until the server has taken over, so nothing is lost if something goes wrong part way.
-      </span>
+      <span className="small">Your server can be the house: it does the owner phone's job around the clock.{' '}<More title="Making the server the house"><p>Your server can be the house: it does the owner phone's job around the clock, keeps years of prices, and gives you Restock in a browser with no
+        linking. This phone stays the owner until the server has taken over, so nothing is lost if something goes wrong part way.</p></More></span>
       <ol className="small" style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <li>On a computer, sign in on the server's page.</li>
         <li>Open Server and phones → Take this household.</li>
@@ -780,10 +776,8 @@ export function RestockServerScreen() {
               If you run one
             </span>
             <strong style={{ fontSize: 17 }}>Your Restock server</strong>
-            <span className="small">
-              Your server is the house: phones join it. It syncs around the clock, at home and away, keeps a year of prices and receipts (you choose how
-              long on its page), and gives you Restock on your computer. It runs on a NAS, mini PC, Raspberry Pi or Home Assistant. Still no account, and the makers of Restock never see any of it.
-            </span>
+            <span className="small">Your server is the house: phones join it. It syncs around the clock, at home and away.{' '}<More title="A Restock server"><p>Your server is the house: phones join it. It syncs around the clock, at home and away, keeps a year of prices and receipts (you choose how
+              long on its page), and gives you Restock on your computer. It runs on a NAS, mini PC, Raspberry Pi or Home Assistant. Still no account, and the makers of Restock never see any of it.</p></More></span>
             <button className="btn primary" disabled={!syncAvailable() || !!working} onClick={() => void scan()}>
               <Icon name="scan" size={18} /> Scan the code from your server's Add a phone page
             </button>
@@ -792,11 +786,9 @@ export function RestockServerScreen() {
           {/* 0.14.0: the server is another copy, never the only one. */}
           <div className="card" style={{ gap: 6 }}>
             <strong>Your data stays on this {deviceWord()} too</strong>
-            <span className="small">
-              The server is one more copy, not the only one. Your pantry, lists, cards and settings stay here in full, with as much price history as
+            <span className="small">The server is one more copy. Your data stays on this phone too.{' '}<More title="Your data stays here"><p>The server is one more copy, not the only one. Your pantry, lists, cards and settings stay here in full, with as much price history as
               "Keep price history for" says (8 weeks unless you change it). Leaving the server, or being taken off it, deletes nothing here: you can
-              still export it, import it or send it to another phone.
-            </span>
+              still export it, import it or send it to another phone.</p></More></span>
           </div>
           <div className="card" style={{ gap: 6 }}>
             <strong>Don't have a server yet?</strong>

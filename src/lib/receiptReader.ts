@@ -2,10 +2,11 @@ import { RestockNative } from './sql/native';
 import { isNative } from '../stores/http';
 import { toLines, type ReadLine } from './reader/lines';
 import type { FromWorker, ToWorker, WorkerFiles } from './reader/ocrWorker';
-// The text reader's files, all part of the app (0.10.7). The models are PaddleOCR's PP-OCRv5 mobile
-// (Apache-2.0); the engine is ONNX Runtime Web (MIT). See src/assets/reader/NOTICE.md.
-import detFile from '../assets/reader/ppocrv5-mobile-det.onnx?url';
-import recFile from '../assets/reader/ppocrv5-mobile-rec.onnx?url';
+import { readerBundled, readerDownloaded, readerFiles } from './readerModels';
+// The photo reader's engine and letter list are part of the app. Its two model files (PaddleOCR's
+// PP-OCRv5 mobile, Apache-2.0; about 20 MB) are downloaded on first use in the phone and tablet apps
+// (lib/readerModels.ts) and built into the Restock server's web pages (reader/bundled.ts). The engine
+// is ONNX Runtime Web (MIT). See src/assets/reader/NOTICE.md.
 import dictFile from '../assets/reader/ppocrv5-dict.txt?url';
 import wasmFile from '../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm?url';
 import mjsFile from '../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs?url';
@@ -13,14 +14,33 @@ import mjsFile from '../../node_modules/onnxruntime-web/dist/ort-wasm-simd-threa
 // The text reader: reads receipts and the fronts of packs, on the phone (or in the browser, for
 // the web page). 0.10.7: PaddleOCR in place of Tesseract, which was made for flat scanned pages
 // and struggled with photos (shiny or curved packs, crumpled receipts, a crooked photo). It runs in
-// its own worker so the screen keeps moving while it reads. Nothing is downloaded and nothing is
-// sent anywhere: the photo is read where it is.
+// its own worker so the screen keeps moving while it reads. Nothing is sent anywhere: the photo is
+// read where it is.
 
 export type { ReadLine };
 
-/** The reader is part of the app: always there. Kept so older screens and settings keep working. */
+/** Whether the reader can read: built in (the server's web pages), or its files have been downloaded. */
 export async function readerInstalled(): Promise<boolean> {
-  return true;
+  return readerBundled() || readerDownloaded();
+}
+
+/** Thrown by readText when the reader's files aren't on the device yet. */
+export class ReaderMissing extends Error {
+  constructor() {
+    super('The photo reader isn’t downloaded yet.');
+    this.name = 'ReaderMissing';
+  }
+}
+
+/** The two model files: from the build where they're built in, otherwise the downloaded ones. */
+async function modelFiles(): Promise<{ det: string | ArrayBuffer; rec: string | ArrayBuffer }> {
+  if (__READER_BUNDLED__) {
+    const b = await import('./reader/bundled');
+    return { det: new URL(b.det, location.href).href, rec: new URL(b.rec, location.href).href };
+  }
+  const f = await readerFiles();
+  if (!f) throw new ReaderMissing();
+  return f;
 }
 
 /**
@@ -32,9 +52,9 @@ export async function removeOldDownload(): Promise<void> {
   await RestockNative.deleteAppDir({ path: 'receipt-reader' }).catch(() => undefined);
 }
 
-const files = (): WorkerFiles => ({
-  det: new URL(detFile, location.href).href,
-  rec: new URL(recFile, location.href).href,
+/** `models`: the worker is starting, so it needs the model files too (a running one already has them). */
+const files = async (models: boolean): Promise<WorkerFiles> => ({
+  ...(models ? await modelFiles() : {}),
   dict: new URL(dictFile, location.href).href,
   wasm: new URL(wasmFile, location.href).href,
   mjs: new URL(mjsFile, location.href).href,
@@ -53,8 +73,11 @@ function getWorker(): Worker {
       const w = waiting.get(e.data.id);
       if (!w) return;
       waiting.delete(e.data.id);
-      if (e.data.error) w.fail(new Error(e.data.error));
-      else w.ok(e.data.lines ?? []);
+      if (e.data.error) {
+        w.fail(new Error(e.data.error));
+        // Start afresh next time (a new worker is handed the model files again).
+        if (!waiting.size) stopReader();
+      } else w.ok(e.data.lines ?? []);
     };
     worker.onerror = (e) => {
       for (const w of waiting.values()) w.fail(new Error(e.message || "The text reader stopped. Try again."));
@@ -105,13 +128,19 @@ async function canvasFrom(image: Blob | HTMLCanvasElement): Promise<HTMLCanvasEl
 
 /** Reads the words in a picture: the text line by line, and each line's size (for a pack's name). */
 export async function readText(image: Blob | HTMLCanvasElement, onStatus?: (s: string) => void): Promise<{ text: string; lines: ReadLine[] }> {
+  // Before anything else: without its files there's nothing to read with (the caller offers the download).
+  if (!worker && !(await readerInstalled())) throw new ReaderMissing();
   onStatus?.('Reading the words…');
   const px = pixels(await canvasFrom(image));
+  const starting = !worker;
+  const f = await files(starting);
   const w = getWorker();
   const id = next++;
   const found = await new Promise<FromWorker['lines']>((ok, fail) => {
     waiting.set(id, { ok, fail });
-    w.postMessage({ id, files: files(), ...px } satisfies ToWorker, [px.data.buffer]);
+    // The model files go across once, when the worker starts (handed over, not copied).
+    const hand = [f.det, f.rec].filter((x): x is ArrayBuffer => x instanceof ArrayBuffer);
+    w.postMessage({ id, files: f, ...px } satisfies ToWorker, [px.data.buffer, ...hand]);
   });
   // Keep it loaded for a minute in case there's another one; then let the memory go.
   idle = setTimeout(stopReader, 60_000);

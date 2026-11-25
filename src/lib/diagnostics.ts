@@ -1,4 +1,5 @@
 import { chainName, type StoreChain } from '../shops';
+import { saveState } from './saveState';
 import { getKV, putKV } from './db';
 
 // "What went wrong": the latest problems from each shop, in plain words, for Settings →
@@ -38,6 +39,12 @@ export function problemsText(list: Problem[], appVersion: string): string {
   const lines = [`Restock ${appVersion} diagnostics, ${new Date().toLocaleString('en-AU')}`, ''];
   for (const p of list) lines.push(`${new Date(p.at).toLocaleString('en-AU')} · ${chainName(p.chain)} · ${p.what}: ${p.message}`);
   if (!list.length) lines.push('No problems recorded.');
+  // Where the app saves its own database (the iPhone and iPad app), and whether the last save worked.
+  const save = saveState();
+  if (save.where) {
+    lines.push('', `Database: ${save.where === 'file' ? 'a file in the app’s storage' : 'the web view’s storage'}${save.bytes ? `, ${(save.bytes / 1024 / 1024).toFixed(1)} MB` : ''}${save.lastOk ? `, last saved ${new Date(save.lastOk).toLocaleString('en-AU')}` : ''}`);
+  }
+  if (save.failed) lines.push(`Saving failed ${save.failed} time${save.failed === 1 ? '' : 's'} in a row: ${save.error ?? 'no reason given'}`);
   return lines.join('\n');
 }
 

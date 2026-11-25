@@ -11,16 +11,15 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.14.0',
-    about: 'Restock on iPhone and iPad, sending your data straight to another phone, and expiry dates on loyalty cards.',
+    version: '0.14.1',
+    about: 'More on iPhone and iPad, a smaller app, and less writing in Settings.',
     changes: [
-      'Restock now runs on iPhone and iPad as well as Android, with the same screens.',
-      'An Android phone and an iPhone can sync with each other over your Wi-Fi: add the iPhone from Phone sharing. The iPhone does its part while Restock is open on it.',
-      'Export data: pick what goes in, then save it as a file or send it straight to another phone with a QR code. It works between any two phones on the same Wi-Fi, once.',
-      'Import data: from a file, by scanning the other phone’s code, or from a photo of the code. Then add it alongside what’s here (same names are skipped) or replace what’s here.',
-      'Loyalty cards can have an expiry date. Restock reminds you a month before, and Home shows it with Update and Remind me later.',
-      'Phone sharing is the recommended way to sync now. A Restock server is for people who run one.',
-      'With a Restock server, your data stays on your phone too. Leaving the server, or being taken off it, deletes nothing on the phone.',
+      'iPhone and iPad: shared prices both ways, recall alerts, app icon colours, and your data saved as a real file with a warning if a save ever fails.',
+      'The photo reader (receipts, and reading a product’s name from a photo) is downloaded the first time you use it, about 21 MB, after asking. Settings can remove it or get it again. The app is about 20 MB smaller.',
+      'Less writing: Settings and its screens say one short line, with the full explanation behind a small ⓘ.',
+      '“Pick my …” on a General list line searches your shops straight away, and an item you add takes over its General line.',
+      'Pharmacy 4 Less is no longer a shop to pick: its website stopped listing products. What you saved from it stays.',
+      'A shop that Unblock can’t fix now offers Turn off, and adding your own shop says up front that not every shop works.',
     ],
   },
 ];

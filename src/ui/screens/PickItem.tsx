@@ -92,6 +92,15 @@ export function PickItemSheet({
   const shown = pantry ? searchItems(query, pantry).slice(0, 40) : [];
   const typed = query.trim() || word;
   const top = useRef<HTMLDivElement>(null);
+  // Nothing of yours matches the line's words: straight to the shop search for them, already filled in
+  // (it used to stop at an empty list of your items). Once only, so Back still shows the list.
+  const sentToShops = useRef(false);
+  const noneOfMine = !!pantry && !searchItems(word, pantry).length;
+  useEffect(() => {
+    if (!noneOfMine || sentToShops.current || toPantry) return;
+    sentToShops.current = true;
+    if (native && online) setShopsFor(word);
+  }, [noneOfMine, native, online, toPantry, word]);
 
   // Back from the shop search goes back to the pantry list, not out of the sheet.
   useBackLayer(() => setShopsFor(undefined), shopsFor !== undefined);
@@ -170,7 +179,7 @@ export function PickItemSheet({
   /** What's under the pantry list: search the shops (online, in the app), or why not. */
   const shopAction = web ? (
     // 0.9.5 (web search): Search the shops (on), or where to do it (off).
-    <web.PickButton typed={typed} pantryShown={!!pantry && shown.length > 0} busy={busy} onSearch={(q) => setShopsFor(q)} auto={toPantry} />
+    <web.PickButton typed={typed} pantryShown={!!pantry && shown.length > 0} busy={busy} onSearch={(q) => setShopsFor(q)} auto={toPantry || noneOfMine} />
   ) : !native ? (
     <div className="banner grey">
       <strong>Shop search works in the Android app</strong>

@@ -1,4 +1,3 @@
-import { isIos } from '../../lib/platform';
 import { useEffect, useState } from 'react';
 import { confirmAction } from '../../lib/confirm';
 import { pruneHistory, serverKeepsHistory } from '../../lib/db';
@@ -11,7 +10,7 @@ import { SHARED_TITLE } from './SharedPrices';
 import { afterSave, updateSettings } from '../../lib/settingsDraft';
 import { isNative } from '../../stores/http';
 import { keepDays, KEEP_WEEKS, historyLabel, type Settings } from '../../types';
-import { Icon } from '../components';
+import { Icon, More } from '../components';
 import { useNav } from '../nav';
 
 // 0.9.14: price history in one place (Settings → Prices and deals, and setup). How far back
@@ -114,11 +113,9 @@ export function SearchKeepSettings({ settings }: { settings: Settings }) {
         <span className="title" style={{ fontSize: 15 }}>
           Search results
         </span>
-        <p className="small" style={{ margin: '4px 0 0' }}>
-          Restock remembers what your searches and scans find: the product, its price that day, its barcode and whether it was in stock. That's how it can
+        <p className="small" style={{ margin: '4px 0 0' }}>Restock remembers what your searches and scans find.{' '}<More title="Search results"><p>Restock remembers what your searches and scans find: the product, its price that day, its barcode and whether it was in stock. That's how it can
           tell you what something cost before, and judge a sale on something you don't track yet. A search always asks the shops again: a remembered
-          price is never shown as today's. They stay on this phone, and go to your own Restock server if you have one.
-        </p>
+          price is never shown as today's. They stay on this phone, and go to your own Restock server if you have one.</p></More></p>
         {serverMode ? (
           <p className="small" style={{ margin: '6px 0 0' }}>
             <strong>Set on each phone.</strong> Searching the shops and remembering what they said happens in the Android app.
@@ -173,17 +170,15 @@ export function PriceHistorySettings({ settings }: { settings: Settings }) {
           <span className="title" style={{ fontSize: 15 }}>
             How far back Restock looks
           </span>
-          <p className="small" style={{ margin: '4px 0 0' }}>
-            Restock keeps the prices it reads, and what your searches find, for this long, and works out each item's usual price from them. With shared
-            prices on, it's also how much shared history this phone gets. Longer knows sales better; it's only a few megabytes either way.
-          </p>
+          <p className="small" style={{ margin: '4px 0 0' }}>How long Restock keeps prices, and works out usual prices from.{' '}<More title="How far back Restock looks"><p>Restock keeps the prices it reads, and what your searches find, for this long, and works out each item's usual price from them. With shared
+            prices on, it's also how much shared history this phone gets. Longer knows sales better; it's only a few megabytes either way.</p></More></p>
         </div>
         <div style={{ padding: '0 14px 6px' }}>
           <HistoryLengths
             settings={settings}
             onPicked={() =>
               void afterSave('market-days', (s) => {
-                if (sharedOn(s) && isNative() && !isIos()) void downloadMarket(undefined, { onlyUnmetered: s.marketData.wifiOnly }).catch(() => undefined);
+                if (sharedOn(s) && isNative()) void downloadMarket(undefined, { onlyUnmetered: s.marketData.wifiOnly }).catch(() => undefined);
               })
             }
           />

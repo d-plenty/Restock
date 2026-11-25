@@ -366,3 +366,24 @@ export async function releaseHaPhone(): Promise<void> {
   if (!who.inHousehold || !who.device || !who.mine || who.house) return;
   await runOps([{ sql: `DELETE FROM ${TABLE} WHERE k = ?`, params: [HA_PHONE] }]);
 }
+
+/** The same words, whatever the capitals, spacing or punctuation. */
+const sameWords = (a: string, b: string) => {
+  const n = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return !!n(a) && n(a) === n(b);
+};
+
+/**
+ * An item was just added the ordinary way (Add, not "Pick my …"). A line still waiting on the General
+ * list under the same words (what was searched for, or the item's name) is that item: it becomes the
+ * item's line, or folds into the line the add just made. So nothing is left behind on General.
+ */
+export async function adoptGeneralLines(group: { id: string; name: string }, words: readonly (string | undefined)[]): Promise<number> {
+  const said = words.filter((w): w is string => !!w && !!w.trim());
+  const waiting = (await allListEntries()).filter(
+    (e) => e.section === 'general' && !e.groupId && !e.product && !e.checked && said.some((w) => sameWords(pickWord(e.text), w) || sameWords(e.text, w)),
+  );
+  let n = 0;
+  for (const e of waiting) if (await pickItemFor(e, group, false)) n++;
+  return n;
+}

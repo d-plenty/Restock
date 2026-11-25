@@ -1,8 +1,11 @@
 # The text reader's models
 
 Restock reads receipts and the fronts of packs on the phone with PaddleOCR's **PP-OCRv5 mobile**
-models, run by ONNX Runtime Web through paddleocr.js. Nothing here is downloaded at run time: these
-files are part of the app.
+models, run by ONNX Runtime Web through paddleocr.js. The engine and the letter list are part of the
+app. The two model files are part of the Restock server's web pages; the phone and tablet apps
+download them the first time the reader is used, after asking, from this folder at the `v0.14.0` tag
+of this repository, and check each one against the SHA-256 below before keeping it
+(`src/lib/readerModels.ts`). Don't move or change the model files at that tag.
 
 | File | What | SHA-256 |
 | --- | --- | --- |

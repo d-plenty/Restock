@@ -37,7 +37,7 @@ import {
   updateProduct,
   updateSettings,
 } from '../../lib/db';
-import { pickItemFor, pickItemOffList } from '../../lib/listPicks';
+import { adoptGeneralLines, pickItemFor, pickItemOffList } from '../../lib/listPicks';
 import { addToList } from '../../lib/listActions'; // 0.9.5 (undo)
 import { genericName, nameHasSize } from '../../lib/naming';
 import { shareTextFile } from '../../lib/backup';
@@ -1211,6 +1211,8 @@ export function AddScreen({
         const old = replaceEntry ?? forLine?.entry.id;
         if (old) await deleteListEntries([old]);
       }
+      // A line waiting on General under these words is this item now (it isn't left behind there).
+      if (groupId && !forLine) await adoptGeneralLines({ id: groupId, name: itemName }, [itemName, term, query]);
       });
       doneAdding.current = true;
       const code = barcode ?? scanned?.barcode;

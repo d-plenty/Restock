@@ -107,6 +107,11 @@ final class RestockShopBrowser: UIViewController, WKNavigationDelegate, WKUIDele
     /// A page address that closes the browser by itself (picking a branch).
     var closeOn: NSRegularExpression?
     var onClose: ((String, Bool) -> Void)?
+    /// A script run in each of the shop's own pages once it has loaded (recording a trolley).
+    var script: String = ""
+    /// Evaluated in the shop's own page when Done is tapped; what it gives is kept in `value`.
+    var readOnDone: String = ""
+    var value: String = ""
 
     private var web: WKWebView?
     private var closed = false
@@ -162,7 +167,15 @@ final class RestockShopBrowser: UIViewController, WKNavigationDelegate, WKUIDele
     }
 
     @objc private func doneTapped() {
-        finish(matched: false)
+        // Read back from the page before it goes, and only from the shop's own site.
+        guard !readOnDone.isEmpty, let page = web, hostAllowed(page.url?.host) else {
+            finish(matched: false)
+            return
+        }
+        page.evaluateJavaScript(readOnDone) { [weak self] result, _ in
+            self?.value = (result as? String) ?? ""
+            self?.finish(matched: false)
+        }
     }
 
     @objc private func backTapped() {
@@ -238,6 +251,9 @@ final class RestockShopBrowser: UIViewController, WKNavigationDelegate, WKUIDele
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         navigationItem.title = webView.url?.host ?? navigationItem.title
+        if !script.isEmpty && hostAllowed(webView.url?.host) {
+            webView.evaluateJavaScript(script, completionHandler: nil)
+        }
         checkAddress()
     }
 
@@ -288,6 +304,12 @@ public class RestockApplePlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDe
         CAPPluginMethod(name: "lanBrowse", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "backgroundSchedule", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "backgroundDone", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "storeRead", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "storeWrite", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "storeDelete", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "iconGet", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "iconSet", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "netInfo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "secretSet", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "secretGet", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "secretDelete", returnType: CAPPluginReturnPromise)
@@ -299,7 +321,7 @@ public class RestockApplePlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDe
     @objc func info(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             call.resolve([
-                "version": 2,
+                "version": 3,
                 "pad": UIDevice.current.userInterfaceIdiom == .pad,
                 "system": UIDevice.current.systemVersion
             ])
@@ -396,8 +418,10 @@ public class RestockApplePlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDe
             browser.message = message
             browser.allowed = allowed
             browser.closeOn = rule
-            browser.onClose = { at, matched in
-                call.resolve(["url": at, "matched": matched])
+            browser.script = call.getString("script") ?? ""
+            browser.readOnDone = call.getString("readOnDone") ?? ""
+            browser.onClose = { [weak browser] at, matched in
+                call.resolve(["url": at, "matched": matched, "value": browser?.value ?? ""])
             }
             let nav = UINavigationController(rootViewController: browser)
             nav.modalPresentationStyle = .fullScreen

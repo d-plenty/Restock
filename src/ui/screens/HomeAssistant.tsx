@@ -26,7 +26,7 @@ import {
 import { MIN_HA_VERSION, tooOld } from '../../lib/haSync';
 import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
-import { LoadingBar, TopBar } from '../components';
+import { LoadingBar, TopBar, More } from '../components';
 import { useNav } from '../nav';
 // 0.9.5 (save): the switch, the list and the address wait for Save settings; Test connection and Sync now run straight away.
 import { saveFirst, stage, staged } from '../../lib/settingsDraft';
@@ -96,19 +96,15 @@ export function InHouse({ house, saved }: { house: HaHouse; saved: boolean }) {
       {pageState({ house }) === 'server' ? (
         <div className="banner grey" role="status" style={{ gap: 8 }}>
           <strong>Home Assistant is handled by {server}</strong>
-          <span style={{ fontSize: 13 }}>
-            Every phone and browser on your server shares one Home Assistant shopping list. Your server keeps it in step all the time, so there’s
-            nothing to set up on this phone. To change the address, the list or the token, use your server’s page.
-          </span>
+          <span style={{ fontSize: 13 }}>Your server keeps one Home Assistant shopping list for every phone. Nothing to set up here.{' '}<More title="Home Assistant on your server"><p>Every phone and browser on your server shares one Home Assistant shopping list. Your server keeps it in step all the time, so there’s
+            nothing to set up on this phone. To change the address, the list or the token, use your server’s page.</p></More></span>
           <ServerLinks house={house} />
         </div>
       ) : (
         <div className="banner grey" role="status" style={{ gap: 8 }}>
           <strong>Set it up on your server’s page</strong>
-          <span style={{ fontSize: 13 }}>
-            In a server household, Home Assistant runs on your server, so every phone and browser shares one list. This phone can’t run its own.
-            Open your server’s page and go to Home Assistant.
-          </span>
+          <span style={{ fontSize: 13 }}>In a server household, Home Assistant runs on your server. Open your server’s page.{' '}<More title="Home Assistant on your server"><p>In a server household, Home Assistant runs on your server, so every phone and browser shares one list. This phone can’t run its own.
+            Open your server’s page and go to Home Assistant.</p></More></span>
           <ServerLinks house={house} />
         </div>
       )}
@@ -280,14 +276,9 @@ export function HomeAssistantScreen() {
 
       <div className="card" style={{ gap: 8 }}>
         <strong>Your shopping list in Home Assistant, both ways</strong>
-        <span className="small">
-          What you add, tick or take off in Restock shows on Home Assistant's list, and the other way round. Say "Okay Nabu, add milk to my
-          shopping list" and milk is on your Restock list next time you open it.
-        </span>
-        <span className="small">
-          If it's clearly one of your pantry items, it's added as that item. If not, it's added as "milk", with a <strong>Pick my milk</strong> button
-          so you can say which one you mean.
-        </span>
+        <span className="small">Your Restock list and Home Assistant's list stay the same, both ways.{' '}<More title="How it works"><p>What you add, tick or take off in Restock shows on Home Assistant's list, and the other way round. Say "Okay Nabu, add milk to my
+          shopping list" and milk is on your Restock list next time you open it.</p><p>If it's clearly one of your pantry items, it's added as that item. If not, it's added as "milk", with a <strong>Pick my milk</strong> button
+          so you can say which one you mean.</p></More></span>
       </div>
 
       {on && <NotServerWide />}
@@ -349,11 +340,9 @@ export function HomeAssistantScreen() {
             onBlur={() => void saveAddress()}
           />
         </label>
-        <span className="small" style={{ marginTop: -4 }}>
-          The one you open Home Assistant with. At home that can be http://homeassistant.local:8123 or its IP address (like http://192.168.1.50:8123).
+        <span className="small" style={{ marginTop: -4 }}>The address you open Home Assistant with.{' '}<More title="The address"><p>The one you open Home Assistant with. At home that can be http://homeassistant.local:8123 or its IP address (like http://192.168.1.50:8123).
           Away from home, use an https:// address, such as your Nabu Casa one (https://….ui.nabu.casa), or a Tailscale address. Restock only uses
-          plain http:// at home or on Tailscale.
-        </span>
+          plain http:// at home or on Tailscale.</p></More></span>
 
         {saved && !changing ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -385,10 +374,8 @@ export function HomeAssistantScreen() {
                 onChange={(e) => setToken(e.target.value)}
               />
             </label>
-            <span className="small" style={{ marginTop: -4 }}>
-              In Home Assistant, open your profile (your name, bottom left) → Security → Long-lived access tokens → Create token. Call it Restock,
-              copy it and paste it here. It stays on this phone only, locked away, and is never synced, shown again or put in a backup.
-            </span>
+            <span className="small" style={{ marginTop: -4 }}>A long-lived access token from your Home Assistant profile. It stays on this phone only.{' '}<More title="The token"><p>In Home Assistant, open your profile (your name, bottom left) → Security → Long-lived access tokens → Create token. Call it Restock,
+              copy it and paste it here. It stays on this phone only, locked away, and is never synced, shown again or put in a backup.</p></More></span>
             {changing && (
               <button
                 className="btn small"
@@ -478,29 +465,20 @@ export function HomeAssistantScreen() {
       <div className="eyebrow">Good to know</div>
       <div className="card" style={{ gap: 8 }}>
         {isIos() ? (
-          <span className="small">
-            <strong>Voice adds come in when you open Restock.</strong> On an iPhone, Restock talks to Home Assistant every minute while it's open,
-            and not while it's closed (iOS doesn't allow that). Something you add by voice is on your Restock list a moment after you open it.
-          </span>
+          <span className="small">Voice adds come in when you open Restock.{' '}<More title="When voice adds arrive"><p><strong>Voice adds come in when you open Restock.</strong> On an iPhone, Restock talks to Home Assistant every minute while it's open,
+            and not while it's closed (iOS doesn't allow that). Something you add by voice is on your Restock list a moment after you open it.</p></More></span>
         ) : (
-          <span className="small">
-            <strong>Voice adds come in within about 15 minutes.</strong> Restock talks to Home Assistant every minute while it's open, and about
+          <span className="small">Voice adds come in within about 15 minutes.{' '}<More title="When voice adds arrive"><p><strong>Voice adds come in within about 15 minutes.</strong> Restock talks to Home Assistant every minute while it's open, and about
             every 15 minutes in the background when it isn't (Android decides exactly when), so something you add by voice comes onto your Restock
-            list, and your other phones, even with Restock closed.
-          </span>
+            list, and your other phones, even with Restock closed.</p></More></span>
         )}
-        <span className="small">
-          <strong>Only the groceries list.</strong> Bottle shop and Chemist lists stay in Restock. Something new goes across
-          while it's still to buy, and ticking off works both ways.
-        </span>
+        <span className="small">Only the groceries list goes across.{' '}<More title="Which list"><p><strong>Only the groceries list.</strong> Bottle shop and Chemist lists stay in Restock. Something new goes across
+          while it's still to buy, and ticking off works both ways.</p></More></span>
         <span className="small">
           <strong>Needs Home Assistant {MIN_HA_VERSION} or newer</strong>, with a to-do list such as the Shopping list integration (it's{' '}
           {DEFAULT_LIST} unless you pick another).
         </span>
-        <span className="small">
-          <strong>What goes to Home Assistant:</strong> your groceries list's lines (their names and how many) and which are ticked. Nothing else, and
-          nothing goes anywhere but your Home Assistant.
-        </span>
+        <span className="small">Only your groceries list's lines and ticks go to Home Assistant, and nowhere else.</span>
       </div>
       <SaveBar />
     </div>

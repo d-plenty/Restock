@@ -37,6 +37,7 @@ tar czf ~/restock-signing-key-backup.tar.gz -C ~ .restock
    cd ~/restock
    npm ci
    npm run typecheck
+   npm run lint
    npm test
    ```
 3. **Build:**

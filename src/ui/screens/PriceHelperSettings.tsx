@@ -1,3 +1,4 @@
+import { More } from '../components';
 import { useEffect, useState } from 'react';
 import { getKV, updateSettings } from '../../lib/db';
 import {
@@ -78,12 +79,10 @@ export function PriceHelperSettings({ settings }: { settings: Settings }) {
 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <p className="small" style={{ margin: 0 }}>
-        For a spare Android phone left on its charger at home. Through the week it searches Coles and Woolworths for {searches.length} everyday things,
+      <p className="small" style={{ margin: 0 }}>For a spare Android phone left charging at home. It searches Coles and Woolworths through the week.{' '}<More title="Price helper phone"><p>For a spare Android phone left on its charger at home. Through the week it searches Coles and Woolworths for {searches.length} everyday things,
         the first page of results each time, about one search every 10 minutes while it's charging on Wi-Fi. What it finds (products and shelf
         prices only) goes to your restock-prices collector, which adds it to the shared prices every night. If a shop turns it away,
-        that shop rests for six hours.
-      </p>
+        that shop rests for six hours.</p></More></p>
       <label className="check">
         <input
           type="checkbox"

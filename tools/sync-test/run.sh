@@ -66,6 +66,8 @@ java -cp "$O/lan-classes:$ORGJSON" family.plenty.restock.LanBridgeTest
 bash tools/sync-test/web-parity.sh
 # 0.14.0: the iPhone's phone-to-phone sync (src/ios/wire.ts) against this Java code, over real sockets.
 bash tools/sync-test/wire-parity.sh
+bash tools/sync-test/recalls-parity.sh
+bash tools/sync-test/market-parity.sh
 # 0.9.4: Home Assistant's round in Java (HaSync.java) against haSync.ts, on shared fixtures.
 bash tools/sync-test/ha-parity.sh
 

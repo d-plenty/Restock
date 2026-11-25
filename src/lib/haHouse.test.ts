@@ -112,7 +112,7 @@ describe('the page in three states', () => {
     expect(screen.pageState(who)).toBe('setUpOnServer');
     const html = render(createElement(screen.InHouse, { house: who.house!, saved: false }));
     expect(html).toContain('Set it up on your server’s page');
-    expect(html).toContain('In a server household, Home Assistant runs on your server, so every phone and browser shares one list');
+    expect(html).toContain('In a server household, Home Assistant runs on your server. Open your server’s page.');
     expect(html).toContain(`href="${SERVER.home}"`);
     expect(html).not.toMatch(/<input|<select/);
     // A token left from before can be removed (it isn't used here).

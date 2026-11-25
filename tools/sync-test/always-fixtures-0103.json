@@ -1,5 +1,5 @@
 {
- "note": "0.10.3 shared answers for Always on special (verdict.ts alwaysOnSpecial and judge, Deals.java). Each reading is [days ago, price, was price, special], at noon on that day. Checked by src/lib/always0103.test.ts and AlwaysTest0103 (tools/sync-test/always-parity.sh).",
+ "note": "0.10.3 shared answers for Always on special (verdict.ts alwaysOnSpecial and judge, Deals.java). Each reading is [days ago, price, was price, special], at noon on that day. Checked by src/lib/always.test.ts and AlwaysTest0103 (tools/sync-test/always-parity.sh).",
  "now": "2026-11-13T12:00:00+10:00",
  "cases": [
   {

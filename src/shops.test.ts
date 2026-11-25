@@ -19,7 +19,7 @@ describe('shops and tabs', () => {
       'Liquor Legends',
       'Bottlemart',
     ]);
-    expect(shopsIn('pharmacy')).toHaveLength(16);
+    expect(shopsIn('pharmacy')).toHaveLength(15);
     expect(new Set(SHOPS.map((s) => s.id)).size).toBe(SHOPS.length);
   });
 

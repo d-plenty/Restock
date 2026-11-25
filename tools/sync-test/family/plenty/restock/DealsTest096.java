@@ -13,7 +13,7 @@ import org.json.JSONObject;
 
 /**
  * 0.9.6: Deals.java against the shared answers in tools/sync-test/deals-fixtures-096.json (a product with an
- * unknown size sits out of the cheapest comparison), which src/lib/dealsParity096.test.ts checks on the
+ * unknown size sits out of the cheapest comparison), which src/lib/dealsParity.test.ts checks on the
  * TypeScript side. Run through tools/sync-test/deals-parity.sh.
  */
 public class DealsTest096 {

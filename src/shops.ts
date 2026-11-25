@@ -284,6 +284,11 @@ export interface ShopDef {
   group?: ShopGroup;
   /** 0.10.3: "Choose your store" opens the shop's website to pick it there (IGA: prices are each branch's own). */
   pickOnSite?: string;
+  /**
+   * The shop stopped listing products online, so there's nothing to read. It's still known by name
+   * (what was saved from it keeps its shop), but it can't be picked, searched or checked any more.
+   */
+  gone?: true;
 }
 
 /** 0.10.3: the headings in the shop picker, every tab's picker listing every shop under them. */
@@ -502,8 +507,8 @@ export const SHOPS: ShopDef[] = [
     name: 'Pharmacy 4 Less',
     color: '#0091d0',
     website: 'https://www.pharmacy4less.com.au',
-    // 0.12.8: its shop moved: "/?s=" now opens its front page (no products, so it read as blocked)
-    search: 'https://pharmacy4less.com.au/search.php?search_query={q}&section=product',
+    // Its website dropped its online shop (no products, no search), so it's no longer a shop to pick.
+    gone: true,
     map: /pharmacy\s*4\s*less/i,
   }),
   P({
@@ -689,6 +694,10 @@ export const customShops = () => custom;
 
 export const isCustom = (c: string | undefined): c is CustomChain => !!c && c.startsWith('custom-');
 export const shopDef = (c: string | undefined): ShopDef | undefined => (c ? BY_ID.get(c) : undefined);
+/** A shop that stopped listing products online (ShopDef.gone). */
+export const isGoneShop = (c: string | undefined): boolean => !!shopDef(c)?.gone;
+/** The picked shops without any that have gone. */
+export const withoutGone = <T extends string>(chains: readonly T[]): T[] => chains.filter((c) => !isGoneShop(c));
 export const customShop = (c: string | undefined) => custom.find((s) => s.id === c);
 
 export function chainName(c: Chain | string | undefined): string {
@@ -776,7 +785,7 @@ export function shopsByGroup(): { group: ShopGroup; name: string; shops: { id: S
     group: g.id,
     name: g.name,
     shops: [
-      ...SHOPS.filter((s) => groupOf(s) === g.id).map((s) => ({ id: s.id as StoreChain, name: s.name, note: s.note })),
+      ...SHOPS.filter((s) => groupOf(s) === g.id && !s.gone).map((s) => ({ id: s.id as StoreChain, name: s.name, note: s.note })),
       ...(g.id === 'other' ? custom.map((s) => ({ id: s.id, name: s.name, note: hostOf(s.website), custom: true })) : []),
     ],
   })).filter((g) => g.shops.length);
@@ -785,7 +794,7 @@ export function shopsByGroup(): { group: ShopGroup; name: string; shops: { id: S
 /** Every shop in a section, built-in first then the person's own. */
 export function shopsIn(section: Section): { id: StoreChain; name: string; note?: string; custom?: boolean }[] {
   return [
-    ...SHOPS.filter((s) => s.section === section).map((s) => ({ id: s.id as StoreChain, name: s.name, note: s.note })),
+    ...SHOPS.filter((s) => s.section === section && !s.gone).map((s) => ({ id: s.id as StoreChain, name: s.name, note: s.note })),
     ...custom.filter((s) => s.section === section).map((s) => ({ id: s.id, name: s.name, note: hostOf(s.website), custom: true })),
   ];
 }
@@ -801,7 +810,7 @@ export function hostOf(url: string): string {
 /** The shops picked in this section. */
 export function enabledIn(enabled: readonly string[], section: Section, m?: Partial<Record<string, readonly string[]>>): StoreChain[] {
   const out = enabled.filter(
-    (c): c is StoreChain => c !== 'other' && c !== 'costco' && !isLocalOnlyShop(c) && shopOnTab(c, section, m) && (!!shopDef(c) || !!customShop(c)),
+    (c): c is StoreChain => c !== 'other' && c !== 'costco' && !isLocalOnlyShop(c) && !isGoneShop(c) && shopOnTab(c, section, m) && (!!shopDef(c) || !!customShop(c)),
   );
   // 0.9.6: Costco, when it's picked, comes after the other shops (0.10.3: on each tab it's picked for).
   return enabled.includes('costco') && shopOnTab('costco', section, m) ? [...out, 'costco'] : out;

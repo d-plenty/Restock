@@ -6,9 +6,8 @@ import { useLive } from '../../lib/useLive';
 import { chainName } from '../../shops';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
-import { Icon, Sheet, timeAgo } from '../components';
+import { Icon, Sheet, timeAgo, More } from '../components';
 import { useNav } from '../nav';
-import { isIos } from '../../lib/platform';
 
 // 0.10.0: Shared prices, one switch (Settings → Privacy and sharing, and setup): this phone gets
 // the shared price history (Judge new items from day one) and sends back the shelf prices it reads
@@ -43,7 +42,7 @@ export function SharedPricesSection({ settings }: { settings: Settings }) {
 
   const download = async (onlyUnmetered = false) => {
     if (!isNative()) {
-      nav.toast('Shared prices download in the Android app.');
+      nav.toast('Shared prices download in the app.');
       return;
     }
     setProgress('Checking what’s published…');
@@ -102,12 +101,6 @@ export function SharedPricesSection({ settings }: { settings: Settings }) {
       <div className="eyebrow" id="s-shared">
         {SHARED_TITLE}
       </div>
-      {isIos() && (
-        <div className="banner grey" role="status">
-          <strong>Coming to iPhone and iPad</strong>
-          <span style={{ fontSize: 13 }}>Shared prices aren't downloaded or sent from an iPhone or iPad yet. Restock still learns each item's usual price from its own checks.</span>
-        </div>
-      )}
       <div className="card flush">
         <label className="check">
           <input
@@ -231,22 +224,11 @@ export function TurnOffShared({ onKeep, onOff }: { onKeep: () => void; onOff: ()
   return (
     <Sheet title="Turn off shared prices?" onClose={onKeep}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <p style={{ margin: 0 }}>
-          <strong>Shared prices is what lets Restock judge a new item on day one.</strong> Without it, a new item has no history, so for its first 4 to 8
-          weeks Restock can't tell whether a "special" is really a good price, and you could miss a real one or fall for a fake one.
-        </p>
-        <p style={{ margin: 0 }}>
-          <strong>It works because everyone shares.</strong> Each phone that sends the shelf prices it reads makes the history better for every Restock
-          user, you included. It's free, open data, published on GitHub for anyone to use, and never sold.
-        </p>
-        <p style={{ margin: 0 }}>
-          <strong>Nothing about you goes.</strong> Only the price, product and day that the shop's own website showed. Never your name, account, list,
-          pantry, cards, branch, location, receipts, the words you search, or prices you type in.
-        </p>
-        <p className="small" style={{ margin: 0 }}>
-          If you turn it off, this phone stops downloading the shared history and stops sending prices, and new items are judged only from the prices
-          this phone sees itself. You can turn it back on any time in Privacy and sharing.
-        </p>
+        <p style={{ margin: 0 }}>Shared prices lets Restock judge a new item from day one.{' '}<More title="What shared prices does"><p><strong>Shared prices is what lets Restock judge a new item on day one.</strong> Without it, a new item has no history, so for its first 4 to 8
+          weeks Restock can't tell whether a "special" is really a good price, and you could miss a real one or fall for a fake one.</p><p><strong>It works because everyone shares.</strong> Each phone that sends the shelf prices it reads makes the history better for every Restock
+          user, you included. It's free, open data, published on GitHub for anyone to use, and never sold.</p></More></p>
+        <p style={{ margin: 0 }}>Nothing about you is sent: only the price, product and day the shop's website showed.</p>
+        <p className="small" style={{ margin: 0 }}>Off: this phone stops downloading and sending. Turn it back on any time.</p>
         <button type="button" className="btn primary block" onClick={onKeep}>
           Keep sharing
         </button>

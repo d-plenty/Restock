@@ -18,7 +18,7 @@ import {
   watchSearchTest,
   type SearchTestState,
 } from '../../lib/searchTest';
-import { CheckedAgo, ChainDot, Icon, LoadingBar, TopBar } from '../components';
+import { CheckedAgo, ChainDot, Icon, LoadingBar, TopBar, More } from '../components';
 import { useNav } from '../nav';
 import { planOf } from '../../lib/checkSchedule';
 import { getCheckLog, missedSlot, missedWords, OUTCOME_WORDS, whenWords } from '../../lib/checkLog';
@@ -163,15 +163,10 @@ export function DiagnosticsScreen() {
 
       <div className="eyebrow">Send search details</div>
       <div className="card">
-        <p className="small" style={{ margin: 0 }}>
-          If a shop's search looks wrong, run one search here. Restock searches the shop's website (not your branch) and saves exactly what
+        <p className="small" style={{ margin: 0 }}>Run one search and save what the shop sent back, to send to the developer.{' '}<More title="Capturing a shop's answer"><p>If a shop's search looks wrong, run one search here. Restock searches the shop's website (not your branch) and saves exactly what
           the shop sent back into a file you can send to the developer, so the connection can be fixed. Nothing from your pantry, lists or
-          settings goes in it.
-        </p>
-        <p className="small" style={{ margin: 0 }}>
-          The shop's answer can still be about you: if you're signed in to Woolworths inside Restock, Woolworths answers for your account (its
-          branch's prices and stock, and possibly what's in your trolley). Open the file and check it before you send it.
-        </p>
+          settings goes in it.</p></More></p>
+        <p className="small" style={{ margin: 0 }}>The answer can be about you if you're signed in to that shop. Open the file and check it before you send it.</p>
         <label className="field">
           <span>Shop</span>
           <select className="input" value={shop ?? ''} onChange={(e) => setChain(e.target.value as StoreChain)}>
@@ -233,11 +228,9 @@ function TrolleyRecorder() {
     <>
       <div className="eyebrow">Record adding to a trolley</div>
       <div className="card">
-        <p className="small" style={{ margin: 0 }}>
-          Teaches Restock to fill your trolley. Sign in to the shop first (Settings → My shops). Then tap Record, add any one item to your trolley on
+        <p className="small" style={{ margin: 0 }}>Teaches Restock to fill your trolley: record adding one item on the shop's page.{' '}<More title="Recording a trolley"><p>Teaches Restock to fill your trolley. Sign in to the shop first (Settings → My shops). Then tap Record, add any one item to your trolley on
           the shop's page, and tap Done. Restock saves only the shop's own trolley and search calls, with names, emails, addresses and card numbers
-          removed, into a file for you to send. You can open it and check before sending.
-        </p>
+          removed, into a file for you to send. You can open it and check before sending.</p></More></p>
         <div className="seg" role="radiogroup" aria-label="Which shop">
           {(['coles', 'woolworths'] as const).map((c) => (
             <button key={c} role="radio" aria-checked={chain === c} className={chain === c ? 'on' : ''} onClick={() => setChain(c)}>
@@ -293,11 +286,9 @@ function SearchTest() {
     <>
       <div className="eyebrow">Search test</div>
       <div className="card">
-        <p className="small" style={{ margin: 0 }}>
-          Searches a list of everyday words (milk, Western Star, Panadol, VB…) at each of your shops, the way Restock does, and saves what came
+        <p className="small" style={{ margin: 0 }}>Searches everyday words at each shop and saves what came back, to send to the developer.{' '}<More title="Search test"><p>Searches a list of everyday words (milk, Western Star, Panadol, VB…) at each of your shops, the way Restock does, and saves what came
           back in one file you can send to the developer, so search can be made better. One search at a time with a pause in between. The file
-          has the shops' answers and the test words: nothing from your pantry, lists or settings, and no branch numbers.
-        </p>
+          has the shops' answers and the test words: nothing from your pantry, lists or settings, and no branch numbers.</p></More></p>
         <label className="field">
           <span>Which shops</span>
           <select className="input" value={which} disabled={!!progress} onChange={(e) => setWhich(e.target.value as 'all' | Section)}>
@@ -395,10 +386,8 @@ function BackgroundChecks() {
                 No scheduled checks noted yet (they're noted from 0.10.2).
               </p>
             )}
-            <p className="small" style={{ margin: 0 }}>
-              A check that never started was held back by Android, or was waiting for a connection or more battery (it needs both). One that
-              stopped part way ran out of the time Android gives it.
-            </p>
+            <p className="small" style={{ margin: 0 }}>A check that never started was held back by Android.{' '}<More title="Why a check didn't run"><p>A check that never started was held back by Android, or was waiting for a connection or more battery (it needs both). One that
+              stopped part way ran out of the time Android gives it.</p></More></p>
           </>
         )}
         <p className="small" style={{ margin: 0, fontWeight: 600, color: held ? 'var(--amber-ink)' : 'var(--green-ink)' }}>

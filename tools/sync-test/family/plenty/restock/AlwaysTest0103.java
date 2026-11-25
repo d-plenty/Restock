@@ -9,7 +9,7 @@ import org.json.JSONObject;
 
 /**
  * 0.10.3: Deals.java's Always on special against the shared answers in
- * tools/sync-test/always-fixtures-0103.json, which src/lib/always0103.test.ts checks on the
+ * tools/sync-test/always-fixtures-0103.json, which src/lib/always.test.ts checks on the
  * TypeScript side. Run through tools/sync-test/always-parity.sh.
  */
 public class AlwaysTest0103 {

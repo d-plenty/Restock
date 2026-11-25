@@ -7,9 +7,8 @@ import { RestockNative } from '../../lib/sql/native';
 import { useLive } from '../../lib/useLive';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
-import { Icon, LoadingBar, timeAgo, TopBar } from '../components';
+import { Icon, LoadingBar, timeAgo, TopBar, More } from '../components';
 import { useNav } from '../nav';
-import { isIos } from '../../lib/platform';
 
 // Recall alerts: once a day (separately from price checks, and not adjustable) Android checks the
 // official Australian recall lists against what you have. RecallChecker.java does the checking,
@@ -80,10 +79,8 @@ export function RecallSettings({ settings, inSetup }: { settings: Settings; inSe
           <span className="title" style={{ fontSize: 15 }}>
             Recall alerts
           </span>
-          <span className="small">
-            Once a day, Restock checks the official Australian recall lists (food, products and medicines) against what's in your Pantry, Bottle shop,
-            Chemist, shopping list and kept receipts.{inSetup ? ' On by default.' : ''}
-          </span>
+          <span className="small">Checks the official recall lists against what you have, once a day.{inSetup ? ' On by default.' : ''}{' '}<More title="Recall alerts"><p>Once a day, Restock checks the official Australian recall lists (food, products and medicines) against what's in your Pantry, Bottle shop,
+            Chemist, shopping list and kept receipts.{inSetup ? ' On by default.' : ''}</p></More></span>
         </span>
         <input
           type="checkbox" className="switch"
@@ -193,12 +190,6 @@ export function RecallsScreen() {
   return (
     <div className="screen">
       <TopBar title="Recall alerts" />
-      {isIos() && (
-        <div className="banner grey" role="status">
-          <strong>Coming to iPhone and iPad</strong>
-          <span style={{ fontSize: 13 }}>Restock doesn't check the recall lists on an iPhone or iPad yet. The official lists are linked below.</span>
-        </div>
-      )}
       <RecallSettings settings={settings} />
       <div className="card">
         <span className="small">
@@ -242,10 +233,7 @@ export function RecallsScreen() {
           </a>
         ))}
       </div>
-      <p className="small">
-        Restock isn't an official alert service and can miss a recall or flag one that isn't yours. For anything you're worried about, check the
-        official list, or ask the shop or a pharmacist.
-      </p>
+      <p className="small">Restock isn't an official alert service and can miss a recall. If you're worried, check the official list or ask the shop or a pharmacist.</p>
       <SaveBar />
     </div>
   );

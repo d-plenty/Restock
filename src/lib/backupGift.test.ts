@@ -54,7 +54,11 @@ describe('automatic backups and gift cards', () => {
     const parts = autoParts({ enabled: true, everyDays: 7, keep: 5, folder: 'content://x', password: 'correct horse' });
     expect(parts.giftCards).toBe(true);
     const locked = await backupJson(parts);
-    expect(locked).not.toContain(PIN);
+    // Nothing readable in the locked file: no tables, no card fields. (Looking for the PIN's four
+    // digits in it would now and then find them by chance in the scrambled text.)
+    expect(JSON.parse(locked).tables).toBeUndefined();
+    expect(locked).not.toContain('"pin"');
+    expect(locked).not.toContain('giftCards');
     const file = JSON.parse(await unlockBackup(locked, 'correct horse'));
     expect(file.tables.giftCards).toEqual([expect.objectContaining({ pin: PIN })]);
     expect(file.cardPhotos).toEqual({ 'cards/gift-1-front.jpg': 'RlJPTlQ=' });

@@ -2,11 +2,11 @@ import { IosWhy } from './IosWhy';
 import { canOpenShop } from '../stores/http';
 import { useState } from 'react';
 import { RestockNative } from '../lib/sql/native';
-import { getSettings } from '../lib/db';
-import { hideWarning, testConnections, unhideWarning, type StoreChain } from '../lib/health';
+import { getSettings, updateSettings } from '../lib/db';
+import { hideWarning, noteUnblockTried, testConnections, unhideWarning, type StoreChain } from '../lib/health';
 import { isNative } from '../stores/http';
 import { forgetSearchInfo } from '../stores/web';
-import { chainName, isPressOnlyShop, kindOf, websiteOf } from '../shops';
+import { chainName, isPressOnlyShop, kindOf, priceSource, websiteOf } from '../shops';
 import { Icon, Sheet } from './components';
 import { useNav } from './nav';
 
@@ -43,7 +43,36 @@ export async function unblockShop(chain: StoreChain): Promise<UnblockResult> {
   await RestockNative.openStore({ chain, home: websiteOf(chain), message: UNBLOCK_BAR });
   // A search page worked out from a "checking your browser" page could be wrong: look again.
   if ((kindOf(chain) ?? 'web') === 'web') await forgetSearchInfo(chain).catch(() => undefined);
-  return (await testShop(chain)).result;
+  const { result } = await testShop(chain);
+  // Opening its page didn't get it going: from here the card offers to turn the shop off.
+  if (result === 'blocked' || result === 'unread') await noteUnblockTried(chain).catch(() => undefined);
+  return result;
+}
+
+/** Takes a shop (and any shop priced from its website) off the shops you use. Its saved items stay. */
+export async function turnOffShop(chain: StoreChain): Promise<void> {
+  const s = await getSettings();
+  await updateSettings({ enabledChains: s.enabledChains.filter((c) => c !== chain && priceSource(c as StoreChain) !== chain) });
+}
+
+/** "Turn off Shop": for a shop that isn't coming back. */
+export function TurnOffShop({ chain, primary, onDone }: { chain: StoreChain; primary?: boolean; onDone?: () => void }) {
+  const nav = useNav();
+  const name = chainName(chain);
+  return (
+    <button
+      type="button"
+      className={`btn ${primary ? 'primary block' : 'small'}`}
+      onClick={() =>
+        void turnOffShop(chain).then(() => {
+          nav.toast(`${name} is off. Turn it back on any time in Settings, Your shops.`);
+          onDone?.();
+        })
+      }
+    >
+      Turn off {name}
+    </button>
+  );
 }
 
 /** What "Try again" says when the shop still isn't working (pure, for testing). */
@@ -194,6 +223,14 @@ export function UnblockSheet({
         <button className="btn primary block" disabled={!canOpenShop() || stage === 'checking'} onClick={() => void go()}>
           <Icon name="external" size={18} /> {stage === 'blocked' || stage === 'unread' ? `Open ${name} again` : `Open ${name}`}
         </button>
+      )}
+      {(stage === 'blocked' || stage === 'unread') && (
+        <>
+          <p className="small" style={{ margin: 0 }}>
+            If {name}’s page has no products or prices on it, it may not sell online any more. Then there’s nothing for Restock to read.
+          </p>
+          <TurnOffShop chain={chain} onDone={onClose} />
+        </>
       )}
       {!isNative() && (
         <p className="small" style={{ margin: 0 }}>

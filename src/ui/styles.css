@@ -7875,3 +7875,37 @@ span.inv-num {
 .app.pad-wide > .overlay.side-root .topbar > .icon-btn[aria-label='Back'] {
   display: none;
 }
+
+/* Less writing: the small i after a short line, and the longer explanation in its sheet (components.tsx More) */
+.more-i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  width: 32px;
+  height: 32px;
+  margin: -8px -4px -8px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--blue);
+  cursor: pointer;
+}
+.more-i:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+.more-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  color: var(--ink);
+  font-weight: 400;
+  text-align: left;
+}
+.more-body p {
+  margin: 0;
+}

@@ -16,6 +16,8 @@ export interface ChainHealth {
   error?: string;
   /** When the current run of failures started (cleared when it works again). */
   failingSince?: string;
+  /** The person opened the shop's page (Unblock) during this run of failures and it still didn't work. */
+  unblockTried?: string;
 }
 export type StoreHealth = Partial<Record<StoreChain, ChainHealth>>;
 
@@ -40,16 +42,32 @@ export async function recordHealth(results: Partial<Record<StoreChain, string | 
   await putKV(KEY, nextHealth(await getHealth(), results, new Date().toISOString()));
 }
 
+/** After this many days of nothing, a shop's website has most likely stopped listing products. */
+export const STUCK_DAYS = 7;
+
+/**
+ * Unblock can't fix this one: the person already opened the shop's page and it still gave nothing,
+ * or it has given nothing for a week. The card then offers to turn the shop off instead of Unblock
+ * (a shop that took its products offline has no check to pass).
+ */
+export const isStuck = (c: ChainHealth | undefined, days: number): boolean => !!c?.failingSince && (!!c.unblockTried || days >= STUCK_DAYS);
+
+/** Unblock was tried and the shop still isn't working. */
+export async function noteUnblockTried(chain: StoreChain, at = new Date().toISOString()): Promise<void> {
+  const h = await getHealth();
+  const cur = h[chain];
+  if (!cur?.failingSince) return;
+  await putKV(KEY, { ...h, [chain]: { ...cur, unblockTried: at } });
+}
+
 /** Stores that have been failing for at least `minHours`, longest first. */
-export function failingStores(h: StoreHealth, now = Date.now(), minHours = 20): { chain: StoreChain; since: string; days: number; error?: string }[] {
+export function failingStores(h: StoreHealth, now = Date.now(), minHours = 20): { chain: StoreChain; since: string; days: number; error?: string; stuck: boolean }[] {
   return (Object.entries(h) as [StoreChain, ChainHealth][])
     .filter(([, c]) => c.failingSince && now - Date.parse(c.failingSince) >= minHours * 3_600_000)
-    .map(([chain, c]) => ({
-      chain,
-      since: c.failingSince!,
-      days: Math.max(1, Math.round((now - Date.parse(c.failingSince!)) / 86_400_000)),
-      error: c.error,
-    }))
+    .map(([chain, c]) => {
+      const days = Math.max(1, Math.round((now - Date.parse(c.failingSince!)) / 86_400_000));
+      return { chain, since: c.failingSince!, days, error: c.error, stuck: isStuck(c, days) };
+    })
     .sort((a, b) => a.since.localeCompare(b.since));
 }
 

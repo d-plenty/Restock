@@ -49,7 +49,7 @@ import {
   stopUsingWoolworths,
 } from '../../lib/accounts';
 import { confirmAction } from '../../lib/confirm';
-import { BetaTag, CUSTOM_BETA_NOTE, ChainDot, Icon, LoadingBar, Sheet, TopBar, SearchField } from '../components';
+import { BetaTag, CUSTOM_BETA_NOTE, ChainDot, Icon, LoadingBar, Sheet, TopBar, SearchField, More } from '../components';
 import { useNav } from '../nav';
 import { money } from '../../lib/units';
 import {
@@ -631,7 +631,7 @@ export function CustomShopSheet({ section, shop, onClose }: { section: Section; 
   const [name, setName] = useState(shop?.name ?? '');
   const [site, setSite] = useState(shop?.website ?? '');
   const [searchAt, setSearchAt] = useState(shop?.search ?? '');
-  const [test, setTest] = useState<{ busy?: boolean; ok?: boolean; text?: string; samples?: string[] }>();
+  const [test, setTest] = useState<{ busy?: boolean; ok?: boolean; text?: string; samples?: string[]; none?: boolean }>();
 
   const website = (() => {
     const t = site.trim();
@@ -671,7 +671,8 @@ export function CustomShopSheet({ section, shop, onClose }: { section: Section; 
         ok: items.length > 0,
         text: items.length
           ? `Working: found ${items.length} products for "${TEST_WORD[section]}".`
-          : `Saved, but no products came back for "${TEST_WORD[section]}". If the site has a search page, search it for "${TEST_WORD[section]}" in your browser, then paste that page's address below with {q} where the word was.`,
+          : `No products or prices came back for "${TEST_WORD[section]}". This website may not list them online, and then Restock can't read it. If it does have a search page, paste its address under Advanced with {q} where the word goes.`,
+        none: !items.length,
         // 0.9.0: a result without a price shows just its name (not "$undefined").
         samples: items.slice(0, 3).map((p) => (typeof p.price === 'number' ? `${p.name} · ${money(p.price)}` : p.name)),
       });
@@ -693,10 +694,10 @@ export function CustomShopSheet({ section, shop, onClose }: { section: Section; 
       title={shop ? `Edit ${shop.name}` : `Add a ${section === 'keg' ? 'bottle shop' : section === 'pharmacy' ? 'pharmacy' : 'shop'}`}
       onClose={onClose}
     >
-      <p className="small">
-        Restock opens the shop's website the same way your browser does, finds its search page and reads the products and prices on it. It only ever
-        searches this shop for things on your {SECTION_NAMES[section]} tab.
-      </p>
+      <p className="small">Restock reads the products and prices on the shop's website, for your {SECTION_NAMES[section]} tab.</p>
+      <div className="banner grey" role="note" style={{ fontSize: 13 }}>
+        <span>Not every shop works. Some don't put products or prices online. Save and test shows you.</span>
+      </div>
       <label className="field">
         <span>Name</span>
         <input
@@ -760,6 +761,11 @@ export function CustomShopSheet({ section, shop, onClose }: { section: Section; 
             </span>
           ))}
         </div>
+      )}
+      {test?.none && (
+        <button className="btn" onClick={() => void remove()}>
+          Remove this shop
+        </button>
       )}
       {!isNative() && <p className="small">Testing works in the Android app.</p>}
       <div className="two">
@@ -855,10 +861,8 @@ export function StoreFields({ settings, section = 'pantry' }: { settings: Settin
       {on && (
         <>
           <div className="eyebrow">1 · {TAB_SHOPS_TITLE[section]}</div>
-          <p className="small" style={{ margin: 0 }}>
-            Tick the shops {section === 'pantry' ? 'your Pantry' : `the ${SECTION_NAMES[section]} tab`} searches and compares. Every shop is here, so
-            you can mix them: a shop can be on more than one tab, with the same branch.
-          </p>
+          <p className="small" style={{ margin: 0 }}>Tick the shops {section === 'pantry' ? 'your Pantry' : `the ${SECTION_NAMES[section]} tab`} searches.{' '}<More title="Picking shops"><p>Tick the shops {section === 'pantry' ? 'your Pantry' : `the ${SECTION_NAMES[section]} tab`} searches and compares. Every shop is here, so
+            you can mix them: a shop can be on more than one tab, with the same branch.</p></More></p>
           <ShopPicker settings={settings} section={section} />
           {!enabledIn(settings.enabledChains, section, settings.shopTabs ?? {}).length && (
             <p className="small" role="status">
@@ -872,15 +876,13 @@ export function StoreFields({ settings, section = 'pantry' }: { settings: Settin
           {section === 'pantry' ? (
             <AisleCard settings={settings} />
           ) : (
-            <p className="small">
-              Prices come from each shop's website, so they're the online price.
+            <p className="small">Prices are each shop's online price.{' '}<More title="Where prices come from"><p>Prices come from each shop's website, so they're the online price.
               {section === 'pharmacy'
                 ? ' Some chemists only show prices in the shop, or set them per branch; those may come up with nothing.'
                 : section === 'keg'
                   ? ' Some bottle shops set prices per branch, so your local one can differ.'
                   : ' Some shops set prices per branch, so your local one can differ.'}{' '}
-              In shopping mode their items only show an aisle when the shop gives aisle numbers.
-            </p>
+              In shopping mode their items only show an aisle when the shop gives aisle numbers.</p></More></p>
           )}
         </>
       )}
@@ -989,10 +991,8 @@ function AisleCard({ settings }: { settings: Settings }) {
         Aisle numbers
       </div>
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <p className="small" style={{ margin: 0 }}>
-          When you start shopping, each item shows its aisle at your branch, and you can sort each shop by aisle, category or A–Z. Where a shop
-          doesn't say, the line just has no aisle.
-        </p>
+        <p className="small" style={{ margin: 0 }}>Each item shows its aisle at your branch when you shop.{' '}<More title="Aisles"><p>When you start shopping, each item shows its aisle at your branch, and you can sort each shop by aisle, category or A–Z. Where a shop
+          doesn't say, the line just has no aisle.</p></More></p>
         <p className="small" style={{ margin: 0, fontWeight: 600 }}>
           {AISLE_NOTE}
         </p>
@@ -1142,11 +1142,9 @@ function WoolworthsAccount({ settings, inline }: { settings: Settings; inline?: 
             <p className="small">
               <strong>Not signed in:</strong> Woolworths' online prices. No stock is shown, as online stock isn't reliable for your branch.
             </p>
-            <p className="small">
-              You sign in on Woolworths' own page, so your password goes to Woolworths, not Restock. Restock then asks the Woolworths website for
+            <p className="small">You sign in on Woolworths' own page, not Restock's. Woolworths may not allow apps to do this.{' '}<More title="Signing in to Woolworths"><p>You sign in on Woolworths' own page, so your password goes to Woolworths, not Restock. Restock then asks the Woolworths website for
               prices as you, and adds to your trolley only when you tap Send. Woolworths may not allow apps to do this, and it may stop working if
-              they change their website.
-            </p>
+              they change their website.</p></More></p>
           </>
         ),
       }}
@@ -1289,20 +1287,14 @@ function ColesStore({ settings, inline }: { settings: Settings; inline?: boolean
         title: 'Your Coles branch',
         body: (
           <>
-            <p className="small">
-              Coles answers for any of its branches by branch number, without signing in. With your branch chosen, Restock shows that branch's own prices
+            <p className="small">With your branch chosen, Restock shows that branch's prices and stock. Beta.{' '}<More title="Your Coles branch"><p>Coles answers for any of its branches by branch number, without signing in. With your branch chosen, Restock shows that branch's own prices
               and stock instead of the website's. This is new, so it's marked Beta: if Coles doesn't answer for your branch, Restock uses the
-              online prices and notes it in Settings → Advanced → Diagnostics.
-            </p>
-            <p className="small">
-              <strong>Choose your Coles branch</strong> opens Coles' shop finder inside Restock. Tap your shop, and Restock picks up its number by
-              itself and comes back. The number is the four digits at the end of the branch page's address, for example …/kirwan-0844.
-            </p>
-            <p className="small">
-              <strong>Signing in to Coles</strong> isn't needed for prices. It's for sending your list into your Coles trolley, once Restock has
+              online prices and notes it in Settings → Advanced → Diagnostics.</p></More></p>
+            <p className="small">Choose your Coles branch opens Coles' shop finder. Tap your shop.{' '}<More title="Choosing your branch"><p><strong>Choose your Coles branch</strong> opens Coles' shop finder inside Restock. Tap your shop, and Restock picks up its number by
+              itself and comes back. The number is the four digits at the end of the branch page's address, for example …/kirwan-0844.</p></More></p>
+            <p className="small">Signing in to Coles isn't needed for prices.{' '}<More title="Signing in to Coles"><p><strong>Signing in to Coles</strong> isn't needed for prices. It's for sending your list into your Coles trolley, once Restock has
               learned how: sign in, then go to Settings → Advanced → Diagnostics → "Record adding to a trolley", add one item, and send the
-              recording.
-            </p>
+              recording.</p></More></p>
           </>
         ),
       }}

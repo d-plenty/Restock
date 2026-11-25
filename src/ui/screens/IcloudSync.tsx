@@ -11,7 +11,7 @@ import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { isFolderCode } from '../../ios/folderHouse';
 import { icloud, type IcloudStatus } from '../../ios/sync';
-import { Icon, Sheet, TopBar } from '../components';
+import { Icon, Sheet, TopBar, More } from '../components';
 import { NotHereBanner } from '../IosWhy';
 import { useNav } from '../nav';
 import { CodeText, PairingQr } from './Sync';
@@ -227,14 +227,9 @@ export function IcloudSyncScreen() {
 
       <div className="card" style={{ gap: 8 }}>
         <strong>One shared folder in iCloud Drive</strong>
-        <span className="small">
-          Your household shares one folder. Each iPhone and iPad puts its changes there and picks up everyone else's, at home or away. No server, and
-          no account with Restock. What's in the folder is sealed, so only your household's devices can read it.
-        </span>
-        <span className="small">
-          <strong>It syncs while Restock is open:</strong> when you open it, every minute after that, and a few seconds after you change something.
-          Not while it's closed. Nobody else needs to have Restock open at the same time.
-        </span>
+        <span className="small">Your household shares one sealed folder in iCloud Drive. No server, no account.{' '}<More title="iCloud sync"><p>Your household shares one folder. Each iPhone and iPad puts its changes there and picks up everyone else's, at home or away. No server, and
+          no account with Restock. What's in the folder is sealed, so only your household's devices can read it.</p></More></span>
+        <span className="small">Syncs while Restock is open, not while it's closed.</span>
       </div>
 
       {st?.inHouse ? (
@@ -285,10 +280,8 @@ export function IcloudSyncScreen() {
           {st?.joining && (
             <div className="card" style={{ gap: 10 }} role="status">
               <strong>Waiting for the household's first device</strong>
-              <span className="small">
-                Keep Restock open on both. The first device has to see this one in the folder and let it in, and iCloud can take a minute to pass
-                things along. This {device} joins by itself when the answer arrives.
-              </span>
+              <span className="small">Keep Restock open on both. This {device} joins by itself when the answer arrives.{' '}<More title="Joining"><p>Keep Restock open on both. The first device has to see this one in the folder and let it in, and iCloud can take a minute to pass
+                things along. This {device} joins by itself when the answer arrives.</p></More></span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button className="btn small primary" disabled={!!busy} onClick={() => void syncNow()}>
                   {busy ?? 'Look now'}

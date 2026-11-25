@@ -19,6 +19,7 @@
 		A1D2013200000000000000B1 /* RestockApple.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D2013200000000000000A1 /* RestockApple.swift */; };
 		A1D2014000000000000000B2 /* RestockLan.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D2014000000000000000A2 /* RestockLan.swift */; };
 		A1D2014000000000000000B3 /* RestockBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D2014000000000000000A3 /* RestockBackground.swift */; };
+		A1D2014100000000000000B4 /* RestockStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D2014100000000000000A4 /* RestockStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +36,7 @@
 		A1D2013200000000000000A1 /* RestockApple.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestockApple.swift; sourceTree = "<group>"; };
 		A1D2014000000000000000A2 /* RestockLan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestockLan.swift; sourceTree = "<group>"; };
 		A1D2014000000000000000A3 /* RestockBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestockBackground.swift; sourceTree = "<group>"; };
+		A1D2014100000000000000A4 /* RestockStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestockStore.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -74,6 +76,7 @@
 				A1D2013200000000000000A1 /* RestockApple.swift */,
 				A1D2014000000000000000A2 /* RestockLan.swift */,
 				A1D2014000000000000000A3 /* RestockBackground.swift */,
+				A1D2014100000000000000A4 /* RestockStore.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -172,6 +175,7 @@
 				A1D2013200000000000000B1 /* RestockApple.swift in Sources */,
 				A1D2014000000000000000B2 /* RestockLan.swift in Sources */,
 				A1D2014000000000000000B3 /* RestockBackground.swift in Sources */,
+				A1D2014100000000000000B4 /* RestockStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -311,6 +315,7 @@
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
@@ -333,6 +338,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;

@@ -26,6 +26,12 @@ export function checkPrices(onProgress?: (done: number, total: number) => void, 
   return running;
 }
 
+async function afterIosCheck(): Promise<void> {
+  await RestockNative.sharePrices().catch(() => undefined);
+  await (RestockNative as unknown as { marketMaybeRefresh?: () => Promise<void> }).marketMaybeRefresh?.().catch(() => undefined);
+  refresh();
+}
+
 async function doCheck(onProgress?: (done: number, total: number) => void, opts?: { slot?: boolean }): Promise<CheckResult> {
   if (!isNative()) return { checked: 0, updated: 0, errors: {}, nativeOnly: true };
   // iPhone app: an iPhone has no background job to hand this to, so it's done here while Restock is open.
@@ -33,6 +39,8 @@ async function doCheck(onProgress?: (done: number, total: number) => void, opts?
     try {
       const r = await checkBySearch(onProgress);
       await updateSettings({ lastCheck: nowIso() }).catch(() => undefined);
+      // As Android does after its background check: send what was read, and get the shared history if there's something new.
+      void afterIosCheck();
       return { ...r, nativeOnly: false };
     } finally {
       refresh();

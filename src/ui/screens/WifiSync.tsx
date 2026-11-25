@@ -11,7 +11,7 @@ import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
 import { isWifiCode } from '../../ios/wire';
 import { wifi, type WifiStatus } from '../../ios/sync';
-import { Icon, Sheet, TopBar } from '../components';
+import { Icon, Sheet, TopBar, More } from '../components';
 import { useNav } from '../nav';
 import { CodeText, PairingQr } from './Sync';
 
@@ -204,14 +204,10 @@ export function WifiSyncScreen({ apple }: { apple?: boolean }) {
 
       <div className="card" style={{ gap: 8 }}>
         <strong>Straight between phones, on your own Wi-Fi</strong>
-        <span className="small">
-          No server and no account. The phones swap changes with each other when they're on the same Wi-Fi. Nothing leaves your home, and what they
-          send is sealed so only your household's phones can read it.
-        </span>
-        <span className="small">
-          <strong>This {device} syncs while Restock is open on it.</strong> An Android phone (Samsung, Google Pixel, Oppo, Motorola, Nokia and most
-          phones that aren't iPhones) answers in the background, so it doesn't need Restock open.
-        </span>
+        <span className="small">No server, no account. Phones swap changes on the same Wi-Fi.{' '}<More title="Syncing over Wi-Fi"><p>No server and no account. The phones swap changes with each other when they're on the same Wi-Fi. Nothing leaves your home, and what they
+          send is sealed so only your household's phones can read it.</p></More></span>
+        <span className="small">This {device} syncs while Restock is open. The Android phone answers in the background.{' '}<More title="When it syncs"><p><strong>This {device} syncs while Restock is open on it.</strong> An Android phone (Samsung, Google Pixel, Oppo, Motorola, Nokia and most
+          phones that aren't iPhones) answers in the background, so it doesn't need Restock open.</p></More></span>
         {apple && (
           <span className="small">
             <strong>Two iPhones or iPads:</strong> both need Restock open on screen at the same moment, on the same Wi-Fi, or nothing is swapped.
@@ -360,10 +356,7 @@ export function WifiSyncScreen({ apple }: { apple?: boolean }) {
 
           <div className="eyebrow">Good to know</div>
           <div className="card" style={{ gap: 8 }}>
-            <span className="small">
-              <strong>Only at home.</strong> The phones have to be on the same Wi-Fi. Away from home, each keeps working by itself and they catch up
-              when they're back.
-            </span>
+            <span className="small">Only at home, on the same Wi-Fi. Away, each works alone and they catch up later.</span>
             <span className="small">
               <strong>The first time, iOS asks</strong> whether Restock may find devices on your local network. Say yes: that is how it reaches the
               other phone.

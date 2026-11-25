@@ -70,7 +70,8 @@ function restockPwa(): Plugin {
 export default mergeConfig(
   base,
   defineConfig({
-    define: { 'import.meta.env.VITE_SERVER_MODE': JSON.stringify('1') },
+    // The server hands out the photo reader's model files itself (a browser never goes to GitHub for them).
+    define: { 'import.meta.env.VITE_SERVER_MODE': JSON.stringify('1'), __READER_BUNDLED__: 'true' },
     plugins: [restockPwa()],
     build: { outDir: process.env.SERVER_WEB_OUT || 'server/public/app', emptyOutDir: true, sourcemap: false },
   }),

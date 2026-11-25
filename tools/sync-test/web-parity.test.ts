@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import initSqlJs from 'sql.js';
 import { expect, it } from 'vitest';
-import { MIGRATIONS } from '../../src/lib/sql/schema';
+
 import { createSqlJsDriver } from '../../src/lib/sql/sqljs';
 import { addListEntry, getReceipt, getSettings, initDb, saveReceipt, updateListEntry, updateSettings } from '../../src/lib/db';
 import { getHouseholdSettings, setHouseholdSettings } from '../../src/lib/householdSettings';

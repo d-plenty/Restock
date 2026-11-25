@@ -1,5 +1,10 @@
 name: Checks
 
+# Every push to main and every pull request: the type check, the linter and the unit tests; the
+# Android app's own sync code run against real databases and a real Restock server; and a build of
+# the Android app. The iPhone app is built by its own workflow (ios.yml), and the server's tests and
+# image by the server's repository.
+
 on:
   push:
     branches: [main]
@@ -8,8 +13,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
+    name: Type check, lint and unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,4 +29,55 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test
+
+  sync:
+    name: Android sync code against real databases and a server
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: Restock
+          # The tags too: phones on older versions are built from them where they exist.
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: d-plenty/restock-server
+          path: restock-server
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Restock/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: org.json (the JSON library Android has built in)
+        run: mvn -q dependency:copy -Dartifact=org.json:json:20240303 -DoutputDirectory="$RUNNER_TEMP/lib"
+      - run: npm ci
+        working-directory: Restock
+      - name: Sync tests
+        working-directory: Restock
+        run: ORGJSON="$RUNNER_TEMP/lib/json-20240303.jar" bash tools/sync-test/run.sh
+
+  android:
+    name: Android app builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      # A debug build: it needs no signing key, and none is ever kept here.
+      - run: npm run android:apk-debug

@@ -60,7 +60,7 @@ export const SOON: Soon[] = [
     id: 'iphone',
     icon: 'phone',
     title: 'iPhone app',
-    short: 'Restock runs on iPhone and iPad now. Widgets, recall alerts and the App Store are still to come',
+    short: 'Restock runs on iPhone and iPad now. Widgets and the App Store are still to come',
     body: (
       <>
         <p>
@@ -76,8 +76,7 @@ export const SOON: Soon[] = [
           tap Share, then <strong>Add to Home Screen</strong>. The server's sign-in page has the steps under <strong>On iPhone?</strong>
         </p>
         <p>
-          Still to come on iPhone and iPad: home screen widgets, recall alerts, shared price history (knowing an item's usual price from day one),
-          app icon colours, and the App Store and TestFlight. Two things aren't possible on an iPhone because of Apple's restrictions: checking
+          Still to come on iPhone and iPad: home screen widgets, and the App Store and TestFlight. Two things aren't possible on an iPhone because of Apple's restrictions: checking
           prices at a set time of day (they're checked when you open Restock) and Restock updating itself.
         </p>
       </>

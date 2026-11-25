@@ -897,6 +897,38 @@ export function PriceChart({ readings, typical }: { readings: PriceReading[]; ty
   );
 }
 
+/**
+ * Less writing on screen: a screen says one short line, and the longer explanation sits behind this
+ * small ⓘ, in a sheet. `title` is the sheet's heading (what the explanation is about).
+ */
+export function More({ title, children }: { title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="more-i"
+        aria-label={`More about: ${title}`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(true);
+        }}
+      >
+        <Icon name="info" size={18} />
+      </button>
+      {open && (
+        <Sheet title={title} onClose={() => setOpen(false)}>
+          <div className="more-body">{children}</div>
+          <button className="btn primary block" onClick={() => setOpen(false)}>
+            Done
+          </button>
+        </Sheet>
+      )}
+    </>
+  );
+}
+
 /** A short "how this works" note that opens when tapped. */
 export function Explain({ title, children, open }: { title: string; children: ReactNode; open?: boolean }) {
   return (

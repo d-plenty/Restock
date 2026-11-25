@@ -28,8 +28,9 @@ export function LookSettings({ settings }: { settings: Settings }) {
       const real = s.look.icon === 'match' ? nearestIcon(s.look.accent ?? AUS_GREEN).id : s.look.icon;
       setIconBusy(true);
       try {
-        await RestockNative.setAppIcon({ id: real });
-        nav.toast('App icon changed. If it disappeared from your home screen, add it again from the app list.');
+        const { ok } = await RestockNative.setAppIcon({ id: real });
+        if (ok === false) throw new Error('not changed');
+        nav.toast(isIos() ? 'App icon changed.' : 'App icon changed. If it disappeared from your home screen, add it again from the app list.');
       } catch {
         nav.toast("Couldn't change the icon on this phone.");
       } finally {
@@ -124,7 +125,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
         </div>
       </details>
 
-      <details className="pick-more" hidden={isIos()}>
+      <details className="pick-more">
         <summary>
           <span className="grow">App icon colour</span>
           <span className="small">{look.icon === 'match' ? 'Matches accent' : (ICON_COLOURS.find((c) => c.id === iconId)?.name ?? '')}</span>
@@ -162,8 +163,9 @@ export function LookSettings({ settings }: { settings: Settings }) {
             })}
           </div>
           <span className="small">
-            The basket on the icon turns light or dark to suit the colour. On some phones changing the icon closes Restock for a moment, and you may
-            need to put the icon back on your home screen.
+            {isIos()
+              ? 'The basket on the icon turns light or dark to suit the colour.'
+              : 'The basket on the icon turns light or dark to suit the colour. On some phones changing the icon closes Restock for a moment, and you may need to put the icon back on your home screen.'}
           </span>
         </div>
       </details>

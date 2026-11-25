@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
 export default defineConfig({
-  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  define: { __APP_VERSION__: JSON.stringify(pkg.version), __READER_BUNDLED__: 'false' },
   // Not the app: no public/ copied, no index.html.
   publicDir: false,
   // 0.9.5: the shop connections (src/stores/*, for "Let the web page search the shops") come in, but
