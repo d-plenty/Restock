@@ -13,7 +13,7 @@
 set -e
 cd "$(dirname "$0")/../.."
 : "${ORGJSON:?Set ORGJSON to the org.json jar (https://github.com/stleary/JSON-java)}"
-npx vitest run --config tools/sync-test/vitest.config.ts >/dev/null
+npx vitest run --config tools/sync-test/vitest.config.ts tools/sync-test/schema.test.ts >/dev/null
 J=android/app/src/main/java/family/plenty/restock
 O=tools/sync-test/out
 rm -rf $O/classes && mkdir -p $O/classes
