@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.15.2" src="https://img.shields.io/badge/status-release%20candidate%200.15.2-ffcd00">
+  <img alt="Release candidate 0.16.0" src="https://img.shields.io/badge/status-release%20candidate%200.16.0-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0152">New in 0.15.2</a> ·
+  <a href="#new-in-0160">New in 0.16.0</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#iphone-and-ipad">On iPhone</a> ·
@@ -143,6 +143,27 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 ## iPhone and iPad
 
 Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Prices are checked in the background too: a little at a time, and a longer check from your set time while the iPhone is charging and on Wi-Fi (iOS picks the exact moment). One thing isn't possible because of Apple's restrictions: the app updating itself. Still to come there: home screen widgets, Search with Google Lens straight from the app, and the App Store. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.16.0
+
+A fresh look, your name on Home, a new logo, and holiday themes.
+
+**A fresh look**
+- **Every screen, every device:** rounder cards that float on a soft shadow, pill-shaped buttons, fields and choices, round icon buttons, a deeper curve under the navy top, and a floating tab bar with the tab you're on in a gold pill. Settings' rows have coloured icons. Nothing has moved.
+- **Tablets, iPads and computers use the whole screen.** Upright, the page fills the width (it was the phone's column with empty sides); sideways, the navy top reaches right across. Android tablets get the side bar too, the same as the iPad.
+
+**Your name**
+- **"What should we call you?"** when you set up or join, and once after updating (skip it and it doesn't ask again). Home says "Good morning, Sam".
+- It also names this phone in your household ("Sam's iPhone") and goes in your backup's file name; restoring a backup brings it back. Change it at the top of Settings (the ⓘ says where it's used).
+
+**A new logo and an opening**
+- **A touched-up logo** with a shine, the basket's weave and a gold price tag, on the app icon, the server and GitHub.
+- **A short opening animation**, about two and a half seconds, when Restock starts from closed (not each time you come back to it). A tap ends it early. With Less motion on it's a still picture instead.
+
+**Holiday themes**
+- **Christmas** (1–26 December), **New Year** (27 December – 1 January), **Australia Day** (2–31 January), **Easter** (the two weeks up to Easter Monday) and **Halloween** (October). Each has its own opening, a sunny day look in light mode and a night look in dark mode: the kangaroos pulling Santa's sleigh over the beach, fireworks at New Year, the flag waving over the barbecue, eggs and fireflies, bats and a haunted house. On the default theme the app also takes the holiday's colours, with a little decoration in Home's top bar.
+- **Settings → Look and colours:** Opening animation (off: no opening at all), Holiday themes, and **See the openings**, which plays any of them, day or night, whenever you like. Each phone and browser has its own. Your own colours stay as they are (you still get the opening).
+- "Australian theme" is now called the **default theme**.
 
 ## New in 0.15.2
 

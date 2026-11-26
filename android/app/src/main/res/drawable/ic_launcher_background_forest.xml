@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- App icon background: forest (Settings → Look and colours → App icon). -->
+<!-- App icon background for the forest icon, with a soft shine at the top (made by tools/icons/make-icons.cjs). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -16,6 +16,18 @@
                 android:endY="108"
                 android:startColor="#2E7D32"
                 android:endColor="#19451C" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M0,0h108v54h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="18"
+                android:endX="0"
+                android:endY="54"
+                android:startColor="#38FFFFFF"
+                android:endColor="#00FFFFFF" />
         </aapt:attr>
     </path>
 </vector>

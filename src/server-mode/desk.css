@@ -976,3 +976,27 @@ html.server-mode select.input {
 .dk-btns a.btn:hover {
   text-decoration: none;
 }
+
+/* ---------- 0.16.0: the modern look, as on the phone (styles.css) ----------
+   Rounder cards on a soft shadow (an edge in dark mode), and pills for the switches and buttons. */
+.dk-tile,
+.dk-table-wrap {
+  border-radius: var(--r-xl);
+  border-color: var(--card-edge);
+  box-shadow: var(--card-shadow);
+}
+button.dk-tile:hover {
+  border-color: var(--line-2);
+}
+.dk-tile.navy {
+  border-color: var(--navy);
+}
+.dk-seg,
+.dk-seg button,
+.dd-export-btn,
+.dk-phone-pick button {
+  border-radius: var(--r-full);
+}
+.dd-band {
+  border-radius: var(--r-xl);
+}

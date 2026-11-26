@@ -2,6 +2,11 @@
 // household, with what only the owner phone or each phone can change shown greyed. Phones: each
 // phone's own settings, greyed, to change on that phone. Everything it reads or changes goes
 // through settingsData.ts.
+import { NameCard } from '../../ui/NameAsk';
+import { lessMotion } from '../../ui/Opening';
+import { OpeningPreview } from '../../ui/OpeningPreview';
+import { useSettings } from '../../lib/useLive';
+import { updateSettings as updateBrowserSettings } from '../../lib/db';
 import { Fragment, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { confirmAction } from '../../lib/confirm';
 import { useLive } from '../../lib/useLive';
@@ -307,6 +312,8 @@ function HouseholdPart() {
   const [changing, setChanging] = useState(false);
   const [msg, setMsg] = useState<string>();
   const [saving, setSaving] = useState(false);
+  const mine = useSettings(); // 0.16.0: this browser's own (the name, the openings, the holidays)
+  const [seeing, setSeeing] = useState(false); // 0.16.0: See the openings
   // 0.9.5 (save): changes waiting for Save settings, shown in place of what's set (hv).
   const [pend, setPend] = useState<Pending>({});
   const dirty = !!h && pendingChanges(h, pend).length > 0;
@@ -340,6 +347,8 @@ function HouseholdPart() {
   const hold = (p: Pending) => setPend((was) => ({ ...was, ...p })); // 0.9.5 (save)
   return (
     <>
+      {/* 0.16.0: what to call you in this browser, as at the top of the phone's Settings */}
+      <NameCard name={mine?.myName} />
       <p className="small dk-tight">
         Household settings apply to every phone and go out with the next sync. Anything only a phone can change is shown greyed, with where to change it.
       </p>
@@ -630,6 +639,31 @@ function HouseholdPart() {
               </button>
             ))}
           </div>
+        </Line>
+        {/* 0.16.0: as on the phone (Look and colours): the holidays, this browser's own */}
+        <Line title="Opening animation" htmlFor="dk-opening" sub="A short animation when the page opens. Off, no opening at all, holidays included. Just for this browser">
+          <input
+            id="dk-opening"
+            type="checkbox"
+            className="switch"
+            checked={mine?.look.opening !== false}
+            onChange={(e) => mine && void updateBrowserSettings({ look: { ...mine.look, opening: e.target.checked } }, { local: true })}
+          />
+        </Line>
+        <Line title="Holiday themes" htmlFor="dk-holidays" sub="Christmas, New Year, Australia Day, Easter and Halloween: the holiday's opening, and its colours. Just for this browser">
+          <input
+            id="dk-holidays"
+            type="checkbox"
+            className="switch"
+            checked={mine?.look.holidays !== false}
+            onChange={(e) => mine && void updateBrowserSettings({ look: { ...mine.look, holidays: e.target.checked } }, { local: true })}
+          />
+        </Line>
+        <Line title="See the openings" sub="The usual one and each holiday's, day and night">
+          <button className="btn small" onClick={() => setSeeing(true)}>
+            See them
+          </button>
+          {seeing && mine && <OpeningPreview still={lessMotion(mine.a11y.motion)} onClose={() => setSeeing(false)} />}
         </Line>
         <Line
           title="Download this browser's copy"

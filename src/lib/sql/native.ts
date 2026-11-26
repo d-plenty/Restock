@@ -266,6 +266,8 @@ export interface SyncInfo {
   device?: string;
   /** This phone's name, shown on the others. */
   name?: string;
+  /** 0.16.0: what it's called when no one has named it (Android: the model; iPhone: "iPhone" or "iPad"). */
+  defaultName?: string;
   household?: string;
   shareCards?: boolean;
   keepReady?: boolean;

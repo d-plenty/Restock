@@ -25,6 +25,8 @@
   --r-md: 12px;
   --r-lg: 16px;
   --r-xl: 22px;
+  /* 0.16.0: the curve under a screen's navy top */
+  --r-2xl: 32px;
   --r-full: 999px;
   /* Text: tags and fine print, details, table text, body and item names, card headings and
      fields, section numbers, page numbers, screen titles, big figures, letter placeholders. */
@@ -150,6 +152,15 @@
   --tab-on: var(--gold);
   --shade-bg: var(--navy);
   --bubble-ring: var(--gold);
+  /* 0.16.0 (the modern look): cards float on a soft shadow instead of an outline, the tab bar is a
+     floating pill, and the tab you're on is a pill of its own. In dark mode cards keep an edge. */
+  --card-shadow: 0 1px 2px rgba(1, 33, 105, 0.05), 0 8px 22px rgba(1, 33, 105, 0.06);
+  --card-edge: transparent;
+  --bar-shadow: 0 12px 30px rgba(1, 33, 105, 0.3);
+  --cta-shadow: 0 10px 24px rgba(0, 122, 56, 0.3);
+  --tab-pill: var(--gold);
+  --tab-pill-ink: var(--navy);
+  --on-navy-soft: rgba(255, 255, 255, 0.14);
   --aldi-dot: var(--shop-aldi);
   /* Chart colours (web Data tab). */
   --chart-1: #012169;
@@ -241,6 +252,10 @@
   --tile-icon-bg: rgba(255, 255, 255, 0.1);
   --shadow: rgba(0, 0, 0, 0.45);
   --tabbar-bg: #0b1a44;
+  --card-shadow: none;
+  --card-edge: var(--line);
+  --bar-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+  --cta-shadow: none;
   --shade-bg: #0b1a44;
   --on-ink: var(--bg);
   --bar: var(--line);
@@ -308,6 +323,10 @@
     --tile-icon-bg: rgba(255, 255, 255, 0.1);
     --shadow: rgba(0, 0, 0, 0.45);
     --tabbar-bg: #0b1a44;
+    --card-shadow: none;
+    --card-edge: var(--line);
+    --bar-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+    --cta-shadow: none;
     --shade-bg: #0b1a44;
     --on-ink: var(--bg);
     --bar: var(--line);
@@ -340,6 +359,9 @@
   --tabbar-bg: var(--surface);
   --tab-ink: var(--muted);
   --tab-on: var(--green);
+  --tab-pill: var(--green-bg);
+  --tab-pill-ink: var(--green-ink);
+  --bar-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
   --shade-bg: var(--bg);
   --bubble-ring: var(--surface);
   /* The web's sidebar keeps light text, so in the Plain style it's a neutral dark, not navy. */
@@ -413,4 +435,36 @@
   --line: #4d4d4d;
   --line-2: #4d4d4d;
   --dash: var(--ink-2);
+}
+
+/* ---------- 0.16.0: the holidays (lib/holiday.ts), on the default theme only ----------
+   The bars take the holiday's colours, the gold and the main buttons follow, and everything else
+   stays as it is (text colours too, so they stay readable in dark mode). Set on <html data-holiday> by lib/theme.ts, and gone again when the holiday is. */
+:root[data-holiday='christmas'] {
+  --more-top: linear-gradient(160deg, #a3162a 0%, #6e0d1c 100%);
+  --tabbar-bg: #7a0f20;
+  --green-solid: #0f6b3a;
+}
+:root[data-holiday='halloween'] {
+  --more-top: linear-gradient(160deg, #3a1d5c 0%, #1c0f33 100%);
+  --tabbar-bg: #24123f;
+  --gold: #ff8a1c;
+  --green-solid: #a34a00;
+}
+:root[data-holiday='easter'] {
+  --more-top: linear-gradient(160deg, #4a86c8 0%, #2f5f9e 100%);
+  --tabbar-bg: #2f5f9e;
+  --gold: #ffe28a;
+  --green-solid: #23774a;
+}
+:root[data-holiday='australia'] {
+  --more-top: linear-gradient(160deg, #00964a 0%, #006b31 100%);
+  --tabbar-bg: #006b31;
+  --green-solid: #012169;
+}
+
+:root[data-holiday='newyear'] {
+  --more-top: linear-gradient(160deg, #2a2f7a 0%, #0d1240 100%);
+  --tabbar-bg: #141a52;
+  --green-solid: #6a2fb0;
 }

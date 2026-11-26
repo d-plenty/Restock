@@ -109,11 +109,21 @@ export function MoreTop({ children }: { children?: ReactNode }) {
   );
 }
 
+const TONES: Record<string, 'green' | 'amber' | 'pink' | 'blue' | 'purple' | 'teal' | 'orange' | 'slate'> = {
+  settings: 'slate',
+  card: 'blue',
+  shop: 'green',
+  receipt: 'amber',
+};
+
 /** The rows under the navy top, the same five on the phone and the web page. */
 function MoreRow({ icon, title, sub, onClick, off }: { icon: string; title: string; sub: string; onClick: () => void; off?: boolean }) {
   return (
     <button className="row" onClick={onClick}>
-      <Icon name={icon} size={22} />
+      {/* 0.16.0: in a coloured tile, like Settings' rows */}
+      <span className="row-tile" data-tone={TONES[icon] ?? 'slate'} aria-hidden="true">
+        <Icon name={icon} size={20} />
+      </span>
       <span className="grow">
         <span className="title" style={{ fontSize: 15 }}>
           {title}

@@ -1316,6 +1316,9 @@ public class RestockNativePlugin extends Plugin {
 
     private JSObject syncInfoObject(SyncHub hub) {
         JSObject o = new JSObject();
+        // 0.16.0: what this phone is called before anyone names it (its model), so the app can tell
+        // a phone that was never renamed from one someone named (lib/myName.ts).
+        o.put("defaultName", SyncHub.defaultName());
         try {
             hub.upgradeOldPairing();
             boolean ready = hub.ready();

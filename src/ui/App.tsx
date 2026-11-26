@@ -15,10 +15,10 @@ import { cachedSettings, getKV, getSettings, pruneHistory, putKV, refresh, updat
 import { checkForUpdate, learnChannel, SELF_UPDATE, weeklyCheckDue } from '../lib/updates';
 import { version as appVersion } from '../../package.json';
 import { setConnectionMode } from '../stores/http';
-import { applyTheme, syncInsets } from '../lib/theme';
+import { applyTheme, isDark, syncInsets } from '../lib/theme';
 import { scheduleReminders } from '../lib/notify';
 import { useLive } from '../lib/useLive';
-import { Announcer, closeTopLayer, Icon, layerHost, runBackHandlers } from './components';
+import { Announcer, closeTopLayer, Icon, layerHost, Logo, runBackHandlers } from './components';
 import { isMoreTab, isSectionTab, NavContext, type Nav, type Screen, type Tab } from './nav';
 import { MoreScreen } from './screens/More';
 import { activeSections, type Section } from '../shops';
@@ -32,6 +32,10 @@ import { ItemScreen } from './screens/Item';
 import { ListScreen } from './screens/List';
 import { Onboarding } from './screens/Onboarding';
 import { WhatsNewPrompt } from './screens/WhatsNew';
+import { NameSheet } from './NameAsk';
+import { lessMotion, Opening, openingPlayed } from './Opening';
+import { holidayNow } from '../lib/holiday';
+import { labelPhone } from '../lib/myName';
 import { InventoryScreen, InventorySettingsScreen } from './Inventory';
 import { noteSeenVersion, seenVersion, shouldOfferWhatsNew } from '../lib/whatsNew';
 import { addShared, nameFromLink, splitShared } from '../lib/shared';
@@ -367,6 +371,8 @@ function RestockApp() {
   // 0.12.9: after an update, offer What's new once. A new install is never asked: it notes the
   // version while it's being set up.
   const [whatsNew, setWhatsNew] = useState(false);
+  const [nameLater, setNameLater] = useState(false);
+  const [opening, setOpening] = useState(() => !openingPlayed());
   const closeWhatsNew = () => {
     noteSeenVersion(appVersion);
     setWhatsNew(false);
@@ -490,6 +496,10 @@ function RestockApp() {
     void tidyReceipts().catch((e) => console.error('receipt tidy-up failed', e));
     // 0.15.2: the screens opened now and then are loaded quietly, so none opens on a blank page.
     void preloadScreens();
+    // 0.16.0: this phone's name in the household follows the person's (after a restore, say).
+    void getSettings()
+      .then((s) => (s.myName ? labelPhone(s.myName) : undefined))
+      .catch(() => undefined);
     // 0.9.13: feedback that couldn't go when it was sent (no connection) goes now.
     void import('../lib/feedback').then((f) => f.sendWaiting()).catch(() => undefined);
     // 0.10.0: Shared prices is one switch, on for every phone. A phone that had sharing off stays off
@@ -571,6 +581,8 @@ function RestockApp() {
         <div className="app">
           <div className="status-shade" aria-hidden />
           <Onboarding />
+          {/* 0.16.0: the opening animation plays before the first screen too */}
+          {opening && settings && settings.look.opening !== false && <Opening holiday={holidayNow(settings)} look={isDark(settings.theme) ? 'night' : 'day'} still={lessMotion(settings.a11y.motion)} onDone={() => setOpening(false)} />}
           {/* Setup tiles can open these (cards, shop accounts, sync) before setup is finished. */}
           {stack.length > 0 && (
             <div className="overlay">
@@ -750,7 +762,7 @@ function RestockApp() {
           {/* 0.13.2, an iPad held sideways: the same tabs down the left side, with More's rows listed under them. */}
           {padWide && (
             <div className="pad-brand" aria-hidden="true">
-              <span className="pad-brand-mark">R</span>
+              <Logo size={38} />
               <span>Restock</span>
             </div>
           )}
@@ -784,6 +796,10 @@ function RestockApp() {
 
         <TourHost />
         <ConfirmHost />
+        {/* 0.16.0: the opening animation, once each time Restock starts from closed (Opening.tsx) */}
+        {opening && settings && settings.look.opening !== false && <Opening holiday={holidayNow(settings)} look={isDark(settings.theme) ? 'night' : 'day'} still={lessMotion(settings.a11y.motion)} onDone={() => setOpening(false)} />}
+        {/* 0.16.0: once after updating (a new install asks while setting up): what to call you */}
+        {!whatsNew && !nameLater && settings?.onboarded && !settings.nameAsked && <NameSheet onClose={() => setNameLater(true)} />}
         {whatsNew && (
           <WhatsNewPrompt
             onRead={() => {

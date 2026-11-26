@@ -26,6 +26,7 @@ import { INV_BACKUP_KV, inventoryForBackup, restoreInventory } from './inventory
 import { isCardPhotoPath, readCardPhoto, writeCardPhoto } from './cardPhotos';
 import { costcoOf, withCostcoKept, withoutCostco } from './costcoLocal';
 import { quiet } from './quietErrors';
+import { fileNamePart } from './myName';
 
 export { shareTextFile };
 
@@ -250,7 +251,9 @@ export async function exportBackup(parts: ExportParts = EVERYTHING): Promise<str
     parts.receipts !== false;
   // 0.9.0: named for the day on the phone's own calendar, not UTC's (an evening backup in
   // Australia isn't yesterday's).
-  const name = `restock-backup-${localDay(new Date().toISOString())}${whole ? '' : '-part'}${parts.password ? '-locked' : ''}.json`;
+  // 0.16.0: with the name of whoever made it, when there is one ("restock-backup-Declan-2026-11-26.json").
+  const who = fileNamePart(await getSettings());
+  const name = `restock-backup-${who ? who + '-' : ''}${localDay(new Date().toISOString())}${whole ? '' : '-part'}${parts.password ? '-locked' : ''}.json`;
 
   await shareTextFile(name, json, 'application/json', 'Restock backup');
   await updateSettings({ lastBackupAt: new Date().toISOString() });

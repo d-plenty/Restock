@@ -1,4 +1,5 @@
 import { getSettings, updateSettings } from './db';
+import { fileNamePart } from './myName';
 import { backupJson, EVERYTHING, type ExportParts } from './backup';
 import { RestockNative } from './sql/native';
 import { isNative } from '../stores/http';
@@ -48,10 +49,13 @@ function backupDue(s: Settings, now = Date.now()): boolean {
   return now - Date.parse(b.lastAt) >= b.everyDays * 86_400_000 - 3 * 3_600_000;
 }
 
-/** "restock-auto-2026-11-07-0915.json": sorts by date, so the oldest are easy to find and remove. */
-function autoName(d = new Date()): string {
+/**
+ * "restock-auto-2026-11-07-0915.json": sorts by date, so the oldest are easy to find and remove.
+ * 0.16.0: the person's name after the time, when there is one ("…-0915-Declan.json"): still by date.
+ */
+export function autoName(d = new Date(), who = ''): string {
   const p = (n: number) => String(n).padStart(2, '0');
-  return `restock-auto-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.json`;
+  return `restock-auto-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${who ? '-' + who : ''}.json`;
 }
 
 let running = false;
@@ -66,7 +70,7 @@ export async function maybeAutoBackup(force = false): Promise<string | undefined
     // 0.9.0: locked with the automatic backups' password, if one is set.
     // 0.9.6 (review M3): gift cards only in a locked backup (autoParts).
     const json = await backupJson(autoParts(s.autoBackup));
-    const name = autoName();
+    const name = autoName(new Date(), fileNamePart(s));
     await RestockNative.writeBackup({ uri: s.autoBackup.folder, name, json, keep: s.autoBackup.keep });
     const now = new Date().toISOString();
     const latest = await getSettings();

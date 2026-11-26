@@ -12,6 +12,7 @@ import { HistoryLengths } from './DayOne';
 import { SHARED_ONE_LINE, SHARED_TITLE, TurnOffShared } from './SharedPrices';
 import { shareFromNow, sharedOn } from '../../lib/priceShare';
 import { useLive, useSettings } from '../../lib/useLive';
+import { NameFields } from '../NameAsk';
 import { enabledIn, SECTION_NAMES, sectionOn, type MadeSection } from '../../shops';
 import { CustomStarts, madeInUse } from './CustomSections';
 import { checkAll } from '../../lib/permissions';
@@ -910,7 +911,7 @@ const AGREE_POINTS: { icon: string; tone: string; title: string; text: string }[
 export function Onboarding() {
   const settings = useSettings();
   // 0.10.7: accessibility comes straight after the welcome, before anything else is asked
-  const [stage, setStage] = useState<'welcome' | 'a11y' | 'privacy' | 'notify' | 'restored'>('welcome');
+  const [stage, setStage] = useState<'welcome' | 'a11y' | 'name' | 'privacy' | 'notify' | 'restored'>('welcome');
   // 0.8.2: joining a household from the first screen: privacy, then scan the owner phone's code.
   const [joiningHousehold, setJoiningHousehold] = useState(false);
   const [joinCode, setJoinCode] = useState<string>();
@@ -944,8 +945,9 @@ export function Onboarding() {
   };
   // Android's back button steps back through setup instead of closing Restock.
   useBackHandler(() => {
-    if (stage === 'a11y' || stage === 'privacy' || stage === 'notify') {
-      setStage(stage === 'notify' ? 'privacy' : 'welcome');
+    if (stage === 'a11y' || stage === 'name' || stage === 'privacy' || stage === 'notify') {
+      // 0.16.0: the name comes between the welcome and the agreement.
+      setStage(stage === 'notify' ? 'privacy' : stage === 'privacy' ? 'name' : 'welcome');
       return true;
     }
     return false;
@@ -1026,12 +1028,13 @@ export function Onboarding() {
           onSetUp={() => {
             // 0.12.0: straight to the short agreement; accessibility is the button at the top.
             setJoiningHousehold(false);
-            setStage('privacy');
+            // 0.16.0: "What should we call you?" first.
+            setStage('name');
           }}
           onRestoreFile={(file) => void restore(file)}
           onJoin={() => {
             setJoiningHousehold(true);
-            setStage('privacy');
+            setStage('name');
           }}
           onA11y={() => setStage('a11y')}
         />
@@ -1060,6 +1063,15 @@ export function Onboarding() {
           >
             Done
           </button>
+        </>
+      )}
+      {stage === 'name' && (
+        // 0.16.0: one box. The name goes with this phone into the household and its backups (myName.ts).
+        <>
+          <div className="navy-top">
+            <h1>What should we call you?</h1>
+          </div>
+          <NameFields start={settings.myName ?? ''} onDone={() => setStage('privacy')} />
         </>
       )}
       {stage === 'privacy' && (

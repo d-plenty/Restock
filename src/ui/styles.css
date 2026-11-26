@@ -7789,3 +7789,408 @@ span.inv-num {
 .more-body p {
   margin: 0;
 }
+
+/* ---------- 0.16.0: your name (NameAsk.tsx) ---------- */
+.name-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.name-ask-line {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: 1.45;
+}
+.name-ask-input {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+}
+.name-ask-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.name-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  min-height: var(--hit);
+  cursor: pointer;
+}
+.name-main .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.name-avatar {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-navy);
+  color: var(--gold);
+  font-size: var(--fs-xl);
+  font-weight: 800;
+}
+.name-chev {
+  flex: none;
+  border: none;
+  background: none;
+  color: var(--muted);
+  min-width: var(--hit);
+  min-height: var(--hit);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* ---------- 0.16.0: a holiday's decoration in Home's top bar (HolidayDecor.tsx) ---------- */
+.home-top {
+  position: relative;
+  isolation: isolate;
+}
+.home-top > :not(.holiday-decor) {
+  position: relative;
+  z-index: 1;
+}
+.holiday-decor {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.hd-lights {
+  position: absolute;
+  left: 0;
+  top: calc(var(--top, 0px) - 2px);
+  width: 100%;
+  height: 30px;
+}
+/* room for the lights above the date */
+.home-top:has(.hd-christmas) {
+  padding-top: calc(var(--top) + 34px);
+}
+.hd-tw-a {
+  animation: hdTwinkle 1s ease-in-out infinite;
+}
+.hd-tw-b {
+  animation: hdTwinkle 1s ease-in-out 0.5s infinite;
+}
+.hd-web {
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+.hd-spider {
+  position: absolute;
+  right: 22px;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: 50% 0;
+  animation: hdSpin 2.6s ease-in-out infinite;
+}
+.hd-thread {
+  width: 1px;
+  height: calc(var(--top, 0px) + 12px);
+  background: var(--on-navy-line);
+}
+.hd-bat {
+  position: absolute;
+  left: 52%;
+  top: calc(var(--top, 0px) + 22px);
+}
+.hd-eggs {
+  position: absolute;
+  right: 14px;
+  bottom: 6px;
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+}
+.hd-confetti {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.85;
+}
+.hd-cross {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.18;
+}
+.check-now {
+  position: relative;
+}
+.hd-hat {
+  position: absolute;
+  left: -10px;
+  top: -14px;
+  transform: rotate(-18deg);
+  pointer-events: none;
+}
+.hello-name {
+  position: relative;
+  display: inline-block;
+}
+.hd-ears {
+  position: absolute;
+  left: 50%;
+  top: -24px;
+  margin-left: -18px;
+  z-index: -1;
+  pointer-events: none;
+}
+@keyframes hdTwinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes hdSpin {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+:root[data-motion='reduce'] :is(.hd-tw-a, .hd-tw-b, .hd-spider) {
+  animation: none;
+}
+
+/* ---------- 0.16.0: the modern look ----------
+   Everything stays where it was; only the shapes change. Pills for buttons, fields, chips and
+   switches between choices; cards that float on a soft shadow (an edge in dark mode) with rounder
+   corners; round icon buttons; a deeper curve under the navy top; a floating pill tab bar with the
+   tab you're on in a gold pill (iPad sideways: the side bar's tab in the same pill); coloured icon
+   tiles on Settings' rows; the stepper a pill. Phone, tablet, iPhone, iPad and the web all get it. */
+.btn,
+.btn.small,
+.chip,
+.input,
+select.input,
+select,
+.seg,
+.seg button {
+  border-radius: var(--r-full);
+}
+textarea.input {
+  border-radius: var(--r-lg);
+}
+.btn.small {
+  padding: 0 14px;
+}
+.chip {
+  padding: 0 16px;
+}
+.card {
+  border-radius: var(--r-xl);
+  border-color: var(--card-edge);
+  box-shadow: var(--card-shadow);
+}
+.card.dashed {
+  border-color: var(--dash);
+  box-shadow: none;
+}
+.card .card,
+.sheet .card,
+.overlay .sheet .card {
+  box-shadow: none;
+  border-color: var(--line);
+}
+.navy-top,
+.navy-cont,
+.screen > .topbar {
+  border-radius: 0 0 var(--r-2xl) var(--r-2xl);
+}
+.navy-top.navy-open {
+  border-radius: 0;
+}
+:is(.navy-top, .navy-cont, .screen > .topbar) :is(.icon-btn, .btn:not(.primary)) {
+  border-color: transparent;
+  background: var(--on-navy-soft);
+}
+/* the tab bar: a floating navy pill */
+.app:not(.pad-wide) > .tabs,
+:root:not([data-style='plain']) .app:not(.pad-wide) > .tabs {
+  margin: 4px 12px calc(var(--bottom) + 10px);
+  padding: 8px;
+  border: 0;
+  border-radius: var(--r-full);
+  box-shadow: var(--bar-shadow);
+  align-items: center;
+}
+:root[data-style='plain'] .app:not(.pad-wide) > .tabs {
+  border: 1px solid var(--line);
+}
+.app:not(.pad-wide) > .tabs .tab {
+  min-height: 52px;
+  padding: 4px 0;
+  border-radius: var(--r-full);
+}
+.app:not(.pad-wide) > .tabs .tab[aria-current='page']:not(.centre-add) {
+  background: var(--tab-pill);
+  color: var(--tab-pill-ink);
+  margin: 0 2px;
+}
+.app:not(.pad-wide) > .tabs .tab[aria-current='page']:not(.centre-add)::before {
+  display: none;
+}
+.app:not(.pad-wide) > .tabs .tab.centre-add .bubble {
+  margin-top: -30px;
+}
+.app.pad-wide > .tabs .tab {
+  border-radius: var(--r-full);
+}
+.app.pad-wide > .tabs .tab[aria-current='page'] {
+  background: var(--tab-pill);
+  color: var(--tab-pill-ink);
+}
+/* Settings' rows: a coloured icon tile in front */
+.row-tile {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+}
+.row-tile[data-tone='green'] {
+  background: var(--tile-green-bg);
+  color: var(--tile-green-ink);
+}
+.row-tile[data-tone='amber'] {
+  background: var(--tile-amber-bg);
+  color: var(--tile-amber-ink);
+}
+.row-tile[data-tone='pink'] {
+  background: var(--tile-pink-bg);
+  color: var(--tile-pink-ink);
+}
+.row-tile[data-tone='blue'] {
+  background: var(--tile-blue-bg);
+  color: var(--tile-blue-ink);
+}
+.row-tile[data-tone='purple'] {
+  background: var(--tile-purple-bg);
+  color: var(--tile-purple-ink);
+}
+.row-tile[data-tone='teal'] {
+  background: var(--tile-teal-bg);
+  color: var(--tile-teal-ink);
+}
+.row-tile[data-tone='orange'] {
+  background: var(--tile-orange-bg);
+  color: var(--tile-orange-ink);
+}
+.row-tile[data-tone='slate'] {
+  background: var(--tile-slate-bg);
+  color: var(--tile-slate-ink);
+}
+/* the stepper: a pill */
+.stepper {
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--sunken);
+}
+.stepper button {
+  background: transparent;
+  border-radius: var(--r-full);
+  color: var(--ink);
+}
+.stepper.going {
+  box-shadow: inset 0 0 0 1.5px var(--red-ink);
+}
+.sticky-cta .btn.primary {
+  height: 56px;
+  box-shadow: var(--cta-shadow);
+}
+/* the other cards and tiles: the same float */
+.setup-tile,
+.sync-choice,
+.shop-pick,
+.match-card,
+.shop-tile,
+.cat-tile,
+.alt-group,
+.ios-box {
+  border-radius: var(--r-xl);
+  border-color: var(--card-edge);
+  box-shadow: var(--card-shadow);
+}
+.cart-btn,
+.home-links button,
+.add-tool {
+  border-radius: var(--r-full);
+}
+:is(.navy-top, .navy-cont) .list-switch-pill {
+  border-color: transparent;
+  background: var(--on-navy-soft);
+}
+.shopmode-top,
+.more-top {
+  border-radius: 0 0 var(--r-2xl) var(--r-2xl);
+}
+
+/* ---------- 0.16.0: tablets, iPads and computers: using the screen ----------
+   Held upright, a tablet or an iPad had the phone's narrow column with empty sides: now the page
+   fills the screen, its words in a comfortable column in the middle, the navy top right across and
+   the tab bar a pill in the middle. Sideways (the side bar), the same: the navy top and the buttons
+   stuck to the bottom reach right across, edge to edge, instead of stopping short. */
+@media (min-width: 700px) {
+  .app:not(.pad-wide) {
+    max-width: none;
+    --pad-gutter: max(18px, calc((100vw - 760px) / 2));
+  }
+  .app:not(.pad-wide) > .tabs,
+  :root:not([data-style='plain']) .app:not(.pad-wide) > .tabs {
+    width: min(620px, calc(100% - 24px));
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+.app.pad-wide {
+  --pad-gutter: max(18px, calc((100vw - var(--pad-side) - 820px) / 2));
+}
+@media (min-width: 700px) {
+  .app .screen {
+    padding-left: var(--pad-gutter);
+    padding-right: var(--pad-gutter);
+  }
+  .app .screen > :is(.navy-top, .navy-cont, .topbar, .more-top),
+  .app .sticky-cta {
+    margin-left: calc(-1 * var(--pad-gutter));
+    margin-right: calc(-1 * var(--pad-gutter));
+    padding-left: var(--pad-gutter);
+    padding-right: var(--pad-gutter);
+  }
+}

@@ -304,7 +304,14 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
       accent: colour(lk.accent),
       icon: oneOf(lk.icon, ICONS, D.look.icon),
       black: maybeBool(lk.black),
+      // 0.16.0: the holidays (holiday.ts): on unless turned off.
+      holidays: maybeBool(lk.holidays),
+      opening: maybeBool(lk.opening),
     }),
+    // 0.16.0: what to call the person (myName.ts).
+    myName: text(s.myName, 60),
+    nameAsked: maybeBool(s.nameAsked),
+    phoneLabel: text(s.phoneLabel, 60),
     a11y: {
       text: number(ax.text, D.a11y.text, TEXT_MIN, TEXT_MAX),
       contrast: bool(ax.contrast, D.a11y.contrast),

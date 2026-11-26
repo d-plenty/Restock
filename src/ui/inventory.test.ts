@@ -267,7 +267,7 @@ describe('0.13.1 inventory: on the screen', () => {
     expect(ui).toContain('Add to my shopping list automatically');
     expect(ui).toContain('Count what I tick off while shopping');
     expect(ui).toMatch(/await act\('Inventory settings saved', \(\) => saveInventorySettings\(d\)\)/);
-    expect(read('./screens/Settings.tsx')).toMatch(/row\('Inventory', inventorySummary\(inv\), \(\) => nav\.push\(\{ name: 'inventorySettings' \}\)\)/);
+    expect(read('./screens/Settings.tsx')).toMatch(/row\('Inventory', inventorySummary\(inv\), \(\) => nav\.push\(\{ name: 'inventorySettings' \}\)/);
   });
   it('the web page has the same Settings row (0.15.0: and the phone screens themselves)', () => {
     expect(read('../server-mode/ui/DeskSettings.tsx')).toContain('<InventoryLine />');

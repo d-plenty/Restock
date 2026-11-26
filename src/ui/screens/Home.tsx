@@ -2,6 +2,9 @@ import { useNow } from '../useNow';
 import { deviceWord, isIos, isPad } from '../../lib/platform';
 import { saveNeedsWarning, saveNow, saveState, subscribeSaveState } from '../../lib/saveState';
 import { greeting, todayText } from '../../lib/greeting';
+import { nameOf } from '../../lib/myName';
+import { holidayColours, holidayGreeting, holidayNow } from '../../lib/holiday';
+import { BunnyEars, HolidayDecor, SantaHat } from '../HolidayDecor';
 import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { askResume, clearTrip, loadTrip, subscribeTrip } from '../../lib/trip';
 import { refreshText, useFullRefresh } from '../refresh';
@@ -99,17 +102,33 @@ export function HomeScreen() {
   };
 
   const today = todayText();
+  // 0.16.0: the decoration follows the holiday's colours (only on the default theme).
+  const decor = holidayColours(settings);
 
   return (
     <div className="screen" {...refresh.props}>
       {refresh.indicator}
       {/* 0.12.4: the navy top every screen has: the greeting, the price check, the search box and this week's saving */}
-      <div className="navy-top">
+      <div className="navy-top home-top">
+      {/* 0.16.0: a holiday's little decoration, on the default theme (HolidayDecor.tsx) */}
+      <HolidayDecor holiday={decor} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div className="sub">{today}</div>
         <div className="topbar">
           {/* 0.12.5: no Settings cog here; Settings is in More */}
-          <h1>{greeting()}</h1>
+          {/* 0.16.0: with the person's name, when they gave one, and the holiday's hello */}
+          <h1>
+            {holidayGreeting(holidayNow(settings), greeting())}
+            {nameOf(settings) && (
+              <>
+                ,{' '}
+                <span className="hello-name">
+                  {nameOf(settings)}
+                  {decor === 'easter' && <BunnyEars />}
+                </span>
+              </>
+            )}
+          </h1>
         </div>
         {/* 0.10.10: Cards and Receipts live in More only. 0.12.2: the catalogues are here again, as buttons. */}
         <div className="checkline">
@@ -149,6 +168,7 @@ export function HomeScreen() {
               {isNative() && (
                 <button className="btn primary small check-now" onClick={runCheck} aria-label="Check prices and stock now">
                   <Icon name="refresh" size={16} /> Check now
+                  {decor === 'christmas' && <SantaHat />}
                 </button>
               )}
             </>

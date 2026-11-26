@@ -442,9 +442,21 @@ export interface Settings {
   area?: HomeArea;
   lastCheck?: string;
   demoLoaded?: boolean;
-  /** Colours: the Australian style (navy bars, green and gold) or plain; an accent colour; the app icon colour. */
+  /** Colours: the default style (navy bars, green and gold; called "australia" in the data) or plain; an accent colour; the app icon colour. */
   /** `black`: true black in dark mode, for OLED screens (0.8.9). On unless set to false (0.9.0). */
-  look: { style: 'australia' | 'plain'; accent?: string; icon: string; black?: boolean };
+  /** 0.16.0, `holidays`: the holiday opening and, on the default theme, its colours (holiday.ts). On unless false.
+   * `opening`: the opening animation at start (Opening.tsx); on unless false. Off, no opening plays at all.
+   */
+  look: { style: 'australia' | 'plain'; accent?: string; icon: string; black?: boolean; holidays?: boolean; opening?: boolean };
+  /**
+   * 0.16.0: what to call the person on this phone (myName.ts): Home's greeting, this phone's name in
+   * the household and on a server, and backup names. This phone's own (in its backups, never synced).
+   * `nameAsked`: asked once (set or skipped). `phoneLabel`: the name Restock gave this phone from it,
+   * so a name someone typed themselves is never replaced.
+   */
+  myName?: string;
+  nameAsked?: boolean;
+  phoneLabel?: string;
   /** Accessibility: text size (1 = normal), high contrast, less motion, bigger buttons. */
   a11y: {
     text: number;

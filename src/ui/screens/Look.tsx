@@ -7,7 +7,9 @@ import { RestockNative } from '../../lib/sql/native';
 import { textOn } from '../../lib/theme';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
-import { Icon, ThemePicker } from '../components';
+import { Icon, More, ThemePicker } from '../components';
+import { lessMotion } from '../Opening';
+import { OpeningPreview } from '../OpeningPreview';
 import { useNav } from '../nav';
 
 // Settings → Look and colours, and Settings → Accessibility. Also used by the setup tiles.
@@ -17,6 +19,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
   const look = settings.look;
   const accent = look.accent ?? AUS_GREEN;
   const [iconBusy, setIconBusy] = useState(false);
+  const [seeing, setSeeing] = useState(false); // 0.16.0: See the openings
   const setLook = (patch: Partial<Settings['look']>) => updateSettings({ look: { ...look, ...patch } });
 
   const iconId = look.icon === 'match' ? nearestIcon(accent).id : look.icon;
@@ -75,15 +78,62 @@ export function LookSettings({ settings }: { settings: Settings }) {
       <div className="field">
         <span>Style</span>
         <div className="seg" role="group" aria-label="Style">
+          {/* 0.16.0: "Default theme" (it was called Australian) */}
           <button type="button" aria-pressed={look.style === 'australia'} onClick={() => setLook({ style: 'australia' })}>
-            Australian
+            Default theme
           </button>
           <button type="button" aria-pressed={look.style === 'plain'} onClick={() => setLook({ style: 'plain' })}>
             Plain
           </button>
         </div>
-        <span className="small">Australian has navy bars with a gold line and a navy savings banner. Plain is simpler.</span>
+        <span className="small">
+          The default theme has navy bars, gold and green. Plain is simpler.{' '}
+          <More title="Default theme">
+            <p>The default theme is Restock&rsquo;s Australian theme: navy, gold and green, the colours of the flag and the green and gold.</p>
+            <p>On a holiday it takes that holiday&rsquo;s colours for a while (with Holiday themes on), then goes back by itself. Pick your own accent colour and it stays yours all year.</p>
+          </More>
+        </span>
       </div>
+
+      {/* 0.16.0: the opening animation (Opening.tsx): this phone's own. Off, no opening at all. */}
+      <label className="check" style={{ padding: 0 }}>
+        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <span className="title" style={{ fontSize: 15 }}>
+            Opening animation
+          </span>
+          <span className="small">
+            A short animation when Restock starts.{' '}
+            <More title="Opening animation">
+              <p>About two and a half seconds, each time Restock starts from closed (not when you come back to it). A tap ends it early.</p>
+              <p>With Less motion on (Accessibility, or your phone&rsquo;s own Reduce motion) it&rsquo;s a still picture instead. Turned off here, there&rsquo;s no opening at all, holidays included.</p>
+              <p>Just for this phone.</p>
+            </More>
+          </span>
+        </span>
+        <input type="checkbox" className="switch" checked={look.opening !== false} onChange={(e) => void setLook({ opening: e.target.checked })} />
+      </label>
+
+      {/* 0.16.0: the holidays (lib/holiday.ts): this phone's own */}
+      <label className="check" style={{ padding: 0 }}>
+        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <span className="title" style={{ fontSize: 15 }}>
+            Holiday themes
+          </span>
+          <span className="small">
+            Christmas, New Year, Australia Day, Easter and Halloween.{' '}
+            <More title="Holiday themes">
+              <p>On a holiday Restock opens with that holiday&rsquo;s animation (with Opening animation on). On the default theme the app also takes the holiday&rsquo;s colours, with a small decoration at the top of Home.</p>
+              <p>Christmas is 1 to 26 December, New Year 27 December to 1 January, Australia Day the rest of January, Easter the two weeks up to Easter Monday, and Halloween all of October. Each looks like day in light mode and night in dark mode. Afterwards everything goes back to normal by itself.</p>
+              <p>Just for this phone.</p>
+            </More>
+          </span>
+        </span>
+        <input type="checkbox" className="switch" checked={look.holidays !== false} onChange={(e) => void setLook({ holidays: e.target.checked })} />
+      </label>
+      <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => setSeeing(true)}>
+        <Icon name="star" size={16} /> See the openings
+      </button>
+      {seeing && <OpeningPreview still={lessMotion(settings.a11y.motion)} onClose={() => setSeeing(false)} />}
 
       {/* The colour grids are tucked away until you want them (0.7.3). */}
       <details className="pick-more">
@@ -224,7 +274,7 @@ export function AccessibilitySettings({ settings, web }: { settings: Settings; w
       <div className="card flush">
         {toggle('big', 'Bigger buttons', 'Every button and checkbox at least finger-sized.')}
         {toggle('noSwipe', 'No swiping', "Rows don't move when you swipe them. Everything a swipe does has a button too.")}
-        {toggle('motion', 'Less motion', 'No sliding or popping animations. Restock also does this when your phone asks for less motion.')}
+        {toggle('motion', 'Less motion', 'No sliding or popping animations, and the opening animation is a still picture. Restock also does this when your phone asks for less motion.')}
         {toggle('slowMessages', 'Messages stay longer', 'Messages at the bottom of the screen, and their Undo, stay three times as long.')}
       </div>
       <p className="small" style={{ margin: 0 }}>

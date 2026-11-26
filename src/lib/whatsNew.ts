@@ -11,15 +11,17 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.15.2',
-    about: 'Faster, even while prices are being checked, and iPhone checks in the background.',
+    version: '0.16.0',
+    about: 'A fresh look, your name on Home, a new logo, and holiday themes.',
     changes: [
-      'Screens stay quick during a price check: prices are saved in lots, not one at a time.',
-      'No more blank page when you open Settings, Receipts and other screens.',
-      'A price check that stops part way carries on where it got to next time (unless that was over a day ago).',
-      'iPhone and iPad: prices are checked in the background too. A little at a time, and a longer check from your set time while it’s charging and on Wi-Fi. Pick the days and time in Settings, as on Android.',
-      'iPhone and iPad: Check now keeps going when you leave Restock (iOS 26 and later), with its progress on the Lock Screen.',
-      'iPhone and iPad: deal alerts after a check in the background, as on Android.',
+      'A fresh look on every screen: rounder cards, pill-shaped buttons and fields, and a floating tab bar.',
+      'Restock asks what to call you, and says hello on Home ("Good morning, Sam"). Change it at the top of Settings.',
+      'Your name also labels this phone in your household, and is in your backup’s file name.',
+      'A new logo, and a short opening animation when Restock starts (a still picture with Less motion on).',
+      'Holiday themes: Christmas, New Year, Australia Day, Easter and Halloween, each with its own opening (a day and a night look) and colours.',
+      'Settings → Look and colours: turn the opening animation or the holiday themes off, and see every holiday’s opening any time.',
+      '“Australian theme” is now called the default theme.',
+      'Tablets, iPads and computers use the whole screen.',
     ],
   },
 ];

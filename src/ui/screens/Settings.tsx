@@ -25,6 +25,7 @@ import { inventorySummary, useInventory } from '../Inventory';
 import { loadDemo, removeDemo } from '../../lib/demo';
 import { PICKS_TITLE } from '../../lib/makerPicks';
 import { useLive, useDraftSettings } from '../../lib/useLive';
+import { NameCard } from '../NameAsk';
 import { money } from '../../lib/units';
 import { STALE_DAYS } from '../../lib/verdict';
 import { chainName, GOOD_SALE, GREAT_SALE, historyLabel, type Settings } from '../../types';
@@ -179,6 +180,24 @@ const SETTINGS_PAGES: Record<SettingsPage, { title: string }> = {
   about: { title: 'About' },
   advanced: { title: 'Advanced' },
 };
+/** 0.16.0: each row's icon tile on the main list: an icon, and its colour. */
+type Tile = [icon: string, tone: 'green' | 'amber' | 'pink' | 'blue' | 'purple' | 'teal' | 'orange' | 'slate'];
+const TILES_OF: Record<SettingsPage | 'cards' | 'feedback' | 'permissions', Tile> = {
+  a11y: ['access', 'purple'],
+  list: ['list', 'green'],
+  prices: ['tag', 'amber'],
+  alerts: ['bell', 'orange'],
+  cards: ['card', 'blue'],
+  data: ['chart', 'teal'],
+  sync: ['refresh', 'green'],
+  privacy: ['shield', 'slate'],
+  permissions: ['lock', 'amber'],
+  look: ['palette', 'pink'],
+  help: ['info', 'blue'],
+  feedback: ['pencil', 'teal'],
+  about: ['book', 'slate'],
+  advanced: ['tools', 'slate'],
+};
 /** The main list's groups of rows, in order (Feedback sits in Help; Advanced is last). */
 // 0.11.1: Permissions is a row of its own under Your phone (it was inside Privacy and sharing).
 const GROUPS: { title: string; pages: (SettingsPage | 'cards' | 'feedback' | 'permissions')[] }[] = [
@@ -268,8 +287,13 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
   const titleOf = (p: SettingsPage | 'cards' | 'feedback' | 'permissions') =>
     p === 'cards' ? 'Cards' : p === 'feedback' ? 'Send feedback' : p === 'permissions' ? 'Permissions' : SETTINGS_PAGES[p].title;
 
-  const row = (title: string, sub: string, onClick: () => void) => (
+  const row = (title: string, sub: string, onClick: () => void, tile?: Tile) => (
     <button className="row" onClick={onClick}>
+      {tile && (
+        <span className="row-tile" data-tone={tile[1]} aria-hidden="true">
+          <Icon name={tile[0]} size={20} />
+        </span>
+      )}
       <span className="grow">
         <span className="title">{title}</span>
         <span className="small">{sub}</span>
@@ -295,22 +319,24 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       )}
       {on('hub') && (
         <>
+          {/* 0.16.0: what to call you, at the top */}
+          {!query.trim() && <NameCard name={settings.myName} />}
           <div className="card flush">
-            {row('Setup', ((n) => (n ? 'Your shops, alerts and permissions, when you want them' : 'All set · more to set up when you want it'))(TILES.filter((t) => isEssential(t.id) && !tileStatus(settings, t.id, syncShown).ok).length), () => nav.push({ name: 'setup' }))}
+            {row('Setup', ((n) => (n ? 'Your shops, alerts and permissions, when you want them' : 'All set · more to set up when you want it'))(TILES.filter((t) => isEssential(t.id) && !tileStatus(settings, t.id, syncShown).ok).length), () => nav.push({ name: 'setup' }), ['sliders', 'blue'])}
           </div>
           <div className="eyebrow" id="s-stores">
             Your shops
           </div>
           <div className="card flush">
             {/* 0.9.8: one row per tab of My shops; sign-ins and stock are on each shop's own row there. 0.9.14: each says its tab. */}
-            {row('Supermarkets (Pantry tab)', `${shopSummary(settings, 'pantry')} · ${shopAccountsSummary(settings)}`, () => nav.push({ name: 'stores', section: 'pantry' }))}
+            {row('Supermarkets (Pantry tab)', `${shopSummary(settings, 'pantry')} · ${shopAccountsSummary(settings)}`, () => nav.push({ name: 'stores', section: 'pantry' }), ['shop', 'green'])}
             {/* 0.10.12: Beta is said on each one's page (and in Setup), not on these rows. */}
             {/* 0.12.0: Bottle shops and Chemists show once they're switched on; before that they're two of the starts under "Make a custom section" */}
             {/* 0.10.7: each custom section (Baby and Pets are custom sections now), then making another */}
             {/* 0.13.0: Bottle shop and Chemist are two of them, under whatever they're called now */}
-            {madeInUse(settings).map((c) => row(SECTION_NAMES[c], shopSummary(settings, c), () => nav.push({ name: 'stores', section: c })))}
+            {madeInUse(settings).map((c) => row(SECTION_NAMES[c], shopSummary(settings, c), () => nav.push({ name: 'stores', section: c }), ['tag', 'amber']))}
             {(customsInUse(settings).length < MAX_CUSTOM || !settings.sections.keg || !settings.sections.pharmacy) &&
-              row('Create a custom tab', 'Chemist, bottle shop, baby, pets, automotive, tools, office or your own · Beta', () => setNewCustom(true))}
+              row('Create a custom tab', 'Chemist, bottle shop, baby, pets, automotive, tools, office or your own · Beta', () => setNewCustom(true), ['plus', 'purple'])}
           </div>
           {newCustom && <NewCustomSheet onClose={() => setNewCustom(false)} />}
           {/* 0.13.1: inventory (how much of each thing is at home), off until it's turned on, tab by tab */}
@@ -318,7 +344,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
             Inventory
           </div>
           <div className="card flush">
-            {row('Inventory', inventorySummary(inv), () => nav.push({ name: 'inventorySettings' }))}
+            {row('Inventory', inventorySummary(inv), () => nav.push({ name: 'inventorySettings' }), ['box', 'orange'])}
           </div>
         </>
       )}
@@ -332,14 +358,14 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
               </div>
               <div className="card flush" data-search-hide="1">
                 {g.pages.map((p) => (
-                  <Fragment key={p}>{row(titleOf(p), pageSub(p), () => open(p))}</Fragment>
+                  <Fragment key={p}>{row(titleOf(p), pageSub(p), () => open(p), TILES_OF[p])}</Fragment>
                 ))}
               </div>
             </Fragment>
           ))}
           <div className="card flush" data-search-hide="1">
             {row(SETTINGS_PAGES.advanced.title, settings.beta?.enabled ? 'Testing features on · diagnostics, price helper phone · erase everything' : 'Testing features and diagnostics · erase everything', () =>
-              open('advanced'),
+              open('advanced'), TILES_OF.advanced,
             )}
           </div>
         </>

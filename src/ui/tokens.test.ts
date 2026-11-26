@@ -63,6 +63,7 @@ describe('tokens: text contrast is at least 4.5:1 in every theme', () => {
     ['--fixed-ink', '--everyday'],
     ['--tab-ink', '--tabbar-bg'],
     ['--tab-on', '--tabbar-bg'],
+    ['--tab-pill-ink', '--tab-pill'],
     ['--on-navy', '--chrome-bg'],
     ['--on-navy-muted', '--chrome-bg'],
     ['--gold', '--navy'],

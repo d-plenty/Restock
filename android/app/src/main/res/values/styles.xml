@@ -18,5 +18,7 @@
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- 0.16.0: navy behind the icon while Restock starts (Android 12 and later), as the opening animation is -->
+        <item name="windowSplashScreenBackground">#012169</item>
     </style>
 </resources>

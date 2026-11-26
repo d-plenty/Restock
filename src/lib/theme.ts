@@ -1,6 +1,7 @@
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 import type { Settings } from '../types';
 import { RestockNative } from './sql/native';
+import { holidayColours } from './holiday';
 
 // Light, dark, or follow the phone; the Australian or Plain style; an accent colour; and the
 // accessibility options. The CSS reads <html data-theme data-style data-text …>; an accent colour
@@ -9,7 +10,8 @@ import { RestockNative } from './sql/native';
 
 const darkQuery = () => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : undefined);
 
-function isDark(theme: Settings['theme']): boolean {
+/** Dark right now: set to Dark, or following a phone that's in dark mode. */
+export function isDark(theme: Settings['theme']): boolean {
   return theme === 'dark' || (theme === 'system' && !!darkQuery()?.matches);
 }
 
@@ -91,6 +93,10 @@ function paint() {
   if (black) root.dataset.black = '1';
   else delete root.dataset.black;
   for (const k of ACCENT_KEYS) root.style.removeProperty(k);
+  // 0.16.0: a holiday's colours, on the default theme only (holiday.ts; tokens.css [data-holiday]).
+  const holiday = holidayColours(current);
+  if (holiday) root.dataset.holiday = holiday;
+  else delete root.dataset.holiday;
   if (look.accent) for (const [k, v] of Object.entries(accentVars(look.accent, dark, black))) root.style.setProperty(k, v);
   // Accessibility.
   if (a11y.text && a11y.text !== 1) {
@@ -128,6 +134,8 @@ export function applyTheme(s: Look) {
   if (!listening) {
     listening = true;
     darkQuery()?.addEventListener?.('change', () => current.theme === 'system' && paint());
+    // 0.16.0: a holiday starts or ends while Restock is open in the background: right when it's back.
+    document.addEventListener?.('visibilitychange', () => document.visibilityState === 'visible' && paint());
   }
 }
 

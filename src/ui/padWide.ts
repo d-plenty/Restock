@@ -2,6 +2,9 @@
 // More's rows listed under them, so everything is one tap away. Held upright it's the phone layout.
 // 0.15.0: the web page on a Restock server too, in a wide window (in place of its own desktop
 // pages), with Your server as one more row.
+// 0.16.0: an Android tablet too (it was the phone's column in the middle of the screen), so tablets
+// and iPads look the same.
+import { Capacitor } from '@capacitor/core';
 import { useSyncExternalStore } from 'react';
 import { isIos } from '../lib/platform';
 import { serverMode } from '../server-mode/flag';
@@ -9,14 +12,14 @@ import { serverMode } from '../server-mode/flag';
 /** Wide enough for the side bar (an iPad in landscape, a large one upright, or a computer). */
 const PAD_WIDE_MIN = 1000;
 
-const query = () => ((serverMode || isIos()) && typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(`(min-width: ${PAD_WIDE_MIN}px)`) : undefined);
+const query = () => ((serverMode || isIos() || Capacitor.getPlatform() === 'android') && typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(`(min-width: ${PAD_WIDE_MIN}px)`) : undefined);
 const subscribe = (fn: () => void) => {
   const q = query();
   q?.addEventListener('change', fn);
   return () => q?.removeEventListener('change', fn);
 };
 
-/** Is this the iPhone and iPad app (or the web page) in a window wide enough for the side bar? Always false on Android. */
+/** Is this the app (iPad, Android tablet) or the web page in a window wide enough for the side bar? */
 export function usePadWide(): boolean {
   return useSyncExternalStore(
     subscribe,
