@@ -13,7 +13,7 @@ import { act } from '../../lib/undo';
 import * as draft from '../../lib/settingsDraft';
 import { blackAndWhite, findPaper, fullQuad, greyscale, rotate, shrink, warp, type Img, type Quad } from '../../lib/scan';
 import { money } from '../../lib/units';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import { activeSections, chainName, SECTION_NAMES, SHOPS, type Section, type StoreChain } from '../../shops';
 import type { Receipt, Settings } from '../../types';
 import { ChainDot, Icon, LoadingBar, TopBar } from '../components';
@@ -175,7 +175,7 @@ export function ReceiptsSettings({ settings, inSetup }: { settings: Settings; in
 /** Home → Receipts: the kept receipts, newest first. */
 export function ReceiptsScreen() {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const receipts = useLive(allReceipts, []);
   if (!settings || !receipts) return <div className="screen" />;
   const keep = settings.receipts.keepMonths;
@@ -428,7 +428,7 @@ function ReceiptLines({ text, items, onChange }: { text: string; items: number; 
 export function ReceiptScreen({ id }: { id?: string }) {
   const gate = useReaderGate();
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const [existing, setExisting] = useState<Receipt>();
   const [photo, setPhoto] = useState<string>();
   // A saved receipt's other photos (a long receipt taken in several).

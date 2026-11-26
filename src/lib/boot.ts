@@ -176,7 +176,7 @@ export const setSyncDatabase = (d: typeof syncDb) => (syncDb = d);
 
 /** The iPhone and iPad app on the system's SQLite: the same two files, kept as they were first (ios/nativeDb.ts). */
 async function openAppleDatabase(): Promise<void> {
-  const { AppleDb, readyFile } = await import('../ios/nativeDb');
+  const { AppleDb, readyFile, readLaneHere } = await import('../ios/nativeDb');
   const { DB_FILE, MARKET_FILE } = await import('../ios/store');
   const web = {
     get: (key: string) => idb<unknown>('readonly', (s) => s.get(key)),
@@ -184,7 +184,9 @@ async function openAppleDatabase(): Promise<void> {
   };
   await readyFile(DB_FILE, web).catch(quiet('iPhone database'));
   await readyFile(MARKET_FILE, web).catch(quiet('iPhone database'));
-  const main = new AppleDb(DB_FILE);
+  // 0.15.2: reads on a lane of their own, where this build's native side has one.
+  const readLane = await readLaneHere();
+  const main = new AppleDb(DB_FILE, undefined, { readLane });
   const updated = await versionChanged(main);
   await initDb(main);
   if (updated) {
@@ -193,7 +195,7 @@ async function openAppleDatabase(): Promise<void> {
   }
   await main.run("INSERT OR REPLACE INTO kv (key, value) VALUES ('appVersion', ?)", [JSON.stringify(__APP_VERSION__)]).catch(quiet('database'));
   // The shared price history keeps its own file (0.15.0), so the main one stays small.
-  const market = new AppleDb(MARKET_FILE);
+  const market = new AppleDb(MARKET_FILE, undefined, { readLane });
   await market.run(MARKET_TABLE);
   setMarketDriver(market);
   // Every change is on the disk once it answers: nothing waits to be saved.

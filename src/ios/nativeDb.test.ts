@@ -3,7 +3,7 @@
 import initSqlJs, { type Database } from 'sql.js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { AsyncSyncEngine } from '../server-mode/engine';
-import { AppleDb, bindable, KEPT, readyFile, type AppleSqlPlugin } from './nativeDb';
+import { AppleDb, bindable, isRead, KEPT, readyFile, type AppleSqlPlugin } from './nativeDb';
 import { DB_FILE } from './store';
 
 let SQL: Awaited<ReturnType<typeof initSqlJs>>;
@@ -34,6 +34,24 @@ function fakeSwift(files: Map<string, Uint8Array> = new Map()) {
       st.free();
       return { rows };
     }),
+    // 0.15.2: the read-only connection. sql.js has one connection, so this reads the same database;
+    // what matters here is that it doesn't wait in the writing queue.
+    sqlRead: (o) =>
+      new Promise((r, j) =>
+        setTimeout(() => {
+          try {
+            log.push('read ' + o.sql);
+            const st = db(o.db).prepare(o.sql);
+            st.bind(o.values);
+            const rows: Record<string, unknown>[] = [];
+            while (st.step()) rows.push(st.getAsObject());
+            st.free();
+            r({ rows });
+          } catch (e) {
+            j(e as Error);
+          }
+        }, 0),
+      ),
     sqlRun: (o) => later(() => {
       log.push(o.sql);
       db(o.db).run(o.sql, o.values);
@@ -104,6 +122,50 @@ describe('the database in the system SQLite', () => {
     ).rejects.toThrow('stop');
     expect(await e.meta('c')).toBeNull();
     expect(await e.meta('b')).toBe('2');
+  });
+
+  test("0.15.2: with the read lane, reads skip past a sync that holds the file, but see the app's own writes", async () => {
+    const s = fakeSwift();
+    const d = new AppleDb('restock.sqlite', s.p, { readLane: true });
+    await d.run('CREATE TABLE sync_meta (key TEXT PRIMARY KEY, value TEXT)');
+    await d.run('CREATE TABLE household (k TEXT PRIMARY KEY, v TEXT)');
+    const e = new AsyncSyncEngine(d.forEngine(), () => true, () => '');
+    const order: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    // A sync holding the file until it's let go.
+    const held = e.hold(async () => {
+      await e.setMeta('a', '1');
+      await gate;
+      order.push('sync done');
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    // A screen's read doesn't wait for it.
+    const rows = await d.query<{ n: number }>('SELECT COUNT(*) AS n FROM household');
+    order.push('read');
+    expect(rows[0].n).toBe(0);
+    // A write does, and a read asked after that write waits for it (so it sees it).
+    const w = d.run("INSERT INTO household (k, v) VALUES ('x', 'y')").then(() => order.push('write'));
+    const after = d.query<{ n: number }>('SELECT COUNT(*) AS n FROM household').then((r) => {
+      order.push('read after write');
+      return r[0].n;
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    release();
+    await Promise.all([held, w]);
+    expect(await after).toBe(1);
+    expect(order).toEqual(['read', 'sync done', 'write', 'read after write']);
+    // Only SELECTs take the read lane.
+    expect(s.log.filter((l) => l.startsWith('read ')).length).toBe(2);
+    expect([isRead(' select 1'), isRead('PRAGMA user_version'), isRead('INSERT INTO t SELECT 1')]).toEqual([true, false, false]);
+  });
+
+  test('without the read lane (an older native side), reads wait their turn as before', async () => {
+    const s = fakeSwift();
+    const d = new AppleDb('restock.sqlite', s.p);
+    await d.run('CREATE TABLE t (n INTEGER)');
+    await d.query('SELECT n FROM t');
+    expect(s.log.some((l) => l.startsWith('read '))).toBe(false);
   });
 
   test("before the first open: a copy is kept, once; an install whose newest copy was in the web view's storage has it written to the file first", async () => {

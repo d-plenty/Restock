@@ -3,12 +3,12 @@
 import { andList } from '../../lib/minVersion';
 import { useState } from 'react';
 import { confirmAction } from '../../lib/confirm';
-import { getSettings } from '../../lib/db';
+
 import { chainName, enabledIn, SECTION_NAMES } from '../../shops';
 import type { Settings } from '../../types';
 import { RestockNative, type TakeBack } from '../../lib/sql/native';
 import { syncAvailable, type SyncInfo } from '../../lib/sync';
-import { useLive } from '../../lib/useLive';
+import { useSettings } from '../../lib/useLive';
 import { LoadingBar, Sheet, More } from '../components';
 import { useNav } from '../nav';
 import { webLink } from '../../lib/site';
@@ -172,7 +172,7 @@ export function shopsText(s: Settings | undefined): string {
 
 /** Always said when a phone stops sharing something or leaves: shop data isn't personal, and it stays. */
 export function ShopDataStays() {
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   return (
     <span className="small"><strong style={{ color: 'var(--ink)' }}>Prices and product details</strong> your phone found at your shops ({shopsText(settings)}) stay on the server
       for the household, with the shared shopping list and pantry. They're about the shops, not about you.</span>

@@ -120,10 +120,10 @@ any source, not just Play:
 4. **App Store Connect forms** (drafts below): App Privacy, the age rating, the category (Shopping or
    Lifestyle), the privacy policy address, and the description, keywords and screenshots.
 5. **Review notes.** Things Apple's reviewers will ask about, to explain up front:
-   - **Plain http** (`NSAllowsArbitraryLoads`). This is only to reach the user's own Restock server
-     or Home Assistant on their home network, at an address they typed. Apple may ask for this to be
-     narrowed. The alternative is `NSAllowsLocalNetworking`, which covers `.local` names and IP
-     addresses but not names like `nas.lan`.
+   - **Plain http.** Since 0.15.2 the App Store version only allows it on the home network
+     (`NSAllowsLocalNetworking`: IP addresses and `.local` names), to reach the user's own Restock
+     server or Home Assistant at an address they typed. A name like `nas.lan` needs https there. The
+     version installed from a computer still allows any address (`NSAllowsArbitraryLoads`).
    - **Local network.** It's for Wi-Fi sync with the household's phones, and iOS asks the user first.
    - **Shop websites.** Restock opens the shops' own public pages to read prices, like a browser.
    - **A demo.** Reviewers need to try it without a household: an empty Home's "Look around with sample
@@ -168,8 +168,10 @@ The questions are about what the app sends off the phone to the developer or to 
 
 ### Privacy policy
 
-Both stores need a privacy policy at a web address. The README's privacy section is most of it.
-GitHub Pages (beside the F-Droid repo) is one place to put it.
+Both stores need a privacy policy at a web address. Since 0.15.2 it's
+[docs/PRIVACY.md](PRIVACY.md) (and the fine print, [docs/TERMS.md](TERMS.md)): the same words the app
+shows, made from them by `node tools/legal-pages/make.mjs` (a test fails if they drift apart). Its
+address is `https://github.com/d-plenty/Restock/blob/main/docs/PRIVACY.md`.
 
 ## Sources
 

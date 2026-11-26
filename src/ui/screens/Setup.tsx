@@ -11,7 +11,7 @@ import { downloadMarket } from '../../lib/market';
 import { HistoryLengths } from './DayOne';
 import { SHARED_ONE_LINE, SHARED_TITLE, TurnOffShared } from './SharedPrices';
 import { shareFromNow, sharedOn } from '../../lib/priceShare';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import { enabledIn, SECTION_NAMES, sectionOn, type MadeSection } from '../../shops';
 import { CustomStarts, madeInUse } from './CustomSections';
 import { checkAll } from '../../lib/permissions';
@@ -908,7 +908,7 @@ const AGREE_POINTS: { icon: string; tone: string; title: string; text: string }[
 ];
 
 export function Onboarding() {
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   // 0.10.7: accessibility comes straight after the welcome, before anything else is asked
   const [stage, setStage] = useState<'welcome' | 'a11y' | 'privacy' | 'notify' | 'restored'>('welcome');
   // 0.8.2: joining a household from the first screen: privacy, then scan the owner phone's code.
@@ -1200,7 +1200,7 @@ export function Onboarding() {
 // ---------- Settings → Setup ----------
 
 export function SetupScreen() {
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const nav = useNav();
   // Went through everything: back to the tiles, which show what's done and what was skipped.
   const walk = useTileWalk(() => {

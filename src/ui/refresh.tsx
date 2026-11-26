@@ -125,7 +125,8 @@ export function useFullRefresh(onChecked?: (res: CheckResult) => void) {
       }
       setStage('prices');
       setProgress(undefined);
-      const res = await checkPrices((d, t) => setProgress([d, t]));
+      // 0.15.2: pressed by hand, so on an iPhone it may keep going after Restock leaves the screen.
+      const res = await checkPrices((d, t) => setProgress([d, t]), { byHand: true });
       checkedRef.current?.(res);
       if (sync?.paired && res.updated > 0) {
         setStage('share');
@@ -139,6 +140,8 @@ export function useFullRefresh(onChecked?: (res: CheckResult) => void) {
             : "Couldn't find the household's other phones"
           : undefined,
         tried ? `checked ${res.checked} price${res.checked === 1 ? '' : 's'} · ${res.updated} updated` : undefined,
+        // 0.15.2 (iPhone): stopped part way; the rest is checked next time.
+        res.complete === false ? 'the rest next time' : undefined,
       ].filter(Boolean);
       nav.toast(bits.length ? bits.join(' · ').replace(/^./, (c) => c.toUpperCase()) : 'Nothing to check yet. Add items with a shop match first.');
     })().finally(() => {

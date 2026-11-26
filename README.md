@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.15.1" src="https://img.shields.io/badge/status-release%20candidate%200.15.1-ffcd00">
+  <img alt="Release candidate 0.15.2" src="https://img.shields.io/badge/status-release%20candidate%200.15.2-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0151">New in 0.15.1</a> ·
+  <a href="#new-in-0152">New in 0.15.2</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#iphone-and-ipad">On iPhone</a> ·
@@ -142,7 +142,26 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 ## iPhone and iPad
 
-Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Two things aren't possible because of Apple's restrictions: checking prices at a set time of day (they're checked when you open Restock) and the app updating itself. Still to come there: home screen widgets, Search with Google Lens straight from the app, and the App Store. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Prices are checked in the background too: a little at a time, and a longer check from your set time while the iPhone is charging and on Wi-Fi (iOS picks the exact moment). One thing isn't possible because of Apple's restrictions: the app updating itself. Still to come there: home screen widgets, Search with Google Lens straight from the app, and the App Store. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.15.2
+
+Faster, even while prices are being checked or the household is syncing, and the iPhone checks prices in the background.
+
+**Faster, on every phone**
+- **Screens stay quick during a price check.** Prices are saved in lots of 20 instead of one at a time, so the screens re-read once a lot, not once a product. On iPhone this was what made a tab take seconds to open mid-check.
+- **No blank page between screens.** Settings, Receipts and the other screens opened now and then are loaded quietly once Restock has started, and screens show your settings straight away instead of waiting for them.
+- **iPhone and iPad: reads have a lane of their own** (a second, read-only connection to the database), so a screen never waits behind a price check's saves or a sync.
+
+**Price checks**
+- **A check that's cut off carries on** where it got to (the app closed, the phone slept, Android or iOS stopped it), unless that was more than a day ago: then it starts again. Android and iPhone both.
+- **iPhone and iPad check in the background:** a little at a time whenever iOS wakes Restock (about half a minute, with the household sync), and a longer check from your set time (4:00 am unless changed) while the phone is charging and on Wi-Fi. iOS picks the exact moment, so it can be later. The days and time are picked in Settings, the same as on Android.
+- **Check now keeps going** when you leave Restock, with its progress on the Lock Screen (iOS 26 and later; earlier, it carries on next time).
+- **Deal alerts on iPhone** after a check in the background, as on Android.
+
+**The stores**
+- The privacy policy and the fine print are on GitHub as pages ([privacy policy](docs/PRIVACY.md), [fine print](docs/TERMS.md)), made from the same words the app shows: the address both stores ask for.
+- The App Store version only allows plain http on the home network (a server or Home Assistant at an IP address or a `.local` name). The version installed from a computer is unchanged.
 
 ## New in 0.15.1
 

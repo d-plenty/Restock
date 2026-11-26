@@ -1,4 +1,4 @@
-import { getSettings as savedSettings, updateSettings as saveSettings } from './db';
+import { cachedSettings, getSettings as savedSettings, updateSettings as saveSettings } from './db';
 import { changed } from './live';
 import type { Settings } from '../types';
 
@@ -103,6 +103,12 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 export async function getSettings(): Promise<Settings> {
   const s = await savedSettings();
   return draft ? { ...s, ...draft.patch } : s;
+}
+
+/** 0.15.2: the same, from the last settings read (nothing to wait for), for a screen's first look. */
+export function cachedDraftSettings(): Settings | undefined {
+  const s = cachedSettings();
+  return s && (draft ? { ...s, ...draft.patch } : s);
 }
 
 /**

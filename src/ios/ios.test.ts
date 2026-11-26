@@ -24,9 +24,10 @@ describe('iPhone app: price checks happen when Restock is opened', () => {
   });
   it('the check runs on the iPhone itself, and Home says when the next one is', () => {
     const check = read('../lib/check.ts');
-    expect(check).toMatch(/if \(isIos\(\)\) \{\s*try \{\s*const r = await checkBySearch\(onProgress\);/);
-    expect(check).toMatch(/if \(isIos\(\)\) return \{ due: iosCheckDue\(settings\) \};/);
-    expect(read('../ui/screens/Home.tsx')).toContain("if (isIos()) return 'when you next open Restock';");
+    expect(check).toMatch(/if \(isIos\(\)\) \{[\s\S]{0,400}const r = await checkBySearch\(/);
+    expect(check).toMatch(/if \(isIos\(\)\) return \{ due: iosCheckDue\(settings\) \|\| \(autoChecks\(settings\) && \(await unfinishedCheck\(\)\)\) \};/);
+    // 0.15.2: from the set time, while charging (ios/backgroundCheck.ts).
+    expect(read('../ui/screens/Home.tsx')).toContain("if (isIos()) return `${nextCheckWords(planOf(s), now)}, while charging`;");
   });
 });
 
@@ -69,7 +70,7 @@ describe('iPhone app: greyed out, with why', () => {
   it('0.14.0: only what Apple makes impossible keeps a note, and it says exactly that', () => {
     const settings = read('../ui/screens/Settings.tsx');
     expect(settings).toContain("Updating from inside the app: not possible on iPhone due to Apple's restrictions.");
-    expect(settings).toContain("Picking a time of day: not possible on iPhone due to Apple's restrictions.");
+    // 0.15.2: a time of day is possible now (the earliest a background check starts).
     // Nothing else on an iPhone is greyed with a "why" box any more.
     for (const f of ['Settings', 'Look', 'RestockServer', 'SyncOverview']) expect(read(`../ui/screens/${f}.tsx`), f).not.toMatch(/<IosBox reason="(updates|widgets|appIcon|serverExtras|importData)"/);
     expect(read('../ui/screens/Soon.tsx')).toContain('Still to come: home screen widgets, Search with Google Lens straight from Restock (it opens in the browser for now), and the App Store.');
@@ -82,9 +83,10 @@ describe('iPhone app: greyed out, with why', () => {
     expect(why).not.toContain('greyed out?');
     expect(why).toMatch(/<div className="ios-box">\s*\{children\}\s*<IosWhy reason=\{reason\}/);
   });
-  it('the price check setting is reworded, not greyed', () => {
+  it('the price check setting is the same as Android\'s, reworded, not greyed (0.15.2)', () => {
     const settings = read('../ui/screens/Settings.tsx');
-    expect(settings).toContain('Check prices when I open Restock');
+    expect(settings).toContain('while your iPhone is charging and on Wi-Fi. iOS picks the exact moment');
+    expect(settings).not.toContain('Picking a time of day: not possible on iPhone');
     expect(settings).not.toContain('<IosWhy reason="background"');
   });
   it('nothing changes off an iPhone: sync, updates and Home Assistant are where they were on Android', () => {
@@ -396,8 +398,8 @@ describe('0.13.2: the iPhone as a phone of a house', () => {
   it('0.14.0: an iPhone or iPad syncs every way: iCloud, with another phone over the Wi-Fi, and a Restock server', () => {
     expect(IOS_SYNC).toEqual({ server: true, wifi: true, folder: true });
     const app = read('../ui/App.tsx');
-    expect(app).toContain("const IcloudSyncScreen = lazy(() => import('./screens/IcloudSync')");
-    expect(app).toContain("const WifiSyncScreen = lazy(() => import('./screens/WifiSync')");
+    expect(app).toContain("const IcloudSyncScreen = lazyScreen(() => import('./screens/IcloudSync')");
+    expect(app).toContain("const WifiSyncScreen = lazyScreen(() => import('./screens/WifiSync')");
     const o = read('../ui/screens/SyncOverview.tsx');
     // iCloud first on an iPhone (Recommended), a phone on the Wi-Fi next, a server last and never "Recommended".
     expect(o).toContain("(ios ? (['folder', 'wifi', 'server'] as const) : (['wifi', 'folder', 'server'] as const))");

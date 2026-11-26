@@ -11,14 +11,14 @@ import { clearTrip, saveTrip, type SavedTrip } from '../../lib/trip';
 import { scanBarcode } from '../../lib/barcode';
 import { serverMode } from '../../server-mode/flag';
 import { PhoneOnlyNote } from '../../server-mode/ui/PhoneOnly';
-import { allCards, getSettings, updateListEntry, updateSettings, cachedSettings } from '../../lib/db';
+import { allCards, updateListEntry, updateSettings, cachedSettings } from '../../lib/db';
 import { buzz } from '../../lib/listActions';
 import { shopTotals, type ShopTotals } from '../../lib/shopTotals';
 import { act } from '../../lib/undo';
 import { Stepper } from '../Stepper';
 import { money } from '../../lib/units';
 import { kiloPrice } from '../../lib/unitPrice';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
 import { chainName, secondBranch, type Category, type Chain, type ListEntry, type LoyaltyCard, type Settings } from '../../types';
 import { ChainDot, Icon, previewFromOption, type PreviewProduct, ProductPreview, RowInfo, Sheet, Thumb, useBackLayer } from '../components';
@@ -501,7 +501,6 @@ export function ShoppingMode({
   // goes back to the shops, with the done ones greyed. "See everything in one list" is the old view.
   // (`at` and `doneAt` are declared above, with the trip's plan.)
 
-
   // Keep the screen on while shopping: asked for once, let go when shopping mode closes.
   useEffect(() => {
     let lock: { release: () => Promise<void> } | undefined;
@@ -532,7 +531,7 @@ export function ShoppingMode({
 
   // 0.10.2: each shop's lines by aisle (the default; 1 to 50, or 50 to 1), category, or A–Z. Your
   // pick is remembered (Settings → Shopping list and receipts, In shopping mode, start with).
-  const live = useLive(getSettings, []) ?? cachedSettings();
+  const live = useSettings() ?? cachedSettings();
   const [sort, setSortState] = useState<NonNullable<Settings['shopSort']>>(() => {
     const start = cachedSettings()?.shopSort ?? { by: 'aisle' };
     // The web has no aisle numbers: it starts with your categories instead.

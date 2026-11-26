@@ -4,12 +4,12 @@
 import { useEffect, useState } from 'react';
 import { scanBarcode } from '../../lib/barcode';
 import { confirmAction } from '../../lib/confirm';
-import { getSettings } from '../../lib/db';
+
 import { deviceWord } from '../../lib/platform';
 import { RestockNative } from '../../lib/sql/native';
 import { useSyncStatus } from './useSyncStatus';
 import { agoText } from '../../lib/sync';
-import { useLive } from '../../lib/useLive';
+import { useSettings } from '../../lib/useLive';
 import { isWifiCode } from '../../ios/wire';
 import { wifi, type WifiStatus } from '../../ios/sync';
 import { Icon, Sheet, TopBar, More } from '../components';
@@ -94,7 +94,7 @@ function Toggle({ on, label, detail, disabled, onChange }: { on: boolean; label:
 /** `apple`: opened from "iPhone to iPhone over Wi-Fi" (the same thing, with what that needs said first). */
 export function WifiSyncScreen({ apple }: { apple?: boolean }) {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const { st, busy, error, setError, load, run } = useSyncStatus<WifiStatus>(() => wifi.status());
   const [adding, setAdding] = useState(false);
   const device = deviceWord();

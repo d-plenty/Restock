@@ -11,14 +11,15 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.15.1',
-    about: 'A tidy-up, and the iPhone and iPad keep their data in their own database.',
+    version: '0.15.2',
+    about: 'Faster, even while prices are being checked, and iPhone checks in the background.',
     changes: [
-      'iPhone and iPad: Restock’s data is now in the system’s own database, as on Android. Each change is saved as it’s made. The first time, a copy of the old file is kept beside it.',
-      'A shop you took off Your shops no longer stays on Home.',
-      'Check for updates also offers Restock’s own F-Droid repo.',
-      'If you run a Restock server, update it to 0.15.1 too. Its setup page’s sign-in moved.',
-      'Lots of behind-the-scenes tidying, and many more tests.',
+      'Screens stay quick during a price check: prices are saved in lots, not one at a time.',
+      'No more blank page when you open Settings, Receipts and other screens.',
+      'A price check that stops part way carries on where it got to next time (unless that was over a day ago).',
+      'iPhone and iPad: prices are checked in the background too. A little at a time, and a longer check from your set time while it’s charging and on Wi-Fi. Pick the days and time in Settings, as on Android.',
+      'iPhone and iPad: Check now keeps going when you leave Restock (iOS 26 and later), with its progress on the Lock Screen.',
+      'iPhone and iPad: deal alerts after a check in the background, as on Android.',
     ],
   },
 ];

@@ -1,11 +1,11 @@
 // 0.15.0: phone sharing's codes and the Add a phone sheet (moved out of Sync.tsx, which had grown past
 // 2,000 lines): the QR code, the code as text, the countdown, and what the new phone shares.
 import { useEffect, useState } from 'react';
-import { getSettings, updateSettings } from '../../lib/db';
+import { updateSettings } from '../../lib/db';
 import { SECTIONS, sectionOn, type Section } from '../../shops';
 import { RestockNative } from '../../lib/sql/native';
 import { syncInfo, type SyncInfo } from '../../lib/sync';
-import { useLive } from '../../lib/useLive';
+import { useSettings } from '../../lib/useLive';
 import { Icon, LoadingBar, Sheet, More } from '../components';
 import { useNav } from '../nav';
 import { TabsPicker } from './Sync';
@@ -123,7 +123,7 @@ function useCountdown(until: number | undefined) {
  * for 10 minutes. Closing the sheet closes the code.
  */
 export function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => void }) {
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const [household, setHousehold] = useState<string>();
   const [code, setCode] = useState<string>();
   const [until, setUntil] = useState<number>();

@@ -8,9 +8,9 @@
 // - the notices (new version, offline, home screen) at the top, below the notch.
 // 0.15.0: wide windows (from 1000 px) have the side bar instead of the tab bar (ui/padWide.ts).
 import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
-import { getSettings } from '../../lib/db';
+
 import { agoText } from '../../lib/sync';
-import { useLive } from '../../lib/useLive';
+import { useSettings } from '../../lib/useLive';
 import { activeSections } from '../../shops';
 import { Icon, TopBar } from '../../ui/components';
 import { isMoreTab, isSectionTab, useNav, type Screen, type Tab } from '../../ui/nav';
@@ -49,7 +49,7 @@ const BAR: { id: Tab; label: string; icon: string }[] = [
 /** The phone's tab bar, with More in place of Add. */
 function PhoneTabs() {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const more = useMoreOpen();
   const bar = useRef<HTMLElement>(null);
   const ready = !!settings;
@@ -195,7 +195,7 @@ function SyncCard() {
 /** More: what the phone keeps off its tab bar, and the server's own pages. */
 export function MorePage() {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const offline = useIsOffline();
   useEffect(() => {
     setMore(1);

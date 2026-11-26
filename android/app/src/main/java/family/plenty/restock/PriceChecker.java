@@ -13,6 +13,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Build;
 import android.util.Log;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -151,12 +152,38 @@ final class PriceChecker {
             }
         }
 
+        // 0.15.2: a check that was cut off (Android stopped the job, the phone turned off) carries on
+        // from where it got to, unless that was more than a day ago: then it starts again.
+        Instant startedAt = Instant.now();
+        Set<String> already = new HashSet<>();
+        JSONObject was = readKv(db, PROGRESS_KV);
+        if (was != null) {
+            Instant then = parseInstant(was.optString("started", ""));
+            if (then != null && Duration.between(then, startedAt).compareTo(RESUME_FOR) < 0 && !then.isAfter(startedAt)) {
+                startedAt = then;
+                JSONArray ids = was.optJSONArray("done");
+                if (ids != null) for (int i = 0; i < ids.length(); i++) already.add(ids.optString(i));
+            }
+        }
+        List<String> doneIds = new ArrayList<>(already);
+        int skipped = 0;
+        for (List<String[]> list : byChain.values()) {
+            for (java.util.Iterator<String[]> it = list.iterator(); it.hasNext(); ) {
+                if (already.contains(it.next()[0])) {
+                    it.remove();
+                    skipped++;
+                }
+            }
+        }
+        writeProgress(db, startedAt, doneIds);
+
         StoreClient client = new StoreClient();
         client.setWebFetcher(StoreWeb.forAll(context), "browser".equals(settings.optString("connection", "auto")));
         JSONObject accounts = settings.optJSONObject("accounts");
         JSONObject woolies = accounts != null ? accounts.optJSONObject("woolworths") : null;
         client.useWoolworthsAccount(woolies != null && woolies.optBoolean("signedIn", false));
-        int done = 0;
+        int done = skipped;
+        if (progress != null && skipped > 0) progress.onProgress(done, total);
         // The phone's own calendar day, not UTC's (Deals.localDay).
         String today = Deals.localDay(now());
         // 0.10.2: aisle numbers at your branches (Coles, with Prices and stock at my store on). Kept on
@@ -234,11 +261,15 @@ final class PriceChecker {
                     Log.w(TAG, chain + " check failed", e);
                 }
                 done++;
+                doneIds.add(p[0]);
+                if (doneIds.size() % SAVE_EVERY == 0) writeProgress(db, startedAt, doneIds);
                 if (progress != null) progress.onProgress(done, total);
                 Thread.sleep(PAUSE_MS);
             }
         }
 
+        // Finished: the next check starts from the beginning.
+        db.delete("kv", "key = ?", new String[] {PROGRESS_KV});
         if (shelfChanged) writeKv(db, ShelfWatch.KV, shelf);
         if (aislesChanged) {
             tidyAisles(aisles);
@@ -753,6 +784,31 @@ final class PriceChecker {
             .setAutoCancel(true);
         if (tap != null) b.setContentIntent(tap);
         nm.notify(id, b.build());
+    }
+
+    // ---------- how far a check has got (0.15.2, the same as the iPhone's: lib/checkProgress.ts) ----------
+
+    /** This phone only (sync only ever reads and writes the "settings" key). */
+    static final String PROGRESS_KV = "checkProgress";
+    /** A check cut off longer ago than this starts again from the beginning. */
+    static final Duration RESUME_FOR = Duration.ofHours(24);
+    /** How many products between notes of how far the check has got. */
+    static final int SAVE_EVERY = 20;
+
+    static void writeProgress(SQLiteDatabase db, Instant started, List<String> done) {
+        try {
+            writeKv(db, PROGRESS_KV, new JSONObject().put("started", started.toString()).put("done", new JSONArray(done)));
+        } catch (Exception e) {
+            Log.w(TAG, "check progress not saved", e);
+        }
+    }
+
+    static Instant parseInstant(String s) {
+        try {
+            return s.isEmpty() ? null : Instant.parse(s);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ---------- key/value table (values are JSON text, same as the app) ----------

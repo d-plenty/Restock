@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getSettings, updateSettings } from '../lib/db';
 import { loadDemo, removeDemo } from '../lib/demo';
-import { useLive } from '../lib/useLive';
+import { useSettings } from '../lib/useLive';
 import type { Settings } from '../types';
 import { useNav, type Tab } from './nav';
 
@@ -82,7 +82,7 @@ function findTarget(f: Step['find']): Element | null {
 }
 
 export function TourHost() {
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const nav = useNav();
   const [ready, setReady] = useState(false);
   const active = !!settings?.tour.active;

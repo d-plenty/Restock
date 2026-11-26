@@ -2,7 +2,9 @@ import { loadTrip, reopensTrip } from '../lib/trip';
 import { App as CapApp } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react';
+import { lazyScreen, preloadScreens } from './lazyScreen';
+import { isIos as isIosHere } from '../lib/platform';
 import { createPortal } from 'react-dom';
 import { openDatabase } from '../lib/boot';
 import { wireSync } from '../lib/sync';
@@ -45,30 +47,31 @@ import { watchWidgets } from '../lib/widgets';
 import { tidyReceipts } from '../lib/receipts';
 import { PantryScreen } from './screens/Pantry';
 // Only ever shown on iPhone and iPad, so it (and the sync engine it brings) is loaded only there.
-const WifiSyncScreen = lazy(() => import('./screens/WifiSync').then((m) => ({ default: m.WifiSyncScreen })));
-// 0.15.0: screens opened now and then load when first opened, so Restock starts quicker.
-const CardsScreen = lazy(() => import('./screens/Cards').then((m) => ({ default: m.CardsScreen })));
-const CataloguesScreen = lazy(() => import('./screens/Catalogues').then((m) => ({ default: m.CataloguesScreen })));
-const PermissionsScreen = lazy(() => import('./screens/Permissions').then((m) => ({ default: m.PermissionsScreen })));
-const HouseholdScreen = lazy(() => import('./screens/Household').then((m) => ({ default: m.HouseholdScreen })));
-const CategoriesScreen = lazy(() => import('./screens/Categories').then((m) => ({ default: m.CategoriesScreen })));
-const PicksScreen = lazy(() => import('./screens/Picks').then((m) => ({ default: m.PicksScreen })));
-const SetupScreen = lazy(() => import('./screens/Setup').then((m) => ({ default: m.SetupScreen })));
-const ScannedScreen = lazy(() => import('./screens/Scanned').then((m) => ({ default: m.ScannedScreen })));
-const DiagnosticsScreen = lazy(() => import('./screens/Diagnostics').then((m) => ({ default: m.DiagnosticsScreen })));
-const ShopCatalogueScreen = lazy(() => import('./screens/ShopCatalogue').then((m) => ({ default: m.ShopCatalogueScreen })));
-const RecallsScreen = lazy(() => import('./screens/Recalls').then((m) => ({ default: m.RecallsScreen })));
-const SoonScreen = lazy(() => import('./screens/Soon').then((m) => ({ default: m.SoonScreen })));
-const SettingsScreen = lazy(() => import('./screens/Settings').then((m) => ({ default: m.SettingsScreen })));
-const FeedbackScreen = lazy(() => import('./screens/Feedback').then((m) => ({ default: m.FeedbackScreen })));
-const StoresScreen = lazy(() => import('./screens/Stores').then((m) => ({ default: m.StoresScreen })));
-const SyncScreen = lazy(() => import('./screens/Sync').then((m) => ({ default: m.SyncScreen })));
-const RestockServerScreen = lazy(() => import('./screens/RestockServer').then((m) => ({ default: m.RestockServerScreen })));
-const HomeAssistantScreen = lazy(() => import('./screens/HomeAssistant').then((m) => ({ default: m.HomeAssistantScreen })));
-const ReceiptScreen = lazy(() => import('./screens/Receipts').then((m) => ({ default: m.ReceiptScreen })));
-const ReceiptsScreen = lazy(() => import('./screens/Receipts').then((m) => ({ default: m.ReceiptsScreen })));
-const WhatsNewScreen = lazy(() => import('./screens/WhatsNew').then((m) => ({ default: m.WhatsNewScreen })));
-const IcloudSyncScreen = lazy(() => import('./screens/IcloudSync').then((m) => ({ default: m.IcloudSyncScreen })));
+const WifiSyncScreen = lazyScreen(() => import('./screens/WifiSync').then((m) => m.WifiSyncScreen), { preload: isIosHere() });
+// 0.15.0: screens opened now and then load when first opened, so Restock starts quicker. 0.15.2: and
+// they're loaded quietly once it has started (lazyScreen.tsx), so none opens on a blank page.
+const CardsScreen = lazyScreen(() => import('./screens/Cards').then((m) => m.CardsScreen));
+const CataloguesScreen = lazyScreen(() => import('./screens/Catalogues').then((m) => m.CataloguesScreen));
+const PermissionsScreen = lazyScreen(() => import('./screens/Permissions').then((m) => m.PermissionsScreen));
+const HouseholdScreen = lazyScreen(() => import('./screens/Household').then((m) => m.HouseholdScreen));
+const CategoriesScreen = lazyScreen(() => import('./screens/Categories').then((m) => m.CategoriesScreen));
+const PicksScreen = lazyScreen(() => import('./screens/Picks').then((m) => m.PicksScreen));
+const SetupScreen = lazyScreen(() => import('./screens/Setup').then((m) => m.SetupScreen));
+const ScannedScreen = lazyScreen(() => import('./screens/Scanned').then((m) => m.ScannedScreen));
+const DiagnosticsScreen = lazyScreen(() => import('./screens/Diagnostics').then((m) => m.DiagnosticsScreen));
+const ShopCatalogueScreen = lazyScreen(() => import('./screens/ShopCatalogue').then((m) => m.ShopCatalogueScreen));
+const RecallsScreen = lazyScreen(() => import('./screens/Recalls').then((m) => m.RecallsScreen));
+const SoonScreen = lazyScreen(() => import('./screens/Soon').then((m) => m.SoonScreen));
+const SettingsScreen = lazyScreen(() => import('./screens/Settings').then((m) => m.SettingsScreen));
+const FeedbackScreen = lazyScreen(() => import('./screens/Feedback').then((m) => m.FeedbackScreen));
+const StoresScreen = lazyScreen(() => import('./screens/Stores').then((m) => m.StoresScreen));
+const SyncScreen = lazyScreen(() => import('./screens/Sync').then((m) => m.SyncScreen));
+const RestockServerScreen = lazyScreen(() => import('./screens/RestockServer').then((m) => m.RestockServerScreen));
+const HomeAssistantScreen = lazyScreen(() => import('./screens/HomeAssistant').then((m) => m.HomeAssistantScreen));
+const ReceiptScreen = lazyScreen(() => import('./screens/Receipts').then((m) => m.ReceiptScreen));
+const ReceiptsScreen = lazyScreen(() => import('./screens/Receipts').then((m) => m.ReceiptsScreen));
+const WhatsNewScreen = lazyScreen(() => import('./screens/WhatsNew').then((m) => m.WhatsNewScreen));
+const IcloudSyncScreen = lazyScreen(() => import('./screens/IcloudSync').then((m) => m.IcloudSyncScreen), { preload: isIosHere() });
 import { wireHomeAssistant } from '../lib/homeAssistant';
 import { serverMode, serverUi } from '../server-mode/flag';
 import { padSide, usePadWide, type PadSide } from './padWide';
@@ -485,6 +488,8 @@ function RestockApp() {
     });
     void maybeAutoBackup().catch((e) => console.error('auto backup failed', e));
     void tidyReceipts().catch((e) => console.error('receipt tidy-up failed', e));
+    // 0.15.2: the screens opened now and then are loaded quietly, so none opens on a blank page.
+    void preloadScreens();
     // 0.9.13: feedback that couldn't go when it was sent (no connection) goes now.
     void import('../lib/feedback').then((f) => f.sendWaiting()).catch(() => undefined);
     // 0.10.0: Shared prices is one switch, on for every phone. A phone that had sharing off stays off

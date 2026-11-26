@@ -11,7 +11,7 @@ import { lookupBarcode, scanBarcode } from '../../lib/barcode';
 import { serverMode, serverUi } from '../../server-mode/flag';
 import { PhoneOnlyNote } from '../../server-mode/ui/PhoneOnly';
 import { cleanSearch } from '../../lib/searchText';
-import { addListEntry, allCategories, allGroups, allListEntries, checkEntriesOp, deleteListEntries, findProductByBarcode, getSettings, groupProductIds, nowIso, runOps, uid, updateListEntry, updateSettings, cachedSettings } from '../../lib/db';
+import { addListEntry, allCategories, allGroups, allListEntries, checkEntriesOp, deleteListEntries, findProductByBarcode, groupProductIds, nowIso, runOps, uid, updateListEntry, updateSettings, cachedSettings } from '../../lib/db';
 import { buzz, scannedLine, splitCount } from '../../lib/listActions';
 import { loadRecommendations } from '../../lib/recs';
 import { bothPrices, lineCost, type Option } from '../../lib/verdict';
@@ -21,7 +21,7 @@ import { act } from '../../lib/undo';
 import { Stepper } from '../Stepper';
 import { money, tidySize } from '../../lib/units';
 import { kiloPrice } from '../../lib/unitPrice';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
 import { chainName, type Chain, type ListEntry, type Settings } from '../../types';
 import { stockPlaces } from '../../lib/stockWhere';
@@ -252,7 +252,7 @@ export function ListScreen() {
   const allEntries = useLive(allListEntries, []);
   const allRecs = useLive(loadRecommendations, []);
   const allCats = useLive(allCategories, []);
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const [picked0, setSection] = useState<ListSection>(nav.section);
   // Opening the list from Home picks the grocery list even when the List tab is already open.
   useResetOn([nav.section], () => setSection(nav.section));

@@ -11,7 +11,7 @@ import { aroundPlan, shopTotals } from '../../lib/shopTotals';
 import { loadRecommendations } from '../../lib/recs';
 import { money } from '../../lib/units';
 import { lineCost } from '../../lib/verdict';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
 import { chainName, stockKnown, type ListEntry, type Settings } from '../../types';
@@ -43,7 +43,7 @@ export function HomeScreen() {
   const now = useNow(60_000);
   const nav = useNav();
   const allRecs = useLive(loadRecommendations, []);
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   // 0.9.3: phone-to-phone sync or a Restock server counts as a copy kept elsewhere.
   const sync = useLive(syncInfo, []);
   const allEntries = useLive(allListEntries, []);
@@ -399,8 +399,8 @@ function nextCheck(
 ): string | undefined {
   // 0.11.0: Off (no days) says nothing here, like background activity off
   if (!s.sync.backgroundActivity || (Array.isArray(s.checkDays) && !s.checkDays.length)) return undefined;
-  // iPhone: there's no set time; the next check is when Restock is next opened (lib/check.ts iosCheckDue).
-  if (isIos()) return 'when you next open Restock';
+  // 0.15.2, iPhone: from the set time, while it's charging (ios/backgroundCheck.ts); iOS picks the moment.
+  if (isIos()) return `${nextCheckWords(planOf(s), now)}, while charging`;
   return nextCheckWords(planOf(s), now);
 }
 

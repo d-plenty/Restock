@@ -8,6 +8,10 @@
 //   the database for a while (the app's side makes sure nothing else is written meanwhile).
 // - Written with WAL, so a change is on the disk once its call answers, and a cut-off write is rolled
 //   back the next time the file opens.
+// - 0.15.2: and a second connection per file, read-only, on a queue of its own (sqlRead). WAL lets it
+//   read while the first one writes, so the screens don't wait behind a price check's saves or the
+//   sync engine holding the file. It sees what was saved before each read started (nativeDb.ts makes
+//   a read wait for the app's own writes asked before it).
 
 import Capacitor
 import Foundation
@@ -19,6 +23,9 @@ enum RestockSql {
     static let queue = DispatchQueue(label: "family.plenty.restock.sql")
     /// Open files, by name (only touched on `queue`).
     static var open: [String: OpaquePointer] = [:]
+    /// 0.15.2: the read-only connections, and their queue (only touched on `readQueue`).
+    static let readQueue = DispatchQueue(label: "family.plenty.restock.sql.read")
+    static var readers: [String: OpaquePointer] = [:]
 
     struct Failure: Error, LocalizedError {
         let message: String
@@ -40,6 +47,22 @@ enum RestockSql {
         try exec(ok, "PRAGMA synchronous = NORMAL")
         try exec(ok, "PRAGMA foreign_keys = ON")
         open[name] = ok
+        return ok
+    }
+
+    /// The read-only connection for a file, once the file is there (nil before: then reads go the
+    /// writing connection's way, which makes the file).
+    static func reader(_ name: String) -> OpaquePointer? {
+        if let db = readers[name] { return db }
+        guard let url = try? RestockStore.file(name), FileManager.default.fileExists(atPath: url.path) else { return nil }
+        var db: OpaquePointer?
+        let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+        guard sqlite3_open_v2(url.path, &db, flags, nil) == SQLITE_OK, let ok = db else {
+            if let d = db { sqlite3_close(d) }
+            return nil
+        }
+        sqlite3_busy_timeout(ok, 5000)
+        readers[name] = ok
         return ok
     }
 
@@ -137,6 +160,28 @@ extension RestockApplePlugin {
         }
     }
 
+    /// 0.15.2: a read on the read-only connection (it doesn't wait behind writes). Before the file is
+    /// there, or if that connection can't read it, the read goes the writing connection's way.
+    @objc func sqlRead(_ call: CAPPluginCall) {
+        let sql = call.getString("sql") ?? ""
+        let values = RestockSql.values(call.options["values"])
+        let name = RestockSql.name(call)
+        RestockSql.readQueue.async {
+            if let db = RestockSql.reader(name), let rows = try? RestockSql.rows(db, sql, values) {
+                call.resolve(["rows": rows])
+                return
+            }
+            RestockSql.queue.async {
+                do {
+                    let db = try RestockSql.connection(name)
+                    call.resolve(["rows": try RestockSql.rows(db, sql, values)])
+                } catch {
+                    call.reject("SQL query failed: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
     @objc func sqlRun(_ call: CAPPluginCall) {
         let sql = call.getString("sql") ?? ""
         let values = RestockSql.values(call.options["values"])
@@ -208,6 +253,10 @@ extension RestockApplePlugin {
     @objc func sqlClose(_ call: CAPPluginCall) {
         let name = RestockSql.name(call)
         RestockSql.queue.async {
+            // The reader first (a checkpoint can't finish while it's reading), then the writer.
+            RestockSql.readQueue.sync {
+                if let r = RestockSql.readers.removeValue(forKey: name) { sqlite3_close(r) }
+            }
             if let db = RestockSql.open.removeValue(forKey: name) {
                 _ = try? RestockSql.exec(db, "PRAGMA wal_checkpoint(TRUNCATE)")
                 sqlite3_close(db)

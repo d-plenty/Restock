@@ -51,9 +51,23 @@ export interface RestockApplePlugin {
   iconGet(): Promise<{ name: string; supported: boolean }>;
   /** Whether the connection is one iOS calls expensive (mobile data, a hotspot). */
   netInfo(): Promise<{ online: boolean; expensive: boolean }>;
-  /** 0.14.0: asks iOS to wake the app later for a short sync (it tells the app with a "backgroundRefresh" event). */
-  backgroundSchedule(): Promise<void>;
+  /**
+   * 0.14.0: asks iOS to wake the app later for a short sync (it tells the app with a "backgroundRefresh"
+   * event). 0.15.2: `checkAt` (ms): and for a longer price check no sooner than then, while the phone
+   * is charging and online (a "backgroundCheck" event; "backgroundStop" when iOS says the time's up).
+   */
+  backgroundSchedule(o?: { checkAt?: number }): Promise<void>;
   backgroundDone(o: { ok: boolean }): Promise<void>;
+  /** 0.15.2: the longer check has finished (or stopped). */
+  backgroundCheckDone(o: { ok: boolean }): Promise<void>;
+  /**
+   * 0.15.2 (iOS 26): a Check now that keeps going after Restock leaves the screen, with its progress
+   * on the Lock Screen. `started` false: not on this iPhone (it then stops when Restock does, and
+   * carries on next time). "backgroundStop" when iOS ends it early.
+   */
+  checkTaskStart(o: { total: number }): Promise<{ started: boolean }>;
+  checkTaskProgress(o: { done: number; total: number }): Promise<void>;
+  checkTaskEnd(o: { ok: boolean }): Promise<void>;
   addListener(event: string, handler: (data: never) => void): Promise<PluginListenerHandle>;
 }
 

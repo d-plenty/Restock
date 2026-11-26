@@ -36,10 +36,13 @@
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>family.plenty.restock.refresh</string>
+		<string>family.plenty.restock.check</string>
+		<string>family.plenty.restock.checknow.*</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
+		<string>processing</string>
 	</array>
 	<key>NSBonjourServices</key>
 	<array>

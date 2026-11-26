@@ -21,7 +21,7 @@ import { shareTextFile } from '../../lib/backup';
 import { slim } from '../../lib/searchTest';
 import { bestMatches, sameCode, type BestMatch, type Candidate, whichOne, UNLIKELY, likeThis, matchesFor, normaliseQuery, queryChanged, recentSearches, rememberSearch, unitTextOf, scoreAll, topPicks, intendedKind, weakShops, type Scored } from '../../lib/searchHelp';
 import { localDay } from '../../lib/verdict';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import { adapterFor, type StoreProduct } from '../../stores';
 import { BlockedError, NativeOnlyError } from '../../stores/http';
 import { CostcoLines } from '../CostcoLines';
@@ -86,7 +86,7 @@ export function AddScreen({
   preTick?: { chain: StoreChain; storeProductId: string; product?: StoreProduct };
 }) {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const allCats = useLive(allCategories, []);
   const [pickedSection, setPickedSection] = useState<Section>(sectionProp);
   const attach = useLive(async () => {

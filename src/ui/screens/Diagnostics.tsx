@@ -1,10 +1,10 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { shareTextFile } from '../../lib/backup';
-import { getSettings } from '../../lib/db';
+
 import { captureWhile, clearProblems, problems, problemsText } from '../../lib/diagnostics';
 import { recordTrolley } from '../../lib/accounts';
 import { getHealth } from '../../lib/health';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import { chainName, enabledIn, isPressOnlyShop, SECTION_NAMES, SECTIONS, type Section, type StoreChain } from '../../shops';
 import { ShopTest } from './ShopTest';
 import { adapterFor } from '../../stores';
@@ -34,7 +34,7 @@ const today = () => localDay(new Date().toISOString());
 
 export function DiagnosticsScreen() {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const list = useLive(problems, []);
   const health = useLive(getHealth, []);
   const [chain, setChain] = useState<StoreChain>();
@@ -352,7 +352,7 @@ function SearchTest() {
  * battery setting (Android decides when background work runs, and can hold it back).
  */
 function BackgroundChecks() {
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const runs = useLive(getCheckLog, []) ?? [];
   const info = useLive(syncInfo, []);
   if (!settings) return null;

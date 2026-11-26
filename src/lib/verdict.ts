@@ -716,7 +716,7 @@ export function isBulk(o: Option, options: Option[], group: Group): boolean {
 }
 
 /** The option an alert or deal card is about. */
-function dealOption(rec: Recommendation): Option | undefined {
+export function dealOption(rec: Recommendation): Option | undefined {
   if (rec.action === 'alt') return rec.alt;
   if (rec.action === 'buy' || rec.action === 'small') return rec.best;
   return undefined;

@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { lazyScreen } from '../lazyScreen';
 import { allCategories, allGroups, getSettings } from '../../lib/db';
 import { searchItems } from '../../lib/haMatch';
 import { keepAsWords, pickItemFor, pickWord } from '../../lib/homeAssistant';
@@ -15,9 +16,9 @@ import { alwaysWords } from './addPickWords';
 import { pickedWords } from './addSave';
 
 // Loaded when first needed: the web app on a Restock server uses this sheet too, and never searches
-// the shops from it.
-const AddScreen = lazy(() => import('./Add').then((m) => ({ default: m.AddScreen })));
-const ManualSheet = lazy(() => import('./AddSheets').then((m) => ({ default: m.ManualSheet })));
+// the shops from it. 0.15.2: on a phone they're loaded quietly once Restock has started (lazyScreen).
+const AddScreen = lazyScreen(() => import('./Add').then((m) => m.AddScreen), { preload: !serverMode });
+const ManualSheet = lazyScreen(() => import('./AddSheets').then((m) => m.ManualSheet), { preload: !serverMode });
 
 /** Whether the phone thinks it's online (searching the shops needs the internet; nothing else here does). */
 function useOnline(): boolean {

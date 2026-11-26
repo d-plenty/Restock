@@ -214,12 +214,18 @@ export function wireSync(): void {
     void App.addListener('resume', () => void lan().then((w) => w.resumed()).catch(quiet('sync')));
     void App.addListener('pause', () => void lan().then((w) => w.paused()).catch(quiet('sync')));
     // And a short sync now and then while Restock isn't on screen, when iOS allows one (RestockBackground.swift).
-    void import('../ios/apple').then(({ appleHere, RestockApple }) => {
+    // 0.15.2: then as much of a price check as fits, and a longer check at the set time while the phone
+    // is charging (ios/backgroundCheck.ts).
+    void Promise.all([import('../ios/apple'), import('../ios/backgroundCheck')]).then(([{ appleHere, RestockApple }, bg]) => {
       if (!appleHere()) return;
-      void App.addListener('pause', () => void RestockApple.backgroundSchedule().catch(quiet('sync')));
+      bg.listen();
+      void App.addListener('pause', () => void bg.scheduleNext().catch(quiet('sync')));
       void RestockApple.addListener('backgroundRefresh', () => {
+        const woke = Date.now();
         void syncInfo()
           .then((i) => (i.paired ? RestockNative.syncNow() : undefined))
+          .catch(quiet('sync'))
+          .then(() => bg.afterBackgroundSync(woke))
           .then(
             () => RestockApple.backgroundDone({ ok: true }),
             () => RestockApple.backgroundDone({ ok: false }),

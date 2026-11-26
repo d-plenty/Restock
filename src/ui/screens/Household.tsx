@@ -1,8 +1,8 @@
 import { useState } from 'react';
 // 0.9.5 (save): the household's name waits for Save settings; categories change at once, with Undo.
-import { afterSave, getSettings, updateSettings } from '../../lib/settingsDraft';
+import { afterSave, updateSettings } from '../../lib/settingsDraft';
 import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar';
-import { useLive } from '../../lib/useLive';
+import { useLive, useDraftSettings } from '../../lib/useLive';
 import { RestockNative } from '../../lib/sql/native';
 import { MAX_SYNC_PHONES, syncInfo } from '../../lib/sync';
 import { Icon, TopBar } from '../components';
@@ -14,7 +14,7 @@ export function HouseholdScreen() {
   useSettingsDraft(); // 0.9.5 (save)
   const draft = useDraftState();
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useDraftSettings();
   const sync = useLive(syncInfo, []);
   const [section, setSection] = useState<Section>('pantry');
   if (!settings) return <div className="screen" />;

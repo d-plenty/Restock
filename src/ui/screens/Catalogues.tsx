@@ -2,7 +2,7 @@ import { allListEntries, getSettings } from '../../lib/db';
 import { shopTileNote } from '../../lib/ownSpecials';
 import { ownCounts } from '../../lib/ownSpecialsLive';
 import { loadRecommendations } from '../../lib/recs';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import { activeSections, chainName, enabledIn, hostOf, shopDef, shopOnTab, websiteOf, type Section, type StoreChain, withCustom } from '../../shops';
 import { serverMode } from '../../server-mode/flag';
 import { storeChoice, type Settings } from '../../types';
@@ -90,7 +90,7 @@ export function yourShops(settings: Settings): StoreChain[] {
 // things on special there), Website the shop's own site with its whole catalogue.
 export function CataloguesScreen() {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const counts = useLive(async () => {
     const [r, s, e] = await Promise.all([loadRecommendations(), getSettings(), allListEntries()]);
     return ownCounts(r, yourShops(s), e);

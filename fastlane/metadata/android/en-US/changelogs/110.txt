@@ -1,0 +1,1 @@
+Faster everywhere, even during a price check: prices are saved in lots, and no screen opens on a blank page. A price check that's cut off carries on where it got to (unless that was over a day ago). On iPhone and iPad, prices are checked in the background too: a little at a time, and a longer check from your set time while charging on Wi-Fi.

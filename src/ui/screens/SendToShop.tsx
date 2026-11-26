@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { getSettings } from '../../lib/db';
-import { useLive } from '../../lib/useLive';
+
+import { useSettings } from '../../lib/useLive';
 import { chainName } from '../../shops';
 import { wooliesAccount } from '../../types';
 import { isNative, viaBrowser } from '../../stores/http';
@@ -42,7 +42,7 @@ function productLink(chain: 'woolworths' | 'coles', l: SendLine): string {
 
 export function SendToShopSheet({ chain, lines, onClose }: { chain: 'woolworths' | 'coles'; lines: SendLine[]; onClose: () => void }) {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const [opened, setOpened] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const name = chainName(chain);

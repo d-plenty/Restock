@@ -17,7 +17,7 @@ import { getSettings, updateSettings } from '../../lib/db';
 import { loadRecommendations } from '../../lib/recs';
 import { money, tidySize } from '../../lib/units';
 import { kiloPrice, priceLine, productLine, type CompareStyle } from '../../lib/unitPrice';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import { ALERT_LEVELS, computeStats, HISTORY_DAYS, multiBuy, optionStyle, productQty, tiedWithBest, withMarket, type Option, type Recommendation, unitWord } from '../../lib/verdict';
 
 const wordList = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
@@ -169,7 +169,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   // 0.12.8: the Products I buy fold, so Edit can open it (a hook: kept above the early returns)
   const productsFold = useRef<HTMLDetailsElement>(null);
   const [learnOpen, setLearnOpen] = useState(false);
-  const appSettings = useLive(getSettings, []);
+  const appSettings = useSettings();
   const [preview, setPreview] = useState<Option>();
   const [rangeWeeks, setRangeWeeks] = useState<number>();
   const adding = useRef(false);

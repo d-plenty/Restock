@@ -4,9 +4,14 @@
 // open this way a copy of each is kept beside it, and an install that still kept its database in the
 // web view's storage (before 0.13.2's file) has it written to the file first.
 //
-// One thing at a time per file: the app's own reads and writes wait their turn, and the sync engine
+// One thing at a time per file: the app's own writes wait their turn, and the sync engine
 // (server-mode/engine.ts, the same one the server and the web use) holds the file for the whole of
 // each thing it does, as it does on a database that answers straight away.
+//
+// 0.15.2: the app's reads (SELECTs) go a lane of their own (sqlRead: a second, read-only connection),
+// so a screen doesn't wait behind a price check's saves or a sync. A read still waits for the app's
+// own writes asked before it, so it always sees them; what the sync engine is in the middle of it
+// doesn't see until the engine has finished (as with any other database).
 import type { RunResult, SqlDriver, SqlOp, SqlValue } from '../lib/sql/driver';
 import type { AsyncSyncDb, Row } from '../server-mode/engine';
 import { appleHere, RestockApple } from './apple';
@@ -14,11 +19,15 @@ import { DB_FILE, MARKET_FILE, databaseStore, fileStore, looksLikeSqlite, type W
 
 /** The plugin version that has the database (RestockSql.swift). */
 export const SQL_VERSION = 4;
+/** 0.15.2: the plugin version with the read lane (sqlRead). */
+export const READ_LANE_VERSION = 5;
 /** The copies kept before the first open in the system's SQLite. */
 export const KEPT = { [DB_FILE]: 'restock-before-0.15.1.sqlite', [MARKET_FILE]: 'restock-market-before-0.15.1.sqlite' } as const;
 
 export interface AppleSqlPlugin {
   sqlQuery(o: { db: string; sql: string; values: SqlValue[] }): Promise<{ rows: Record<string, unknown>[] }>;
+  /** 0.15.2 (plugin version 5): a read on the read-only connection. */
+  sqlRead?(o: { db: string; sql: string; values: SqlValue[] }): Promise<{ rows: Record<string, unknown>[] }>;
   sqlRun(o: { db: string; sql: string; values: SqlValue[] }): Promise<RunResult>;
   sqlBatch(o: { db: string; ops: { sql: string; values: SqlValue[] }[] }): Promise<void>;
   sqlKeepCopy(o: { name: string; copy: string }): Promise<{ copied: boolean; found: boolean }>;
@@ -26,15 +35,27 @@ export interface AppleSqlPlugin {
 }
 const plugin = (): AppleSqlPlugin => RestockApple as unknown as AppleSqlPlugin;
 
+const pluginVersion = async (): Promise<number> => {
+  if (!appleHere()) return 0;
+  try {
+    return (await RestockApple.info()).version;
+  } catch {
+    return 0;
+  }
+};
+
 /** Does this build of the app's native side have the database? */
 export async function nativeSqlHere(): Promise<boolean> {
-  if (!appleHere()) return false;
-  try {
-    return (await RestockApple.info()).version >= SQL_VERSION;
-  } catch {
-    return false;
-  }
+  return (await pluginVersion()) >= SQL_VERSION;
 }
+
+/** 0.15.2: does it have the read lane too? */
+export async function readLaneHere(): Promise<boolean> {
+  return (await pluginVersion()) >= READ_LANE_VERSION;
+}
+
+/** A read that the read lane can take: a SELECT (anything else, PRAGMAs included, goes the writing way). */
+export const isRead = (sql: string): boolean => /^\s*SELECT\b/i.test(sql);
 
 /** What the bridge can carry: true/false as 1/0 (as sql.js and Android store them), nothing as null. */
 export const bindable = (args: readonly unknown[] = []): SqlValue[] =>
@@ -49,12 +70,18 @@ interface Raw {
 /** One database file: the app's driver (every call waits its turn), and the engine's (holds the file). */
 export class AppleDb implements SqlDriver {
   private tail: Promise<unknown> = Promise.resolve();
+  /** The app's last write (reads wait for it, and nothing else). */
+  private written: Promise<unknown> = Promise.resolve();
   private readonly raw: Raw;
+  private readonly read?: (sql: string, args: readonly unknown[]) => Promise<Row[]>;
 
   constructor(
     readonly name: string,
     p: AppleSqlPlugin = plugin(),
+    opts: { readLane?: boolean } = {},
   ) {
+    const sqlRead = p.sqlRead?.bind(p);
+    if (opts.readLane && sqlRead) this.read = async (sql, args) => (await sqlRead({ db: name, sql, values: bindable(args) })).rows as Row[];
     this.raw = {
       query: async (sql, args) => (await p.sqlQuery({ db: name, sql, values: bindable(args) })).rows as Row[],
       run: (sql, args) => p.sqlRun({ db: name, sql, values: bindable(args) }),
@@ -71,14 +98,23 @@ export class AppleDb implements SqlDriver {
     return go;
   }
 
+  /** A write: waits its turn, and the reads asked after it wait for it. */
+  private write<T>(fn: () => Promise<T>): Promise<T> {
+    const go = this.turn(fn);
+    this.written = go.catch(() => undefined);
+    return go;
+  }
+
   query<T = Record<string, unknown>>(sql: string, params: SqlValue[] = []): Promise<T[]> {
-    return this.turn(() => this.raw.query(sql, params) as Promise<T[]>);
+    const read = this.read;
+    if (read && isRead(sql)) return this.written.then(() => read(sql, params) as Promise<T[]>);
+    return this.write(() => this.raw.query(sql, params) as Promise<T[]>);
   }
   run(sql: string, params: SqlValue[] = []): Promise<RunResult> {
-    return this.turn(() => this.raw.run(sql, params));
+    return this.write(() => this.raw.run(sql, params));
   }
   batch(ops: SqlOp[]): Promise<void> {
-    return this.turn(() => this.raw.batch(ops));
+    return this.write(() => this.raw.batch(ops));
   }
 
   /** The sync engine's way in: each thing it does holds the file (see AsyncSyncEngine). */

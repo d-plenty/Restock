@@ -3,7 +3,7 @@
 // and the Settings page. The phone, the iPhone web app and the web page all use these.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { confirmAction } from '../lib/confirm';
-import { allCategories, allGroups, cachedSettings, getProduct, getSettings, openEntryForGroup } from '../lib/db';
+import { allCategories, allGroups, cachedSettings, getProduct, openEntryForGroup } from '../lib/db';
 import {
   haveLabel,
   haveState,
@@ -28,7 +28,7 @@ import {
 } from '../lib/inventory';
 import { addGroupToList } from '../lib/listActions';
 import { act } from '../lib/undo';
-import { useLive } from '../lib/useLive';
+import { useLive, useSettings } from '../lib/useLive';
 import { SECTION_NAMES, type Section } from '../shops';
 import type { Group, Product } from '../types';
 import { Icon, SearchField, Sheet, TopBar } from './components';
@@ -470,7 +470,7 @@ function InventorySettingsBody({ onSaved }: { onSaved?: () => void }) {
   const live = useLive(loadInventory, []);
   const inv = live ?? NO_INVENTORY;
   const loaded = !!live;
-  const settings = useLive(getSettings, []) ?? cachedSettings();
+  const settings = useSettings() ?? cachedSettings();
   const groups = useLive(allGroups, []);
   const [draft, setDraft] = useState<{ tabs: Section[]; auto: boolean; tick: boolean }>();
   const saved = { tabs: [...inv.tabs].sort(), auto: inv.auto, tick: inv.tick };

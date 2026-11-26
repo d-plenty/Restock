@@ -14,7 +14,7 @@ import { request as askPermission } from '../../lib/permissions';
 import { describePosition, findPickedShops, nearbyStores, searchArea, type Area, type NearbyStore } from '../../lib/places';
 import { RestockNative } from '../../lib/sql/native';
 import { asHttps, searchOnSite } from '../../lib/site';
-import { useLive } from '../../lib/useLive';
+import { useLive, useDraftSettings } from '../../lib/useLive';
 import {
   BETA_SHOPS,
   chainName,
@@ -909,7 +909,7 @@ const sectionPageTitle = (s: Section): string => (s === 'pantry' ? 'Supermarkets
 
 export function StoresScreen({ section = 'pantry' }: { section?: Section }) {
   useSettingsDraft(); // 0.9.5 (save)
-  const settings = useLive(getSettings, []);
+  const settings = useDraftSettings();
   const nav = useNav();
   // 0.10.7: one section per page (Back, then the next one in Settings): no row of tabs along the top.
   const tab = section;

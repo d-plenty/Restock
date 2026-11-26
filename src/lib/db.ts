@@ -676,6 +676,22 @@ export async function addReading(r: Omit<PriceReading, 'id'>): Promise<void> {
   await write([insertReadingOp(r)]);
 }
 
+/**
+ * 0.15.2: what a price check found, saved together in one write: the new prices, photos for products
+ * that had none, and how far the check has got (checkProgress.ts). One write means the screens re-read
+ * once for the lot, not once a product.
+ */
+export async function saveFindings(readings: Omit<PriceReading, 'id'>[], photos: { id: string; imageUrl: string }[] = [], note?: { key: string; value: unknown }): Promise<void> {
+  const ops: SqlOp[] = [];
+  if (note) ops.push({ sql: 'INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', params: [note.key, JSON.stringify(note.value)] });
+  for (const p of photos) {
+    const op = updateOp('products', p.id, { imageUrl: p.imageUrl }, PRODUCT_COLS);
+    if (op) ops.push(op);
+  }
+  for (const r of readings) ops.push(insertReadingOp(r));
+  await write(ops);
+}
+
 /** 0.9.6: takes one price out of the history (a price typed in by hand that was wrong). Used inside act() so it can be undone. */
 export async function deleteReading(id: number): Promise<void> {
   await write([{ sql: 'DELETE FROM prices WHERE id = ?', params: [id] }]);
@@ -996,7 +1012,8 @@ export interface Snapshot {
 }
 
 export async function snapshot(): Promise<Snapshot> {
-  const kvRows = await sql().query<{ key: string; value: string }>('SELECT key, value FROM kv');
+  // 0.15.2: how far this phone's price check has got isn't part of a backup (checkProgress.ts).
+  const kvRows = await sql().query<{ key: string; value: string }>("SELECT key, value FROM kv WHERE key != 'checkProgress'");
   return {
     products: await allProducts(),
     groups: await allGroups(),

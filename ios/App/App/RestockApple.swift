@@ -304,10 +304,15 @@ public class RestockApplePlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDe
         CAPPluginMethod(name: "lanBrowse", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "backgroundSchedule", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "backgroundDone", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "backgroundCheckDone", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "checkTaskStart", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "checkTaskProgress", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "checkTaskEnd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "storeRead", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "storeWrite", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "storeDelete", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sqlQuery", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "sqlRead", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sqlRun", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sqlBatch", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sqlKeepCopy", returnType: CAPPluginReturnPromise),
@@ -326,7 +331,7 @@ public class RestockApplePlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDe
     @objc func info(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             call.resolve([
-                "version": 4,
+                "version": 5,
                 // 0.15.1: "appstore" in the App Store build (ios.yml sets it); otherwise installed from a computer.
                 "channel": (Bundle.main.object(forInfoDictionaryKey: "RestockChannel") as? String) ?? "sideload",
                 "pad": UIDevice.current.userInterfaceIdiom == .pad,

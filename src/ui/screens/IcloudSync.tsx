@@ -4,12 +4,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { scanBarcode } from '../../lib/barcode';
 import { confirmAction } from '../../lib/confirm';
-import { getSettings } from '../../lib/db';
+
 import { deviceWord } from '../../lib/platform';
 import { RestockNative } from '../../lib/sql/native';
 import { useSyncStatus } from './useSyncStatus';
 import { agoText } from '../../lib/sync';
-import { useLive } from '../../lib/useLive';
+import { useSettings } from '../../lib/useLive';
 import { isFolderCode } from '../../ios/folderHouse';
 import { icloud, type IcloudStatus } from '../../ios/sync';
 import { Icon, Sheet, TopBar, More } from '../components';
@@ -115,7 +115,7 @@ function AddDeviceSheet({ onClose, onLetIn }: { onClose: () => void; onLetIn: ()
 
 export function IcloudSyncScreen() {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const { st, busy, error, setError, load, run } = useSyncStatus<IcloudStatus>(() => icloud.status());
   const [adding, setAdding] = useState(false);
   const device = deviceWord();

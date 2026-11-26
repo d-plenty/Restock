@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { getKV, getSettings, putKV, refresh } from '../../lib/db';
+import { getKV, putKV, refresh } from '../../lib/db';
 import * as draft from '../../lib/settingsDraft';
 import { SaveBar, useSettingsDraft } from '../SaveBar';
 import { ensureNotificationPermission } from '../../lib/notify';
 import { RestockNative } from '../../lib/sql/native';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
 import { Icon, LoadingBar, timeAgo, TopBar, More } from '../components';
@@ -242,7 +242,7 @@ export function RecallsScreen() {
 /** Home: a red card while a possible recall is open. */
 export function RecallBanner() {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const found = useLive(openRecalls, []);
   if (!settings?.recalls.enabled || !found?.length) return null;
   const first = found[0];

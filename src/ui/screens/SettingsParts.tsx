@@ -1,6 +1,5 @@
 // 0.15.0: Settings' larger parts (moved out of Settings.tsx): connections, price checks,
 // notifications, and app updates.
-import { IOS_CHECK_EVERY_HOURS } from '../../lib/check';
 import { isIos } from '../../lib/platform';
 import { useEffect, useState, type ReactNode } from 'react';
 import { version } from '../../../package.json';
@@ -139,35 +138,9 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
   };
   const blocked = choice !== 'off' && !settings.sync.backgroundActivity;
 
-  // iPhone app: an iPhone can't run a check at a set time, so this is one switch: check when Restock is
-  // opened (when the last check is more than 12 hours old), or only when Check now is tapped.
-  if (isIos()) {
-    const on = choice !== 'off' && settings.sync.backgroundActivity;
-    return (
-      <>
-        <div className="card flush">
-          <label className="check">
-            <input className="switch" type="checkbox" checked={on} onChange={(e) => void pick(e.target.checked ? 'twice' : 'off')} />
-            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <span className="title" style={{ fontSize: 15 }}>
-                Check prices when I open Restock
-              </span>
-              <span className="small">Checks when you open Restock, at most every {IOS_CHECK_EVERY_HOURS} hours.{' '}<More title="Check prices when I open Restock"><p>Only the items in your pantry and your tabs. A check runs when you open Restock and the last one is more than {IOS_CHECK_EVERY_HOURS} hours old.</p></More></span>
-            </span>
-          </label>
-          <div className="check" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
-            <span className="small" role="status">
-              {on
-                ? 'An iPhone decides when apps may work in the background, so Restock can’t pick a time of day here. Open it now and then and your prices stay current. Check now on Home checks straight away.'
-                : 'Nothing is checked until you tap Check now on Home. We recommend leaving this on: without it, prices and your specials at each shop go out of date.'}
-            </span>
-            <span className="small">Picking a time of day: not possible on iPhone due to Apple's restrictions.</span>
-          </div>
-        </div>
-      </>
-    );
-  }
-
+  // 0.15.2: the iPhone has the same choices. iOS decides the exact moment an app may work in the
+  // background, so the set time is the earliest a check starts there (while charging and on Wi-Fi).
+  const ios = isIos();
   return (
     <>
       <div className="card flush">
@@ -190,7 +163,9 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
           <span className="small" role="status">
             {choice === 'off'
               ? 'Nothing is checked until you tap Check now on Home. We recommend leaving automatic checks on: without them, prices and your specials at each shop go out of date.'
-              : `Runs ${dayWords(days)} at ${timeWords(settings.checkTime ?? CHECK_TIME_0110)}, your phone's own time. Android may run it a few minutes late; if the phone is off then, it checks soon after it's back. Checking by hand doesn't change it.`}
+              : ios
+                ? `Runs ${dayWords(days)} from ${timeWords(settings.checkTime ?? CHECK_TIME_0110)}, while your iPhone is charging and on Wi-Fi. iOS picks the exact moment, so it can be later. Restock also checks a little at a time in the background, and when you open it.`
+                : `Runs ${dayWords(days)} at ${timeWords(settings.checkTime ?? CHECK_TIME_0110)}, your phone's own time. Android may run it a few minutes late; if the phone is off then, it checks soon after it's back. Checking by hand doesn't change it.`}
           </span>
         </div>
         {choice === 'custom' && (
@@ -236,7 +211,7 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
             </label>
           </>
         )}
-        {blocked && (
+        {blocked && !ios && (
           <div className="check" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }} role="note">
             <span className="small">
               <strong>Background activity is off</strong> (Settings → Sync and backups), so these checks can't run by themselves.

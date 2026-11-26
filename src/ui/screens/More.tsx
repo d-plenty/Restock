@@ -4,9 +4,9 @@
 // and Settings, Cards, Catalogues, Specials and Receipts. The web page's phone layout shows the
 // same tab rows on its own More (PhoneLayout.tsx MorePage), so the phone and the web match.
 import { useState, type ReactNode } from 'react';
-import { getSettings } from '../../lib/db';
+
 import { loadRecommendations } from '../../lib/recs';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
 import { chainName, customDef, EXTRA_SECTIONS, enabledIn, MAX_CUSTOM, SECTION_NAMES, type Section } from '../../shops';
 import { customsInUse, NewCustomSheet } from './CustomSections';
@@ -37,7 +37,7 @@ function tabSummary(recs: Recommendation[] | undefined, section: Section): { thi
  */
 export function MoreTop({ children }: { children?: ReactNode }) {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const recs = useLive(loadRecommendations, []);
   // 0.10.7: a custom section shows as soon as it's made, before its shops are picked (tapping it opens its page in Settings).
   const shown = settings
@@ -127,7 +127,7 @@ function MoreRow({ icon, title, sub, onClick, off }: { icon: string; title: stri
 
 export function MoreScreen() {
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   return (
     <div className="screen more-screen">
       <MoreTop />

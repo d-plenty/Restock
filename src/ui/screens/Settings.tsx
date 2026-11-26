@@ -15,7 +15,7 @@ import { sharedOn } from '../../lib/priceShare';
 import { SharedPricesSection } from './SharedPrices';
 import { sendSpendingToServer, spendingOnServer } from '../../lib/spending';
 // 0.9.5 (save): settings changed here wait for "Save settings" (settingsDraft.ts).
-import { afterSave, getSettings, updateSettings } from '../../lib/settingsDraft';
+import { afterSave, updateSettings } from '../../lib/settingsDraft';
 import { PriceHelperSettings } from './PriceHelperSettings';
 import { PriceHistorySettings } from './DayOne';
 import { YourData } from './YourData';
@@ -24,7 +24,7 @@ import { SaveBar, useSettingsDraft } from '../SaveBar';
 import { inventorySummary, useInventory } from '../Inventory';
 import { loadDemo, removeDemo } from '../../lib/demo';
 import { PICKS_TITLE } from '../../lib/makerPicks';
-import { useLive } from '../../lib/useLive';
+import { useLive, useDraftSettings } from '../../lib/useLive';
 import { money } from '../../lib/units';
 import { STALE_DAYS } from '../../lib/verdict';
 import { chainName, GOOD_SALE, GREAT_SALE, historyLabel, type Settings } from '../../types';
@@ -191,7 +191,7 @@ const GROUPS: { title: string; pages: (SettingsPage | 'cards' | 'feedback' | 'pe
 export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
   useSettingsDraft(); // 0.9.5 (save)
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useDraftSettings();
   const inv = useInventory(); // 0.13.1
   const cardCount = useLive(async () => (await allCards()).length + (await allGiftCards()).length, []); // 0.9.6 (cards): loyalty and gift
   const sync = useLive(syncInfo, []);

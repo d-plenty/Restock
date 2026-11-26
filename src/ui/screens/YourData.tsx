@@ -2,10 +2,10 @@ import { cleanSearch } from '../../lib/searchText';
 import { useEffect, useMemo, useState } from 'react';
 import { allGroups } from '../../lib/db';
 import { phoneSpending, noteTicks, spendingOnServer } from '../../lib/spending';
-import { getSettings } from '../../lib/db';
+
 import { RestockNative } from '../../lib/sql/native';
 import { syncInfo } from '../../lib/sync';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
 import { money } from '../../lib/units';
 import { serverMode } from '../../server-mode/flag';
 import { PriceChart, PriceKey, ShopBars, SpendingChart } from '../../server-mode/ui/DeskDataCharts';
@@ -54,7 +54,7 @@ function Tile({ label, big, sub }: { label: string; big: string; sub?: string })
 export function YourData() {
   const nav = useNav();
   const info = useLive(syncInfo, []);
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const onServer = isNative() && !!info?.server && info.serverApi === 3;
   // 0.10.0: with a server, its figures unless Share my spending with the server is off (Sync and backups).
   const source: Source = onServer && settings && spendingOnServer(settings) ? 'server' : 'phone';

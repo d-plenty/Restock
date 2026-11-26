@@ -77,6 +77,12 @@ jobs:
       - run: npx cap sync ios
       - name: The App Store's version (no word about installing from a computer)
         run: /usr/libexec/PlistBuddy -c "Add :RestockChannel string appstore" ios/App/App/Info.plist
+      # 0.15.2: plain http only to the home network (IP addresses and .local names: a Restock server or
+      # Home Assistant at home), as Apple prefers. The version installed from a computer keeps any address.
+      - name: The App Store's version (plain http only at home)
+        run: |
+          /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity:NSAllowsArbitraryLoads" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true" ios/App/App/Info.plist
       - name: Archive (no signing)
         run: |
           set -o pipefail

@@ -22,7 +22,7 @@ import {
   webPageCode,
   type SyncInfo,
 } from '../../lib/sync';
-import { useLive } from '../../lib/useLive';
+import { useSettings } from '../../lib/useLive';
 import { SECTION_NAMES, SECTIONS, sectionOn, type Section } from '../../shops';
 import { Icon, LoadingBar, Sheet, TopBar, More } from '../components';
 import { useNav } from '../nav';
@@ -520,7 +520,7 @@ function SharesEditor({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) 
 export function RestockServerScreen({ code: scanned }: { code?: string } = {}) {
   useSettingsDraft(); // 0.9.5 (save): what this phone shares waits for Save settings
   const nav = useNav();
-  const settings = useLive(getSettings, []);
+  const settings = useSettings();
   const [info, setInfo] = useState<SyncInfo>();
   const [joined, setJoined] = useState<{ label?: string | null; houseName?: string | null } | undefined>(() => demoSync()?._joined);
   const [choice, setChoice] = useState<HouseChoice>();
