@@ -446,8 +446,9 @@ export interface Settings {
   /** `black`: true black in dark mode, for OLED screens (0.8.9). On unless set to false (0.9.0). */
   /** 0.16.0, `holidays`: the holiday opening and, on the default theme, its colours (holiday.ts). On unless false.
    * `opening`: the opening animation at start (Opening.tsx); on unless false. Off, no opening plays at all.
+   * 0.17.0 `iconPicked`: an icon colour picked by hand (so "Match my accent colour", now the default, is never put back on it).
    */
-  look: { style: 'australia' | 'plain'; accent?: string; icon: string; black?: boolean; holidays?: boolean; opening?: boolean };
+  look: { style: 'australia' | 'plain'; accent?: string; icon: string; black?: boolean; holidays?: boolean; opening?: boolean; iconPicked?: boolean };
   /**
    * 0.16.0: what to call the person on this phone (myName.ts): Home's greeting, this phone's name in
    * the household and on a server, and backup names. This phone's own (in its backups, never synced).
@@ -455,6 +456,9 @@ export interface Settings {
    * so a name someone typed themselves is never replaced.
    */
   myName?: string;
+  /** 0.17.0 (inventoryAsk.ts): shopping trips finished on this phone, and whether it has asked about inventory. */
+  tripsDone?: number;
+  inventoryAsked?: boolean;
   nameAsked?: boolean;
   phoneLabel?: string;
   /** Accessibility: text size (1 = normal), high contrast, less motion, bigger buttons. */
@@ -535,7 +539,8 @@ export const DEFAULT_SETTINGS: Settings = {
   otherContainerSizes: false,
   seenHints: [],
   marketData: { enabled: true, wifiOnly: true, days: 56, every: 'weekly' },
-  look: { style: 'australia', icon: 'green' },
+  // 0.17.0: the app icon matches the accent colour unless one is picked
+  look: { style: 'australia', icon: 'match' },
   a11y: { text: 1, contrast: false, motion: false, big: false },
   setup: { done: [], skipped: [] },
   tour: {},

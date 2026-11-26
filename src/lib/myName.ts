@@ -4,6 +4,7 @@
 // It's used for Home's greeting ("Good morning, Declan"; with no name, "Good morning"), for this
 // phone's name in the household and on a Restock server ("Declan's iPhone"), and in backup file
 // names. It's this phone's own: in its backups (so a restore brings it back), never synced.
+import { serverMode } from '../server-mode/flag';
 import { getSettings, updateSettings } from './db';
 import { Capacitor } from '@capacitor/core';
 import { deviceWord, isIos } from './platform';
@@ -55,6 +56,8 @@ export async function setMyName(name: string): Promise<void> {
   const n = cleanName(name);
   await updateSettings({ myName: n || undefined, nameAsked: true });
   await labelPhone(n).catch(quiet('your name'));
+  // 0.17.0: the web page on a server names this browser by it too (server-mode/live.ts)
+  if (serverMode) await import('../server-mode/live').then((m) => m.nameThisBrowser(n)).catch(quiet('your name'));
 }
 
 /** Skipped: not asked again. */
@@ -77,3 +80,16 @@ export async function labelPhone(name: string): Promise<void> {
   await RestockNative.syncSet({ name: label });
   await updateSettings({ phoneLabel: label });
 }
+
+/** 0.17.0: what kind of browser this is, for its name in the household ("Sam's Firefox"); "browser" when it can't tell. */
+export function browserWord(ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''): string {
+  if (/Edg\//.test(ua)) return 'Edge';
+  if (/Firefox\//.test(ua)) return 'Firefox';
+  if (/OPR\//.test(ua)) return 'Opera';
+  if (/Chrome\//.test(ua)) return 'Chrome';
+  if (/Safari\//.test(ua)) return 'Safari';
+  return 'browser';
+}
+
+/** 0.17.0: the web page's name in the household: "Sam's Chrome" with a name, "Web" without. */
+export const browserLabel = (name: string | undefined, ua?: string): string => (cleanName(name ?? '') ? phoneLabelFor(cleanName(name ?? ''), browserWord(ua)) : 'Web');

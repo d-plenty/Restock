@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.16.0" src="https://img.shields.io/badge/status-release%20candidate%200.16.0-ffcd00">
+  <img alt="Release candidate 0.17.0" src="https://img.shields.io/badge/status-release%20candidate%200.17.0-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0160">New in 0.16.0</a> ·
+  <a href="#new-in-0170">New in 0.17.0</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#iphone-and-ipad">On iPhone</a> ·
@@ -143,6 +143,30 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 ## iPhone and iPad
 
 Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Prices are checked in the background too: a little at a time, and a longer check from your set time while the iPhone is charging and on Wi-Fi (iOS picks the exact moment). One thing isn't possible because of Apple's restrictions: the app updating itself. Still to come there: home screen widgets, Search with Google Lens straight from the app, and the App Store. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.17.0
+
+Tidier everywhere: the same sizes on every screen, shorter Settings, and what's new for every update you skipped.
+
+**The same on every screen and device**
+- **One size for buttons, fields and search bars**, the same on Android phones and tablets, iPhone, iPad and a Restock server's web page. Home's top is tighter ("Prices updated today 7:12 pm" and a smaller Check now) and the tab bar sits lower.
+- **Pop-ups on tablets, iPads and wide windows** dim the whole screen and sit in the middle of the page (they dimmed a phone-wide strip, off to one side).
+
+**Shorter Settings**
+- **Your name** opens a page that says where it's used; the keyboard only comes up when you tap the name.
+- **Setup checklist:** what's still to set up, one row each, with the done ones folded away.
+- **Sync and Backups** have a page each. **Prices and deals**, **Shared prices** (a line, with How it works holding the switch) and the backup settings say it in fewer words.
+- **Inventory stays out of the way** until you want it: the Inventory button only shows once it's on, and Restock asks once, after 20 things in the pantry and 3 shopping trips. It's still in Settings whenever you like.
+
+**Look and colours**
+- **11 accent colours and 11 app icons**, plus the colour wheel for any colour at all. The app icons are shown as the real icon. The app icon matches your accent unless you pick one.
+- **See the animations:** each one with a picture, its dates and "showing now", and Day and Night buttons. Playing one can always be left: a tap, Back or Escape.
+- **New holiday dates:** Australia Day 2–27 January, Easter the three weeks up to Easter Monday, Halloween 11 October – 1 November. Each ends the day after.
+
+**And**
+- **Skipped an update or two?** What's new shows every version since the one you had.
+- **On a Restock server, each browser is named after you**, like "Sam's Chrome".
+- **Fixes:** the square box behind search bars in true black, the Feedback page's layout, the Advanced icon in Settings.
 
 ## New in 0.16.0
 

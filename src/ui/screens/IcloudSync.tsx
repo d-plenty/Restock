@@ -95,7 +95,7 @@ function AddDeviceSheet({ onClose, onLetIn }: { onClose: () => void; onLetIn: ()
         </div>
       )}
       <ol className="small" style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <li>On the other device, share this household's iCloud folder with it and pick that folder in Restock (Sync and backups, then iCloud sync).</li>
+        <li>On the other device, share this household's iCloud folder with it and pick that folder in Restock (Sync, then iCloud sync).</li>
         <li>
           There, tap <strong>Join with a code</strong> and scan this.
         </li>
@@ -129,7 +129,7 @@ export function IcloudSyncScreen() {
   const start = async () => {
     const name = settings?.household.name || 'Our house';
     const sure = await confirmAction(`Start "${name}" on this ${device}?`, {
-      detail: `This ${device} becomes the household's first device: the others are added from here. What's on it now becomes the household's. Its name can be changed in Sync and backups.`,
+      detail: `This ${device} becomes the household's first device: the others are added from here. What's on it now becomes the household's. Its name can be changed in Sync.`,
       action: 'Start the household',
       danger: false,
     });
@@ -365,7 +365,7 @@ export function IcloudSyncScreen() {
               a Restock server.
             </span>
             <span className="small">
-              <strong>Keep a backup too</strong> (Sync and backups, then Backups). Sync keeps your devices the same, mistakes included.
+              <strong>Keep a backup too</strong> (Settings → Backups). Sync keeps your devices the same, mistakes included.
             </span>
           </div>
         </>

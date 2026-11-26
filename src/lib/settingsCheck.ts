@@ -302,7 +302,10 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
       style: oneOf(lk.style, ['australia', 'plain'] as const, D.look.style),
       // The accent is a colour ("#ffcd00"): one of the swatches, or any colour from the colour wheel.
       accent: colour(lk.accent),
-      icon: oneOf(lk.icon, ICONS, D.look.icon),
+      // 0.17.0: "Match my accent colour" is the default. Someone who never touched either (green icon,
+      // no accent of their own) gets it too: it looks the same, and now follows a new accent.
+      icon: lk.icon === 'green' && !lk.accent && lk.iconPicked !== true ? 'match' : oneOf(lk.icon, ICONS, D.look.icon),
+      iconPicked: maybeBool(lk.iconPicked),
       black: maybeBool(lk.black),
       // 0.16.0: the holidays (holiday.ts): on unless turned off.
       holidays: maybeBool(lk.holidays),
@@ -312,6 +315,9 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     myName: text(s.myName, 60),
     nameAsked: maybeBool(s.nameAsked),
     phoneLabel: text(s.phoneLabel, 60),
+    // 0.17.0: the inventory question (inventoryAsk.ts)
+    tripsDone: s.tripsDone === undefined ? undefined : number(s.tripsDone, 0, 0, 1000, true),
+    inventoryAsked: maybeBool(s.inventoryAsked),
     a11y: {
       text: number(ax.text, D.a11y.text, TEXT_MIN, TEXT_MAX),
       contrast: bool(ax.contrast, D.a11y.contrast),

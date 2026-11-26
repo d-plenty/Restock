@@ -61,7 +61,7 @@ function AddPhoneSheet({ onClose, onIn }: { onClose: () => void; onIn: () => voi
       <ol className="small" style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <li>Put the other phone on the same Wi-Fi as this {device}.</li>
         <li>
-          In Restock on it, open <strong>Sync and backups</strong>, choose to sync with another phone, then <strong>Join with a code</strong>.
+          In Restock on it, open <strong>Sync</strong>, choose to sync with another phone, then <strong>Join with a code</strong>.
         </li>
         <li>Scan this code. Keep Restock open here until it says the phone is in.</li>
       </ol>
@@ -119,7 +119,7 @@ export function WifiSyncScreen({ apple }: { apple?: boolean }) {
     const out = await scanBarcode('Scan the code on the other phone', {
       accept: (text) => (isWifiCode(text) ? text.trim() : undefined),
       qr: true,
-      wrong: "That isn't a Restock sync code. On the other phone, open Sync and backups and choose Add a phone.",
+      wrong: "That isn't a Restock sync code. On the other phone, open Sync and choose Add a phone.",
       typeHint: 'Or type the code',
     });
     if (!out.ok) return;
@@ -217,7 +217,7 @@ export function WifiSyncScreen({ apple }: { apple?: boolean }) {
               <button className="sync-choice" disabled={!!busy || !st.available} onClick={() => void join()}>
                 <strong style={{ fontSize: 17 }}>Join with a code</strong>
                 <span className="small">
-                  The other phone already has a household. On it, open Sync and backups, choose Add a phone, and scan the code it shows with this{' '}
+                  The other phone already has a household. On it, open Sync, choose Add a phone, and scan the code it shows with this{' '}
                   {device}.
                 </span>
               </button>
@@ -349,7 +349,7 @@ export function WifiSyncScreen({ apple }: { apple?: boolean }) {
               other phone.
             </span>
             <span className="small">
-              <strong>Keep a backup too</strong> (Sync and backups, then Backups). Sync keeps your phones the same, mistakes included.
+              <strong>Keep a backup too</strong> (Settings → Backups). Sync keeps your phones the same, mistakes included.
             </span>
           </div>
         </>

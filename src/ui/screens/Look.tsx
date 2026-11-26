@@ -1,18 +1,28 @@
 import { isIos } from '../../lib/platform';
-import { useState } from 'react';
-import { ACCENTS, AUS_GREEN, ICON_COLOURS, nearestIcon } from '../../lib/looks';
+import { useId, useState } from 'react';
+import { ACCENTS, AUS_GREEN, ICON_COLOURS, ICON_PAINT, nearestIcon, SHOWN_ACCENTS, SHOWN_ICONS } from '../../lib/looks';
 // 0.9.5 (save): on a settings screen these wait for Save settings (settingsDraft.ts).
 import { afterSave, updateSettings } from '../../lib/settingsDraft';
 import { RestockNative } from '../../lib/sql/native';
 import { textOn } from '../../lib/theme';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
-import { Icon, More, ThemePicker } from '../components';
+import { Icon, LogoDrawing, More, ThemePicker } from '../components';
 import { lessMotion } from '../Opening';
 import { OpeningPreview } from '../OpeningPreview';
 import { useNav } from '../nav';
 
 // Settings → Look and colours, and Settings → Accessibility. Also used by the setup tiles.
+
+/** 0.17.0: an app icon colour, shown as the icon itself. */
+function IconPicture({ id }: { id: string }) {
+  const uid = useId().replace(/:/g, '');
+  return (
+    <svg className="icon-picture" viewBox="18 18 72 72" aria-hidden="true">
+      <LogoDrawing id={uid} paint={ICON_PAINT[id] ?? ICON_PAINT.green} />
+    </svg>
+  );
+}
 
 export function LookSettings({ settings }: { settings: Settings }) {
   const nav = useNav();
@@ -23,8 +33,11 @@ export function LookSettings({ settings }: { settings: Settings }) {
   const setLook = (patch: Partial<Settings['look']>) => updateSettings({ look: { ...look, ...patch } });
 
   const iconId = look.icon === 'match' ? nearestIcon(accent).id : look.icon;
+  // 0.17.0: the 11 offered colours, plus a colour picked before that isn't among them
+  const shownAccents = ACCENTS.filter((a) => SHOWN_ACCENTS.includes(a.id) || (a.id !== 'green' && a.hex.toLowerCase() === accent.toLowerCase()));
+  const shownIcons = ICON_COLOURS.filter((c) => SHOWN_ICONS.includes(c.id) || c.id === iconId);
   const setIcon = async (id: string) => {
-    await setLook({ icon: id });
+    await setLook({ icon: id, iconPicked: id !== 'match' });
     if (!isNative()) return;
     // 0.9.5 (save): the app icon changes once it's saved (with the accent it's saved with).
     await afterSave('icon', async (s) => {
@@ -123,7 +136,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
             Christmas, New Year, Australia Day, Easter and Halloween.{' '}
             <More title="Holiday themes">
               <p>On a holiday Restock opens with that holiday&rsquo;s animation (with Opening animation on). On the default theme the app also takes the holiday&rsquo;s colours, with a small decoration at the top of Home.</p>
-              <p>Christmas is 1 to 26 December, New Year 27 December to 1 January, Australia Day the rest of January, Easter the two weeks up to Easter Monday, and Halloween all of October. Each looks like day in light mode and night in dark mode. Afterwards everything goes back to normal by itself.</p>
+              <p>Christmas is 1 to 26 December, New Year 27 December to 1 January, Australia Day 2 to 27 January, Easter the three weeks up to Easter Monday, and Halloween 11 October to 1 November. Each looks like day in light mode and night in dark mode. Afterwards everything goes back to normal by itself.</p>
               <p>Just for this phone.</p>
             </More>
           </span>
@@ -131,9 +144,9 @@ export function LookSettings({ settings }: { settings: Settings }) {
         <input type="checkbox" className="switch" checked={look.holidays !== false} onChange={(e) => void setLook({ holidays: e.target.checked })} />
       </label>
       <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => setSeeing(true)}>
-        <Icon name="star" size={16} /> See the openings
+        <Icon name="star" size={16} /> See the animations
       </button>
-      {seeing && <OpeningPreview still={lessMotion(settings.a11y.motion)} onClose={() => setSeeing(false)} />}
+      {seeing && <OpeningPreview still={lessMotion(settings.a11y.motion)} settings={settings} onClose={() => setSeeing(false)} />}
 
       {/* The colour grids are tucked away until you want them (0.7.3). */}
       <details className="pick-more">
@@ -145,7 +158,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
         </summary>
         <div className="field">
           <div className="swatches" role="radiogroup" aria-label="Accent colour">
-            {ACCENTS.map((a) => {
+            {shownAccents.map((a) => {
               const on = (look.accent ?? AUS_GREEN).toLowerCase() === a.hex.toLowerCase();
               return (
                 <button
@@ -163,7 +176,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
               );
             })}
             <label
-              className={`swatch wheel${ACCENTS.some((a) => a.hex.toLowerCase() === accent.toLowerCase()) ? '' : ' on'}`}
+              className={`swatch wheel${shownAccents.some((a) => a.hex.toLowerCase() === accent.toLowerCase()) ? '' : ' on'}`}
               aria-label="Pick any colour"
             >
               <input type="color" value={accent} onChange={(e) => void setAccent(e.target.value)} />
@@ -193,7 +206,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
             <span>Match my accent colour</span>
           </label>
           <div className="swatches" role="radiogroup" aria-label="App icon colour">
-            {ICON_COLOURS.map((c) => {
+            {shownIcons.map((c) => {
               const on = iconId === c.id;
               return (
                 <button
@@ -207,7 +220,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
                   style={{ background: c.hex, color: textOn(c.hex) }}
                   onClick={() => void setIcon(c.id)}
                 >
-                  <Icon name="scan" size={16} stroke={2.6} />
+                  <IconPicture id={c.id} />
                 </button>
               );
             })}

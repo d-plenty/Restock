@@ -39,6 +39,8 @@ export function SharedPricesSection({ settings }: { settings: Settings }) {
   const sent = useLive(priceShareStatus, []);
   const [progress, setProgress] = useState<string>();
   const [asking, setAsking] = useState(false);
+  // 0.17.0: a short line, and "How it works" opens the whole story with the switch in it
+  const [open, setOpen] = useState(false);
 
   const download = async (onlyUnmetered = false) => {
     if (!isNative()) {
@@ -102,6 +104,18 @@ export function SharedPricesSection({ settings }: { settings: Settings }) {
         {SHARED_TITLE}
       </div>
       <div className="card flush">
+        <button className="row" aria-expanded={open} onClick={() => setOpen((x) => !x)}>
+          <span className="grow">
+            <span className="title">{SHARED_TITLE}</span>
+            <span className="small">{on ? 'On' : 'Off'} · a fair verdict on new items from day one</span>
+          </span>
+          <span className="small linkish-text">{open ? 'Less' : 'How it works'}</span>
+          <span className={open ? 'turn-up' : 'turn-down'}>
+            <Icon name="chevron" size={18} />
+          </span>
+        </button>
+        {open && (
+          <>
         <label className="check">
           <input
             type="checkbox"
@@ -117,9 +131,7 @@ export function SharedPricesSection({ settings }: { settings: Settings }) {
             <span className="title" style={{ fontSize: 15 }}>
               {SHARED_TITLE}
             </span>
-            <span className="small">
-              {on ? 'On' : 'Off'} · {SHARED_ONE_LINE}
-            </span>
+            <span className="small">{SHARED_ONE_LINE}</span>
           </span>
         </label>
         <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -187,6 +199,8 @@ export function SharedPricesSection({ settings }: { settings: Settings }) {
                 <Icon name="refresh" size={16} /> {progress ? 'Downloading…' : 'Download now'}
               </button>
             </div>
+          </>
+        )}
           </>
         )}
         {!on && info && info.count > 0 && (

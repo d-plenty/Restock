@@ -618,7 +618,7 @@ function SyncTile() {
       {ios && (
         <div className="row">
           <span className="grow">
-            <span className="small">An iPhone or iPad syncs while Restock is open. Every way of sharing, and what isn't here yet, is in Settings → Sync and backups.</span>
+            <span className="small">An iPhone or iPad syncs while Restock is open. Every way of sharing, and what isn't here yet, is in Settings → Sync.</span>
           </span>
         </div>
       )}
@@ -803,6 +803,7 @@ function SetupTiles({
           <p className="sub">Three things to start with. Continue goes through them; the rest can wait, and it's all in Settings later.</p>
         </div>
       )}
+      {!inSettings && (
       <div className="setup-progress" aria-label={`${essDone} of ${ESSENTIAL.length} of the main three looked at`}>
         <div className="loading-bar">
           <span style={{ width: `${(essDone / ESSENTIAL.length) * 100}%` }} />
@@ -811,35 +812,64 @@ function SetupTiles({
           {essDone === ESSENTIAL.length ? 'All set' : `${essDone} of ${ESSENTIAL.length} looked at`}
         </span>
       </div>
-      {settings.privacyAccepted && (
+      )}
+      {settings.privacyAccepted && !inSettings && (
         <div className="setup-done-strip">
           <Icon name="check" size={18} stroke={3} /> Privacy and security · done
         </div>
       )}
-      {/* 0.10.10: three to start with, then the rest (it was thirteen tiles in one grid) */}
-      {[
-        { label: 'The main three', tiles: tilesFor(settings).filter((t) => isEssential(t.id)) },
-        { label: 'More, when you want it', tiles: tilesFor(settings).filter((t) => !isEssential(t.id)) },
-      ].map((g) => (
-        <div key={g.label} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <h2 className="eyebrow">{g.label}</h2>
-          <div className="setup-grid">
-            {g.tiles.map((t) => {
-              const st = tileStatus(settings, t.id, cover);
-              return (
-                <button key={t.id} className={`setup-tile${st.ok ? ' done' : ''}`} onClick={() => onOpen(t.id)} aria-label={`${t.title}: ${st.text}`}>
-                  <span className="setup-ic">
-                    <Icon name={t.icon} size={20} />
-                  </span>
-                  <span className="setup-tt">{t.title}</span>
-                  <span className="setup-td">{t.sub}</span>
-                  <span className={`setup-st${st.ok ? ' ok' : ''}`}>{st.text}</span>
-                </button>
-              );
-            })}
+      {/* 0.10.10: three to start with, then the rest (it was thirteen tiles in one grid).
+          0.17.0: a checklist (it was a grid of tiles): one row each with what it's at. From
+          Settings only what's still to do shows, and what's done folds away under it. */}
+      {(() => {
+        const rowOf = (t: Tile) => {
+          const st = tileStatus(settings, t.id, cover);
+          return (
+            <button key={t.id} className={`row setup-row${st.ok ? ' done' : ''}`} onClick={() => onOpen(t.id)} aria-label={`${t.title}: ${st.text}`}>
+              <span className="row-tile" data-tone={st.ok ? 'green' : 'slate'} aria-hidden="true">
+                <Icon name={st.ok ? 'check' : t.icon} size={20} stroke={st.ok ? 3 : 2} />
+              </span>
+              <span className="grow">
+                <span className="title">{t.title}</span>
+                <span className="small">{t.sub}</span>
+              </span>
+              <span className={`setup-st${st.ok ? ' ok' : ''}`}>{st.text}</span>
+              <Icon name="chevron" size={18} />
+            </button>
+          );
+        };
+        const all = tilesFor(settings);
+        if (inSettings) {
+          const left = all.filter((t) => !tileStatus(settings, t.id, cover).ok);
+          const done = all.filter((t) => tileStatus(settings, t.id, cover).ok);
+          return (
+            <>
+              {left.length > 0 ? <div className="card flush">{left.map(rowOf)}</div> : <p className="small">Everything&rsquo;s set up.</p>}
+              {done.length > 0 && (
+                <details className="card flush fold">
+                  <summary className="row">
+                    <span className="grow">
+                      <span className="title">Done</span>
+                      <span className="small">{done.length} set up</span>
+                    </span>
+                    <Icon name="chevron" size={18} />
+                  </summary>
+                  {done.map(rowOf)}
+                </details>
+              )}
+            </>
+          );
+        }
+        return [
+          { label: 'The main three', tiles: all.filter((t) => isEssential(t.id)) },
+          { label: 'More, when you want it', tiles: all.filter((t) => !isEssential(t.id)) },
+        ].map((g) => (
+          <div key={g.label} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <h2 className="eyebrow">{g.label}</h2>
+            <div className="card flush">{g.tiles.map(rowOf)}</div>
           </div>
-        </div>
-      ))}
+        ));
+      })()}
       <div className="setup-foot sticky">
         {onLater && (
           <button className="btn" onClick={onLater}>
@@ -1186,7 +1216,7 @@ export function Onboarding() {
             <div className="card" style={{ gap: 6 }}>
               <strong>Share with your household again?</strong>
               <span className="small">
-                Backups don't include the household. To sync this phone, join with a new code from the owner phone (Settings → Sync and backups → Add a phone
+                Backups don't include the household. To sync this phone, join with a new code from the owner phone (Settings → Sync → Add a phone
                 there).
               </span>
               <button
@@ -1224,8 +1254,8 @@ export function SetupScreen() {
     <div className="screen" style={{ gap: 16 }}>
       {!tile && (
         <>
-          <TopBar title="Setup" />
-          <p className="sub">Nothing here has to be done first: Restock asks for each thing when it's needed. Tap a tile to set it now.</p>
+          <TopBar title="Setup checklist" />
+          <p className="sub">What&rsquo;s still to set up. Nothing has to be done first: Restock asks for each thing when it&rsquo;s needed.</p>
           <SetupTiles
             settings={settings}
             inSettings

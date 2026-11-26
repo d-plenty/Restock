@@ -367,7 +367,7 @@ function BackgroundChecks() {
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {!settings.sync.backgroundActivity ? (
           <p className="small" style={{ margin: 0 }}>
-            Background activity is off (Settings → Sync and backups), so prices are only checked when you tap Check now.
+            Background activity is off (Settings → Sync), so prices are only checked when you tap Check now.
           </p>
         ) : (
           <>

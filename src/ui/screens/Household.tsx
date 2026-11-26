@@ -101,7 +101,7 @@ export function HouseholdScreen() {
       </div>
       <p className="small">
         {sync?.house
-          ? 'Each phone picks what it shares with the house (Sync and backups → What this phone shares), and keeps its own look, backups and shop sign-ins.'
+          ? 'Each phone picks what it shares with the house (Sync → What this phone shares), and keeps its own look, backups and shop sign-ins.'
           : 'With sync on, the pantry, list, prices, categories and alerts are shared. Each phone keeps its own look, receipts, backups and shop sign-ins.'}
       </p>
 

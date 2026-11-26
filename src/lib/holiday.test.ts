@@ -23,13 +23,18 @@ describe('the holidays', () => {
     expect(holidayOn(d(2026, 12, 31))).toBe('newyear');
     expect(holidayOn(d(2027, 1, 1))).toBe('newyear');
     expect(holidayOn(d(2027, 1, 2))).toBe('australia');
-    expect(holidayOn(d(2026, 10, 15))).toBe('halloween');
-    expect(holidayOn(d(2027, 1, 26))).toBe('australia');
+    expect(holidayOn(d(2026, 10, 10))).toBeUndefined();
+    expect(holidayOn(d(2026, 10, 11))).toBe('halloween');
+    expect(holidayOn(d(2026, 10, 31))).toBe('halloween');
+    expect(holidayOn(d(2026, 11, 1))).toBe('halloween');
+    expect(holidayOn(d(2026, 11, 2))).toBeUndefined();
+    expect(holidayOn(d(2027, 1, 27))).toBe('australia');
+    expect(holidayOn(d(2027, 1, 28))).toBeUndefined();
     expect(holidayOn(d(2027, 2, 1))).toBeUndefined();
     expect(holidayOn(d(2026, 11, 26))).toBeUndefined();
-    // Easter 2027 is Sunday 28 March: the two weeks up to Easter Monday (16–29 March).
-    expect(holidayOn(d(2027, 3, 15))).toBeUndefined();
-    expect(holidayOn(d(2027, 3, 16))).toBe('easter');
+    // Easter 2027 is Sunday 28 March: the three weeks up to Easter Monday (9–29 March).
+    expect(holidayOn(d(2027, 3, 8))).toBeUndefined();
+    expect(holidayOn(d(2027, 3, 9))).toBe('easter');
     expect(holidayOn(d(2027, 3, 29))).toBe('easter');
     expect(holidayOn(d(2027, 3, 30))).toBeUndefined();
     // and late Easters in April

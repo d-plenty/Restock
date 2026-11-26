@@ -184,7 +184,7 @@ export function RecoverySheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet title="Recovery key" onClose={onClose}>
       <p className="small">
-        If this server is ever lost, a phone can take the household back with this key (Settings → Sync and backups → Take over). Save it somewhere only
+        If this server is ever lost, a phone can take the household back with this key (Settings → Sync → Take over). Save it somewhere only
         you can get to, like a password manager. Anyone with it and one of your phones' backups can become the household's owner.
       </p>
       {key ? (

@@ -251,7 +251,7 @@ export function YourData() {
           </p>
         )}
         <p className="small" style={{ margin: '8px 0 0' }}>
-          Export it in Sync and backups (a backup, or spreadsheets). Erase it all in Advanced.
+          Export it in Backups (a backup, or spreadsheets). Erase it all in Advanced.
         </p>
       </div>
     </>

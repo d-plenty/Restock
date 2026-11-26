@@ -48,18 +48,32 @@ interface Picture {
   pill: [string, string] | null;
 }
 
-export function Opening({ holiday, onDone, look = 'night', still = false }: { holiday?: Holiday; onDone: () => void; look?: OpeningLook; still?: boolean }) {
+export function Opening({
+  holiday,
+  onDone,
+  look = 'night',
+  still = false,
+  thumb = false,
+}: {
+  holiday?: Holiday;
+  onDone?: () => void;
+  look?: OpeningLook;
+  still?: boolean;
+  /** 0.17.0: a small still picture of it (Settings → See the animations), not the opening itself. */
+  thumb?: boolean;
+}) {
   const id = useId().replace(/:/g, '');
   const [leaving, setLeaving] = useState(false);
-  const done = useRef(onDone);
+  const done = useRef(onDone ?? (() => undefined));
   useEffect(() => {
-    done.current = onDone;
+    done.current = onDone ?? (() => undefined);
   });
   useEffect(() => {
+    if (thumb) return;
     played = true;
     const t = setTimeout(() => done.current(), OPENING_MS + FADE_MS);
     return () => clearTimeout(t);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const skip = () => {
     if (leaving) return;
     setLeaving(true);
@@ -83,12 +97,11 @@ export function Opening({ holiday, onDone, look = 'night', still = false }: { ho
   const easter = holiday === 'easter';
   // Light skies have navy words; dark ones white (opening.css .op-lite).
   const lite = LITE.has(`${h}-${key}`);
+  const Tag = thumb ? 'span' : 'button';
   return (
-    <button
-      type="button"
-      className={`opening op-${h} op-${key}${lite ? ' op-lite' : ''}${scene.picture ? ' op-big' : ''}${still ? ' op-still' : ''}${leaving ? ' op-leaving' : ''}`}
-      onClick={skip}
-      aria-label="Restock is starting"
+    <Tag
+      {...(thumb ? { 'aria-hidden': true } : { type: 'button' as const, onClick: skip, 'aria-label': 'Restock is starting' })}
+      className={`opening op-${h} op-${key}${lite ? ' op-lite' : ''}${scene.picture ? ' op-big' : ''}${still || thumb ? ' op-still' : ''}${thumb ? ' op-thumb' : ''}${leaving ? ' op-leaving' : ''}`}
     >
       {scene.behind}
       {pic && (
@@ -99,7 +112,7 @@ export function Opening({ holiday, onDone, look = 'night', still = false }: { ho
             preserveAspectRatio="xMidYMax slice"
             ref={(el) => {
               // Less motion: the picture's own SVG animations stop where they'd be, too.
-              if (el && still) {
+              if (el && (still || thumb)) {
                 el.setCurrentTime?.(2.2);
                 el.pauseAnimations?.();
               }
@@ -111,13 +124,15 @@ export function Opening({ holiday, onDone, look = 'night', still = false }: { ho
       <svg className="op-logo" viewBox={easter ? '18 -10 72 100' : '18 18 72 72'} aria-hidden="true">
         <LogoDrawing id={id} before={scene.logoBefore} extra={scene.logoExtra} after={scene.logoAfter} />
       </svg>
+      {!thumb && (
       <div className="op-words">
         <div className="op-word">Restock</div>
         <div className="op-sub" style={pic?.pill ? style({ background: pic.pill[0], color: pic.pill[1] }) : undefined}>
           {SUB[h]}
         </div>
       </div>
-    </button>
+      )}
+    </Tag>
   );
 }
 

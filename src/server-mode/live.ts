@@ -23,6 +23,7 @@ import { syncRound, type RoundResult, type SharedSection } from './round';
 import { refreshHouseKeys, session, type Session } from './session';
 import { syncDbOf } from './sqldb';
 import { quiet } from '../lib/quietErrors';
+import { browserLabel } from '../lib/myName';
 
 const STORE = 'files';
 const dbName = (webId: string) => `restock-server-${webId}`;
@@ -165,9 +166,10 @@ export async function openServerDatabase(s: Session): Promise<void> {
     engine.db.exec('DELETE FROM sync_held');
     engine.setMeta('device', me);
   }
-  engine.setMeta('name', 'Web');
   if (s.ownerPub && !engine.meta('owner_pin')) engine.setMeta('owner_pin', s.ownerPub);
   const st = await getSettings();
+  // 0.17.0: named by your name ("Sam's Chrome"), or "Web"
+  engine.setMeta('name', browserLabel(st.myName));
   if (!st.onboarded) await updateSettings({ onboarded: true, privacyAccepted: st.privacyAccepted ?? new Date().toISOString(), seenHints: [...new Set([...(st.seenHints ?? []), 'tour'])] });
   setPhotoSource(serverPhoto);
   setStatus({ household: engine.householdValue('name') ?? s.household });
@@ -224,6 +226,11 @@ let firstDone = false;
 let keysAskedAt = 0;
 
 /** One round now (or the one already going). */
+/** 0.17.0: your name changed in this browser's Settings: its name in the household follows. */
+export function nameThisBrowser(name: string | undefined): void {
+  engine?.setMeta('name', browserLabel(name));
+}
+
 export function syncNow(): Promise<RoundResult | undefined> {
   if (running) return running;
   running = (async () => {

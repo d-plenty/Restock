@@ -147,7 +147,7 @@ function AddPhoneV3({ onAdded, onClose, known }: { onAdded: () => void; onClose?
           </p>
           <Qr text={code.code} label={`Code for ${code.label} to scan`} />
           <p className="small house-tight">
-            On the phone: Restock → Settings → Sync and backups → <strong>Join your server</strong> → Scan. Works once, for{' '}
+            On the phone: Restock → Settings → Sync → <strong>Join your server</strong> → Scan. Works once, for{' '}
             {left >= 60 ? `${Math.ceil(left / 60)} more min` : `${left} more seconds`}. Needs Restock 0.9.4 or newer.
           </p>
           <details className="small">

@@ -266,7 +266,7 @@ export function JoinSheet({
         <>
           <p className="small" style={{ margin: 0 }}>
             {where} shares {offered.map((t) => SHARE_TABS.find((x) => x.tab === t)!.title.toLowerCase()).join(', ')}. Pick what this phone shares; the
-            rest stays on this phone only. You can change it later in Settings → Sync and backups → Phones and sharing.
+            rest stays on this phone only. You can change it later in Settings → Sync → Phones and sharing.
           </p>
           <TabsPicker offered={keg ? offered : offered.filter((t) => t !== 'keg')} value={tabs} onChange={setTabs} />
           <button className="btn primary block" disabled={!tabs.length} onClick={() => setStep(!fresh && mineInTabs ? 'things' : 'cards')}>
@@ -321,7 +321,7 @@ async function scanPairingCode(): Promise<string | undefined> {
   const out = await scanBarcode('Scan the code on the owner phone', {
     accept: pairingCode,
     qr: true,
-    wrong: "That isn't a Restock sync code. On the owner phone, open Settings → Sync and backups → Add a phone.",
+    wrong: "That isn't a Restock sync code. On the owner phone, open Settings → Sync → Add a phone.",
     typeHint: 'Or paste the code',
   });
   return out.ok ? out.code : undefined;

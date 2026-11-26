@@ -150,7 +150,7 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
               Check prices automatically
             </span>
             <span className="small">
-              Only the items in your pantry and on your shopping lists. Only on a network connection and when the battery isn't low.
+              Your pantry and lists, when there&rsquo;s a connection and the battery isn&rsquo;t low.
             </span>
           </label>
           <select id="check-how-often" className="input" style={{ height: 48, flex: 'none', width: '100%', fontSize: 15 }} value={choice} onChange={(e) => void pick(e.target.value as CheckChoice)}>
@@ -162,10 +162,19 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
           </select>
           <span className="small" role="status">
             {choice === 'off'
-              ? 'Nothing is checked until you tap Check now on Home. We recommend leaving automatic checks on: without them, prices and your specials at each shop go out of date.'
-              : ios
-                ? `Runs ${dayWords(days)} from ${timeWords(settings.checkTime ?? CHECK_TIME_0110)}, while your iPhone is charging and on Wi-Fi. iOS picks the exact moment, so it can be later. Restock also checks a little at a time in the background, and when you open it.`
-                : `Runs ${dayWords(days)} at ${timeWords(settings.checkTime ?? CHECK_TIME_0110)}, your phone's own time. Android may run it a few minutes late; if the phone is off then, it checks soon after it's back. Checking by hand doesn't change it.`}
+              ? 'Only when you tap Check now. Prices go out of date without automatic checks.'
+              : `${dayWords(days)[0].toUpperCase()}${dayWords(days).slice(1)} ${ios ? 'from' : 'at'} ${timeWords(settings.checkTime ?? CHECK_TIME_0110)}${ios ? ', while charging' : ''}.`}{' '}
+            {choice !== 'off' && (
+              <More title="Automatic price checks">
+                {ios ? (
+                  <p>
+                    From the set time while your iPhone is charging and on Wi-Fi. iOS picks the exact moment, so it can be later. Restock also checks a little at a time in the background, and when you open it.
+                  </p>
+                ) : (
+                  <p>At the set time on your phone&rsquo;s own clock. Android may run it a few minutes late, and if the phone is off then, it checks soon after it&rsquo;s back. Checking by hand doesn&rsquo;t change it.</p>
+                )}
+              </More>
+            )}
           </span>
         </div>
         {choice === 'custom' && (
@@ -214,7 +223,7 @@ export function PriceCheckSettings({ settings }: { settings: Settings }) {
         {blocked && !ios && (
           <div className="check" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }} role="note">
             <span className="small">
-              <strong>Background activity is off</strong> (Settings → Sync and backups), so these checks can't run by themselves.
+              <strong>Background activity is off</strong> (Settings → Sync), so these checks can't run by themselves.
             </span>
             <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => void save({ on: true })}>
               Turn it on

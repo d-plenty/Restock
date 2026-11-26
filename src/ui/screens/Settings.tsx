@@ -39,7 +39,7 @@ import { ReaderSettings } from '../ReaderDownload';
 import { recallSummary } from './Recalls';
 import { ComingSoon } from './Soon';
 import { WidgetSettings } from './WidgetSettings';
-import { TILES, isEssential, tileStatus } from './Setup';
+import { tilesFor, tileStatus } from './Setup';
 import { startTour } from '../Tour';
 import { type StoreChain } from '../../lib/health';
 import { useNav } from '../nav';
@@ -122,7 +122,7 @@ async function eraseAll() {
     if (info?.paired && info.isOwner && (info.members ?? []).some((m) => !m.me)) {
       await confirmAction('Make another phone the owner first', {
         detail:
-          'This is the household\'s owner phone. In Settings → Sync and backups → Phones and sharing, tap another phone and choose "Make this the owner phone", sync once, then erase this one. Or remove the other phones first.',
+          'This is the household\'s owner phone. In Settings → Sync → Phones and sharing, tap another phone and choose "Make this the owner phone", sync once, then erase this one. Or remove the other phones first.',
         action: 'OK',
         danger: false,
       });
@@ -165,7 +165,7 @@ async function eraseAll() {
  * Settings' own pages, each opened from a row on the main list (0.9.13). 0.9.14: grouped for
  * someone who just wants it to work: Your shops, Everyday, Your phone, Help, then Advanced.
  */
-export type SettingsPage = 'a11y' | 'list' | 'prices' | 'alerts' | 'data' | 'sync' | 'look' | 'privacy' | 'help' | 'about' | 'advanced';
+export type SettingsPage = 'a11y' | 'list' | 'prices' | 'alerts' | 'data' | 'sync' | 'backups' | 'look' | 'privacy' | 'help' | 'about' | 'advanced';
 const SETTINGS_PAGES: Record<SettingsPage, { title: string }> = {
   // 0.10.7: Accessibility, its own page (it was inside Look and accessibility)
   a11y: { title: 'Accessibility' },
@@ -173,7 +173,9 @@ const SETTINGS_PAGES: Record<SettingsPage, { title: string }> = {
   prices: { title: 'Prices and deals' },
   alerts: { title: 'Notifications' },
   data: { title: 'Your data' },
-  sync: { title: 'Sync and backups' },
+  // 0.17.0: Sync and Backups are two pages (they were one)
+  sync: { title: 'Sync' },
+  backups: { title: 'Backups' },
   look: { title: 'Look and colours' },
   privacy: { title: 'Privacy and sharing' },
   help: { title: 'Help' },
@@ -190,20 +192,21 @@ const TILES_OF: Record<SettingsPage | 'cards' | 'feedback' | 'permissions', Tile
   cards: ['card', 'blue'],
   data: ['chart', 'teal'],
   sync: ['refresh', 'green'],
+  backups: ['download', 'blue'],
   privacy: ['shield', 'slate'],
   permissions: ['lock', 'amber'],
   look: ['palette', 'pink'],
   help: ['info', 'blue'],
   feedback: ['pencil', 'teal'],
   about: ['book', 'slate'],
-  advanced: ['tools', 'slate'],
+  advanced: ['pack:tools', 'slate'],
 };
 /** The main list's groups of rows, in order (Feedback sits in Help; Advanced is last). */
 // 0.11.1: Permissions is a row of its own under Your phone (it was inside Privacy and sharing).
 const GROUPS: { title: string; pages: (SettingsPage | 'cards' | 'feedback' | 'permissions')[] }[] = [
   { title: 'Accessibility', pages: ['a11y'] },
   { title: 'Everyday', pages: ['list', 'prices', 'alerts', 'cards'] },
-  { title: 'Your phone', pages: ['data', 'sync', 'privacy', 'permissions', 'look'] },
+  { title: 'Your phone', pages: ['data', 'sync', 'backups', 'privacy', 'permissions', 'look'] },
   { title: 'Help', pages: ['help', 'feedback', 'about'] },
 ];
 
@@ -263,7 +266,9 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       case 'data':
         return 'Spending, prices over time, what’s stored';
       case 'sync':
-        return 'Household, Restock server, Phone sharing, Home Assistant, backups';
+        return 'Your household, phones, Restock server, Home Assistant';
+      case 'backups':
+        return 'Export, import, automatic backups';
       case 'a11y':
         return 'Text size, bold text, contrast, spacing, bigger buttons, less motion';
       case 'look':
@@ -321,9 +326,12 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
         <>
           {/* 0.16.0: what to call you, at the top */}
           {!query.trim() && <NameCard name={settings.myName} />}
-          <div className="card flush">
-            {row('Setup', ((n) => (n ? 'Your shops, alerts and permissions, when you want them' : 'All set · more to set up when you want it'))(TILES.filter((t) => isEssential(t.id) && !tileStatus(settings, t.id, syncShown).ok).length), () => nav.push({ name: 'setup' }), ['sliders', 'blue'])}
-          </div>
+          {/* 0.17.0: a setup checklist, only while there's something left to set up */}
+          {((setupLeft) => setupLeft > 0 && (
+            <div className="card flush">
+              {row('Setup checklist', `${setupLeft} thing${setupLeft === 1 ? '' : 's'} left to set up`, () => nav.push({ name: 'setup' }), ['sliders', 'blue'])}
+            </div>
+          ))(tilesFor(settings).filter((t) => !tileStatus(settings, t.id, syncShown).ok).length)}
           <div className="eyebrow" id="s-stores">
             Your shops
           </div>
@@ -477,9 +485,9 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       {page === 'data' && <YourData />}
       {on('sync') && (
         <>
-          {/* 0.9.1: sync and backups in one place. Sync keeps phones the same; backups are how you go back. */}
-          <div className="eyebrow" id="s-sync">
-            Sync and backups
+          {/* 0.9.1: sync and backups in one place. 0.17.0: two pages: Sync keeps phones the same; Backups are how you go back. */}
+          <div className={all ? 'eyebrow' : 'sr-only'} id="s-sync">
+            Sync
           </div>
           {/* 0.9.3: the household on top, how the phones sync, then backups. Any of the three counts as kept elsewhere. */}
           <SyncOverview settings={settings} info={syncShown} onInfo={setSyncShown} haSummary={serverMode ? undefined : haSummary} />
@@ -515,22 +523,28 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
               </label>
             </div>
           )}
-          <p className="small group-note">Sync keeps your phones the same, mistakes included. Backups let you go back.</p>
-
-          <h3 className="group-head" id="s-backups">
+          <p className="small group-note">Sync keeps your phones the same, mistakes included. Keep a backup too (Settings → Backups).</p>
+        </>
+      )}
+      {on('backups') && (
+        <>
+          <div className={all ? 'eyebrow' : 'sr-only'} id="s-backups">
             Backups
-          </h3>
+          </div>
+          <p className="small group-note" style={{ marginTop: 0 }}>
+            A copy of everything, to go back to or move to a new phone.
+          </p>
           <div className="card flush">
             <button className="row" onClick={() => setExporting(true)}>
               <span className="grow">
                 <span className="title">Export data</span>
-                <span className="small">A file, or straight to another phone. {pricesIn(settings, span)}</span>
+                <span className="small">A backup file, or straight to another phone. {pricesIn(settings, span)}</span>
               </span>
             </button>
             <button className="row" onClick={() => setImporting(true)}>
               <span className="grow">
                 <span className="title">Import data</span>
-                <span className="small">From a file or straight from another phone. Add it alongside what's here, or replace what's here.</span>
+                <span className="small">From a backup file or another phone</span>
               </span>
             </button>
           </div>
@@ -823,7 +837,7 @@ function PrivacySharing({ settings }: { settings: Settings }) {
       </div>
       <div className="card">
         <p className="small" style={{ margin: 0 }}>Everything stays on this phone unless you set up sharing.{' '}<More title="What stays on this phone"><p>Your pantry, shopping lists, cards, receipts, what you spend, the prices you type in and the items you track stay on this phone. They only go
-          to your own household's phones, your own Restock server or Home Assistant if you set those up (Sync and backups), and into backups you make.</p></More></p>
+          to your own household's phones, your own Restock server or Home Assistant if you set those up (Sync), and into backups you make.</p></More></p>
       </div>
       {/* 0.10.0: one switch for getting and sending shared prices (SharedPrices.tsx). */}
       <SharedPricesSection settings={settings} />

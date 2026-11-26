@@ -1,8 +1,10 @@
 // 0.16.0: "What should we call you?" (lib/myName.ts). The same box in three places: a step of the
 // first setup (after Set up or Join), a sheet on Home once after updating, and Settings → Your name.
 import { useState } from 'react';
-import { cleanName, NAME_MAX, setMyName, skipName } from '../lib/myName';
-import { Icon, More, Sheet } from './components';
+import { browserWord, cleanName, NAME_MAX, setMyName, skipName } from '../lib/myName';
+import { Icon, Sheet } from './components';
+import { deviceWord } from '../lib/platform';
+import { serverMode } from '../server-mode/flag';
 
 /** The box and its buttons. `onDone` once saved or skipped. */
 export function NameFields({ start = '', onDone, skipLabel = 'Skip for now', saveLabel = 'Continue', autoFocus = true }: { start?: string; onDone: () => void; skipLabel?: string | null; saveLabel?: string; autoFocus?: boolean }) {
@@ -65,35 +67,68 @@ export function NameSheet({ start, onClose, fromSettings }: { start?: string; on
   );
 }
 
-/** Settings → the top: your name, with what it's for behind the ⓘ, and tap to change it. */
+/** What the name is used for (Settings → your name). */
+function NameUses({ n }: { n?: string }) {
+  // 0.17.0: what this is, in its own words: this iPad, this phone, this browser (the web page).
+  const dev = serverMode ? 'browser' : deviceWord();
+  const like = serverMode ? browserWord() : dev;
+  return (
+    <div className="name-uses">
+      <p>Restock says hello with it on Home.</p>
+      <p>This {dev} is called by it in your household and on your Restock server (like &ldquo;{n || 'Sam'}&rsquo;s {like}&rdquo;), unless you named the {dev} yourself.</p>
+      {!serverMode && <p>Your backups have it in their names, and restoring one brings it back.</p>}
+      <p className="small">It stays on this {dev}: it isn&rsquo;t shared with the other {serverMode ? 'browsers and phones' : 'phones'} as a setting.</p>
+    </div>
+  );
+}
+
+/**
+ * Settings → the top: your name. 0.17.0: a tap opens what it's used for with the name under it;
+ * the keyboard only comes up when the name itself is tapped to change it (no ⓘ to find).
+ */
 export function NameCard({ name }: { name?: string }) {
+  const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const n = name?.trim();
+  const close = () => {
+    setOpen(false);
+    setEditing(false);
+  };
   return (
     <>
       <div className="card flush name-card">
-        <div className="row name-row">
-          <button className="name-main" onClick={() => setEditing(true)} aria-label={n ? `Your name: ${n}. Change it` : 'Add your name'}>
-            <span className="name-avatar" aria-hidden="true">
-              {(n?.[0] ?? '?').toUpperCase()}
-            </span>
-            <span className="grow">
-              <span className="title">{n || 'Add your name'}</span>
-              <span className="small">Your name</span>
-            </span>
-          </button>
-          <More title="Your name">
-            <p>Restock says hello with it on Home.</p>
-            <p>This phone is called by it in your household and on your Restock server (like &ldquo;{n || 'Sam'}&rsquo;s iPhone&rdquo;), unless you named the phone yourself.</p>
-            <p>Your backups have it in their names, and restoring one brings it back.</p>
-            <p>It stays on this phone. It isn&rsquo;t shared with the other phones as a setting.</p>
-          </More>
-          <button className="name-chev" onClick={() => setEditing(true)} aria-label="Change your name">
-            <Icon name="chevron" size={18} />
-          </button>
-        </div>
+        <button className="row name-row" onClick={() => setOpen(true)} aria-label={n ? `Your name: ${n}` : 'Add your name'}>
+          <span className="name-avatar" aria-hidden="true">
+            {(n?.[0] ?? '?').toUpperCase()}
+          </span>
+          <span className="grow">
+            <span className="title">{n || 'Add your name'}</span>
+            <span className="small">Your name</span>
+          </span>
+          <Icon name="chevron" size={18} />
+        </button>
       </div>
-      {editing && <NameSheet start={n ?? ''} fromSettings onClose={() => setEditing(false)} />}
+      {open && (
+        <Sheet title="Your name" onClose={close}>
+          {editing ? (
+            <NameFields start={n ?? ''} onDone={close} saveLabel="Save" skipLabel={null} />
+          ) : (
+            <>
+              <button className="row name-row name-edit" onClick={() => setEditing(true)} aria-label={n ? `${n}. Tap to change it` : 'Add your name'}>
+                <span className="name-avatar" aria-hidden="true">
+                  {(n?.[0] ?? '?').toUpperCase()}
+                </span>
+                <span className="grow">
+                  <span className="title">{n || 'Add your name'}</span>
+                  <span className="small">Tap to change it</span>
+                </span>
+                <Icon name="pencil" size={18} />
+              </button>
+              <NameUses n={n} />
+            </>
+          )}
+        </Sheet>
+      )}
     </>
   );
 }

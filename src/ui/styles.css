@@ -5037,7 +5037,8 @@ html.on-welcome #root {
 }
 :root[data-links='1'] a,
 :root[data-links='1'] .linkish,
-:root[data-links='1'] .link-quiet {
+:root[data-links='1'] .link-quiet,
+:root[data-links='1'] .linkish-text {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -6934,7 +6935,7 @@ button.fold-go {
 }
 /* 0.12.7, true black: a box you type in on the top bar is black, set into the bar (it was the
    bar's own colour and vanished into it). */
-:root[data-black='1'] :is(.navy-top, .navy-cont, .more-top) :is(.input, .search-field) {
+:root[data-black='1'] :is(.navy-top, .navy-cont, .more-top) .input {
   background: var(--bg);
   border-color: var(--line-2);
 }
@@ -7815,26 +7816,6 @@ span.inv-num {
   align-items: center;
   gap: 10px;
 }
-.name-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  min-height: var(--hit);
-  cursor: pointer;
-}
-.name-main .grow {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
 .name-avatar {
   flex: none;
   width: 44px;
@@ -7848,17 +7829,17 @@ span.inv-num {
   font-size: var(--fs-xl);
   font-weight: 800;
 }
-.name-chev {
-  flex: none;
-  border: none;
-  background: none;
-  color: var(--muted);
-  min-width: var(--hit);
-  min-height: var(--hit);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+.name-edit {
+  border-radius: var(--r-xl);
+  background: var(--sunken);
+}
+.name-uses {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.name-uses p {
+  margin: 0;
 }
 
 /* ---------- 0.16.0: a holiday's decoration in Home's top bar (HolidayDecor.tsx) ---------- */
@@ -8192,5 +8173,137 @@ textarea.input {
     margin-right: calc(-1 * var(--pad-gutter));
     padding-left: var(--pad-gutter);
     padding-right: var(--pad-gutter);
+  }
+}
+
+/* ---------- 0.17.0: one set of sizes, everywhere ----------
+   Big things at the top of a tab (the add button, the box you type in, the round buttons beside
+   them) are all --h-control (48 px); the buttons in a row, the switches between choices and
+   Check now are --h-control-sm (36 px). No screen has a button bigger than the rest. */
+:is(.navy-top, .navy-cont) .input,
+.big-add > .btn.primary,
+.btn.big-add-scan,
+.add-bar-scan,
+.btn.add-bar-scan,
+.sticky-cta .btn.primary {
+  height: var(--h-control);
+  min-height: var(--h-control);
+}
+.big-add > .btn.primary {
+  font-size: var(--fs-md);
+}
+.btn.big-add-scan,
+.add-bar-scan,
+.btn.add-bar-scan {
+  width: var(--h-control);
+  min-width: var(--h-control);
+}
+:is(.navy-top, .navy-cont) :is(.icon-btn, .btn.small, .list-switch-pill),
+.checkline .check-now {
+  height: var(--h-control-sm);
+  min-height: var(--h-control-sm);
+}
+:is(.navy-top, .navy-cont) .icon-btn {
+  width: var(--h-control-sm);
+}
+.checkline .check-now {
+  padding: 0 12px;
+  font-size: var(--fs-sm);
+}
+/* Home's top: one short line and a smaller Check now */
+.home-top {
+  gap: 10px;
+}
+/* A switch between choices on two rows (Feedback's "What's it about?"): a rounded box, not a pill */
+.seg.seg-grid {
+  display: grid;
+  grid-auto-flow: row;
+  grid-template-columns: 1fr 1fr;
+  border-radius: var(--r-xl);
+}
+/* The tab bar sits just above the phone's home bar (less empty space under it) */
+.app:not(.pad-wide) > .tabs,
+:root:not([data-style='plain']) .app:not(.pad-wide) > .tabs {
+  margin-bottom: max(6px, calc(var(--bottom) - 14px));
+}
+/* 0.17.0: See the animations */
+.op-list-row {
+  gap: 12px;
+}
+.op-thumb-box {
+  flex: none;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  line-height: 0;
+}
+.op-list-btns {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+.op-now {
+  color: var(--green);
+  font-weight: 700;
+}
+/* 0.17.0: the colours, 6 and 5 with the colour wheel last; the app icons drawn as themselves */
+.swatches {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.swatch.icon {
+  background: none !important;
+  border: 0;
+  overflow: visible;
+}
+.icon-picture {
+  width: 44px;
+  height: 44px;
+  display: block;
+}
+.swatch.icon.on {
+  outline-offset: 3px;
+  border-radius: var(--r-md);
+}
+.linkish-text { color: var(--green); font-weight: 600; white-space: nowrap; }
+.rec-tag { margin-left: 8px; vertical-align: middle; }
+/* 0.17.0: Setup as a checklist: a row each, its status as a small pill on the right */
+.setup-row .setup-st {
+  position: static;
+  flex: none;
+  white-space: nowrap;
+}
+.setup-row.done .title {
+  color: var(--ink-2);
+}
+.whats-new-list {
+  margin: 0;
+  padding: 0 18px 14px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 0.17.0: on a tablet, an iPad or a wide window, a sheet dims the whole screen (it dimmed only a
+   phone-wide strip, and sat off to the left beside the side bar) and sits in the middle of the page,
+   at a comfortable width. */
+@media (min-width: 700px) {
+  #layers {
+    max-width: none;
+  }
+  #layers .sheet-back {
+    justify-content: center;
+  }
+  #layers .sheet {
+    width: min(600px, calc(100% - 48px));
+  }
+  :root:has(.app.pad-wide) #layers .sheet-back {
+    padding-left: 264px;
+  }
+  #layers .toast {
+    left: max(16px, calc((100% - 560px) / 2));
+    right: max(16px, calc((100% - 560px) / 2));
+  }
+  :root:has(.app.pad-wide) #layers .toast {
+    left: max(280px, calc(264px + (100% - 264px - 560px) / 2));
   }
 }

@@ -101,7 +101,7 @@ export function FeedbackScreen() {
         <span className="title" id="fb-kind">
           What's it about?
         </span>
-        <div className="seg" role="group" aria-labelledby="fb-kind" style={{ marginTop: 8, display: 'grid', gridAutoFlow: 'row', gridTemplateColumns: '1fr 1fr' }}>
+        <div className="seg seg-grid" role="group" aria-labelledby="fb-kind" style={{ marginTop: 8 }}>
           {FEEDBACK_KINDS.map((k) => (
             <button key={k.id} type="button" aria-pressed={kind === k.id} onClick={() => setKind(k.id)}>
               {k.label}

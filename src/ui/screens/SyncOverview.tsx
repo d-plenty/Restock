@@ -12,7 +12,7 @@ import { serverSummary } from './Sync';
 import { AddPhoneSheet } from './SyncServer';
 
 /**
- * The top of Settings → Sync and backups (0.9.3; 0.9.4: the "Restock sync redesign" canvas). Not set
+ * The top of Settings → Sync (0.9.3; 0.9.4: the "Restock sync redesign" canvas). Not set
  * up: everything is only on this phone, and the three ways to sync, your server first, then phones
  * on your Wi-Fi, then a cloud drive folder. Set up: a strip with only what's in use (and the last
  * backup's day and time), the house, then how the household syncs. Backups follow in Settings.
@@ -89,7 +89,7 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
       {info && !p.covered && (
         <div className="sync-alone" role="status">
           <strong>Everything is only on this {device}</strong>
-          <span>Pick one way below to keep a copy and share with your household. You can add more later.</span>
+          <span>Pick a way below to share it with your household.</span>
         </div>
       )}
 
@@ -119,7 +119,7 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
             <button className="row" onClick={() => nav.push({ name: 'household' })}>
               <span className="grow">
                 <span className="title">Household name</span>
-                <span className="small">{settings.household.name || 'Our house'} · what your phones and the server call your household</span>
+                <span className="small">{settings.household.name || 'Our house'}</span>
               </span>
             </button>
           </div>
@@ -127,79 +127,42 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
           {/* 0.13.2: what's recommended goes by what the phone can do and what most households have.
               Android: Phone sharing first (no account, no server). iPhone and iPad: iCloud first. A
               Restock server is for people who run one, so it's listed last and isn't "Recommended". */}
-          {(ios ? (['folder', 'wifi', 'server'] as const) : (['wifi', 'folder', 'server'] as const)).map((kind, i) => {
-            const can = canSync(kind);
-            const first = i === 0;
-            const choice =
-              kind === 'server' ? (
-                <button key={kind} className="sync-choice" disabled={!can} onClick={() => nav.push({ name: 'restockServer' })}>
-                  <span className="sync-choice-head">
-                    <span className="sync-choice-ic server" aria-hidden="true">
-                      <Icon name="server" size={22} />
-                    </span>
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <strong style={{ fontSize: 17 }}>Your Restock server</strong>
-                      <span className="eyebrow" style={{ margin: 0 }}>
-                        If you run one
-                      </span>
-                    </span>
+          {/* 0.17.0: one row each, a line about it, and Recommended on the first (they were big cards full of words) */}
+          <div className="card flush">
+            {(ios ? (['folder', 'wifi', 'server'] as const) : (['wifi', 'folder', 'server'] as const)).map((kind, i) => {
+              const can = canSync(kind);
+              const first = i === 0;
+              const [title, sub, icon, tone, go] =
+                kind === 'server'
+                  ? (['Your Restock server', 'If you run one: at home and away, and Restock on your computer', 'server', 'slate', () => nav.push({ name: 'restockServer' })] as const)
+                  : kind === 'wifi'
+                    ? ([ios ? 'Sync with an Android phone' : 'Phone sharing', ios ? 'With an Android phone, on your Wi-Fi' : 'Phones swap changes on your Wi-Fi. No account', 'wifi', 'green', () => nav.push(ios ? { name: 'wifiSync' } : { name: 'sync' })] as const)
+                    : ([ios ? 'iCloud sync' : 'A cloud drive folder', ios ? 'iPhones and iPads, at home or away' : 'Google Drive, Dropbox and the like, away from home', 'folder', 'blue', () => nav.push({ name: 'sync' })] as const);
+              const choice = (
+                <button key={kind} className="row" disabled={!can} onClick={go}>
+                  <span className="row-tile" data-tone={tone} aria-hidden="true">
+                    <Icon name={icon} size={20} />
                   </span>
-                  <span className="small">For households that run their own Restock server. Syncs at home and away, and gives you Restock on your computer.</span>
-                  <span className="sync-choice-go">Join your server ›</span>
-                </button>
-              ) : kind === 'wifi' ? (
-                <button key={kind} className={`sync-choice${first ? ' recommended' : ''}`} disabled={!can} onClick={() => nav.push(ios ? { name: 'wifiSync' } : { name: 'sync' })}>
-                  <span className="sync-choice-head">
-                    <span className="sync-choice-ic wifi" aria-hidden="true">
-                      <Icon name="wifi" size={22} />
+                  <span className="grow">
+                    <span className="title">
+                      {title}
+                      {first && <span className="tag good rec-tag">Recommended</span>}
                     </span>
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {first && (
-                        <span className="eyebrow green" style={{ margin: 0 }}>
-                          Recommended
-                        </span>
-                      )}
-                      <strong style={{ fontSize: 17 }}>{ios ? 'Sync with an Android phone' : 'Phone sharing'}</strong>
-                      <span className="eyebrow" style={{ margin: 0 }}>
-                        No account · your own Wi-Fi
-                      </span>
-                    </span>
+                    <span className="small">{sub}</span>
                   </span>
-                  <span className="small">{ios ? 'For a household with an Android phone. Swaps changes on your Wi-Fi when you open Restock.' : 'No server, no account. Phones swap changes on your Wi-Fi. Nothing leaves your home.'}</span>
-                  <span className="small sync-eg">Android phones: Samsung, Google Pixel, Oppo, Motorola, Nokia and most phones that aren't iPhones.</span>
-                </button>
-              ) : (
-                <button key={kind} className={`sync-choice${first ? ' recommended' : ''}`} disabled={!can} onClick={() => nav.push({ name: 'sync' })}>
-                  <span className="sync-choice-head">
-                    <span className="sync-choice-ic folder" aria-hidden="true">
-                      <Icon name="folder" size={22} />
-                    </span>
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {first && (
-                        <span className="eyebrow green" style={{ margin: 0 }}>
-                          Recommended
-                        </span>
-                      )}
-                      <strong style={{ fontSize: 17 }}>{ios ? 'iCloud sync' : 'A cloud drive folder'}</strong>
-                      {!ios && (
-                        <span className="eyebrow" style={{ margin: 0 }}>
-                          For away from home
-                        </span>
-                      )}
-                    </span>
-                  </span>
-                  <span className="small">{ios ? 'For iPhones and iPads. One shared folder in iCloud Drive, at home or away.' : 'A folder your drive app keeps in step, like Google Drive or Dropbox. Slower.'}</span>
+                  <Icon name="chevron" size={18} />
                 </button>
               );
-            // 0.15.0: every way works on an iPhone now; a build without the Files part says so.
-            return can || !ios ? (
-              choice
-            ) : (
-              <IosBox key={kind} reason="icloud">
-                {choice}
-              </IosBox>
-            );
-          })}
+              // 0.15.0: every way works on an iPhone now; a build without the Files part says so.
+              return can || !ios ? (
+                choice
+              ) : (
+                <IosBox key={kind} reason="icloud">
+                  {choice}
+                </IosBox>
+              );
+            })}
+          </div>
           {/* 0.14.0: two iPhones straight to each other works, but only with both open at once: it's there for people who want it, not offered as a good choice. */}
           {ios && canSync('wifi') && (
             <details className="card flush fold">
@@ -224,8 +187,8 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
             </details>
           )}
           <p className="small" style={{ margin: 0 }}>Whichever you choose, keep a backup too.{' '}<More title="Sync and backups"><p>{ios
-              ? `Whichever you choose, also keep a backup on this ${device} (Backups, below). And on an iPhone or iPad, Restock syncs when it's open, not while it's closed.`
-              : 'Whichever you choose, also keep a backup on this phone (Backups, below). On Android, Restock syncs in the background too.'}</p></More></p>
+              ? `Whichever you choose, also keep a backup on this ${device} (Settings → Backups). And on an iPhone or iPad, Restock syncs when it's open, not while it's closed.`
+              : 'Whichever you choose, also keep a backup on this phone (Settings → Backups). On Android, Restock syncs in the background too.'}</p></More></p>
           {/* 0.9.11: Home Assistant sits with the other ways of sharing. */}
           {haSummary !== undefined && (
             <button className="sync-choice" onClick={() => nav.push({ name: 'homeAssistant' })}>
@@ -284,7 +247,7 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
             {way(
               !!info?.server,
               'Restock server',
-              info?.server ? `On · ${serverSummary(info)}` : ios && paired ? 'Not used: this device shares through iCloud. A device belongs to one household at a time' : 'Off · your own server, at home and away, around the clock',
+              info?.server ? `On · ${serverSummary(info)}` : ios && paired ? 'Not used: this device shares through iCloud' : 'Off',
               () => nav.push({ name: 'restockServer' }),
             )}
             {/* 0.13.2: only the ways this device can sync (an iPhone or iPad can't do every one yet) */}
@@ -298,13 +261,11 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
                   : house
                     ? 'On · set up Phone sharing on the other phones too'
                     : 'On · add a phone to start'
-                : ios
-                  ? paired
-                    ? 'Not used: a device belongs to one household at a time'
-                    : 'Off · straight between phones on your Wi-Fi'
+                : ios && paired
+                  ? 'Not used on this device'
                   : house
-                    ? 'Off · optional. Set up Phone sharing to also swap changes at home when the server is down'
-                    : "Off · turn on to also swap changes at home when the internet's down",
+                    ? 'Off · optional, for when the server is down'
+                    : 'Off',
               () => nav.push(ios ? { name: 'wifiSync' } : { name: 'sync' }),
             )}
             {(!ios || canSync('folder')) &&
@@ -312,14 +273,10 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
               !!info?.folder && !house,
               ios ? 'iCloud sync' : 'Cloud drive folder',
               house
-                ? ios
-                  ? 'Not used: this device is on your server. A device belongs to one household at a time'
-                  : 'Not needed: your server syncs away from home'
+                ? 'Not needed: your server syncs away from home'
                 : info?.folder
                   ? (info.folderError ?? `On · ${info.folderName ?? 'a folder'} · ${info.folderAt ? `synced ${agoText(info.folderAt)}` : 'not synced yet'}`)
-                  : ios
-                    ? 'Off · a shared folder in iCloud Drive, for iPhones and iPads'
-                    : 'Off · Google Drive, Dropbox, OneDrive, Syncthing, Nextcloud or WebDAV',
+                  : 'Off',
               () => nav.push({ name: 'sync' }),
             )}
             {haSummary !== undefined && way(!!haSummary && !haSummary.startsWith('Your shopping list'), 'Home Assistant', haSummary, () => nav.push({ name: 'homeAssistant' }))}

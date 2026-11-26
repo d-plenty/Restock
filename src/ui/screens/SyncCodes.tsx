@@ -227,9 +227,9 @@ export function InviteSheet({ info, onClose }: { info: SyncInfo; onClose: () => 
           {!expired && <CodeText code={code} />}
           <ol className="small" style={{ margin: 0, paddingLeft: 18 }}>
             <li>Put both phones on the same Wi-Fi, and keep this screen open.</li>
-            <li>On the other phone (Restock 0.8.5 or newer), tap Join your household on the first screen, or Settings → Sync and backups → Join a household.</li>
+            <li>On the other phone (Restock 0.8.5 or newer), tap Join your household on the first screen, or Settings → Sync → Join a household.</li>
             {/* 0.14.0: an iPhone or iPad joins the same way, from its own screen. */}
-            <li>On an iPhone or iPad (Restock 0.14.0 or newer): Settings → Sync and backups → Sync with an Android phone → Join with a code. It syncs while Restock is open on it.</li>
+            <li>On an iPhone or iPad (Restock 0.14.0 or newer): Settings → Sync → Sync with an Android phone → Join with a code. It syncs while Restock is open on it.</li>
             <li>Scan this code.</li>
           </ol>
           <button className="btn block" onClick={close}>

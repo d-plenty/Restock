@@ -1,7 +1,8 @@
 // 0.12.9: Settings → What's new, and the box that offers it once after an update.
 import { version } from '../../../package.json';
 import { RELEASES } from '../../lib/updates';
-import { WHATS_NEW } from '../../lib/whatsNew';
+import { skippedNotes, updatedFrom, WHATS_NEW } from '../../lib/whatsNew';
+import { EARLIER } from '../../lib/whatsNewHistory';
 import { Icon, Sheet, TopBar } from '../components';
 import { useNav } from '../nav';
 
@@ -9,6 +10,8 @@ export function WhatsNewScreen() {
   const nav = useNav();
   // 0.12.10: the latest version only (it listed the last four, which was a lot to scroll past).
   const v = WHATS_NEW[0];
+  const from = updatedFrom();
+  const skipped = skippedNotes(from, v.version, EARLIER);
   return (
     <div className="screen">
       <TopBar title="What's new" />
@@ -24,6 +27,28 @@ export function WhatsNewScreen() {
           ))}
         </ul>
       </section>
+      {/* 0.17.0: skipped an update or two? Each version since the one this phone had, one tap each. */}
+      {skipped.length > 0 && (
+        <>
+          <h3 className="group-head">Also new since your last update{from ? ` (${from})` : ''}</h3>
+          {skipped.map((e) => (
+            <details key={e.version} className="card flush fold whats-new-old">
+              <summary className="row">
+                <span className="grow">
+                  <span className="title">Restock {e.version}</span>
+                  <span className="small">{e.about}</span>
+                </span>
+                <Icon name="chevron" size={18} />
+              </summary>
+              <ul className="whats-new-list">
+                {e.changes.map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ul>
+            </details>
+          ))}
+        </>
+      )}
       <p className="small" style={{ margin: 0 }}>
         Earlier versions, and every detail of this one, are on Restock's GitHub page.
       </p>

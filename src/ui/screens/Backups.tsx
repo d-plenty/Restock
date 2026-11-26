@@ -10,7 +10,7 @@ import { RestockNative } from '../../lib/sql/native';
 import { isNative } from '../../stores/http';
 import { isIos } from '../../lib/platform';
 import type { Settings } from '../../types';
-import { Icon, timeAgo } from '../components';
+import { Icon, More, timeAgo } from '../components';
 import { pricesIn } from './BackupParts';
 import { LOCAL_SUGGESTED } from '../../lib/protection';
 import { useNav } from '../nav';
@@ -105,10 +105,17 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
             Back up automatically
           </span>
           <span className="small">
-            {isIos()
-              ? 'Saves a whole backup on this iPhone when you open Restock and the last one is old enough. An iPhone can’t do it while Restock is closed.'
-              : 'Saves a whole backup into Documents/Restock backups on this phone, or a folder you pick (Nextcloud, Syncthing).'}{' '}
-            {pricesIn(settings, span)} {AUTO_GIFT_NOTE}
+            {isIos() ? 'A whole backup on this iPhone, when you open Restock.' : 'A whole backup into a folder on this phone.'}{' '}
+            <More title="Back up automatically">
+              <p>
+                {isIos()
+                  ? 'Restock saves a whole backup on this iPhone when you open it and the last one is old enough. An iPhone can’t do it while Restock is closed.'
+                  : 'Restock saves a whole backup into Documents/Restock backups on this phone, or a folder you pick (Nextcloud or Syncthing, say).'}
+              </p>
+              <p>
+                {pricesIn(settings, span)} {AUTO_GIFT_NOTE}
+              </p>
+            </More>
           </span>
         </span>
         <input type="checkbox" className="switch" checked={b.enabled} onChange={(e) => void toggle(e.target.checked)} aria-label="Back up automatically" />
@@ -143,7 +150,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
           <span className="title" style={{ fontSize: 15 }}>
             How often
           </span>
-          <span className="small">When you open Restock and the last backup is older than this.</span>
+          <span className="small">When the last one is older than this.</span>
         </span>
         <select
           className="input"
@@ -165,7 +172,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
           <span className="title" style={{ fontSize: 15 }}>
             Keep the newest
           </span>
-          <span className="small">Older automatic backups in the folder are removed. Your other files are never touched.</span>
+          <span className="small">Older ones are removed. Your other files are never touched.</span>
         </span>
         <select
           className="input"
@@ -188,7 +195,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
             <span className="title" style={{ fontSize: 15 }}>
               Include receipt photos
             </span>
-            <span className="small">Restock's own photos of your receipts (not your phone's photos). Untick for smaller backups.</span>
+            <span className="small">Restock&rsquo;s photos of your receipts. Untick for smaller backups.</span>
           </span>
         </label>
       )}
@@ -199,8 +206,8 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
           </span>
           <span className="small">
             {b.password
-              ? 'On. Restoring one of these backups asks for the password. It’s kept on this phone only, never in a backup.'
-              : 'Off. Worth turning on if the folder is in the cloud: backups hold your loyalty card numbers. Gift cards are left out until you set one.'}
+              ? 'On. Restoring asks for it. Kept on this phone only.'
+              : 'Off. Worth it if the folder is in the cloud (backups hold card numbers).'}
           </span>
         </span>
         <span style={{ display: 'flex', gap: 8 }}>
@@ -221,7 +228,7 @@ export function AutoBackupSettings({ settings, inSetup }: { settings: Settings; 
             <span className="title" style={{ fontSize: 15 }}>
               Remind me to back up
             </span>
-            <span className="small">A reminder on Home when nothing keeps a copy of your pantry. Not now brings it back in a week, then this often.</span>
+            <span className="small">On Home, when nothing keeps a copy of your pantry.</span>
           </span>
           <select
             className="input"

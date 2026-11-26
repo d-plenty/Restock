@@ -105,3 +105,19 @@ describe('your name', () => {
     expect(s.myName).toBe('Declan');
   });
 });
+
+describe('0.17.0: the web page names its browser', () => {
+  it("Sam's Chrome, or Web with no name", async () => {
+    const { browserLabel, browserWord } = await import('./myName');
+    const chrome = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36';
+    expect(browserWord(chrome)).toBe('Chrome');
+    expect(browserWord('Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0')).toBe('Firefox');
+    expect(browserWord('Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15')).toBe('Safari');
+    expect(browserWord('Mozilla/5.0 Chrome/131.0 Safari/537.36 Edg/131.0')).toBe('Edge');
+    expect(browserWord('curl')).toBe('browser');
+    expect(browserLabel('Sam', chrome)).toBe('Sam’s Chrome');
+    expect(browserLabel('James', chrome)).toBe('James’ Chrome');
+    expect(browserLabel(undefined, chrome)).toBe('Web');
+    expect(browserLabel('  ', chrome)).toBe('Web');
+  });
+});

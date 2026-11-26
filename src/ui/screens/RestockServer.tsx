@@ -32,7 +32,7 @@ import { askAdult } from './Sync';
 import { LeaveServerSheet, ServerCard, ShopDataStays, TAKE_BACK_NOTE } from './SyncServer';
 
 /**
- * Settings → Sync and backups → Restock server (0.9.3), and 0.9.4's server-first households: the
+ * Settings → Sync → Restock server (0.9.3), and 0.9.4's server-first households: the
  * server is the house, and phones join it (docs/server-v3-design.md). Here a phone joins its server
  * (scan the code from the server's Add a phone page), picks what it shares, and can leave. An owner
  * phone on a 0.9.3-style server hands its household to the server from here.
@@ -251,7 +251,7 @@ function JoinedPage({ joined, info, onDone }: { joined: { label?: string | null;
       </button>
       {busy && <LoadingBar seconds={8} />}
       <p className="small" style={{ textAlign: 'center', margin: 0 }}>
-        Change any of this later in Sync and backups.
+        Change any of this later in Sync.
       </p>
     </>
   );

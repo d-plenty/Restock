@@ -11,6 +11,7 @@ import { clearTrip, saveTrip, type SavedTrip } from '../../lib/trip';
 import { scanBarcode } from '../../lib/barcode';
 import { serverMode } from '../../server-mode/flag';
 import { PhoneOnlyNote } from '../../server-mode/ui/PhoneOnly';
+import { noteTripDone } from '../../lib/inventoryAsk';
 import { allCards, updateListEntry, updateSettings, cachedSettings } from '../../lib/db';
 import { buzz } from '../../lib/listActions';
 import { shopTotals, type ShopTotals } from '../../lib/shopTotals';
@@ -605,7 +606,10 @@ export function ShoppingMode({
   /** Step out: with things still to get the trip is kept ("Resume shopping"); with none it's over. */
   function leave() {
     if (left.length) saveTrip(tripNow(false));
-    else clearTrip();
+    else {
+      clearTrip();
+      void noteTripDone(); // 0.17.0: counts towards asking about inventory (inventoryAsk.ts)
+    }
     onClose();
   }
   // Back (or Escape) goes back to the shops from one shop, else closes shopping mode, unless a sheet
@@ -613,6 +617,7 @@ export function ShoppingMode({
   useBackLayer(() => (at ? setAt(undefined) : leave()));
   const finish = () => {
     clearTrip();
+    void noteTripDone();
     onClose();
   };
   // 0.9.4, the web on a server: a line opens its product (only the checkbox ticks); see ShopRow.

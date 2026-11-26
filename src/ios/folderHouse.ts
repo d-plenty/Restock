@@ -75,7 +75,7 @@ export const isFolderCode = (code: string): boolean => /^restock-icloud:1\?/i.te
 
 export function parseFolderCode(code: string): FolderInvite {
   const m = /^restock-icloud:1\?(.*)$/is.exec((code ?? '').trim());
-  if (!m) throw new FolderProblem("That isn't an iCloud sync code. On the household's first iPhone or iPad, open Sync and backups, then iCloud sync, and choose Add an iPhone or iPad.");
+  if (!m) throw new FolderProblem("That isn't an iCloud sync code. On the household's first iPhone or iPad, open Sync, then iCloud sync, and choose Add an iPhone or iPad.");
   const f: Record<string, string> = {};
   for (const part of m[1].split('&')) {
     const eq = part.indexOf('=');

@@ -26,8 +26,9 @@ describe('iPhone app: price checks happen when Restock is opened', () => {
     const check = read('../lib/check.ts');
     expect(check).toMatch(/if \(isIos\(\)\) \{[\s\S]{0,400}const r = await checkBySearch\(/);
     expect(check).toMatch(/if \(isIos\(\)\) return \{ due: iosCheckDue\(settings\) \|\| \(autoChecks\(settings\) && \(await unfinishedCheck\(\)\)\) \};/);
-    // 0.15.2: from the set time, while charging (ios/backgroundCheck.ts).
-    expect(read('../ui/screens/Home.tsx')).toContain("if (isIos()) return `${nextCheckWords(planOf(s), now)}, while charging`;");
+    // 0.17.0: Home says only when prices were updated; when the next check is, is in Settings → Prices and deals.
+    expect(read('../ui/screens/Home.tsx')).toContain('`Prices updated ${whenWords(settings.lastCheck)}`');
+    expect(read('../ui/screens/SettingsParts.tsx')).toContain("${ios ? ', while charging' : ''}");
   });
 });
 
@@ -252,7 +253,7 @@ describe('0.13.2: the screens', () => {
     const o = read('../ui/screens/SyncOverview.tsx');
     expect(o).toContain("(ios ? (['folder', 'wifi', 'server'] as const) : (['wifi', 'folder', 'server'] as const))");
     expect(o).toContain('If you run one');
-    expect(o).toContain("Android phones: Samsung, Google Pixel, Oppo, Motorola, Nokia and most phones that aren't iPhones.");
+    expect(o).toContain('<span className="tag good rec-tag">Recommended</span>');
     expect(o).not.toContain('className="sync-choice recommended" disabled={!syncAvailable()} onClick={() => nav.push({ name: \'restockServer\' })}');
   });
   it('the project is for iPhone and iPad, registers its own plugin, and may talk to things on the home network', () => {

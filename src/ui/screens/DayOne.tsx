@@ -58,28 +58,23 @@ export function HistoryLengths({ settings, onPicked }: { settings: Settings; onP
     });
     onPicked?.(w);
   };
+  // 0.17.0: one list to pick from and one line about the one picked (it was a long list of
+  // radio buttons, each with its own paragraph)
+  const cost = windowCost(keepDays(weeks) as MarketDays, settings.enabledChains, index);
   return (
-    <div role="radiogroup" aria-label="How far back Restock looks" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {KEEP_WEEKS.map((w) => {
-        const cost = windowCost(keepDays(w) as MarketDays, settings.enabledChains, index);
-        return (
-          <label key={w} className="check" style={{ padding: '8px 0' }}>
-            <input type="radio" name="history-weeks" checked={weeks === w} onChange={() => void pick(w)} />
-            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <span className="title" style={{ fontSize: 15 }}>
-                {historyLabel(w)}
-                {w === 8 ? ' (default)' : ''}
-              </span>
-              <span className="small">
-                {LENGTH_HELP[w]}
-                {sharedOn(settings) && cost.shops.length
-                  ? ` Shared prices: ${cost.measured ? '' : 'about '}${megabytes(cost.download)} to download, about ${megabytes(cost.stored)} on this phone.`
-                  : ''}
-              </span>
-            </span>
-          </label>
-        );
-      })}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <select className="input" aria-label="How far back Restock looks" value={weeks} onChange={(e) => void pick(Number(e.target.value))}>
+        {KEEP_WEEKS.map((w) => (
+          <option key={w} value={w}>
+            {historyLabel(w)}
+            {w === 8 ? ' (default)' : ''}
+          </option>
+        ))}
+      </select>
+      <span className="small">
+        {LENGTH_HELP[weeks] ?? ''}
+        {sharedOn(settings) && cost.shops.length ? ` Shared prices: ${cost.measured ? '' : 'about '}${megabytes(cost.download)} to download.` : ''}
+      </span>
     </div>
   );
 }
@@ -123,8 +118,8 @@ function SearchKeepSettings({ settings }: { settings: Settings }) {
         ) : (
           <p className="small" style={{ margin: '6px 0 0' }} role="status">
             {count && count.rows > 0
-              ? `Remembering ${count.rows.toLocaleString('en-AU')} price${count.rows === 1 ? '' : 's'} of ${count.products.toLocaleString('en-AU')} product${count.products === 1 ? '' : 's'}. Kept for ${historyLabel(weeks)}${own ? '' : ', the same as your price history'}.`
-              : `Nothing remembered yet. Kept for ${historyLabel(weeks)}${own ? '' : ', the same as your price history'}.`}
+              ? `${count.rows.toLocaleString('en-AU')} price${count.rows === 1 ? '' : 's'} remembered, kept for ${historyLabel(weeks)}.`
+              : `Nothing remembered yet. Kept for ${historyLabel(weeks)}.`}
           </p>
         )}
       </div>
@@ -140,19 +135,18 @@ function SearchKeepSettings({ settings }: { settings: Settings }) {
           <span className="title" style={{ fontSize: 15 }}>
             Keep search results for a different time
           </span>
-          <span className="small">Off: they're kept as long as your price history, and follow it when you change it.</span>
+          <span className="small">Off: the same as your price history.</span>
         </span>
       </label>
       {own && !serverMode && (
-        <div role="radiogroup" aria-label="How long to keep search results" style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 14px 6px' }}>
-          {KEEP_WEEKS.map((w) => (
-            <label key={w} className="check" style={{ padding: '8px 0' }}>
-              <input type="radio" name="search-keep-weeks" checked={weeks === w} onChange={() => void save(w)} />
-              <span className="title" style={{ fontSize: 15 }}>
+        <div style={{ padding: '0 14px 12px' }}>
+          <select className="input" aria-label="How long to keep search results" value={weeks} onChange={(e) => void save(Number(e.target.value))}>
+            {KEEP_WEEKS.map((w) => (
+              <option key={w} value={w}>
                 {historyLabel(w)}
-              </span>
-            </label>
-          ))}
+              </option>
+            ))}
+          </select>
         </div>
       )}
     </div>
@@ -190,7 +184,7 @@ export function PriceHistorySettings({ settings }: { settings: Settings }) {
           <span className="grow">
             <span className="title">{SHARED_TITLE}</span>
             <span className="small">
-              {on ? 'On' : 'Off'} · judges new items from day one, and shares the shop prices your phone reads (Privacy and sharing)
+              {on ? 'On' : 'Off'} · in Privacy and sharing
             </span>
           </span>
           <Icon name="chevron" size={18} />

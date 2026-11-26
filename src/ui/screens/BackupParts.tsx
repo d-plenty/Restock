@@ -295,7 +295,7 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
             <ol className="small" style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
               <li>Put the other phone on the same Wi-Fi as this one.</li>
               <li>
-                In Restock on it, open <strong>Settings</strong>, then <strong>Sync and backups</strong>, and choose <strong>Import data</strong>, then{' '}
+                In Restock on it, open <strong>Settings</strong>, then <strong>Backups</strong>, and choose <strong>Import data</strong>, then{' '}
                 <strong>From another phone</strong>.
               </li>
               <li>Scan this code with it. Keep this screen open until it says Sent.</li>

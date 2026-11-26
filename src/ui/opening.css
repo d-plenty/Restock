@@ -419,3 +419,44 @@
     transform: translate(6px, -10px);
   }
 }
+
+/* ---------- 0.17.0: a small still picture of an opening (Settings → See the animations) ---------- */
+.opening.op-thumb {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  width: 84px;
+  height: 56px;
+  border-radius: 12px;
+  gap: 0;
+  padding: 0;
+  cursor: default;
+  animation: none;
+  justify-content: center;
+}
+.opening.op-thumb.op-big {
+  padding-bottom: 0;
+}
+.op-thumb .op-words {
+  display: none;
+}
+.op-thumb .op-logo,
+.op-thumb.op-big .op-logo,
+.op-thumb.op-easter .op-logo {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  filter: none;
+}
+.op-thumb .op-star {
+  width: 1px;
+  height: 1px;
+}
+.op-thumb .op-egg {
+  width: 9px;
+  height: 12px;
+}
+.op-thumb .op-firefly {
+  width: 2px;
+  height: 2px;
+}

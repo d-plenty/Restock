@@ -1,18 +1,19 @@
 import { useFullRefresh } from '../refresh';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { itemsToSort, sortTargets } from '../../lib/categoryGuess';
 import { allCategories, allListEntries, cachedSettings, deleteGroup, updateGroup } from '../../lib/db';
 import { addAllToList, addToList, buzz, takeOffList } from '../../lib/listActions';
 import { act } from '../../lib/undo';
 import { loadRecommendations } from '../../lib/recs';
-import { useLive } from '../../lib/useLive';
+import { useLive, useSettings } from '../../lib/useLive';
+import { inventoryAsked, shouldAskInventory } from '../../lib/inventoryAsk';
 import { type Recommendation } from '../../lib/verdict';
 import { BetaTag, Hold, Icon, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, SearchField } from '../components';
 import { BigAdd, NoneFound, RecRow } from '../simple';
 import { picksOffered } from '../../lib/makerPicks';
 import { PicksOffer } from './Picks';
 import { HaveChip, HaveSheet, InventoryButton, useInventory } from '../Inventory';
-import { haveState, INVENTORY_SECTIONS } from '../../lib/inventory';
+import { haveState, INVENTORY_SECTIONS, setInventoryTab } from '../../lib/inventory';
 import { cleanSearch } from '../../lib/searchText';
 import { serverMode } from '../../server-mode/flag';
 import { isMoreTab, useNav } from '../nav';
@@ -99,6 +100,25 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   const invOn = inv.tabs.has(section);
   const [haveFor, setHaveFor] = useState<Recommendation>();
   const isLow = (r: Recommendation) => invOn && haveState(inv.have.get(r.group.id)) !== 'ok';
+  // 0.17.0: after a while, asked once whether to keep track of what's at home (inventoryAsk.ts)
+  const settingsNow = useSettings();
+  const asking = useRef(false);
+  useEffect(() => {
+    if (section !== 'pantry' || asking.current || serverMode || !shouldAskInventory(settingsNow, recs?.length ?? 0, inv.tabs.size > 0)) return;
+    asking.current = true;
+    void (async () => {
+      await inventoryAsked();
+      const yes = await confirmAction('Keep track of what you have at home?', {
+        detail: 'Inventory counts what you have of each thing, adds it as you tick it off while shopping, and tells you when you’re running low. You can turn it on or off any time in Settings → Inventory.',
+        action: 'Turn it on',
+        danger: false,
+      });
+      if (yes) {
+        await setInventoryTab('pantry', true);
+        nav.toast('Inventory is on for your pantry. Tap Inventory at the top to start.');
+      }
+    })();
+  }, [section, settingsNow, recs?.length, inv.tabs.size]); // eslint-disable-line react-hooks/exhaustive-deps
   const adding = useRef(false);
   // read each time the Pantry is drawn (it stays behind the picks page, and must notice they were added)
   const [picksNo, setPicksNo] = useState(false);
@@ -251,7 +271,8 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
         {/* 0.13.1: Inventory, beside Edit, whether it's on for this tab or not (off: its page says what it is, with Turn on) */}
         {/* (the two stay side by side: on a tab with a long name they move under it together) */}
         <span className="topbar-actions">
-        {!editing && INVENTORY_SECTIONS.includes(section) && <InventoryButton section={section} onOpen={() => nav.push({ name: 'inventory', section })} />}
+        {/* 0.17.0: only once it's on for this tab (Restock asks about it after a while: inventoryAsk.ts) */}
+        {!editing && invOn && INVENTORY_SECTIONS.includes(section) && <InventoryButton section={section} onOpen={() => nav.push({ name: 'inventory', section })} />}
         {recs.length === 0 && (
           <button className="btn small edit-btn" aria-label={`Edit this tab: ${TAB_EDIT_WORDS(section)}`} onClick={() => nav.push({ name: 'stores', section })}>
             <Icon name="pencil" size={16} /> Edit

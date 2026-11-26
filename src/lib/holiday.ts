@@ -6,9 +6,10 @@
 //
 //   Christmas      1–26 December
 //   New Year       27 December – 1 January
-//   Australia Day  2–31 January
-//   Easter         the two weeks up to Easter Monday (it moves: late March to late April)
-//   Halloween      all of October
+//   Australia Day  2–27 January
+//   Easter         the three weeks up to Easter Monday (it moves: late March to late April)
+//   Halloween      the three weeks up to Halloween, 11 October – 1 November
+// 0.17.0: each ends the day after (Boxing Day, New Year's Day, the 27th, Easter Monday, 1 November).
 import type { Settings } from '../types';
 
 export type Holiday = 'christmas' | 'newyear' | 'australia' | 'easter' | 'halloween';
@@ -46,12 +47,12 @@ export function holidayOn(d = new Date()): Holiday | undefined {
   const day = d.getDate();
   if ((m === 12 && day >= 27) || (m === 1 && day === 1)) return 'newyear';
   if (m === 12) return 'christmas';
-  if (m === 10) return 'halloween';
-  if (m === 1) return 'australia';
+  if ((m === 10 && day >= 11) || (m === 11 && day === 1)) return 'halloween';
+  if (m === 1 && day <= 27) return 'australia';
   const e = easterSunday(d.getFullYear());
   const sunday = new Date(d.getFullYear(), e.month - 1, e.day);
   const monday = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + 1);
-  const from = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 13);
+  const from = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 20);
   const today = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   if (today >= from && today <= monday) return 'easter';
   return undefined;

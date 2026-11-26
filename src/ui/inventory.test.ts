@@ -242,8 +242,8 @@ describe('0.13.1 inventory: backups and spreadsheets', () => {
 describe('0.13.1 inventory: on the screen', () => {
   const ui = read('./Inventory.tsx');
   const pantry = read('./screens/Pantry.tsx');
-  it('the Inventory button is beside Edit on every tab, on or off; off opens what it is, with one big Turn on', () => {
-    expect(pantry).toMatch(/\{!editing && INVENTORY_SECTIONS\.includes\(section\) && <InventoryButton section=\{section\}/);
+  it('the Inventory button is beside Edit once it is on for the tab (0.17.0); off opens what it is, with one big Turn on', () => {
+    expect(pantry).toMatch(/\{!editing && invOn && INVENTORY_SECTIONS\.includes\(section\) && <InventoryButton section=\{section\}/);
     expect(pantry.indexOf('<InventoryButton')).toBeLessThan(pantry.indexOf('aria-label={`Edit this tab'));
     expect(ui).toMatch(/Keep an inventory for \{name\}\?/);
     expect(ui).toMatch(/className="btn primary block inv-turn-on"[\s\S]{0,200}>\s*Turn on\s*<\/button>/);

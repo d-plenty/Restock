@@ -564,9 +564,9 @@ function HouseholdPart() {
             Open Data
           </button>
         </Line>
-        {/* 0.10.0: as on the phone (Settings → Sync and backups → Share my spending with the server). */}
+        {/* 0.10.0: as on the phone (Settings → Sync → Share my spending with the server). */}
         <Line title="Share my spending with the server" sub="Each phone chooses, on unless turned off. Off, a phone keeps its spending to itself and its Your data shows only that phone's." greyed>
-          <PhoneOnlyNote compact text="Set on each phone (Settings → Sync and backups on the phone)." />
+          <PhoneOnlyNote compact text="Set on each phone (Settings → Sync on the phone)." />
         </Line>
       </Group>
 
@@ -659,11 +659,11 @@ function HouseholdPart() {
             onChange={(e) => mine && void updateBrowserSettings({ look: { ...mine.look, holidays: e.target.checked } }, { local: true })}
           />
         </Line>
-        <Line title="See the openings" sub="The usual one and each holiday's, day and night">
+        <Line title="See the animations" sub="The usual one and each holiday's, day and night">
           <button className="btn small" onClick={() => setSeeing(true)}>
             See them
           </button>
-          {seeing && mine && <OpeningPreview still={lessMotion(mine.a11y.motion)} onClose={() => setSeeing(false)} />}
+          {seeing && mine && <OpeningPreview still={lessMotion(mine.a11y.motion)} settings={mine} onClose={() => setSeeing(false)} />}
         </Line>
         <Line
           title="Download this browser's copy"

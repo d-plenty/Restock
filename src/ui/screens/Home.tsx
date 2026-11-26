@@ -1,5 +1,5 @@
 import { useNow } from '../useNow';
-import { deviceWord, isIos, isPad } from '../../lib/platform';
+import { deviceWord, isPad } from '../../lib/platform';
 import { saveNeedsWarning, saveNow, saveState, subscribeSaveState } from '../../lib/saveState';
 import { greeting, todayText } from '../../lib/greeting';
 import { nameOf } from '../../lib/myName';
@@ -17,7 +17,7 @@ import { lineCost } from '../../lib/verdict';
 import { useLive, useSettings } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
-import { chainName, stockKnown, type ListEntry, type Settings } from '../../types';
+import { chainName, type ListEntry, type Settings } from '../../types';
 import { ChainDot, Icon, LoadingBar } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { failingStores, getHealth, getHiddenWarnings, isBlockedError, isHidden, offerUnblock } from '../../lib/health';
@@ -37,7 +37,7 @@ import { TabOffer } from './SetupNudges';
 import { UpdateBanner } from '../UpdateBanner';
 import { serverMode } from '../../server-mode/flag';
 import { ConnectionsSheet } from './SettingsParts';
-import { nextCheckWords, planOf } from '../../lib/checkSchedule';
+import { planOf } from '../../lib/checkSchedule';
 import { getCheckLog, missedSlot, missedWords, whenWords } from '../../lib/checkLog';
 
 import { startTour } from '../Tour';
@@ -88,7 +88,6 @@ export function HomeScreen() {
       nav.toast(`Backup failed: ${e instanceof Error ? e.message : e}`);
     }
   };
-  const next = nextCheck(settings);
   // 0.10.2: a scheduled check that didn't happen says so (Advanced → Diagnostics says why).
   const missed =
     isNative() && !serverMode && settings.sync.backgroundActivity
@@ -154,7 +153,8 @@ export function HomeScreen() {
                   : !isNative()
                   ? 'Live prices work in the Android app'
                   : settings.lastCheck
-                    ? `${settings.enabledChains.some((c) => stockKnown(settings, c)) ? 'Prices & stock' : 'Prices'} updated ${whenWords(settings.lastCheck)}${next ? ` · next ${next}` : ''}`
+                    ? // 0.17.0: one short line (when the next check is, is in Settings → Prices and deals)
+                      `Prices updated ${whenWords(settings.lastCheck)}`
                     : 'Prices not checked yet'}
                 {missed !== undefined && (
                   <>
@@ -412,17 +412,6 @@ function FirstHome({ tourSeen }: { tourSeen?: boolean }) {
   );
 }
 
-/** When the next background check should run, in words ("tonight 5:00 pm", "tomorrow 5:00 am"). 0.9.6: the set time of day. */
-function nextCheck(
-  s: { checkIntervalHours: number; checkTime?: string; checkWeekday?: number; checkDays?: number[]; sync: { backgroundActivity: boolean } },
-  now = Date.now(),
-): string | undefined {
-  // 0.11.0: Off (no days) says nothing here, like background activity off
-  if (!s.sync.backgroundActivity || (Array.isArray(s.checkDays) && !s.checkDays.length)) return undefined;
-  // 0.15.2, iPhone: from the set time, while it's charging (ios/backgroundCheck.ts); iOS picks the moment.
-  if (isIos()) return `${nextCheckWords(planOf(s), now)}, while charging`;
-  return nextCheckWords(planOf(s), now);
-}
 
 /**
  * 0.10.4: a shop that's turning Restock away. It says plainly that it's the shop's website checking
