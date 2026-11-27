@@ -11,16 +11,15 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.18.1',
-    about: 'Pages load first on older iPads, a new Simple design, your own colours, and safer admin changes.',
+    version: '0.18.2',
+    about: 'Faster on iPhone and iPad: pages straight away, taps that answer, and one price check a day.',
     changes: [
-      'On an older iPad or iPhone, pages open first and the syncing and price checks wait their turn. No more black screens while a page loads.',
-      'Simple design (Look and colours → Style): white, one colour, square and flat, and lighter work for older phones. It replaces Plain.',
-      'Restock’s own colour wheel everywhere, a theme colour for the bars and tops, and Android widgets in your colours.',
-      'Animations: the opening, the holidays and every animation to play, on one page.',
-      'Admins: Are you sure? before adding, removing or changing a phone, a notification when the server’s phones change, and a warning before the last admin phone steps down or leaves.',
-      'Share my spending, receipts and loyalty cards ask before turning off, with the details behind ⓘ.',
-      'An iPad held sideways shows Settings side by side, and What’s planned says what’s next: the App Store and Google Play, F-Droid, iPhone widgets and Running low.',
+      'Home, the Pantry and the list show straight away when Restock opens, with what was there last time, then update by themselves.',
+      'Taps answer while prices are being checked: what you tap goes first, and the check waits while you’re using the screen.',
+      'iPhone and iPad check prices once a day, from your set time (4:00 am unless changed), as Android does. Opening Restock again the same day doesn’t check again.',
+      'Price history is read once and kept, so screens don’t read it all again at every change (on Android too).',
+      'Long lists come in parts as you scroll, in both designs.',
+      'Diagnostics → Speed on this phone shows anything slow, to copy into a report.',
     ],
   },
 ];

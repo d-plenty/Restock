@@ -12,7 +12,7 @@ import {
   type Receipt,
   type Settings,
 } from '../types';
-import { changed } from './live';
+import { changed, pricesChangeCount } from './live';
 import { listLineWithoutCostco } from './costcoLocal';
 import { applyCustomSections, asListSection, isCustomSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, setShopTabs, shareTab, shopDef, isGoneShop, withoutGone, type ListSection, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
@@ -31,6 +31,9 @@ let driver: SqlDriver | undefined;
 
 export async function initDb(d: SqlDriver): Promise<void> {
   driver = d;
+  // 0.18.2: another database: nothing read from the last one is kept.
+  readCache.gen = -1;
+  readCache.map = new Map();
   await migrate(d);
   // 0.9.6 (cards): gift cards, on this phone only (schema.ts GIFT_CARDS_TABLE says why it's not a migration).
   await d.run(GIFT_CARDS_TABLE);
@@ -58,7 +61,7 @@ export const marketQuery = <T = Record<string, unknown>>(text: string, params: S
 export async function marketWrite(ops: SqlOp[]): Promise<void> {
   if (!ops.length) return;
   await msql().batch(ops);
-  changed();
+  changed('noprices');
 }
 
 // 0.9.5 (undo): while an undoable action runs, undo.ts sees each write first, to remember the rows
@@ -78,7 +81,8 @@ async function write(ops: SqlOp[]): Promise<void> {
   if (watchWrites) await watchWrites(ops);
   if (ops.length === 1) await sql().run(ops[0].sql, ops[0].params);
   else await sql().batch(ops);
-  changed();
+  // 0.18.2: says whether the price history was touched (readingsFor keeps what it read until it is).
+  changed(ops.some((o) => /\bprices\b/i.test(o.sql)) ? undefined : 'noprices');
 }
 
 export function uid(): string {
@@ -689,7 +693,15 @@ export async function saveFindings(readings: Omit<PriceReading, 'id'>[], photos:
     if (op) ops.push(op);
   }
   for (const r of readings) ops.push(insertReadingOp(r));
+  // 0.18.2: a price check's findings: only these products' history is read again (not everyone's).
+  const was = pricesChangeCount();
+  const kept = readCache.gen === was;
   await write(ops);
+  if (kept && pricesChangeCount() === was + 1) {
+    // What's kept stays, but these products are read again next time they're asked for.
+    for (const r of readings) readCache.map.delete(r.productId);
+    readCache.gen = pricesChangeCount();
+  }
 }
 
 /** 0.9.6: takes one price out of the history (a price typed in by hand that was wrong). Used inside act() so it can be undone. */
@@ -708,15 +720,50 @@ export async function getProductsByBarcode(codes: string[]): Promise<Product[]> 
   return out;
 }
 
+async function readingsQuery(productIds: string[]): Promise<Map<string, PriceReading[]>> {
+  const map = new Map<string, PriceReading[]>();
+  for (let i = 0; i < productIds.length; i += 500) {
+    const part = productIds.slice(i, i + 500);
+    const rows = await sql().query(`SELECT * FROM prices WHERE product_id IN (${placeholders(part.length)}) ORDER BY date`, part);
+    for (const row of rows) {
+      const r = toReading(row);
+      const arr = map.get(r.productId) ?? [];
+      arr.push(r);
+      map.set(r.productId, arr);
+    }
+  }
+  return map;
+}
+
+/**
+ * 0.18.2: the price history read so far, kept until it changes (live.ts pricesChangeCount). Every
+ * screen asked for every product's history again at every change, a tick on the list included: on
+ * an iPhone or iPad that's thousands of rows across to the app each time, while a price check runs.
+ */
+const readCache: { gen: number; map: Map<string, PriceReading[]> } = { gen: -1, map: new Map() };
+
 export async function readingsFor(productIds: string[]): Promise<Map<string, PriceReading[]>> {
   const map = new Map<string, PriceReading[]>();
   if (!productIds.length) return map;
-  const rows = await sql().query(`SELECT * FROM prices WHERE product_id IN (${placeholders(productIds.length)}) ORDER BY date`, productIds);
-  for (const row of rows) {
-    const r = toReading(row);
-    const arr = map.get(r.productId) ?? [];
-    arr.push(r);
-    map.set(r.productId, arr);
+  const gen = pricesChangeCount();
+  if (readCache.gen !== gen) {
+    readCache.gen = gen;
+    readCache.map = new Map();
+  }
+  const missing = [...new Set(productIds.filter((id) => !readCache.map.has(id)))];
+  if (missing.length) {
+    const got = await readingsQuery(missing);
+    // Kept only if nothing changed while it was read.
+    if (readCache.gen === gen && pricesChangeCount() === gen) for (const id of missing) readCache.map.set(id, got.get(id) ?? []);
+    for (const id of missing) {
+      const arr = got.get(id);
+      if (arr?.length) map.set(id, arr.slice());
+    }
+  }
+  for (const id of productIds) {
+    if (map.has(id)) continue;
+    const arr = readCache.map.get(id);
+    if (arr?.length) map.set(id, arr.slice());
   }
   return map;
 }

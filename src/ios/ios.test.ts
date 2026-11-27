@@ -1,7 +1,7 @@
 // The iPhone app: the pieces that can be held to account without an iPhone.
 import { readSource } from '../lib/readSource';
 import { describe, expect, it } from 'vitest';
-import { IOS_CHECK_EVERY_HOURS, iosCheckDue } from '../lib/check';
+import { iosCheckDue } from '../lib/check';
 import { IosUnavailable } from '../lib/platform';
 import { IOS_REASONS } from '../ui/IosWhy';
 import { RestockIos } from './native';
@@ -9,23 +9,37 @@ import { RestockIos } from './native';
 const read = (p: string) => readSource(new URL(p, import.meta.url));
 
 describe('iPhone app: price checks happen when Restock is opened', () => {
-  const base = { sync: { backgroundActivity: true } } as Parameters<typeof iosCheckDue>[0];
-  const now = Date.parse('2026-11-24T10:00:00Z');
-  it('due with no check yet, or one older than 12 hours; not sooner', () => {
-    expect(IOS_CHECK_EVERY_HOURS).toBe(12);
+  // 0.18.2: once per set check time, as Android (every day at 4:00 am; the tests run on Sydney time).
+  const base = { sync: { backgroundActivity: true }, checkIntervalHours: 24, checkTime: '04:00', checkDays: [0, 1, 2, 3, 4, 5, 6] } as Parameters<typeof iosCheckDue>[0];
+  const at = (local: string) => Date.parse(local + '+11:00');
+  const now = at('2026-11-27T20:00:00');
+  it('owed when no check has started since 4:00 am today; not again the same day', () => {
     expect(iosCheckDue({ ...base }, now)).toBe(true);
-    expect(iosCheckDue({ ...base, lastCheck: '2026-11-23T21:59:00Z' }, now)).toBe(true);
-    expect(iosCheckDue({ ...base, lastCheck: '2026-11-24T04:00:00Z' }, now)).toBe(false);
+    // Yesterday's check: owed.
+    expect(iosCheckDue({ ...base, lastCheck: new Date(at('2026-11-26T21:00:00')).toISOString() }, now)).toBe(true);
+    // Checked at 4:10 am, or half an hour ago: not again today.
+    expect(iosCheckDue({ ...base, lastCheck: new Date(at('2026-11-27T04:10:00')).toISOString() }, now)).toBe(false);
+    expect(iosCheckDue({ ...base, lastCheck: new Date(at('2026-11-27T19:30:00')).toISOString() }, now)).toBe(false);
+    // A check that started today and was cut off counts too (the rest is done in the background).
+    expect(iosCheckDue({ ...base, lastCheck: new Date(at('2026-11-25T05:00:00')).toISOString() }, now, new Date(at('2026-11-27T07:00:00')).toISOString())).toBe(false);
+    // Before 4:00 am, yesterday's 4:00 am is the one that counts.
+    expect(iosCheckDue({ ...base, lastCheck: new Date(at('2026-11-26T09:00:00')).toISOString() }, at('2026-11-27T03:00:00'))).toBe(false);
     expect(iosCheckDue({ ...base, lastCheck: 'nonsense' }, now)).toBe(true);
+  });
+  it('on twice-a-week checks, only after a check day’s set time', () => {
+    // Wednesday and Saturday: Friday 27th, the last was Wednesday the 25th at 4:00 am.
+    const twice = { ...base, checkDays: [3, 6] };
+    expect(iosCheckDue({ ...twice, lastCheck: new Date(at('2026-11-25T06:00:00')).toISOString() }, now)).toBe(false);
+    expect(iosCheckDue({ ...twice, lastCheck: new Date(at('2026-11-24T06:00:00')).toISOString() }, now)).toBe(true);
   });
   it('never when automatic checks are off', () => {
     expect(iosCheckDue({ ...base, checkDays: [] }, now)).toBe(false);
-    expect(iosCheckDue({ sync: { backgroundActivity: false } } as Parameters<typeof iosCheckDue>[0], now)).toBe(false);
+    expect(iosCheckDue({ ...base, sync: { backgroundActivity: false } } as Parameters<typeof iosCheckDue>[0], now)).toBe(false);
   });
   it('the check runs on the iPhone itself, and Home says when the next one is', () => {
     const check = read('../lib/check.ts');
     expect(check).toMatch(/if \(isIos\(\)\) \{[\s\S]{0,400}const r = await checkBySearch\(/);
-    expect(check).toMatch(/if \(isIos\(\)\) return \{ due: iosCheckDue\(settings\) \|\| \(autoChecks\(settings\) && \(await unfinishedCheck\(\)\)\) \};/);
+    expect(check).toContain('if (isIos()) return { due: iosCheckDue(settings, Date.now(), (await readProgress())?.started) };');
     // 0.17.0: Home says only when prices were updated; when the next check is, is in Settings → Prices and deals.
     expect(read('../ui/screens/Home.tsx')).toContain('`Prices updated ${whenWords(settings.lastCheck)}`');
     expect(read('../ui/screens/SettingsParts.tsx')).toContain("${ios ? ', while charging' : ''}");

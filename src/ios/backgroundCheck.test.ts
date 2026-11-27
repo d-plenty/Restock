@@ -57,8 +57,9 @@ describe('when a background check is owed', () => {
     expect(await bg.checkOwed({ ...s, lastCheck: undefined }, 'long', now)).toBe(true);
     expect(await bg.checkOwed({ ...s, lastCheck: new Date(now).toISOString() }, 'long', now)).toBe(false);
     expect(await bg.checkOwed({ ...s, lastCheck: new Date(now - 2 * 86_400_000).toISOString() }, 'long', now)).toBe(true);
-    expect(await bg.checkOwed({ ...s, lastCheck: new Date(now - 3_600_000).toISOString() }, 'refresh', now)).toBe(false);
-    expect(await bg.checkOwed({ ...s, lastCheck: new Date(now - 13 * 3_600_000).toISOString() }, 'refresh', now)).toBe(true);
+    // 0.18.2: the short run goes by the same rule (once per set time).
+    expect(await bg.checkOwed({ ...s, lastCheck: new Date(now).toISOString() }, 'refresh', now)).toBe(false);
+    expect(await bg.checkOwed({ ...s, lastCheck: new Date(now - 25 * 3_600_000).toISOString() }, 'refresh', now)).toBe(true);
     // Automatic checks off (or Check now only): never.
     expect(await bg.checkOwed({ ...s, lastCheck: undefined, checkDays: [] }, 'long', now)).toBe(false);
     expect(await bg.checkOwed({ ...s, lastCheck: undefined, sync: { ...s.sync, backgroundActivity: false } }, 'refresh', now)).toBe(false);

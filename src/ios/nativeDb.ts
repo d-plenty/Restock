@@ -12,6 +12,7 @@
 // so a screen doesn't wait behind a price check's saves or a sync. A read still waits for the app's
 // own writes asked before it, so it always sees them; what the sync engine is in the middle of it
 // doesn't see until the engine has finished (as with any other database).
+import { noteSpeed } from '../lib/speedLog';
 import type { RunResult, SqlDriver, SqlOp, SqlValue } from '../lib/sql/driver';
 import type { AsyncSyncDb, Row } from '../server-mode/engine';
 import { appleHere, RestockApple } from './apple';
@@ -53,6 +54,9 @@ export async function nativeSqlHere(): Promise<boolean> {
 export async function readLaneHere(): Promise<boolean> {
   return (await pluginVersion()) >= READ_LANE_VERSION;
 }
+
+/** 0.18.2: how long a read waits for the app's own last write before reading what's there. */
+export const READ_WAIT_MS = 250;
 
 /** A read that the read lane can take: a SELECT (anything else, PRAGMAs included, goes the writing way). */
 export const isRead = (sql: string): boolean => /^\s*SELECT\b/i.test(sql);
@@ -107,7 +111,17 @@ export class AppleDb implements SqlDriver {
 
   query<T = Record<string, unknown>>(sql: string, params: SqlValue[] = []): Promise<T[]> {
     const read = this.read;
-    if (read && isRead(sql)) return this.written.then(() => read(sql, params) as Promise<T[]>);
+    // 0.18.2: a read waits for the app's last write a moment at most (READ_WAIT_MS), then reads what's
+    // saved: that write may itself be waiting behind a sync round or a price check's save, and a screen
+    // waited for all of it. What it then misses comes with the next change, a moment later.
+    if (read && isRead(sql)) {
+      const t0 = Date.now();
+      return Promise.race([this.written, new Promise((r) => setTimeout(r, READ_WAIT_MS))]).then(() => {
+        const waited = Date.now() - t0;
+        if (waited >= READ_WAIT_MS) noteSpeed('read', waited);
+        return read(sql, params) as Promise<T[]>;
+      });
+    }
     return this.write(() => this.raw.query(sql, params) as Promise<T[]>);
   }
   run(sql: string, params: SqlValue[] = []): Promise<RunResult> {

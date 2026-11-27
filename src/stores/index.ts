@@ -117,6 +117,10 @@ function fakeAdapter(chain: StoreChain): StoreAdapter {
     chain,
     pages: ['woolworths', 'coles', 'aldi'].includes(chain),
     search: async (term: string, _storeId?: string, page = 1) => {
+      // 0.18.2: the speed test (tools/bench) puts a shop that answers like a real one here: a wait for
+      // the network and a big answer to read. Test builds only, as this whole adapter is.
+      const bench = (globalThis as { __benchShop?: (chain: string, term: string) => Promise<StoreProduct[]> }).__benchShop;
+      if (bench) return bench(chain, term);
       const grocer = chain === 'woolworths' || chain === 'coles';
       // "western star": Woolworths and Coles sell it, Aldi only has things with "star" in them (0.8.6).
       const fake = (id: string, name: string, size: string, price: number) => ({ ...earth(id, name, size, price), brand: undefined });

@@ -3,7 +3,7 @@
 import initSqlJs, { type Database } from 'sql.js';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { AsyncSyncEngine } from '../server-mode/engine';
-import { AppleDb, bindable, isRead, KEPT, readyFile, type AppleSqlPlugin } from './nativeDb';
+import { AppleDb, bindable, isRead, KEPT, READ_WAIT_MS, readyFile, type AppleSqlPlugin } from './nativeDb';
 import { DB_FILE } from './store';
 
 let SQL: Awaited<ReturnType<typeof initSqlJs>>;
@@ -158,6 +158,32 @@ describe('the database in the system SQLite', () => {
     // Only SELECTs take the read lane.
     expect(s.log.filter((l) => l.startsWith('read ')).length).toBe(2);
     expect([isRead(' select 1'), isRead('PRAGMA user_version'), isRead('INSERT INTO t SELECT 1')]).toEqual([true, false, false]);
+  });
+
+  test('0.18.2: a read waits a moment at most for a write that is itself stuck behind a sync', async () => {
+    const s = fakeSwift();
+    const d = new AppleDb('restock.sqlite', s.p, { readLane: true });
+    await d.run('CREATE TABLE sync_meta (key TEXT PRIMARY KEY, value TEXT)');
+    await d.run('CREATE TABLE household (k TEXT PRIMARY KEY, v TEXT)');
+    const e = new AsyncSyncEngine(d.forEngine(), () => true, () => '');
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const held = e.hold(async () => {
+      await gate;
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    // A price check's save, queued behind the sync; a screen reads after it.
+    const w = d.run("INSERT INTO household (k, v) VALUES ('x', 'y')");
+    const t0 = Date.now();
+    const rows = await d.query<{ n: number }>('SELECT COUNT(*) AS n FROM household');
+    const took = Date.now() - t0;
+    // It read what's there after READ_WAIT_MS, not after the whole sync.
+    expect(rows[0].n).toBe(0);
+    expect(took).toBeGreaterThanOrEqual(READ_WAIT_MS - 20);
+    expect(took).toBeLessThan(READ_WAIT_MS + 400);
+    release();
+    await Promise.all([held, w]);
+    expect((await d.query<{ n: number }>('SELECT COUNT(*) AS n FROM household'))[0].n).toBe(1);
   });
 
   test('without the read lane (an older native side), reads wait their turn as before', async () => {

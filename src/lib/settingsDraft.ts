@@ -70,7 +70,7 @@ export function openDraft(): () => void {
     if (at >= 0) below.splice(at, 1);
     if (draft !== d) return;
     draft = below.pop();
-    changed();
+    changed('noprices');
     emit();
   };
 }
@@ -125,7 +125,7 @@ export async function updateSettings(patch: Partial<Settings>, opts: { local?: b
     else (d.patch as Record<string, unknown>)[k] = structuredClone(v);
   }
   savedAt = undefined;
-  changed();
+  changed('noprices');
   emit();
   return { ...saved, ...d.patch };
 }
@@ -210,7 +210,7 @@ export async function saveDraft(): Promise<boolean> {
     return false;
   } finally {
     saving = false;
-    changed();
+    changed('noprices');
     emit();
   }
 }
@@ -226,7 +226,7 @@ export function discardDraft(): void {
   epoch++;
   savedAt = undefined;
   error = undefined;
-  changed();
+  changed('noprices');
   emit();
 }
 

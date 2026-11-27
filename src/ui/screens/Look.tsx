@@ -133,7 +133,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
           {simple ? 'White, one colour, square and flat, and lighter work for older phones.' : 'Navy bars, gold and green.'}{' '}
           <More title="Style">
             <p>The default theme is Restock&rsquo;s Australian theme: navy, gold and green, the colours of the flag and the green and gold. On a holiday it takes that holiday&rsquo;s colours for a while (with Holiday themes on), then goes back by itself.</p>
-            <p>Simple is white with one colour of your choice, a band of it at the top, square corners and no shadows. In dark mode it&rsquo;s plain black. It also goes easier on the phone: long lists come in parts, price checks take longer breaks, and charts are plainer. A good pick for an older phone or tablet.</p>
+            <p>Simple is white with one colour of your choice, a band of it at the top, square corners and no shadows. In dark mode it&rsquo;s plain black. It also goes easier on the phone: price checks take longer breaks, and charts are plainer. A good pick for an older phone or tablet.</p>
             <p>Picking Simple turns the opening animation and the holiday themes off and Less motion on. Turn any back on in Animations or Accessibility. Going back to the default theme puts them back as they were.</p>
           </More>
         </span>

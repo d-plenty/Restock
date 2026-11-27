@@ -136,7 +136,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   const full = useFullRefresh();
   // 0.18.1: in parts with the Simple design (useChunks.tsx)
   const chunks = useChunks();
-  if (!recs || !categories || !entries) return <ScreenWaiting back={false} />;
+  if (!recs || !categories || !entries) return <ScreenWaiting back={false} name="Pantry" />;
 
   const onList = new Map(entries.filter((e) => !e.checked && e.groupId).map((e) => [e.groupId!, e.id]));
   // The same deals Home counts ("wait" isn't a deal yet).

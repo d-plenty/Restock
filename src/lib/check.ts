@@ -1,4 +1,7 @@
 import { isLite } from './simple';
+import { holdRecs } from './recs';
+import { busyWith } from './speedLog';
+import { latestSlot, planOf } from './checkSchedule';
 import { logProblem } from './diagnostics';
 import { isPressOnlyShop, kindOf, priceSource, sectionOn, tabsOf, type StoreChain } from '../shops';
 import { adapterFor } from '../stores';
@@ -101,15 +104,17 @@ export async function syncBackgroundSchedule(settings: Settings): Promise<{ due:
   // iPhone app: iOS doesn't let an app run at a set time. Prices are checked when Restock is opened, when
   // the last check is older than IOS_CHECK_EVERY_HOURS (and automatic checks aren't switched off).
   // 0.15.2: or a check was cut off less than a day ago: it carries on.
-  if (isIos()) return { due: iosCheckDue(settings) || (autoChecks(settings) && (await unfinishedCheck())) };
+  // 0.18.2: once per set time, as Android: a check started since the latest one (4:00 am, say) counts,
+  // finished or not, so opening Restock again the same day doesn't check again (what a cut-off check
+  // didn't get to is done in the background: ios/backgroundCheck.ts).
+  if (isIos()) return { due: iosCheckDue(settings, Date.now(), (await readProgress())?.started) };
   const r = await RestockNative.scheduleChecks({ enabled: settings.sync.backgroundActivity, intervalHours: settings.checkIntervalHours });
   // 0.9.11: and the price helper's half-hourly job (on only on a phone set up as one).
   await RestockNative.priceHelperSchedule?.().catch(quiet('price check'));
   return { due: !!r.due };
 }
 
-/** iPhone: how old the last check has to be before opening Restock checks again. */
-export const IOS_CHECK_EVERY_HOURS = 12;
+
 /** Automatic checks are on (not switched off, and not "only when I press Check now"). */
 export const autoChecks = (s: Pick<Settings, 'sync' | 'checkDays'>): boolean => s.sync.backgroundActivity && !(s.checkDays && !s.checkDays.length);
 
@@ -119,10 +124,21 @@ export async function unfinishedCheck(now = Date.now()): Promise<boolean> {
   return !!was && carryOn(was, now).started === was.started;
 }
 
-export function iosCheckDue(s: Pick<Settings, 'lastCheck' | 'sync' | 'checkDays'>, now = Date.now()): boolean {
+/**
+ * iPhone and iPad: is a check owed when Restock opens? 0.18.2: the same rule as Android's: once per set
+ * check time (4:00 am on the check days, unless changed). Owed when that time has passed and no check
+ * has started since: the last finished one (`lastCheck`, a Check now included) or one that was cut off
+ * part way (`started`). (It was: whenever the last finished check was 12 hours old, and every time a
+ * cut-off one was there to carry on, so a long check started again at nearly every open.)
+ */
+export function iosCheckDue(s: Pick<Settings, 'lastCheck' | 'sync' | 'checkDays' | 'checkTime' | 'checkIntervalHours' | 'checkWeekday'>, now = Date.now(), started?: string): boolean {
   if (!autoChecks(s)) return false;
-  const last = s.lastCheck ? Date.parse(s.lastCheck) : NaN;
-  return !Number.isFinite(last) || now - last >= IOS_CHECK_EVERY_HOURS * 3_600_000;
+  const slot = latestSlot(planOf(s), now);
+  if (slot === undefined) return false;
+  return ![s.lastCheck, started].some((t) => {
+    const at = t ? Date.parse(t) : NaN;
+    return Number.isFinite(at) && at >= slot && at <= now;
+  });
 }
 
 /**
@@ -162,6 +178,9 @@ export async function checkBySearch(
   const found = findings(() => ({ key: PROGRESS_KEY, value: finished ? null : progress }));
   onProgress?.(done, total);
   const timeUp = () => !!opts.stop?.() || (opts.until !== undefined && Date.now() >= opts.until);
+  // 0.18.2: the deals are worked out again every few seconds while it saves, not at every lot (recs.ts).
+  holdRecs(true);
+  busyWith('a price check', true);
   try {
     for (const p of todo) {
       // 0.15.2: time's up (in the background): what's done is saved, and the rest is checked next time.
@@ -201,6 +220,8 @@ export async function checkBySearch(
   } finally {
     // Cut off (an error, or iOS stopping it): what was found is saved with how far it got.
     await found.save();
+    holdRecs(false);
+    busyWith('a price check', false);
   }
   return { checked, updated, errors, complete: finished };
 }

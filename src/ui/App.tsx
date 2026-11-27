@@ -1,5 +1,6 @@
 import { loadTrip, reopensTrip } from '../lib/trip';
-import { afterScreens, screensReady } from '../lib/screensFirst';
+import { afterScreens, CHECK_AFTER_OPEN_MS, screensReady } from '../lib/screensFirst';
+import { watchBusy } from '../lib/speedLog';
 import { App as CapApp } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
@@ -470,6 +471,9 @@ function RestockApp() {
     const maybeCheck = async () => {
       // 0.18.1: the screens first, then the catch-up (on an older iPad it held every page up).
       await afterScreens();
+      // 0.18.2: on iPhone and iPad (where the check runs in the app itself) a few seconds more, so
+      // you can get going first.
+      if (isIos()) await new Promise((r) => setTimeout(r, CHECK_AFTER_OPEN_MS));
       let s = await getSettings();
       // 0.11.0: once, on the update from 0.10.x: automatic checks move to Wednesday and Saturday at
       // 4:00 am (settingsCheck.ts works it out; this saves it, so the phone's background job reads it).
@@ -508,6 +512,8 @@ function RestockApp() {
     // when Restock opens and each time it comes back to the screen.
     const phonesNow = () => void import('../lib/adminNotices').then((m) => m.checkPhoneChanges()).catch(() => undefined);
     void afterScreens().then(phonesNow);
+    // 0.18.2: Diagnostics → Speed notes the moments the screen was too busy to answer a tap.
+    watchBusy();
     // 0.15.2: the screens opened now and then are loaded quietly, so none opens on a blank page.
     void preloadScreens().finally(screensReady);
     // 0.16.0: this phone's name in the household follows the person's (after a restore, say).

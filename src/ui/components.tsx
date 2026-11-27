@@ -1,5 +1,6 @@
 import { useLatest } from './useLatest';
 import { isLite } from '../lib/simple';
+import { noteSpeed } from '../lib/speedLog';
 import { useNow } from './useNow';
 import { wasSince } from '../lib/wasSince';
 import { createContext, useContext, useEffect, useId, useRef, useState, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react';
@@ -353,12 +354,17 @@ export function TopBar({ title, right, back = true, tag }: { title: string; righ
  * 0.18.1: a screen whose things are still being read: its title and Back straight away, and a loading
  * bar if it takes more than a moment (before, an older iPad showed a black page until it was ready).
  */
-export function ScreenWaiting({ title, back = true }: { title?: string; back?: boolean }) {
+export function ScreenWaiting({ title, back = true, name }: { title?: string; back?: boolean; /** 0.18.2: what it's called in Diagnostics → Speed, with no title shown */ name?: string }) {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setSlow(true), 350);
-    return () => clearTimeout(t);
-  }, []);
+    // 0.18.2: how long it waited, for Diagnostics → Speed (lib/speedLog.ts).
+    const t0 = performance.now();
+    return () => {
+      clearTimeout(t);
+      noteSpeed('screen', performance.now() - t0, title || name || 'A page');
+    };
+  }, [title, name]);
   return (
     <div className="screen" aria-busy="true">
       {(title !== undefined || back) && <TopBar title={title ?? ''} back={back} />}

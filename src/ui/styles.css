@@ -8505,3 +8505,11 @@ textarea.input {
 .settings-split .row[aria-current='page'] .title {
   color: var(--green-ink);
 }
+/* 0.18.2: Diagnostics → Speed on this phone */
+.speed-notes {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

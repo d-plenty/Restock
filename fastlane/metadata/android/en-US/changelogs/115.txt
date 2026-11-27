@@ -1,0 +1,1 @@
+Faster on iPhone and iPad: pages show straight away with what was there last time, taps answer while prices are checked, and Restock checks prices once a day (from 4:00 am, as Android) instead of nearly every time it opens. Prices are read once and kept, on every phone. Diagnostics shows how quick Restock is on this phone.

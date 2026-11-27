@@ -1,4 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { clearSpeedNotes, speedNotes, speedWords } from '../../lib/speedLog';
+import { deviceWord } from '../../lib/platform';
 import { shareTextFile } from '../../lib/backup';
 
 import { captureWhile, clearProblems, problems, problemsText } from '../../lib/diagnostics';
@@ -95,6 +97,9 @@ export function DiagnosticsScreen() {
       <p className="sub">What went wrong lately, in plain words. It stays on your phone unless you copy or send it.</p>
 
       {isNative() && <BackgroundChecks />}
+
+      {/* 0.18.2: how quick Restock is on this phone (lib/speedLog.ts) */}
+      <SpeedNotes />
 
       {/* 0.10.3: any shop, picked or not, with a report to send. */}
       <ShopTest />
@@ -469,3 +474,51 @@ function QuietProblems() {
 let quietSnap: QuietError[] | undefined;
 onQuiet(() => (quietSnap = undefined));
 const quietErrorsSnapshot = () => (quietSnap ??= quietErrors());
+
+/** 0.18.2: Speed on this phone: the slow moments lately, with Copy (for a report). */
+function SpeedNotes() {
+  const nav = useNav();
+  const [notes, setNotes] = useState(speedNotes);
+  const copy = async () => {
+    const text = [`Restock ${__APP_VERSION__} speed notes`, ...notes.map((n) => `${new Date(n.at).toLocaleString('en-AU')}  ${speedWords(n)}`)].join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      nav.toast('Copied');
+    } catch {
+      await shareTextFile(`restock-speed-${today()}.txt`, text, 'text/plain');
+    }
+  };
+  return (
+    <>
+      <div className="eyebrow">Speed on this {deviceWord()}</div>
+      <div className="card" style={{ gap: 8 }}>
+        {notes.length === 0 ? (
+          <span className="small">Nothing slow lately. Screens that take more than a moment to show, and times it was too busy to answer a tap, are listed here.</span>
+        ) : (
+          <ul className="small speed-notes">
+            {notes.slice(0, 20).map((n) => (
+              <li key={`${n.at}-${n.what}-${n.ms}`}>
+                <span className="num">{new Date(n.at).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }).toLowerCase()}</span> {speedWords(n)}
+              </li>
+            ))}
+          </ul>
+        )}
+        <span className="row-btns" style={{ display: 'flex', gap: 8 }}>
+          <button className="btn small" disabled={!notes.length} onClick={() => void copy()}>
+            Copy
+          </button>
+          <button
+            className="btn small"
+            disabled={!notes.length}
+            onClick={() => {
+              clearSpeedNotes();
+              setNotes([]);
+            }}
+          >
+            Clear
+          </button>
+        </span>
+      </div>
+    </>
+  );
+}

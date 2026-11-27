@@ -31,6 +31,10 @@ export const screensReading = (): number => reading;
  */
 export async function screensFirst(restMs = 0, maxMs = 1500): Promise<void> {
   await new Promise((r) => setTimeout(r, restMs));
+  // 0.18.2: and while you're touching the screen (scrolling, tapping), background work waits for a
+  // quiet moment (up to TOUCH_HOLD_MS at a time), so what you tap answers straight away.
+  const holdUntil = Date.now() + TOUCH_HOLD_MS;
+  while (Date.now() - lastTouch < TOUCH_QUIET_MS && Date.now() < holdUntil) await new Promise((r) => setTimeout(r, 150));
   if (reading === 0) return;
   await new Promise<void>((resolve) => {
     const t = setTimeout(() => {
@@ -56,3 +60,15 @@ export async function afterScreens(maxMs = 8000): Promise<void> {
   await Promise.race([settledOnce, new Promise((r) => setTimeout(r, maxMs))]);
   await screensFirst(0);
 }
+
+// ---------- 0.18.2: touches ----------
+let lastTouch = 0;
+/** Background work waits until the screen hasn't been touched for this long. */
+const TOUCH_QUIET_MS = 1200;
+/** …but no longer than this each time, so it always carries on. */
+const TOUCH_HOLD_MS = 10_000;
+if (typeof window !== 'undefined')
+  for (const ev of ['pointerdown', 'touchstart', 'wheel', 'keydown'] as const) window.addEventListener?.(ev, () => (lastTouch = Date.now()), { passive: true, capture: true });
+
+/** 0.18.2: on iPhone and iPad, the price check that's owed starts this long after Restock opens. */
+export const CHECK_AFTER_OPEN_MS = 6000;

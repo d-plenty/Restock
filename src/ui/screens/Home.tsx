@@ -68,7 +68,7 @@ export function HomeScreen() {
     const [r, s, e] = await Promise.all([loadRecommendations(), getSettings(), allListEntries()]);
     return ownCounts(r, yourShops(s), e);
   }, []);
-  if (!allRecs || !settings || !allEntries) return <ScreenWaiting back={false} />;
+  if (!allRecs || !settings || !allEntries) return <ScreenWaiting back={false} name="Home" />;
   const { on, recs, totals, openLines, worth, saving } = weekDeals(allRecs, settings, allEntries);
   const shops = yourShops(settings);
   // Only warn about shops you still use, on a tab that's switched on.

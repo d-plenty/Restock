@@ -6,6 +6,19 @@ import type { VersionNotes } from './whatsNew';
 
 export const EARLIER: VersionNotes[] = [
   {
+    version: '0.18.1',
+    about: 'Pages load first on older iPads, a new Simple design, your own colours, and safer admin changes.',
+    changes: [
+      'On an older iPad or iPhone, pages open first and the syncing and price checks wait their turn. No more black screens while a page loads.',
+      'Simple design (Look and colours → Style): white, one colour, square and flat, and lighter work for older phones. It replaces Plain.',
+      'Restock’s own colour wheel everywhere, a theme colour for the bars and tops, and Android widgets in your colours.',
+      'Animations: the opening, the holidays and every animation to play, on one page.',
+      'Admins: Are you sure? before adding, removing or changing a phone, a notification when the server’s phones change, and a warning before the last admin phone steps down or leaves.',
+      'Share my spending, receipts and loyalty cards ask before turning off, with the details behind ⓘ.',
+      'An iPad held sideways shows Settings side by side, and What’s planned says what’s next: the App Store and Google Play, F-Droid, iPhone widgets and Running low.',
+    ],
+  },
+  {
     version: '0.18.0',
     about: 'Add phones and tablets from an admin phone, each holiday on or off, plain colours, and lots of fixes.',
     changes: [

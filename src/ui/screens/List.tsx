@@ -341,7 +341,7 @@ export function ListScreen() {
   }, selecting);
   // 0.18.1: in parts with the Simple design (useChunks.tsx)
   const chunks = useChunks();
-  if (!allEntries || !allRecs || !allCats || !settings || !sums) return <ScreenWaiting back={false} />;
+  if (!allEntries || !allRecs || !allCats || !settings || !sums) return <ScreenWaiting back={false} name="The list" />;
   const { sectionsOn, section, groupSection, entries, recs, shops, totals, names, c, stockItems } = sums;
   const categories = allCats.filter((x) => x.section === section);
   const openCount = (sec: ListSection) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;

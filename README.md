@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.18.1" src="https://img.shields.io/badge/status-release%20candidate%200.18.1-ffcd00">
+  <img alt="Release candidate 0.18.2" src="https://img.shields.io/badge/status-release%20candidate%200.18.2-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0181">New in 0.18.1</a> ·
+  <a href="#new-in-0182">New in 0.18.2</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#iphone-and-ipad">On iPhone</a> ·
@@ -143,6 +143,18 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 ## iPhone and iPad
 
 Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Prices are checked in the background too: a little at a time, and a longer check from your set time while the iPhone is charging and on Wi-Fi (iOS picks the exact moment). One thing isn't possible because of Apple's restrictions: the app updating itself. Still to come there: the App Store, and home screen widgets. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.18.2
+
+Faster on iPhone and iPad: pages straight away, taps that answer, and one price check a day.
+
+- **Pages straight away.** Home, the Pantry and the list show what was there last time the moment Restock opens, then update by themselves once today's deals are worked out. No loading bar on them.
+- **Taps answer while prices are checked.** What you tap goes ahead of the price check's saves, and on iPhone and iPad the check waits while you're scrolling or tapping, and starts a few seconds after Restock opens.
+- **One price check a day on iPhone and iPad**, from your set time (4:00 am unless changed), as Android does. A check that has started since then counts, so opening Restock again the same day doesn't check again; what a cut-off check didn't get to is done in the background.
+- **Price history is read once and kept.** Every screen read every product's history again at every change, even a tick on the list. Now it's read once, and only the products a price check updated are read again. On Android too.
+- **Long lists come in parts** as you scroll, in both designs.
+- **Diagnostics → Speed on this phone** lists anything slow: a screen that took a while to show, or a moment the app was too busy to answer a tap (and whether a price check or a sync was running). Copy it into a report.
+- Tested with 400 products and a price check running on a simulated slow iPad: tabs opened in 0.1–0.6 s (they took 1–2.5 s in 0.18.1), the longest freeze dropped from about 2.5 s to under 0.75 s, and the check got through three times as many products in the same time.
 
 ## New in 0.18.1
 

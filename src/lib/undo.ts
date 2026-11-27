@@ -55,7 +55,6 @@ const MERGE_MS = 6000;
 let steps: Held[] = [];
 let nextId = 1;
 const listeners = new Set<(e: UndoEvent) => void>();
-let queue: Promise<unknown> = Promise.resolve();
 
 export function onUndo(fn: (e: UndoEvent) => void): () => void {
   listeners.add(fn);
@@ -204,11 +203,29 @@ function contextFor(c: Capture): ActContext {
   return ctx;
 }
 
-/** Runs `fn` next in the one queue every action, undo and background write goes through. */
-function enqueue<T>(fn: () => Promise<T>): Promise<T> {
-  const run = queue.then(fn);
-  queue = run.catch(() => undefined);
-  return run;
+/**
+ * Runs `fn` in the one queue every action, undo and background write goes through, one at a time.
+ * 0.18.2: what someone tapped goes before background writes still waiting (a price check's saves):
+ * a tap waited behind every one of them.
+ */
+const taps: (() => Promise<void>)[] = [];
+const later: (() => Promise<void>)[] = [];
+let pumping = false;
+function enqueue<T>(fn: () => Promise<T>, bg = false): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    (bg ? later : taps).push(() => Promise.resolve().then(fn).then(resolve, reject));
+    // Started a moment later, as before (never inside the caller's own step).
+    void Promise.resolve().then(pump);
+  });
+}
+async function pump(): Promise<void> {
+  if (pumping) return;
+  pumping = true;
+  try {
+    for (let job = taps.shift() ?? later.shift(); job; job = taps.shift() ?? later.shift()) await job();
+  } finally {
+    pumping = false;
+  }
 }
 
 /**
@@ -219,7 +236,7 @@ function enqueue<T>(fn: () => Promise<T>): Promise<T> {
  * action (it would wait for that action, which waits for it).
  */
 export function background<T>(fn: () => Promise<T>): Promise<T> {
-  return enqueue(fn);
+  return enqueue(fn, true);
 }
 
 /**

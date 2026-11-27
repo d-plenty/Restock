@@ -5,6 +5,7 @@
 //
 // An iPhone only syncs while Restock is open: when it opens or comes back, every minute after that,
 // and a few seconds after something changes (lib/sync.ts wires those, as on Android).
+import { busyWith } from '../lib/speedLog';
 import { screensFirst } from '../lib/screensFirst';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { strToU8 } from 'fflate';
@@ -329,6 +330,7 @@ export function syncNow(): Promise<SyncNowResult> {
   running = (async (): Promise<SyncNowResult> => {
     // 0.18.1: a screen being opened reads first (lib/screensFirst.ts).
     await screensFirst();
+    busyWith('a sync', true);
     const { house, folder, wifi, saved } = (await hub());
     let received = 0;
     let viaServer = false;
@@ -378,7 +380,10 @@ export function syncNow(): Promise<SyncNowResult> {
     if (received > 0) events.changed();
     events.done(i);
     return { ...i, reached, received, sent, wifi: overWifi, viaServer, viaFolder, names };
-  })().finally(() => (running = undefined));
+  })().finally(() => {
+    running = undefined;
+    busyWith('a sync', false);
+  });
   return running;
 }
 

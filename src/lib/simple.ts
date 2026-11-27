@@ -1,8 +1,8 @@
 // 0.18.1: the Simple design (Settings → Look and colours → Style). It replaced Plain. Picking it
 // turns the opening animation and the holiday themes off and Less motion on, and remembers what they
 // were, so going back to the default theme puts them back. It also goes easier on the phone
-// (`isLite`): long lists come in parts, price checks on the iPhone and iPad take longer breaks,
-// and charts are drawn plainer.
+// (`isLite`): price checks on the iPhone and iPad take longer breaks, and charts are drawn
+// plainer (0.18.2: long lists come in parts in both designs now).
 import type { Settings } from '../types';
 
 type S = Pick<Settings, 'look' | 'a11y'>;
