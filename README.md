@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.18.2" src="https://img.shields.io/badge/status-release%20candidate%200.18.2-ffcd00">
+  <img alt="Release candidate 0.18.3" src="https://img.shields.io/badge/status-release%20candidate%200.18.3-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0182">New in 0.18.2</a> ·
+  <a href="#new-in-0183">New in 0.18.3</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#iphone-and-ipad">On iPhone</a> ·
@@ -48,9 +48,9 @@ The phone pictures are real screenshots from a phone running Restock (shop branc
 
 | | |
 |:---:|:---:|
-| ![The server's web page on a computer: Pantry](docs/screenshots/web-pantry-0111.png) | ![The server's Your data page: spending each month, from what you ticked off](docs/screenshots/web-data-0111.png) |
+| ![The server's web page: Phones and admins](docs/screenshots/web-phones-0183.png) | ![The server's web page: Data](docs/screenshots/web-data-0183.png) |
 
-The two web pictures use sample data: real products and prices, with a made-up year of price history and spending.
+The two web pictures use sample data.
 
 > **Local first. Works without signal.** Your list, pantry and prices live on your phone, not in a cloud. In a shopping centre with no reception, your list still opens straight away, and you can tick things off, add items from your pantry or type new ones. It all syncs when you're back online. Only searching the shops for new products and live prices needs the internet. **A server is optional:** Restock works fully on its own, and your own Restock server adds things on top.
 
@@ -80,7 +80,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Scan to add.** An open-source barcode scanner built in, with Open Food Facts lookup. A shop that lists that barcode has it ticked; at the others you tick what you buy.
 - **Undo.** After most changes (Add to list, a tick, a delete, an edit, "Add all to my list"), a small **Undo** shows for a few seconds. One tap puts it all back, however many things changed.
 - **Save settings.** Settings changes wait for a big green **Save settings** button, so you know when they're saved. Leaving with unsaved changes asks first.
-- **Your own Restock server** (optional). Run [Restock server](https://github.com/d-plenty/restock-server) on a NAS, mini PC or Raspberry Pi, or as an app in Home Assistant. **Your server is the house:** you name it, add phones from its web page, and each phone chooses what it shares. It syncs around the clock, runs your Home Assistant shopping list, shows your spending and price charts in its **Data** tab, and gives you Restock on your computer and [on iPhone](#restock-on-iphone). See [Your own Restock server](#your-own-restock-server).
+- **Your own Restock server** (optional). Run [Restock server](https://github.com/d-plenty/restock-server) on a NAS, mini PC or Raspberry Pi, or as an app in Home Assistant. **Your server is the house:** you name it, add phones with a code, and each phone chooses what it shares. It syncs around the clock, at home and away, runs your Home Assistant shopping list, and keeps your history. Its web page, and Server admin on an admin phone, look after the phones, the data and the server's settings. See [Your own Restock server](#your-own-restock-server).
 - **Other sizes of this.** Tick a product and Restock shows the same thing in other packs (375 mL cans × 10, × 24, × 30), compared per litre or per 100 g, so a 10-pack on special doesn't slip past your usual 30-pack.
 - **Sync with your household, no server needed.** Up to 6 phones in the same house share one pantry and shopping list, straight from one phone to another on your Wi-Fi. Away from home, phones can also sync through Nextcloud, another WebDAV server or a Syncthing folder, sealed so only your phones can read it. You pick what's shared: groceries, Keg and Health, each on or off.
 - **Your specials at each shop.** A button on Home for every shop you use, saying how many of your things are on special there. It opens just the things you buy that are on special at that shop (from your pantry and your shopping list), and nothing you don't. The shop's whole catalogue is one tap away, on its own site.
@@ -143,6 +143,20 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 ## iPhone and iPad
 
 Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Prices are checked in the background too: a little at a time, and a longer check from your set time while the iPhone is charging and on Wi-Fi (iOS picks the exact moment). One thing isn't possible because of Apple's restrictions: the app updating itself. Still to come there: the App Store, and home screen widgets. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.18.3
+
+Look after your server from a phone, a stripped-back server page with a yes on your phone to sign in, home and away addresses that just work, and a new first screen.
+
+- **Server admin on an admin phone** (Settings → Sync → Restock server): the phones and tablets, adding one with a code, Sign in a computer, Data and how long it's kept, Activity, and Server settings: the household, the addresses, signing in, Home Assistant and updates.
+- **"Is this you?"** Signing in to the server's page with the passphrase, and each risky change there, needs a yes on an admin phone too, like two-factor: both show the same two-digit number. Open Restock on the phone and it asks. Every admin phone lost: the recovery key instead.
+- **The server's page, stripped back** to Phones and admins, Data and Server settings, a page each in the sidebar. It's about 1.7 MB instead of 40, and keeps nothing of the household in the browser.
+- **Cloudflare tunnels work.** Codes made through a tunnel had an `http://` away address, which phones turn down ("Restock only uses http:// for a server at home…"). Away addresses are https now, and a server puts its saved one right by itself.
+- **Home first, then away.** A phone gives up on the home address after a moment (it was 15 seconds) and tries away, and back at home goes home again. No location or Wi-Fi permission.
+- **A new first screen:** Set up, Join a home server, or Import from backup (a file, or straight from another phone). Joining a server from the first screen works now, and lands on Home.
+- **Used and expired codes** say which. Codes survive the server restarting.
+- **Connections in an export:** tick it (in a file locked with a password, or one sent straight across) and Home Assistant comes along with its token, and from an admin phone a code for the new phone to join the server as a phone of its own.
+- **The last admin phone** can't be removed or made a user.
 
 ## New in 0.18.2
 
@@ -908,7 +922,7 @@ Android 8.0 or newer, including de-Googled phones. Pick one:
 - **Download the APK:** **[restock.apk](https://github.com/d-plenty/Restock/releases/latest/download/restock.apk)** is always the newest version, or pick one from **[Releases](../../releases)**. Open it on your phone and allow the install. Restock can then update itself: **Settings → About and updates → Check for updates** (or turn on *Tell me when there's an update*).
 - **F-Droid (Restock's own repo):** open **[d-plenty.github.io/Restock](https://d-plenty.github.io/Restock/)** on your phone and tap *Add to F-Droid*, or scan its QR code in F-Droid → Settings → Repositories. Then install Restock from F-Droid and it keeps it up to date. Works with F-Droid, Droid-ify and Neo Store. Restock isn't in the main F-Droid repository yet.
 - **Obtainium:** tap the Obtainium badge at the top on your phone, or add `https://github.com/d-plenty/Restock` in [Obtainium](https://github.com/ImranR98/Obtainium).
-- **iPhone and iPad:** the app is installed from a computer for now. See [iPhone and iPad](#iphone-and-ipad). With your own Restock server you can also use its web page from the home screen: see [Restock on iPhone](#restock-on-iphone).
+- **iPhone and iPad:** the app is installed from a computer for now. See [iPhone and iPad](#iphone-and-ipad). 
 
 All three Android ways are the same APK, signed with the same key, so you can switch between them and updates install over the top. Nothing is lost.
 
@@ -930,41 +944,18 @@ All three Android ways are the same APK, signed with the same key, so you can sw
 
 [Restock server](https://github.com/d-plenty/restock-server) is optional. It's a small server you run at home: on a NAS (TrueNAS, Synology, QNAP, Unraid), a Raspberry Pi 4 or 5, a mini PC, or as an app in Home Assistant. One `docker run` command, or a Compose file for Dockge, Portainer and TrueNAS. Then:
 
-- **It's the house.** You name it on its web page and add each phone with a one-time code. Each phone chooses what it shares: groceries always; Keg, Health, receipts and loyalty cards only if you turn them on. Gift cards never leave the phone.
+- **It's the house.** You name it on its web page and add each phone with a one-time code (from the web page, or from an admin phone). Each phone chooses what it shares: groceries always; Keg, Health, receipts and loyalty cards only if you turn them on. Gift cards never leave the phone.
 - **It syncs around the clock,** at home and away, and keeps your household's history.
 - **It runs your Home Assistant shopping list** for everyone, even with every phone closed.
-- **Restock on your computer:** the Shopping list, pantry, specials and catalogues, laid out for a big screen.
-- **Data:** spending each month and where you shop (from what you tick off, not receipts), price over time for each item, and what you buy most. Download it all as a spreadsheet (.xlsx), CSV files or a full export file. **Manage data** shows what's on the server and lets you delete older data, with two checks first. **Auto delete** is off unless you turn it on.
-- **Let the web page search the shops** (off unless you turn it on): add things from the web page that aren't in your pantry yet. The server searches the shops only when someone presses Search. Some shops may block a server; then search on a phone.
-- **Restock on iPhone,** from the server's https address. See [Restock on iPhone](#restock-on-iphone).
+- **Its web page looks after the server** (0.18.3): Phones and admins, Data (how much of each kind, export, import, backups, how long it's kept, delete), and Server settings: the household, the addresses at home and away, signing in, Home Assistant, updates and moving. Signing in with the passphrase, and each risky change, needs a yes on an admin phone too, like two-factor. The shopping list, pantry and shops are on the phones.
+- **Server admin on an admin phone** (Settings → Sync → Restock server) does most of the same from the phone.
+- **Your spending and price charts** are in Your data on each phone.
 
 The server can read what your phones share with it, so it can do all this. It's your server, so keep its data folder and backups private. Traffic between phones and the server is encrypted, even on plain http at home. The [server's README](https://github.com/d-plenty/restock-server) has the install steps for each machine.
 
 ## Restock on iPhone
 
-There's an iPhone and iPad app ([iPhone and iPad](#iphone-and-ipad)). Without it, with your own Restock server you can put the server's web page on your iPhone's home screen. It opens like an app, and your Shopping list works with no signal.
-
-**It needs the server's https address.** iPhones only keep a web app for offline use, and only let it use the camera, on https. A Cloudflare tunnel or Tailscale's https (`tailscale serve`) both work. See [at home and away](https://github.com/d-plenty/restock-server#at-home-and-away) in the server's README.
-
-1. Open the server's https address in Safari.
-2. Tap Share, then **Add to Home Screen**.
-3. Tap **Add**. Open Restock from your home screen and sign in.
-4. Tick **Keep me signed in**, so it still opens when you're offline.
-
-The steps are also on the server's sign-in page, under **On iPhone?**. On Android, open the https address in Chrome and tap the menu, then **Add to Home screen** (or **Install app**).
-
-**With no signal:**
-
-- Your Shopping list opens, and you can tick things off, add and remove them.
-- Scanning a barcode adds things you already have in your pantry.
-- Your changes go to the server when you're back online. The list shows when it was last updated.
-- Prices, specials and settings need the server.
-
-**Good to know:**
-
-- **Open it once with a connection** after you sign in (with **Keep me signed in** ticked), so it can keep a copy for offline. Offline, it opens what this phone last saved: the Pantry, Keg and Health tabs, all four lists (tick, add, edit, Move to and Undo), your cards with their barcodes, and specials, catalogues and price history as last saved. Changes sync when you're back online. Searching the shops, the Data tab (and Import), Server and phones, and Activity need signal.
-- **Sign out** takes the saved copy off that iPhone. If the iPhone runs low on space, iOS can clear what Restock saved: it loads again next time you're online, but changes not sent yet are lost. A sign-in made by scanning with a phone isn't kept for offline: sign in with your passphrase.
-- **No background price checks, alerts or widgets** on iPhone, and no Wi-Fi sync between phones. Those need a real iPhone app: see [Wanted](#wanted-someone-to-bring-restock-to-iphone).
+There's an iPhone and iPad app: see [iPhone and iPad](#iphone-and-ipad). Since 0.18.3 a Restock server's web page looks after the server only (its phones, data and settings), so it's no longer a way to shop on an iPhone. The first time it opens in a browser, it deletes the copy of the household the earlier page kept there.
 
 ## Home Assistant
 
@@ -982,7 +973,7 @@ Good to know:
 - **With a Restock server,** Home Assistant is set up on the server's web page instead, and runs around the clock for everyone on the server. Phones on a server don't run their own.
 - **If Home Assistant's list comes back empty** (while Home Assistant is starting up, say), Restock changes nothing and looks again. Only if it's still empty a couple of minutes later does it take those lines off your Restock list too.
 - **Needs Home Assistant 2024.8 or newer**, with a to-do list such as the Shopping list integration. The Shopping list and General sync, plus any line that came from Home Assistant wherever it went.
-- **Private:** without a server, the phone talks straight to your Home Assistant. Only the list's lines and ticks go there. The token stays on that phone, sealed, and is never shown again, synced or put in a backup. Plain `http://` only works for a Home Assistant at home or on Tailscale; anywhere else use `https://`.
+- **Private:** without a server, the phone talks straight to your Home Assistant. Only the list's lines and ticks go there. The token stays on that phone, sealed, and is never shown again or synced. It only goes in a backup with **Connections** ticked, in a file locked with a password or one sent straight to another phone. Plain `http://` only works for a Home Assistant at home or on Tailscale; anywhere else use `https://`.
 
 ## Questions
 
@@ -1088,7 +1079,7 @@ Please don't post anything private (card numbers, PINs, backup files, export fil
 
 0.15.1 update: there is an iPhone and iPad app now ([iPhone and iPad](#iphone-and-ipad)), installed from a computer, and its App Store version is built with every release ([docs/STORES.md](docs/STORES.md)). What's still wanted is help with the App Store side. The rest of this section is from before the app.
 
-Restock already works on iPhone through your own server ([Restock on iPhone](#restock-on-iphone)). A real iPhone app would add what a web app can't do: background price checks, alerts, widgets and Wi-Fi sync between phones, with no server needed. I'm looking for a developer who knows their way around the Apple side and is willing to build it and put it on the App Store.
+Restock works on iPhone and iPad already, installed from a computer ([iPhone and iPad](#iphone-and-ipad)). A real iPhone app would add what a web app can't do: background price checks, alerts, widgets and Wi-Fi sync between phones, with no server needed. I'm looking for a developer who knows their way around the Apple side and is willing to build it and put it on the App Store.
 
 Why I'm asking: publishing on the App Store means paying Apple every year for a developer account, and beta testing means getting everyone onto TestFlight. As one person doing this for free, I'm not keen to take that on myself. If you already have an Apple developer account (or are happy to), this could be a good fit.
 
@@ -1133,7 +1124,7 @@ Tell Restock roughly how much of something you've got (a full bottle, two left, 
 It's here now: **Settings → Your data** on the phone (and the server's **Data** tab) shows what you spent each month, where you shop and what you saved on specials, from what you tick off. With a Restock server, phones share their spending with it unless you turn that off, so every phone shows the household's figures. Still to come, when reading receipts is better: a switch to use your receipts for spending instead. Full budgeting is planned as a separate app, so this stays light.
 
 ### An iPhone app
-Restock works on iPhone now, through your server ([Restock on iPhone](#restock-on-iphone)). A real iPhone app, with background checks, alerts, widgets and Wi-Fi sync, needs a developer with an Apple developer account: see [Wanted: someone to bring Restock to iPhone](#wanted-someone-to-bring-restock-to-iphone).
+Restock works on iPhone and iPad now, installed from a computer ([iPhone and iPad](#iphone-and-ipad)). A real iPhone app, with background checks, alerts, widgets and Wi-Fi sync, needs a developer with an Apple developer account: see [Wanted: someone to bring Restock to iPhone](#wanted-someone-to-bring-restock-to-iphone).
 
 ### Shared prices
 It's here now. Every price Restock sees can help everyone else: with **Shared prices** on (the default), a new item arrives with months of history, so you know straight away whether its "special" is real, and your phone shares the shelf prices it reads in return.

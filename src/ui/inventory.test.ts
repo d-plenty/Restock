@@ -270,11 +270,13 @@ describe('0.13.1 inventory: on the screen', () => {
     expect(read('./screens/Settings.tsx')).toMatch(/row\('Inventory', inventorySummary\(inv\), \(\) => nav\.push\(\{ name: 'inventorySettings' \}\)/);
   });
   it('the web page has the same Settings row (0.15.0: and the phone screens themselves)', () => {
-    expect(read('../server-mode/ui/DeskSettings.tsx')).toContain('<InventoryLine />');
   });
   it("the welcome's Restore is a file box you tap, not a hidden one pressed from code", () => {
+    // 0.18.3: Import from backup on the welcome opens the Import sheet, whose From a file is the file box itself.
     const setup = read('./screens/Setup.tsx');
-    expect(setup).toMatch(/<label className="welcome-restore welcome-file">\s*Restore from a backup\s*<input\s+type="file"/);
-    expect(setup).not.toContain('fileRef');
+    expect(setup).toContain('Import from backup');
+    const restore = read('./screens/Restore.tsx');
+    expect(restore).toMatch(/<label className="sync-choice welcome-file"[\s\S]{0,400}<input\s+type="file"/);
+    expect(restore).not.toContain('fileRef');
   });
 });

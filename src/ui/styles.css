@@ -3623,6 +3623,11 @@ select {
 #layers > * {
   pointer-events: auto;
 }
+/* 0.18.3: the first screen sits above the app (z-index 50): a sheet opened on it (Import from
+   backup, a restore, joining with a phone's code) is drawn above it, not hidden behind. */
+:root.on-welcome #layers {
+  z-index: 60;
+}
 #layers > .sr-only {
   pointer-events: none;
 }
@@ -8512,4 +8517,22 @@ textarea.input {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* 0.18.3: "Is this you?" (ApprovalSheet.tsx): the two digits the browser shows. */
+.approve-digits {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+.approve-digits span {
+  width: 56px;
+  height: 68px;
+  border-radius: var(--r-md);
+  background: var(--brand-navy);
+  color: var(--brand-gold);
+  font-size: var(--fs-display);
+  font-weight: 800;
+  display: grid;
+  place-items: center;
 }

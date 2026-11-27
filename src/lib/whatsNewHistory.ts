@@ -6,6 +6,18 @@ import type { VersionNotes } from './whatsNew';
 
 export const EARLIER: VersionNotes[] = [
   {
+    version: '0.18.2',
+    about: 'Faster on iPhone and iPad: pages straight away, taps that answer, and one price check a day.',
+    changes: [
+      'Home, the Pantry and the list show straight away when Restock opens, with what was there last time, then update by themselves.',
+      'Taps answer while prices are being checked: what you tap goes first, and the check waits while you’re using the screen.',
+      'iPhone and iPad check prices once a day, from your set time (4:00 am unless changed), as Android does. Opening Restock again the same day doesn’t check again.',
+      'Price history is read once and kept, so screens don’t read it all again at every change (on Android too).',
+      'Long lists come in parts as you scroll, in both designs.',
+      'Diagnostics → Speed on this phone shows anything slow, to copy into a report.',
+    ],
+  },
+  {
     version: '0.18.1',
     about: 'Pages load first on older iPads, a new Simple design, your own colours, and safer admin changes.',
     changes: [

@@ -7,7 +7,7 @@
 // computer". Signed in with a phone: the keys come from the phone and stay for this tab only.
 // 0.15.0: the 0.9.3 household's vault, passphrase and link sign-in are gone.
 
-import { api3, ApiError, setV3Auth, type Confirm, type SessionGift } from './api';
+import { api3, ApiError, setV3Auth, type ApproveView, type Confirm, type SessionGift } from './api';
 import { b64u, derivePassphrase, loginKeyOf, loginProof, newEcdhKey, openRsf1, random, sessionKeyOf, unb64 } from './crypto';
 
 export interface Session {
@@ -106,7 +106,20 @@ function houseSession(user: string, sid: string, key: Uint8Array, gift: SessionG
  * key), prove the passphrase with loginKey over `c` and a one-off ECDH key, and work out the same
  * session key the server does. `step` says what's happening (the passphrase takes a few seconds).
  */
-export async function loginV3(user: string, passphrase: string, keep = false, step?: (what: string) => void): Promise<Session> {
+/**
+ * 0.18.3: a sign-in waiting for a yes on an admin phone. `wait` asks every 2 seconds until the phone
+ * says yes (the session, with the household's keys), no, or the request runs out (each throws in words).
+ * `recovery` says yes with the recovery key instead.
+ */
+export interface PendingLogin {
+  approve: ApproveView;
+  wait: (stop: () => boolean) => Promise<Session | undefined>;
+  recovery: (key: string) => Promise<void>;
+  cancel: () => Promise<void>;
+}
+export const isPending = (x: Session | PendingLogin): x is PendingLogin => 'approve' in x && 'wait' in x;
+
+export async function loginV3(user: string, passphrase: string, keep = false, step?: (what: string) => void): Promise<Session | PendingLogin> {
   const u = user.trim();
   const ch = await api3.challenge(u);
   if (ch.setup) throw new ApiError(409, 'setup', "This server's passphrase isn't set yet. Open the server's setup page first.");
@@ -119,16 +132,54 @@ export async function loginV3(user: string, passphrase: string, keep = false, st
   const epub = b64u(e.pub);
   const r = await api3.login({ user: u, c: ch.c, epub, proof: loginProof(loginKey, ch.c, epub) });
   const sessionKey = sessionKeyOf(e.priv, unb64(ch.kex), unb64(ch.c), loginKey);
-  let gift: SessionGift;
-  try {
-    gift = openRsf1<SessionGift>(sessionKey, unb64(r.sealed));
-  } catch {
-    // The server worked out another key: not the server this page came from, or a changed answer.
-    throw new ApiError(0, 'sealed', "The server's answer didn't open. Check the address, and sign in again.");
-  }
-  const s = houseSession(u, r.session, sessionKey, { expires: r.expires, ...gift }, { keep });
-  remember(s);
-  return s;
+  const open = (sealed: string) => {
+    try {
+      return openRsf1<SessionGift>(sessionKey, unb64(sealed));
+    } catch {
+      // The server worked out another key: not the server this page came from, or a changed answer.
+      throw new ApiError(0, 'sealed', "The server's answer didn't open. Check the address, and sign in again.");
+    }
+  };
+  const done = (gift: SessionGift) => {
+    const s = houseSession(u, r.session, sessionKey, { expires: r.expires, ...gift }, { keep });
+    remember(s);
+    return s;
+  };
+  if (!r.approve || r.sealed) return done(open(r.sealed ?? ''));
+  // 0.18.3: then a yes on an admin phone. Until then this session only asks how that's going.
+  setV3Auth({ session: r.session, key: sessionKey });
+  const id = r.approve.id;
+  return {
+    approve: r.approve,
+    wait: async (stop) => {
+      while (!stop()) {
+        let a: ApproveView & { sealed?: string };
+        try {
+          a = await api3.approveStatus(id);
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 0) {
+            await new Promise((res) => setTimeout(res, 3000));
+            continue;
+          }
+          setV3Auth(undefined);
+          if (err instanceof ApiError && err.status === 401) throw new Error('An admin phone said no, or the sign-in ran out. Sign in again if that was you.');
+          throw err;
+        }
+        if (a.status === 'yes' && a.sealed) return done(open(a.sealed));
+        if (a.status === 'no') throw new Error('An admin phone said no. Sign in again if that was you.');
+        if (a.status === 'expired') throw new Error('No admin phone said yes in time. Sign in again.');
+        await new Promise((res) => setTimeout(res, 2000));
+      }
+      return undefined;
+    },
+    recovery: async (key) => {
+      await api3.approveByRecovery(id, key);
+    },
+    cancel: async () => {
+      await api3.approveCancel(id).catch(() => undefined);
+      setV3Auth(undefined);
+    },
+  };
 }
 
 /** Sign in with a phone (v3): the code carries a one-off key; the phone approves; the server gives the keys. */
@@ -208,7 +259,7 @@ export async function changeHousePassphrase(currentPass: string, next: string): 
   try {
     await api3.passphrase({ c: ch.c, proof, salt: b64u(salt), auth: b64u(fresh.auth) });
   } catch (e) {
-    if (e instanceof ApiError && (e.code === 'current' || e.status === 403)) throw new Error("That isn't the current passphrase.");
+    if (e instanceof ApiError && e.code === 'current') throw new Error("That isn't the current passphrase.");
     throw e;
   }
 }

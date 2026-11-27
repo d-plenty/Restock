@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { clearSpeedNotes, speedNotes, speedWords } from '../../lib/speedLog';
-import { deviceWord } from '../../lib/platform';
+import { deviceWord, isIos } from '../../lib/platform';
 import { shareTextFile } from '../../lib/backup';
 
 import { captureWhile, clearProblems, problems, problemsText } from '../../lib/diagnostics';
@@ -394,18 +394,32 @@ function BackgroundChecks() {
                 No scheduled checks noted yet (they're noted from 0.10.2).
               </p>
             )}
-            <p className="small" style={{ margin: 0 }}>A check that never started was held back by Android.{' '}<More title="Why a check didn't run"><p>A check that never started was held back by Android, or was waiting for a connection or more battery (it needs both). One that
+            {/* 0.18.3: on iPhone and iPad it isn't Android: the check runs when Restock opens (iOS only lets it run in the background now and then). */}
+            {isIos() ? (
+              <p className="small" style={{ margin: 0 }}>
+                A check that never started was waiting for Restock to be opened.{' '}
+                <More title="Why a check didn't run">
+                  <p>
+                    On {deviceWord() === 'iPad' ? 'an iPad' : 'an iPhone'}, the day's check runs when Restock is opened after the set time. iOS only lets it run in the background now and then, when it chooses. One that stopped part way was closed, or
+                    lost its connection, before it finished; it carries on next time.
+                  </p>
+                </More>
+              </p>
+            ) : (
+              <p className="small" style={{ margin: 0 }}>A check that never started was held back by Android.{' '}<More title="Why a check didn't run"><p>A check that never started was held back by Android, or was waiting for a connection or more battery (it needs both). One that
               stopped part way ran out of the time Android gives it.</p></More></p>
+            )}
           </>
         )}
-        <p className="small" style={{ margin: 0, fontWeight: 600, color: held ? 'var(--amber-ink)' : 'var(--green-ink)' }}>
+        {/* 0.18.3: Android's battery setting; iPhones and iPads have none like it. */}
+        {!isIos() && <p className="small" style={{ margin: 0, fontWeight: 600, color: held ? 'var(--amber-ink)' : 'var(--green-ink)' }}>
           {info?.backgroundRestricted
             ? "Restock's battery setting is Restricted, so Android holds its checks back."
             : info?.batteryExempt === false
               ? "Restock's battery setting is Optimised, so Android can delay its checks."
               : "Restock's battery setting is Unrestricted: checks run on time."}
-        </p>
-        {held && (
+        </p>}
+        {held && !isIos() && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn small primary" onClick={() => void RestockNative.requestBatteryExemption().catch(() => undefined)}>
               Let it run in the background

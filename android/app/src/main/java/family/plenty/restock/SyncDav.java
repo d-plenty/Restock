@@ -53,6 +53,12 @@ import org.json.JSONObject;
  */
 final class SyncDav {
     static final int CONNECT_MS = 15_000;
+    /**
+     * 0.18.3: a shorter wait to connect, for this thread's next requests (ServerFolder sets it while it
+     * tries the home address and has an away one to try next: away from home, a home address that
+     * doesn't answer took 15 seconds to give up on before the away one was tried).
+     */
+    static final ThreadLocal<Integer> CONNECT_LIMIT = new ThreadLocal<>();
     static final int READ_MS = 30_000;
     static final long REQUEST_MS = 120_000;
     static final int MAX_FILE = 32 * 1024 * 1024;
@@ -192,7 +198,8 @@ final class SyncDav {
         Socket s = raw;
         try {
             try {
-                raw.connect(new InetSocketAddress(addr, port), CONNECT_MS);
+                Integer limit = CONNECT_LIMIT.get();
+                raw.connect(new InetSocketAddress(addr, port), limit != null ? limit : CONNECT_MS);
                 raw.setSoTimeout(READ_MS);
                 if (tls) {
                     SSLSocket ssl = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault()).createSocket(raw, host.replace("[", "").replace("]", ""), port, true);

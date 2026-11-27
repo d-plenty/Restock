@@ -2,7 +2,7 @@
 // phone and the web; this says where the cards live:
 // - the phone: its database (loyalty cards in `cards`, synced only if the person shares them;
 //   gift cards in `gift_cards`, never synced) and its own private storage for card photos;
-// - the web: this browser only (server-mode/cardStore.ts, IndexedDB), never the server.
+// - the web: none since 0.18.3 (the server's page looks after the server only); never the server.
 import type { GiftBarcodeType, GiftCard, LoyaltyCard } from '../types';
 import { addCard, allCards, allGiftCards, deleteCard, deleteGiftCard, getKV, putKV, saveGiftCard, setCardExpiry } from './db';
 import { onChange } from './live';

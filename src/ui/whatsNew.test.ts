@@ -39,7 +39,6 @@ describe("0.12.9: What's new", () => {
     expect(whatsNew.indexOf('Done')).toBeLessThan(whatsNew.indexOf('Open the GitHub page'));
     expect(whatsNew).toMatch(/href=\{RELEASES\} target="_blank" rel="noreferrer"/);
     expect(read('./screens/Settings.tsx')).toMatch(/row\("What's new"/);
-    expect(read('../server-mode/ui/DeskSettings.tsx')).toMatch(/name: 'whatsnew'/);
     expect(app).toMatch(/top\.name === 'whatsnew' && <WhatsNewScreen \/>/);
   });
 });

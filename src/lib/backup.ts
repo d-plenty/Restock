@@ -19,6 +19,7 @@ import { isPhotoPath, readPhoto, writePhoto } from './receiptFiles';
 import { lockBackup } from './backupLock';
 import { localDay } from './verdict';
 import { textToBase64 } from './base64';
+import { collectConnections, restoreConnections, type Connections } from './connections';
 import { shareTextFile } from './shareFile';
 import { LIST_ALIASES, LOCAL_ONLY_KV } from './haKeys';
 import { aliasesForBackup } from './listPicks';
@@ -37,6 +38,8 @@ interface BackupFile {
   /** What was picked when exporting (missing in older, everything-included backups). */
   parts?: ExportParts;
   tables: Snapshot;
+  /** 0.18.3: Connections (Restock server, Home Assistant): only in a locked file or a copy sent straight across (connections.ts). */
+  connections?: Connections;
   /** Receipt photos (base64 JPEG) by their path in Restock's storage. Restock's own copies, not the phone's photos. */
   photos?: Record<string, string>;
   /** Shared prices (0.9.0): products and their prices only, nothing about you (sharedPrices.ts). Ignored when restoring. */
@@ -76,6 +79,13 @@ export interface ExportParts extends RestoreParts {
    * no giftCards at all, so restoring it leaves this phone's gift cards alone.
    */
   giftCards?: boolean;
+  /**
+   * 0.18.3: Connections (Restock server, Home Assistant), off unless ticked, and only for a file
+   * locked with a password or a copy sent straight to another phone (`direct`): they carry the token.
+   */
+  connections?: boolean;
+  /** 0.18.3: this copy goes straight to another phone (its server code lasts 10 minutes, not a day). */
+  direct?: boolean;
 }
 
 /** 0.9.6 (review M3): Export a backup with Cards ticked and no password. */
@@ -131,7 +141,7 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
     app: 'restock',
     version: 2,
     exportedAt: new Date().toISOString(),
-    parts: { ...picked, password: undefined, serverPhotos: undefined, keepCostco: undefined, noTypedPrices: undefined },
+    parts: { ...picked, password: undefined, serverPhotos: undefined, keepCostco: undefined, noTypedPrices: undefined, direct: undefined },
     tables: withoutSecrets(pickSnapshot(all, picked, { prices: parts.prices })),
   };
   if (parts.noTypedPrices) file.tables.prices = file.tables.prices.filter((r) => r.source !== 'manual');
@@ -172,6 +182,11 @@ export async function backupJson(parts: ExportParts = EVERYTHING): Promise<strin
         if (path && data) cardPhotos[path] = data;
       }
     if (Object.keys(cardPhotos).length) file.cardPhotos = cardPhotos;
+  }
+  // 0.18.3: never in a file anyone could open.
+  if (parts.connections && (parts.password || parts.direct)) {
+    const c = await collectConnections(!!parts.direct).catch(() => undefined);
+    if (c) file.connections = c;
   }
   const json = JSON.stringify(file);
   return parts.password ? lockBackup(json, parts.password) : json;
@@ -324,6 +339,8 @@ export interface BackupSummary {
   sections: Section[];
   /** Suggested tidier names for pantry items, e.g. "Coles Simply Pure Honey Squeeze 400g" → "Honey". */
   renames: { groupId: string; from: string; to: string }[];
+  /** 0.18.3: the file's Connections (Restock server, Home Assistant), when it has them. */
+  connections?: Connections;
 }
 
 /** Reads a backup file without changing anything, so the person can pick what to restore. */
@@ -373,6 +390,7 @@ export function readBackup(text: string): BackupSummary {
     // Older backups had everything; part backups say which tabs they hold.
     sections: file.parts ? (file.parts.sections ?? []) : SECTIONS,
     renames: suggestRenames(snap.groups, snap.products),
+    ...(file.connections && typeof file.connections === 'object' ? { connections: file.connections } : {}),
   };
 }
 
@@ -438,6 +456,15 @@ export async function restoreBackup(
   if (parts.receipts) await restorePhotos(summary.photos);
   if (parts.cards) await restoreCardPhotos(summary.cardPhotos, summary.snapshot);
   if (opts.stayInSetup) await updateSettings({ privacyAccepted: opts.stayInSetup });
+  // 0.18.3: Connections, when ticked: Home Assistant set up again, and the server's code kept for the next screen.
+  if (parts.connections && summary.connections) connected = await restoreConnections(summary.connections).catch(() => ({}));
+}
+let connected: { server?: 'join' | 'ask' } = {};
+/** 0.18.3: what the last restore did about the Restock server (once). */
+export function lastRestoreServer(): 'join' | 'ask' | undefined {
+  const v = connected.server;
+  connected = {};
+  return v;
 }
 
 /**

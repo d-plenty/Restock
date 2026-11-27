@@ -27,7 +27,7 @@ import {
 } from './crypto';
 import { WebSyncEngine } from './engine';
 import { syncRound, sharedSectionOf, type Remote } from './round';
-import { changeHousePassphrase, forget, loginV3, refreshHouseKeys, session, setUpHouse } from './session';
+import { changeHousePassphrase, forget, loginV3, refreshHouseKeys, session, setUpHouse, type Session } from './session';
 import { syncDbOf } from './sqldb';
 
 const ROUNDS = 600_000;
@@ -141,7 +141,7 @@ describe('signing in to a house (v3)', () => {
     globalThis.fetch = h.fetchFn as typeof fetch;
     await probeServer();
     expect(isV3()).toBe(true);
-    const s = await loginV3('admin', PASS);
+    const s = (await loginV3('admin', PASS)) as Session;
     expect(s.v).toBe(3);
     expect(s.keys).toEqual(h.keys());
     expect(s.webId).toBe('w3web');
@@ -191,7 +191,7 @@ describe('signing in to a house (v3)', () => {
     const h = fakeHouse({ mode: 'new' });
     globalThis.fetch = h.fetchFn as typeof fetch;
     await probeServer();
-    const s = await loginV3('admin', PASS);
+    const s = (await loginV3('admin', PASS)) as Session;
     expect(Object.keys(s.keys)).toHaveLength(0);
     const next = await setUpHouse('Declan and Sarah');
     expect(next.keys).toEqual(h.keys());

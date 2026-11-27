@@ -1172,6 +1172,8 @@ export interface RestoreParts {
   shops?: boolean;
   /** Restoring shops: only these tabs' shops are replaced (all three when not given). */
   shopSections?: Section[];
+  /** 0.18.3: Connections (Restock server, Home Assistant), from a file that has them (backup.ts). */
+  connections?: boolean;
 }
 
 /** Settings that are about your shops. */

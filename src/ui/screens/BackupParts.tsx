@@ -199,7 +199,7 @@ export function PartsPicker({
 /** Export a backup: pick what goes in, then share the file. */
 export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: (msg: string) => void }) {
   const [counts, setCounts] = useState<PartCounts>();
-  const [parts, setParts] = useState<ExportParts>(EVERYTHING);
+  const [parts, setParts] = useState<ExportParts>({ ...EVERYTHING, connections: false });
   const [busy, setBusy] = useState(false);
   // 0.9.0: lock the file with a password.
   const [lock, setLock] = useState(false);
@@ -260,7 +260,7 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
     setSendError(undefined);
     try {
       // Prices typed in by hand stay on this phone; the transfer itself is sealed, so no password.
-      const text = await backupJson({ ...parts, password: undefined, serverPhotos: false, noTypedPrices: true });
+      const text = await backupJson({ ...parts, password: undefined, serverPhotos: false, noTypedPrices: true, direct: true });
       const name = (await getSettings()).household.name || 'A Restock phone';
       const o = await offerData(lan, text, { name }, (p) => setSent(p));
       setOffer(o);
@@ -351,6 +351,26 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
           </div>
         )}
       </div>
+      {/* 0.18.3: Connections (Restock server, Home Assistant): off to start with, and only locked or sent straight across. */}
+      <div className="card flush">
+        <label className="check">
+          <input type="checkbox" checked={!!parts.connections} onChange={(e) => setParts((x) => ({ ...x, connections: e.target.checked }))} aria-label="Connections (Restock server, Home Assistant)" />
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              Connections (Restock server, Home Assistant)
+            </span>
+            <span className="small">
+              So the new phone joins your server as a phone of its own, and Home Assistant just works (its token goes too). Only in a file locked with a password, or one sent straight to
+              another phone.
+            </span>
+          </span>
+        </label>
+        {parts.connections && !lock && (
+          <p className="small" style={{ margin: '0 14px 12px', color: 'var(--amber-ink)' }}>
+            Lock it with a password to save them in a file. Sending straight to another phone takes them as it is.
+          </p>
+        )}
+      </div>
       {/* 0.9.6 (review M3): gift cards ticked, no password: say so plainly. */}
       {giftCardsUnlocked({ ...parts, password: lock ? pw : undefined }, counts?.giftCards ?? 0) && (
         <p className="banner red small" role="alert">
@@ -362,7 +382,7 @@ export function ExportSheet({ onClose, onDone }: { onClose: () => void; onDone: 
           {sendError}
         </p>
       )}
-      <button className="btn primary block" disabled={!any || busy || !counts || !!pwProblem} onClick={go}>
+      <button className="btn primary block" disabled={!any || busy || !counts || !!pwProblem || (!!parts.connections && !lock)} onClick={go}>
         <Icon name="external" size={18} /> {busy ? 'Working…' : 'Save to a file'}
       </button>
       <button className="btn block" disabled={!any || busy || !counts || !direct} onClick={() => void send()}>

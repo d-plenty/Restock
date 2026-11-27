@@ -1,7 +1,8 @@
 // 0.18.0: Settings → Sync → Restock server, on an admin phone: Phones and tablets. The phones on
 // the server with Admin on the admins; tap one for Rename, Make admin / Make user and Remove; Add a
 // phone or tablet shows the code it scans (once, for 10 minutes), for a user or (Make admin) an
-// admin. The same as the server's web page does (server-mode/ui/DeskServer.tsx), from the phone.
+// admin. The same as the server's web page does (server-mode/admin/PhonesPage.tsx), from the phone.
+// 0.18.3: inside Server admin (ServerAdmin.tsx); the only admin phone can't be made a user.
 import { useEffect, useRef, useState } from 'react';
 import { confirmAction } from '../../lib/confirm';
 import { deviceWord } from '../../lib/platform';
@@ -156,7 +157,8 @@ function PhoneSheet({ p, onClose, onDone, onlyAdmin }: { p: Phone; onClose: () =
       <div className="card flush">
         <button
           className="row"
-          disabled={busy}
+          // 0.18.3: the only admin phone can't be made a user (the server says no too).
+          disabled={busy || (isAdmin(p) && onlyAdmin)}
           onClick={() =>
             void run(async () => {
               if (!isAdmin(p)) {
@@ -167,13 +169,10 @@ function PhoneSheet({ p, onClose, onDone, onlyAdmin }: { p: Phone; onClose: () =
                 });
                 if (!ok) return undefined;
               } else if (p.me) {
-                // 0.18.1: the last admin phone is told what that means
-                const ok = await confirmAction(onlyAdmin ? 'Make the only admin a user?' : 'Make this phone a user?', {
-                  detail: onlyAdmin
-                    ? "This is the server's only admin phone. Once it's a user, phones can only be added, removed or made admins on the server's web page, with the passphrase. To keep an admin phone, make another one an admin first."
-                    : 'It stops being able to add, remove or change phones. Another admin, or the web page, can make it an admin again.',
+                const ok = await confirmAction('Make this phone a user?', {
+                  detail: 'It stops being able to add, remove or change phones. Another admin, or the web page, can make it an admin again.',
                   action: 'Make user',
-                  danger: onlyAdmin,
+                  danger: false,
                 });
                 if (!ok) return undefined;
               } else {
@@ -195,7 +194,13 @@ function PhoneSheet({ p, onClose, onDone, onlyAdmin }: { p: Phone; onClose: () =
             <span className="title" style={{ fontSize: 15 }}>
               {isAdmin(p) ? 'Make user' : 'Make admin'}
             </span>
-            <span className="small">{isAdmin(p) ? 'Syncs as before, without looking after the phones.' : 'Can add, remove and change phones and tablets.'}</span>
+            <span className="small">
+              {isAdmin(p) && onlyAdmin
+                ? "It's the only admin phone. Make another phone an admin first, so there's always one to look after the phones and say yes to sign-ins."
+                : isAdmin(p)
+                  ? 'Syncs as before, without looking after the phones.'
+                  : 'Can add, remove and change phones and tablets, and say yes to sign-ins.'}
+            </span>
           </span>
         </button>
         {!p.me && (
@@ -295,7 +300,7 @@ export function ServerPhones({ label }: { label: string }) {
           </div>
         )}
         <p className="small" style={{ padding: '4px 14px 12px', margin: 0 }}>
-          You're an admin: you look after the phones on this server, as its web page does.
+          You're an admin: you look after the phones on this server and say yes to sign-ins, as its web page does.
         </p>
       </div>
       {adding && phones && (

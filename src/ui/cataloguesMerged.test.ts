@@ -48,13 +48,13 @@ describe('0.12.3: My catalogue merged into each shop, only your own things', () 
     expect(shopTileNote(undefined)).toBe('Your specials');
   });
   it('Open my catalogue is gone from Home, More, the iPhone web page and the web', () => {
-    for (const f of ['./screens/Home.tsx', './screens/More.tsx', '../server-mode/ui/PhoneLayout.tsx']) {
+    for (const f of ['./screens/Home.tsx', './screens/More.tsx']) {
       const src = read(f);
       expect(src).not.toContain('>Open my catalogue<');
       expect(src).not.toContain('title="Open my catalogue"');
       expect(src).not.toContain("name: 'mycatalogue'");
     }
-    for (const f of ['./screens/More.tsx', '../server-mode/ui/PhoneLayout.tsx']) expect(read(f)).toContain('title="Your shops"');
+    for (const f of ['./screens/More.tsx']) expect(read(f)).toContain('title="Your shops"');
     // 0.15.0: a wide web page's side bar is the iPad's, with Your shops in it.
     expect(read('./padWide.ts')).toContain("{ screen: 'catalogues', label: 'Your shops', icon: 'shop' }");
   });

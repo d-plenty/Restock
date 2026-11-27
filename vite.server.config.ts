@@ -18,22 +18,27 @@ function restockPwa(): Plugin {
   return {
     name: 'restock-pwa',
     apply: 'build',
-    transformIndexHtml(html) {
-      // The phone app's page has the cream theme colour; the web app's top strip is navy.
-      const page = html.replace(/<meta name="theme-color"[^>]*>\s*/, '');
-      return {
-        html: page,
-        tags: [
-          { tag: 'meta', attrs: { name: 'theme-color', content: MANIFEST.theme_color }, injectTo: 'head' },
-          { tag: 'link', attrs: { rel: 'manifest', href: 'pwa/manifest.webmanifest' }, injectTo: 'head' },
-          { tag: 'link', attrs: { rel: 'apple-touch-icon', href: 'pwa/apple-touch-icon.png' }, injectTo: 'head' },
-          { tag: 'meta', attrs: { name: 'apple-mobile-web-app-capable', content: 'yes' }, injectTo: 'head' },
-          { tag: 'meta', attrs: { name: 'mobile-web-app-capable', content: 'yes' }, injectTo: 'head' },
-          { tag: 'meta', attrs: { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }, injectTo: 'head' },
-          { tag: 'meta', attrs: { name: 'apple-mobile-web-app-title', content: MANIFEST.short_name }, injectTo: 'head' },
-          { tag: 'meta', attrs: { name: 'format-detection', content: 'telephone=no' }, injectTo: 'head' },
-        ],
-      };
+    // 'pre': before Vite reads the page's script, so the build starts from the server page's own entry.
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html) {
+        // The phone app's page has the cream theme colour; the web app's top strip is navy.
+        // 0.18.3: the server's own page (src/server-mode/admin), not the app.
+        const page = html.replace(/<meta name="theme-color"[^>]*>\s*/, '').replace('/src/main.tsx', '/src/server-mode/admin/entry.tsx').replace('<title>Restock</title>', '<title>Restock server</title>');
+        return {
+          html: page,
+          tags: [
+            { tag: 'meta', attrs: { name: 'theme-color', content: MANIFEST.theme_color }, injectTo: 'head' },
+            { tag: 'link', attrs: { rel: 'manifest', href: 'pwa/manifest.webmanifest' }, injectTo: 'head' },
+            { tag: 'link', attrs: { rel: 'apple-touch-icon', href: 'pwa/apple-touch-icon.png' }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'apple-mobile-web-app-capable', content: 'yes' }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'mobile-web-app-capable', content: 'yes' }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'apple-mobile-web-app-title', content: MANIFEST.short_name }, injectTo: 'head' },
+            { tag: 'meta', attrs: { name: 'format-detection', content: 'telephone=no' }, injectTo: 'head' },
+          ],
+        };
+      },
     },
     buildStart() {
       for (const name of ICONS)

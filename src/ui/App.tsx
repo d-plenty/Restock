@@ -4,7 +4,7 @@ import { watchBusy } from '../lib/speedLog';
 import { App as CapApp } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react';
+import { lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { lazyScreen, preloadScreens } from './lazyScreen';
 import { isIos as isIosHere } from '../lib/platform';
 import { createPortal } from 'react-dom';
@@ -56,6 +56,13 @@ import { PantryScreen } from './screens/Pantry';
 const WifiSyncScreen = lazyScreen(() => import('./screens/WifiSync').then((m) => m.WifiSyncScreen), { preload: isIosHere() });
 // 0.15.0: screens opened now and then load when first opened, so Restock starts quicker. 0.15.2: and
 // they're loaded quietly once it has started (lazyScreen.tsx), so none opens on a blank page.
+// 0.18.3: "Is this you?" on an admin phone; loaded only when a request comes (ApprovalSheet.tsx).
+const ApprovalSheetLazy = () => (
+  <Suspense fallback={null}>
+    <ApprovalSheetPart />
+  </Suspense>
+);
+const ApprovalSheetPart = lazy(() => import('./ApprovalSheet').then((m) => ({ default: m.ApprovalSheet })));
 const CardsScreen = lazyScreen(() => import('./screens/Cards').then((m) => m.CardsScreen));
 const CataloguesScreen = lazyScreen(() => import('./screens/Catalogues').then((m) => m.CataloguesScreen));
 const PermissionsScreen = lazyScreen(() => import('./screens/Permissions').then((m) => m.PermissionsScreen));
@@ -73,6 +80,7 @@ const FeedbackScreen = lazyScreen(() => import('./screens/Feedback').then((m) =>
 const StoresScreen = lazyScreen(() => import('./screens/Stores').then((m) => m.StoresScreen));
 const SyncScreen = lazyScreen(() => import('./screens/Sync').then((m) => m.SyncScreen));
 const RestockServerScreen = lazyScreen(() => import('./screens/RestockServer').then((m) => m.RestockServerScreen));
+const ServerAdminScreen = lazyScreen(() => import('./screens/ServerAdmin').then((m) => m.ServerAdminScreen));
 const HomeAssistantScreen = lazyScreen(() => import('./screens/HomeAssistant').then((m) => m.HomeAssistantScreen));
 const ReceiptScreen = lazyScreen(() => import('./screens/Receipts').then((m) => m.ReceiptScreen));
 const ReceiptsScreen = lazyScreen(() => import('./screens/Receipts').then((m) => m.ReceiptsScreen));
@@ -375,6 +383,8 @@ function RestockApp() {
   const [whatsNew, setWhatsNew] = useState(false);
   const [nameLater, setNameLater] = useState(false);
   const [opening, setOpening] = useState(() => !openingPlayed());
+  // 0.18.3: a browser is waiting for this admin phone's yes (ApprovalSheet.tsx loads then).
+  const [askingYes, setAskingYes] = useState(false);
   const closeWhatsNew = () => {
     noteSeenVersion(appVersion);
     setWhatsNew(false);
@@ -432,7 +442,7 @@ function RestockApp() {
       else if (a.action === 'cards') setStack([{ name: 'cards' }]);
       else if (a.action === 'sync') setStack([{ name: 'settings' }, { name: 'settings', page: 'sync' }, { name: 'sync' }]);
       // 0.18.1: a change to the server's phones (lib/adminNotices.ts) opens the server's page
-      else if (a.action === 'serverPhones') setStack([{ name: 'settings' }, { name: 'settings', page: 'sync' }, { name: 'restockServer' }]);
+      else if (a.action === 'serverPhones') setStack([{ name: 'settings' }, { name: 'settings', page: 'sync' }, { name: 'restockServer' }, { name: 'serverAdmin' }]);
       else if (a.action === 'updates') setStack([{ name: 'settings' }, { name: 'settings', page: 'about' }]);
       else if (a.action === 'scan') {
         const out = await scanBarcode();
@@ -514,6 +524,8 @@ function RestockApp() {
     void afterScreens().then(phonesNow);
     // 0.18.2: Diagnostics → Speed notes the moments the screen was too busy to answer a tap.
     watchBusy();
+    // 0.18.3: on an admin phone, "Is this you?" for a browser waiting for a yes (lib/approvalsWatch.ts).
+    if (!serverMode) void afterScreens().then(() => import('../lib/approvalsWatch').then((m) => m.watchApprovals(() => setAskingYes(true))).catch(() => undefined));
     // 0.15.2: the screens opened now and then are loaded quietly, so none opens on a blank page.
     void preloadScreens().finally(screensReady);
     // 0.16.0: this phone's name in the household follows the person's (after a restore, say).
@@ -619,7 +631,8 @@ function RestockApp() {
                 ) : (
                   <SyncScreen invite={(stack[stack.length - 1] as { invite?: boolean }).invite} />
                 ))}
-              {stack[stack.length - 1].name === 'restockServer' && <RestockServerScreen code={(stack[stack.length - 1] as { code?: string }).code} />}
+              {stack[stack.length - 1].name === 'restockServer' && <RestockServerScreen code={(stack[stack.length - 1] as { code?: string }).code} fromSetup={(stack[stack.length - 1] as { fromSetup?: boolean }).fromSetup} />}
+              {stack[stack.length - 1].name === 'serverAdmin' && <ServerAdminScreen />}
               {stack[stack.length - 1].name === 'homeAssistant' && <HomeAssistantScreen />}
               {stack[stack.length - 1].name === 'household' && <HouseholdScreen />}
               {stack[stack.length - 1].name === 'categories' && <CategoriesScreen section={(stack[stack.length - 1] as { section: Section }).section} />}
@@ -629,6 +642,7 @@ function RestockApp() {
             </div>
           )}
           <ConfirmHost />
+          {askingYes && <ApprovalSheetLazy />}
           {/* 0.9.1: in the layer on <body>, so they still work while a sheet shuts the app off (components.tsx Sheet). */}
           {createPortal(
             <>
@@ -706,7 +720,8 @@ function RestockApp() {
             <WifiSyncScreen apple={top.apple} />
           </Suspense>
         )}
-        {top.name === 'restockServer' && <RestockServerScreen code={top.code} />}
+        {top.name === 'restockServer' && <RestockServerScreen code={top.code} fromSetup={top.fromSetup} />}
+        {top.name === 'serverAdmin' && <ServerAdminScreen />}
         {top.name === 'homeAssistant' && <HomeAssistantScreen />}
         {top.name === 'household' && <HouseholdScreen />}
         {top.name === 'categories' && <CategoriesScreen section={top.section} />}
@@ -818,6 +833,7 @@ function RestockApp() {
 
         <TourHost />
         <ConfirmHost />
+          {askingYes && <ApprovalSheetLazy />}
         {/* 0.16.0: the opening animation, once each time Restock starts from closed (Opening.tsx) */}
         {opening && settings && settings.look.opening !== false && <Opening holiday={holidayNow(settings)} look={isDark(settings.theme) ? 'night' : 'day'} still={lessMotion(settings.a11y.motion)} onDone={() => setOpening(false)} />}
         {/* 0.16.0: once after updating (a new install asks while setting up): what to call you */}

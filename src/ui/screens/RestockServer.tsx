@@ -19,7 +19,6 @@ import {
   syncAvailable,
   syncInfo,
   syncNowMessage,
-  webPageCode,
   type SyncInfo,
 } from '../../lib/sync';
 import { useSettings } from '../../lib/useLive';
@@ -30,7 +29,7 @@ import { serverKeepText } from '../../lib/autoDelete';
 import { SuggestLocalBackup } from './Backups';
 import { askAdult } from './Sync';
 import { LeaveServerSheet, ServerCard, ShopDataStays, TAKE_BACK_NOTE } from './SyncServer';
-import { ServerPhones } from './ServerPhones';
+import { signInComputer } from './signInComputer';
 import { myRole, type Role } from '../../lib/serverPhones';
 
 /**
@@ -335,33 +334,11 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
 
   const scanWeb = async () => {
     setError(undefined);
-    const out = await scanBarcode("Scan the code on your server's sign-in page", {
-      accept: webPageCode,
-      qr: true,
-      wrong: "That isn't a code from your Restock server's page. On the computer, choose Sign in with a phone and scan the code it shows.",
-      typeHint: 'Or paste the code',
-    });
-    if (!out.ok) return;
-    let w: { kind: 'link' | 'login'; host: string };
     try {
-      w = await RestockNative.syncWebCode({ code: out.code });
+      const done = await signInComputer(setWorking);
+      if (done) nav.toast(`Signed in on ${done.host}`);
     } catch (e) {
       setError(errText(e));
-      return;
-    }
-    const ok = await confirmAction(`Sign in to Restock on ${w.host}?`, {
-      detail: `The browser showing the code (at ${w.host}) can see and change your house's list, pantry and prices until it signs out. Only say yes if you're signing in on that page yourself, right now. If someone sent you this code or asked you to scan it, say no.`,
-      action: 'Sign in',
-    });
-    if (!ok) return;
-    setWorking('Signing the browser in…');
-    try {
-      await RestockNative.syncWebApprove({ code: out.code });
-      nav.toast(`Signed in on ${w.host}`);
-    } catch (e) {
-      setError(errText(e));
-    } finally {
-      setWorking(undefined);
     }
   };
 
@@ -423,7 +400,21 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
       {sharing && <SharesEditor info={info} onInfo={onInfo} />}
 
       {role === 'admin' ? (
-        <ServerPhones label={label} />
+        <>
+          <div className="eyebrow">You're an admin</div>
+          <div className="card flush">
+            <button className="row" onClick={() => nav.push({ name: 'serverAdmin' })}>
+              <Icon name="shield" size={18} />
+              <span className="grow">
+                <span className="title" style={{ fontSize: 15 }}>
+                  Server admin
+                </span>
+                <span className="small">Phones and tablets, data, activity and the server's settings</span>
+              </span>
+              <Icon name="chevron" size={18} />
+            </button>
+          </div>
+        </>
       ) : (
       <>
       <div className="eyebrow">Phones on {label}</div>
@@ -534,7 +525,10 @@ function SharesEditor({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) 
 
 // ---------- the screen ----------
 
-export function RestockServerScreen({ code: scanned }: { code?: string } = {}) {
+/** 0.18.3: codes already joined with from the first screen (never tried twice). */
+const USED_CODES = new Set<string>();
+
+export function RestockServerScreen({ code: scanned, fromSetup }: { code?: string; fromSetup?: boolean } = {}) {
   useSettingsDraft(); // 0.9.5 (save): what this phone shares waits for Save settings
   const nav = useNav();
   const settings = useSettings();
@@ -591,6 +585,12 @@ export function RestockServerScreen({ code: scanned }: { code?: string } = {}) {
         // 0.15.0: an iPhone or iPad's household (phones on the Wi-Fi, or iCloud) doesn't pass the news on
         // by itself: each other phone joins the server with its own Add a phone code.
         nav.toast(isIos() ? 'Your household is on the server now. Add each other phone from the server\'s Add a phone page.' : syncNowMessage(s));
+      } else if (fromSetup) {
+        // 0.18.3: joined from the first screen: Home, with the first price check on its way (it had
+        // stayed on this screen). What the phone shares is here, in Settings → Sync, when wanted.
+        nav.pop();
+        nav.setTab('home');
+        nav.toast(`Joined ${r.houseName ?? 'your server'}. What this phone shares: Settings → Sync → Restock server.`);
       } else setJoined({ label: r.label, houseName: r.houseName });
     });
 
@@ -606,11 +606,11 @@ export function RestockServerScreen({ code: scanned }: { code?: string } = {}) {
     await joinWith(out.code);
   };
 
-  // 0.15.0: a code scanned on the first screen (Join your household) is used straight away, once.
-  const usedScanned = useRef(false);
+  // 0.15.0: a code scanned on the first screen (Join a home server) is used straight away, once.
+  // 0.18.3: once for the whole app (the screen can open twice), not once per screen.
   useEffect(() => {
-    if (!scanned || usedScanned.current || !info) return;
-    usedScanned.current = true;
+    if (!scanned || USED_CODES.has(scanned) || !info) return;
+    USED_CODES.add(scanned);
     void joinWith(scanned);
     // Once, when the server's details arrive.
     // eslint-disable-next-line react-hooks/exhaustive-deps

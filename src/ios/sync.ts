@@ -62,7 +62,7 @@ const appHttp: Http = async (o) => {
     responseType: 'arraybuffer',
     // Never followed for us: a followed redirect turns a POST into a GET (house.ts ask()).
     disableRedirects: true,
-    connectTimeout: 15_000,
+    connectTimeout: o.connectMs ?? 15_000,
     readTimeout: 45_000,
   });
   const headers: Record<string, string> = {};
@@ -511,12 +511,11 @@ export async function serverData(path: string): Promise<Record<string, unknown>>
 }
 
 /** 0.18.0: RestockNativePlugin.serverAdmin: the server's phones, as an admin phone (sealed both ways). */
-export async function serverAdmin(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const ok =
-    (method === 'GET' && (path === '/me' || path === '/phones')) ||
-    (method === 'POST' && path === '/phones') ||
-    ((method === 'PATCH' || method === 'DELETE') && /^\/phones\/[A-Za-z0-9_-]{1,64}$/.test(path));
-  if (!ok) throw new Error('Not something an admin phone does.');
+export type AdminMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+/** 0.18.3: what an admin phone asks its server for (RestockNativePlugin.ADMIN_PATHS is the same). */
+export const ADMIN_PATHS = /^\/(me|phones(\/[A-Za-z0-9_-]{1,64})?|approvals(\/[A-Za-z0-9_-]{20,40})?|confirm\/challenge|settings|activity(\?limit=\d{1,4})?|browsers(\/[A-Za-z0-9_-]{22})?|homeassistant(\/(test|sync))?|data\/(summary|autodelete)|recovery|server\/(log|updates|restart))$/;
+export async function serverAdmin(method: AdminMethod, path: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (!ADMIN_PATHS.test(path) || !['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) throw new Error('Not something an admin phone does.');
   return (await hub()).house.sealed(method, path, body ?? (method === 'GET' ? undefined : {}));
 }
 

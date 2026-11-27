@@ -53,14 +53,20 @@ final class ServerSync {
         return v == null ? 1 : Integer.parseInt(v);
     }
 
-    /** The server's addresses (home first, then away), or an empty list. */
+    /**
+     * The server's addresses (home first, then away), or an empty list. 0.18.3: the one that answered
+     * last goes first (as on the iPhone), so a phone that's away from home doesn't wait for home first
+     * every time; the other one is still tried when it doesn't answer.
+     */
     List<String> addresses() {
         List<String> out = new ArrayList<>();
         try {
             for (String k : new String[] { "server_home", "server_away" }) {
                 String v = e.meta(k);
-                if (v != null) out.add(v);
+                if (v != null && !v.isEmpty() && !out.contains(v)) out.add(v);
             }
+            String last = e.meta("server_reached");
+            if (last != null && out.remove(last)) out.add(0, last);
         } catch (Exception ignored) {
             // none
         }
@@ -121,7 +127,7 @@ final class ServerSync {
             // the server can take it off its list itself (Phones → Remove)
         }
         clearNotes();
-        for (String k : new String[] { "server_dev_priv", "server_home", "server_away", "server_webs", "server_api", "server_kex", "server_kex_priv", "server_sid", "server_handover", "server_mode" })
+        for (String k : new String[] { "server_dev_priv", "server_home", "server_away", "server_reached", "server_webs", "server_api", "server_kex", "server_kex_priv", "server_sid", "server_handover", "server_mode" })
             e.setMeta(k, null);
     }
 
@@ -351,8 +357,31 @@ final class ServerSync {
         }
     }
 
+    /**
+     * 0.18.3: home first. At the start of each round, when the away address answered last, the home
+     * one is asked (a moment at most, ServerFolder.QUICK_CONNECT_MS): back at home, the round goes
+     * there, not out through the internet and back. The rest of the round keeps to the one that answered.
+     */
+    void preferHome() {
+        try {
+            String home = e.meta("server_home");
+            String last = e.meta("server_reached");
+            if (home == null || home.isEmpty() || last == null || last.equals(home)) return;
+            SyncDav.CONNECT_LIMIT.set(ServerFolder.QUICK_CONNECT_MS);
+            try {
+                SyncDav.Response r = SyncDav.request("GET", java.net.URI.create(home + ServerFolder.API3 + "/health"), new java.util.LinkedHashMap<>(), null, SyncDav.MAX_SMALL);
+                if (r.status == 200) e.setMeta("server_reached", home);
+            } finally {
+                SyncDav.CONNECT_LIMIT.remove();
+            }
+        } catch (Exception ignored) {
+            // not at home: away it is
+        }
+    }
+
     /** One round with the server. Never throws: a problem is in `error`, and nothing is deleted then. */
     Round round(String nowIso, long now) {
+        preferHome();
         Round out = new Round();
         if (!on() || key() == null) return out;
         try {
@@ -369,6 +398,7 @@ final class ServerSync {
             // 0.9.5: the server asked phones to resend (its signed server row's `resend`).
             if (v3()) resendIfAsked(f, nowIso, now, out);
             out.reached = f.reached();
+            if (out.reached != null && !out.reached.equals(e.meta("server_reached"))) e.setMeta("server_reached", out.reached);
             noteFileKey();
             List<String> names = f.names();
             e.setMeta("server_files", String.valueOf(names.size()));

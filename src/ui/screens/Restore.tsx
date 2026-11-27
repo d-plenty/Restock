@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { decodePhoto, scanBarcode } from '../../lib/barcode';
 import { canSendDirect, deviceLan, fetchData, isSendCode } from '../../lib/handover';
+import { describeConnections } from '../../lib/connections';
 import { askPassword, confirmAction } from '../../lib/confirm';
 import { isLocked, NOT_OURS, unlockBackup } from '../../lib/backupLock';
 import { RestockNative } from '../../lib/sql/native';
@@ -42,6 +43,8 @@ export function RestoreSheet({
     shopSections: all ? c.shopTabs : [],
     settings: all && c.hasSettings,
     receipts: all && c.receipts > 0,
+    // 0.18.3: from setup, yes when the file has them; from Settings, ticked by hand.
+    connections: all && !!summary.connections,
   });
   // 0.14.0: add alongside what's here (nothing replaced; same names skipped), or replace the parts ticked.
   // From setup there's nothing here yet, so it's always the plain restore.
@@ -68,7 +71,8 @@ export function RestoreSheet({
   const [showAll, setShowAll] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const any = parts.pantry || parts.list || parts.cards || parts.shops || parts.settings || parts.receipts;
+  const any = parts.pantry || parts.list || parts.cards || parts.shops || parts.settings || parts.receipts || parts.connections;
+  const conn = describeConnections(summary.connections);
   const when = summary.exportedAt
     ? new Date(summary.exportedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })
     : undefined;
@@ -144,6 +148,7 @@ export function RestoreSheet({
         parts.shops && `${(parts.shopSections ?? []).map((sec) => SECTION_NAMES[sec].toLowerCase()).join(' and ')} shops`,
         parts.settings && 'settings',
         parts.receipts && 'receipts',
+        parts.connections && conn && 'connections',
       ]
         .filter(Boolean)
         .join(', ');
@@ -209,6 +214,27 @@ export function RestoreSheet({
           Shopping lists are replaced tab by tab: the tabs this backup has list lines for{parts.pantry ? ', and the tabs whose items you restore' : ''}.
           Other tabs' lists stay as they are.
         </p>
+      )}
+
+      {conn && (
+        <div className="card flush">
+          <label className="check">
+            <input type="checkbox" checked={!!parts.connections} onChange={(e) => setParts((x) => ({ ...x, connections: e.target.checked }))} aria-label="Connections" />
+            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <span className="title" style={{ fontSize: 15 }}>
+                Connections
+              </span>
+              <span className="small">
+                {conn[0].toUpperCase() + conn.slice(1)}.{' '}
+                {summary.connections?.server?.code
+                  ? 'This phone joins the server as a phone of its own, with the code in the file (once).'
+                  : summary.connections?.server
+                    ? "The server's addresses only: ask an admin for a code to join it."
+                    : ''}
+              </span>
+            </span>
+          </label>
+        </div>
       )}
 
       {renames.length > 0 && (parts.pantry || parts.list) && (
@@ -297,7 +323,6 @@ export async function readBackupFile(file: File): Promise<BackupSummary> {
  * data → Send to another phone, on it). Either way the next step is the same: tick what to bring in.
  */
 export function ImportSheet({ onPicked, onClose, onError }: { onPicked: (s: BackupSummary) => void; onClose: () => void; onError: (msg: string) => void }) {
-  const fileRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
@@ -340,26 +365,28 @@ export function ImportSheet({ onPicked, onClose, onError }: { onPicked: (s: Back
           {busy}
         </p>
       )}
-      <button className="sync-choice" disabled={!!busy} onClick={() => fileRef.current?.click()}>
+      {/* 0.18.3: the file box itself is what's tapped (as on the first screen, 0.13.1): a button pressing a
+          hidden one from code opened nothing on some phones. */}
+      <label className="sync-choice welcome-file" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }} aria-disabled={!!busy}>
         <strong style={{ fontSize: 17 }}>From a file</strong>
         <span className="small">A file made with Export data, or one of Restock's backups.</span>
-      </button>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="application/json,.json"
-        hidden
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          e.target.value = '';
-          if (!file) return;
-          try {
-            onPicked(await readBackupFile(file));
-          } catch (err) {
-            onError(err instanceof Error ? err.message : 'Could not read that file');
-          }
-        }}
-      />
+        <input
+          type="file"
+          accept="application/json,.json"
+          aria-label="Import from a file"
+          disabled={!!busy}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (!file) return;
+            try {
+              onPicked(await readBackupFile(file));
+            } catch (err) {
+              onError(err instanceof Error ? err.message : 'Could not read that file');
+            }
+          }}
+        />
+      </label>
       <div className="sync-choice" aria-disabled={!direct} style={direct ? undefined : { opacity: 0.6 }}>
         <strong style={{ fontSize: 17 }}>From another phone</strong>
         <span className="small">

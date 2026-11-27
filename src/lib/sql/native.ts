@@ -38,7 +38,7 @@ export interface RestockNativePlugin {
    * 0.18.0: the phones on the household's Restock server, as an admin phone (lib/serverPhones.ts):
    * GET /me, GET /phones, POST /phones, PATCH and DELETE /phones/<device>, sealed both ways.
    */
-  serverAdmin(opts: { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; path: string; body?: Record<string, unknown> }): Promise<Record<string, unknown>>;
+  serverAdmin(opts: { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string; body?: Record<string, unknown> }): Promise<Record<string, unknown>>;
   /** 0.9.14: Send prices back now (PriceShare.java): what this phone read from the shops since the last send. */
   sharePrices(): Promise<{ sent: number }>;
   /** Download shared price history (MarketData.java) and summarise it into the market table. */
@@ -77,6 +77,8 @@ export interface RestockNativePlugin {
   haSaveToken(opts: { token: string; address: string }): Promise<void>;
   haForgetToken(): Promise<void>;
   haHasToken(): Promise<{ saved: boolean }>;
+  /** 0.18.3: the saved token and its address, for Export data → Connections only (a locked file, or a copy sent straight across). */
+  haExportToken(): Promise<{ token?: string; address?: string }>;
   /** `path` is Home Assistant's API (/api/…). `token`: one typed in but not saved yet (Test connection). */
   haRequest(opts: { address: string; method: 'GET' | 'POST'; path: string; body?: string; token?: string }): Promise<{ status: number; body: string }>;
   /**

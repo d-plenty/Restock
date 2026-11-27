@@ -366,14 +366,17 @@ public class RestockNativePlugin extends Plugin {
      * 0.18.0: the phones on the Restock server, as an admin phone: GET /me and /phones, POST /phones
      * (a code for a new phone), PATCH and DELETE /phones/<device>. Sealed both ways (ServerFolder.sealedCall).
      */
+    /** 0.18.3: what an admin phone asks its server for (ios/sync.ts ADMIN_PATHS is the same). */
+    static final String ADMIN_PATHS = "/(me|phones(/[A-Za-z0-9_-]{1,64})?|approvals(/[A-Za-z0-9_-]{20,40})?|confirm/challenge|settings|activity(\\?limit=\\d{1,4})?|browsers(/[A-Za-z0-9_-]{22})?|homeassistant(/(test|sync))?|data/(summary|autodelete)|recovery|server/(log|updates|restart))";
+
     @PluginMethod
     public void serverAdmin(final PluginCall call) {
         final String method = call.getString("method", "GET");
         final String path = call.getString("path", "");
         final JSObject body = call.getObject("body");
-        boolean ok = ("GET".equals(method) && (path.equals("/me") || path.equals("/phones")))
-                || ("POST".equals(method) && path.equals("/phones"))
-                || (("PATCH".equals(method) || "DELETE".equals(method)) && path.matches("/phones/[A-Za-z0-9_-]{1,64}"));
+        // 0.18.3: Server admin: the phones, the requests for a yes, Data, Activity and Server settings
+        // (the server checks again that this phone is an admin, for every one).
+        boolean ok = method.matches("GET|POST|PUT|PATCH|DELETE") && path.matches(ADMIN_PATHS);
         if (!ok) {
             call.reject("Not something an admin phone does.");
             return;
@@ -614,6 +617,24 @@ public class RestockNativePlugin extends Plugin {
             } catch (Exception e) {
                 call.reject(e.getMessage() != null ? e.getMessage() : "Couldn't save the token.");
             }
+        });
+    }
+
+    /** 0.18.3: the saved token and its address, for Export data → Connections only (a locked file, or a copy sent straight across). */
+    @PluginMethod
+    public void haExportToken(PluginCall call) {
+        haThread.execute(() -> {
+            JSObject out = new JSObject();
+            try {
+                String[] t = HomeAssistant.exportToken(getContext());
+                if (t != null) {
+                    out.put("token", t[0]);
+                    out.put("address", t[1]);
+                }
+            } catch (Exception ignored) {
+                // none, or it can't be opened: the file goes without it
+            }
+            call.resolve(out);
         });
     }
 

@@ -40,7 +40,6 @@ describe('0.13.0: adding', () => {
   it('only what is kept needs a name', () => {
     expect(add).toMatch(/if \(!name\.trim\(\) && target !== 'list'\)/);
     expect(add).toMatch(/const itemName = name\.trim\(\) \|\| onceName\(/);
-    expect(read('../server-mode/ui/WebShopSearch.tsx')).toMatch(/if \(!name\.trim\(\) && target !== 'list'\)/);
   });
 });
 

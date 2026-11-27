@@ -23,7 +23,7 @@ describe('Auto delete words', () => {
   });
 
   it('no "Keep data for" left where people read it', () => {
-    for (const f of ['src/ui/screens/RestockServer.tsx', 'src/server-mode/ui/DeskActivity.tsx', 'src/server-mode/ui/DeskDataManage.tsx', 'src/server-mode/ui/DeskData.tsx']) {
+    for (const f of ['src/ui/screens/RestockServer.tsx', 'src/server-mode/admin/DataPage.tsx']) {
       // Comments may say what it used to be called; strings may not.
       const code = readFileSync(f, 'utf8')
         .replace(/\/\*[\s\S]*?\*\//g, '')

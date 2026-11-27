@@ -11,15 +11,15 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.18.2',
-    about: 'Faster on iPhone and iPad: pages straight away, taps that answer, and one price check a day.',
+    version: '0.18.3',
+    about: 'Look after your server from a phone, a yes on your phone to sign in to its page, and home and away addresses that just work.',
     changes: [
-      'Home, the Pantry and the list show straight away when Restock opens, with what was there last time, then update by themselves.',
-      'Taps answer while prices are being checked: what you tap goes first, and the check waits while you’re using the screen.',
-      'iPhone and iPad check prices once a day, from your set time (4:00 am unless changed), as Android does. Opening Restock again the same day doesn’t check again.',
-      'Price history is read once and kept, so screens don’t read it all again at every change (on Android too).',
-      'Long lists come in parts as you scroll, in both designs.',
-      'Diagnostics → Speed on this phone shows anything slow, to copy into a report.',
+      'Server admin on an admin phone (Settings → Sync → Restock server): the phones and tablets, Data, Activity and the server’s settings.',
+      '“Is this you?” A sign-in on the server’s page, and each risky change there, needs a yes on an admin phone, with the same number on both.',
+      'The server’s page looks after the server only now: Phones and admins, Data and Server settings, a page each.',
+      'Cloudflare tunnels work: codes have the server’s https away address. A phone tries home first, for a moment, then away.',
+      'A new first screen: Set up, Join a home server, or Import from backup. Joining a server from it works now.',
+      'Export data can take your connections too (Restock server, Home Assistant), in a locked file or one sent straight across.',
     ],
   },
 ];

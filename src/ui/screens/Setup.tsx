@@ -30,7 +30,9 @@ import { AccessibilitySettings, LookSettings } from './Look';
 import { PermissionList } from './Permissions';
 import { RecallSettings } from './Recalls';
 import { ReceiptsSettings } from './Receipts';
-import { readBackupFile, RestoreSheet } from './Restore';
+import { ImportSheet, RestoreSheet } from './Restore';
+import { takePendingJoin } from '../../lib/connections';
+import { lastRestoreServer } from '../../lib/backup';
 import { StoreFields } from './Stores';
 import { JoinSheet, scanJoinCode } from './Sync';
 import { NotificationSettings, PriceCheckSettings, UpdateRows } from './SettingsParts';
@@ -376,7 +378,7 @@ function FlagBackground() {
   );
 }
 
-function Welcome({ onSetUp, onRestoreFile, onJoin, onA11y }: { onSetUp: () => void; /** A backup file was picked. */ onRestoreFile: (file: File) => void; onJoin: () => void; onA11y: () => void }) {
+function Welcome({ onSetUp, onImport, onJoin, onA11y }: { onSetUp: () => void; /** 0.18.3: Import from backup (a file, or another phone's code). */ onImport: () => void; onJoin: () => void; onA11y: () => void }) {
   // 0.9.10: navy behind the clock and the gesture bar, with light icons, while the welcome shows.
   useEffect(() => {
     document.documentElement.classList.add('on-welcome');
@@ -410,24 +412,13 @@ function Welcome({ onSetUp, onRestoreFile, onJoin, onA11y }: { onSetUp: () => vo
           <button className="welcome-go" onClick={onSetUp}>
             Set up
           </button>
-          {/* 0.13.1: the file box itself is what's tapped (it lies over the words, unseen). Before, a button
-              pressed a hidden file box from code, which on one phone opened nothing and left the screen stuck:
-              a tap straight on a file box is the way every web view opens its picker. */}
-          <label className="welcome-restore welcome-file">
-            Restore from a backup
-            <input
-              type="file"
-              accept="application/json,.json"
-              aria-label="Restore from a backup"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (file) onRestoreFile(file);
-              }}
-            />
-          </label>
+          {/* 0.18.3: the three ways in: Set up, Join a home server (its code, or another phone's), and
+              Import from backup (a file, or straight from another phone's code: ImportSheet). */}
           <button className="welcome-restore" onClick={onJoin}>
-            Join your household
+            Join a home server
+          </button>
+          <button className="welcome-restore" onClick={onImport}>
+            Import from backup
           </button>
         </div>
       </div>
@@ -948,6 +939,9 @@ export function Onboarding() {
   const [joinedMsg, setJoinedMsg] = useState<string>();
   const [reading, setReading] = useState<'privacy' | 'disclaimer'>();
   const [picking, setPicking] = useState<BackupSummary>();
+  // 0.18.3: Import from backup on the first screen (a file, or another phone's code).
+  const [importing, setImporting] = useState(false);
+  const [serverJoin, setServerJoin] = useState<'join' | 'ask'>();
   const [asking, setAsking] = useState(false);
   const nav = useNav();
   const finish = async () => {
@@ -1007,16 +1001,11 @@ export function Onboarding() {
     const got = await scanJoinCode();
     if (!got) return;
     if (got.kind === 'phone') return setJoinCode(got.code);
-    nav.push({ name: 'restockServer', code: got.code });
+    // 0.18.3: setup finishes first, then the server's screen opens with the code. The other way round,
+    // the screen opened in setup, joined, and opened again once setup finished, where it tried the code
+    // a second time (used by then), so joining a server from the first screen didn't seem to work.
     await firstFinish();
-  };
-
-  const restore = async (file: File) => {
-    try {
-      setPicking(await readBackupFile(file));
-    } catch (e) {
-      nav.toast(e instanceof Error ? e.message : 'Could not read that file');
-    }
+    nav.push({ name: 'restockServer', code: got.code, fromSetup: true });
   };
 
   const sheets = (
@@ -1035,6 +1024,16 @@ export function Onboarding() {
           }}
         />
       )}
+      {importing && (
+        <ImportSheet
+          onClose={() => setImporting(false)}
+          onError={(msg) => nav.toast(msg)}
+          onPicked={(summary) => {
+            setImporting(false);
+            setPicking(summary);
+          }}
+        />
+      )}
       {picking && (
         <RestoreSheet
           summary={picking}
@@ -1043,6 +1042,8 @@ export function Onboarding() {
           onClose={() => setPicking(undefined)}
           onDone={(what) => {
             setPicking(undefined);
+            // 0.18.3: Connections from the backup: a code to join the server with, or a note to ask for one.
+            setServerJoin(lastRestoreServer());
             setStage('restored');
             nav.toast(`Restored your ${what}. Welcome back!`);
           }}
@@ -1061,7 +1062,7 @@ export function Onboarding() {
             // 0.16.0: "What should we call you?" first.
             setStage('name');
           }}
-          onRestoreFile={(file) => void restore(file)}
+          onImport={() => setImporting(true)}
           onJoin={() => {
             setJoiningHousehold(true);
             setStage('name');
@@ -1212,12 +1213,33 @@ export function Onboarding() {
             </p>
           </div>
           <PermissionList hideNote />
-          {!joinedMsg && isNative() && (
+          {!joinedMsg && isNative() && serverJoin === 'join' && (
+            <div className="card" style={{ gap: 6 }}>
+              <strong>Join your Restock server</strong>
+              <span className="small">The backup had a code for it. This phone joins as a phone of its own.</span>
+              <button
+                className="btn small primary"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() =>
+                  void (async () => {
+                    const code = takePendingJoin();
+                    if (!code) return joinHousehold();
+                    await firstFinish();
+                    nav.push({ name: 'restockServer', code, fromSetup: true });
+                  })()
+                }
+              >
+                Join the server
+              </button>
+            </div>
+          )}
+          {!joinedMsg && isNative() && serverJoin !== 'join' && (
             <div className="card" style={{ gap: 6 }}>
               <strong>Share with your household again?</strong>
               <span className="small">
-                Backups don't include the household. To sync this phone, join with a new code from the owner phone (Settings → Sync → Add a phone
-                there).
+                {serverJoin === 'ask'
+                  ? 'The backup has your Restock server, without a code to join it. Ask an admin for one (Server admin → Add a phone or tablet), then scan it here.'
+                  : "Backups don't include the household. To sync this phone, join with a new code from your server, or the owner phone (Settings → Sync → Add a phone there)."}
               </span>
               <button
                 className="btn small"

@@ -1,0 +1,1 @@
+Look after your Restock server from an admin phone. Signing in to the server's page needs a yes on an admin phone too, like two-factor. The server's page now looks after the server only. Cloudflare tunnels work, and phones try home first, then away. A new first screen: Set up, Join a home server or Import from backup. Exports can take your connections.

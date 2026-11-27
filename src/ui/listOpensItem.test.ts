@@ -85,7 +85,6 @@ describe('0.12.8: no doubled-up results', () => {
   });
   it('is used where results are kept and shown, on the phone and the web', () => {
     expect((add.match(/uniqueProducts\(/g) ?? []).length).toBeGreaterThanOrEqual(5);
-    expect(read('../server-mode/ui/webSearch.ts')).toMatch(/uniqueProducts\(s\.items\)/);
   });
 });
 

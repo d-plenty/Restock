@@ -8,7 +8,7 @@
 // were drawn first for Plenty Flow (openingScenes/), and each loads only when it plays.
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Holiday } from '../lib/holiday';
-import { LogoDrawing } from './components';
+import { LogoDrawing } from './Logo';
 import './opening.css';
 
 /** How long it shows before it fades (ms). */

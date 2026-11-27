@@ -79,7 +79,25 @@ const targetOf = (path: string) => {
   return u.pathname + u.search;
 };
 
-async function call(method: string, path: string, body?: unknown, raw?: Uint8Array, extra?: Record<string, string>, opts: CallOpts = {}, retried = false): Promise<Response> {
+/** 0.18.3: a request for a yes on an admin phone (approve.mjs on the server). */
+export interface ApproveView {
+  id: string;
+  what: string;
+  number: string;
+  phones: string[];
+  expires?: string;
+  expiresIn: number;
+  status: 'waiting' | 'yes' | 'no' | 'expired' | string;
+}
+let askYes: ((a: ApproveView) => Promise<boolean>) | undefined;
+/**
+ * 0.18.3: who shows "Say yes on an admin phone" (the page's PhoneYes). A risky change the server
+ * answers with 403 'approve' waits for it, then goes again with `approved` in place of the passphrase,
+ * so every risky change on the page gets the second step without each one doing it.
+ */
+export const whenYesNeeded = (fn: ((a: ApproveView) => Promise<boolean>) | undefined) => (askYes = fn);
+
+async function call(method: string, path: string, body?: unknown, raw?: Uint8Array, extra?: Record<string, string>, opts: CallOpts = {}, retried = false, yesDone = false): Promise<Response> {
   let bytes: Uint8Array | undefined = raw;
   let type: string | undefined = raw ? 'application/octet-stream' : undefined;
   if (!raw && body !== undefined) {
@@ -111,11 +129,24 @@ async function call(method: string, path: string, body?: unknown, raw?: Uint8Arr
       const t = Number(r.headers.get('X-Restock-Time'));
       if (Number.isFinite(t) && t > 0) {
         skew = t - Date.now();
-        return call(method, path, body, raw, extra, opts, true);
+        return call(method, path, body, raw, extra, opts, true, yesDone);
       }
     }
+    // 0.18.3: a yes on an admin phone first, then the same change again with it.
+    const approve = (j as { approve?: ApproveView }).approve;
+    if (r.status === 403 && code === 'approve' && approve && askYes && !yesDone && body && typeof body === 'object' && !Array.isArray(body)) {
+      if (!(await askYes(approve))) throw new ApiError(403, 'approve-cancelled', 'Nothing changed: no admin phone said yes.');
+      const next: Record<string, unknown> = { ...(body as Record<string, unknown>), approved: approve.id };
+      delete next.confirm;
+      delete next.c;
+      delete next.proof;
+      return call(method, path, next, raw, extra, opts, retried, true);
+    }
     if (r.status === 401 && !opts.quiet401) onSignedOut?.();
-    const more = { ...(typeof j.retryAfter === 'number' ? { retryAfter: j.retryAfter } : {}), ...(typeof j.next === 'string' ? { next: j.next } : {}) };
+    // 0.18.3: the whole refusal (an approve request, a minimum version, …), not only retryAfter and next.
+    const { error: _e, message: _m, ...more } = j as Record<string, unknown>;
+    void _e;
+    void _m;
     throw new ApiError(r.status, code, typeof j.message === 'string' ? j.message : words(r.status, code), Object.keys(more).length ? more : undefined);
   }
   return r;
@@ -252,6 +283,38 @@ export interface HouseSettings {
   keepMonths?: number | null;
   /** 0.9.5 (web search): "Let the web page search the shops" (off unless turned on). */
   webSearch?: boolean;
+  // 0.18.3: the rest of Server settings (GET answers all of them; PUT takes any of the changeable ones).
+  home?: string | null;
+  away?: string | null;
+  /** Set where the server runs (RESTOCK_HOME_URL / RESTOCK_AWAY_URL): not changeable here. */
+  homeFixed?: boolean;
+  awayFixed?: boolean;
+  addrSet?: boolean;
+  timeZone?: string | null;
+  timeZoneSet?: boolean;
+  minApp?: string;
+  lowestApp?: string;
+  version?: string;
+  /** Sign out after: 1, 24, 168 or 720 hours of not being used. */
+  sessionHours?: number;
+  user?: string | null;
+  updates?: Updates;
+  updateCheck?: boolean;
+  inDocker?: boolean;
+  /** The admin phones that can say yes (on 0.18.3 or newer). */
+  approvers?: string[];
+  recoverySaved?: boolean;
+  /** Sign in by scanning with a phone (on unless turned off). */
+  qrSignIn?: boolean;
+}
+
+export interface Updates {
+  on: boolean;
+  version: string;
+  latest: string | null;
+  newer: boolean;
+  checked: string | null;
+  url: string | null;
 }
 
 export interface HaConfig {
@@ -306,7 +369,7 @@ export const v3Send = v3send;
 export const api3 = {
   challenge: (user: string) => json<{ salt: string; c: string; kex: string; setup?: boolean }>(call('GET', `/api/v3/login/challenge?user=${enc3(user)}`)),
   login: (body: { user: string; c: string; epub: string; proof: string }) =>
-    json<{ session: string; expires?: string | number; sealed: string }>(call('POST', '/api/v3/login', body, undefined, undefined, { quiet401: true })),
+    json<{ session: string; expires?: string | number; sealed?: string; approve?: ApproveView }>(call('POST', '/api/v3/login', body, undefined, undefined, { quiet401: true })),
   logout: (everywhere = false) => call('POST', '/api/v3/logout', everywhere ? { everywhere: true } : {}),
   /** This session's keys again (after a rekey, or setting up the house). Null when the server has no such path. */
   session: async (): Promise<SessionGift | null> => {
@@ -319,6 +382,15 @@ export const api3 = {
   },
   setup: (name: string) => v3send<SessionGift & { ok?: boolean }>('POST', '/api/v3/setup', { name }),
   qrStart: (epub: string) => json<{ id: string; kex: string; expires?: string | number }>(call('POST', '/api/v3/qrlogin', { epub })),
+  /** 0.18.3: a sign-in or risky change waiting for a yes on an admin phone. */
+  approveStatus: (id: string) => json<ApproveView & { sealed?: string }>(call('GET', `/api/v3/approve/${enc3(id)}`)),
+  approveByRecovery: (id: string, recovery: string) => json<ApproveView>(call('POST', `/api/v3/approve/${enc3(id)}`, { recovery }, undefined, undefined, { seal: true })),
+  approveCancel: (id: string) => call('DELETE', `/api/v3/approve/${enc3(id)}`).then(() => undefined),
+  recoverySaved: () => v3send<{ saved: boolean }>('POST', '/api/v3/recovery', { saved: true }),
+  userName: (user: string, confirm: Confirm) => v3send<{ user: string }>('POST', '/api/v3/username', { user, confirm }),
+  serverLog: () => v3get<{ text: string; lines: number }>('/api/v3/server/log'),
+  restart: () => v3send<{ ok: boolean }>('POST', '/api/v3/server/restart', {}),
+  updates: () => v3get<Updates>('/api/v3/server/updates'),
   qrPoll: (id: string) => json<{ pending?: boolean; status?: string; session?: string; expires?: string | number; sealed?: string }>(call('GET', `/api/v3/qrlogin/${enc3(id)}`)),
 
   phones: async () => listOf<Phone>(await v3get<unknown>('/api/v3/phones'), 'phones'),

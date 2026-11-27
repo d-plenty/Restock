@@ -364,7 +364,8 @@ describe('0.13.2: the iPhone as a phone of a house', () => {
     const p = await phone(refuse(410, { error: 'used' }));
     p.raw.run("INSERT INTO items (id, name, created_at, section) VALUES ('i-bread', 'Bread', '2026-11-01T00:00:00.000Z', 'pantry')");
     const before = p.raw.exec("SELECT stamp FROM sync_log WHERE pk = 'i-bread'")[0].values[0][0];
-    await expect(p.house.join(code)).rejects.toThrow(/has been used or has run out/);
+    // 0.18.3: used and expired say which.
+    await expect(p.house.join(code)).rejects.toThrow(/already used/);
     expect((await p.house.joined())).toBe(false);
     expect(p.raw.exec("SELECT stamp FROM sync_log WHERE pk = 'i-bread'")[0].values[0][0]).toBe(before);
     expect((await p.e.meta('key'))).toBeNull();

@@ -61,6 +61,28 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         this.api = api;
     }
 
+    /** 0.18.3: how long to wait to connect to an address that isn't the last one to try (then the next is tried). */
+    static final int QUICK_CONNECT_MS = 2500;
+
+    interface Call {
+        SyncDav.Response run() throws Exception;
+    }
+
+    /** Runs `c` with the short connect wait when `b` isn't the last address of `all` (the home one, with away after it). */
+    static SyncDav.Response quickly(List<String> all, String b, Call c) throws Exception {
+        boolean quick = all.size() > 1 && !b.equals(all.get(all.size() - 1));
+        if (quick) SyncDav.CONNECT_LIMIT.set(QUICK_CONNECT_MS);
+        try {
+            return c.run();
+        } finally {
+            if (quick) SyncDav.CONNECT_LIMIT.remove();
+        }
+    }
+
+    private SyncDav.Response quickly(String b, Call c) throws Exception {
+        return quickly(bases, b, c);
+    }
+
     /** The address that answered this round (after names()), or null. */
     String reached() {
         return base;
@@ -401,7 +423,7 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         for (String a : bases) {
             if (a == null) continue;
             try {
-                SyncDav.Response r = SyncDav.request("GET", URI.create(a + API3 + "/health"), new LinkedHashMap<>(), null, SyncDav.MAX_SMALL);
+                SyncDav.Response r = quickly(bases, a, () -> SyncDav.request("GET", URI.create(a + API3 + "/health"), new LinkedHashMap<>(), null, SyncDav.MAX_SMALL));
                 if (r.status != 200) continue;
                 JSONObject o = new JSONObject(r.text());
                 o.put("_reached", a);
@@ -426,7 +448,7 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
             try {
                 Map<String, String> h = new LinkedHashMap<>();
                 h.put("Content-Type", "application/json");
-                r = SyncDav.request("POST", URI.create(a + API3 + "/join"), h, b, SyncDav.MAX_SMALL);
+                r = quickly(bases, a, () -> SyncDav.request("POST", URI.create(a + API3 + "/join"), h, b, SyncDav.MAX_SMALL));
             } catch (Exception e) {
                 last = e;
                 continue;
@@ -441,9 +463,13 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
             if ("not-empty".equals(err)) throw new NotEmptyException(said);
             if ("device-taken".equals(err))
                 throw new SyncDav.Problem(said.isEmpty() ? "That phone is already on this server. Remove it on the server's Phones page first, then add it again." : said);
-            if ("invite".equals(err)) throw new SyncDav.Problem("That code isn't from this server. Make a new one on the server's Add a phone page.");
-            if (r.status == 410 || "used".equals(err) || "expired".equals(err))
-                throw new SyncDav.Problem("That code has been used or has run out. Make a new one on the server's Add a phone page (each code works once, for 10 minutes).");
+            if ("invite".equals(err)) throw new SyncDav.Problem("That code isn't from this server. Ask an admin for a new one (Server admin → Add a phone or tablet, or the server's page).");
+            // 0.18.3: used and expired say which (a server from before 0.18.3 only says 410).
+            if ("used".equals(err)) throw new SyncDav.Problem(said.isEmpty() ? "That code was already used: each one adds one phone. Ask an admin for a new one (Server admin → Add a phone or tablet)." : said);
+            if ("expired".equals(err)) throw new SyncDav.Problem(said.isEmpty() ? "That code has run out (they last 10 minutes). Ask an admin for a new one (Server admin → Add a phone or tablet)." : said);
+            if ("old-app".equals(err) || "update".equals(err)) throw new SyncDav.Problem(said.isEmpty() ? "Update Restock to join this server." : said);
+            if (r.status == 410)
+                throw new SyncDav.Problem("That code has been used or has run out. Ask an admin for a new one (each code works once, for 10 minutes).");
             if ("member".equals(err) || "removed".equals(err) || (body.optBoolean("member", false) && (r.status == 401 || r.status == 403)))
                 throw new NotMember(said.isEmpty() ? "The server doesn't have this phone in its household. Add it on the server's Add a phone page instead." : said);
             if (r.status == 404) throw new SyncDav.Problem("That server needs updating to Restock server 0.9.4 for this code.");
@@ -564,7 +590,7 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         }
         if (body != null)
             h.put("Content-Type", sealed ? SEALED : path.startsWith(api + "/files/") ? (path.endsWith(".json") ? "application/json" : "application/octet-stream") : "application/json");
-        SyncDav.Response r = SyncDav.request(method, u, h, body, max);
+        SyncDav.Response r = quickly(b, () -> SyncDav.request(method, u, h, body, max));
         if (r.status == 401 || r.status == 403) {
             String err = errorOf(r);
             if (err.equals("clock")) return r;

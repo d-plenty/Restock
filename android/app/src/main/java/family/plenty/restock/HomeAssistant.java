@@ -89,6 +89,12 @@ final class HomeAssistant {
         KEYS.forgetKey();
     }
 
+    /** 0.18.3: the saved token and the address it's for, or null (Export data → Connections). */
+    static String[] exportToken(Context c) throws Exception {
+        if (!hasToken(c)) return null;
+        return new String[] { token(c), prefs(c).getString(FOR, "") };
+    }
+
     private static String token(Context c) throws Exception {
         String sealed = prefs(c).getString(TOKEN, null);
         if (sealed == null) throw new Exception("No token is saved on this phone. Paste one in on Settings → Home Assistant.");

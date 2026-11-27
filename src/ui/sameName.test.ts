@@ -37,7 +37,6 @@ describe('0.12.10: no two items with one name', () => {
     expect(read('./screens/Add.tsx')).toMatch(/target !== 'list' && sameNameItem\(everyItem, name\)/);
     expect(read('./screens/Add.tsx')).toMatch(/target !== 'list' && takenItem/);
     expect(read('./screens/Item.tsx')).toMatch(/sameNameItem\(everyItem, name, group\)/);
-    expect(read('../server-mode/ui/WebShopSearch.tsx')).toMatch(/target !== 'list' && takenItem/);
   });
 });
 

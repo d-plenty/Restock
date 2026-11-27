@@ -381,7 +381,7 @@ export class RestockIos extends WebPlugin {
     return sync.serverData(o?.path ?? '');
   }
   // 0.18.0: an admin phone's requests about the server's phones.
-  async serverAdmin(o: { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; path: string; body?: Record<string, unknown> }) {
+  async serverAdmin(o: { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string; body?: Record<string, unknown> }) {
     return sync.serverAdmin(o?.method ?? 'GET', o?.path ?? '', o?.body);
   }
 
@@ -528,6 +528,10 @@ export class RestockIos extends WebPlugin {
   }
   async haHasToken() {
     return { saved: !!(await this.haSaved()) };
+  }
+  async haExportToken() {
+    const s = await this.haSaved();
+    return s ? { token: s.token, address: s.for } : {};
   }
   async haForgetToken() {
     await Filesystem.deleteFile({ path: HA_FILE, directory: Directory.Library }).catch(() => undefined);

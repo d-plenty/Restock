@@ -22,7 +22,10 @@ import { syncRound, type Remote, type RoundResult } from '../server-mode/round';
 import { forgetHousehold, myKeys } from './household';
 
 /** One request: what was sent back, as bytes. Throws only when the server couldn't be reached at all. */
-export type Http = (o: { method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'PROPFIND' | 'MKCOL'; url: string; headers: Record<string, string>; body?: Uint8Array }) => Promise<{ status: number; headers: Record<string, string>; bytes: Uint8Array }>;
+/** 0.18.3: `connectMs`, a shorter wait to connect (the home address, with the away one to try next). */
+/** 0.18.3: how long to wait to connect to an address that isn't the last one to try. */
+export const QUICK_CONNECT_MS = 2500;
+export type Http = (o: { method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'PROPFIND' | 'MKCOL'; url: string; headers: Record<string, string>; body?: Uint8Array; connectMs?: number }) => Promise<{ status: number; headers: Record<string, string>; bytes: Uint8Array }>;
 
 /** Something the person can act on, in words (SyncDav.Problem). */
 export class HouseProblem extends Error {
@@ -232,7 +235,7 @@ export class House {
   async health(where: string[]): Promise<Record<string, unknown> | null> {
     for (const a of where) {
       try {
-        const r = await this.http({ method: 'GET', url: `${a}/api/v3/health`, headers: { Accept: 'application/json' } });
+        const r = await this.http({ method: 'GET', url: `${a}/api/v3/health`, headers: { Accept: 'application/json' }, ...(a !== where[where.length - 1] ? { connectMs: QUICK_CONNECT_MS } : {}) });
         if (r.status === 200) return json(r.bytes);
       } catch {
         // not reachable from here: the other address
@@ -408,9 +411,13 @@ export class House {
       if (err === 'device-taken' || (r.status === 409 && err !== 'not-empty'))
         throw new HouseProblem(said || 'This phone is already on that server. Remove it on the Phones page first, then add it again.');
       if (err === 'not-empty') throw new HouseProblem(said || "That server's house already has things in it. Scan a fresh Add a phone code to join it.");
-      if (err === 'invite') throw new HouseProblem("That code isn't from this server. Make a new one on the server's Add a phone page.");
-      if (r.status === 403 || r.status === 410 || err === 'used' || err === 'expired')
-        throw new HouseProblem("That code has been used or has run out. Make a new one on the server's Add a phone page (each code works once, for 10 minutes).");
+      if (err === 'invite') throw new HouseProblem("That code isn't from this server. Ask an admin for a new one (Server admin → Add a phone or tablet, or the server's page).");
+      // 0.18.3: used and expired say which (a server from before 0.18.3 only says 410).
+      if (err === 'used') throw new HouseProblem(said || 'That code was already used: each one adds one phone. Ask an admin for a new one (Server admin → Add a phone or tablet).');
+      if (err === 'expired') throw new HouseProblem(said || 'That code has run out (they last 10 minutes). Ask an admin for a new one (Server admin → Add a phone or tablet).');
+      if (r.status === 403 && said) throw new HouseProblem(said);
+      if (r.status === 403 || r.status === 410)
+        throw new HouseProblem('That code has been used or has run out. Ask an admin for a new one (each code works once, for 10 minutes).');
       if (r.status === 507) throw new HouseProblem('The server already has as many phones as it takes.');
       if (r.status === 429) throw new HouseProblem('The server is busy. Try again in a minute.');
       throw new HouseProblem(said || `The server turned the code down (${r.status}).`);
@@ -506,7 +513,7 @@ export class House {
    * again there, and that is the address kept; any other redirect counts as not reaching the server.
    */
   private async ask(base: string, o: { method: 'GET' | 'PUT' | 'DELETE' | 'POST' | 'PATCH'; path: string; headers: Record<string, string>; body?: Uint8Array }): Promise<{ r: Awaited<ReturnType<Http>>; base: string }> {
-    const r = await this.http({ method: o.method, url: base + o.path, headers: o.headers, body: o.body });
+    const r = await this.http({ method: o.method, url: base + o.path, headers: o.headers, body: o.body, ...(this.quick.has(base) ? { connectMs: QUICK_CONNECT_MS } : {}) });
     if (r.status < 300 || r.status >= 400 || r.status === 304) return { r, base };
     const secure = base.replace(/^http:\/\//i, 'https://');
     let to = '';
@@ -528,12 +535,19 @@ export class House {
     for (const k of ['server_home', 'server_away', 'server_reached']) if ((await this.e.meta(k)) === from) (await this.e.setMeta(k, to));
   }
   private movedTo = new Map<string, string>();
+  /** 0.18.3: the addresses being tried with another one after them (a short wait to connect). */
+  private quick = new Set<string>();
 
   /** A signed request at the first address that answers; a wrong clock is put right once with the server's time. */
   private async send(method: 'GET' | 'PUT' | 'DELETE' | 'POST' | 'PATCH', path: string, body?: Uint8Array, sealedN?: string): Promise<Awaited<ReturnType<Http>>> {
     let last: unknown;
-    for (const base of (await this.bases())) {
+    const all = await this.bases();
+    for (const base of all) {
       let r: Awaited<ReturnType<Http>>;
+      // 0.18.3: not the last address to try: give up on it after a moment (away from home, a home
+      // address that doesn't answer took 15 seconds before the away one was tried).
+      if (all.length > 1 && base !== all[all.length - 1]) this.quick.add(base);
+      else this.quick.delete(base);
       try {
         r = await this.sendOnce(base, method, path, body, sealedN);
         if (r.status === 401 && errorOf(r.bytes) === 'clock') {
@@ -560,7 +574,7 @@ export class House {
    * server key (the server's Your data: its figures, and this phone's spending and searches going up).
    * The answer has to name this request's own nonce, so an old answer can't be played back.
    */
-  async sealed(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<Record<string, unknown>> {
+  async sealed(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<Record<string, unknown>> {
     if (!(await this.joined())) throw new HouseProblem("This phone isn't in a household on a Restock server.");
     const keys = (await this.serverKeys());
     const keyv = Number((await this.e.meta('keyv')) ?? 0) || 0;
@@ -644,8 +658,26 @@ export class House {
   }
 
   /** One round: a newer key, the others' files, then this phone's own. Notes when and how it went. */
+  /**
+   * 0.18.3: home first. At the start of each round, when the away address answered last, the home one
+   * is asked (a moment at most): back at home, the round goes there, not out through the internet and
+   * back. The rest of the round keeps to the one that answered (bases(): the one reached last first).
+   */
+  private async preferHome(): Promise<void> {
+    const home = await this.e.meta('server_home');
+    const last = await this.e.meta('server_reached');
+    if (!home || !last || last === home) return;
+    try {
+      const r = await this.http({ method: 'GET', url: `${home}/api/v3/health`, headers: { Accept: 'application/json' }, connectMs: QUICK_CONNECT_MS });
+      if (r.status === 200) await this.e.setMeta('server_reached', home);
+    } catch {
+      // not at home: away it is
+    }
+  }
+
   async sync(): Promise<RoundResult & { rekeyed: boolean }> {
     if (!(await this.joined())) throw new HouseProblem('This phone isn\'t on a Restock server.');
+    await this.preferHome();
     try {
       const remote = this.remote();
       const first = await remote.files();

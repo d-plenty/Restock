@@ -8,7 +8,6 @@ const list = read('./screens/List.tsx');
 const item = read('./screens/Item.tsx');
 const sizes = read('./OtherSizes.tsx');
 const comps = read('./components.tsx');
-const web = read('../server-mode/ui/WebShopSearch.tsx');
 const tokens = read('./tokens.css');
 const css = read('./styles.css');
 
@@ -16,16 +15,13 @@ describe('0.12.7: the name is yours', () => {
   it('a new item is never named for you: the box is empty, with one idea to tap', () => {
     expect(add).not.toMatch(/setName\(genericName\(/);
     expect(add).toMatch(/<NameFirst/);
-    expect(web).toMatch(/<NameFirst/);
     expect(read('./screens/NameFirst.tsx')).toMatch(/Use "\$\{idea\}"|Use &quot;|Use “|Use "/);
   });
   it('saving without a name is stopped, on the phone and the web', () => {
     expect(add).toMatch(/setNameMissing\(true\)/);
-    expect(web).toMatch(/nameMissing|setNameMissing/);
   });
   it('a category is chosen only when Restock is sure', () => {
     expect(add).toMatch(/confidentCategoryId\(/);
-    expect(web).toMatch(/confidentCategoryId\(/);
   });
 });
 
@@ -36,9 +32,6 @@ describe('0.12.7: Also happy with, while adding', () => {
     expect(add).toMatch(/Make it an alternative/);
     expect(add).toMatch(/Move to Products I buy/); // 0.12.8: was "Make it what I buy"
     expect(add).toMatch(/addItemFromPicks\([^)]*altPicks\)/s);
-  });
-  it('the web says where it works (it is a phone part)', () => {
-    expect(web).toMatch(/Also happy with[^<]*phone/s);
   });
 });
 
@@ -70,7 +63,6 @@ describe('0.12.7: the ⓘ and the was-date', () => {
     expect(more).not.toMatch(/info-dot|more-info-dot/);
     expect(item).toMatch(/<RowInfo/);
     expect(sizes).toMatch(/<RowInfo/);
-    expect(web).toMatch(/<RowInfo/);
   });
   it('"Was $5.80 - 01/09/2026" is said in words, and flagged past 14 days, without calling it fake', () => {
     expect(comps).toMatch(/was-since\$\{was\.old \? ' old' : ''\}/);

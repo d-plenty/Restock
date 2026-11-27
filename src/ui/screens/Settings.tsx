@@ -1,3 +1,5 @@
+import { takePendingJoin } from '../../lib/connections';
+import { lastRestoreServer } from '../../lib/backup';
 import { useResetOn } from '../useResetOn';
 import { SettingsSideContext, useSettingsSplit } from '../settingsSide';
 import { isIos } from '../../lib/platform';
@@ -860,6 +862,11 @@ function SettingsBody({ page, side, onOpen, current }: { page?: SettingsPage; /*
           onDone={(what, whole) => {
             setPicking(undefined);
             nav.toast(whole ? what : `Replaced your ${what}`);
+            // 0.18.3: Connections brought a code for the Restock server: join with it now.
+            const server = lastRestoreServer();
+            const code = server === 'join' ? takePendingJoin() : undefined;
+            if (code) return nav.push({ name: 'restockServer', code });
+            if (server === 'ask') return nav.toast('Your Restock server came with the backup. Ask an admin for a code to join it.');
             if (whole) return;
             // 0.8.2: backups never hold the household; offer to join it again.
             void syncInfo().then(async (i) => {
