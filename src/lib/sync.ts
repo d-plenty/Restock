@@ -1,4 +1,5 @@
 import { isIos } from './platform';
+import { afterScreens } from './screensFirst';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { cachedSettings, getSettings, reapplyHouseholdSettings } from './db';
@@ -176,8 +177,10 @@ export function wireSync(): void {
   wired = true;
   void reapplyHouseholdSettings().catch(quiet('sync'));
   // 0.13.2: an iPhone or iPad has no background sync, so it syncs as soon as Restock opens.
+  // 0.18.1: once the screens are up (lib/screensFirst.ts).
   if (isIos())
-    void syncInfo()
+    void afterScreens()
+      .then(() => syncInfo())
       .then((i) => (i.paired ? RestockNative.syncNow() : undefined))
       .catch(quiet('sync'));
   void RestockNative.addListener('syncChanged', () => {

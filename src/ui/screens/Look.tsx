@@ -1,17 +1,18 @@
 import { isIos } from '../../lib/platform';
 import { useId, useState } from 'react';
 import { ACCENTS, AUS_GREEN, ICON_COLOURS, ICON_PAINT, nearestIcon, SHOWN_ACCENTS, SHOWN_ICONS } from '../../lib/looks';
+import { ColourWheel } from '../ColourWheel';
+import { animationsSummary } from './Animations';
 // 0.9.5 (save): on a settings screen these wait for Save settings (settingsDraft.ts).
 import { afterSave, updateSettings } from '../../lib/settingsDraft';
 import { RestockNative } from '../../lib/sql/native';
-import { textOn } from '../../lib/theme';
+import { pickSimple, leaveSimple } from '../../lib/simple';
+import { NAVY, textOn } from '../../lib/theme';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
 import { Icon, LogoDrawing, More, ThemePicker } from '../components';
-import { lessMotion } from '../Opening';
-import { HOLIDAY_NAMES, HOLIDAY_ORDER, HOLIDAY_WHEN } from '../../lib/holiday';
-import { OpeningPreview } from '../OpeningPreview';
 import { useNav } from '../nav';
+import { useOpenSettingsPage } from '../settingsSide';
 
 // Settings → Look and colours, and Settings → Accessibility. Also used by the setup tiles.
 
@@ -25,19 +26,44 @@ function IconPicture({ id }: { id: string }) {
   );
 }
 
+/** 0.18.1: a row of colour swatches, then Restock's own colour wheel for any other colour. */
+function Swatches({ label, value, onPick, first, wheelTitle }: { label: string; value: string | undefined; onPick: (hex: string | undefined) => void; first?: { name: string; hex: string }; wheelTitle: string }) {
+  const [wheel, setWheel] = useState(false);
+  const order = (id: string) => (SHOWN_ACCENTS.includes(id) ? SHOWN_ACCENTS.indexOf(id) : SHOWN_ACCENTS.length);
+  const list = ACCENTS.filter((a) => SHOWN_ACCENTS.includes(a.id) || (!!value && a.hex.toLowerCase() === value.toLowerCase())).sort((a, b) => order(a.id) - order(b.id));
+  const current = (value ?? first?.hex ?? '').toLowerCase();
+  const own = !!value && !list.some((a) => a.hex.toLowerCase() === current) && current !== first?.hex.toLowerCase();
+  const swatch = (key: string, name: string, hex: string, pick: string | undefined, on: boolean) => (
+    <button key={key} type="button" role="radio" aria-checked={on} aria-label={name} className={`swatch${on ? ' on' : ''}`} style={{ background: hex, color: textOn(hex) }} onClick={() => onPick(pick)}>
+      {on && <Icon name="check" size={16} stroke={3} />}
+    </button>
+  );
+  return (
+    <div className="swatches" role="radiogroup" aria-label={label}>
+      {first && swatch('first', first.name, first.hex, undefined, !value)}
+      {list.filter((a) => a.hex.toLowerCase() !== first?.hex.toLowerCase()).map((a) => swatch(a.id, a.name, a.hex, a.hex, !!value && a.hex.toLowerCase() === current))}
+      <button type="button" role="radio" aria-checked={own} className={`swatch wheel${own ? ' on' : ''}`} aria-label="Pick any colour on the colour wheel" onClick={() => setWheel(true)}>
+        {own && <Icon name="check" size={16} stroke={3} />}
+      </button>
+      {wheel && <ColourWheel title={wheelTitle} value={value ?? first?.hex ?? AUS_GREEN} onPick={(hex) => onPick(hex)} onClose={() => setWheel(false)} />}
+    </div>
+  );
+}
+
+const colourName = (hex: string | undefined, none: string) => (hex ? (ACCENTS.find((a) => a.hex.toLowerCase() === hex.toLowerCase())?.name ?? 'Your own colour') : none);
+
 export function LookSettings({ settings }: { settings: Settings }) {
   const nav = useNav();
   const look = settings.look;
+  const simple = look.style === 'simple';
+  // 0.18.1: on the right, while Settings is side by side
+  const openPage = useOpenSettingsPage();
   const accent = look.accent ?? AUS_GREEN;
   const [iconBusy, setIconBusy] = useState(false);
-  const [seeing, setSeeing] = useState(false); // 0.16.0: See the openings
   const setLook = (patch: Partial<Settings['look']>) => updateSettings({ look: { ...look, ...patch } });
 
   const iconId = look.icon === 'match' ? nearestIcon(accent).id : look.icon;
-  // 0.17.0: the 11 offered colours, plus a colour picked before that isn't among them
-  // 0.18.0: in the order Settings lists them (greens, blues, purple to red, then the rest).
   const order = (ids: string[]) => (id: string) => (ids.includes(id) ? ids.indexOf(id) : ids.length);
-  const shownAccents = ACCENTS.filter((a) => SHOWN_ACCENTS.includes(a.id) || (a.id !== 'green' && a.hex.toLowerCase() === accent.toLowerCase())).sort((a, b) => order(SHOWN_ACCENTS)(a.id) - order(SHOWN_ACCENTS)(b.id));
   const shownIcons = ICON_COLOURS.filter((c) => SHOWN_ICONS.includes(c.id) || c.id === iconId).sort((a, b) => order(SHOWN_ICONS)(a.id) - order(SHOWN_ICONS)(b.id));
   const setIcon = async (id: string) => {
     await setLook({ icon: id, iconPicked: id !== 'match' });
@@ -71,6 +97,20 @@ export function LookSettings({ settings }: { settings: Settings }) {
     });
   };
 
+  // 0.18.1: Simple turns the animations off and Less motion on (each can go back on); going back to
+  // the default theme puts them back as they were.
+  const pickStyle = async (style: Settings['look']['style']) => {
+    if (style === look.style) return;
+    const next = style === 'simple' ? pickSimple(settings) : leaveSimple(settings);
+    await updateSettings(next);
+    if (style === 'simple') {
+      const reader = await simpleReaderNote();
+      nav.toast(`Simple: the animations are off and Less motion is on. Turn any back on in Animations or Accessibility.${reader}`);
+    }
+  };
+
+  const barDefault = simple ? { name: 'The same as the accent', hex: accent } : { name: 'Navy (the default)', hex: NAVY };
+
   return (
     <div className="card" style={{ gap: 14 }}>
       <div className="field">
@@ -78,144 +118,94 @@ export function LookSettings({ settings }: { settings: Settings }) {
         <ThemePicker value={settings.theme} onChange={(theme) => updateSettings({ theme })} />
       </div>
 
-      <label className="check" style={{ padding: 0 }}>
-        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title" style={{ fontSize: 15 }}>
-            True black in dark mode
-          </span>
-          <span className="small">
-            A pure black background in dark mode.{' '}
-            <More title="True black in dark mode">
-              <p>For OLED screens: the background is pure black, so those pixels switch off. It saves battery and gives deeper contrast.</p>
-              <p>On to start with. It shows when Light or dark is set to Dark, or to System while your phone is in dark mode.</p>
-            </More>
-          </span>
-        </span>
-        <input type="checkbox" className="switch" checked={look.black !== false} onChange={(e) => void setLook({ black: e.target.checked })} />
-      </label>
-
       <div className="field">
         <span>Style</span>
         <div className="seg" role="group" aria-label="Style">
-          {/* 0.16.0: "Default theme" (it was called Australian) */}
-          <button type="button" aria-pressed={look.style === 'australia'} onClick={() => setLook({ style: 'australia' })}>
+          {/* 0.16.0: "Default theme" (it was called Australian). 0.18.1: Simple replaced Plain. */}
+          <button type="button" aria-pressed={!simple} onClick={() => void pickStyle('australia')}>
             Default theme
           </button>
-          <button type="button" aria-pressed={look.style === 'plain'} onClick={() => setLook({ style: 'plain' })}>
-            Plain
+          <button type="button" aria-pressed={simple} onClick={() => void pickStyle('simple')}>
+            Simple
           </button>
         </div>
         <span className="small">
-          The default theme has navy bars, gold and green. Plain is simpler.{' '}
-          <More title="Default theme">
-            <p>The default theme is Restock&rsquo;s Australian theme: navy, gold and green, the colours of the flag and the green and gold.</p>
-            <p>On a holiday it takes that holiday&rsquo;s colours for a while (with Holiday themes on), then goes back by itself. Pick your own accent colour and it stays yours all year.</p>
+          {simple ? 'White, one colour, square and flat, and lighter work for older phones.' : 'Navy bars, gold and green.'}{' '}
+          <More title="Style">
+            <p>The default theme is Restock&rsquo;s Australian theme: navy, gold and green, the colours of the flag and the green and gold. On a holiday it takes that holiday&rsquo;s colours for a while (with Holiday themes on), then goes back by itself.</p>
+            <p>Simple is white with one colour of your choice, a band of it at the top, square corners and no shadows. In dark mode it&rsquo;s plain black. It also goes easier on the phone: long lists come in parts, price checks take longer breaks, and charts are plainer. A good pick for an older phone or tablet.</p>
+            <p>Picking Simple turns the opening animation and the holiday themes off and Less motion on. Turn any back on in Animations or Accessibility. Going back to the default theme puts them back as they were.</p>
           </More>
         </span>
       </div>
 
-      {/* 0.16.0: the opening animation (Opening.tsx): this phone's own. Off, no opening at all. */}
-      <label className="check" style={{ padding: 0 }}>
-        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title" style={{ fontSize: 15 }}>
-            Opening animation
+      {simple ? (
+        <label className="check" style={{ padding: 0 }}>
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              Accent band in dark mode
+            </span>
+            <span className="small">Off: dark mode is plain black. On: the coloured band stays at the top.</span>
           </span>
-          <span className="small">
-            A short animation when Restock starts.{' '}
-            <More title="Opening animation">
-              <p>Two and a half seconds (three and a half on a holiday), each time Restock starts from closed (not when you come back to it). A tap ends it early.</p>
-              <p>With Less motion on (Accessibility, or your phone&rsquo;s own Reduce motion) it&rsquo;s a still picture instead. Turned off here, there&rsquo;s no opening at all, holidays included.</p>
-              <p>Just for this phone.</p>
-            </More>
+          <input type="checkbox" className="switch" checked={!!look.band} onChange={(e) => void setLook({ band: e.target.checked })} />
+        </label>
+      ) : (
+        <label className="check" style={{ padding: 0 }}>
+          <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <span className="title" style={{ fontSize: 15 }}>
+              True black in dark mode
+            </span>
+            <span className="small">
+              A pure black background in dark mode.{' '}
+              <More title="True black in dark mode">
+                <p>For OLED screens: the background is pure black, so those pixels switch off. It saves battery and gives deeper contrast.</p>
+                <p>On to start with. It shows when Light or dark is set to Dark, or to System while your phone is in dark mode.</p>
+              </More>
+            </span>
           </span>
-        </span>
-        <input type="checkbox" className="switch" checked={look.opening !== false} onChange={(e) => void setLook({ opening: e.target.checked })} />
-      </label>
-
-      {/* 0.16.0: the holidays (lib/holiday.ts): this phone's own */}
-      <label className="check" style={{ padding: 0 }}>
-        <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <span className="title" style={{ fontSize: 15 }}>
-            Holiday themes
-          </span>
-          <span className="small">
-            Christmas, New Year, Australia Day, Easter and Halloween.{' '}
-            <More title="Holiday themes">
-              <p>On a holiday Restock opens with that holiday&rsquo;s animation (with Opening animation on). On the default theme the app also takes the holiday&rsquo;s colours, with a small decoration at the top of Home.</p>
-              <p>Christmas is 1 to 26 December, New Year 27 December to 1 January, Australia Day 19 to 27 January, Easter the three weeks up to Easter Monday, and Halloween 11 October to 1 November. Each looks like day in light mode and night in dark mode. Afterwards everything goes back to normal by itself.</p>
-              <p>Turn any one off on its own below. Just for this phone.</p>
-            </More>
-          </span>
-        </span>
-        <input type="checkbox" className="switch" checked={look.holidays !== false} onChange={(e) => void setLook({ holidays: e.target.checked })} />
-      </label>
-      {/* 0.18.0: each holiday on or off on its own, while Holiday themes is on */}
-      {look.holidays !== false && (
-        <div className="holiday-each" role="group" aria-label="Each holiday">
-          {HOLIDAY_ORDER.map((h) => (
-            <label key={h} className="check" style={{ padding: 0 }}>
-              <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
-                <span className="title" style={{ fontSize: 15 }}>
-                  {HOLIDAY_NAMES[h]}
-                </span>
-                <span className="small">{HOLIDAY_WHEN[h]}</span>
-              </span>
-              <input
-                type="checkbox"
-                className="switch"
-                checked={!look.holidaysOff?.includes(h)}
-                onChange={(e) => {
-                  const off = new Set(look.holidaysOff ?? []);
-                  if (e.target.checked) off.delete(h);
-                  else off.add(h);
-                  void setLook({ holidaysOff: HOLIDAY_ORDER.filter((x) => off.has(x)) });
-                }}
-              />
-            </label>
-          ))}
-        </div>
+          <input type="checkbox" className="switch" checked={look.black !== false} onChange={(e) => void setLook({ black: e.target.checked })} />
+        </label>
       )}
-      <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => setSeeing(true)}>
-        <Icon name="star" size={16} /> See the animations
+
+      {/* 0.18.1: the opening, the holidays and the previews are on their own page */}
+      <button className="row look-anim-row" onClick={() => openPage('animations')}>
+        <Icon name="star" size={18} />
+        <span className="grow">
+          <span className="title" style={{ fontSize: 15 }}>
+            Animations
+          </span>
+          <span className="small">{animationsSummary(look)}</span>
+        </span>
+        <Icon name="chevron" size={18} />
       </button>
-      {seeing && <OpeningPreview still={lessMotion(settings.a11y.motion)} settings={settings} onClose={() => setSeeing(false)} />}
 
       {/* The colour grids are tucked away until you want them (0.7.3). */}
       <details className="pick-more">
         <summary>
           <span className="grow">Accent colour</span>
-          <span className="small">{ACCENTS.find((a) => a.hex.toLowerCase() === accent.toLowerCase())?.name ?? 'Your own colour'}</span>
+          <span className="small">{colourName(look.accent, 'Australian green')}</span>
           <span className="pick-dot" style={{ background: accent }} aria-hidden />
           <Icon name="chevron" size={18} />
         </summary>
         <div className="field">
-          <div className="swatches" role="radiogroup" aria-label="Accent colour">
-            {shownAccents.map((a) => {
-              const on = (look.accent ?? AUS_GREEN).toLowerCase() === a.hex.toLowerCase();
-              return (
-                <button
-                  key={a.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  aria-label={a.name}
-                  className={`swatch${on ? ' on' : ''}`}
-                  style={{ background: a.hex, color: textOn(a.hex) }}
-                  onClick={() => void setAccent(a.id === 'green' ? undefined : a.hex)}
-                >
-                  {on && <Icon name="check" size={16} stroke={3} />}
-                </button>
-              );
-            })}
-            <label
-              className={`swatch wheel${shownAccents.some((a) => a.hex.toLowerCase() === accent.toLowerCase()) ? '' : ' on'}`}
-              aria-label="Pick any colour"
-            >
-              <input type="color" value={accent} onChange={(e) => void setAccent(e.target.value)} />
-            </label>
-          </div>
+          <Swatches label="Accent colour" value={look.accent} first={{ name: 'Australian green', hex: AUS_GREEN }} onPick={(hex) => void setAccent(hex)} wheelTitle="Accent colour" />
+          <span className="small">Buttons, links and ticks. Text on buttons switches between white and black by itself, so it stays readable. Shops keep their own colours.</span>
+        </div>
+      </details>
+
+      {/* 0.18.1: the theme colour: the bars and tops */}
+      <details className="pick-more">
+        <summary>
+          <span className="grow">Theme colour</span>
+          <span className="small">{colourName(look.bar, simple ? 'Same as accent' : 'Navy')}</span>
+          <span className="pick-dot" style={{ background: look.bar ?? barDefault.hex }} aria-hidden />
+          <Icon name="chevron" size={18} />
+        </summary>
+        <div className="field">
+          <Swatches label="Theme colour" value={look.bar} first={barDefault} onPick={(hex) => void setLook({ bar: hex })} wheelTitle="Theme colour" />
           <span className="small">
-            Text on buttons switches between white and black by itself, so it stays readable. Shops keep their own colours.
+            {simple ? 'The band at the top of each screen.' : 'The top of each screen and the tab bar.'} Text on it turns white or black by itself.
+            {!simple && ' With a colour of its own, the holidays keep to their openings.'}
           </span>
         </div>
       </details>
@@ -229,12 +219,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
         </summary>
         <div className="field">
           <label className="check" style={{ padding: 0 }}>
-            <input
-              type="checkbox" className="switch"
-              checked={look.icon === 'match'}
-              onChange={(e) => void setIcon(e.target.checked ? 'match' : iconId)}
-              disabled={iconBusy}
-            />
+            <input type="checkbox" className="switch" checked={look.icon === 'match'} onChange={(e) => void setIcon(e.target.checked ? 'match' : iconId)} disabled={iconBusy} />
             <span>Match my accent colour</span>
           </label>
           <div className="swatches" role="radiogroup" aria-label="App icon colour">
@@ -270,6 +255,17 @@ export function LookSettings({ settings }: { settings: Settings }) {
       </details>
     </div>
   );
+}
+
+/** 0.18.1: picking Simple with the photo reader downloaded: say it's kept, and where it can go. */
+async function simpleReaderNote(): Promise<string> {
+  try {
+    const { readerBundled, readerDownloaded, READER_SIZE_TEXT } = await import('../../lib/readerModels');
+    if (readerBundled() || !(await readerDownloaded())) return '';
+    return ` The photo reader (${READER_SIZE_TEXT}) stays downloaded: remove it in Settings → Shopping list and receipts if you don't use it.`;
+  } catch {
+    return '';
+  }
 }
 
 const TEXT_SIZES = [

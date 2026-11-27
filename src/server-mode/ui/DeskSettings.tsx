@@ -1,11 +1,10 @@
 // 0.9.3: Settings at desktop widths, in two parts. Household: what the web can change for the whole
-import { HOLIDAY_NAMES, HOLIDAY_ORDER, HOLIDAY_WHEN } from '../../lib/holiday';
 // household, with what only the owner phone or each phone can change shown greyed. Phones: each
 // phone's own settings, greyed, to change on that phone. Everything it reads or changes goes
 // through settingsData.ts.
 import { NameCard } from '../../ui/NameAsk';
-import { lessMotion } from '../../ui/Opening';
-import { OpeningPreview } from '../../ui/OpeningPreview';
+import { AnimationsSettings, animationsSummary } from '../../ui/screens/Animations';
+import { leaveSimple, pickSimple } from '../../lib/simple';
 import { useSettings } from '../../lib/useLive';
 import { updateSettings as updateBrowserSettings } from '../../lib/db';
 import { Fragment, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
@@ -641,49 +640,43 @@ function HouseholdPart() {
             ))}
           </div>
         </Line>
-        {/* 0.16.0: as on the phone (Look and colours): the holidays, this browser's own */}
-        <Line title="Opening animation" htmlFor="dk-opening" sub="A short animation when the page opens. Off, no opening at all, holidays included. Just for this browser">
-          <input
-            id="dk-opening"
-            type="checkbox"
-            className="switch"
-            checked={mine?.look.opening !== false}
-            onChange={(e) => mine && void updateBrowserSettings({ look: { ...mine.look, opening: e.target.checked } }, { local: true })}
-          />
-        </Line>
-        <Line title="Holiday themes" htmlFor="dk-holidays" sub="Christmas, New Year, Australia Day, Easter and Halloween: the holiday's opening, and its colours. Just for this browser">
-          <input
-            id="dk-holidays"
-            type="checkbox"
-            className="switch"
-            checked={mine?.look.holidays !== false}
-            onChange={(e) => mine && void updateBrowserSettings({ look: { ...mine.look, holidays: e.target.checked } }, { local: true })}
-          />
-        </Line>
-        {/* 0.18.0: each holiday on or off on its own, as on the phone */}
-        {mine?.look.holidays !== false &&
-          HOLIDAY_ORDER.map((h) => (
-            <Line key={h} title={HOLIDAY_NAMES[h]} htmlFor={`dk-holiday-${h}`} sub={HOLIDAY_WHEN[h]}>
-              <input
-                id={`dk-holiday-${h}`}
-                type="checkbox"
-                className="switch"
-                checked={!mine?.look.holidaysOff?.includes(h)}
-                onChange={(e) => {
-                  if (!mine) return;
-                  const off = new Set(mine.look.holidaysOff ?? []);
-                  if (e.target.checked) off.delete(h);
-                  else off.add(h);
-                  void updateBrowserSettings({ look: { ...mine.look, holidaysOff: HOLIDAY_ORDER.filter((x) => off.has(x)) } }, { local: true });
+        {/* 0.18.1: the style, as on the phone (Look and colours), this browser's own */}
+        <Line title="Style" sub={mine?.look.style === 'simple' ? 'White, one colour, square and flat. Just for this browser' : 'Navy, gold and green. Just for this browser'}>
+          <div className="dk-seg" role="group" aria-label="Style">
+            {(
+              [
+                ['australia', 'Default theme'],
+                ['simple', 'Simple'],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                aria-pressed={(mine?.look.style ?? 'australia') === v}
+                onClick={() => {
+                  if (!mine || mine.look.style === v) return;
+                  void updateBrowserSettings(v === 'simple' ? pickSimple(mine) : leaveSimple(mine), { local: true });
                 }}
-              />
-            </Line>
-          ))}
-        <Line title="See the animations" sub="The usual one and each holiday's, day and night">
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Line>
+        {mine?.look.style === 'simple' && (
+          <Line title="Accent band in dark mode" htmlFor="dk-band" sub="Off: dark mode is plain black. On: the coloured band stays at the top. Just for this browser">
+            <input id="dk-band" type="checkbox" className="switch" checked={!!mine.look.band} onChange={(e) => void updateBrowserSettings({ look: { ...mine.look, band: e.target.checked } }, { local: true })} />
+          </Line>
+        )}
+        {/* 0.18.1: the opening, the holidays and the previews in one place, as on the phone */}
+        <Line title="Animations" sub={mine ? `${animationsSummary(mine.look)}. Just for this browser` : undefined}>
           <button className="btn small" onClick={() => setSeeing(true)}>
-            See them
+            Open
           </button>
-          {seeing && mine && <OpeningPreview still={lessMotion(mine.a11y.motion)} settings={mine} onClose={() => setSeeing(false)} />}
+          {seeing && mine && (
+            <Sheet title="Animations" onClose={() => setSeeing(false)}>
+              <AnimationsSettings web settings={mine} setLook={(patch) => updateBrowserSettings({ look: { ...mine.look, ...patch } }, { local: true })} />
+            </Sheet>
+          )}
         </Line>
         <Line
           title="Download this browser's copy"

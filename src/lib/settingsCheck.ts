@@ -208,6 +208,7 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
       monthly: bool(a.monthly, D.alerts.monthly),
       stockUp: bool(a.stockUp, D.alerts.stockUp),
       stockUpTips: bool(a.stockUpTips, D.alerts.stockUpTips),
+      ...(typeof a.phones === 'boolean' ? { phones: a.phones } : {}),
     },
     sync: compact({
       mode: oneOf(sy.mode, ['device', 'server'] as const, D.sync.mode),
@@ -299,9 +300,19 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
     lastCheck: when(s.lastCheck),
     demoLoaded: maybeBool(s.demoLoaded),
     look: compact({
-      style: oneOf(lk.style, ['australia', 'plain'] as const, D.look.style),
+      // 0.18.1: Simple replaced Plain.
+      style: oneOf(lk.style === 'plain' ? 'simple' : lk.style, ['australia', 'simple'] as const, D.look.style),
       // The accent is a colour ("#ffcd00"): one of the swatches, or any colour from the colour wheel.
       accent: colour(lk.accent),
+      // 0.18.1: the theme colour, and Simple's band in dark mode, and what Simple turned off.
+      bar: colour(lk.bar),
+      band: maybeBool(lk.band),
+      ...(lk.simpleWas && typeof lk.simpleWas === 'object'
+        ? (() => {
+            const w = lk.simpleWas as Record<string, unknown>;
+            return { simpleWas: compact({ opening: maybeBool(w.opening), holidays: maybeBool(w.holidays), motion: maybeBool(w.motion) }) };
+          })()
+        : {}),
       // 0.17.0: "Match my accent colour" is the default. Someone who never touched either (green icon,
       // no accent of their own) gets it too: it looks the same, and now follows a new accent.
       icon: lk.icon === 'green' && !lk.accent && lk.iconPicked !== true ? 'match' : oneOf(lk.icon, ICONS, D.look.icon),

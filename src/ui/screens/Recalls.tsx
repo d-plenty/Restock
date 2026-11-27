@@ -7,7 +7,7 @@ import { RestockNative } from '../../lib/sql/native';
 import { useLive, useSettings } from '../../lib/useLive';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
-import { Icon, LoadingBar, timeAgo, TopBar, More } from '../components';
+import { Icon, LoadingBar, timeAgo, TopBar, More, ScreenWaiting } from '../components';
 import { useNav } from '../nav';
 
 // Recall alerts: once a day (separately from price checks, and not adjustable) Android checks the
@@ -163,7 +163,7 @@ export function RecallsScreen() {
   const settings = useLive(draft.getSettings, []);
   const found = useLive(openRecalls, []);
   const [busy, setBusy] = useState(false);
-  if (!settings || !found) return <div className="screen" />;
+  if (!settings || !found) return <ScreenWaiting title="Recall alerts" />;
 
   const check = async () => {
     setBusy(true);

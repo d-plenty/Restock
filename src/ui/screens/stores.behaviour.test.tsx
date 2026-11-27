@@ -14,7 +14,8 @@ describe('Coming soon, in each version', () => {
     setChannel('github');
     expect(SELF_UPDATE).toBe(true);
     await show(<ComingSoon />);
-    expect(titles()).toEqual(expect.arrayContaining(['F-Droid: more about it', 'iPhone and iPad: more about it']));
+    // 0.18.1: the official app stores, F-Droid's main repository and Running low (no iPhone widgets on Android)
+    expect(titles()).toEqual(['The App Store and Google Play: more about it', 'F-Droid: more about it', 'Running low: more about it']);
   });
   test('Google Play: no other app store, and no updater', async () => {
     setChannel('play');
@@ -22,12 +23,13 @@ describe('Coming soon, in each version', () => {
     expect(SELF_UPDATE).toBe(false);
     await show(<ComingSoon />);
     expect(titles()).not.toContain('F-Droid: more about it');
+    expect(titles()).not.toContain('The App Store and Google Play: more about it');
   });
   test('the App Store: nothing about installing from a computer', async () => {
     setChannel('appstore');
     await show(<ComingSoon />);
     expect(document.body.textContent).not.toMatch(/from a computer|F-Droid/);
-    expect(titles()).toContain('iPhone and iPad: more about it');
+    expect(titles()).toEqual(['Widgets on iPhone and iPad: more about it', 'Running low: more about it']);
   });
 });
 

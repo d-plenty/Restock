@@ -18,7 +18,7 @@ import { useLive, useSettings } from '../../lib/useLive';
 import { type Recommendation } from '../../lib/verdict';
 import { isNative } from '../../stores/http';
 import { chainName, type ListEntry, type Settings } from '../../types';
-import { ChainDot, Icon, LoadingBar } from '../components';
+import { ChainDot, Icon, LoadingBar, ScreenWaiting } from '../components';
 import { activeSections, searchChainsIn, type StoreChain } from '../../shops';
 import { failingStores, getHealth, getHiddenWarnings, isBlockedError, isHidden, offerUnblock } from '../../lib/health';
 import { HideForADay, TryAgain, TurnOffShop, UnblockButton } from '../Unblock';
@@ -68,7 +68,7 @@ export function HomeScreen() {
     const [r, s, e] = await Promise.all([loadRecommendations(), getSettings(), allListEntries()]);
     return ownCounts(r, yourShops(s), e);
   }, []);
-  if (!allRecs || !settings || !allEntries) return <div className="screen" />;
+  if (!allRecs || !settings || !allEntries) return <ScreenWaiting back={false} />;
   const { on, recs, totals, openLines, worth, saving } = weekDeals(allRecs, settings, allEntries);
   const shops = yourShops(settings);
   // Only warn about shops you still use, on a tab that's switched on.

@@ -11,15 +11,16 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.18.0',
-    about: 'Add phones and tablets from an admin phone, each holiday on or off, plain colours, and lots of fixes.',
+    version: '0.18.1',
+    about: 'Pages load first on older iPads, a new Simple design, your own colours, and safer admin changes.',
     changes: [
-      'Admin phones: an admin adds phones and tablets, removes them, and makes others admins, from Settings → Sync → Your Restock server. Your server says who’s an admin.',
-      'Look and colours: 14 plain colours for the accent and the app icon (the same ones, so Match my accent colour matches exactly), and each holiday has its own switch.',
-      'Australia Day shows for the week leading up to it (19–27 January).',
-      'The opening is smoother: 2.5 seconds, or 3.5 on a holiday.',
-      'True black and the app icon colours say it in a line, with the rest behind ⓘ.',
-      'Fixes: the tab bar on Android sat on the gesture line, and a few things on iPad.',
+      'On an older iPad or iPhone, pages open first and the syncing and price checks wait their turn. No more black screens while a page loads.',
+      'Simple design (Look and colours → Style): white, one colour, square and flat, and lighter work for older phones. It replaces Plain.',
+      'Restock’s own colour wheel everywhere, a theme colour for the bars and tops, and Android widgets in your colours.',
+      'Animations: the opening, the holidays and every animation to play, on one page.',
+      'Admins: Are you sure? before adding, removing or changing a phone, a notification when the server’s phones change, and a warning before the last admin phone steps down or leaves.',
+      'Share my spending, receipts and loyalty cards ask before turning off, with the details behind ⓘ.',
+      'An iPad held sideways shows Settings side by side, and What’s planned says what’s next: the App Store and Google Play, F-Droid, iPhone widgets and Running low.',
     ],
   },
 ];

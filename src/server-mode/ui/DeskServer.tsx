@@ -67,6 +67,17 @@ function AddPhoneV3({ onAdded, onClose, known }: { onAdded: () => void; onClose?
   const make = async () => {
     setError(undefined);
     setJoined(undefined);
+    // 0.18.1: asked first, as on the phone (Are you sure?)
+    const name = label.trim();
+    const asAdmin = admin && canAdmin();
+    const ok = await confirmAction(asAdmin ? `Add ${name} as an admin?` : `Add ${name}?`, {
+      detail: asAdmin
+        ? `A code shows for ${name} to scan, once, for 10 minutes. As an admin it can add phones and tablets, remove them, and make others admins or users, from Restock on the phone.`
+        : `A code shows for ${name} to scan, once, for 10 minutes. It joins as a user: it syncs, without looking after the phones.`,
+      action: 'Show the code',
+      danger: false,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       before.current = new Set((known ?? []).map((p) => p.device));
@@ -235,6 +246,18 @@ function PhonesCard({ phones, error, reload }: { phones?: Phone[]; error?: strin
         detail: `${name} can then add phones and tablets, remove them, and make others admins or users, from Restock on the phone.`,
         action: 'Make admin',
         danger: false,
+      });
+      if (!ok) return;
+    } else {
+      // 0.18.1: Make user is asked about too; the last admin phone is told what that means.
+      const admins = (phones ?? []).filter((x) => (!x.status || x.status === 'active') && x.role === 'admin');
+      const last = admins.length === 1 && admins[0].device === p.device;
+      const ok = await confirmAction(`Make ${name} a user?`, {
+        detail: last
+          ? `${name} is the only admin phone. Once it's a user, phones can only be added, removed or made admins here, signed in with the passphrase.`
+          : `${name} keeps syncing, but can't add, remove or change phones any more. You can make it an admin again.`,
+        action: 'Make user',
+        danger: last,
       });
       if (!ok) return;
     }

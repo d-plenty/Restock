@@ -483,7 +483,7 @@ describe('restoring settings', () => {
       sections: { keg: false, pharmacy: true },
       onboarded: false,
       receipts: { enabled: false, installed: false, keepMonths: 6 },
-      look: { style: 'plain' as const, icon: 'red' },
+      look: { style: 'simple' as const, icon: 'red' },
     };
     const shopsOnly = mergeRestoredSettings(cur, incoming, { shops: true });
     expect(shopsOnly.sections).toEqual({ keg: false, pharmacy: true });
@@ -494,7 +494,7 @@ describe('restoring settings', () => {
     expect(otherOnly.theme).toBe('light');
     expect(otherOnly.onboarded).toBe(true);
     expect(otherOnly.receipts).toEqual({ enabled: false, installed: true, keepMonths: 6 });
-    expect(otherOnly.look).toEqual({ style: 'plain', icon: 'navy' });
+    expect(otherOnly.look).toEqual({ style: 'simple', icon: 'navy' });
     expect(otherOnly.setup.skipped).toEqual([]);
   });
 });

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.18.0" src="https://img.shields.io/badge/status-release%20candidate%200.18.0-ffcd00">
+  <img alt="Release candidate 0.18.1" src="https://img.shields.io/badge/status-release%20candidate%200.18.1-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0180">New in 0.18.0</a> ·
+  <a href="#new-in-0181">New in 0.18.1</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#iphone-and-ipad">On iPhone</a> ·
@@ -131,7 +131,7 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 - **Sync and backups in one place**: a strip that says whether everything is kept somewhere else (phone sync, a folder backup or your Restock server all count), then your server, Wi-Fi and away from home, then backups.
 - **Backups**: export and restore exactly the parts you pick, plus optional automatic backups into a folder you choose. Lock any backup with a password (encrypted on the phone). Restock also keeps a copy from just before each update, so an update can be undone.
 - **Spreadsheets**: export your pantry, shopping list and price history as CSV files for Excel, Google Sheets, LibreOffice or Numbers.
-- **Look and colours**: Light, Dark or System, with true black for OLED screens; Australian or Plain; 24 accent colours; 16 app icon colours.
+- **Look and colours**: Light, Dark or System, with true black for OLED screens; the default theme or Simple; an accent colour, a theme colour and an app icon colour, from 13 plain colours or Restock's own colour wheel; and Animations (the opening and the holidays).
 - **Accessibility**: the first step of setup and its own page in Settings: text size, bold text, high contrast, easier reading spacing, bigger buttons, no swiping, less motion and more. See [Accessibility](#accessibility).
 - **Updates**: Settings → About → Check for updates, or turn on **Tell me when there's an update** to check every 24 hours (or every 7 days) when you open Restock. Or install through [Restock's own F-Droid repo](https://d-plenty.github.io/Restock/) or Obtainium and let them handle updates.
 - **Shared prices**: one switch, on unless you turn it off (Settings → Privacy and sharing, or setup). Your phone downloads 8 weeks, 6 months or 12 months of shared history for your shops from [restock-prices](https://github.com/d-plenty/restock-prices) (Restock's own collection of Coles, Woolworths and Aldi prices, from its collector and from phones), weekly or every day, so new items get a fair verdict from day one. In return it shares the shelf prices it reads from those shops (shop, product, size, barcode, the price and the day). Prices you type in yourself never go, nothing about you is ever included, and the data is free on GitHub and will never be sold. See [Shared prices](#shared-prices).
@@ -142,7 +142,39 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 
 ## iPhone and iPad
 
-Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Prices are checked in the background too: a little at a time, and a longer check from your set time while the iPhone is charging and on Wi-Fi (iOS picks the exact moment). One thing isn't possible because of Apple's restrictions: the app updating itself. Still to come there: home screen widgets, Search with Google Lens straight from the app, and the App Store. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Prices are checked in the background too: a little at a time, and a longer check from your set time while the iPhone is charging and on Wi-Fi (iOS picks the exact moment). One thing isn't possible because of Apple's restrictions: the app updating itself. Still to come there: the App Store, and home screen widgets. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.18.1
+
+Pages load first on older iPads, a new Simple design, your own colours, and safer admin changes.
+
+**Faster on older iPads and iPhones**
+- **Pages first.** Restock opens the page you're on, and the others' code, before the first sync, the price catch-up, automatic backups and the rest start. A price check takes short breaks so a page can load in between.
+- **No more black screens.** A page that's still loading shows its title, Back and a loading bar. (A page could stay black while a price check was busy saving prices: it now always shows what it read.)
+
+**Simple design** (Settings → Look and colours → Style)
+- **White, one colour, square and flat**: a band of your colour at the top, square corners, no shadows. Dark mode is plain black, with a switch to keep the coloured band. It replaces Plain (Plain is Simple now).
+- **Lighter on older phones**: long lists come in parts as you scroll, price checks take longer breaks, and charts draw less.
+- Picking it turns the opening, the holiday themes and the motion off (each can go back on). Going back to the default theme puts them back as they were.
+
+<p align="center"><img src="docs/screenshots/designs-0181.png" alt="Home in the default theme and in Simple, each in light and dark mode" width="830"></p>
+
+**Your colours**
+- **Restock's own colour wheel**, the same on every phone, tablet and the web page (it was each phone's own colour picker).
+- **Theme colour**: the tops of the screens and the tab bar (navy to start with), next to the accent and app icon colours.
+- **Android widgets** set to "Like the app" use your theme colour, with the title in your accent and Quick actions in your app icon's colour.
+- **Animations**: one row on Look and colours opens the opening, the holiday switches and every animation to play, on one page (on the web page too).
+
+**Admins** (with a Restock server)
+- **Are you sure?** before adding a phone, removing one, or making one an admin or a user, on the phone and the web page.
+- **A notification** on an admin phone when a phone joins, leaves or is removed, or becomes an admin or a user (Settings → Notifications; on to start with).
+- **The last admin phone** is warned before it makes itself a user or leaves the server.
+- **Activity → Admin actions** on the web page shows just what admins did.
+
+**And**
+- Share my spending, Share receipts and Share my loyalty cards ask before turning off, in one line with the rest behind ⓘ.
+- An iPad (or Android tablet) held sideways shows Settings side by side: the list on the left, the page on the right.
+- What's planned says what's next: the App Store and Google Play, F-Droid's main repository, widgets on iPhone and iPad, and Running low.
 
 ## New in 0.18.0
 

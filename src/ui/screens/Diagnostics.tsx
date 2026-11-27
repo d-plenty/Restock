@@ -18,7 +18,7 @@ import {
   watchSearchTest,
   type SearchTestState,
 } from '../../lib/searchTest';
-import { CheckedAgo, ChainDot, Icon, LoadingBar, TopBar, More } from '../components';
+import { CheckedAgo, ChainDot, Icon, LoadingBar, TopBar, More, ScreenWaiting } from '../components';
 import { useNav } from '../nav';
 import { planOf } from '../../lib/checkSchedule';
 import { getCheckLog, missedSlot, missedWords, OUTCOME_WORDS, whenWords } from '../../lib/checkLog';
@@ -40,7 +40,7 @@ export function DiagnosticsScreen() {
   const [chain, setChain] = useState<StoreChain>();
   const [term, setTerm] = useState('');
   const [busy, setBusy] = useState(false);
-  if (!settings || !list || !health) return <div className="screen" />;
+  if (!settings || !list || !health) return <ScreenWaiting title="Diagnostics" />;
 
   // 0.10.3: every tab's shops, each once (a shop on two tabs shows with the first).
   const seen = new Set<string>();

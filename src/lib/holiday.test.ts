@@ -49,8 +49,9 @@ describe('the holidays', () => {
     expect(holidayNow(look({}), xmas)).toBe('christmas');
     expect(holidayNow(look({ holidays: false }), xmas)).toBeUndefined();
     expect(holidayColours(look({}), xmas)).toBe('christmas');
-    expect(holidayColours(look({ style: 'plain' }), xmas)).toBeUndefined();
+    expect(holidayColours(look({ style: 'simple' }), xmas)).toBeUndefined();
     expect(holidayColours(look({ accent: '#6b3fa0' }), xmas)).toBeUndefined();
+    expect(holidayColours(look({ bar: '#6b3fa0' }), xmas)).toBeUndefined();
     // Your own colours still get the opening.
     expect(holidayNow(look({ accent: '#6b3fa0' }), xmas)).toBe('christmas');
   });

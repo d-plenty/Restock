@@ -1,5 +1,8 @@
 // 0.15.0: Settings' larger parts (moved out of Settings.tsx): connections, price checks,
 // notifications, and app updates.
+import { syncInfo } from '../../lib/sync';
+import { phoneNoticesOn } from '../../lib/adminNotices';
+import { myRole } from '../../lib/serverPhones';
 import { isIos } from '../../lib/platform';
 import { useEffect, useState, type ReactNode } from 'react';
 import { version } from '../../../package.json';
@@ -244,6 +247,18 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
     // 0.9.5 (save): on a settings screen, once it's saved.
     await afterSave('reminders', (saved) => scheduleReminders(saved).catch(() => undefined), s);
   };
+  // 0.18.1: on an admin phone, changes to the server's phones (lib/adminNotices.ts)
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void syncInfo()
+      .then((i) => (i.server && i.serverApi === 3 ? myRole() : null))
+      .then((r) => live && setAdmin(r === 'admin'))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
 
   return (
     <>
@@ -306,6 +321,23 @@ export function NotificationSettings({ settings }: { settings: Settings }) {
             <span className="small">On deals for things that only go on special every few weeks: "a good time to stock up".</span>
           </span>
         </label>
+        {admin && (
+          <label className="check">
+            <input type="checkbox" className="switch" checked={phoneNoticesOn(settings)} onChange={(e) => setAlerts({ phones: e.target.checked })} />
+            <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <span className="title" style={{ fontSize: 15 }}>
+                Changes to the server&rsquo;s phones
+              </span>
+              <span className="small">
+                When a phone or tablet joins, leaves or is removed, or becomes an admin or a user.{' '}
+                <More title="Changes to the server's phones">
+                  <p>For admins. Restock looks at the server&rsquo;s phones each time it opens or you come back to it, and tells you what changed since it last looked. What you change yourself isn&rsquo;t sent to you.</p>
+                  <p>On to start with. Just for this phone.</p>
+                </More>
+              </span>
+            </span>
+          </label>
+        )}
       </div>
     </>
   );

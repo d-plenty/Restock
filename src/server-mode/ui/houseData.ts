@@ -527,3 +527,36 @@ export function deleteError(e: unknown): string {
   return errText(e);
 }
 
+
+/**
+ * 0.18.1: Activity → Admin actions: what an admin did to the phones, the passphrase and the server's
+ * settings (Activity shows everything else too: sign-ins, changes sent, merges).
+ */
+export const ADMIN_ACTIONS: ReadonlySet<string> = new Set([
+  'phone-joined',
+  'phone-left',
+  'phone-removed',
+  'phone-renamed',
+  'phone-role',
+  'invite-made',
+  'browser-signed-out',
+  'signed-out-everywhere',
+  'web-sign-in-approved',
+  'passphrase-changed',
+  'passphrase-reset',
+  'handover-code',
+  'handover-done',
+  'settings-changed',
+  'auto-delete-changed',
+  'data-deleted',
+  'deleted-everything',
+  'data-exported',
+  'data-imported',
+  'recovery-key-shown',
+  'backup-downloaded',
+  'home-assistant-changed',
+  'trash-emptied',
+  'web-search-on',
+  'web-search-off',
+]);
+export const isAdminAction = (a: Pick<Activity, 'what'>): boolean => ADMIN_ACTIONS.has(a.what);

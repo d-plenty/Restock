@@ -6,7 +6,7 @@ import { createElement } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 
-const calls = vi.hoisted(() => ({ list: [] as { method: string; path: string; body?: unknown }[], confirm: true }));
+const calls = vi.hoisted(() => ({ list: [] as { method: string; path: string; body?: unknown }[], confirm: true, newKey: false, synced: 0 }));
 const PHONES = [
   { device: 'd-me', label: 'Declan', role: 'admin', me: true, status: 'active' },
   { device: 'd-sarah', label: "Sarah's phone", role: 'user', status: 'active' },
@@ -20,15 +20,17 @@ vi.mock('../../lib/sql/native', async (importOriginal) => {
     RestockNative: {
       serverAdmin: async (o: { method: string; path: string; body?: unknown }) => {
         calls.list.push(o);
+        if (calls.newKey) throw new Error("The server's answer couldn't be opened with this household's keys.");
         if (o.method === 'GET' && o.path === '/phones') return { phones: PHONES };
         if (o.method === 'POST') return { code: 'restock-server:3?h=x&i=y&k=z', expiresIn: 600, role: (o.body as { admin?: boolean }).admin ? 'admin' : 'user' };
         return { ok: true };
       },
-      syncNow: async () => ({}),
+      syncNow: async () => ((calls.synced++, (calls.newKey = false)), {}),
     },
   };
 });
-vi.mock('../../lib/confirm', () => ({ confirmAction: async () => calls.confirm }));
+const asked = vi.hoisted(() => [] as { title: string; detail?: string }[]);
+vi.mock('../../lib/confirm', () => ({ confirmAction: async (title: string, o?: { detail?: string }) => (asked.push({ title, detail: o?.detail }), calls.confirm) }));
 vi.mock('./SyncCodes', () => ({ PairingQr: ({ code }: { code: string }) => createElement('div', { 'data-code': code }), CodeText: () => null }));
 vi.mock('../components', async (importOriginal) => {
   const real = await importOriginal<typeof import('../components')>();
@@ -47,6 +49,7 @@ beforeEach(() => {
   calls.list = [];
   calls.confirm = true;
   toasts.length = 0;
+  asked.length = 0;
 });
 
 describe('Phones and tablets, on an admin phone', () => {
@@ -90,6 +93,30 @@ describe('Phones and tablets, on an admin phone', () => {
     await screen.findByText(/joins as an admin/);
     expect(calls.list.find((c) => c.method === 'POST')?.body).toEqual({ label: "Mum's iPad", admin: true });
     expect(document.querySelector('[data-code]')?.getAttribute('data-code')).toBe('restock-server:3?h=x&i=y&k=z');
+  });
+
+  it('0.18.1: Add, and Make user for another phone, ask first; said no, nothing is sent', async () => {
+    calls.confirm = false;
+    show();
+    fireEvent.click(await screen.findByText('Add a phone or tablet'));
+    fireEvent.change(screen.getByLabelText('Whose phone or tablet is it?'), { target: { value: 'Gran' } });
+    fireEvent.click(screen.getByText('Show the code'));
+    await waitFor(() => expect(asked.map((a) => a.title)).toContain('Add Gran?'));
+    expect(calls.list.some((c) => c.method === 'POST')).toBe(false);
+    cleanup();
+    show();
+    fireEvent.click(await screen.findByText('Kitchen iPad'));
+    fireEvent.click(screen.getByText('Make user'));
+    await waitFor(() => expect(asked.map((a) => a.title)).toContain('Make Kitchen iPad a user?'));
+    expect(calls.list.some((c) => c.method === 'PATCH')).toBe(false);
+  });
+
+  it('0.18.1: an answer sealed with a new household key: it syncs (taking the key) and asks again', async () => {
+    calls.newKey = true;
+    calls.synced = 0;
+    const { serverPhones } = await import('../../lib/serverPhones');
+    expect((await serverPhones()).length).toBe(4);
+    expect(calls.synced).toBe(1);
   });
 
   it('a code that isn’t a server code is refused; a server without roles answers null', async () => {

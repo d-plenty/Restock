@@ -1,3 +1,4 @@
+import { isLite } from './simple';
 import { logProblem } from './diagnostics';
 import { isPressOnlyShop, kindOf, priceSource, sectionOn, tabsOf, type StoreChain } from '../shops';
 import { adapterFor } from '../stores';
@@ -11,6 +12,7 @@ import { localDay } from './verdict';
 import { background } from './undo';
 import { quiet } from './quietErrors';
 import { carryOn, PROGRESS_KEY, readProgress } from './checkProgress';
+import { screensFirst } from './screensFirst';
 
 // Price checks run in the app's native Android code (PriceCheckWorker.java), both for
 // "Check now" and for the background schedule, so there's one implementation.
@@ -33,6 +35,8 @@ export interface CheckOptions {
   until?: number;
   /** 0.15.2, iPhone: stop now (iOS has said the time's up). */
   stop?: () => boolean;
+  /** 0.18.1, iPhone and iPad: a rest between products (ms), so an older device has time to draw. */
+  restMs?: number;
 }
 
 let running: Promise<CheckResult> | undefined;
@@ -62,7 +66,7 @@ async function doCheck(onProgress?: (done: number, total: number) => void, opts?
           task?.progress(done, total);
         },
         undefined,
-        { until: opts?.until, stop: () => !!opts?.stop?.() || !!task?.stopped() },
+        { until: opts?.until, stop: () => !!opts?.stop?.() || !!task?.stopped(), restMs: opts?.until ? 0 : isLite() ? 150 : 40 },
       );
       if (r.complete) {
         await updateSettings({ lastCheck: nowIso() }).catch(quiet('price check'));
@@ -131,7 +135,7 @@ export function iosCheckDue(s: Pick<Settings, 'lastCheck' | 'sync' | 'checkDays'
 export async function checkBySearch(
   onProgress?: (done: number, total: number) => void,
   limit = 400,
-  opts: Pick<CheckOptions, 'until' | 'stop'> = {},
+  opts: Pick<CheckOptions, 'until' | 'stop' | 'restMs'> = {},
 ): Promise<{ checked: number; updated: number; errors: Partial<Record<Chain, string>>; complete: boolean }> {
   const settings = await getSettings();
   const sources = settings.enabledChains.map(priceSource);
@@ -162,6 +166,8 @@ export async function checkBySearch(
     for (const p of todo) {
       // 0.15.2: time's up (in the background): what's done is saved, and the rest is checked next time.
       if (timeUp()) break;
+      // 0.18.1: a screen being opened goes first; and a breath between products so the phone can draw.
+      await screensFirst(opts.restMs ?? 0);
       done++;
       // A shop that has turned away three in a row isn't asked again this time (nor marked done: next time it is).
       if ((failed.get(p.chain) ?? 0) >= 3) {

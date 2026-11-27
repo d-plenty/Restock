@@ -1,4 +1,5 @@
 import { useFullRefresh } from '../refresh';
+import { chunkSections, useChunks } from '../useChunks';
 import { useEffect, useRef, useState } from 'react';
 import { itemsToSort, sortTargets } from '../../lib/categoryGuess';
 import { allCategories, allListEntries, cachedSettings, deleteGroup, updateGroup } from '../../lib/db';
@@ -8,7 +9,7 @@ import { loadRecommendations } from '../../lib/recs';
 import { useLive, useSettings } from '../../lib/useLive';
 import { inventoryAsked, shouldAskInventory } from '../../lib/inventoryAsk';
 import { type Recommendation } from '../../lib/verdict';
-import { BetaTag, Hold, Icon, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, SearchField } from '../components';
+import { BetaTag, Hold, Icon, previewFromOption, ProductPreview, SelectBar, Sheet, SwipeRow, SearchField, ScreenWaiting } from '../components';
 import { BigAdd, NoneFound, RecRow } from '../simple';
 import { picksOffered } from '../../lib/makerPicks';
 import { PicksOffer } from './Picks';
@@ -133,7 +134,9 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   };
 
   const full = useFullRefresh();
-  if (!recs || !categories || !entries) return <div className="screen" />;
+  // 0.18.1: in parts with the Simple design (useChunks.tsx)
+  const chunks = useChunks();
+  if (!recs || !categories || !entries) return <ScreenWaiting back={false} />;
 
   const onList = new Map(entries.filter((e) => !e.checked && e.groupId).map((e) => [e.groupId!, e.id]));
   // The same deals Home counts ("wait" isn't a deal yet).
@@ -377,7 +380,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           </p>
         ))}
 
-      {sections.map((s) => (
+      {chunkSections(sections, chunks.limit).map((s) => (
         <section key={s.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="eyebrow">{s.name}</div>
           {s.id === 'none' && !editing && toSort.length >= 3 && (
@@ -439,6 +442,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
           </div>
         </section>
       ))}
+      {chunks.more(sections.reduce((n, s) => n + s.items.length, 0))}
 
       {/* 0.11.0: how many items there are (before, ticking them all in Edit was the only way to count) */}
       {recs.length > 0 && (

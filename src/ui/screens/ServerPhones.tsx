@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { confirmAction } from '../../lib/confirm';
 import { deviceWord } from '../../lib/platform';
 import { newCode, phoneLabel, removePhone, renamePhone, serverPhones, setRole, type Phone } from '../../lib/serverPhones';
+import { notePhones } from '../../lib/adminNotices';
 import { useNow } from '../useNow';
 import { Icon, LoadingBar, Sheet, timeAgo } from '../components';
 import { useNav } from '../nav';
@@ -24,6 +25,16 @@ function AddSheet({ onClose, onJoined, known }: { onClose: () => void; onJoined:
   const before = useRef(new Set(known.map((p) => p.device)));
   const make = async () => {
     setError(undefined);
+    // 0.18.1: an admin's changes are asked about first (Are you sure?)
+    const name = label.trim();
+    const ok = await confirmAction(makeAdmin ? `Add ${name} as an admin?` : `Add ${name}?`, {
+      detail: makeAdmin
+        ? `A code shows for ${name} to scan, once, for 10 minutes. As an admin it can add phones and tablets, remove them, and make others admins or users.`
+        : `A code shows for ${name} to scan, once, for 10 minutes. It joins as a user: it syncs, without looking after the phones.`,
+      action: 'Show the code',
+      danger: false,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       before.current = new Set(known.map((p) => p.device));
@@ -106,7 +117,7 @@ function AddSheet({ onClose, onJoined, known }: { onClose: () => void; onJoined:
   );
 }
 
-function PhoneSheet({ p, onClose, onDone }: { p: Phone; onClose: () => void; onDone: (msg: string) => void }) {
+function PhoneSheet({ p, onClose, onDone, onlyAdmin }: { p: Phone; onClose: () => void; onDone: (msg: string) => void; /** 0.18.1: this is the server's only admin phone */ onlyAdmin: boolean }) {
   const [label, setLabel] = useState(phoneLabel(p));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -156,8 +167,19 @@ function PhoneSheet({ p, onClose, onDone }: { p: Phone; onClose: () => void; onD
                 });
                 if (!ok) return undefined;
               } else if (p.me) {
-                const ok = await confirmAction('Make this phone a user?', {
-                  detail: 'It stops being able to add, remove or change phones. Another admin, or the web page, can make it an admin again.',
+                // 0.18.1: the last admin phone is told what that means
+                const ok = await confirmAction(onlyAdmin ? 'Make the only admin a user?' : 'Make this phone a user?', {
+                  detail: onlyAdmin
+                    ? "This is the server's only admin phone. Once it's a user, phones can only be added, removed or made admins on the server's web page, with the passphrase. To keep an admin phone, make another one an admin first."
+                    : 'It stops being able to add, remove or change phones. Another admin, or the web page, can make it an admin again.',
+                  action: 'Make user',
+                  danger: onlyAdmin,
+                });
+                if (!ok) return undefined;
+              } else {
+                // 0.18.1: Make user for another phone is asked about too
+                const ok = await confirmAction(`Make ${name} a user?`, {
+                  detail: `${name} keeps syncing, but can't add, remove or change phones any more. You can make it an admin again.`,
                   action: 'Make user',
                   danger: false,
                 });
@@ -223,7 +245,8 @@ export function ServerPhones({ label }: { label: string }) {
   useEffect(() => {
     let live = true;
     serverPhones().then(
-      (l) => live && (setPhones(l), setError(undefined)),
+      // 0.18.1: what's seen here isn't sent as a notification later (lib/adminNotices.ts)
+      (l) => live && (setPhones(l), setError(undefined), void notePhones(l)),
       (e) => live && setError(errText(e)),
     );
     return () => {
@@ -232,6 +255,7 @@ export function ServerPhones({ label }: { label: string }) {
   }, [tick]);
   const reload = () => setTick((t) => t + 1);
   const active = phones?.filter((p) => !p.status || p.status === 'active') ?? [];
+  const onlyAdmin = active.filter(isAdmin).length === 1 && active.some((p) => p.me && isAdmin(p));
   return (
     <>
       <div className="eyebrow">Phones and tablets on {label}</div>
@@ -288,6 +312,7 @@ export function ServerPhones({ label }: { label: string }) {
       {open && (
         <PhoneSheet
           p={open}
+          onlyAdmin={onlyAdmin}
           onClose={() => setOpen(undefined)}
           onDone={(msg) => {
             setOpen(undefined);

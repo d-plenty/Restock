@@ -425,7 +425,23 @@ Builds:
     gradle:
       - github
 
+  - versionName: 0.18.1
+    versionCode: 114
+    commit: v0.18.1
+    subdir: android/app
+    sudo:
+      - apt-get update
+      - apt-get install -y npm
+    init: cd ../.. && npm ci
+    prebuild:
+      - cd ../..
+      - sed -i '/REQUEST_INSTALL_PACKAGES/d' android/app/src/main/AndroidManifest.xml
+      - VITE_FDROID=1 npm run build
+      - npx cap sync android
+    gradle:
+      - github
+
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.18.0
-CurrentVersionCode: 113
+CurrentVersion: 0.18.1
+CurrentVersionCode: 114

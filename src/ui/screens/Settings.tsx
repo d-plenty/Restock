@@ -1,10 +1,11 @@
 import { useResetOn } from '../useResetOn';
+import { SettingsSideContext, useSettingsSplit } from '../settingsSide';
 import { isIos } from '../../lib/platform';
 import { cleanSearch } from '../../lib/searchText';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { version } from '../../../package.json';
 import legal from '../../lib/legal.json';
-import { confirmAction } from '../../lib/confirm';
+import { askLeave, confirmAction } from '../../lib/confirm';
 import type { BackupSummary } from '../../lib/backup';
 import { shareCsv } from '../../lib/csvExport';
 import { RestockNative } from '../../lib/sql/native';
@@ -15,7 +16,7 @@ import { sharedOn } from '../../lib/priceShare';
 import { SharedPricesSection } from './SharedPrices';
 import { sendSpendingToServer, spendingOnServer } from '../../lib/spending';
 // 0.9.5 (save): settings changed here wait for "Save settings" (settingsDraft.ts).
-import { afterSave, updateSettings } from '../../lib/settingsDraft';
+import { afterSave, canLeave, updateSettings } from '../../lib/settingsDraft';
 import { PriceHelperSettings } from './PriceHelperSettings';
 import { PriceHistorySettings } from './DayOne';
 import { YourData } from './YourData';
@@ -29,9 +30,10 @@ import { NameCard } from '../NameAsk';
 import { money } from '../../lib/units';
 import { STALE_DAYS } from '../../lib/verdict';
 import { chainName, GOOD_SALE, GREAT_SALE, historyLabel, type Settings } from '../../types';
-import { Explain, Icon, Logo, TopBar, SearchField, More } from '../components';
+import { Explain, Icon, Logo, TopBar, SearchField, More, ScreenWaiting } from '../components';
 import { UnblockButton } from '../Unblock';
 import { AccessibilitySettings, LookSettings } from './Look';
+import { AnimationsSettings } from './Animations';
 import { AutoBackupSettings } from './Backups';
 import { SyncOverview } from './SyncOverview';
 import { ReceiptsSettings } from './Receipts';
@@ -165,7 +167,7 @@ async function eraseAll() {
  * Settings' own pages, each opened from a row on the main list (0.9.13). 0.9.14: grouped for
  * someone who just wants it to work: Your shops, Everyday, Your phone, Help, then Advanced.
  */
-export type SettingsPage = 'a11y' | 'list' | 'prices' | 'alerts' | 'data' | 'sync' | 'backups' | 'look' | 'privacy' | 'help' | 'about' | 'advanced';
+export type SettingsPage = 'a11y' | 'list' | 'prices' | 'alerts' | 'data' | 'sync' | 'backups' | 'look' | 'animations' | 'privacy' | 'help' | 'about' | 'advanced';
 const SETTINGS_PAGES: Record<SettingsPage, { title: string }> = {
   // 0.10.7: Accessibility, its own page (it was inside Look and accessibility)
   a11y: { title: 'Accessibility' },
@@ -177,6 +179,8 @@ const SETTINGS_PAGES: Record<SettingsPage, { title: string }> = {
   sync: { title: 'Sync' },
   backups: { title: 'Backups' },
   look: { title: 'Look and colours' },
+  // 0.18.1: opened from Look and colours
+  animations: { title: 'Animations' },
   privacy: { title: 'Privacy and sharing' },
   help: { title: 'Help' },
   about: { title: 'About' },
@@ -196,6 +200,7 @@ const TILES_OF: Record<SettingsPage | 'cards' | 'feedback' | 'permissions', Tile
   privacy: ['shield', 'slate'],
   permissions: ['lock', 'amber'],
   look: ['palette', 'pink'],
+  animations: ['star', 'pink'],
   help: ['info', 'blue'],
   feedback: ['pencil', 'teal'],
   about: ['book', 'slate'],
@@ -210,7 +215,33 @@ const GROUPS: { title: string; pages: (SettingsPage | 'cards' | 'feedback' | 'pe
   { title: 'Help', pages: ['help', 'feedback', 'about'] },
 ];
 
+/**
+ * 0.18.1: Settings side by side (an iPad held sideways, settingsSide.ts): the list on the left, the
+ * page picked on the right (Look and colours to start with). Leaving a page with changes not saved
+ * asks first, as Back does.
+ */
+function SettingsSplit() {
+  const [side, setSide] = useState<SettingsPage>('look');
+  const pick = (p: SettingsPage) => {
+    if (p === side) return;
+    void canLeave(askLeave).then((ok) => ok && setSide(p));
+  };
+  return (
+    <SettingsSideContext.Provider value={(p) => pick(p as SettingsPage)}>
+      <div className="settings-split">
+        <SettingsBody onOpen={pick} current={side} />
+        <SettingsBody key={side} page={side} side />
+      </div>
+    </SettingsSideContext.Provider>
+  );
+}
+
 export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
+  const split = useSettingsSplit();
+  return !page && split ? <SettingsSplit /> : <SettingsBody page={page} />;
+}
+
+function SettingsBody({ page, side, onOpen, current }: { page?: SettingsPage; /** 0.18.1: the page on the right, side by side */ side?: boolean; onOpen?: (p: SettingsPage) => void; current?: SettingsPage }) {
   useSettingsDraft(); // 0.9.5 (save)
   const nav = useNav();
   const settings = useDraftSettings();
@@ -249,7 +280,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
     if (query.trim()) screen.current.querySelectorAll('details').forEach((d) => (d.open = true));
     setMatches(filterSettings(screen.current, query));
   }, [query, settings, cardCount]);
-  if (!settings) return <div className="screen" />;
+  if (!settings) return <ScreenWaiting title={page ? SETTINGS_PAGES[page].title : 'Settings'} />;
   // 0.9.13: searching the main list looks through every page (Advanced's testing features only once they're on).
   const all = !page && !!query.trim();
   const on = (p: SettingsPage | 'hub') => (p === 'hub' ? !page : page === p || all);
@@ -272,7 +303,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
       case 'a11y':
         return 'Text size, bold text, contrast, spacing, bigger buttons, less motion';
       case 'look':
-        return 'Colours, dark mode, app icon, widgets';
+        return 'Style, colours, dark mode, animations, app icon, widgets';
       case 'privacy':
         return `Privacy policy · what stays on this phone · Shared prices ${sharedOn(settings) ? 'on' : 'off'}`;
       case 'permissions':
@@ -288,12 +319,14 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
     }
   };
   const open = (p: SettingsPage | 'cards' | 'feedback' | 'permissions') =>
-    p === 'cards' ? nav.push({ name: 'cards' }) : p === 'feedback' ? nav.push({ name: 'feedback' }) : p === 'permissions' ? nav.push({ name: 'permissions' }) : nav.push({ name: 'settings', page: p });
+    onOpen && p !== 'cards' && p !== 'feedback' && p !== 'permissions'
+      ? onOpen(p)
+      : p === 'cards' ? nav.push({ name: 'cards' }) : p === 'feedback' ? nav.push({ name: 'feedback' }) : p === 'permissions' ? nav.push({ name: 'permissions' }) : nav.push({ name: 'settings', page: p });
   const titleOf = (p: SettingsPage | 'cards' | 'feedback' | 'permissions') =>
     p === 'cards' ? 'Cards' : p === 'feedback' ? 'Send feedback' : p === 'permissions' ? 'Permissions' : SETTINGS_PAGES[p].title;
 
-  const row = (title: string, sub: string, onClick: () => void, tile?: Tile) => (
-    <button className="row" onClick={onClick}>
+  const row = (title: string, sub: string, onClick: () => void, tile?: Tile, here?: boolean) => (
+    <button className="row" onClick={onClick} aria-current={here ? 'page' : undefined}>
       {tile && (
         <span className="row-tile" data-tone={tile[1]} aria-hidden="true">
           <Icon name={tile[0]} size={20} />
@@ -309,7 +342,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
 
   return (
     <div className="screen" ref={screen}>
-      <TopBar title={page ? SETTINGS_PAGES[page].title : 'Settings'} />
+      <TopBar title={page ? SETTINGS_PAGES[page].title : 'Settings'} back={!side} />
       {!page && (
         <>
           <div data-keep="1">
@@ -366,7 +399,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
               </div>
               <div className="card flush" data-search-hide="1">
                 {g.pages.map((p) => (
-                  <Fragment key={p}>{row(titleOf(p), pageSub(p), () => open(p), TILES_OF[p])}</Fragment>
+                  <Fragment key={p}>{row(titleOf(p), pageSub(p), () => open(p), TILES_OF[p], p === current)}</Fragment>
                 ))}
               </div>
             </Fragment>
@@ -501,6 +534,16 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
                   checked={spendingOnServer(settings)}
                   onChange={async (e) => {
                     const server = e.target.checked;
+                    // 0.18.1: turning it off is asked about first
+                    if (!server) {
+                      const ok = await confirmAction('Stop sharing your spending?', {
+                        detail:
+                          "Your data then shows only what this phone worked out, and keeps it here. What it sent before stays on the server, in the household's figures. Turn it back on any time.",
+                        action: 'Stop sharing',
+                        danger: false,
+                      });
+                      if (!ok) return;
+                    }
                     await updateSettings({ yourData: { server } });
                     if (server)
                       await afterSave('spending', () =>
@@ -515,9 +558,11 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
                     Share my spending with the server
                   </span>
                   <span className="small">
-                    {spendingOnServer(settings)
-                      ? "On · Your data shows your household's spending from your Restock server, the same on every phone. This phone's earlier spending goes to it once."
-                      : 'Off · Your data shows only what this phone worked out, and keeps it here.'}
+                    {spendingOnServer(settings) ? "On · the household's spending, on every phone." : 'Off · only this phone’s, kept here.'}{' '}
+                    <More title="Share my spending with the server">
+                      <p>On: Your data shows your household&rsquo;s spending from your Restock server, the same on every phone. This phone&rsquo;s earlier spending goes to it once.</p>
+                      <p>Off: Your data shows only what this phone worked out, and keeps it here. What it sent before stays on the server.</p>
+                    </More>
                   </span>
                 </span>
               </label>
@@ -569,6 +614,14 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
         </>
       )}
       {on('a11y') && <AccessibilitySettings settings={settings} />}
+      {on('animations') && (
+        <>
+          <div className={all ? 'eyebrow' : 'sr-only'} id="s-animations">
+            Animations
+          </div>
+          <AnimationsSettings settings={settings} setLook={(patch) => updateSettings({ look: { ...settings.look, ...patch } })} />
+        </>
+      )}
       {on('look') && (
         <>
           {/* 0.10.8: on its own page the title already says it (only shown when searching all of Settings) */}
@@ -688,7 +741,7 @@ export function SettingsScreen({ page }: { page?: SettingsPage } = {}) {
           <div className="eyebrow" id="s-soon">
             Coming soon
           </div>
-          <Fold title="What's planned" sub="Stock at home, spending, hosted sync, iPhone and more">
+          <Fold title="What's planned" sub="The App Store and Google Play, F-Droid, and more">
             <ComingSoon />
           </Fold>
         </>

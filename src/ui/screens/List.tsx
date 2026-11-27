@@ -1,4 +1,5 @@
 import { useResetOn } from '../useResetOn';
+import { useChunks } from '../useChunks';
 import { CheckStockButton } from '../CheckStock';
 import type { StockItem } from '../../lib/stockWhere';
 import { noteTicksSoon } from '../../lib/spending';
@@ -25,7 +26,7 @@ import { useLive, useSettings } from '../../lib/useLive';
 import type { Recommendation } from '../../lib/verdict';
 import { chainName, type Chain, type ListEntry, type Settings } from '../../types';
 import { stockPlaces } from '../../lib/stockWhere';
-import { ChainDot, ChainName, DetailsPanel, Hold, useBackHandler, Icon, previewFromOption, type PreviewProduct, ProductPreview, RowInfo, SelectBar, Sheet, stockWhere, storePageUrl, Thumb } from '../components';
+import { ChainDot, ChainName, DetailsPanel, Hold, useBackHandler, Icon, previewFromOption, type PreviewProduct, ProductPreview, RowInfo, SelectBar, Sheet, stockWhere, storePageUrl, Thumb, ScreenWaiting } from '../components';
 import { MemberInfoTag, MultiInfoTag, StockInfoTag, SwapInfoTag, VerdictInfoTag } from '../tagInfo';
 import { SendToShopSheet } from './SendToShop';
 import { PickItemSheet } from './PickItem';
@@ -338,7 +339,9 @@ export function ListScreen() {
     setPicked(new Set());
     return true;
   }, selecting);
-  if (!allEntries || !allRecs || !allCats || !settings || !sums) return <div className="screen" />;
+  // 0.18.1: in parts with the Simple design (useChunks.tsx)
+  const chunks = useChunks();
+  if (!allEntries || !allRecs || !allCats || !settings || !sums) return <ScreenWaiting back={false} />;
   const { sectionsOn, section, groupSection, entries, recs, shops, totals, names, c, stockItems } = sums;
   const categories = allCats.filter((x) => x.section === section);
   const openCount = (sec: ListSection) => allEntries.filter((e) => !e.checked && entrySection(e, groupSection) === sec).length;
@@ -804,7 +807,12 @@ export function ListScreen() {
         </div>
       )}
 
-      {view === 'all' && open.length > 0 && <div className="card flush">{open.map((e) => renderRow(e, open.some((x) => !!previewOf(x))))}</div>}
+      {view === 'all' && open.length > 0 && (
+        <>
+          <div className="card flush">{open.slice(0, chunks.limit).map((e) => renderRow(e, open.some((x) => !!previewOf(x))))}</div>
+          {chunks.more(open.length)}
+        </>
+      )}
 
       {/* 0.9.5: Aisle group, the same grouping as the web: each category in your order, then Other. */}
       {view === 'aisle' &&

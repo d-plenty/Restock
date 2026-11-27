@@ -332,6 +332,8 @@ export interface Settings {
     stockUp: boolean;
     /** Stock-up tips with deal alerts ("usually on sale every 6 weeks, a good time to stock up"). */
     stockUpTips: boolean;
+    /** 0.18.1: on an admin phone, when the server's phones change (lib/adminNotices.ts). On unless turned off. */
+    phones?: boolean;
   };
   sync: {
     mode: 'device' | 'server';
@@ -448,7 +450,17 @@ export interface Settings {
    * `opening`: the opening animation at start (Opening.tsx); on unless false. Off, no opening plays at all.
    * 0.17.0 `iconPicked`: an icon colour picked by hand (so "Match my accent colour", now the default, is never put back on it).
    */
-  look: { style: 'australia' | 'plain'; accent?: string; icon: string; black?: boolean; holidays?: boolean; opening?: boolean; iconPicked?: boolean; /** 0.18.0: holidays turned off one by one (Holiday themes still on). */ holidaysOff?: ('christmas' | 'newyear' | 'australia' | 'easter' | 'halloween')[] };
+  look: {
+    /** 0.18.1: the Simple design replaced Plain (an old 'plain' is read as 'simple'). */
+    style: 'australia' | 'simple';
+    accent?: string;
+    /** 0.18.1: the theme colour (the bars and tops): navy in the default theme, the accent in Simple, unless one is picked. */
+    bar?: string;
+    /** 0.18.1: Simple in dark mode: the coloured band at the top too (off: plain black). */
+    band?: boolean;
+    /** 0.18.1: what Simple turned off when it was picked (put back on going back to the default theme). */
+    simpleWas?: { opening?: boolean; holidays?: boolean; motion?: boolean };
+    icon: string; black?: boolean; holidays?: boolean; opening?: boolean; iconPicked?: boolean; /** 0.18.0: holidays turned off one by one (Holiday themes still on). */ holidaysOff?: ('christmas' | 'newyear' | 'australia' | 'easter' | 'halloween')[] };
   /**
    * 0.16.0: what to call the person on this phone (myName.ts): Home's greeting, this phone's name in
    * the household and on a server, and backup names. This phone's own (in its backups, never synced).

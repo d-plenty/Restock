@@ -6,6 +6,8 @@ import { RestockNative } from './sql/native';
 import { money } from './units';
 import { isNative } from '../stores/http';
 import type { Group, ListEntry, Settings } from '../types';
+import { AUS_GREEN, ICON_COLOURS, nearestIcon } from './looks';
+import { bandColour, contrast, NAVY, textOn } from './theme';
 
 // What the home screen widgets show. Android draws them (Widgets.java); the app hands over the
 // words each time something changes, a moment later so a burst of changes is one update.
@@ -18,6 +20,23 @@ export interface WidgetData {
   dark: boolean;
   updated: string;
   look: Settings['widgets'];
+  /** 0.18.1: "Like the app": the theme colour behind, the accent for the title, the app icon's colour for the buttons. */
+  app: { bg: string; title: string; icon: string };
+}
+
+/**
+ * 0.18.1: the widgets "like the app": the theme colour (navy, or the colour picked; Simple's band)
+ * behind them, the title in the accent colour and Quick actions' buttons in the app icon's colour,
+ * each only where it reads on the background (otherwise white or near-black, as the text is).
+ */
+export function widgetAppColours(look: Settings['look'], dark: boolean): WidgetData['app'] {
+  const bg = bandColour(look, dark) ?? (dark ? '#0b1a44' : NAVY);
+  const ink = textOn(bg) === '#ffffff' ? '#ffffff' : '#0f1d3d';
+  const accent = look.accent ?? AUS_GREEN;
+  const iconId = look.icon === 'match' ? nearestIcon(accent).id : look.icon;
+  const icon = ICON_COLOURS.find((c) => c.id === iconId)?.hex ?? accent;
+  const readable = (c: string) => (contrast(c, bg) >= 3 ? c : ink);
+  return { bg, title: readable(accent), icon: readable(icon) };
 }
 
 /**
@@ -69,6 +88,7 @@ async function widgetData(): Promise<WidgetData> {
     dark,
     updated: new Date().toLocaleString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' }),
     look: s.widgets,
+    app: widgetAppColours(s.look, dark),
   };
 }
 

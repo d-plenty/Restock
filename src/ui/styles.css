@@ -88,7 +88,7 @@ a {
   padding: 6px 6px calc(var(--bottom) + 8px);
 }
 /* Australian style: a gold line along the top of the navy bar. */
-:root:not([data-style='plain']) .tabs {
+:root:not([data-style='simple']) .tabs {
   border-top: 3px solid var(--gold);
 }
 
@@ -294,14 +294,14 @@ p {
 }
 /* Australian style: the savings banner is flag navy, with a gold number and a faint Southern Cross,
    drawn as on the flag (0.9.0): Alpha, Beta, Gamma and Delta Crucis 7-pointed, Epsilon small and 5-pointed. */
-:root:not([data-style='plain']) .banner.green {
+:root:not([data-style='simple']) .banner.green {
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='5940 480 3100 4080'%3E%3Cpath fill='white' fill-opacity='.22' d='M7560 3840L7629 4056L7841 3976L7716 4164L7911 4280L7685 4300L7716 4524L7560 4360L7404 4524L7435 4300L7209 4280L7404 4164L7279 3976L7491 4056ZM6300 1845L6369 2061L6581 1981L6456 2169L6651 2285L6425 2305L6456 2529L6300 2365L6144 2529L6175 2305L5949 2285L6144 2169L6019 1981L6231 2061ZM7560 480L7629 696L7841 616L7716 804L7911 920L7685 940L7716 1164L7560 1000L7404 1164L7435 940L7209 920L7404 804L7279 616L7491 696ZM8680 1509L8749 1725L8961 1645L8836 1833L9031 1949L8805 1969L8836 2193L8680 2029L8524 2193L8555 1969L8329 1949L8524 1833L8399 1645L8611 1725ZM8064 2520L8113 2662L8264 2665L8144 2756L8187 2900L8064 2814L7941 2900L7984 2756L7864 2665L8015 2662Z'/%3E%3C/svg%3E")
       no-repeat right 16px center / auto 78%,
     linear-gradient(120deg, var(--navy), var(--navy-2));
   color: var(--white);
 }
-:root:not([data-style='plain']) .banner.green .big {
+:root:not([data-style='simple']) .banner.green .big {
   color: var(--gold);
 }
 .banner.amber {
@@ -3440,7 +3440,7 @@ input[type='checkbox'].switch:focus-visible {
   width: 100% !important;
 }
 /* Keep words clear of the Southern Cross on the navy banners. */
-:root:not([data-style='plain']) .banner.green {
+:root:not([data-style='simple']) .banner.green {
   padding-right: 68px;
 }
 /* A long tag (a branch name in "OUT OF STOCK AT …") wraps rather than running off the screen. */
@@ -7690,7 +7690,7 @@ span.inv-num {
   border-top: 0;
   overflow-y: auto;
 }
-:root:not([data-style='plain']) .app.pad-wide > .tabs {
+:root:not([data-style='simple']) .app.pad-wide > .tabs {
   border-top: 0;
   border-right: 3px solid var(--gold);
 }
@@ -8022,7 +8022,7 @@ textarea.input {
 }
 /* the tab bar: a floating navy pill */
 .app:not(.pad-wide) > .tabs,
-:root:not([data-style='plain']) .app:not(.pad-wide) > .tabs {
+:root:not([data-style='simple']) .app:not(.pad-wide) > .tabs {
   margin: 4px 12px calc(var(--bottom) + 10px);
   padding: 8px;
   border: 0;
@@ -8030,7 +8030,7 @@ textarea.input {
   box-shadow: var(--bar-shadow);
   align-items: center;
 }
-:root[data-style='plain'] .app:not(.pad-wide) > .tabs {
+:root[data-style='simple'] .app:not(.pad-wide) > .tabs {
   border: 1px solid var(--line);
 }
 .app:not(.pad-wide) > .tabs .tab {
@@ -8153,7 +8153,7 @@ textarea.input {
     --pad-gutter: max(18px, calc((100vw - 760px) / 2));
   }
   .app:not(.pad-wide) > .tabs,
-  :root:not([data-style='plain']) .app:not(.pad-wide) > .tabs {
+  :root:not([data-style='simple']) .app:not(.pad-wide) > .tabs {
     width: min(620px, calc(100% - 24px));
     margin-left: auto;
     margin-right: auto;
@@ -8223,13 +8223,13 @@ textarea.input {
 }
 /* The tab bar sits just above the phone's home bar (less empty space under it) */
 .app:not(.pad-wide) > .tabs,
-:root:not([data-style='plain']) .app:not(.pad-wide) > .tabs {
+:root:not([data-style='simple']) .app:not(.pad-wide) > .tabs {
   margin-bottom: max(6px, calc(var(--bottom) - 14px));
 }
 /* 0.18.0: Android's gesture line sits lower in a thinner strip than the iPhone's home bar: the tab
    bar keeps clear of it (it was touching it), with about the same gap the iPhone has. */
 :root[data-os='android'] .app:not(.pad-wide) > .tabs,
-:root[data-os='android']:not([data-style='plain']) .app:not(.pad-wide) > .tabs {
+:root[data-os='android']:not([data-style='simple']) .app:not(.pad-wide) > .tabs {
   margin-bottom: calc(var(--bottom) + 2px);
 }
 /* 0.17.0: See the animations */
@@ -8323,4 +8323,185 @@ textarea.input {
   gap: 10px;
   padding-left: 14px;
   border-left: 3px solid var(--line);
+}
+
+/* ---------- 0.18.1: the Simple design (tokens.css has its colours and corners) ----------
+   Flat and square: no shadows, outlines instead; the tab bar sits along the bottom with a line above
+   it; round only where round means something (dots, switches, colour swatches). On a band where
+   gold wouldn't read (Simple, or a light theme colour: data-bar-plain), what's gold on navy is the
+   band's own text colour, and the main button there is that colour with the band's colour on it. */
+:root[data-style='simple'] .app:not(.pad-wide) > .tabs {
+  margin: 0;
+  padding: 6px 8px calc(var(--bottom) + 6px);
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+}
+:root[data-style='simple'] .app.pad-wide > .tabs {
+  border-right: 1px solid var(--line);
+}
+:root[data-style='simple'] :is(.dot, .swatch, .info-dot, .ph-mark, .ph-radio, .pick-dot, .sync-dot, .recall-mark, .trip-tick, .shop-pick-tick, .notify-bell, .update-banner-icon, .cc-colour, .irow-i, .sync-house-ic, .chain-dot, .map-pin, .stop, .tab.centre-add .bubble),
+:root[data-style='simple'] input[type='checkbox'].switch,
+:root[data-style='simple'] input[type='checkbox'].switch::after {
+  border-radius: var(--r-round);
+}
+:root[data-style='simple'] :is(.tab.centre-add .bubble, .add-mini, .toast, .selectbar, .welcome-go, .tour-card, .welcome-a11y, .list-switch-menu, .ph-mark),
+:root[data-style='simple'] input[type='checkbox'].switch::after {
+  box-shadow: none;
+}
+:root[data-style='simple'] :is(.toast, .selectbar, .tour-card, .list-switch-menu) {
+  border: 1px solid var(--line-2);
+}
+:root[data-style='simple'] .sheet {
+  border-top: 1px solid var(--line-2);
+}
+:root[data-style='simple'] .banner.green {
+  background: var(--green-bg);
+  color: var(--green-ink);
+}
+/* Simple's top: a solid band, square at the bottom. */
+:root[data-style='simple'] :is(.navy-top, .navy-cont, .screen > .topbar, .shopmode-top, .more-top) {
+  border-radius: 0;
+}
+/* Dark mode without the band: plain black, with a line under the top. */
+:root[data-style='simple']:not([data-band='1']) :is(.navy-top, .screen > .topbar, .shopmode-top, .more-top) {
+  border-bottom: 1px solid var(--line);
+}
+:root[data-style='simple']:not([data-band='1']) :is(.navy-top, .navy-cont, .screen > .topbar, .shopmode-top) .btn.primary {
+  background: var(--green-solid);
+  border-color: var(--green-solid);
+  color: var(--on-accent);
+}
+:root[data-bar-plain='1'] :is(.navy-kicker, .navy-sum-big),
+:root[data-bar-plain='1'] :is(.navy-top, .navy-cont) :is(.eyebrow, .linkish, .list-switch > svg),
+:root[data-bar-plain='1'] .shopmode-top .small strong,
+:root[data-bar-plain='1'] .list-switch.which-list .list-switch-name {
+  color: var(--on-navy);
+}
+:root[data-bar-plain='1'] .pad-brand-mark {
+  background: var(--on-navy);
+  color: var(--more-top);
+}
+:root[data-style='simple'] .name-avatar {
+  background: var(--green-solid);
+  color: var(--on-accent);
+}
+:root[data-bar-plain='1'] .shopmode-top .shop-progress span {
+  background: var(--on-navy);
+}
+:root[data-bar-plain='1'][data-band='1'] :is(.navy-top, .navy-cont, .screen > .topbar, .shopmode-top) .btn.primary,
+:root[data-bar-plain='1']:not([data-style='simple']) :is(.navy-top, .navy-cont, .screen > .topbar, .shopmode-top) .btn.primary {
+  background: var(--on-navy);
+  border-color: var(--on-navy);
+  color: var(--more-top);
+}
+:root[data-bar-plain='1'] :is(.navy-top, .navy-cont) :is(.icon-btn, .btn, .linkish, .list-switch):focus-visible {
+  outline-color: var(--on-navy);
+}
+
+/* ---------- 0.18.1: Restock's own colour wheel (ColourWheel.tsx) ---------- */
+.cw {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cw-wheel {
+  position: relative;
+  width: min(260px, 70vw);
+  aspect-ratio: 1;
+  align-self: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle closest-side, var(--white), transparent),
+    conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+  touch-action: none;
+  cursor: crosshair;
+}
+.cw-wheel:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+}
+.cw-dim {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--black);
+  pointer-events: none;
+}
+.cw-knob {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 50%;
+  border: 3px solid var(--white);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.cw-light input[type='range'] {
+  width: 100%;
+  height: 28px;
+  border-radius: var(--r-sm);
+  appearance: none;
+  -webkit-appearance: none;
+}
+.cw-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.cw-preview {
+  width: 64px;
+  height: var(--h-control);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-2);
+  font-weight: 800;
+  font-size: var(--fs-lg);
+  flex: none;
+}
+.cw-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+:root[data-style='simple'] :is(.cw-wheel, .cw-dim, .cw-knob) {
+  border-radius: 50%;
+}
+/* 0.18.1: Look and colours → Animations, the row that opens it */
+.look-anim-row {
+  margin: 0 -14px;
+}
+/* 0.18.1: Show more, at the end of a long list in parts (Simple) */
+.chunk-more {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+/* 0.18.1: Settings side by side, on an iPad held sideways (settingsSide.ts): the list, then the page. */
+.settings-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.settings-split > .screen {
+  --pad-gutter: 18px;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+.settings-split > .screen:first-child {
+  flex: 0 0 min(380px, 42%);
+  border-right: 1px solid var(--line);
+}
+.settings-split > .screen:last-child {
+  flex: 1;
+  min-width: 0;
+}
+.settings-split .row[aria-current='page'] {
+  background: var(--green-bg);
+}
+.settings-split .row[aria-current='page'] .title {
+  color: var(--green-ink);
 }

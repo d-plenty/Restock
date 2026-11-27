@@ -74,7 +74,8 @@ describe('iPhone app: greyed out, with why', () => {
     // 0.15.2: a time of day is possible now (the earliest a background check starts).
     // Nothing else on an iPhone is greyed with a "why" box any more.
     for (const f of ['Settings', 'Look', 'RestockServer', 'SyncOverview']) expect(read(`../ui/screens/${f}.tsx`), f).not.toMatch(/<IosBox reason="(updates|widgets|appIcon|serverExtras|importData)"/);
-    expect(read('../ui/screens/Soon.tsx')).toContain('Still to come: home screen widgets, Search with Google Lens straight from Restock (it opens in the browser for now), and the App Store.');
+    // 0.18.1: What's planned, as an app store's "coming soon" reads
+    expect(read('../ui/screens/Soon.tsx')).toContain('The same three widgets Android has: Deals, Shopping list and Quick actions');
     // 0.15.0: sync, the server and Home Assistant always work on an iPhone: their banners are for the web preview only.
     expect(read('../ui/screens/Sync.tsx')).toContain('<NotHereBanner title="Sync works in the Android app"');
     expect(read('../ui/screens/RestockServer.tsx')).toContain('<NotHereBanner title="The Restock server works in the Android app"');

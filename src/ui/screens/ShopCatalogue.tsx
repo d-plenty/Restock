@@ -19,7 +19,7 @@ import type { StoreProduct } from '../../stores/types';
 import { serverMode } from '../../server-mode/flag';
 import { sharedSpecials } from '../../server-mode/live';
 import { photoUrl } from '../../server-mode/ui/deskShared';
-import { ChainDot, Icon, LoadingBar, Sheet, Thumb, TopBar } from '../components';
+import { ChainDot, Icon, LoadingBar, Sheet, Thumb, TopBar, ScreenWaiting } from '../components';
 import { useNav } from '../nav';
 import { NoneFound } from '../simple';
 import { cleanSearch } from '../../lib/searchText';
@@ -112,7 +112,7 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
   const items = useMemo(() => filterSpecials(all, typed, sort), [all, typed, sort]);
   const saving = all.reduce((t, s) => t + s.saving, 0);
 
-  if (!base) return <div className="screen" />;
+  if (!base) return <ScreenWaiting title={name} />;
   const err = lists?.find((l) => l.chain === chain)?.error;
   const known = shopDef(chain)?.catalogue;
   const own = httpsLink(serverMode ? (known?.url ?? shared?.catalogues[chain]?.url) : link?.url);

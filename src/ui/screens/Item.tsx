@@ -22,7 +22,7 @@ import { ALERT_LEVELS, computeStats, HISTORY_DAYS, multiBuy, optionStyle, produc
 
 const wordList = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 import { chainName, HISTORY_WEEKS, historyLabel, LEARNING_DAYS, type Group, type PriceReading } from '../../types';
-import { Hold, MoreInfo, RowInfo, previewFromOption, ProductPreview, ChainDot, Icon, Sheet, SwapBox, TopBar } from '../components';
+import { Hold, MoreInfo, RowInfo, previewFromOption, ProductPreview, ChainDot, Icon, Sheet, SwapBox, TopBar, ScreenWaiting } from '../components';
 import { CheapestInfoTag, MemberInfoTag, MultiInfoTag, StockInfoTag, SwapInfoTag, VerdictInfoTag } from '../tagInfo';
 import { useNav } from '../nav';
 import { costcoIsOn, isLocalOnlyShop, searchChainsIn, type StoreChain } from '../../shops';
@@ -191,7 +191,7 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   }, [olderPrices, wantOlder, older]);
 
   const [checkingCostco, setCheckingCostco] = useState(false); // 0.9.6 (review L1): "Check at Costco"
-  if (data === undefined) return <div className="screen" />;
+  if (data === undefined) return <ScreenWaiting title="Item" />;
   if (data === null) {
     return (
       <div className="screen">

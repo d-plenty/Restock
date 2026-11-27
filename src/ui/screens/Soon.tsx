@@ -2,9 +2,11 @@ import type { ReactNode } from 'react';
 import { Icon, TopBar } from '../components';
 import { useNav } from '../nav';
 import { appChannel } from '../../lib/updates';
+import { isIos } from '../../lib/platform';
 
-// Settings → Coming soon: what's planned, each with a short page saying what it'll do and what's
-// here already. 0.15.0: shared prices (here) came off the list; each page is a sentence or two.
+// Settings → Help → What's planned: what's coming in future releases, each with a short page. 0.18.1:
+// rewritten as an app store's "coming soon" reads: the App Store and Google Play, F-Droid's main
+// repository, widgets on the iPhone and iPad, and Running low. What's already here came off it.
 
 interface Soon {
   id: string;
@@ -16,59 +18,19 @@ interface Soon {
 
 const ALL_SOON: Soon[] = [
   {
-    id: 'inventory',
-    icon: 'pantry',
-    title: 'Running low',
-    short: 'Suggestions to add things before you run out',
+    id: 'stores',
+    icon: 'download',
+    title: 'The App Store and Google Play',
+    short: 'Restock in the official app stores',
     body: (
       <>
-        <p>Inventory (Settings) already keeps how much you have. Next, Restock learns how fast you use each thing and suggests adding it to your list before you run out, timed with a good price.</p>
+        <p>Restock is coming to the App Store and Google Play, so you can install it and get updates the usual way, with nothing set up by hand.</p>
+        <p>Until then: on Android, from GitHub or Restock&rsquo;s own F-Droid repo; on iPhone and iPad, installed from a computer.</p>
       </>
     ),
   },
   {
-    id: 'spending',
-    icon: 'chart',
-    title: 'Spending from receipts',
-    short: 'Here now in Your data. Receipts as a source later',
-    body: (
-      <>
-        <p>Your data already shows what you spent each month, from what you tick off your list. Later: a switch to work it out from your receipts instead.</p>
-      </>
-    ),
-  },
-  {
-    id: 'iphone',
-    icon: 'phone',
-    title: 'iPhone and iPad',
-    short: 'Widgets, Google Lens and the App Store are still to come',
-    body: (
-      <>
-        <p>
-          Restock runs on iPhone and iPad, installed from a computer for now:{' '}
-          <a href="https://github.com/d-plenty/Restock/blob/main/docs/IPHONE.md" target="_blank" rel="noreferrer">
-            how, and the warnings
-          </a>
-          .
-        </p>
-        <p>Still to come: home screen widgets, Search with Google Lens straight from Restock (it opens in the browser for now), and the App Store.</p>
-      </>
-    ),
-  },
-  {
-    // 0.15.1: the App Store's version says this one instead (nothing about installing from a computer).
-    id: 'iphone-store',
-    icon: 'phone',
-    title: 'iPhone and iPad',
-    short: 'Widgets and Google Lens are still to come',
-    body: (
-      <>
-        <p>Still to come: home screen widgets, and Search with Google Lens straight from Restock (it opens in the browser for now).</p>
-      </>
-    ),
-  },
-  {
-    id: 'github',
+    id: 'fdroid',
     icon: 'download',
     title: 'F-Droid',
     short: 'Restock in the main F-Droid repository',
@@ -79,24 +41,42 @@ const ALL_SOON: Soon[] = [
           <a href="https://d-plenty.github.io/Restock/" target="_blank" rel="noreferrer">
             its own F-Droid repo
           </a>
-          , with every release. Still to come: the main F-Droid repository, so you can find it without adding a repo.
+          , with every release. Coming: the main F-Droid repository, so you can find it in F-Droid without adding a repo.
         </p>
+      </>
+    ),
+  },
+  {
+    id: 'widgets',
+    icon: 'phone',
+    title: 'Widgets on iPhone and iPad',
+    short: 'Deals, your shopping list and quick actions on the home screen',
+    body: (
+      <>
+        <p>The same three widgets Android has: Deals, Shopping list and Quick actions (Scan, List, Receipt), on your iPhone or iPad&rsquo;s home screen, in your colours.</p>
+      </>
+    ),
+  },
+  {
+    id: 'inventory',
+    icon: 'pantry',
+    title: 'Running low',
+    short: 'Suggestions to add things before you run out',
+    body: (
+      <>
+        <p>Inventory (Settings) already keeps how much you have. Coming: Restock learns how fast you use each thing and suggests adding it to your list before you run out, timed with a good price.</p>
       </>
     ),
   },
 ];
 
-/**
- * 0.15.1: what's coming, for this version of the app: the store versions say nothing about installing
- * from a computer or about Restock's own F-Droid repo (each store installs and updates its own).
- */
+/** What's coming for this version of the app: the store versions leave out the stores and F-Droid (they're installed from one), and Android leaves out the iPhone's widgets. */
 function soonHere(): Soon[] {
   const c = appChannel();
+  const store = c === 'play' || c === 'appstore';
   return ALL_SOON.filter((s) => {
-    const store = c === 'play' || c === 'appstore';
-    if (s.id === 'iphone') return c !== 'appstore';
-    if (s.id === 'iphone-store') return c === 'appstore';
-    if (s.id === 'github') return !store;
+    if (s.id === 'stores' || s.id === 'fdroid') return !store;
+    if (s.id === 'widgets') return isIos() || c === 'appstore';
     return true;
   });
 }
@@ -127,7 +107,14 @@ export function ComingSoon() {
 
 export function SoonScreen({ id }: { id: string }) {
   const s = soonHere().find((x) => x.id === id);
-  if (!s) return <div className="screen" />;
+  // An old link to one that's here now (or no longer planned).
+  if (!s)
+    return (
+      <div className="screen">
+        <TopBar title="Coming soon" />
+        <p className="small">That one isn&rsquo;t on the list any more: it&rsquo;s here now, or no longer planned.</p>
+      </div>
+    );
   return (
     <div className="screen">
       <TopBar title="Coming soon" />

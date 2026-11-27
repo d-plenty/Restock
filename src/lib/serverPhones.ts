@@ -9,7 +9,21 @@ import type { Phone } from '../server-mode/api';
 export type Role = 'admin' | 'user';
 export type { Phone };
 
-const admin = (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: Record<string, unknown>) => RestockNative.serverAdmin({ method, path, ...(body ? { body } : {}) });
+/**
+ * One request. 0.18.1: after a phone is removed the household has a new key, and the server answers
+ * with it: an answer this phone can't open yet means it hasn't taken the new key, so it syncs (and
+ * takes it) and asks once more.
+ */
+async function admin(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const ask = () => RestockNative.serverAdmin({ method, path, ...(body ? { body } : {}) });
+  try {
+    return await ask();
+  } catch (e) {
+    if (method === 'DELETE' || !/couldn.t be opened with this household.s keys/i.test(e instanceof Error ? e.message : String(e))) throw e;
+    await RestockNative.syncNow().catch(() => undefined);
+    return ask();
+  }
+}
 
 /** What this phone is on its server; null on a server from before 0.18.0 (no roles there) or out of reach. */
 export async function myRole(): Promise<Role | null> {
@@ -45,5 +59,6 @@ export const setRole = (device: string, role: Role) => admin('PATCH', `/phones/$
 /** Remove: it stops syncing, and the household gets a new key (this phone takes it at its next sync). */
 export async function removePhone(device: string): Promise<void> {
   await admin('DELETE', `/phones/${encodeURIComponent(device)}`, {});
-  void RestockNative.syncNow().catch(() => undefined);
+  // 0.18.1: waited for, so the list that shows next opens with the new key (it didn't, now and then).
+  await RestockNative.syncNow().catch(() => undefined);
 }

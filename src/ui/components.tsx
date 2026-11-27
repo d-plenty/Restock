@@ -1,4 +1,5 @@
 import { useLatest } from './useLatest';
+import { isLite } from '../lib/simple';
 import { useNow } from './useNow';
 import { wasSince } from '../lib/wasSince';
 import { createContext, useContext, useEffect, useId, useRef, useState, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react';
@@ -348,6 +349,31 @@ export function TopBar({ title, right, back = true, tag }: { title: string; righ
   );
 }
 
+/**
+ * 0.18.1: a screen whose things are still being read: its title and Back straight away, and a loading
+ * bar if it takes more than a moment (before, an older iPad showed a black page until it was ready).
+ */
+export function ScreenWaiting({ title, back = true }: { title?: string; back?: boolean }) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 350);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div className="screen" aria-busy="true">
+      {(title !== undefined || back) && <TopBar title={title ?? ''} back={back} />}
+      {slow && (
+        <div style={{ padding: '24px 4px' }} role="status">
+          <LoadingBar seconds={3} />
+          <span className="small" style={{ display: 'block', textAlign: 'center', marginTop: 8 }}>
+            Loading…
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** 0.10.2: shops marked Beta where they're picked or set up (it works the same; it's tested less). 0.10.3: and IGA and the new shops (shops.ts). */
 export { BETA_SHOPS } from '../shops';
 /** What the Beta means, wherever it's explained (setup, Settings, the tab itself, the web page). */
@@ -491,6 +517,7 @@ export function Thumb({ src, icon = 'box' }: { src?: string; icon?: string }) {
           src={src}
           alt=""
           loading="lazy"
+          decoding="async"
           referrerPolicy={plain === src ? 'strict-origin-when-cross-origin' : 'no-referrer'}
           onError={() => (plain === src ? setBroken(src) : setPlain(src))}
         />
@@ -763,8 +790,11 @@ export function timeAgo(iso?: string): string {
 
 // ---------- price chart ----------
 
-export function PriceChart({ readings, typical }: { readings: PriceReading[]; typical?: number }) {
+export function PriceChart({ readings: all, typical }: { readings: PriceReading[]; typical?: number }) {
   const [tapped, setTapped] = useState<number>();
+  // 0.18.1: with the Simple design, a run of readings at the same price is drawn as one (the line
+  // looks the same; an older phone has far less to draw).
+  const readings = isLite() ? all.filter((r, i) => i === 0 || i === all.length - 1 || r.price !== all[i - 1].price || !!r.isSpecial !== !!all[i - 1].isSpecial) : all;
   if (readings.length < 2) {
     return <p className="small">The price history chart appears after a couple of price checks.</p>;
   }

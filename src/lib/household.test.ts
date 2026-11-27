@@ -10,7 +10,7 @@ const owner: Partial<Settings> = {
   historyWeeks: 26,
   checkIntervalHours: 24,
   alerts: { ...mergeSettings({}).alerts, daily: true },
-  look: { style: 'plain', icon: 'blue' },
+  look: { style: 'simple', icon: 'blue' },
   household: { name: 'Declan and Sarah' },
 };
 

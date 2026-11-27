@@ -27,50 +27,57 @@ function Player({ playing, still, onEnd }: { playing: Playing; still: boolean; o
   );
 }
 
-export function OpeningPreview({ onClose, still, settings }: { onClose: () => void; still: boolean; settings?: Pick<Settings, 'look' | 'theme'> }) {
+/** 0.18.1: the list of animations to play (on the Animations page, and in this sheet). */
+export function AnimationList({ still, settings }: { still: boolean; settings?: Pick<Settings, 'look' | 'theme'> }) {
   const [playing, setPlaying] = useState<Playing>();
   const nowH = settings ? (settings.look.opening === false ? undefined : (holidayNow(settings) ?? 'none')) : undefined;
   const nowLook: OpeningLook = settings && isDark(settings.theme) ? 'night' : 'day';
   return (
     <>
-      <Sheet title="See the animations" onClose={onClose}>
-        <p className="small" style={{ margin: 0 }}>
-          Day is how it looks in light mode, night in dark mode.
-        </p>
-        <div className="card flush op-list">
-          {ALL.map((h) => (
-            <div key={h} className="row op-list-row">
-              <span className="op-thumb-box">
-                <Opening thumb holiday={h === 'none' ? undefined : h} look={h === nowH ? nowLook : 'day'} />
+      <div className="card flush op-list">
+        {ALL.map((h) => (
+          <div key={h} className="row op-list-row">
+            <span className="op-thumb-box">
+              <Opening thumb holiday={h === 'none' ? undefined : h} look={h === nowH ? nowLook : 'day'} />
+            </span>
+            <span className="grow">
+              <span className="title">{nameOf(h)}</span>
+              <span className="small">
+                {WHEN[h]}
+                {h === nowH && <strong className="op-now"> · showing now</strong>}
               </span>
-              <span className="grow">
-                <span className="title">{nameOf(h)}</span>
-                <span className="small">
-                  {WHEN[h]}
-                  {h === nowH && <strong className="op-now"> · showing now</strong>}
-                </span>
-              </span>
-              <span className="op-list-btns">
-                {h === 'none' ? (
-                  <button className="btn small" onClick={() => setPlaying({ h, look: 'night' })} aria-label="Play the usual one">
-                    Play
+            </span>
+            <span className="op-list-btns">
+              {h === 'none' ? (
+                <button className="btn small" onClick={() => setPlaying({ h, look: 'night' })} aria-label="Play the usual one">
+                  Play
+                </button>
+              ) : (
+                <>
+                  <button className="btn small" onClick={() => setPlaying({ h, look: 'day' })} aria-label={`Play ${nameOf(h)}, day`}>
+                    Day
                   </button>
-                ) : (
-                  <>
-                    <button className="btn small" onClick={() => setPlaying({ h, look: 'day' })} aria-label={`Play ${nameOf(h)}, day`}>
-                      Day
-                    </button>
-                    <button className="btn small" onClick={() => setPlaying({ h, look: 'night' })} aria-label={`Play ${nameOf(h)}, night`}>
-                      Night
-                    </button>
-                  </>
-                )}
-              </span>
-            </div>
-          ))}
-        </div>
-      </Sheet>
+                  <button className="btn small" onClick={() => setPlaying({ h, look: 'night' })} aria-label={`Play ${nameOf(h)}, night`}>
+                    Night
+                  </button>
+                </>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
       {playing && <Player playing={playing} still={still} onEnd={() => setPlaying(undefined)} />}
     </>
+  );
+}
+
+export function OpeningPreview({ onClose, still, settings }: { onClose: () => void; still: boolean; settings?: Pick<Settings, 'look' | 'theme'> }) {
+  return (
+    <Sheet title="See the animations" onClose={onClose}>
+      <p className="small" style={{ margin: 0 }}>
+        Day is how it looks in light mode, night in dark mode.
+      </p>
+      <AnimationList still={still} settings={settings} />
+    </Sheet>
   );
 }

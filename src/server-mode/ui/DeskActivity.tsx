@@ -5,7 +5,7 @@ import { useRef, useState, type KeyboardEvent } from 'react';
 import { timeAgo } from '../../ui/components';
 import { HousePage } from './DeskServer';
 import { logsKeepText } from '../../lib/autoDelete';
-import { isTrouble, useActivity, useHouseSettings, usePhonesV3, whatOf, whoOf } from './houseData';
+import { isAdminAction, isTrouble, useActivity, useHouseSettings, usePhonesV3, whatOf, whoOf } from './houseData';
 
 type Part = 'activity' | 'logs';
 
@@ -18,12 +18,25 @@ function when(iso: string): string {
 }
 
 function Rows({ logs }: { logs: boolean }) {
-  const { data, error, reload } = useActivity(logs);
+  const { data: all, error, reload } = useActivity(logs);
   const phones = usePhonesV3();
+  // 0.18.1: Activity can show only what admins did (houseData.ts ADMIN_ACTIONS)
+  const [adminOnly, setAdminOnly] = useState(false);
+  const data = all && !logs && adminOnly ? all.filter(isAdminAction) : all;
   return (
     <>
+      {!logs && (
+        <div className="dk-seg dk-self-start" role="group" aria-label="Which activity">
+          <button aria-pressed={!adminOnly} onClick={() => setAdminOnly(false)}>
+            Everything
+          </button>
+          <button aria-pressed={adminOnly} onClick={() => setAdminOnly(true)}>
+            Admin actions
+          </button>
+        </div>
+      )}
       {error && <p className="banner red small">{error}</p>}
-      {data?.length === 0 && <p className="small">Nothing yet.</p>}
+      {data?.length === 0 && <p className="small">{adminOnly && !logs ? 'No admin actions in what the server keeps.' : 'Nothing yet.'}</p>}
       {data === undefined && !error && <p className="small">Loading…</p>}
       {data && data.length > 0 && (
         <div className="card flush">

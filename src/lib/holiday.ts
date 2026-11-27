@@ -86,9 +86,9 @@ export const holidayNow = (s: Look | undefined, d = new Date()): Holiday | undef
   return h && !holidayOff(s, h) ? h : undefined;
 };
 
-/** On the default theme (navy, gold and green, no colour of its own picked): the holiday's colours too. */
+/** On the default theme (navy, gold and green, no colour of its own picked, accent or theme): the holiday's colours too. */
 export const holidayColours = (s: Look | undefined, d = new Date()): Holiday | undefined =>
-  s && s.look.style !== 'plain' && !s.look.accent ? holidayNow(s, d) : undefined;
+  s && s.look.style === 'australia' && !s.look.accent && !s.look.bar ? holidayNow(s, d) : undefined;
 
 /** Home's hello on the holiday ("Merry Christmas"), or the time of day's. */
 export function holidayGreeting(h: Holiday | undefined, timeOfDay: string): string {

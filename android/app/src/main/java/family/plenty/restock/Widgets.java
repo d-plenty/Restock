@@ -60,6 +60,9 @@ final class Widgets {
         boolean none;
         int ink;
         int muted;
+        /** 0.18.1: the title (the accent colour, "like the app") and Quick actions' buttons (the app icon's colour). */
+        int title;
+        int icon;
     }
 
     static Look look(JSONObject d) {
@@ -69,7 +72,10 @@ final class Widgets {
         String kind = s.optString("background", "solid");
         Look l = new Look();
         l.none = "none".equals(kind);
-        l.bg = "colour".equals(kind) ? parse(s.optString("colour"), 0xFF00843D) : (dark ? 0xFF15213F : 0xFFFFFFFF);
+        // 0.18.1: "Like the app" is the app's theme colour now (the app works it out: "app").
+        JSONObject app = d.optJSONObject("app");
+        boolean likeApp = "solid".equals(kind) && app != null;
+        l.bg = "colour".equals(kind) ? parse(s.optString("colour"), 0xFF00843D) : likeApp ? parse(app.optString("bg"), 0xFF012169) : (dark ? 0xFF15213F : 0xFFFFFFFF);
         l.alpha = Math.round(255 * Math.max(0, Math.min(100, 100 - s.optInt("transparency", 0))) / 100f);
         String text = s.optString("text", "auto");
         if ("auto".equals(text)) {
@@ -79,6 +85,9 @@ final class Widgets {
             l.ink = parse(text, Color.WHITE);
         }
         l.muted = (l.ink & 0x00FFFFFF) | 0xB3000000;
+        boolean autoText = "auto".equals(text);
+        l.title = likeApp && autoText ? parse(app.optString("title"), l.ink) : l.ink;
+        l.icon = likeApp && autoText ? parse(app.optString("icon"), l.ink) : l.ink;
         return l;
     }
 
@@ -134,7 +143,7 @@ final class Widgets {
         String title = deals ? "Deals" : "Shopping list";
         if (!deals && count > 0) title += " · " + d.optInt("listCount", count);
         v.setTextViewText(R.id.widget_title, title);
-        v.setTextColor(R.id.widget_title, l.ink);
+        v.setTextColor(R.id.widget_title, l.title);
 
         StringBuilder body = new StringBuilder();
         for (int i = 0; i < Math.min(count, 8); i++) {
@@ -171,7 +180,7 @@ final class Widgets {
         String[] actions = {"scan", "list", "receipt"};
         boolean receipts = d.optBoolean("receipts", false);
         for (int i = 0; i < parts.length; i++) {
-            v.setInt(parts[i][1], "setColorFilter", l.ink);
+            v.setInt(parts[i][1], "setColorFilter", l.icon);
             v.setTextColor(parts[i][2], l.ink);
             v.setOnClickPendingIntent(parts[i][0], open(context, actions[i], 10 + i));
         }

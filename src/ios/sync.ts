@@ -5,6 +5,7 @@
 //
 // An iPhone only syncs while Restock is open: when it opens or comes back, every minute after that,
 // and a few seconds after something changes (lib/sync.ts wires those, as on Android).
+import { screensFirst } from '../lib/screensFirst';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { strToU8 } from 'fflate';
 import { syncDatabase } from '../lib/boot';
@@ -326,6 +327,8 @@ let running: Promise<SyncNowResult> | undefined;
 export function syncNow(): Promise<SyncNowResult> {
   if (running) return running;
   running = (async (): Promise<SyncNowResult> => {
+    // 0.18.1: a screen being opened reads first (lib/screensFirst.ts).
+    await screensFirst();
     const { house, folder, wifi, saved } = (await hub());
     let received = 0;
     let viaServer = false;

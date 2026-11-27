@@ -5,7 +5,7 @@ import { SaveBar, useDraftState, useSettingsDraft } from '../SaveBar';
 import { useLive, useDraftSettings } from '../../lib/useLive';
 import { RestockNative } from '../../lib/sql/native';
 import { MAX_SYNC_PHONES, syncInfo } from '../../lib/sync';
-import { Icon, TopBar } from '../components';
+import { Icon, TopBar, ScreenWaiting } from '../components';
 import { useNav } from '../nav';
 import { CategoryEditor } from './Categories';
 import { activeSections, SECTION_NAMES, type Section } from '../../shops';
@@ -17,7 +17,7 @@ export function HouseholdScreen() {
   const settings = useDraftSettings();
   const sync = useLive(syncInfo, []);
   const [section, setSection] = useState<Section>('pantry');
-  if (!settings) return <div className="screen" />;
+  if (!settings) return <ScreenWaiting title="Household" />;
   const sectionsOn = activeSections(settings);
 
   return (

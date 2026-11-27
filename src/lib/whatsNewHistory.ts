@@ -1,10 +1,22 @@
-// 0.17.0: what changed in the versions before this one (0.18.0: 0.17.0 moved here), for someone who skipped some updates: after
+// 0.17.0: what changed in the versions before this one (each release moves the one before here), for someone who skipped some updates: after
 // updating from 0.14.6 to 0.17.0, What's new offers 0.16.0, 0.15.2 … down to what they had. Older
 // than 0.12.0 is on the GitHub releases page. Newest first. (From each version's own notes:
 // fastlane/metadata/android/en-US/changelogs.)
 import type { VersionNotes } from './whatsNew';
 
 export const EARLIER: VersionNotes[] = [
+  {
+    version: '0.18.0',
+    about: 'Add phones and tablets from an admin phone, each holiday on or off, plain colours, and lots of fixes.',
+    changes: [
+      'Admin phones: an admin adds phones and tablets, removes them, and makes others admins, from Settings → Sync → Your Restock server. Your server says who’s an admin.',
+      'Look and colours: 14 plain colours for the accent and the app icon (the same ones, so Match my accent colour matches exactly), and each holiday has its own switch.',
+      'Australia Day shows for the week leading up to it (19–27 January).',
+      'The opening is smoother: 2.5 seconds, or 3.5 on a holiday.',
+      'True black and the app icon colours say it in a line, with the rest behind ⓘ.',
+      'Fixes: the tab bar on Android sat on the gesture line, and a few things on iPad.',
+    ],
+  },
   {
     version: '0.17.0',
     about: 'Tidier everywhere: the same sizes on every screen, shorter Settings, and what’s new for every update you skipped.',

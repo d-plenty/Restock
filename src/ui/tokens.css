@@ -13,7 +13,7 @@
      --blue-*        info (CHEAPER SWAP)     --focus    focus ring
    Brand: navy #012169, gold #ffcd00, green #007a38, cream #f6f4ea. They never change.
    Themes: light (default), dark (data-theme=dark, or system + the phone's dark mode), true black
-   (data-black=1, while dark), and the Plain style (data-style=plain). Accent colours picked in
+   (data-black=1, while dark), and the Simple design (data-style=simple, 0.18.1). Accent colours picked in
    Look and colours override --green, --green-solid, --green-ink, --green-bg, --on-accent,
    --small-bg and --small-line (lib/theme.ts); the deal colours never follow the accent. */
 
@@ -28,6 +28,8 @@
   /* 0.16.0: the curve under a screen's navy top */
   --r-2xl: 32px;
   --r-full: 999px;
+  /* 0.18.1: round whatever the style (Simple squares off --r-full): dots, switches, swatches. */
+  --r-round: 999px;
   /* Text: tags and fine print, details, table text, body and item names, card headings and
      fields, section numbers, page numbers, screen titles, big figures, letter placeholders. */
   --fs-xs: 12px;
@@ -341,68 +343,64 @@
   }
 }
 
-/* ---------- the Plain style: Restock's original neutral colours, without the navy bars ---------- */
-:root[data-style='plain'] {
-  --bg: #f5f4ef;
-  --sunken: #ecebe3;
-  --ink: #1b1f1d;
-  --ink-2: #3a3f3c;
-  --muted: #5a6175;
-  --line: #e4e2d9;
-  --line-2: #d9d7ce;
-  --dash: #a9a38c;
-  --green: #17643f;
-  --green-solid: #17643f;
-  --green-ink: #005a2a;
-  --green-bg: #dcefe1;
-  --shadow: rgba(0, 0, 0, 0.08);
+/* ---------- 0.18.1: the Simple design (it replaced Plain) ----------
+   White, one accent colour, a solid band of it at the top, square corners, and flat: no shadows,
+   no floating bars. In dark mode it's plain black with the accent (the band too, if it's kept:
+   Look and colours → Accent band in dark mode). lib/theme.ts sets the accent and the band's colours
+   (--green…, --more-top, --on-navy…) on <html>; these are the rest. */
+:root[data-style='simple'] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --sunken: #f2f2f2;
+  --ink: #1a1a1a;
+  --ink-2: #333333;
+  --muted: #595959;
+  --line: #dddddd;
+  --line-2: #c4c4c4;
+  --dash: #9a9a9a;
+  --r-xs: 2px;
+  --r-sm: 2px;
+  --r-md: 2px;
+  --r-lg: 2px;
+  --r-xl: 2px;
+  --r-2xl: 0px;
+  --r-full: 2px;
+  --shadow: rgba(0, 0, 0, 0);
+  --card-shadow: none;
+  --card-edge: var(--line);
+  --bar-shadow: none;
+  --cta-shadow: none;
+  --band: var(--green-solid);
+  --more-top: var(--band);
+  --shade-bg: var(--band);
+  --chrome-bg: var(--band);
   --tabbar-bg: var(--surface);
-  --tab-ink: var(--muted);
-  --tab-on: var(--green);
-  --tab-pill: var(--green-bg);
-  --tab-pill-ink: var(--green-ink);
-  --bar-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
-  --shade-bg: var(--bg);
+  --tab-ink: #444444;
+  --tab-on: var(--on-accent);
+  --tab-pill: var(--green-solid);
+  --tab-pill-ink: var(--on-accent);
   --bubble-ring: var(--surface);
-  /* The web's sidebar keeps light text, so in the Plain style it's a neutral dark, not navy. */
-  --chrome-bg: #1b1f1d;
-  --more-top: var(--chrome-bg);
+  --tile-icon-bg: var(--surface);
+  --scrim: rgba(0, 0, 0, 0.45);
 }
-:root[data-style='plain'][data-theme='dark'] {
-  --bg: #111412;
-  --surface: #1a1e1c;
-  --sunken: #252a27;
-  --ink: #eef1f7;
-  --ink-2: #c8cfdd;
-  --muted: #98a2b8;
-  --line: #2e3430;
-  --line-2: #3b423d;
-  --dash: #4d4d4d;
-  --green: #4fca8a;
-  --green-solid: #17643f;
-  --green-ink: #9fe3bd;
-  --green-bg: #183a28;
-  --shadow: rgba(0, 0, 0, 0.4);
-  --chrome-bg: #1a1e1c;
+:root[data-style='simple'][data-dark='1'] {
+  --bg: #000000;
+  --surface: #0d0d0d;
+  --sunken: #1a1a1a;
+  --ink: #f2f2f2;
+  --ink-2: #d0d0d0;
+  --muted: #a3a3a3;
+  --line: #2b2b2b;
+  --line-2: #3d3d3d;
+  --dash: #5c5c5c;
+  --tab-ink: #b3b3b3;
+  --tile-icon-bg: rgba(255, 255, 255, 0.08);
+  --scrim: rgba(0, 0, 0, 0.7);
 }
-@media (prefers-color-scheme: dark) {
-  :root[data-style='plain'][data-theme='system'] {
-    --bg: #111412;
-    --surface: #1a1e1c;
-    --sunken: #252a27;
-    --ink: #eef1f7;
-    --ink-2: #c8cfdd;
-    --muted: #98a2b8;
-    --line: #2e3430;
-    --line-2: #3b423d;
-    --dash: #4d4d4d;
-    --green: #4fca8a;
-    --green-solid: #17643f;
-    --green-ink: #9fe3bd;
-    --green-bg: #183a28;
-    --shadow: rgba(0, 0, 0, 0.4);
-    --chrome-bg: #1a1e1c;
-  }
+:root[data-style='simple'][data-contrast='high'] {
+  --muted: var(--ink-2);
+  --line: var(--line-2);
+  --dash: var(--ink-2);
 }
 
 /* ---------- true black, in dark mode, for OLED screens (0.8.9) ----------

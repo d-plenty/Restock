@@ -16,7 +16,7 @@ import { money } from '../../lib/units';
 import { useLive, useSettings } from '../../lib/useLive';
 import { activeSections, chainName, SECTION_NAMES, SHOPS, type Section, type StoreChain } from '../../shops';
 import type { Receipt, Settings } from '../../types';
-import { ChainDot, Icon, LoadingBar, TopBar } from '../components';
+import { ChainDot, Icon, LoadingBar, TopBar, ScreenWaiting } from '../components';
 import { useNav } from '../nav';
 
 // Receipts (an add-on, off until switched on): scan a receipt, straighten it, read the shop,
@@ -177,7 +177,7 @@ export function ReceiptsScreen() {
   const nav = useNav();
   const settings = useSettings();
   const receipts = useLive(allReceipts, []);
-  if (!settings || !receipts) return <div className="screen" />;
+  if (!settings || !receipts) return <ScreenWaiting title="Receipts" />;
   const keep = settings.receipts.keepMonths;
 
   if (!settings.receipts.enabled) {
@@ -483,7 +483,7 @@ export function ReceiptScreen({ id }: { id?: string }) {
     if (src && quad && step === 'look') setResult(finish(src, quad, look));
   });
 
-  if (!settings) return <div className="screen" />;
+  if (!settings) return <ScreenWaiting title="Receipts" />;
   const tabs = activeSections(settings);
   const set = (p: Partial<Fields>) => setFields((f) => ({ ...(f as Fields), ...p }));
 
@@ -746,7 +746,7 @@ export function ReceiptScreen({ id }: { id?: string }) {
     );
   }
 
-  if (!fields) return <div className="screen" />;
+  if (!fields) return <ScreenWaiting title="Receipts" />;
   const on = existing ? deleteOn({ scannedAt: existing.scannedAt, pinned: fields.pinned }, settings.receipts.keepMonths) : undefined;
   const items = itemLines(fields.text);
 

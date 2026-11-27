@@ -6,7 +6,7 @@ import { useLive, useSettings } from '../../lib/useLive';
 import { activeSections, chainName, enabledIn, hostOf, shopDef, shopOnTab, websiteOf, type Section, type StoreChain, withCustom } from '../../shops';
 import { serverMode } from '../../server-mode/flag';
 import { storeChoice, type Settings } from '../../types';
-import { ChainDot, Icon, TopBar } from '../components';
+import { ChainDot, Icon, TopBar, ScreenWaiting } from '../components';
 import { useNav } from '../nav';
 
 const GROUP: Record<Section, string> = withCustom({ pantry: 'Groceries', keg: 'Bottle shop', pharmacy: 'Chemist' }, (n) => n);
@@ -95,7 +95,7 @@ export function CataloguesScreen() {
     const [r, s, e] = await Promise.all([loadRecommendations(), getSettings(), allListEntries()]);
     return ownCounts(r, yourShops(s), e);
   }, []);
-  if (!settings) return <div className="screen" />;
+  if (!settings) return <ScreenWaiting title="Your shops" />;
   const groups = catalogueShops(settings);
   return (
     <div className="screen">

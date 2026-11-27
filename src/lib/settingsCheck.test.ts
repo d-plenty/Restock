@@ -28,7 +28,7 @@ describe('checking settings', () => {
       marketData: { enabled: true, wifiOnly: false, days: 182, every: 'daily' },
       checkIntervalHours: 168,
       shopAroundMin: 0.5,
-      look: { style: 'plain', accent: '#ffcd00', icon: 'match', black: false },
+      look: { style: 'simple', accent: '#ffcd00', bar: '#123456', band: true, simpleWas: { opening: true, holidays: false, motion: false }, icon: 'match', black: false },
       a11y: { text: 1.3, contrast: true, motion: false, big: true },
       receipts: { enabled: true, installed: true, keepMonths: 0 },
       autoBackup: { enabled: true, folder: 'content://x/tree/y', everyDays: 14, keep: 10, password: '  spaces kept  ' },

@@ -21,7 +21,7 @@ import { SELF_UPDATE } from '../../lib/updates';
 import { DEFAULT_SETTINGS } from '../../types';
 import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
-import { BETA_NOTE, CUSTOM_BETA_NOTE, Icon, Logo, TopBar, useBackHandler, More } from '../components';
+import { BETA_NOTE, CUSTOM_BETA_NOTE, Icon, Logo, TopBar, useBackHandler, More, ScreenWaiting } from '../components';
 import { useNav } from '../nav';
 import { AutoBackupSettings, SuggestLocalBackup } from './Backups';
 import { protection, suggestLocalText } from '../../lib/protection';
@@ -1248,7 +1248,7 @@ export function SetupScreen() {
   const walk = useTileWalk(() => {
     void getSettings().then((s) => nav.toast(s.setup.skipped.length ? "That's all of them. Skipped ones are still here when you want them." : 'All set up.'));
   });
-  if (!settings) return <div className="screen" />;
+  if (!settings) return <ScreenWaiting title="Setup checklist" />;
   const tile = walk.open && TILES.find((t) => t.id === walk.open);
   return (
     <div className="screen" style={{ gap: 16 }}>

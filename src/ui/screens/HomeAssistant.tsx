@@ -26,7 +26,7 @@ import {
 import { MIN_HA_VERSION, tooOld } from '../../lib/haSync';
 import { agoText } from '../../lib/sync';
 import { useLive } from '../../lib/useLive';
-import { LoadingBar, TopBar, More } from '../components';
+import { LoadingBar, TopBar, More, ScreenWaiting } from '../components';
 import { useNav } from '../nav';
 // 0.9.5 (save): the switch, the list and the address wait for Save settings; Test connection and Sync now run straight away.
 import { saveFirst, stage, staged } from '../../lib/settingsDraft';
@@ -157,7 +157,7 @@ export function HomeAssistantScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config?.address, saved]);
 
-  if (!config || saved === undefined || !who) return <div className="screen" />;
+  if (!config || saved === undefined || !who) return <ScreenWaiting title="Home Assistant" />;
   if (who.house && pageState(who) !== 'phone') return <InHouse house={who.house} saved={saved} />;
   // Another phone in the household syncs with Home Assistant (this one stopped, or never started).
   const elsewhere = who.inHousehold && !!who.device && !who.mine ? phoneLabel(who.name) : undefined;

@@ -1105,16 +1105,31 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                 className="switch"
                 checked={!!sh(info).shareReceipts}
                 disabled={!info.isOwner}
-                onChange={(e) => void set({ householdReceipts: e.target.checked })}
+                onChange={async (e) => {
+                  const on = e.target.checked;
+                  // 0.18.1: turning sharing off is asked about first
+                  if (
+                    !on &&
+                    !(await confirmAction('Stop sharing receipts?', {
+                      detail: 'New receipts stay on the phone they were kept on. Receipts the other phones have already stay on them.',
+                      action: 'Stop sharing',
+                      danger: false,
+                    }))
+                  )
+                    return;
+                  void set({ householdReceipts: on });
+                }}
               />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <span className="title" style={{ fontSize: 15 }}>
                   Share receipts with the household
                 </span>
                 <span className="small">
-                  {info.isOwner
-                    ? 'Kept receipts go to every phone, for the tabs each one shares. Photos only go over the Wi-Fi; until one arrives, the receipt shows without it.'
-                    : `Only the owner phone${owner ? ` (${owner.name})` : ''} can change this.${info.shareReceipts ? ' Photos only go over the Wi-Fi.' : ''}`}
+                  {info.isOwner ? 'Kept receipts go to every phone.' : `Only the owner phone${owner ? ` (${owner.name})` : ''} can change this.`}{' '}
+                  <More title="Share receipts with the household">
+                    <p>Kept receipts go to every phone, for the tabs each one shares. Photos only go over the Wi-Fi; until one arrives, the receipt shows without it.</p>
+                    <p>Only the owner phone can turn this on or off.</p>
+                  </More>
                 </span>
               </span>
             </label>
@@ -1138,12 +1153,35 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
 
           <div className="card flush">
             {!(info.house || info.serverApi === 3) && <label className="check">
-              <input type="checkbox" className="switch" checked={!!sh(info).shareCards} onChange={(e) => void set({ shareCards: e.target.checked })} />
+              <input
+                type="checkbox"
+                className="switch"
+                checked={!!sh(info).shareCards}
+                onChange={async (e) => {
+                  const on = e.target.checked;
+                  // 0.18.1: turning sharing off is asked about first
+                  if (
+                    !on &&
+                    !(await confirmAction('Stop sharing your loyalty cards?', {
+                      detail: "Your cards stop going to the household's other phones. Copies they have already stay on them until they're removed there.",
+                      action: 'Stop sharing',
+                      danger: false,
+                    }))
+                  )
+                    return;
+                  void set({ shareCards: on });
+                }}
+              />
               <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <span className="title" style={{ fontSize: 15 }}>
                   Share my loyalty cards
                 </span>
-                <span className="small">Copies this phone's Flybuys and Everyday Rewards numbers to the household's other phones.</span>
+                <span className="small">
+                  To the household&rsquo;s other phones.{' '}
+                  <More title="Share my loyalty cards">
+                    <p>Copies this phone&rsquo;s Flybuys and Everyday Rewards numbers to the household&rsquo;s other phones, so anyone can show them at the checkout.</p>
+                  </More>
+                </span>
               </span>
             </label>}
             <label className="check">

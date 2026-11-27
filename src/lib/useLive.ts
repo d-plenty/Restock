@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { cachedSettings, getSettings } from './db';
 import { onChange } from './live';
+import { screenReading } from './screensFirst';
 import { cachedDraftSettings, getSettings as draftSettings } from './settingsDraft';
 import type { Settings } from '../types';
 
@@ -14,33 +15,47 @@ export function useLive<T>(query: () => Promise<T>, deps: unknown[] = [], initia
     let alive = true;
     // 0.9.0: one run at a time. Changes while a run is going ask for one more run after it, not one
     // each, so a burst of writes (ticking off a few items) reloads once or twice, not once per write.
+    // 0.18.1: every answer is shown, even one a change has already overtaken (the next run replaces
+    // it). Before, an answer was dropped whenever something changed while it ran, so during a price
+    // check on an older iPad (a saved price every moment, each run slower than the gap between them)
+    // a screen never got one, and stayed black until the check was done. And the next run waits as
+    // long as the last one took (at least a fifth of a second): a busy database leaves the phone time
+    // to draw the screen and answer taps, instead of rerunning the same query back to back.
     let busy = false;
     let again = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const load = () => {
-      if (busy) {
+      if (busy || timer) {
         again = true;
         return;
       }
       busy = true;
+      const started = Date.now();
+      // Background work waits while a screen reads (lib/screensFirst.ts).
+      const read = screenReading();
       let run: Promise<T>;
       try {
         run = query();
       } catch (e) {
         busy = false;
+        read();
         console.error('query failed', e);
         return;
       }
       run
         .then((v) => {
-          // Something changed while it ran: this answer is already out of date, the next run replaces it.
-          if (alive && !again) setValue(v);
+          if (alive) setValue(v);
         })
         .catch((e) => console.error('query failed', e))
         .finally(() => {
           busy = false;
+          read();
           if (alive && again) {
             again = false;
-            load();
+            timer = setTimeout(() => {
+              timer = undefined;
+              if (alive) load();
+            }, Math.min(2000, Math.max(200, Date.now() - started)));
           }
         });
     };
@@ -48,6 +63,7 @@ export function useLive<T>(query: () => Promise<T>, deps: unknown[] = [], initia
     const off = onChange(load);
     return () => {
       alive = false;
+      if (timer) clearTimeout(timer);
       off();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

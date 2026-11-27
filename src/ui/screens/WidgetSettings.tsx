@@ -1,7 +1,9 @@
 // 0.9.5 (save): waits for Save settings on a settings screen (settingsDraft.ts).
 import { afterSave, updateSettings } from '../../lib/settingsDraft';
-import { textOn } from '../../lib/theme';
-import { pushWidgetsSoon } from '../../lib/widgets';
+import { useState } from 'react';
+import { isDark, textOn } from '../../lib/theme';
+import { ColourWheel } from '../ColourWheel';
+import { pushWidgetsSoon, widgetAppColours } from '../../lib/widgets';
 import type { Settings } from '../../types';
 
 // Settings → Home screen widgets: how all three widgets look. Adding one is done the usual way:
@@ -19,9 +21,13 @@ export function WidgetSettings({ settings }: { settings: Settings }) {
     await updateSettings({ widgets: { ...w, ...patch } });
     await afterSave('widgets', () => pushWidgetsSoon(300));
   };
-  const dark = settings.theme === 'dark';
-  const bg = w.background === 'colour' ? w.colour : dark ? '#15213f' : '#ffffff';
+  const [wheel, setWheel] = useState(false);
+  const dark = isDark(settings.theme);
+  // 0.18.1: "Like the app": the theme colour, with the accent and app icon colours (widgets.ts).
+  const app = widgetAppColours(settings.look, dark);
+  const bg = w.background === 'colour' ? w.colour : app.bg;
   const ink = w.text !== 'auto' ? w.text : w.background === 'none' ? '#ffffff' : textOn(bg) === '#ffffff' ? '#ffffff' : '#0f1d3d';
+  const title = w.background === 'solid' && w.text === 'auto' ? app.title : ink;
   return (
     <div className="card">
       <p className="small" style={{ margin: 0 }}>
@@ -45,16 +51,13 @@ export function WidgetSettings({ settings }: { settings: Settings }) {
         </div>
       </div>
       {w.background === 'colour' && (
-        <label className="field">
+        <div className="field">
           <span>Colour</span>
-          <input
-            type="color"
-            className="input"
-            style={{ height: 44, padding: 4 }}
-            value={w.colour}
-            onChange={(e) => void set({ colour: e.target.value })}
-          />
-        </label>
+          <button type="button" className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => setWheel(true)}>
+            <span className="pick-dot" style={{ background: w.colour }} aria-hidden /> Change the colour
+          </button>
+          {wheel && <ColourWheel title="Widget colour" value={w.colour} onPick={(hex) => void set({ colour: hex })} onClose={() => setWheel(false)} />}
+        </div>
       )}
       {w.background !== 'none' && (
         <label className="field">
@@ -90,14 +93,14 @@ export function WidgetSettings({ settings }: { settings: Settings }) {
             className="widget-preview-bg"
             style={{ background: w.background === 'none' ? 'transparent' : bg, opacity: 1 - w.transparency / 100 }}
           />
-          <strong>Shopping list · 3</strong>
+          <strong style={{ color: title }}>Shopping list · 3</strong>
           <span>☐ Milk</span>
           <span>☐ Bread</span>
           <span>☐ Vegemite</span>
         </div>
       </div>
       <p className="small" style={{ margin: 0 }}>
-        "Automatic" text picks white or dark, whichever is easier to read on the background.
+        "Like the app" uses your theme colour, with the title in your accent colour and Quick actions in your app icon&rsquo;s colour. "Automatic" text picks white or dark, whichever is easier to read on the background.
       </p>
     </div>
   );

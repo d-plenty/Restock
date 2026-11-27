@@ -1,4 +1,5 @@
 import { loadTrip, reopensTrip } from '../lib/trip';
+import { afterScreens, screensReady } from '../lib/screensFirst';
 import { App as CapApp } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
@@ -18,7 +19,7 @@ import { setConnectionMode } from '../stores/http';
 import { applyTheme, isDark, syncInsets } from '../lib/theme';
 import { scheduleReminders } from '../lib/notify';
 import { useLive } from '../lib/useLive';
-import { Announcer, closeTopLayer, Icon, layerHost, Logo, runBackHandlers } from './components';
+import { Announcer, closeTopLayer, Icon, layerHost, Logo, runBackHandlers, ScreenWaiting } from './components';
 import { isMoreTab, isSectionTab, NavContext, type Nav, type Screen, type Tab } from './nav';
 import { MoreScreen } from './screens/More';
 import { activeSections, type Section } from '../shops';
@@ -429,6 +430,8 @@ function RestockApp() {
       } else if (a.action === 'daily') nav.setTab('pantry');
       else if (a.action === 'cards') setStack([{ name: 'cards' }]);
       else if (a.action === 'sync') setStack([{ name: 'settings' }, { name: 'settings', page: 'sync' }, { name: 'sync' }]);
+      // 0.18.1: a change to the server's phones (lib/adminNotices.ts) opens the server's page
+      else if (a.action === 'serverPhones') setStack([{ name: 'settings' }, { name: 'settings', page: 'sync' }, { name: 'restockServer' }]);
       else if (a.action === 'updates') setStack([{ name: 'settings' }, { name: 'settings', page: 'about' }]);
       else if (a.action === 'scan') {
         const out = await scanBarcode();
@@ -465,6 +468,8 @@ function RestockApp() {
   useEffect(() => {
     if (!onboarded || !Capacitor.isNativePlatform()) return;
     const maybeCheck = async () => {
+      // 0.18.1: the screens first, then the catch-up (on an older iPad it held every page up).
+      await afterScreens();
       let s = await getSettings();
       // 0.11.0: once, on the update from 0.10.x: automatic checks move to Wednesday and Saturday at
       // 4:00 am (settingsCheck.ts works it out; this saves it, so the phone's background job reads it).
@@ -492,10 +497,19 @@ function RestockApp() {
       scheduleReminders(s).catch((e) => console.error('reminders failed', e));
       RestockNative.scheduleRecalls({ enabled: s.recalls.enabled }).catch((e) => console.error('recall schedule failed', e));
     });
-    void maybeAutoBackup().catch((e) => console.error('auto backup failed', e));
-    void tidyReceipts().catch((e) => console.error('receipt tidy-up failed', e));
+    // 0.18.1: these wait for the screens too (lib/screensFirst.ts).
+    void afterScreens()
+      .then(() => maybeAutoBackup())
+      .catch((e) => console.error('auto backup failed', e));
+    void afterScreens()
+      .then(() => tidyReceipts())
+      .catch((e) => console.error('receipt tidy-up failed', e));
+    // 0.18.1: an admin phone hears about changes to the server's phones (lib/adminNotices.ts),
+    // when Restock opens and each time it comes back to the screen.
+    const phonesNow = () => void import('../lib/adminNotices').then((m) => m.checkPhoneChanges()).catch(() => undefined);
+    void afterScreens().then(phonesNow);
     // 0.15.2: the screens opened now and then are loaded quietly, so none opens on a blank page.
-    void preloadScreens();
+    void preloadScreens().finally(screensReady);
     // 0.16.0: this phone's name in the household follows the person's (after a restore, say).
     void getSettings()
       .then((s) => (s.myName ? labelPhone(s.myName) : undefined))
@@ -532,14 +546,15 @@ function RestockApp() {
         }
       })().catch(() => undefined);
     // 0.9.14: Your data: ticks made on other phones or in Home Assistant since Restock last looked.
-    if (!serverMode) void import('../lib/spending').then(async (f) => {
+    // 0.18.1: these three once the screens are up (lib/screensFirst.ts).
+    if (!serverMode) void afterScreens().then(() => import('../lib/spending')).then(async (f) => {
       await f.noteTicks();
       await f.maybeSendSpending(); // 0.10.0: Share my spending with the server
     }).catch(() => undefined);
     // 0.9.14: Send prices back: what earlier searches and price checks read, if it didn't go yet.
-    if (!serverMode) void import('../lib/priceShare').then((f) => f.sendPricesNow()).catch(() => undefined);
+    if (!serverMode) void afterScreens().then(() => import('../lib/priceShare')).then((f) => f.sendPricesNow()).catch(() => undefined);
     // 0.11.0: what searches found also goes to a household's own Restock server (lib/seen.ts)
-    if (!serverMode) void import('../lib/seen').then((f) => f.sendSeenToServer()).catch(() => undefined);
+    if (!serverMode) void afterScreens().then(() => import('../lib/seen')).then((f) => f.sendSeenToServer()).catch(() => undefined);
     const stopWidgets = watchWidgets();
     // 0.9.3: the shopping list with Home Assistant, if it's on for this phone (homeAssistant.ts).
     const stopHa = serverMode
@@ -553,6 +568,7 @@ function RestockApp() {
       refresh();
       void maybeCheck().catch((e) => console.error('price check failed', e));
       void maybeAutoBackup().catch((e) => console.error('auto backup failed', e));
+      phonesNow();
     });
     return () => {
       stopWidgets();
@@ -586,12 +602,12 @@ function RestockApp() {
           {/* Setup tiles can open these (cards, shop accounts, sync) before setup is finished. */}
           {stack.length > 0 && (
             <div className="overlay">
-              <Suspense fallback={<div className="screen" />}>
+              <Suspense fallback={<ScreenWaiting />}>
               {stack[stack.length - 1].name === 'stores' && <StoresScreen section={(stack[stack.length - 1] as { section?: Section }).section} />}
               {stack[stack.length - 1].name === 'cards' && <CardsScreen />}
               {stack[stack.length - 1].name === 'sync' &&
                 (isIos() ? (
-                  <Suspense fallback={<div className="screen" />}>
+                  <Suspense fallback={<ScreenWaiting />}>
                     <IcloudSyncScreen />
                   </Suspense>
                 ) : (
@@ -636,7 +652,7 @@ function RestockApp() {
   // The screen opened on top of the tab, if any (the server's own version where it has one).
   const overlay = top ? (
     (serverMode && serverUi.current?.screen(top)) || (
-      <Suspense fallback={<div className="screen" />}>
+      <Suspense fallback={<ScreenWaiting />}>
         {top.name === 'item' && <ItemScreen key={top.groupId} groupId={top.groupId} />}
         {top.name === 'add' && (
           <AddScreen
@@ -673,14 +689,14 @@ function RestockApp() {
         {/* 0.13.2: on iPhone and iPad, Sync is iCloud sync (syncing with another phone has its own screen there, wifiSync) */}
         {top.name === 'sync' &&
           (isIos() ? (
-            <Suspense fallback={<div className="screen" />}>
+            <Suspense fallback={<ScreenWaiting />}>
               <IcloudSyncScreen />
             </Suspense>
           ) : (
             <SyncScreen invite={top.invite} />
           ))}
         {top.name === 'wifiSync' && (
-          <Suspense fallback={<div className="screen" />}>
+          <Suspense fallback={<ScreenWaiting />}>
             <WifiSyncScreen apple={top.apple} />
           </Suspense>
         )}

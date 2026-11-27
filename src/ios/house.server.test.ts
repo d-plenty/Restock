@@ -124,6 +124,39 @@ describe.skipIf(!SERVER)('an iPhone in a Restock server house (real server)', ()
     const list = (await t.web.get('/api/v3/phones')).body;
     expect(JSON.stringify(list)).not.toContain(`"${(await e.device())}","status":"active"`);
   }, 60_000);
+  // 0.18.1: an admin iPhone against the real server: Phones and tablets, sealed both ways, and what the
+  // notifications to admins (lib/adminNotices.ts) would say about others' changes.
+  it('as an admin: lists, adds and changes phones; a user is refused; changes by others read as notices', async () => {
+    const H = await import(/* @vite-ignore */ `${SERVER}/test/helpers.mjs`);
+    const { phoneChanges, snapshot } = await import('../lib/adminNotices');
+    const t = await H.house();
+    const { e } = await phoneDb();
+    const house = new House(e, http);
+    await house.join((await t.web.post('/api/v3/phones', { label: 'Admin iPad' })).body.code as string);
+    const me = await e.device();
+    // A user can't look after the phones.
+    await expect(house.sealed('POST', '/phones', { label: 'Nope' })).rejects.toThrow();
+    expect((await t.web.req('PATCH', '/api/v3/phones/' + me, { json: { role: 'admin' } })).body.role).toBe('admin');
+    expect(await house.sealed('GET', '/me')).toMatchObject({ role: 'admin' });
+    const before = snapshot(((await house.sealed('GET', '/phones')).phones ?? []) as never);
+    // Others' changes: a phone joins, the web page makes it an admin; another joins and leaves.
+    const gran = await H.addPhone(t, 'Gran');
+    await t.web.req('PATCH', '/api/v3/phones/' + gran.device, { json: { role: 'admin' } });
+    const kid = await H.addPhone(t, 'Kid');
+    await t.settle();
+    const now = snapshot(((await house.sealed('GET', '/phones')).phones ?? []) as never);
+    expect(phoneChanges(before, now, me)).toEqual(expect.arrayContaining(['Gran joined as an admin', 'Kid joined']));
+    // This admin's own changes go to the server.
+    const made = await house.sealed('POST', '/phones', { label: 'New phone' });
+    expect(String(made.code)).toMatch(/^restock-server:3\?/);
+    await house.sealed('PATCH', '/phones/' + gran.device, { role: 'user' });
+    await house.sealed('DELETE', '/phones/' + kid.device, {});
+    // The household has a new key now: this phone takes it with a sync (lib/serverPhones.ts does too).
+    await expect(house.sealed('GET', '/phones')).rejects.toThrow(/couldn't be opened/);
+    await house.sync();
+    const after = snapshot(((await house.sealed('GET', '/phones')).phones ?? []) as never);
+    expect(phoneChanges(now, after, me)).toEqual(['Gran is a user now', 'Kid was removed']);
+  }, 60_000);
   // 0.14.0: Sign in on a computer, from an iPhone: the phone says yes to the browser whose code it scanned.
   it('signs a browser in by scanning its code, and refuses a code from somewhere else', async () => {
     const H = await import(/* @vite-ignore */ `${SERVER}/test/helpers.mjs`);

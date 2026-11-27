@@ -24,7 +24,7 @@ import { shareTextFile } from '../../lib/shareFile';
 import { localDay } from '../../lib/verdict';
 import type { GiftBarcodeType, GiftCard, LoyaltyCard } from '../../types';
 import { brandOf, loyaltyCodeType } from '../../lib/cardBrands';
-import { Icon, LoadingBar, Sheet, TopBar } from '../components';
+import { Icon, LoadingBar, Sheet, TopBar, ScreenWaiting } from '../components';
 import { useNav } from '../nav';
 import { CardCode } from './CardCode';
 import { AddCardSheet, BalanceSheet, EditGiftSheet, keptText, PROGRAMS } from './CardForm';
@@ -118,7 +118,7 @@ export function CardsScreen({
     void scheduleCardReminders(data.gifts, data.loyalty);
   }, [data, store]);
 
-  if (!data) return <div className="screen" />;
+  if (!data) return <ScreenWaiting title="Cards" back={back} />;
   const { loyalty, gifts } = data;
   const active = gifts.filter((g) => !g.usedUp);
   const used = gifts.filter((g) => g.usedUp);

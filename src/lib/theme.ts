@@ -2,6 +2,7 @@ import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 import type { Settings } from '../types';
 import { RestockNative } from './sql/native';
 import { holidayColours } from './holiday';
+import { setLite } from './simple';
 
 // Light, dark, or follow the phone; the Australian or Plain style; an accent colour; and the
 // accessibility options. The CSS reads <html data-theme data-style data-text …>; an accent colour
@@ -62,10 +63,11 @@ function untilReadable(c: string, against: string, target: number, towards: 'bla
 }
 
 /** The CSS variables for an accent colour, in light or dark mode. Exported for the tests. */
-export function accentVars(accent: string, dark: boolean, black = false): Record<string, string> {
+export function accentVars(accent: string, dark: boolean, black = false, simple = false): Record<string, string> {
   const base = toHex(hex(accent));
-  const surface = black ? '#0a0a0a' : dark ? '#111b30' : '#ffffff';
-  const bg = black ? '#000000' : dark ? '#0a1120' : '#f6f4ea';
+  // 0.18.1: Simple is white in light mode and black in dark mode.
+  const surface = simple ? (dark ? '#0d0d0d' : '#ffffff') : black ? '#0a0a0a' : dark ? '#111b30' : '#ffffff';
+  const bg = simple ? (dark ? '#000000' : '#ffffff') : black ? '#000000' : dark ? '#0a1120' : '#f6f4ea';
   // Text-coloured uses (links, labels, active tab) need 4.5:1 against cards and the page.
   const ink = untilReadable(untilReadable(base, surface, 4.5, dark ? 'white' : 'black'), bg, 4.5, dark ? 'white' : 'black');
   return {
@@ -81,6 +83,49 @@ export function accentVars(accent: string, dark: boolean, black = false): Record
 
 const ACCENT_KEYS = ['--green', '--green-solid', '--on-accent', '--green-ink', '--green-bg', '--small-bg', '--small-line'];
 
+/** 0.18.1: the default theme's navy, and the default accent (Simple's band when nothing's picked). */
+export const NAVY = '#012169';
+const AUS_GREEN = '#00843d';
+const GOLD = '#ffcd00';
+const rgba = (rgb: number[], a: number) => `rgba(${rgb.map((v) => Math.round(v)).join(', ')}, ${a})`;
+
+/**
+ * 0.18.1: the theme colour: the tops of the screens, the tab bar (the default theme) and the web's
+ * sidebar, with text on them that reads (white or near-black). `plain`: gold doesn't read on it (or
+ * it's Simple), so what's gold on navy is the text colour instead. Exported for the tests.
+ */
+export function barVars(colour: string, opts: { dark: boolean; simple: boolean }): { vars: Record<string, string>; plain: boolean } {
+  let c = toHex(hex(colour));
+  // The default theme's bars are a step darker in dark mode (as navy is).
+  if (opts.dark && !opts.simple) c = toHex(mix(hex(c), [0, 0, 0], 0.3));
+  const on = textOn(c) === '#ffffff' ? '#ffffff' : '#111111';
+  const onRgb = hex(on);
+  const plain = opts.simple || contrast(GOLD, c) < 2.2;
+  const pill = plain ? on : GOLD;
+  const vars: Record<string, string> = {
+    '--more-top': c,
+    '--shade-bg': c,
+    '--chrome-bg': c,
+    '--band': c,
+    '--on-navy': on,
+    '--on-navy-muted': toHex(mix(onRgb, hex(c), 0.22)),
+    '--on-navy-line': rgba(onRgb, 0.35),
+    '--on-navy-hover': rgba(onRgb, 0.1),
+    '--on-navy-soft': rgba(onRgb, 0.14),
+  };
+  if (!opts.simple) Object.assign(vars, { '--tabbar-bg': c, '--tab-ink': vars['--on-navy-muted'], '--tab-on': pill, '--tab-pill': pill, '--tab-pill-ink': textOn(pill) === '#ffffff' ? '#ffffff' : c });
+  return { vars, plain };
+}
+const BAR_KEYS = ['--more-top', '--shade-bg', '--chrome-bg', '--band', '--on-navy', '--on-navy-muted', '--on-navy-line', '--on-navy-hover', '--on-navy-soft', '--tabbar-bg', '--tab-ink', '--tab-on', '--tab-pill', '--tab-pill-ink'];
+
+/** 0.18.1: the colour of the top band now, or undefined for the default navy (no colour of its own). */
+export function bandColour(look: Settings['look'], dark: boolean): string | undefined {
+  if (look.style !== 'simple') return look.bar;
+  // Simple: the theme colour, or the accent; in dark mode plain black unless the band is kept.
+  if (dark && !look.band) return '#000000';
+  return look.bar ?? look.accent ?? AUS_GREEN;
+}
+
 function paint() {
   const root = document.documentElement;
   const { theme, look, a11y } = current;
@@ -91,15 +136,29 @@ function paint() {
   const dark = isDark(theme);
   // True black (0.8.9): only while dark, so "System" still goes light in the day.
   // On unless turned off (0.9.0: true black is the default).
-  const black = dark && look.black !== false;
+  // 0.18.1: Simple's dark mode is plain black already.
+  const simple = look.style === 'simple';
+  setLite(simple);
+  const black = dark && look.black !== false && !simple;
   if (black) root.dataset.black = '1';
   else delete root.dataset.black;
-  for (const k of ACCENT_KEYS) root.style.removeProperty(k);
+  if (dark) root.dataset.dark = '1';
+  else delete root.dataset.dark;
+  for (const k of [...ACCENT_KEYS, ...BAR_KEYS]) root.style.removeProperty(k);
   // 0.16.0: a holiday's colours, on the default theme only (holiday.ts; tokens.css [data-holiday]).
   const holiday = holidayColours(current);
   if (holiday) root.dataset.holiday = holiday;
   else delete root.dataset.holiday;
-  if (look.accent) for (const [k, v] of Object.entries(accentVars(look.accent, dark, black))) root.style.setProperty(k, v);
+  if (look.accent || simple) for (const [k, v] of Object.entries(accentVars(look.accent ?? AUS_GREEN, dark, black, simple))) root.style.setProperty(k, v);
+  // 0.18.1: the theme colour (the bars), and Simple's band.
+  const band = bandColour(look, dark);
+  const bar = band ? barVars(band, { dark, simple }) : undefined;
+  if (bar) for (const [k, v] of Object.entries(bar.vars)) root.style.setProperty(k, v);
+  if (bar?.plain) root.dataset.barPlain = '1';
+  else delete root.dataset.barPlain;
+  // Simple with its band showing (always in light mode; in dark mode when it's kept).
+  if (simple && (!dark || look.band)) root.dataset.band = '1';
+  else delete root.dataset.band;
   // Accessibility.
   if (a11y.text && a11y.text !== 1) {
     root.dataset.text = String(a11y.text);
@@ -124,8 +183,8 @@ function paint() {
     else delete root.dataset[key];
   }
   if (Capacitor.isNativePlatform()) {
-    // The Australian style has a navy strip behind the clock, so its icons are always light.
-    const lightIcons = dark || look.style !== 'plain';
+    // The clock's icons are light on the navy strip (or a dark theme colour), dark on a light one.
+    const lightIcons = band ? textOn(barVars(band, { dark, simple }).vars['--more-top']) === '#ffffff' : true;
     SystemBars.setStyle({ style: lightIcons ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => undefined);
   }
 }

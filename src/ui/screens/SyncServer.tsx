@@ -1,7 +1,8 @@
 // 0.15.0: the Restock server's parts of Sync and backups (moved out of Sync.tsx): adding a phone,
 // a 0.9.3-style server, and leaving the server.
 import { andList } from '../../lib/minVersion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { myRole, serverPhones } from '../../lib/serverPhones';
 import { confirmAction } from '../../lib/confirm';
 
 import { chainName, enabledIn, SECTION_NAMES } from '../../shops';
@@ -209,6 +210,23 @@ export function LeaveServerSheet({ info, onClose, onDone }: { info: SyncInfo; on
   const personal = [...shared, ...back.filter((k) => !shared.includes(k) && (info.takeBack ?? []).includes(k))];
   const allTicked = personal.length > 0 && personal.every((k) => back.includes(k));
   const flip = (k: TakeBack, on: boolean) => setBack((b) => (on ? [...new Set([...b, k])] : b.filter((x) => x !== k)));
+  // 0.18.1: the server's only admin phone is told what leaving means for looking after the phones.
+  const [onlyAdmin, setOnlyAdmin] = useState(false);
+  useEffect(() => {
+    if (info.serverApi !== 3) return;
+    let live = true;
+    void myRole()
+      .then((r) => (r === 'admin' ? serverPhones() : undefined))
+      .then((list) => {
+        if (!live || !list) return;
+        const admins = list.filter((p) => (!p.status || p.status === 'active') && p.role === 'admin');
+        setOnlyAdmin(admins.length === 1 && !!admins[0].me);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [info.serverApi]);
   const leave = async (bringBack = true, takeBack: TakeBack[] = back) => {
     setBusy(true);
     setError(undefined);
@@ -226,6 +244,12 @@ export function LeaveServerSheet({ info, onClose, onDone }: { info: SyncInfo; on
       <p className="small" style={{ margin: 0, fontSize: 15 }}>
         This phone stops syncing with the server and keeps everything it has now.
       </p>
+      {onlyAdmin && (
+        <div className="banner amber" role="alert">
+          <strong>This is the server&rsquo;s only admin phone.</strong> Once it leaves, phones can only be added, removed or made admins on the server&rsquo;s web page, with
+          the passphrase. To keep an admin phone, make another one an admin first (Phones and tablets).
+        </div>
+      )}
       <div className="card" style={{ gap: 8 }}>
         <ShopDataStays />
         <span className="small">
