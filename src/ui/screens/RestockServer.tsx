@@ -30,6 +30,8 @@ import { serverKeepText } from '../../lib/autoDelete';
 import { SuggestLocalBackup } from './Backups';
 import { askAdult } from './Sync';
 import { LeaveServerSheet, ServerCard, ShopDataStays, TAKE_BACK_NOTE } from './SyncServer';
+import { ServerPhones } from './ServerPhones';
+import { myRole, type Role } from '../../lib/serverPhones';
 
 /**
  * Settings → Sync → Restock server (0.9.3), and 0.9.4's server-first households: the
@@ -320,6 +322,15 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
   const [error, setError] = useState<string>();
   const label = serverName(info);
   const keep = info.serverRow?.keepMonths;
+  // 0.18.0: an admin phone looks after the server's phones here (null: a server from before 0.18.0).
+  const [role, setRole] = useState<Role | null>();
+  useEffect(() => {
+    let live = true;
+    void myRole().then((r) => live && setRole(r));
+    return () => {
+      live = false;
+    };
+  }, []);
   const phones = (info.members ?? []).filter((m) => !m.device.startsWith('srv-')).length;
 
   const scanWeb = async () => {
@@ -411,6 +422,10 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
 
       {sharing && <SharesEditor info={info} onInfo={onInfo} />}
 
+      {role === 'admin' ? (
+        <ServerPhones label={label} />
+      ) : (
+      <>
       <div className="eyebrow">Phones on {label}</div>
       <div className="card flush">
         {(info.members ?? [])
@@ -427,9 +442,11 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
             </div>
           ))}
         <p className="small" style={{ padding: '4px 14px 12px', margin: 0 }}>
-          Phones are added and removed on the server's page.
+          {role === null ? "Phones are added and removed on the server's page." : "Phones and tablets are added and removed on the server's page, or by an admin."}
         </p>
       </div>
+      </>
+      )}
 
       <div className="card flush" hidden={isIos() && !canSync('wifi')}>
         <button className="row" onClick={() => nav.push({ name: 'sync' })}>

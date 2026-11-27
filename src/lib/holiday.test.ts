@@ -22,7 +22,10 @@ describe('the holidays', () => {
     expect(holidayOn(d(2026, 12, 27))).toBe('newyear');
     expect(holidayOn(d(2026, 12, 31))).toBe('newyear');
     expect(holidayOn(d(2027, 1, 1))).toBe('newyear');
-    expect(holidayOn(d(2027, 1, 2))).toBe('australia');
+    // 0.18.0: Australia Day is the week leading up to it, to the day after (19–27 January).
+    expect(holidayOn(d(2027, 1, 2))).toBeUndefined();
+    expect(holidayOn(d(2027, 1, 18))).toBeUndefined();
+    expect(holidayOn(d(2027, 1, 19))).toBe('australia');
     expect(holidayOn(d(2026, 10, 10))).toBeUndefined();
     expect(holidayOn(d(2026, 10, 11))).toBe('halloween');
     expect(holidayOn(d(2026, 10, 31))).toBe('halloween');
@@ -59,5 +62,12 @@ describe('the holidays', () => {
     expect(holidayGreeting('australia', 'Good morning')).toBe('G’day');
     expect(holidayGreeting('halloween', 'Good evening')).toBe('Good evening');
     expect(holidayGreeting(undefined, 'Good afternoon')).toBe('Good afternoon');
+  });
+
+  it('0.18.0: one holiday off on its own; the others still show; Holiday themes off turns them all off', () => {
+    const on = { look: { ...DEFAULT_SETTINGS.look, holidaysOff: ['christmas' as const] } };
+    expect(holidayNow(on, d(2026, 12, 10))).toBeUndefined();
+    expect(holidayNow(on, d(2026, 12, 30))).toBe('newyear');
+    expect(holidayNow({ look: { ...on.look, holidays: false } }, d(2026, 12, 30))).toBeUndefined();
   });
 });

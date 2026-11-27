@@ -1,0 +1,1 @@
+Admin phones: with a Restock server, an admin adds phones and tablets, removes them and makes others admins, right from the phone. 14 plain colours for the accent and the app icon. Each holiday has its own switch. Australia Day shows 19–27 January. A smoother opening. Fixes: the Android tab bar sat on the gesture line, and a few things on iPad.

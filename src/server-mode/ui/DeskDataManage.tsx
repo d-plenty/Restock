@@ -332,7 +332,7 @@ export function DeskDataManage({ narrow }: { narrow?: boolean }) {
     setMsg(undefined);
     try {
       await data.resend();
-      setMsg({ text: 'Asked. Each phone sends everything it has again the next time it syncs (Restock 0.9.5 phones).' });
+      setMsg({ text: 'Asked. Each phone sends everything it has again the next time it syncs.' });
       summary.reload();
     } catch (e) {
       // 0.9.5 (review): asked less than a day ago: the server says when it can be asked again.

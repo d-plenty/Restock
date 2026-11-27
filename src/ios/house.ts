@@ -22,7 +22,7 @@ import { syncRound, type Remote, type RoundResult } from '../server-mode/round';
 import { forgetHousehold, myKeys } from './household';
 
 /** One request: what was sent back, as bytes. Throws only when the server couldn't be reached at all. */
-export type Http = (o: { method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PROPFIND' | 'MKCOL'; url: string; headers: Record<string, string>; body?: Uint8Array }) => Promise<{ status: number; headers: Record<string, string>; bytes: Uint8Array }>;
+export type Http = (o: { method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'PROPFIND' | 'MKCOL'; url: string; headers: Record<string, string>; body?: Uint8Array }) => Promise<{ status: number; headers: Record<string, string>; bytes: Uint8Array }>;
 
 /** Something the person can act on, in words (SyncDav.Problem). */
 export class HouseProblem extends Error {
@@ -477,7 +477,7 @@ export class House {
     return `Restock2 d=${(await this.e.device())}, t=${t}, n=${n}, s=${sig}`;
   }
 
-  private async sendOnce(base: string, method: 'GET' | 'PUT' | 'DELETE' | 'POST', path: string, body?: Uint8Array, sealedN?: string): Promise<Awaited<ReturnType<Http>>> {
+  private async sendOnce(base: string, method: 'GET' | 'PUT' | 'DELETE' | 'POST' | 'PATCH', path: string, body?: Uint8Array, sealedN?: string): Promise<Awaited<ReturnType<Http>>> {
     const u = new URL(base + path);
     const headers: Record<string, string> = {
       Authorization: (await this.authorization(method, u.pathname + u.search, this.now() + (this.skew.get(base) ?? 0), body, sealedN)),
@@ -505,7 +505,7 @@ export class House {
    * POST into a GET): an http:// address that only sends on to the same place over https:// is asked
    * again there, and that is the address kept; any other redirect counts as not reaching the server.
    */
-  private async ask(base: string, o: { method: 'GET' | 'PUT' | 'DELETE' | 'POST'; path: string; headers: Record<string, string>; body?: Uint8Array }): Promise<{ r: Awaited<ReturnType<Http>>; base: string }> {
+  private async ask(base: string, o: { method: 'GET' | 'PUT' | 'DELETE' | 'POST' | 'PATCH'; path: string; headers: Record<string, string>; body?: Uint8Array }): Promise<{ r: Awaited<ReturnType<Http>>; base: string }> {
     const r = await this.http({ method: o.method, url: base + o.path, headers: o.headers, body: o.body });
     if (r.status < 300 || r.status >= 400 || r.status === 304) return { r, base };
     const secure = base.replace(/^http:\/\//i, 'https://');
@@ -530,7 +530,7 @@ export class House {
   private movedTo = new Map<string, string>();
 
   /** A signed request at the first address that answers; a wrong clock is put right once with the server's time. */
-  private async send(method: 'GET' | 'PUT' | 'DELETE' | 'POST', path: string, body?: Uint8Array, sealedN?: string): Promise<Awaited<ReturnType<Http>>> {
+  private async send(method: 'GET' | 'PUT' | 'DELETE' | 'POST' | 'PATCH', path: string, body?: Uint8Array, sealedN?: string): Promise<Awaited<ReturnType<Http>>> {
     let last: unknown;
     for (const base of (await this.bases())) {
       let r: Awaited<ReturnType<Http>>;
@@ -560,7 +560,7 @@ export class House {
    * server key (the server's Your data: its figures, and this phone's spending and searches going up).
    * The answer has to name this request's own nonce, so an old answer can't be played back.
    */
-  async sealed(method: 'GET' | 'POST', path: string, body?: unknown): Promise<Record<string, unknown>> {
+  async sealed(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<Record<string, unknown>> {
     if (!(await this.joined())) throw new HouseProblem("This phone isn't in a household on a Restock server.");
     const keys = (await this.serverKeys());
     const keyv = Number((await this.e.meta('keyv')) ?? 0) || 0;

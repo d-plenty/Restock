@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.17.0" src="https://img.shields.io/badge/status-release%20candidate%200.17.0-ffcd00">
+  <img alt="Release candidate 0.18.0" src="https://img.shields.io/badge/status-release%20candidate%200.18.0-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0170">New in 0.17.0</a> ·
+  <a href="#new-in-0180">New in 0.18.0</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#iphone-and-ipad">On iPhone</a> ·
@@ -143,6 +143,28 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 ## iPhone and iPad
 
 Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Prices are checked in the background too: a little at a time, and a longer check from your set time while the iPhone is charging and on Wi-Fi (iOS picks the exact moment). One thing isn't possible because of Apple's restrictions: the app updating itself. Still to come there: home screen widgets, Search with Google Lens straight from the app, and the App Store. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.18.0
+
+Add phones and tablets from your phone, each holiday on or off, plain colours, and lots of fixes.
+
+**Admin phones** (with a Restock server)
+- Each phone on your server is a **user** or an **admin**. Phones already on it start as users: tick the ones you want as admins on the server's Server and phones page (signed in with the passphrase).
+- **An admin adds phones and tablets** from Settings → Sync → Your Restock server → Phones and tablets: name it, and it shows the code the new one scans (once, for 10 minutes). Tick Make admin to add another admin.
+- **An admin removes phones, and makes others admins or users**, as the web page does. The server checks every request, and the requests and codes go sealed with your household's key.
+- Phones on 0.17.0 keep syncing as before; they get the new section when they update.
+
+**Look and colours**
+- **14 plain colours** for the accent and the app icon, the same set for both, so Match my accent colour is an exact match. A colour of your own from the colour wheel gives the closest icon (phones only take icons that come with the app).
+- **Each holiday has its own switch** under Holiday themes, on the phone and the web page.
+- **Australia Day** shows for the week leading up to it: 19–27 January.
+- **A smoother opening**: 2.5 seconds, or 3.5 on a holiday.
+
+**Fixes and tidying**
+- The tab bar on Android sat on the gesture line: it now keeps clear of it, as on iPhone.
+- True black and the app icon colours say it in a line, with the rest behind ⓘ.
+- Settings is in every backup, and Export and Import let you pick it.
+- Code tidied for Restock 0.14.0 and newer only; every version number is checked by a test before release.
 
 ## New in 0.17.0
 

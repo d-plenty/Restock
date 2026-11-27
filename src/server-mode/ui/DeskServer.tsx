@@ -21,6 +21,7 @@ import {
   browserKind,
   dayText,
   errText,
+  isAdmin,
   isThisBrowser,
   newPhoneCode,
   phoneName,
@@ -56,7 +57,8 @@ export function HousePage({ title, sub, actions, narrow, children }: { title: st
 /** Add a phone: name it ("Sister's phone"), then the code it scans (works once, for 10 minutes). */
 function AddPhoneV3({ onAdded, onClose, known }: { onAdded: () => void; onClose?: () => void; known: Phone[] | undefined }) {
   const [label, setLabel] = useState('');
-  const [code, setCode] = useState<{ code: string; until: number; label: string }>();
+  const [admin, setAdmin] = useState(false);
+  const [code, setCode] = useState<{ code: string; until: number; label: string; admin: boolean }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [joined, setJoined] = useState<string>();
@@ -68,8 +70,8 @@ function AddPhoneV3({ onAdded, onClose, known }: { onAdded: () => void; onClose?
     setBusy(true);
     try {
       before.current = new Set((known ?? []).map((p) => p.device));
-      const c = await newPhoneCode(label);
-      setCode({ ...c, label: label.trim() });
+      const c = await newPhoneCode(label, admin && canAdmin());
+      setCode({ ...c, label: label.trim(), admin: admin && canAdmin() });
     } catch (e) {
       setError(errText(e));
     } finally {
@@ -88,6 +90,7 @@ function AddPhoneV3({ onAdded, onClose, known }: { onAdded: () => void; onClose?
             setJoined(phoneName(fresh));
             setCode(undefined);
             setLabel('');
+            setAdmin(false);
             onAdded();
           }
         })
@@ -135,6 +138,15 @@ function AddPhoneV3({ onAdded, onClose, known }: { onAdded: () => void; onClose?
           <span id="house-add-help" className="dk-sub">
             The name everyone sees for it on this server. You can rename it later.
           </span>
+          {canAdmin() && (
+            <label className="house-check">
+              <input type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} />
+              <span>
+                <strong>Make admin</strong>
+                <span className="dk-sub">An admin can add phones and tablets, remove them, and make others admins, from Restock on the phone.</span>
+              </span>
+            </label>
+          )}
           {code && left === 0 && <p className="small">That code ran out. Make a new one.</p>}
           <button className="btn primary" type="submit" disabled={busy || !label.trim()}>
             {busy ? 'Making a code…' : 'Show the code'}
@@ -144,11 +156,12 @@ function AddPhoneV3({ onAdded, onClose, known }: { onAdded: () => void; onClose?
         <>
           <p className="small house-tight">
             For <strong>{code.label}</strong>
+            {code.admin ? ' · joins as an admin' : ''}
           </p>
           <Qr text={code.code} label={`Code for ${code.label} to scan`} />
           <p className="small house-tight">
             On the phone: Restock → Settings → Sync → <strong>Join your server</strong> → Scan. Works once, for{' '}
-            {left >= 60 ? `${Math.ceil(left / 60)} more min` : `${left} more seconds`}. Needs Restock 0.9.4 or newer.
+            {left >= 60 ? `${Math.ceil(left / 60)} more min` : `${left} more seconds`}. Needs Restock {MIN_APP} or newer.
           </p>
           <details className="small">
             <summary>Can't scan it?</summary>
@@ -214,6 +227,25 @@ function RenameSheet({ p, onClose, onDone }: { p: Phone; onClose: () => void; on
 function PhonesCard({ phones, error, reload }: { phones?: Phone[]; error?: string; reload: () => void }) {
   const [renaming, setRenaming] = useState<Phone>();
   const [msg, setMsg] = useState<string>();
+  // 0.18.0: Make admin / Make user.
+  const setRole = async (p: Phone, role: 'admin' | 'user') => {
+    const name = phoneName(p);
+    if (role === 'admin') {
+      const ok = await confirmAction(`Make ${name} an admin?`, {
+        detail: `${name} can then add phones and tablets, remove them, and make others admins or users, from Restock on the phone.`,
+        action: 'Make admin',
+        danger: false,
+      });
+      if (!ok) return;
+    }
+    try {
+      await api3.setRole(p.device, role);
+      setMsg(role === 'admin' ? `${name} is an admin now.` : `${name} is a user now.`);
+      reload();
+    } catch (e) {
+      setMsg(errText(e));
+    }
+  };
   const remove = async (p: Phone) => {
     const name = phoneName(p);
     try {
@@ -255,7 +287,10 @@ function PhonesCard({ phones, error, reload }: { phones?: Phone[]; error?: strin
       {active.map((p) => (
         <div key={p.device} className="dk-row">
           <span className="grow">
-            <span className="dk-row-title">{phoneName(p)}</span>
+            <span className="dk-row-title">
+              {phoneName(p)}
+              {isAdmin(p) && <span className="tag house-admin-tag">Admin</span>}
+            </span>
             <span className="dk-sub">
               {[
                 appTooOld(p.version) ? `needs updating to Restock ${MIN_APP} or newer` : undefined,
@@ -267,9 +302,16 @@ function PhonesCard({ phones, error, reload }: { phones?: Phone[]; error?: strin
                 .join(' · ')}
             </span>
           </span>
-          <button className="btn small" onClick={() => setRenaming(p)} aria-label={`Rename ${phoneName(p)}`}>
-            Rename
-          </button>
+          {canManage(phones) && (
+            <button className="btn small" onClick={() => setRenaming(p)} aria-label={`Rename ${phoneName(p)}`}>
+              Rename
+            </button>
+          )}
+          {canAdmin() && (
+            <button className="btn small" onClick={() => void setRole(p, isAdmin(p) ? 'user' : 'admin')} aria-label={`${isAdmin(p) ? 'Make user' : 'Make admin'}: ${phoneName(p)}`}>
+              {isAdmin(p) ? 'Make user' : 'Make admin'}
+            </button>
+          )}
           {canAdmin() && (
             <button className="btn small house-danger" onClick={() => void remove(p)} aria-label={`Remove ${phoneName(p)}`}>
               Remove
@@ -295,8 +337,8 @@ function PhonesCard({ phones, error, reload }: { phones?: Phone[]; error?: strin
         </p>
       )}
       <p className="dk-row dk-sub">
-        Removing a phone stops it syncing. Nothing it shared is deleted.{canAdmin() ? '' : ' To remove one, sign in with the passphrase.'} A phone
-        that chose Leave this server shows as Left.
+        Removing a phone stops it syncing. Nothing it shared is deleted.{canAdmin() ? '' : canManage(phones) ? ' To remove one, or make one an admin, sign in with the passphrase.' : ' Only an admin adds and changes phones: sign in with the passphrase, or with an admin phone.'} An
+        admin can also add, remove and change phones from Restock on the phone. A phone that chose Leave this server shows as Left.
       </p>
       <p className="dk-row dk-sub">
         Phone sharing is a separate, optional extra that a phone can set up for itself (phones swapping changes at home). It is off unless someone sets it up
@@ -455,6 +497,17 @@ function CardsCard({ phones }: { phones?: Phone[] }) {
   );
 }
 
+/**
+ * 0.18.0: this browser looks after the phones (Add a phone, Rename): signed in with the passphrase,
+ * or with a phone the server says is an admin. Unknown while the list loads (shown, and the server checks).
+ */
+export function canManage(phones: Phone[] | undefined): boolean {
+  if (canAdmin()) return true;
+  const by = session()?.viaDevice;
+  const me = by ? phones?.find((p) => p.device === by) : undefined;
+  return phones === undefined || me?.role === 'admin';
+}
+
 export function ServerAndPhones({ narrow }: { narrow?: boolean }) {
   const st = useStatus();
   const phones = usePhonesV3();
@@ -467,7 +520,8 @@ export function ServerAndPhones({ narrow }: { narrow?: boolean }) {
       title={narrow ? 'Server and phones' : name}
       sub={narrow ? undefined : 'your Restock server'}
       actions={
-        !adding && (
+        !adding &&
+        canManage(phones.data) && (
           <button className="btn primary" onClick={() => setAdding(true)}>
             <Icon name="plus" size={18} /> Add a phone
           </button>

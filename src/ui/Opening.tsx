@@ -12,7 +12,10 @@ import { LogoDrawing } from './components';
 import './opening.css';
 
 /** How long it shows before it fades (ms). */
-export const OPENING_MS = 2500;
+/** 0.18.0: how long the usual opening shows before it fades (2.5 seconds in all, the fade included). */
+export const OPENING_MS = 2150;
+/** And a holiday's (3.5 seconds in all): there's more to look at. */
+export const EVENT_MS = 3150;
 /** The fade at the end (ms). */
 export const FADE_MS = 350;
 
@@ -71,7 +74,7 @@ export function Opening({
   useEffect(() => {
     if (thumb) return;
     played = true;
-    const t = setTimeout(() => done.current(), OPENING_MS + FADE_MS);
+    const t = setTimeout(() => done.current(), (holiday ? EVENT_MS : OPENING_MS) + FADE_MS);
     return () => clearTimeout(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const skip = () => {
@@ -101,7 +104,7 @@ export function Opening({
   return (
     <Tag
       {...(thumb ? { 'aria-hidden': true } : { type: 'button' as const, onClick: skip, 'aria-label': 'Restock is starting' })}
-      className={`opening op-${h} op-${key}${lite ? ' op-lite' : ''}${scene.picture ? ' op-big' : ''}${still || thumb ? ' op-still' : ''}${thumb ? ' op-thumb' : ''}${leaving ? ' op-leaving' : ''}`}
+      className={`opening op-${h}${h !== 'none' ? ' op-event' : ''} op-${key}${lite ? ' op-lite' : ''}${scene.picture ? ' op-big' : ''}${still || thumb ? ' op-still' : ''}${thumb ? ' op-thumb' : ''}${leaving ? ' op-leaving' : ''}`}
     >
       {scene.behind}
       {pic && (

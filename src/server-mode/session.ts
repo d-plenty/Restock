@@ -20,6 +20,8 @@ export interface Session {
   household?: string;
   /** Signed in with a phone: the passphrase can't be changed in this tab. */
   viaPhone?: boolean;
+  /** 0.18.0: the phone that signed it in (an admin phone's browser looks after the phones too). */
+  viaDevice?: string;
   /** 0.9.4: 3 for a house's session (no vault: webPriv and webPub are ''). */
   v?: 3;
   /** v3: the session's id and its key (base64url), for the request MACs and sealed answers. */
@@ -94,6 +96,7 @@ function houseSession(user: string, sid: string, key: Uint8Array, gift: SessionG
     sessionKey: b64u(key),
     expires: gift.expires,
     viaPhone: gift.kind === 'phone' || undefined,
+    ...(typeof (gift as { device?: unknown }).device === 'string' ? { viaDevice: (gift as { device: string }).device } : {}),
     ...more,
   };
 }
@@ -184,7 +187,7 @@ export async function setUpHouse(name: string): Promise<Session> {
   const r = await api3.setup(name.trim());
   const g = r && r.keys ? r : await api3.session();
   if (!g?.keys) throw new Error('The server set up the house but sent no keys. Sign in again.');
-  const next = houseSession(s.user, s.sid, unb64(s.sessionKey), { ...g, household: g.household ?? { name: name.trim() } }, { keep: s.keep, viaPhone: s.viaPhone });
+  const next = houseSession(s.user, s.sid, unb64(s.sessionKey), { ...g, household: g.household ?? { name: name.trim() } }, { keep: s.keep, viaPhone: s.viaPhone, viaDevice: s.viaDevice });
   remember(next);
   return next;
 }

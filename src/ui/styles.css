@@ -8226,6 +8226,12 @@ textarea.input {
 :root:not([data-style='plain']) .app:not(.pad-wide) > .tabs {
   margin-bottom: max(6px, calc(var(--bottom) - 14px));
 }
+/* 0.18.0: Android's gesture line sits lower in a thinner strip than the iPhone's home bar: the tab
+   bar keeps clear of it (it was touching it), with about the same gap the iPhone has. */
+:root[data-os='android'] .app:not(.pad-wide) > .tabs,
+:root[data-os='android']:not([data-style='plain']) .app:not(.pad-wide) > .tabs {
+  margin-bottom: calc(var(--bottom) + 2px);
+}
 /* 0.17.0: See the animations */
 .op-list-row {
   gap: 12px;
@@ -8246,9 +8252,11 @@ textarea.input {
   color: var(--green);
   font-weight: 700;
 }
-/* 0.17.0: the colours, 6 and 5 with the colour wheel last; the app icons drawn as themselves */
+/* 0.17.0: the app icons drawn as themselves. 0.18.0: 14 plain colours, seven to a row (the colour
+   wheel last among the accents) */
 .swatches {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
 }
 .swatch.icon {
   background: none !important;
@@ -8306,4 +8314,13 @@ textarea.input {
   :root:has(.app.pad-wide) #layers .toast {
     left: max(280px, calc(264px + (100% - 264px - 560px) / 2));
   }
+}
+
+/* 0.18.0: each holiday's own switch, set in under Holiday themes */
+.holiday-each {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 14px;
+  border-left: 3px solid var(--line);
 }

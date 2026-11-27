@@ -116,7 +116,6 @@ export function TakeOverSheet({ ownerName, onClose, onDone }: { ownerName?: stri
     <Sheet title="Take over as the owner" onClose={onClose}>
       <p className="small">For when the owner phone{ownerName ? ` (${ownerName})` : ''} is lost. Enter the recovery key and this phone becomes the owner.{' '}<More title="Taking over as owner"><p>For when the owner phone{ownerName ? ` (${ownerName})` : ''} is lost, broken or wiped. Enter the household's recovery key and this phone
         becomes the owner: it can add and remove phones. Then remove the lost phone, so it can't sync again.</p></More></p>
-      <p className="small">Every phone in the household needs Restock 0.9.0 or newer to see the change.</p>
       <label className="field">
         <span>Recovery key</span>
         <input

@@ -448,7 +448,7 @@ export interface Settings {
    * `opening`: the opening animation at start (Opening.tsx); on unless false. Off, no opening plays at all.
    * 0.17.0 `iconPicked`: an icon colour picked by hand (so "Match my accent colour", now the default, is never put back on it).
    */
-  look: { style: 'australia' | 'plain'; accent?: string; icon: string; black?: boolean; holidays?: boolean; opening?: boolean; iconPicked?: boolean };
+  look: { style: 'australia' | 'plain'; accent?: string; icon: string; black?: boolean; holidays?: boolean; opening?: boolean; iconPicked?: boolean; /** 0.18.0: holidays turned off one by one (Holiday themes still on). */ holidaysOff?: ('christmas' | 'newyear' | 'australia' | 'easter' | 'halloween')[] };
   /**
    * 0.16.0: what to call the person on this phone (myName.ts): Home's greeting, this phone's name in
    * the household and on a server, and backup names. This phone's own (in its backups, never synced).

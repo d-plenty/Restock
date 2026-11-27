@@ -1000,3 +1000,28 @@ button.dk-tile:hover {
 .dd-band {
   border-radius: var(--r-xl);
 }
+
+/* 0.18.0: Make admin, when adding a phone; the Admin tag on a phone's row. */
+.house-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-height: var(--h-control-sm);
+  cursor: pointer;
+}
+.house-check input {
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  accent-color: var(--green);
+  flex: none;
+}
+.house-check > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.house-admin-tag {
+  margin-left: 8px;
+  vertical-align: middle;
+}

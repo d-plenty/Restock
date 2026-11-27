@@ -11,18 +11,15 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.17.0',
-    about: 'Tidier everywhere: the same sizes on every screen, shorter Settings, and what’s new for every update you skipped.',
+    version: '0.18.0',
+    about: 'Add phones and tablets from an admin phone, each holiday on or off, plain colours, and lots of fixes.',
     changes: [
-      'The same button and box sizes on every screen, a tighter top on Home, and the tab bar lower down.',
-      'Inventory stays out of the way until you want it: Restock asks once, after you’ve used it for a while.',
-      'Settings: your name explains where it’s used, Setup is a short checklist, and Sync and Backups have a page each.',
-      'Prices and deals, Shared prices and the backup settings say it in fewer words, with the rest behind ⓘ.',
-      'Look and colours: 11 accent and app icon colours plus the colour wheel, the icons shown as the real icon, and See the animations with a picture of each.',
-      'Holiday dates: Australia Day 2–27 January, Easter the three weeks up to Easter Monday, and Halloween 11 October – 1 November.',
-      'Skipped an update or two? What’s new now has every version since the one you had.',
-      'On a Restock server, each browser is named after you and itself, like “Sam’s Chrome”.',
-      'Fixes: the square box behind search bars in true black, the Feedback page layout, the Advanced icon, an animation you couldn’t get out of, and pop-ups on tablets and iPads dimming only a strip of the screen.',
+      'Admin phones: an admin adds phones and tablets, removes them, and makes others admins, from Settings → Sync → Your Restock server. Your server says who’s an admin.',
+      'Look and colours: 14 plain colours for the accent and the app icon (the same ones, so Match my accent colour matches exactly), and each holiday has its own switch.',
+      'Australia Day shows for the week leading up to it (19–27 January).',
+      'The opening is smoother: 2.5 seconds, or 3.5 on a holiday.',
+      'True black and the app icon colours say it in a line, with the rest behind ⓘ.',
+      'Fixes: the tab bar on Android sat on the gesture line, and a few things on iPad.',
     ],
   },
 ];

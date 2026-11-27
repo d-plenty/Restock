@@ -86,6 +86,8 @@ function paint() {
   const { theme, look, a11y } = current;
   root.dataset.theme = theme;
   root.dataset.style = look.style;
+  // 0.18.0: the phone's own system (the tab bar sits a little differently above each one's home bar).
+  root.dataset.os = Capacitor.getPlatform();
   const dark = isDark(theme);
   // True black (0.8.9): only while dark, so "System" still goes light in the day.
   // On unless turned off (0.9.0: true black is the default).

@@ -34,6 +34,11 @@ export interface RestockNativePlugin {
   serverSeen(opts: { rows: Record<string, unknown>[] }): Promise<{ added: number; skipped: number }>;
   /** 0.9.14: the Restock server's statistics, read as this phone (Your data): "/data/stats?period=3" and the like. */
   serverData(opts: { path: string }): Promise<Record<string, unknown>>;
+  /**
+   * 0.18.0: the phones on the household's Restock server, as an admin phone (lib/serverPhones.ts):
+   * GET /me, GET /phones, POST /phones, PATCH and DELETE /phones/<device>, sealed both ways.
+   */
+  serverAdmin(opts: { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; path: string; body?: Record<string, unknown> }): Promise<Record<string, unknown>>;
   /** 0.9.14: Send prices back now (PriceShare.java): what this phone read from the shops since the last send. */
   sharePrices(): Promise<{ sent: number }>;
   /** Download shared price history (MarketData.java) and summarise it into the market table. */

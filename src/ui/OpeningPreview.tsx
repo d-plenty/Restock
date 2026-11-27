@@ -6,7 +6,7 @@
 // the still picture, as at start.
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { HOLIDAY_NAMES, holidayNow, type Holiday } from '../lib/holiday';
+import { HOLIDAY_NAMES, HOLIDAY_WHEN, holidayNow, type Holiday } from '../lib/holiday';
 import { isDark } from '../lib/theme';
 import type { Settings } from '../types';
 import { layerHost, Sheet, useBackLayer } from './components';
@@ -14,14 +14,7 @@ import { Opening, type OpeningLook } from './Opening';
 
 const ALL: (Holiday | 'none')[] = ['none', 'christmas', 'newyear', 'australia', 'easter', 'halloween'];
 const nameOf = (h: Holiday | 'none') => (h === 'none' ? 'The usual one' : HOLIDAY_NAMES[h]);
-const WHEN: Record<Holiday | 'none', string> = {
-  none: 'The rest of the year',
-  christmas: '1–26 December',
-  newyear: '27 December – 1 January',
-  australia: '2–27 January',
-  easter: 'The three weeks up to Easter Monday',
-  halloween: '11 October – 1 November',
-};
+const WHEN: Record<Holiday | 'none', string> = { none: 'The rest of the year', ...HOLIDAY_WHEN };
 
 type Playing = { h: Holiday | 'none'; look: OpeningLook };
 

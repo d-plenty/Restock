@@ -976,3 +976,20 @@ Nothing. Fixes only (the Shopping list's buttons, search boxes, big text, Dan Mu
 
 - Nothing in how phones and the server talk. 0.12.0 is a change to the screens.
 - **Kept on a phone only** (not synced, not sent): the setting `shopsAsked` (`false` on a phone set up with the short setup, until its first search has asked "Where do you shop?"; unset on older phones and restores).
+
+## 0.18.0: what changed on the wire
+
+Admin phones. Each phone on a server is a **user** or an **admin** (`devices[d].role`, `"admin"` or
+absent). Phones on a server before 0.18.0 have no role, so they are users.
+
+- `GET /api/v3/me` (a phone): `{ device, role, label }`, so an admin phone shows Phones and tablets.
+- `GET /api/v3/phones`: the web page, or an admin phone. Each phone has `role`, and the asking phone `me: true`.
+- `POST /api/v3/phones` `{ label, admin? }`: a code, as before. `admin: true` makes a code for an admin: the
+  web page signed in with the passphrase, or an admin phone. The phone that joins with it is an admin.
+- `PATCH /api/v3/phones/<d>` `{ label?, role? }`: Rename, as before; `role` (`"admin"` or `"user"`) needs
+  the passphrase sign-in on the web page, or an admin phone. Noted as `phone-role` in the activity log.
+- `DELETE /api/v3/phones/<d>`: the web page with the passphrase again (as before), or an admin phone
+  (not itself: a phone takes itself off with `DELETE /api/v3/devices/<me>`). The answer to a phone is
+  sealed with the key it asked with; the new one reaches it in `keys/<device>.bin`.
+- From a phone, all of these must be sealed both ways (`X-Restock-Seal: rsf1`, a sealed body):
+  the codes let a new phone in, so they never cross the network readable. A user phone gets 403 `admin`.

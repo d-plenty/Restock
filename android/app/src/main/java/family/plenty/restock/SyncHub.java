@@ -1184,6 +1184,13 @@ final class SyncHub {
         return s.open().postSealed("/data/seen", body, s.sealKey(), s.fileKeys());
     }
 
+    /** 0.18.0: an admin phone's requests about the server's phones (RestockNativePlugin.serverAdmin), sealed both ways. */
+    org.json.JSONObject serverAdmin(String method, String path, org.json.JSONObject body) throws Exception {
+        ServerSync s = server();
+        if (!s.on() || !s.v3()) throw new IllegalStateException("This phone isn't in a household on a Restock server.");
+        return s.open().sealed(method, path, body, s.sealKey(), s.fileKeys());
+    }
+
     /** 0.9.14: the server's statistics for Your data (only a v3 household's server has them). */
     org.json.JSONObject serverRead(String pathAndQuery) throws Exception {
         ServerSync s = server();

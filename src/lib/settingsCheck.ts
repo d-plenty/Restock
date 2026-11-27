@@ -306,6 +306,8 @@ export function checkSettings(raw: unknown, opts: { strict?: boolean } = {}): Se
       // no accent of their own) gets it too: it looks the same, and now follows a new accent.
       icon: lk.icon === 'green' && !lk.accent && lk.iconPicked !== true ? 'match' : oneOf(lk.icon, ICONS, D.look.icon),
       iconPicked: maybeBool(lk.iconPicked),
+      // 0.18.0: holidays turned off one by one.
+      ...(Array.isArray(lk.holidaysOff) ? { holidaysOff: [...new Set(lk.holidaysOff.filter((h: unknown): h is 'christmas' | 'newyear' | 'australia' | 'easter' | 'halloween' => typeof h === 'string' && ['christmas', 'newyear', 'australia', 'easter', 'halloween'].includes(h)))] } : {}),
       black: maybeBool(lk.black),
       // 0.16.0: the holidays (holiday.ts): on unless turned off.
       holidays: maybeBool(lk.holidays),

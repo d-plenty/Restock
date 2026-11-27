@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { FADE_MS, lessMotion, Opening, OPENING_MS, openingPlayed, resetOpening } from './Opening';
+import { EVENT_MS, FADE_MS, lessMotion, Opening, OPENING_MS, openingPlayed, resetOpening } from './Opening';
 
 // 0.16.0: the opening animation (Opening.tsx).
 beforeEach(() => {
@@ -21,7 +21,9 @@ describe('the opening animation', () => {
     expect(screen.getByText('Restock')).toBeTruthy();
     expect(screen.getByText('Half price? Prove it.')).toBeTruthy();
     expect(openingPlayed()).toBe(true);
-    expect(OPENING_MS).toBe(2500);
+    // 0.18.0: 2.5 seconds in all for the usual one (3.5 for a holiday), the fade included.
+    expect(OPENING_MS + FADE_MS).toBe(2500);
+    expect(EVENT_MS + FADE_MS).toBe(3500);
     act(() => void vi.advanceTimersByTime(OPENING_MS + FADE_MS - 1));
     expect(done).not.toHaveBeenCalled();
     act(() => void vi.advanceTimersByTime(2));
@@ -69,7 +71,7 @@ describe('the opening animation', () => {
     const done = vi.fn();
     const { container } = render(<Opening holiday="halloween" still onDone={done} />);
     expect(container.querySelector('.opening.op-still')).toBeTruthy();
-    act(() => void vi.advanceTimersByTime(OPENING_MS + FADE_MS));
+    act(() => void vi.advanceTimersByTime(EVENT_MS + FADE_MS));
     expect(done).toHaveBeenCalledTimes(1);
   });
 

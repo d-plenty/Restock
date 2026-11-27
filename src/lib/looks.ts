@@ -12,16 +12,16 @@ export const AUS_GREEN = '#00843d';
 
 export const ACCENTS: Swatch[] = [
   { id: 'green', name: 'Australian green', hex: AUS_GREEN },
-  { id: 'gold', name: 'Gold', hex: '#ffcd00' },
+  { id: 'gold', name: 'Yellow', hex: '#ffcd00' },
   { id: 'navy', name: 'Navy', hex: '#012169' },
   { id: 'red', name: 'Red', hex: '#c8102e' },
-  { id: 'forest', name: 'Forest', hex: '#2e7d32' },
+  { id: 'forest', name: 'Dark green', hex: '#2e7d32' },
   { id: 'lime', name: 'Lime', hex: '#7cb342' },
   { id: 'olive', name: 'Olive', hex: '#6b8e23' },
   { id: 'teal', name: 'Teal', hex: '#00897b' },
   { id: 'mint', name: 'Mint', hex: '#26a69a' },
-  { id: 'sky', name: 'Sky', hex: '#0277bd' },
-  { id: 'blue', name: 'Blue', hex: '#1f6fb2' },
+  { id: 'sky', name: 'Blue', hex: '#0277bd' },
+  { id: 'blue', name: 'Mid blue', hex: '#1f6fb2' },
   { id: 'indigo', name: 'Indigo', hex: '#3949ab' },
   { id: 'purple', name: 'Purple', hex: '#6b3fa0' },
   { id: 'plum', name: 'Plum', hex: '#8e24aa' },
@@ -32,26 +32,26 @@ export const ACCENTS: Swatch[] = [
   { id: 'amber', name: 'Amber', hex: '#f2a900' },
   { id: 'sand', name: 'Sand', hex: '#b08d57' },
   { id: 'brown', name: 'Brown', hex: '#6d4c41' },
-  { id: 'slate', name: 'Slate', hex: '#455a64' },
+  { id: 'slate', name: 'Grey', hex: '#455a64' },
   { id: 'charcoal', name: 'Charcoal', hex: '#37474f' },
   { id: 'black', name: 'Black', hex: '#1b1b1b' },
 ];
 
 export const ICON_COLOURS: Swatch[] = [
   { id: 'green', name: 'Australian green', hex: '#1f8352' },
-  { id: 'gold', name: 'Gold', hex: '#ffcd00' },
+  { id: 'gold', name: 'Yellow', hex: '#ffcd00' },
   { id: 'navy', name: 'Navy', hex: '#012169' },
   { id: 'red', name: 'Red', hex: '#c8102e' },
-  { id: 'forest', name: 'Forest', hex: '#2e7d32' },
+  { id: 'forest', name: 'Dark green', hex: '#2e7d32' },
   { id: 'teal', name: 'Teal', hex: '#00897b' },
-  { id: 'sky', name: 'Sky', hex: '#0277bd' },
+  { id: 'sky', name: 'Blue', hex: '#0277bd' },
   { id: 'indigo', name: 'Indigo', hex: '#3949ab' },
   { id: 'purple', name: 'Purple', hex: '#6b3fa0' },
   { id: 'pink', name: 'Pink', hex: '#d81b60' },
   { id: 'orange', name: 'Orange', hex: '#e65100' },
   { id: 'amber', name: 'Amber', hex: '#f2a900' },
   { id: 'brown', name: 'Brown', hex: '#6d4c41' },
-  { id: 'slate', name: 'Slate', hex: '#455a64' },
+  { id: 'slate', name: 'Grey', hex: '#455a64' },
   { id: 'black', name: 'Black', hex: '#1b1b1b' },
   { id: 'white', name: 'White', hex: '#f4f1e8' },
 ];
@@ -60,8 +60,13 @@ export const ICON_COLOURS: Swatch[] = [
  * 0.17.0: the colours offered in Settings: 11 that look good (6 and 5), and the colour wheel for
  * anything else. A colour picked before that isn't among them still shows as chosen.
  */
-export const SHOWN_ACCENTS = ['green', 'navy', 'gold', 'red', 'teal', 'sky', 'purple', 'pink', 'orange', 'slate', 'black'];
-export const SHOWN_ICONS = ['green', 'navy', 'gold', 'red', 'teal', 'sky', 'purple', 'pink', 'orange', 'slate', 'black'];
+/**
+ * 0.18.0: the colours offered in Settings: plain, standard ones, the same for the accent and the app
+ * icon (so Match my accent colour matches exactly), 14 each: 13 accents and the colour wheel, and 14
+ * icons (White too). A colour picked before that isn't among them still shows as chosen.
+ */
+export const SHOWN_ACCENTS = ['green', 'forest', 'teal', 'sky', 'navy', 'purple', 'pink', 'red', 'orange', 'gold', 'brown', 'slate', 'black'];
+export const SHOWN_ICONS = [...SHOWN_ACCENTS, 'white'];
 
 /** How each app icon is painted (the same as tools/icons/make-icons.cjs draws them), for its picture in Settings. */
 export interface IconPaint {
@@ -100,6 +105,10 @@ const rgb = (h: string) => {
 
 /** The built-in icon colour closest to an accent colour, for "Match my accent colour". */
 export function nearestIcon(hex: string): Swatch {
+  // 0.18.0: one of the accents in Settings: its own icon, exactly.
+  const same = ACCENTS.find((a) => a.hex.toLowerCase() === hex.toLowerCase());
+  const own = same && ICON_COLOURS.find((c) => c.id === same.id);
+  if (own) return own;
   const [r, g, b] = rgb(hex);
   let best = ICON_COLOURS[0];
   let bestD = Infinity;

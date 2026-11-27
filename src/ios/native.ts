@@ -380,6 +380,10 @@ export class RestockIos extends WebPlugin {
   async serverData(o: { path: string }) {
     return sync.serverData(o?.path ?? '');
   }
+  // 0.18.0: an admin phone's requests about the server's phones.
+  async serverAdmin(o: { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; path: string; body?: Record<string, unknown> }) {
+    return sync.serverAdmin(o?.method ?? 'GET', o?.path ?? '', o?.body);
+  }
 
   // ---------- permissions, and the phone itself ----------
   async checkPermissions(): Promise<NativePermissions> {

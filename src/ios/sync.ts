@@ -502,6 +502,16 @@ export async function serverData(path: string): Promise<Record<string, unknown>>
   return (await hub()).house.sealed('GET', path);
 }
 
+/** 0.18.0: RestockNativePlugin.serverAdmin: the server's phones, as an admin phone (sealed both ways). */
+export async function serverAdmin(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const ok =
+    (method === 'GET' && (path === '/me' || path === '/phones')) ||
+    (method === 'POST' && path === '/phones') ||
+    ((method === 'PATCH' || method === 'DELETE') && /^\/phones\/[A-Za-z0-9_-]{1,64}$/.test(path));
+  if (!ok) throw new Error('Not something an admin phone does.');
+  return (await hub()).house.sealed(method, path, body ?? (method === 'GET' ? undefined : {}));
+}
+
 /** This device's earlier spending (or what its searches found) going up to the household's own server. */
 export async function serverRows(kind: 'spend' | 'seen', rows: Record<string, unknown>[]): Promise<{ added: number; skipped: number }> {
   const r = await (await hub()).house.sealed('POST', `/data/${kind}`, { rows: Array.isArray(rows) ? rows : [] });

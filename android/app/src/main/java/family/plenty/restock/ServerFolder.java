@@ -317,6 +317,11 @@ final class ServerFolder implements SyncFolder.Folder, ServerOffload.Remote {
         return sealedCall("POST", path, body, sealKey, openKeys, SyncDav.MAX_SMALL);
     }
 
+    /** 0.18.0: any of the admin requests (GET, POST, PATCH, DELETE), sealed both ways. */
+    JSONObject sealed(String method, String path, JSONObject body, byte[] sealKey, List<byte[]> openKeys) throws Exception {
+        return sealedCall(method, path, body, sealKey, openKeys, SyncDav.MAX_LIST);
+    }
+
     static final String SEALED = "application/x-restock-sealed";
 
     private JSONObject sealedCall(String method, String path, JSONObject body, byte[] sealKey, List<byte[]> openKeys, int max) throws Exception {

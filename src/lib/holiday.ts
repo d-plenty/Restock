@@ -6,7 +6,7 @@
 //
 //   Christmas      1–26 December
 //   New Year       27 December – 1 January
-//   Australia Day  2–27 January
+//   Australia Day  19–27 January (0.18.0: the week leading up to it; 2–27 January before)
 //   Easter         the three weeks up to Easter Monday (it moves: late March to late April)
 //   Halloween      the three weeks up to Halloween, 11 October – 1 November
 // 0.17.0: each ends the day after (Boxing Day, New Year's Day, the 27th, Easter Monday, 1 November).
@@ -20,6 +20,18 @@ export const HOLIDAY_NAMES: Record<Holiday, string> = {
   halloween: 'Halloween',
   easter: 'Easter',
   australia: 'Australia Day',
+};
+
+/** 0.18.0: in the order they come in the year (Look and colours lists them so, each with its own switch). */
+export const HOLIDAY_ORDER: Holiday[] = ['newyear', 'australia', 'easter', 'halloween', 'christmas'];
+
+/** When each one shows (See the animations and the switches say it). */
+export const HOLIDAY_WHEN: Record<Holiday, string> = {
+  christmas: '1–26 December',
+  newyear: '27 December – 1 January',
+  australia: '19–27 January',
+  easter: 'The three weeks up to Easter Monday',
+  halloween: '11 October – 1 November',
 };
 
 /** Easter Sunday in a year (the Gregorian calendar's rule: Meeus/Jones/Butcher). Month is 1–12. */
@@ -48,7 +60,8 @@ export function holidayOn(d = new Date()): Holiday | undefined {
   if ((m === 12 && day >= 27) || (m === 1 && day === 1)) return 'newyear';
   if (m === 12) return 'christmas';
   if ((m === 10 && day >= 11) || (m === 11 && day === 1)) return 'halloween';
-  if (m === 1 && day <= 27) return 'australia';
+  // 0.18.0: Australia Day is the week leading up to it, to the day after (19–27 January).
+  if (m === 1 && day >= 19 && day <= 27) return 'australia';
   const e = easterSunday(d.getFullYear());
   const sunday = new Date(d.getFullYear(), e.month - 1, e.day);
   const monday = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + 1);
@@ -63,8 +76,15 @@ type Look = Pick<Settings, 'look'>;
 /** Holidays switched on (they are unless turned off). */
 export const holidaysOn = (s: Look | undefined): boolean => s?.look.holidays !== false;
 
+/** 0.18.0: one holiday switched off on its own (Look and colours), the others still on. */
+export const holidayOff = (s: Look | undefined, h: Holiday): boolean => !!s?.look.holidaysOff?.includes(h);
+
 /** The holiday showing now: its opening animation. */
-export const holidayNow = (s: Look | undefined, d = new Date()): Holiday | undefined => (holidaysOn(s) ? holidayOn(d) : undefined);
+export const holidayNow = (s: Look | undefined, d = new Date()): Holiday | undefined => {
+  if (!holidaysOn(s)) return undefined;
+  const h = holidayOn(d);
+  return h && !holidayOff(s, h) ? h : undefined;
+};
 
 /** On the default theme (navy, gold and green, no colour of its own picked): the holiday's colours too. */
 export const holidayColours = (s: Look | undefined, d = new Date()): Holiday | undefined =>

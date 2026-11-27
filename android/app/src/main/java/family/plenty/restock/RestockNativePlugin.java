@@ -362,6 +362,32 @@ public class RestockNativePlugin extends Plugin {
         });
     }
 
+    /**
+     * 0.18.0: the phones on the Restock server, as an admin phone: GET /me and /phones, POST /phones
+     * (a code for a new phone), PATCH and DELETE /phones/<device>. Sealed both ways (ServerFolder.sealedCall).
+     */
+    @PluginMethod
+    public void serverAdmin(final PluginCall call) {
+        final String method = call.getString("method", "GET");
+        final String path = call.getString("path", "");
+        final JSObject body = call.getObject("body");
+        boolean ok = ("GET".equals(method) && (path.equals("/me") || path.equals("/phones")))
+                || ("POST".equals(method) && path.equals("/phones"))
+                || (("PATCH".equals(method) || "DELETE".equals(method)) && path.matches("/phones/[A-Za-z0-9_-]{1,64}"));
+        if (!ok) {
+            call.reject("Not something an admin phone does.");
+            return;
+        }
+        syncThread.execute(() -> {
+            try {
+                org.json.JSONObject b = body == null ? ("GET".equals(method) ? null : new org.json.JSONObject()) : new org.json.JSONObject(body.toString());
+                call.resolve(new JSObject(SyncHub.get(getContext()).serverAdmin(method, path, b).toString()));
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Couldn't reach your Restock server.", e);
+            }
+        });
+    }
+
     /** 0.10.0: POST /api/v3/data/spend: this phone's earlier spending, so the server's figures have it too. */
     @PluginMethod
     public void serverSpend(final PluginCall call) {

@@ -1,4 +1,5 @@
 // 0.9.3: Settings at desktop widths, in two parts. Household: what the web can change for the whole
+import { HOLIDAY_NAMES, HOLIDAY_ORDER, HOLIDAY_WHEN } from '../../lib/holiday';
 // household, with what only the owner phone or each phone can change shown greyed. Phones: each
 // phone's own settings, greyed, to change on that phone. Everything it reads or changes goes
 // through settingsData.ts.
@@ -659,6 +660,25 @@ function HouseholdPart() {
             onChange={(e) => mine && void updateBrowserSettings({ look: { ...mine.look, holidays: e.target.checked } }, { local: true })}
           />
         </Line>
+        {/* 0.18.0: each holiday on or off on its own, as on the phone */}
+        {mine?.look.holidays !== false &&
+          HOLIDAY_ORDER.map((h) => (
+            <Line key={h} title={HOLIDAY_NAMES[h]} htmlFor={`dk-holiday-${h}`} sub={HOLIDAY_WHEN[h]}>
+              <input
+                id={`dk-holiday-${h}`}
+                type="checkbox"
+                className="switch"
+                checked={!mine?.look.holidaysOff?.includes(h)}
+                onChange={(e) => {
+                  if (!mine) return;
+                  const off = new Set(mine.look.holidaysOff ?? []);
+                  if (e.target.checked) off.delete(h);
+                  else off.add(h);
+                  void updateBrowserSettings({ look: { ...mine.look, holidaysOff: HOLIDAY_ORDER.filter((x) => off.has(x)) } }, { local: true });
+                }}
+              />
+            </Line>
+          ))}
         <Line title="See the animations" sub="The usual one and each holiday's, day and night">
           <button className="btn small" onClick={() => setSeeing(true)}>
             See them
@@ -789,7 +809,7 @@ function PhonesPart() {
       </div>
       {!p.sent && (
         <p className="small dk-tight" role="note">
-          {p.name} hasn't sent its settings yet. They show here once it syncs with Restock 0.9.3 or newer.
+          {p.name} hasn't sent its settings yet. They show here once it syncs.
         </p>
       )}
       <div className="dk-grid">

@@ -1,10 +1,25 @@
-// 0.17.0: what changed in the versions before this one, for someone who skipped some updates: after
+// 0.17.0: what changed in the versions before this one (0.18.0: 0.17.0 moved here), for someone who skipped some updates: after
 // updating from 0.14.6 to 0.17.0, What's new offers 0.16.0, 0.15.2 … down to what they had. Older
 // than 0.12.0 is on the GitHub releases page. Newest first. (From each version's own notes:
 // fastlane/metadata/android/en-US/changelogs.)
 import type { VersionNotes } from './whatsNew';
 
 export const EARLIER: VersionNotes[] = [
+  {
+    version: '0.17.0',
+    about: 'Tidier everywhere: the same sizes on every screen, shorter Settings, and what’s new for every update you skipped.',
+    changes: [
+      'The same button and box sizes on every screen, a tighter top on Home, and the tab bar lower down.',
+      'Inventory stays out of the way until you want it: Restock asks once, after you’ve used it for a while.',
+      'Settings: your name explains where it’s used, Setup is a short checklist, and Sync and Backups have a page each.',
+      'Prices and deals, Shared prices and the backup settings say it in fewer words, with the rest behind ⓘ.',
+      'Look and colours: 11 accent and app icon colours plus the colour wheel, the icons shown as the real icon, and See the animations with a picture of each.',
+      'Holiday dates: Australia Day 2–27 January, Easter the three weeks up to Easter Monday, and Halloween 11 October – 1 November.',
+      'Skipped an update or two? What’s new now has every version since the one you had.',
+      'On a Restock server, each browser is named after you and itself, like “Sam’s Chrome”.',
+      'Fixes: the square box behind search bars in true black, the Feedback page layout, the Advanced icon, an animation you couldn’t get out of, and pop-ups on tablets and iPads dimming only a strip of the screen.',
+    ],
+  },
   {
     version: '0.16.0',
     about: 'A fresh look, your name on Home, a new logo, and holiday themes.',

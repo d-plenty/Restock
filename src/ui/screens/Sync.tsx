@@ -983,7 +983,7 @@ export function SyncScreen({ invite }: { invite?: boolean } = {}) {
                   <span className="small">
                     {info.canRecover
                       ? "Take over as the owner with the household's recovery key."
-                      : "Once the owner phone has Restock 0.9.0 and syncs, this phone can take over with the recovery key if it's ever lost."}
+                      : "Once the owner phone syncs, this phone can take over with the recovery key if it's ever lost."}
                   </span>
                 </span>
                 <Icon name="chevron" size={18} />

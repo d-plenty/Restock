@@ -9,6 +9,7 @@ import { isNative } from '../../stores/http';
 import type { Settings } from '../../types';
 import { Icon, LogoDrawing, More, ThemePicker } from '../components';
 import { lessMotion } from '../Opening';
+import { HOLIDAY_NAMES, HOLIDAY_ORDER, HOLIDAY_WHEN } from '../../lib/holiday';
 import { OpeningPreview } from '../OpeningPreview';
 import { useNav } from '../nav';
 
@@ -34,8 +35,10 @@ export function LookSettings({ settings }: { settings: Settings }) {
 
   const iconId = look.icon === 'match' ? nearestIcon(accent).id : look.icon;
   // 0.17.0: the 11 offered colours, plus a colour picked before that isn't among them
-  const shownAccents = ACCENTS.filter((a) => SHOWN_ACCENTS.includes(a.id) || (a.id !== 'green' && a.hex.toLowerCase() === accent.toLowerCase()));
-  const shownIcons = ICON_COLOURS.filter((c) => SHOWN_ICONS.includes(c.id) || c.id === iconId);
+  // 0.18.0: in the order Settings lists them (greens, blues, purple to red, then the rest).
+  const order = (ids: string[]) => (id: string) => (ids.includes(id) ? ids.indexOf(id) : ids.length);
+  const shownAccents = ACCENTS.filter((a) => SHOWN_ACCENTS.includes(a.id) || (a.id !== 'green' && a.hex.toLowerCase() === accent.toLowerCase())).sort((a, b) => order(SHOWN_ACCENTS)(a.id) - order(SHOWN_ACCENTS)(b.id));
+  const shownIcons = ICON_COLOURS.filter((c) => SHOWN_ICONS.includes(c.id) || c.id === iconId).sort((a, b) => order(SHOWN_ICONS)(a.id) - order(SHOWN_ICONS)(b.id));
   const setIcon = async (id: string) => {
     await setLook({ icon: id, iconPicked: id !== 'match' });
     if (!isNative()) return;
@@ -81,8 +84,11 @@ export function LookSettings({ settings }: { settings: Settings }) {
             True black in dark mode
           </span>
           <span className="small">
-            For OLED screens: the background is pure black, so those pixels switch off. Saves battery and gives deeper contrast. On to start with.
-            {settings.theme === 'light' ? ' Shows when Light or dark is set to Dark or System.' : ''}
+            A pure black background in dark mode.{' '}
+            <More title="True black in dark mode">
+              <p>For OLED screens: the background is pure black, so those pixels switch off. It saves battery and gives deeper contrast.</p>
+              <p>On to start with. It shows when Light or dark is set to Dark, or to System while your phone is in dark mode.</p>
+            </More>
           </span>
         </span>
         <input type="checkbox" className="switch" checked={look.black !== false} onChange={(e) => void setLook({ black: e.target.checked })} />
@@ -117,7 +123,7 @@ export function LookSettings({ settings }: { settings: Settings }) {
           <span className="small">
             A short animation when Restock starts.{' '}
             <More title="Opening animation">
-              <p>About two and a half seconds, each time Restock starts from closed (not when you come back to it). A tap ends it early.</p>
+              <p>Two and a half seconds (three and a half on a holiday), each time Restock starts from closed (not when you come back to it). A tap ends it early.</p>
               <p>With Less motion on (Accessibility, or your phone&rsquo;s own Reduce motion) it&rsquo;s a still picture instead. Turned off here, there&rsquo;s no opening at all, holidays included.</p>
               <p>Just for this phone.</p>
             </More>
@@ -136,13 +142,39 @@ export function LookSettings({ settings }: { settings: Settings }) {
             Christmas, New Year, Australia Day, Easter and Halloween.{' '}
             <More title="Holiday themes">
               <p>On a holiday Restock opens with that holiday&rsquo;s animation (with Opening animation on). On the default theme the app also takes the holiday&rsquo;s colours, with a small decoration at the top of Home.</p>
-              <p>Christmas is 1 to 26 December, New Year 27 December to 1 January, Australia Day 2 to 27 January, Easter the three weeks up to Easter Monday, and Halloween 11 October to 1 November. Each looks like day in light mode and night in dark mode. Afterwards everything goes back to normal by itself.</p>
-              <p>Just for this phone.</p>
+              <p>Christmas is 1 to 26 December, New Year 27 December to 1 January, Australia Day 19 to 27 January, Easter the three weeks up to Easter Monday, and Halloween 11 October to 1 November. Each looks like day in light mode and night in dark mode. Afterwards everything goes back to normal by itself.</p>
+              <p>Turn any one off on its own below. Just for this phone.</p>
             </More>
           </span>
         </span>
         <input type="checkbox" className="switch" checked={look.holidays !== false} onChange={(e) => void setLook({ holidays: e.target.checked })} />
       </label>
+      {/* 0.18.0: each holiday on or off on its own, while Holiday themes is on */}
+      {look.holidays !== false && (
+        <div className="holiday-each" role="group" aria-label="Each holiday">
+          {HOLIDAY_ORDER.map((h) => (
+            <label key={h} className="check" style={{ padding: 0 }}>
+              <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
+                <span className="title" style={{ fontSize: 15 }}>
+                  {HOLIDAY_NAMES[h]}
+                </span>
+                <span className="small">{HOLIDAY_WHEN[h]}</span>
+              </span>
+              <input
+                type="checkbox"
+                className="switch"
+                checked={!look.holidaysOff?.includes(h)}
+                onChange={(e) => {
+                  const off = new Set(look.holidaysOff ?? []);
+                  if (e.target.checked) off.delete(h);
+                  else off.add(h);
+                  void setLook({ holidaysOff: HOLIDAY_ORDER.filter((x) => off.has(x)) });
+                }}
+              />
+            </label>
+          ))}
+        </div>
+      )}
       <button className="btn small" style={{ alignSelf: 'flex-start' }} onClick={() => setSeeing(true)}>
         <Icon name="star" size={16} /> See the animations
       </button>
@@ -226,9 +258,13 @@ export function LookSettings({ settings }: { settings: Settings }) {
             })}
           </div>
           <span className="small">
-            {isIos()
-              ? 'The basket on the icon turns light or dark to suit the colour.'
-              : 'The basket on the icon turns light or dark to suit the colour. On some phones changing the icon closes Restock for a moment, and you may need to put the icon back on your home screen.'}
+            {/* 0.18.0: an app icon can only be one the app came with, so the colour wheel has none of its own */}
+            Your own colour from the colour wheel? The icon uses the closest of these.{' '}
+            <More title="App icon colour">
+              <p>Phones only take app icons that come with the app, so there&rsquo;s one for each of these colours and none for a colour of your own. Match my accent colour uses the same colour as your accent, or the closest one.</p>
+              <p>The basket on the icon turns light or dark to suit the colour.</p>
+              {!isIos() && <p>On some phones changing the icon closes Restock for a moment, and you may need to put the icon back on your home screen.</p>}
+            </More>
           </span>
         </div>
       </details>

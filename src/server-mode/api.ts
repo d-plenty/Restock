@@ -230,6 +230,10 @@ export interface Phone {
   shares?: Shares | null;
   /** 2: still on its v2 key (Restock 0.9.3, or not upgraded yet). */
   api?: number;
+  /** 0.18.0: an admin adds, removes and changes the phones (the server says 'user' for the rest). */
+  role?: 'admin' | 'user';
+  /** 0.18.0: the phone that asked (an admin phone's own list). */
+  me?: boolean;
 }
 
 export interface Browser {
@@ -318,8 +322,10 @@ export const api3 = {
   qrPoll: (id: string) => json<{ pending?: boolean; status?: string; session?: string; expires?: string | number; sealed?: string }>(call('GET', `/api/v3/qrlogin/${enc3(id)}`)),
 
   phones: async () => listOf<Phone>(await v3get<unknown>('/api/v3/phones'), 'phones'),
-  addPhone: (label: string) => v3send<{ code: string; expires?: string | number; expiresIn?: number }>('POST', '/api/v3/phones', { label }),
+  addPhone: (label: string, admin = false) => v3send<{ code: string; expires?: string | number; expiresIn?: number }>('POST', '/api/v3/phones', admin ? { label, admin: true } : { label }),
   renamePhone: (device: string, label: string) => v3send<unknown>('PATCH', `/api/v3/phones/${enc3(device)}`, { label }),
+  /** 0.18.0: Make admin / Make user (the passphrase sign-in). */
+  setRole: (device: string, role: 'admin' | 'user') => v3send<unknown>('PATCH', `/api/v3/phones/${enc3(device)}`, { role }),
   /** Remove needs the passphrase again (`confirm`, session.ts confirmPassphrase). */
   removePhone: (device: string, confirm: Confirm) => answer<unknown>(call('DELETE', `/api/v3/phones/${enc3(device)}`, { confirm })),
   browsers: async () => listOf<Browser>(await v3get<unknown>('/api/v3/browsers'), 'browsers'),

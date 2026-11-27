@@ -63,7 +63,7 @@ const TAB_WORD: Record<string, string> = { pantry: 'Pantry, Baby, Pets, Shopping
 /** "Shares Pantry, Shopping list, Keg · receipts" (what the phone said it shares, D9). */
 export function sharesText(p: Phone): string {
   const s = p.shares;
-  if (!s) return p.api === 2 ? 'Shares what the household shared (Restock 0.9.3)' : 'Shares nothing yet';
+  if (!s) return 'Shares nothing yet';
   const bits = (s.tabs ?? []).map((t) => TAB_WORD[t] ?? t);
   if (s.receipts) bits.push('receipts');
   if (s.cards) bits.push('loyalty cards');
@@ -71,6 +71,8 @@ export function sharesText(p: Phone): string {
 }
 
 export const phoneName = (p: Phone) => p.label || p.name || 'Phone';
+/** 0.18.0: phones the server doesn't say are admins (on it before 0.18.0) are users. */
+export const isAdmin = (p: Phone) => p.role === 'admin';
 
 export function dayText(iso?: string): string {
   if (!iso) return '';
@@ -87,8 +89,8 @@ function sortPhones(list: Phone[]): Phone[] {
 export const usePhonesV3 = () => useServer(async () => sortPhones(await api3.phones()));
 
 /** An Add a phone code for a phone with this name: the whole restock-server:3 text, and when it runs out. */
-export async function newPhoneCode(label: string): Promise<{ code: string; until: number }> {
-  const r = await api3.addPhone(label.trim());
+export async function newPhoneCode(label: string, admin = false): Promise<{ code: string; until: number }> {
+  const r = await api3.addPhone(label.trim(), admin);
   const until =
     typeof r.expiresIn === 'number'
       ? Date.now() + r.expiresIn * (r.expiresIn > 100_000 ? 1 : 1000)
@@ -136,6 +138,7 @@ const ACT: Record<string, (d: Detail, name: (device: unknown) => string | undefi
   'phone-left': () => 'left',
   'phone-removed': (d, name) => `removed ${str(d.name) ?? name(d.device) ?? 'a phone'}`,
   'phone-renamed': (d) => `renamed a phone ${str(d.label) ?? ''}`.trim(),
+  'phone-role': (d, name) => `made ${str(d.name) ?? name(d.device) ?? 'a phone'} ${d.role === 'admin' ? 'an admin' : 'a user'}`,
   'invite-made': (d) => (str(d.label) ? `made a code to add ${str(d.label)}` : 'made a code to add a phone'),
   'signed-in': (d) => (d.kind === 'phone' ? 'signed a browser in with a phone' : 'signed in'),
   login: () => 'signed in',
