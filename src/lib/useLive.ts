@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { cachedSettings, getSettings } from './db';
 import { onChange } from './live';
 import { screenReading } from './screensFirst';
+import { noteSpeed } from './speedLog';
 import { cachedDraftSettings, getSettings as draftSettings } from './settingsDraft';
 import type { Settings } from '../types';
 
@@ -24,6 +25,10 @@ export function useLive<T>(query: () => Promise<T>, deps: unknown[] = [], initia
     let busy = false;
     let again = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // 0.18.4: a run that fails is tried again (after 1, 2, 4 … 30 seconds), so a screen never stays
+    // on "Loading…" because one answer went wrong; and a slow one is noted for Diagnostics → Speed.
+    let failures = 0;
+    const name = query.name || 'a screen';
     const load = () => {
       if (busy || timer) {
         again = true;
@@ -44,18 +49,25 @@ export function useLive<T>(query: () => Promise<T>, deps: unknown[] = [], initia
       }
       run
         .then((v) => {
+          failures = 0;
           if (alive) setValue(v);
         })
-        .catch((e) => console.error('query failed', e))
+        .catch((e) => {
+          console.error('query failed', e);
+          failures++;
+          again = true;
+        })
         .finally(() => {
           busy = false;
           read();
+          const took = Date.now() - started;
+          if (took >= SLOW_MS) noteSpeed('read', took, name);
           if (alive && again) {
             again = false;
             timer = setTimeout(() => {
               timer = undefined;
               if (alive) load();
-            }, Math.min(2000, Math.max(200, Date.now() - started)));
+            }, failures ? Math.min(30_000, 1000 * 2 ** (failures - 1)) : Math.min(2000, Math.max(200, Date.now() - started)));
           }
         });
     };
@@ -70,6 +82,9 @@ export function useLive<T>(query: () => Promise<T>, deps: unknown[] = [], initia
   }, deps);
   return value;
 }
+
+/** 0.18.4: a screen's read that takes this long is noted (Diagnostics → Speed). */
+const SLOW_MS = 3000;
 
 /** The settings, live: straight away from the last read (db.ts cachedSettings), then kept up to date. */
 export const useSettings = (): Settings | undefined => useLive(getSettings, [], cachedSettings);

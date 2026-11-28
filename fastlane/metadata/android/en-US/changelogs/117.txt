@@ -1,0 +1,1 @@
+Fixed: on an iPhone or iPad on a Restock server, Home, Pantry and the list could stay on Loading. Each phone can keep its backup on your Restock server, and a lost phone's new one puts it back with the server's passphrase. Server admin on the phone is tidier, and can change the passphrase. The server's web page fits any screen.

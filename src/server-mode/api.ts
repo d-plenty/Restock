@@ -265,6 +265,8 @@ export interface Phone {
   role?: 'admin' | 'user';
   /** 0.18.0: the phone that asked (an admin phone's own list). */
   me?: boolean;
+  /** 0.18.4: its latest backup on the server (null: it hasn't kept one). */
+  backup?: { at: string | null; size: number } | null;
 }
 
 export interface Browser {
@@ -394,7 +396,19 @@ export const api3 = {
   qrPoll: (id: string) => json<{ pending?: boolean; status?: string; session?: string; expires?: string | number; sealed?: string }>(call('GET', `/api/v3/qrlogin/${enc3(id)}`)),
 
   phones: async () => listOf<Phone>(await v3get<unknown>('/api/v3/phones'), 'phones'),
-  addPhone: (label: string, admin = false) => v3send<{ code: string; expires?: string | number; expiresIn?: number }>('POST', '/api/v3/phones', admin ? { label, admin: true } : { label }),
+  /** `replaces`: 0.18.4, a lost phone the new one takes the place of. */
+  addPhone: (label: string, admin = false, replaces?: string) =>
+    v3send<{ code: string; expires?: string | number; expiresIn?: number; role?: 'admin' | 'user' }>('POST', '/api/v3/phones', { label, ...(admin && !replaces ? { admin: true } : {}), ...(replaces ? { replaces } : {}) }),
+  /** 0.18.4: the phone backups' key (its private half sealed with the passphrase), or {} while they're off. */
+  backupKey: () => v3get<{ pub?: string; at?: string; sealed?: string }>('/api/v3/backupkey'),
+  putBackupKey: (k: { pub: string; sealed: string }, confirm: Confirm) => v3send<{ pub: string; at: string }>('PUT', '/api/v3/backupkey', { ...k, confirm }),
+  /** 0.18.4: a phone's backup: the passphrase again (and a yes on an admin phone), then its bytes, once. */
+  phoneBackup: async (device: string, confirm: Confirm): Promise<{ bytes: Uint8Array; sealedKey: string }> => {
+    const t = await v3send<{ token: string; key: { sealed: string } | null }>('POST', `/api/v3/phone-backup/${enc3(device)}`, { confirm });
+    if (!t.key?.sealed) throw new Error("Phone backups aren't on for this server.");
+    const r = await call('GET', `/api/v3/phone-backup/${enc3(device)}?t=${enc3(t.token)}`);
+    return { bytes: new Uint8Array(await r.arrayBuffer()), sealedKey: t.key.sealed };
+  },
   renamePhone: (device: string, label: string) => v3send<unknown>('PATCH', `/api/v3/phones/${enc3(device)}`, { label }),
   /** 0.18.0: Make admin / Make user (the passphrase sign-in). */
   setRole: (device: string, role: 'admin' | 'user') => v3send<unknown>('PATCH', `/api/v3/phones/${enc3(device)}`, { role }),
@@ -407,7 +421,7 @@ export const api3 = {
   /** Keeping less (data is deleted) needs the passphrase again: `confirm`. */
   putSettings: (s: HouseSettings, confirm?: Confirm) => v3send<HouseSettings>('PUT', '/api/v3/settings', confirm ? { ...s, confirm } : s),
   prune: (before: string, confirm: Confirm) => v3send<{ prices?: number; receipts?: number }>('POST', '/api/v3/prune', { before, confirm }),
-  passphrase: (body: { c: string; proof: string; salt: string; auth: string }) => v3send<SessionGift & { session?: string; sealed?: string }>('POST', '/api/v3/passphrase', body, true),
+  passphrase: (body: { c: string; proof: string; salt: string; auth: string; backupSealed?: string }) => v3send<SessionGift & { session?: string; sealed?: string }>('POST', '/api/v3/passphrase', body, true),
   /** The recovery key: only with the passphrase again (`confirm`). */
   recovery: (confirm: Confirm) => v3send<{ recovery?: string; key?: string; saved?: boolean }>('POST', '/api/v3/recovery', { confirm }),
   /** The encrypted backup: its bytes and the name the server gave it (the sign-in passphrase again: `confirm`). */

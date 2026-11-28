@@ -222,13 +222,14 @@ export function sure(title: string, detail: ReactNode, action: string, danger = 
 }
 
 /** Asks for one thing (the passphrase, a name, a word to type). Undefined when cancelled. */
-export function ask(o: { title: string; detail?: ReactNode; label: string; action: string; secret?: boolean; value?: string; danger?: boolean; must?: string; autoComplete?: string }): Promise<string | undefined> {
+/** `optional`: 0.18.4, an empty answer is allowed (and is ''). */
+export function ask(o: { title: string; detail?: ReactNode; label: string; action: string; secret?: boolean; value?: string; danger?: boolean; must?: string; autoComplete?: string; optional?: boolean }): Promise<string | undefined> {
   return mount<string | undefined>((done) => <AskBox o={o} done={done} />);
 }
 function AskBox({ o, done }: { o: Parameters<typeof ask>[0]; done: (v: string | undefined) => void }) {
   const [v, setV] = useState(o.value ?? '');
   const id = useId();
-  const ok = o.must ? v.trim() === o.must : v.length > 0;
+  const ok = o.must ? v.trim() === o.must : o.optional || v.length > 0;
   return (
     <Dialog title={o.title} onClose={() => done(undefined)}>
       <form
@@ -245,7 +246,7 @@ function AskBox({ o, done }: { o: Parameters<typeof ask>[0]; done: (v: string | 
         )}
         <div className="sv-field">
           <label htmlFor={id}>{o.label}</label>
-          <input id={id} className="sv-input" type={o.secret ? 'password' : 'text'} value={v} autoComplete={o.autoComplete ?? (o.secret ? 'current-password' : 'off')} onChange={(e) => setV(e.target.value)} />
+          <input id={id} className="sv-input" type={o.secret ? 'password' : 'text'} value={v} autoComplete={o.autoComplete ?? (o.secret ? (o.optional ? 'new-password' : 'current-password') : 'off')} onChange={(e) => setV(e.target.value)} />
         </div>
         <div className="sv-actions">
           <button className="sv-btn" type="button" onClick={() => done(undefined)}>

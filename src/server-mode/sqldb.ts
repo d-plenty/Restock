@@ -56,6 +56,21 @@ export function asyncSyncDbOf(sync: SyncDb): AsyncSyncDb {
   return {
     query: async (sql, args) => sync.query(sql, args),
     exec: async (sql, args) => sync.exec(sql, args),
+    // 0.18.4: as the iPhone's does (inside a transaction part of it, outside one all or none).
+    async batch(ops) {
+      if (depth > 0) {
+        for (const o of ops) sync.exec(o.sql, o.args);
+        return;
+      }
+      sync.exec('BEGIN');
+      try {
+        for (const o of ops) sync.exec(o.sql, o.args);
+        sync.exec('COMMIT');
+      } catch (e) {
+        sync.exec('ROLLBACK');
+        throw e;
+      }
+    },
     async transaction(body) {
       // sql.js can't wait inside its own transaction: BEGIN and COMMIT around what's awaited.
       if (depth++ === 0) sync.exec('BEGIN');

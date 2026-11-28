@@ -17,6 +17,8 @@ const WHAT: Record<string, string> = {
   'user-name': 'Changing the user name',
   move: 'Moving to a new server',
   erase: 'Erasing this server',
+  'phone-backup': "Downloading a phone's backup",
+  'backup-key': 'Turning on phone backups',
 };
 
 export const phonesWords = (phones: string[]) => (phones.length === 0 ? 'an admin phone' : phones.length === 1 ? phones[0] : `${phones.slice(0, -1).join(', ')} or ${phones[phones.length - 1]}`);

@@ -45,7 +45,8 @@ describe('automatic backups and gift cards', () => {
     expect(file.tables.cards).toEqual([flybuys]);
     expect('giftCards' in file.tables).toBe(false);
     expect(file.cardPhotos).toBeUndefined();
-    expect(json).not.toContain(PIN);
+    // As a field: four digits on their own can turn up inside a random id.
+    expect(json).not.toContain(`"${PIN}"`);
     expect(json).not.toContain(NUMBER);
     expect(json).not.toContain('RlJPTlQ=');
   });

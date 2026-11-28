@@ -19,7 +19,11 @@ const isAdmin = (p: Phone) => p.role === 'admin';
 function AddSheet({ onClose, onJoined, known }: { onClose: () => void; onJoined: (name: string) => void; known: Phone[] }) {
   const [label, setLabel] = useState('');
   const [makeAdmin, setMakeAdmin] = useState(false);
-  const [code, setCode] = useState<{ code: string; until: number; label: string; admin: boolean }>();
+  // 0.18.4: a lost or broken phone this one replaces (it gets its backup, and the lost one comes off).
+  const [replaces, setReplaces] = useState('');
+  const lost = known.filter((p) => !p.me && (!p.status || p.status === 'active'));
+  const replacing = lost.find((p) => p.device === replaces);
+  const [code, setCode] = useState<{ code: string; until: number; label: string; admin: boolean; replaces?: string }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const now = useNow(1000);
@@ -28,8 +32,11 @@ function AddSheet({ onClose, onJoined, known }: { onClose: () => void; onJoined:
     setError(undefined);
     // 0.18.1: an admin's changes are asked about first (Are you sure?)
     const name = label.trim();
-    const ok = await confirmAction(makeAdmin ? `Add ${name} as an admin?` : `Add ${name}?`, {
-      detail: makeAdmin
+    const asAdmin = replacing ? replacing.role === 'admin' : makeAdmin;
+    const ok = await confirmAction(replacing ? `Replace ${phoneLabel(replacing)} with ${name}?` : makeAdmin ? `Add ${name} as an admin?` : `Add ${name}?`, {
+      detail: replacing
+        ? `A code shows for ${name} to scan, once, for 10 minutes. It joins as ${asAdmin ? 'an admin' : 'a user'}, can put back ${phoneLabel(replacing)}'s backup with the server's passphrase, and ${phoneLabel(replacing)} then comes off the server.`
+        : makeAdmin
         ? `A code shows for ${name} to scan, once, for 10 minutes. As an admin it can add phones and tablets, remove them, and make others admins or users.`
         : `A code shows for ${name} to scan, once, for 10 minutes. It joins as a user: it syncs, without looking after the phones.`,
       action: 'Show the code',
@@ -39,8 +46,8 @@ function AddSheet({ onClose, onJoined, known }: { onClose: () => void; onJoined:
     setBusy(true);
     try {
       before.current = new Set(known.map((p) => p.device));
-      const c = await newCode(label, makeAdmin);
-      setCode({ ...c, label: label.trim(), admin: makeAdmin });
+      const c = await newCode(label, makeAdmin, replacing?.device);
+      setCode({ ...c, label: label.trim(), admin: asAdmin, ...(replacing ? { replaces: phoneLabel(replacing) } : {}) });
     } catch (e) {
       setError(errText(e));
     } finally {
@@ -84,8 +91,25 @@ function AddSheet({ onClose, onJoined, known }: { onClose: () => void; onJoined:
               </span>
               <span className="small">An admin can add phones and tablets, remove them, and make others admins.</span>
             </span>
-            <input type="checkbox" className="switch" checked={makeAdmin} onChange={(e) => setMakeAdmin(e.target.checked)} />
+            <input type="checkbox" className="switch" checked={replacing ? replacing.role === 'admin' : makeAdmin} disabled={!!replacing} onChange={(e) => setMakeAdmin(e.target.checked)} />
           </label>
+          {lost.length > 0 && (
+            <>
+              <label htmlFor="sp-replaces" className="title" style={{ fontSize: 15 }}>
+                Replaces a lost or broken phone
+              </label>
+              <select id="sp-replaces" className="input" value={replaces} onChange={(e) => setReplaces(e.target.value)}>
+                <option value="">No, it's a new one</option>
+                {lost.map((p) => (
+                  <option key={p.device} value={p.device}>
+                    {phoneLabel(p)}
+                    {p.backup ? '' : ' (no backup)'}
+                  </option>
+                ))}
+              </select>
+              {replacing && <span className="small">{replacing.backup ? `Its backup is from ${new Date(replacing.backup.at ?? '').toLocaleDateString('en-AU')}. The new one puts it back with the server's passphrase.` : "It hasn't kept a backup on the server, so only what it shared comes back."}</span>}
+            </>
+          )}
           {code && left === 0 && <span className="small">That code ran out. Make a new one.</span>}
           <button className="btn primary" type="submit" disabled={busy || !label.trim()}>
             {busy ? 'Making a code…' : 'Show the code'}
@@ -97,6 +121,7 @@ function AddSheet({ onClose, onJoined, known }: { onClose: () => void; onJoined:
           <span className="small">
             For <strong>{code.label}</strong>
             {code.admin ? ' · joins as an admin' : ''}
+            {code.replaces ? ` · replaces ${code.replaces}` : ''}
           </span>
           <PairingQr code={code.code} label={`Code for ${code.label} to scan`} />
           <span className="small">
@@ -279,7 +304,7 @@ export function ServerPhones({ label }: { label: string }) {
                 {p.me ? ` (this ${deviceWord()})` : ''}
                 {isAdmin(p) && <span className="tag rec-tag">Admin</span>}
               </span>
-              <span className="small">{[p.lastSeen ? `Synced ${timeAgo(p.lastSeen)}` : 'Not synced yet', p.version ? `Restock ${p.version}` : undefined].filter(Boolean).join(' · ')}</span>
+              <span className="small">{[p.lastSeen ? `Synced ${timeAgo(p.lastSeen)}` : 'Not synced yet', p.version ? `Restock ${p.version}` : undefined, p.backup?.at ? `Backup ${timeAgo(p.backup.at)}` : undefined].filter(Boolean).join(' · ')}</span>
             </span>
             <Icon name="chevron" size={18} />
           </button>

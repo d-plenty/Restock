@@ -46,8 +46,9 @@ export async function serverPhones(): Promise<Phone[]> {
 }
 
 /** A code for a new phone or tablet: the whole restock-server:3 text, and when it runs out. */
-export async function newCode(label: string, makeAdmin: boolean): Promise<{ code: string; until: number }> {
-  const r = await admin('POST', '/phones', makeAdmin ? { label: label.trim(), admin: true } : { label: label.trim() });
+/** `replaces`: 0.18.4, a lost phone the new one takes the place of (its role, and its backup to put back). */
+export async function newCode(label: string, makeAdmin: boolean, replaces?: string): Promise<{ code: string; until: number }> {
+  const r = await admin('POST', '/phones', { label: label.trim(), ...(makeAdmin && !replaces ? { admin: true } : {}), ...(replaces ? { replaces } : {}) });
   const secs = typeof r.expiresIn === 'number' ? r.expiresIn : 600;
   if (typeof r.code !== 'string' || !r.code.startsWith('restock-server:3?')) throw new Error("The server's answer had no code in it.");
   return { code: r.code, until: Date.now() + secs * 1000 };

@@ -264,6 +264,73 @@ export function sealWebKeys(webPub: Uint8Array, keys: Record<string, string>): U
   return concat(RSE2, eph.pub, sealLink(linkKey(eph.priv, webPub), { keys }));
 }
 
+// ---------- 0.18.4: each phone's backup on the server ----------
+// The household's backup key: a P-256 key pair. Its public half is on the server for every phone;
+// its private half is sealed with a key from the passphrase (RSK1), so the server can't open a
+// backup, and restoring one (on the web page, or on a phone that replaces a lost one) needs the
+// passphrase.
+// - RSK1: "RSK1" + nonce (12) + AES-256-GCM(HKDF(vaultKey, "restock-backup-key-v1"), aad "RSK1", private key (32)).
+// - RSB1: "RSB1" + a one-off public key (SPKI, 91) + nonce (12) + AES-256-GCM(link key, aad "RSB1",
+//   gzip(JSON { format: 'restock-phone-backup', v: 1, device, label, at, json })).
+export const RSK1 = strToU8('RSK1');
+export const RSB1 = strToU8('RSB1');
+const BACKUP_KEY_INFO = 'restock-backup-key-v1';
+const backupWrap = (vaultKey: Uint8Array) => hkdf(sha256, vaultKey, undefined, strToU8(BACKUP_KEY_INFO), 32);
+
+/** A new backup key, its private half sealed with the passphrase's vault key. */
+export function newBackupKey(vaultKey: Uint8Array): { pub: string; sealed: string } {
+  const k = newEcdhKey();
+  return { pub: b64u(k.pub), sealed: sealBackupKey(vaultKey, k.priv) };
+}
+export function sealBackupKey(vaultKey: Uint8Array, priv: Uint8Array): string {
+  const nonce = random(12);
+  return b64u(concat(RSK1, nonce, gcm(backupWrap(vaultKey), nonce, RSK1).encrypt(priv)));
+}
+/** The private half, with the passphrase's vault key (throws "wrong passphrase" if it doesn't open). */
+export function openBackupKey(vaultKey: Uint8Array, sealed: string): Uint8Array {
+  const b = unb64(sealed);
+  if (!startsWith(b, RSK1) || b.length < 4 + 12 + 16 + 32) throw new Error('not a backup key');
+  try {
+    return gcm(backupWrap(vaultKey), b.subarray(4, 16), RSK1).decrypt(b.subarray(16));
+  } catch {
+    throw new Error("That isn't the server's passphrase.");
+  }
+}
+
+export interface PhoneBackup {
+  format: 'restock-phone-backup';
+  v: 1;
+  device: string;
+  label?: string;
+  at: string;
+  /** The backup file's text (backup.ts backupJson). */
+  json: string;
+}
+
+/** A phone's backup sealed to the household's backup key (its public half, SPKI base64url). */
+export function sealPhoneBackup(pub: string, b: PhoneBackup): Uint8Array {
+  const eph = newEcdhKey();
+  const nonce = random(12);
+  const body = gcm(linkKey(eph.priv, unb64(pub)), nonce, RSB1).encrypt(gzipSync(strToU8(JSON.stringify(b)), { level: 6 }));
+  return concat(RSB1, eph.pub, nonce, body);
+}
+
+/** Opens one with the backup key's private half. */
+export function openPhoneBackup(priv: Uint8Array, bytes: Uint8Array): PhoneBackup {
+  const n = SPKI_P256.length + 65;
+  if (!startsWith(bytes, RSB1) || bytes.length < 4 + n + 12 + 16) throw new Error("That isn't a phone's backup.");
+  const pub = bytes.subarray(4, 4 + n);
+  let raw: Uint8Array;
+  try {
+    raw = gcm(linkKey(priv, pub), bytes.subarray(4 + n, 4 + n + 12), RSB1).decrypt(bytes.subarray(4 + n + 12));
+  } catch {
+    throw new Error("That backup couldn't be opened with this household's backup key.");
+  }
+  const b = JSON.parse(strFromU8(gunzipSync(raw))) as PhoneBackup;
+  if (!b || b.format !== 'restock-phone-backup' || typeof b.json !== 'string') throw new Error("That isn't a phone's backup.");
+  return b;
+}
+
 // ---------- household signatures ----------
 
 /** What a household change's signature covers (SyncHousehold.signed). */

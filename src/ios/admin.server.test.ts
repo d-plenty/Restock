@@ -9,7 +9,8 @@ import { initDb, updateSettings } from '../lib/db';
 import { createSqlJsDriver } from '../lib/sql/sqljs';
 import { AsyncSyncEngine } from '../server-mode/engine';
 import { asyncSyncDbOf, syncDbOf } from '../server-mode/sqldb';
-import { derivePassphrase, loginKeyOf, loginProof, signedText, signWithPkcs8, unb64, verifySig } from '../server-mode/crypto';
+import { derivePassphrase, loginKeyOf, loginProof, newBackupKey, openBackupKey, openPhoneBackup, sealBackupKey, sealPhoneBackup, signedText, signWithPkcs8, unb64, verifySig } from '../server-mode/crypto';
+import { b64u, random } from '../server-mode/crypto';
 import { House, type Http } from './house';
 import { ADMIN_PATHS } from './sync';
 
@@ -32,9 +33,9 @@ async function phone() {
 
 describe('0.18.3: what an admin phone may ask its server for', () => {
   it('Server admin, and nothing else', () => {
-    for (const p of ['/me', '/phones', '/phones/p1234', '/approvals', '/approvals/abcdefghijklmnopqrstuvwx', '/confirm/challenge', '/settings', '/activity?limit=150', '/browsers', '/homeassistant', '/homeassistant/test', '/data/summary', '/data/autodelete', '/recovery', '/server/log', '/server/updates', '/server/restart'])
+    for (const p of ['/me', '/phones', '/phones/p1234', '/approvals', '/approvals/abcdefghijklmnopqrstuvwx', '/confirm/challenge', '/settings', '/activity?limit=150', '/browsers', '/homeassistant', '/homeassistant/test', '/data/summary', '/data/autodelete', '/recovery', '/server/log', '/server/updates', '/server/restart', '/passphrase', '/backupkey'])
       expect(ADMIN_PATHS.test(p), p).toBe(true);
-    for (const p of ['/files', '/data/export', '/data/delete', '/data/delete-everything', '/passphrase', '/backup', '/username', '/phones/../files', '/settings?x=1', '/activity?limit=1;x'])
+    for (const p of ['/files', '/data/export', '/data/delete', '/data/delete-everything', '/backup', '/username', '/phones/../files', '/settings?x=1', '/activity?limit=1;x'])
       expect(ADMIN_PATHS.test(p), p).toBe(false);
   });
 });
@@ -83,4 +84,49 @@ describe.skipIf(!SERVER)('0.18.3: an admin iPhone on the real server', () => {
     const only = await t.web.req('PATCH', '/api/v3/phones/' + device, { json: { role: 'user' } });
     expect(only.status).toBe(409);
   }, 60_000);
+
+  it("0.18.4: keeps its backup, a replacing phone puts it back, and an admin iPhone changes the passphrase", async () => {
+    const H = await import(/* @vite-ignore */ `${SERVER}/test/helpers.mjs`);
+    const t = await H.house();
+    const { e, house } = await phone();
+    const code = (await t.web.post('/api/v3/phones', { label: "Declan's iPhone" })).body.code as string;
+    await house.join(code);
+    const device = await e.device();
+    expect((await t.web.req('PATCH', '/api/v3/phones/' + device, { json: { role: 'admin' } })).status).toBe(200);
+    // Phone backups turned on from the phone itself, with the passphrase.
+    const ch = (await house.sealed('GET', '/confirm/challenge')) as { salt: string; c: string };
+    const keys = await derivePassphrase(H.PASS, unb64(ch.salt), H.ITER);
+    const k = newBackupKey(keys.vault);
+    await house.sealed('PUT', '/backupkey', { ...k, confirm: { c: ch.c, proof: loginProof(loginKeyOf(keys.auth), ch.c, 'phone:' + device) } });
+    const pub = (await house.sealed('GET', '/backupkey')).pub as string;
+    expect(pub).toBe(k.pub);
+    // Its backup up, and back down.
+    await house.putBackup(sealPhoneBackup(pub, { format: 'restock-phone-backup', v: 1, device, at: new Date().toISOString(), json: '{"app":"restock"}' }));
+    const back = await house.getBackup(device);
+    expect(openPhoneBackup(openBackupKey(keys.vault, k.sealed), back!).json).toBe('{"app":"restock"}');
+    // A new iPhone that replaces it: it reads that backup, and the old one comes off.
+    const c2 = (await t.web.post('/api/v3/phones', { label: "Declan's new iPhone", replaces: device })).body.code as string;
+    const two = await phone();
+    await two.house.join(c2);
+    const offer = await two.house.sealed('GET', '/restore');
+    expect(offer.from).toBe(device);
+    expect(await two.house.getBackup(device)).toBeTruthy();
+    await two.house.sealed('POST', '/restore', {});
+    const phones = (await t.web.get('/api/v3/phones')).body.phones as { device: string; status: string; role: string }[];
+    expect(phones.find((p) => p.device === device)?.status).toBe('removed');
+    expect(phones.find((p) => p.device !== device && p.role === 'admin')).toBeTruthy();
+    // The household has a new key now (the old phone came off): the new one takes it at its next sync.
+    await two.house.sync();
+    // The new one is the admin now: it changes the passphrase, bringing the backup key along.
+    const ch2 = (await two.house.sealed('GET', '/confirm/challenge')) as { salt: string; c: string };
+    const old = await derivePassphrase(H.PASS, unb64(ch2.salt), H.ITER);
+    const salt = random(16);
+    const fresh = await derivePassphrase('paper boat moon river', salt, H.ITER);
+    const sealed = (await two.house.sealed('GET', '/backupkey')).sealed as string;
+    const priv = openBackupKey(old.vault, sealed);
+    const dev2 = await two.e.device();
+    await two.house.sealed('POST', '/passphrase', { c: ch2.c, proof: loginProof(loginKeyOf(old.auth), ch2.c, 'phone:' + dev2), salt: b64u(salt), auth: b64u(fresh.auth), backupSealed: sealBackupKey(fresh.vault, priv) });
+    const w = t.web3();
+    expect((await w.login('admin', 'paper boat moon river', H.ITER)).status).toBe(200);
+  }, 90_000);
 });

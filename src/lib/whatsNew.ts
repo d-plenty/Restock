@@ -11,15 +11,14 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.18.3',
-    about: 'Look after your server from a phone, a yes on your phone to sign in to its page, and home and away addresses that just work.',
+    version: '0.18.4',
+    about: 'Restock on iPhone opens properly on a Restock server, each phone keeps its backup on the server, and a tidier Server admin.',
     changes: [
-      'Server admin on an admin phone (Settings → Sync → Restock server): the phones and tablets, Data, Activity and the server’s settings.',
-      '“Is this you?” A sign-in on the server’s page, and each risky change there, needs a yes on an admin phone, with the same number on both.',
-      'The server’s page looks after the server only now: Phones and admins, Data and Server settings, a page each.',
-      'Cloudflare tunnels work: codes have the server’s https away address. A phone tries home first, for a moment, then away.',
-      'A new first screen: Set up, Join a home server, or Import from backup. Joining a server from it works now.',
-      'Export data can take your connections too (Restock server, Home Assistant), in a locked file or one sent straight across.',
+      'Fixed: on an iPhone or iPad joined to a Restock server, Home, Pantry and the list could stay on “Loading…”. Syncing asks the database a few hundred things at a time now, not one by one.',
+      'Each phone can keep its whole backup on your Restock server, once a day (Settings → Sync → Restock server → Backup). Locked so only the server’s passphrase opens it.',
+      'A lost or broken phone: an admin adds the new one as its replacement, and the new one puts the backup back with the server’s passphrase.',
+      'Server admin on the phone is the basics on the go, a page each: Phones and tablets, Sign in a computer, Passphrase (new), Basic settings and Phone backups.',
+      'The server’s web page fits any screen, from a phone to a big monitor, and its Text size makes everything bigger.',
     ],
   },
 ];

@@ -6,7 +6,7 @@
 // Risky changes from here prove the passphrase, as the web page does, over this phone's own id.
 import { RestockNative } from './sql/native';
 import { syncInfo } from './sync';
-import { derivePassphrase, loginKeyOf, loginProof, unb64 } from '../server-mode/crypto';
+import { b64u, derivePassphrase, loginKeyOf, loginProof, openBackupKey, random, sealBackupKey, unb64 } from '../server-mode/crypto';
 import type { Activity, Browser, HaConfig, HouseSettings, Updates } from '../server-mode/api';
 import type { DataSummary } from '../server-mode/ui/houseWords';
 
@@ -82,3 +82,31 @@ export async function recoveryKey(passphrase: string): Promise<string> {
   return r.recovery;
 }
 export const recoverySaved = () => call('POST', '/recovery', { saved: true });
+
+/**
+ * 0.18.4: a new passphrase, from the phone: the current one proved over this phone's id, and the new
+ * one worked into its sign-in key here with a new salt. Neither leaves the phone. Every browser is
+ * signed out. The phone backups' key (when they're on) is opened with the old one and sealed with the
+ * new one in the same request, so the backups still open.
+ */
+export async function changePassphrase(current: string, next: string): Promise<void> {
+  const ch = await call<{ salt: string; c: string }>('GET', '/confirm/challenge');
+  const info = await syncInfo();
+  if (!info.device) throw new Error("This phone's id on the server isn't known yet. Sync, then try again.");
+  const old = await derivePassphrase(current, unb64(ch.salt));
+  const proof = loginProof(loginKeyOf(old.auth), ch.c, 'phone:' + info.device);
+  const salt = random(16);
+  const fresh = await derivePassphrase(next, salt);
+  try {
+    const key = await call<{ sealed?: string }>('GET', '/backupkey');
+    let backupSealed: string | undefined;
+    if (key.sealed) {
+      const priv = openBackupKey(old.vault, key.sealed);
+      backupSealed = sealBackupKey(fresh.vault, priv);
+      priv.fill(0);
+    }
+    await call('POST', '/passphrase', { c: ch.c, proof, salt: b64u(salt), auth: b64u(fresh.auth), ...(backupSealed ? { backupSealed } : {}) });
+  } finally {
+    for (const k of [old.auth, old.vault, fresh.auth, fresh.vault]) k.fill(0);
+  }
+}

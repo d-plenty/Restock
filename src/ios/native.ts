@@ -384,6 +384,16 @@ export class RestockIos extends WebPlugin {
   async serverAdmin(o: { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string; body?: Record<string, unknown> }) {
     return sync.serverAdmin(o?.method ?? 'GET', o?.path ?? '', o?.body);
   }
+  // 0.18.4: each phone's backup on the server.
+  async serverPhone(o: { method: 'GET' | 'POST'; path: string; body?: Record<string, unknown> }) {
+    return sync.serverPhone(o?.method ?? 'GET', o?.path ?? '', o?.body);
+  }
+  async serverBackupPut(o: { data: string }) {
+    return sync.serverBackupPut(o?.data ?? '');
+  }
+  async serverBackupGet(o: { device: string }) {
+    return sync.serverBackupGet(o?.device ?? '');
+  }
 
   // ---------- permissions, and the phone itself ----------
   async checkPermissions(): Promise<NativePermissions> {

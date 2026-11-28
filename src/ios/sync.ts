@@ -34,6 +34,7 @@ import { House, HouseProblem, type Http } from './house';
 import { appleLan, lanHere } from './lan';
 import { WifiHouse, WifiProblem, type Photos } from './wire';
 import { quiet } from '../lib/quietErrors';
+import { base64ToBytes, bytesToBase64 } from '../lib/base64';
 
 const toB64 = (b: Uint8Array): string => {
   let s = '';
@@ -513,10 +514,29 @@ export async function serverData(path: string): Promise<Record<string, unknown>>
 /** 0.18.0: RestockNativePlugin.serverAdmin: the server's phones, as an admin phone (sealed both ways). */
 export type AdminMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 /** 0.18.3: what an admin phone asks its server for (RestockNativePlugin.ADMIN_PATHS is the same). */
-export const ADMIN_PATHS = /^\/(me|phones(\/[A-Za-z0-9_-]{1,64})?|approvals(\/[A-Za-z0-9_-]{20,40})?|confirm\/challenge|settings|activity(\?limit=\d{1,4})?|browsers(\/[A-Za-z0-9_-]{22})?|homeassistant(\/(test|sync))?|data\/(summary|autodelete)|recovery|server\/(log|updates|restart))$/;
+export const ADMIN_PATHS = /^\/(me|phones(\/[A-Za-z0-9_-]{1,64})?|approvals(\/[A-Za-z0-9_-]{20,40})?|confirm\/challenge|settings|activity(\?limit=\d{1,4})?|browsers(\/[A-Za-z0-9_-]{22})?|homeassistant(\/(test|sync))?|data\/(summary|autodelete)|recovery|passphrase|backupkey|server\/(log|updates|restart))$/;
 export async function serverAdmin(method: AdminMethod, path: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
   if (!ADMIN_PATHS.test(path) || !['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) throw new Error('Not something an admin phone does.');
   return (await hub()).house.sealed(method, path, body ?? (method === 'GET' ? undefined : {}));
+}
+
+/** 0.18.4: any phone's own requests about backups (RestockNativePlugin.PHONE_PATHS is the same). */
+export const PHONE_PATHS = /^\/(backupkey|restore)$/;
+export async function serverPhone(method: 'GET' | 'POST', path: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (!PHONE_PATHS.test(path) || !['GET', 'POST'].includes(method)) throw new Error('Not something a phone asks its server.');
+  return (await hub()).house.sealed(method, path, body ?? (method === 'GET' ? undefined : {}));
+}
+/** 0.18.4: this phone's backup up to the server, and a phone's backup down (base64). */
+export async function serverBackupPut(data: string): Promise<{ size: number }> {
+  const bytes = base64ToBytes(data);
+  if (bytes.length < 32 || String.fromCharCode(...bytes.subarray(0, 4)) !== 'RSB1') throw new Error("That isn't a sealed backup.");
+  await (await hub()).house.putBackup(bytes);
+  return { size: bytes.length };
+}
+export async function serverBackupGet(device: string): Promise<{ data?: string }> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(device)) throw new Error("That isn't a phone on the server.");
+  const b = await (await hub()).house.getBackup(device);
+  return b ? { data: bytesToBase64(b) } : {};
 }
 
 /** This device's earlier spending (or what its searches found) going up to the household's own server. */

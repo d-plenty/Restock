@@ -113,6 +113,12 @@ export {
   RSH3,
   RSA3,
   SERVER_KEY_INFO,
+  // 0.18.4: each phone's backup
+  newBackupKey,
+  sealBackupKey,
+  openBackupKey,
+  sealPhoneBackup,
+  openPhoneBackup,
 } from '../server-mode/crypto';
 export type { JoinGift, RecoveryCopy, LinkGift } from '../server-mode/crypto';
 

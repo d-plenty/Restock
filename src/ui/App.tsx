@@ -442,7 +442,7 @@ function RestockApp() {
       else if (a.action === 'cards') setStack([{ name: 'cards' }]);
       else if (a.action === 'sync') setStack([{ name: 'settings' }, { name: 'settings', page: 'sync' }, { name: 'sync' }]);
       // 0.18.1: a change to the server's phones (lib/adminNotices.ts) opens the server's page
-      else if (a.action === 'serverPhones') setStack([{ name: 'settings' }, { name: 'settings', page: 'sync' }, { name: 'restockServer' }, { name: 'serverAdmin' }]);
+      else if (a.action === 'serverPhones') setStack([{ name: 'settings' }, { name: 'settings', page: 'sync' }, { name: 'restockServer' }, { name: 'serverAdmin' }, { name: 'serverAdmin', page: 'phones' }]);
       else if (a.action === 'updates') setStack([{ name: 'settings' }, { name: 'settings', page: 'about' }]);
       else if (a.action === 'scan') {
         const out = await scanBarcode();
@@ -573,6 +573,8 @@ function RestockApp() {
     if (!serverMode) void afterScreens().then(() => import('../lib/priceShare')).then((f) => f.sendPricesNow()).catch(() => undefined);
     // 0.11.0: what searches found also goes to a household's own Restock server (lib/seen.ts)
     if (!serverMode) void afterScreens().then(() => import('../lib/seen')).then((f) => f.sendSeenToServer()).catch(() => undefined);
+    // 0.18.4: this phone's backup on its Restock server, once a day (lib/serverBackup.ts), a little after opening.
+    if (!serverMode) void afterScreens().then(() => new Promise((r) => setTimeout(r, 20_000))).then(() => import('../lib/serverBackup')).then((f) => f.maybeServerBackup()).catch(() => undefined);
     const stopWidgets = watchWidgets();
     // 0.9.3: the shopping list with Home Assistant, if it's on for this phone (homeAssistant.ts).
     const stopHa = serverMode
@@ -632,7 +634,7 @@ function RestockApp() {
                   <SyncScreen invite={(stack[stack.length - 1] as { invite?: boolean }).invite} />
                 ))}
               {stack[stack.length - 1].name === 'restockServer' && <RestockServerScreen code={(stack[stack.length - 1] as { code?: string }).code} fromSetup={(stack[stack.length - 1] as { fromSetup?: boolean }).fromSetup} />}
-              {stack[stack.length - 1].name === 'serverAdmin' && <ServerAdminScreen />}
+              {stack[stack.length - 1].name === 'serverAdmin' && <ServerAdminScreen page={(stack[stack.length - 1] as { page?: 'phones' | 'passphrase' | 'settings' | 'backups' }).page} />}
               {stack[stack.length - 1].name === 'homeAssistant' && <HomeAssistantScreen />}
               {stack[stack.length - 1].name === 'household' && <HouseholdScreen />}
               {stack[stack.length - 1].name === 'categories' && <CategoriesScreen section={(stack[stack.length - 1] as { section: Section }).section} />}
@@ -721,7 +723,7 @@ function RestockApp() {
           </Suspense>
         )}
         {top.name === 'restockServer' && <RestockServerScreen code={top.code} fromSetup={top.fromSetup} />}
-        {top.name === 'serverAdmin' && <ServerAdminScreen />}
+        {top.name === 'serverAdmin' && <ServerAdminScreen page={top.page} />}
         {top.name === 'homeAssistant' && <HomeAssistantScreen />}
         {top.name === 'household' && <HouseholdScreen />}
         {top.name === 'categories' && <CategoriesScreen section={top.section} />}

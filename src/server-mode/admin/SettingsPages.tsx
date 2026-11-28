@@ -312,8 +312,8 @@ export function SecurityPage() {
                   <td>
                     <b>{b.label ?? 'A browser'}</b> {b.current && <span className="sv-tag ok">This one</span>}
                   </td>
-                  <td className="sv-small">{b.kind === 'phone' ? 'An admin phone' : 'The passphrase'}</td>
-                  <td>{ago(b.lastUsed)}</td>
+                  <td className="sv-small" data-label="How">{b.kind === 'phone' ? 'An admin phone' : 'The passphrase'}</td>
+                  <td data-label="Last used">{ago(b.lastUsed)}</td>
                   <td style={{ textAlign: 'right' }}>
                     {!b.current && (
                       <button

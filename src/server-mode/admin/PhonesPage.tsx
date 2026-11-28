@@ -4,12 +4,15 @@
 // The last admin phone can't be removed or made a user (the server says so too).
 import { useEffect, useId, useState } from 'react';
 import { api3, ApiError, type Activity, type Phone } from '../api';
-import { confirmPassphrase, session } from '../session';
+import { confirmPassphrase, confirmWithVault, session } from '../session';
+import { newBackupKey, openBackupKey, openPhoneBackup } from '../crypto';
 import { isAdminAction, isTrouble, phoneName, sharesText, whatOf, whoOf } from '../ui/houseWords';
 import { appTooOld } from '../../lib/minVersion';
-import { ago, ask, Card, change, Dialog, errText, Icon, Loading, LoadError, PageHead, Qr, Seg, sure, toast, useLoad } from './ui';
+import { ago, ask, bytes, Card, change, Dialog, errText, Icon, Loading, LoadError, PageHead, Qr, saveFile, Seg, sure, toast, useLoad } from './ui';
 
 const active = (p: Phone) => !p.status || p.status === 'active';
+/** When a code made now runs out. */
+const inSeconds = (secs: number) => Date.now() + secs * 1000;
 const viaPhone = () => !!session()?.viaPhone;
 
 function sortPhones(list: Phone[]): Phone[] {
@@ -24,8 +27,53 @@ async function remove(p: Phone, reload: () => void) {
   reload();
 }
 
+/**
+ * 0.18.4: a phone's backup, downloaded: the passphrase (it opens the phone backups' key, and a yes on
+ * an admin phone may be asked for), then the file, opened here and saved as a Restock backup file. It
+ * opens in Restock's Import data, on any phone. A password locks it, where this browser can.
+ */
+async function downloadBackup(p: Phone) {
+  const pass = await ask({ title: `${phoneName(p)}'s backup`, detail: "The server's passphrase: it opens the phone backups, and is checked again.", label: 'Passphrase', action: 'Download', secret: true });
+  if (!pass) return;
+  const lockable = typeof crypto !== 'undefined' && !!crypto.subtle;
+  const lock = lockable
+    ? await ask({ title: 'Lock the file?', detail: 'A password for the file, so only someone with it can open it (Restock asks for it when importing). Leave it empty for no lock.', label: 'Password (optional)', action: 'Save the file', secret: true, optional: true })
+    : '';
+  if (lock === undefined) return;
+  await change(async () => {
+    const { confirm, vault } = await confirmWithVault(pass);
+    try {
+      const got = await api3.phoneBackup(p.device, confirm);
+      const priv = openBackupKey(vault, got.sealedKey);
+      const b = openPhoneBackup(priv, got.bytes);
+      priv.fill(0);
+      const text = lock ? await (await import('../../lib/backupLock')).lockBackup(b.json, lock) : b.json;
+      const day = (b.at ?? new Date().toISOString()).slice(0, 10);
+      saveFile(`restock-backup-${phoneName(p).replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${day}.json`, text, 'application/json');
+    } finally {
+      vault.fill(0);
+    }
+  }, lock ? 'Saved, locked with your password' : 'Saved. Keep it private: it has everything on that phone.');
+}
+
+/** 0.18.4: turning phone backups on: a key made here, its private half sealed with the passphrase. */
+async function turnOnBackups(reload: () => void) {
+  const pass = await ask({ title: 'Turn on phone backups', detail: "The server's passphrase. Each phone's backup is locked with it: putting one back asks for it.", label: 'Passphrase', action: 'Turn on', secret: true });
+  if (!pass) return;
+  await change(async () => {
+    const { confirm, vault } = await confirmWithVault(pass);
+    try {
+      await api3.putBackupKey(newBackupKey(vault), confirm);
+    } finally {
+      vault.fill(0);
+    }
+  }, 'Phone backups are on. Each phone backs up once a day while Restock is open on it.');
+  reload();
+}
+
 export function PhonesPage() {
   const phones = useLoad(async () => sortPhones(await api3.phones()));
+  const backupKey = useLoad(() => api3.backupKey());
   const [adding, setAdding] = useState(false);
   const list = phones.data ?? [];
   const on = list.filter(active);
@@ -88,15 +136,32 @@ export function PhonesPage() {
       </div>
       <div className="sv-grid2">
         <ActivityCard phones={list} />
-        <Card title="Adding a phone">
-          <p className="sv-small">
-            Add a phone or tablet shows a QR code it scans in Restock (Settings → Sync → Join a home server). It works once, for 10 minutes, and has both of the server's addresses in it.
-          </p>
-          <div className="sv-note">The last admin phone can't be removed or made a user, so there's always one to say yes and look after the phones.</div>
-        </Card>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card title="Phone backups">
+            {backupKey.data?.pub ? (
+              <p className="sv-small">
+                On{backupKey.data.at ? ` since ${new Date(backupKey.data.at).toLocaleDateString('en-AU')}` : ''}. Each phone keeps its whole backup here once a day, locked with the passphrase (the server can't read them). <b>Backup…</b> on a phone downloads it; to put a lost phone back, Add a phone or tablet → Replaces a lost phone.
+              </p>
+            ) : (
+              <>
+                <p className="sv-small">Off. Turned on, each phone keeps its whole backup here (settings, shops, every tab, cards, receipts), so a lost or broken one can be put back on a new one. They're locked with the passphrase: the server can't read them.</p>
+                <button className="sv-btn primary" type="button" style={{ alignSelf: 'flex-start' }} disabled={viaPhone() || !backupKey.data} onClick={() => void turnOnBackups(backupKey.reload)}>
+                  Turn on phone backups
+                </button>
+              </>
+            )}
+          </Card>
+          <Card title="Adding a phone">
+            <p className="sv-small">
+              Add a phone or tablet shows a QR code it scans in Restock (Settings → Sync → Join a home server). It works once, for 10 minutes, and has both of the server's addresses in it.
+            </p>
+            <div className="sv-note">The last admin phone can't be removed or made a user, so there's always one to say yes and look after the phones.</div>
+          </Card>
+        </div>
       </div>
       {adding && (
         <AddPhone
+          phones={on}
           onClose={() => {
             setAdding(false);
             phones.reload();
@@ -140,9 +205,12 @@ function PhoneRow({ p, onlyAdmin, reload }: { p: Phone; onlyAdmin: boolean; relo
           </span>
         </div>
       </td>
-      <td>{isOn ? <span className={`sv-tag ${p.role === 'admin' ? 'admin' : 'user'}`}>{p.role === 'admin' ? 'Admin' : 'User'}</span> : <span className="sv-tag user">{p.status === 'left' ? 'Left' : 'Removed'}</span>}</td>
-      <td>{isOn ? <span className={`sv-tag ${old || stale ? 'warn' : 'ok'}`}>{old ? 'Needs updating' : ago(p.lastSeen)}</span> : <span className="sv-small">{ago(p.statusAt)}</span>}</td>
-      <td>
+      <td data-label="Role">{isOn ? <span className={`sv-tag ${p.role === 'admin' ? 'admin' : 'user'}`}>{p.role === 'admin' ? 'Admin' : 'User'}</span> : <span className="sv-tag user">{p.status === 'left' ? 'Left' : 'Removed'}</span>}</td>
+      <td data-label="Last synced">
+        {isOn ? <span className={`sv-tag ${old || stale ? 'warn' : 'ok'}`}>{old ? 'Needs updating' : ago(p.lastSeen)}</span> : <span className="sv-small">{ago(p.statusAt)}</span>}
+        {p.backup?.at && <span className="sv-small" style={{ display: 'block' }}>Backup {ago(p.backup.at)} · {bytes(p.backup.size)}</span>}
+      </td>
+      <td data-label={isOn ? 'Shares' : undefined}>
         <span className="sv-small">{isOn ? sharesText(p).replace(/^Shares /, '') : ''}</span>
       </td>
       <td>
@@ -160,6 +228,11 @@ function PhoneRow({ p, onlyAdmin, reload }: { p: Phone; onlyAdmin: boolean; relo
             <button className="sv-btn sm" type="button" onClick={() => void rename()}>
               Rename
             </button>
+            {p.backup && (
+              <button className="sv-btn sm" type="button" onClick={() => (viaPhone() ? toast('Sign in with the passphrase to download a backup.') : void downloadBackup(p))}>
+                Backup…
+              </button>
+            )}
             <button
               className="sv-btn sm danger"
               type="button"
@@ -177,14 +250,17 @@ function PhoneRow({ p, onlyAdmin, reload }: { p: Phone; onlyAdmin: boolean; relo
 }
 
 /** Add a phone or tablet: its name (and Make it an admin), then the code to scan. */
-function AddPhone({ onClose }: { onClose: () => void }) {
+function AddPhone({ onClose, phones }: { onClose: () => void; phones: Phone[] }) {
   const [label, setLabel] = useState('');
   const [admin, setAdmin] = useState(false);
+  // 0.18.4: a lost or broken phone this one replaces (its role, and its backup to put back).
+  const [replaces, setReplaces] = useState('');
+  const replacing = phones.find((p) => p.device === replaces);
   const [code, setCode] = useState<{ code: string; until: number }>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const ids = { name: useId(), admin: useId() };
+  const ids = { name: useId(), admin: useId(), replaces: useId() };
   useEffect(() => {
     if (!code) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -195,9 +271,9 @@ function AddPhone({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(undefined);
     try {
-      const r = await api3.addPhone(label.trim(), admin);
+      const r = await api3.addPhone(label.trim(), admin, replacing?.device);
       const secs = typeof r.expiresIn === 'number' ? r.expiresIn : 600;
-      setCode({ code: r.code, until: Date.now() + secs * 1000 });
+      setCode({ code: r.code, until: inSeconds(secs) });
     } catch (e) {
       setError(e instanceof ApiError && e.status === 403 && admin ? 'Sign in with the passphrase to add an admin.' : errText(e));
     } finally {
@@ -218,7 +294,26 @@ function AddPhone({ onClose }: { onClose: () => void }) {
             <label htmlFor={ids.name}>Its name</label>
             <input id={ids.name} className="sv-input" value={label} maxLength={60} placeholder="Sarah's iPhone" onChange={(e) => setLabel(e.target.value)} />
           </div>
-          <div className="sv-row">
+          {phones.length > 0 && (
+            <div className="sv-field">
+              <label htmlFor={ids.replaces}>Replaces a lost or broken phone</label>
+              <select id={ids.replaces} className="sv-input" value={replaces} onChange={(e) => setReplaces(e.target.value)}>
+                <option value="">No, it's a new one</option>
+                {phones.map((p) => (
+                  <option key={p.device} value={p.device}>
+                    {phoneName(p)}
+                    {p.backup ? '' : ' (no backup)'}
+                  </option>
+                ))}
+              </select>
+              {replacing && (
+                <span className="sv-small">
+                  It joins as {replacing.role === 'admin' ? 'an admin' : 'a user'}. {replacing.backup ? `It can put back ${phoneName(replacing)}'s backup with the passphrase` : `${phoneName(replacing)} has no backup here, so only what it shared comes back`}, and {phoneName(replacing)} then comes off the server.
+                </span>
+              )}
+            </div>
+          )}
+          <div className="sv-row" hidden={!!replacing}>
             <input id={ids.admin} type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} />
             <label htmlFor={ids.admin} className="sv-grow">
               Make it an admin

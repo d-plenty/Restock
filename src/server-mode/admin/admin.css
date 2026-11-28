@@ -47,8 +47,11 @@ body {
   /* Saved to an iPhone's home screen: clear of the notch and the home bar. */
   padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
   font-family: Inter, system-ui, 'Segoe UI', Roboto, sans-serif;
-  font-size: calc(15px * var(--sv-text, 1));
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
+  /* 0.18.4: This browser → Text size scales the whole page (before, only the few lines that had no
+     size of their own grew). Lengths in vh and vw below are divided by it, so they stay the screen's. */
+  zoom: var(--sv-text, 1);
 }
 button,
 input,
@@ -79,9 +82,10 @@ button {
 
 /* ---------- the frame: sidebar and page ---------- */
 .sv {
-  min-height: 100vh;
+  min-height: calc(100dvh / var(--sv-text, 1));
   display: grid;
-  grid-template-columns: 248px 1fr;
+  /* 0.18.4: minmax(0, …): a wide table scrolls in its own box instead of making the page wider than the screen. */
+  grid-template-columns: 248px minmax(0, 1fr);
 }
 .sv-side {
   background: var(--sv-navy);
@@ -92,7 +96,7 @@ button {
   gap: 4px;
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: calc(100dvh / var(--sv-text, 1));
   overflow-y: auto;
 }
 .sv-brand {
@@ -183,8 +187,11 @@ button {
 }
 .sv-main {
   padding: 28px 36px 64px;
-  max-width: 1120px;
+  /* 0.18.4: wider on big screens, and in the middle of what's beside the sidebar (it hugged the left). */
+  max-width: 1280px;
   width: 100%;
+  min-width: 0;
+  justify-self: center;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -301,12 +308,12 @@ p.sv-small {
 }
 .sv-grid3 {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 .sv-grid2 {
   display: grid;
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 16px;
   align-items: start;
 }
@@ -621,7 +628,7 @@ pre.sv-code {
 
 /* ---------- sign-in and the dialogs ---------- */
 .sv-gate {
-  min-height: 100vh;
+  min-height: calc(100dvh / var(--sv-text, 1));
   display: grid;
   place-items: center;
   padding: 24px 16px;
@@ -658,7 +665,7 @@ pre.sv-code {
 }
 .sv-dialog {
   width: min(500px, 100%);
-  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh / var(--sv-text, 1) - 32px);
   overflow-y: auto;
   animation: sv-in 0.18s ease-out;
 }
@@ -682,13 +689,13 @@ pre.sv-code {
   border-radius: var(--sv-pill);
   font-weight: 600;
   z-index: 60;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100vw / var(--sv-text, 1) - 32px);
 }
 
 /* ---------- phone-sized ---------- */
 @media (max-width: 820px) {
   .sv {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .sv-side {
     position: static;
@@ -721,9 +728,58 @@ pre.sv-code {
   }
   .sv-grid3,
   .sv-grid2 {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .sv-tbl-wrap {
     overflow-x: auto;
+  }
+  /* The three figures side by side, small, rather than three tall cards. */
+  .sv-grid3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .sv-grid3 .sv-stat {
+    padding: 12px;
+  }
+  .sv-grid3 .sv-stat b {
+    font-size: 20px;
+  }
+}
+
+/* ---------- 0.18.4: a phone's width: each table row is a card of its own ---------- */
+@media (max-width: 640px) {
+  .sv-tbl thead {
+    display: none;
+  }
+  .sv-tbl,
+  .sv-tbl tbody,
+  .sv-tbl tr,
+  .sv-tbl td {
+    display: block;
+    width: 100%;
+  }
+  .sv-tbl tr {
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--sv-line2);
+  }
+  .sv-tbl tr:last-child {
+    border-bottom: 0;
+  }
+  .sv-tbl td {
+    border: 0;
+    padding: 3px 0;
+    text-align: left !important;
+  }
+  .sv-tbl td[data-label]::before {
+    content: attr(data-label);
+    display: inline-block;
+    min-width: 92px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--sv-soft);
+  }
+  .sv-tbl td .sv-row {
+    justify-content: flex-start !important;
+    padding-top: 6px;
   }
 }

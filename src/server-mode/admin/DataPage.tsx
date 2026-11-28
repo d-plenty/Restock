@@ -121,8 +121,8 @@ export function DataPage() {
                         <span className="sv-dot" style={{ background: COLOURS[k] }} />
                         {NAMES[k]}
                       </td>
-                      <td>{howMany(k, s)}</td>
-                      <td>{bytes(sizeOf(k, s))}</td>
+                      <td data-label="How many">{howMany(k, s)}</td>
+                      <td data-label="Size">{bytes(sizeOf(k, s))}</td>
                       <td style={{ textAlign: 'right' }}>
                         {TABLES[k] && (
                           <button className="sv-btn sm" type="button" disabled={!!busy} onClick={() => void exportKind(k, setBusy)} aria-label={`Export ${NAMES[k]} (Excel)`}>

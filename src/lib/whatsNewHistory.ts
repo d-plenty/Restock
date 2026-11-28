@@ -6,6 +6,18 @@ import type { VersionNotes } from './whatsNew';
 
 export const EARLIER: VersionNotes[] = [
   {
+    version: '0.18.3',
+    about: 'Look after your server from a phone, a yes on your phone to sign in to its page, and home and away addresses that just work.',
+    changes: [
+      'Server admin on an admin phone (Settings → Sync → Restock server): the phones and tablets, Data, Activity and the server’s settings.',
+      '“Is this you?” A sign-in on the server’s page, and each risky change there, needs a yes on an admin phone, with the same number on both.',
+      'The server’s page looks after the server only now: Phones and admins, Data and Server settings, a page each.',
+      'Cloudflare tunnels work: codes have the server’s https away address. A phone tries home first, for a moment, then away.',
+      'A new first screen: Set up, Join a home server, or Import from backup. Joining a server from it works now.',
+      'Export data can take your connections too (Restock server, Home Assistant), in a locked file or one sent straight across.',
+    ],
+  },
+  {
     version: '0.18.2',
     about: 'Faster on iPhone and iPad: pages straight away, taps that answer, and one price check a day.',
     changes: [

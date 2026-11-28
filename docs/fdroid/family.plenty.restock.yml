@@ -460,6 +460,9 @@ Builds:
   - versionName: 0.18.3
     versionCode: 116
     commit: v0.18.3
+  - versionName: 0.18.4
+    versionCode: 117
+    commit: v0.18.4
     subdir: android/app
     sudo:
       - apt-get update
@@ -475,5 +478,5 @@ Builds:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.18.3
-CurrentVersionCode: 116
+CurrentVersion: 0.18.4
+CurrentVersionCode: 117

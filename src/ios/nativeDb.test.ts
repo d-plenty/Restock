@@ -15,6 +15,7 @@ beforeAll(async () => {
 function fakeSwift(files: Map<string, Uint8Array> = new Map()) {
   const open = new Map<string, Database>();
   const log: string[] = [];
+  const inTx = new Set<string>();
   const db = (name: string) => {
     let d = open.get(name);
     if (!d) {
@@ -54,12 +55,19 @@ function fakeSwift(files: Map<string, Uint8Array> = new Map()) {
       ),
     sqlRun: (o) => later(() => {
       log.push(o.sql);
+      if (/^BEGIN/i.test(o.sql)) inTx.add(o.db);
+      else if (/^(COMMIT|ROLLBACK)/i.test(o.sql)) inTx.delete(o.db);
       db(o.db).run(o.sql, o.values);
       return { changes: db(o.db).getRowsModified(), lastId: 0 };
     }),
     sqlBatch: (o) => later(() => {
       const d = db(o.db);
       log.push(`batch ${o.ops.length}`);
+      // As RestockSql.swift: inside a transaction already (the sync engine's), part of it.
+      if (inTx.has(o.db)) {
+        for (const op of o.ops) d.run(op.sql, op.values);
+        return;
+      }
       d.run('BEGIN');
       try {
         for (const op of o.ops) d.run(op.sql, op.values);

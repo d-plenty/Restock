@@ -124,9 +124,14 @@ const readShelf = async (): Promise<ShelfWatch> => (await getKV<ShelfWatch>(KV).
  * Works through what the price check saw: a size that really changed becomes `changed` (and the
  * product takes the new size and name); one that's the same amount written another way is marked
  * looked-at. Answers the watch as it now stands.
+ *
+ * 0.18.4: answers straight away and saves in the background. The recommendations (and so Home, the
+ * tabs and the list) waited for these saves, and on an iPhone or iPad a save can wait behind a sync
+ * round: the screens stayed on "Loading…" for as long as that took.
  */
 export async function processShelf(): Promise<ShelfWatch> {
   const watch = await readShelf();
+  const sizes: { id: string; patch: { size: string; name?: string } }[] = [];
   let dirty = false;
   for (const [id, e] of Object.entries(watch)) {
     if (!e?.saw || e.saw.ok) continue;
@@ -139,16 +144,26 @@ export async function processShelf(): Promise<ShelfWatch> {
     const change = sizeChangeOf(product, e.saw, e.saw.at);
     if (change) {
       e.changed = change;
-      await updateProduct(id, { size: e.saw.size, ...(e.saw.name ? { name: e.saw.name } : {}) });
+      sizes.push({ id, patch: { size: e.saw.size, ...(e.saw.name ? { name: e.saw.name } : {}) } });
       delete e.saw;
     } else {
       e.saw.ok = true;
     }
     dirty = true;
   }
-  if (dirty) await putKV(KV, watch).catch(() => undefined);
+  if (dirty) {
+    const save = async () => {
+      for (const s of sizes) await updateProduct(s.id, s.patch);
+      await putKV(KV, watch);
+    };
+    saving = saving.then(save, save).catch(() => undefined);
+  }
   return watch;
 }
+/** 0.18.4: processShelf's saves, one lot after another. */
+let saving: Promise<void> = Promise.resolve();
+/** For the tests: when processShelf's saves are done. */
+export const shelfSaved = (): Promise<void> => saving;
 
 /**
  * A search just showed these: any that Restock already keeps (same shop, same product number) with

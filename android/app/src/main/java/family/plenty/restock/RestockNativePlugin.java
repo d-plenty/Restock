@@ -367,7 +367,7 @@ public class RestockNativePlugin extends Plugin {
      * (a code for a new phone), PATCH and DELETE /phones/<device>. Sealed both ways (ServerFolder.sealedCall).
      */
     /** 0.18.3: what an admin phone asks its server for (ios/sync.ts ADMIN_PATHS is the same). */
-    static final String ADMIN_PATHS = "/(me|phones(/[A-Za-z0-9_-]{1,64})?|approvals(/[A-Za-z0-9_-]{20,40})?|confirm/challenge|settings|activity(\\?limit=\\d{1,4})?|browsers(/[A-Za-z0-9_-]{22})?|homeassistant(/(test|sync))?|data/(summary|autodelete)|recovery|server/(log|updates|restart))";
+    static final String ADMIN_PATHS = "/(me|phones(/[A-Za-z0-9_-]{1,64})?|approvals(/[A-Za-z0-9_-]{20,40})?|confirm/challenge|settings|activity(\\?limit=\\d{1,4})?|browsers(/[A-Za-z0-9_-]{22})?|homeassistant(/(test|sync))?|data/(summary|autodelete)|recovery|passphrase|backupkey|server/(log|updates|restart))";
 
     @PluginMethod
     public void serverAdmin(final PluginCall call) {
@@ -385,6 +385,66 @@ public class RestockNativePlugin extends Plugin {
             try {
                 org.json.JSONObject b = body == null ? ("GET".equals(method) ? null : new org.json.JSONObject()) : new org.json.JSONObject(body.toString());
                 call.resolve(new JSObject(SyncHub.get(getContext()).serverAdmin(method, path, b).toString()));
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Couldn't reach your Restock server.", e);
+            }
+        });
+    }
+
+    /** 0.18.4: any phone's own requests about backups: the backup key's public half, and restoring a lost phone. */
+    static final String PHONE_PATHS = "/(backupkey|restore)";
+
+    @PluginMethod
+    public void serverPhone(final PluginCall call) {
+        final String method = call.getString("method", "GET");
+        final String path = call.getString("path", "");
+        final JSObject body = call.getObject("body");
+        if (!method.matches("GET|POST") || !path.matches(PHONE_PATHS)) {
+            call.reject("Not something a phone asks its server.");
+            return;
+        }
+        syncThread.execute(() -> {
+            try {
+                org.json.JSONObject b = body == null ? ("GET".equals(method) ? null : new org.json.JSONObject()) : new org.json.JSONObject(body.toString());
+                call.resolve(new JSObject(SyncHub.get(getContext()).serverPhone(method, path, b).toString()));
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Couldn't reach your Restock server.", e);
+            }
+        });
+    }
+
+    /** 0.18.4: this phone's backup up to the server (sealed in the app to the household's backup key), as base64. */
+    @PluginMethod
+    public void serverBackupPut(final PluginCall call) {
+        final String data = call.getString("data", "");
+        syncThread.execute(() -> {
+            try {
+                byte[] bytes = android.util.Base64.decode(data, android.util.Base64.NO_WRAP);
+                if (bytes.length < 32 || bytes[0] != 'R' || bytes[1] != 'S' || bytes[2] != 'B' || bytes[3] != '1') throw new IllegalArgumentException("That isn't a sealed backup.");
+                SyncHub.get(getContext()).serverBackupPut(bytes);
+                JSObject out = new JSObject();
+                out.put("size", bytes.length);
+                call.resolve(out);
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Couldn't reach your Restock server.", e);
+            }
+        });
+    }
+
+    /** 0.18.4: a phone's backup from the server, as base64 ({} if there isn't one). */
+    @PluginMethod
+    public void serverBackupGet(final PluginCall call) {
+        final String device = call.getString("device", "");
+        if (!device.matches("[A-Za-z0-9_-]{1,64}")) {
+            call.reject("That isn't a phone on the server.");
+            return;
+        }
+        syncThread.execute(() -> {
+            try {
+                byte[] bytes = SyncHub.get(getContext()).serverBackupGet(device);
+                JSObject out = new JSObject();
+                if (bytes != null) out.put("data", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP));
+                call.resolve(out);
             } catch (Exception e) {
                 call.reject(e.getMessage() != null ? e.getMessage() : "Couldn't reach your Restock server.", e);
             }

@@ -1191,6 +1191,27 @@ final class SyncHub {
         return s.open().sealed(method, path, body, s.sealKey(), s.fileKeys());
     }
 
+    /** 0.18.4: a phone's own sealed requests about its backup (/backupkey, /restore): the plugin checks the path. */
+    org.json.JSONObject serverPhone(String method, String path, org.json.JSONObject body) throws Exception {
+        ServerSync s = server();
+        if (!s.on() || !s.v3()) throw new IllegalStateException("This phone isn't in a household on a Restock server.");
+        return s.open().sealed(method, path, body, s.sealKey(), s.fileKeys());
+    }
+
+    /** 0.18.4: this phone's backup on the server (backups/<device>.bin, sealed to the household's backup key already). */
+    void serverBackupPut(byte[] data) throws Exception {
+        ServerSync s = server();
+        if (!s.on() || !s.v3()) throw new IllegalStateException("This phone isn't in a household on a Restock server.");
+        s.open().put("backups/" + engine.device() + ".bin", data);
+    }
+
+    /** 0.18.4: a phone's backup (this one's, or the lost one this phone replaces), or null if there isn't one. */
+    byte[] serverBackupGet(String device) throws Exception {
+        ServerSync s = server();
+        if (!s.on() || !s.v3()) throw new IllegalStateException("This phone isn't in a household on a Restock server.");
+        return s.open().read("backups/" + device + ".bin");
+    }
+
     /** 0.9.14: the server's statistics for Your data (only a v3 household's server has them). */
     org.json.JSONObject serverRead(String pathAndQuery) throws Exception {
         ServerSync s = server();

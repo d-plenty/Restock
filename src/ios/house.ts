@@ -595,6 +595,17 @@ export class House {
     return out;
   }
 
+  /** 0.18.4: this phone's backup up to the server (backups/<device>.bin, sealed to the backup key already). */
+  async putBackup(bytes: Uint8Array): Promise<void> {
+    if (!(await this.joined())) throw new HouseProblem("This phone isn't in a household on a Restock server.");
+    await this.remote().write(`backups/${(await this.e.device())}.bin`, bytes);
+  }
+  /** 0.18.4: a phone's backup (this one's, or the lost one this phone replaces), or null. */
+  async getBackup(device: string): Promise<Uint8Array | null> {
+    if (!(await this.joined())) throw new HouseProblem("This phone isn't in a household on a Restock server.");
+    return this.remote().read(`backups/${device}.bin`);
+  }
+
   private remote(): Remote {
     return {
       files: async () => {

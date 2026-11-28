@@ -62,7 +62,7 @@ export type Screen =
   /** 0.15.0: `code`: a server's Add a phone code already scanned (the first screen's Join your household). */
   | { name: 'restockServer'; code?: string; /** 0.18.3: from the first screen: once joined, Home. */ fromSetup?: boolean }
   /** 0.18.3: an admin phone's Server admin (screens/ServerAdmin.tsx). */
-  | { name: 'serverAdmin' }
+  | { name: 'serverAdmin'; page?: 'phones' | 'passphrase' | 'settings' | 'backups' }
   /** 0.9.3: Settings → Home Assistant (the shopping list both ways). */
   | { name: 'homeAssistant' }
   | { name: 'household' }

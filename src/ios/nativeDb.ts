@@ -150,7 +150,19 @@ export class AppleDb implements SqlDriver {
           depth--;
         }
       },
-      exclusive: (fn) => this.turn(fn),
+      // 0.18.4: a step that holds the file a long time is noted (Diagnostics → Speed): the app's saves wait for it.
+      exclusive: (fn) =>
+        this.turn(async () => {
+          const t0 = Date.now();
+          try {
+            return await fn();
+          } finally {
+            noteSpeed('hold', Date.now() - t0);
+          }
+        }),
+      // 0.18.4: the engine's changes in one trip (RestockSql.swift sqlBatch: inside the engine's
+      // transaction, part of it; outside one, all or none).
+      batch: (ops) => raw.batch(ops.map((o) => ({ sql: o.sql, params: bindable(o.args ?? []) }))),
     };
   }
 }

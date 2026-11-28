@@ -8,7 +8,7 @@
 // 0.15.0: the 0.9.3 household's vault, passphrase and link sign-in are gone.
 
 import { api3, ApiError, setV3Auth, type ApproveView, type Confirm, type SessionGift } from './api';
-import { b64u, derivePassphrase, loginKeyOf, loginProof, newEcdhKey, openRsf1, random, sessionKeyOf, unb64 } from './crypto';
+import { b64u, derivePassphrase, loginKeyOf, loginProof, newEcdhKey, openBackupKey, openRsf1, random, sealBackupKey, sessionKeyOf, unb64 } from './crypto';
 
 export interface Session {
   user: string;
@@ -256,8 +256,21 @@ export async function changeHousePassphrase(currentPass: string, next: string): 
   const proof = loginProof(loginKeyOf(old.auth), ch.c, s.sid);
   const salt = random(16);
   const fresh = await derivePassphrase(next, salt);
+  // 0.18.4: the phone backups' key comes along (opened with the old passphrase, sealed with the new).
+  const key = await api3.backupKey().catch(() => ({}) as { sealed?: string });
+  let backupSealed: string | undefined;
+  if (key.sealed) {
+    let priv: Uint8Array;
+    try {
+      priv = openBackupKey(old.vault, key.sealed);
+    } catch {
+      throw new Error("That isn't the current passphrase.");
+    }
+    backupSealed = sealBackupKey(fresh.vault, priv);
+    priv.fill(0);
+  }
   try {
-    await api3.passphrase({ c: ch.c, proof, salt: b64u(salt), auth: b64u(fresh.auth) });
+    await api3.passphrase({ c: ch.c, proof, salt: b64u(salt), auth: b64u(fresh.auth), ...(backupSealed ? { backupSealed } : {}) });
   } catch (e) {
     if (e instanceof ApiError && e.code === 'current') throw new Error("That isn't the current passphrase.");
     throw e;
@@ -276,6 +289,21 @@ export async function confirmPassphrase(passphrase: string): Promise<Confirm> {
   const ch = await api3.challenge(s.user);
   const keys = await derivePassphrase(passphrase, unb64(ch.salt));
   return { c: ch.c, proof: loginProof(loginKeyOf(keys.auth), ch.c, s.sid) };
+}
+
+/**
+ * 0.18.4: the passphrase proved (as confirmPassphrase), and its vault key kept for the caller (to open
+ * the phone backups' key). The caller zeroes `vault` when done.
+ */
+export async function confirmWithVault(passphrase: string): Promise<{ confirm: Confirm; vault: Uint8Array }> {
+  const s = current;
+  if (!s || s.v !== 3 || !s.sid) throw new Error('Sign in with your passphrase first.');
+  if (s.viaPhone) throw new Error('Sign in with your passphrase to do that.');
+  const ch = await api3.challenge(s.user);
+  const keys = await derivePassphrase(passphrase, unb64(ch.salt));
+  const confirm = { c: ch.c, proof: loginProof(loginKeyOf(keys.auth), ch.c, s.sid) };
+  keys.auth.fill(0);
+  return { confirm, vault: keys.vault };
 }
 
 /** Sign out everywhere (v3): every browser's session ends, this one's too. Phones keep syncing. */

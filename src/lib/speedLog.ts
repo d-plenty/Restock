@@ -4,9 +4,9 @@
 // Kept on this phone only, the last 60, so a report about a slow iPad can come with real figures.
 export interface SpeedNote {
   at: number;
-  what: 'screen' | 'prices' | 'busy' | 'read';
+  what: 'screen' | 'prices' | 'busy' | 'read' | 'hold';
   ms: number;
-  /** The screen's name, for 'screen'; what was running, for 'busy'. */
+  /** The screen's name, for 'screen'; what was running, for 'busy'; what read, for 'read'. */
   detail?: string;
 }
 
@@ -42,7 +42,7 @@ function save(): void {
 
 /** Notes one. Quick ones aren't worth keeping: screens under 300 ms, prices under 500 ms. */
 export function noteSpeed(what: SpeedNote['what'], ms: number, detail?: string): void {
-  if ((what === 'screen' && ms < 300) || (what === 'prices' && ms < 500) || (what === 'read' && ms < 500)) return;
+  if ((what === 'screen' && ms < 300) || (what === 'prices' && ms < 500) || (what === 'read' && ms < 500) || (what === 'hold' && ms < 1000)) return;
   const list = load();
   list.push({ at: Date.now(), what, ms: Math.round(ms), ...(detail ? { detail } : {}) });
   if (list.length > MAX) list.splice(0, list.length - MAX);
@@ -81,6 +81,8 @@ export function speedWords(n: SpeedNote): string {
   const s = n.ms >= 1000 ? `${(n.ms / 1000).toFixed(1)} s` : `${n.ms} ms`;
   if (n.what === 'screen') return `${n.detail ?? 'A screen'} took ${s} to show`;
   if (n.what === 'prices') return `Working out the deals took ${s}`;
-  if (n.what === 'read') return `Reading from the database waited ${s}`;
+  if (n.what === 'read') return n.detail ? `Reading for ${n.detail} took ${s}` : `Reading from the database waited ${s}`;
+  // 0.18.4: the sync held the database (iPhone and iPad), and the phone's own saves waited that long.
+  if (n.what === 'hold') return `A sync step held the database for ${s}`;
   return `Too busy to answer a tap for ${s}${n.detail ? ` (${n.detail} running)` : ''}`;
 }

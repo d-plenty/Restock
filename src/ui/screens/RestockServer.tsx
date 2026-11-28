@@ -25,6 +25,8 @@ import { useSettings } from '../../lib/useLive';
 import { SECTION_NAMES, SECTIONS, sectionOn, type Section } from '../../shops';
 import { Icon, LoadingBar, Sheet, TopBar, More } from '../components';
 import { useNav } from '../nav';
+import { PhoneBackupCard, RestoreOfferSheet } from './PhoneBackup';
+import { restoreOffer, type RestoreOffer } from '../../lib/serverBackup';
 import { serverKeepText } from '../../lib/autoDelete';
 import { SuggestLocalBackup } from './Backups';
 import { askAdult } from './Sync';
@@ -409,7 +411,7 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
                 <span className="title" style={{ fontSize: 15 }}>
                   Server admin
                 </span>
-                <span className="small">Phones and tablets, data, activity and the server's settings</span>
+                <span className="small">Phones and tablets, the passphrase, backups and the basics</span>
               </span>
               <Icon name="chevron" size={18} />
             </button>
@@ -438,6 +440,10 @@ function HouseCard({ info, onInfo }: { info: SyncInfo; onInfo: (i: SyncInfo) => 
       </div>
       </>
       )}
+
+      {/* 0.18.4: this phone's backup on the server (PhoneBackup.tsx) */}
+      <div className="eyebrow">Backup</div>
+      <PhoneBackupCard />
 
       <div className="card flush" hidden={isIos() && !canSync('wifi')}>
         <button className="row" onClick={() => nav.push({ name: 'sync' })}>
@@ -535,6 +541,8 @@ export function RestockServerScreen({ code: scanned, fromSetup }: { code?: strin
   const [info, setInfo] = useState<SyncInfo>();
   const [joined, setJoined] = useState<{ label?: string | null; houseName?: string | null } | undefined>(() => demoSync()?._joined);
   const [choice, setChoice] = useState<HouseChoice>();
+  // 0.18.4: joined with a code that replaces a lost phone: put its backup back first (PhoneBackup.tsx).
+  const [offer, setOffer] = useState<{ offer: RestoreOffer; next: () => void }>();
   const [working, setWorking] = useState<string>();
   const [error, setError] = useState<string>();
   useEffect(() => {
@@ -585,13 +593,20 @@ export function RestockServerScreen({ code: scanned, fromSetup }: { code?: strin
         // 0.15.0: an iPhone or iPad's household (phones on the Wi-Fi, or iCloud) doesn't pass the news on
         // by itself: each other phone joins the server with its own Add a phone code.
         nav.toast(isIos() ? 'Your household is on the server now. Add each other phone from the server\'s Add a phone page.' : syncNowMessage(s));
-      } else if (fromSetup) {
-        // 0.18.3: joined from the first screen: Home, with the first price check on its way (it had
-        // stayed on this screen). What the phone shares is here, in Settings → Sync, when wanted.
-        nav.pop();
-        nav.setTab('home');
-        nav.toast(`Joined ${r.houseName ?? 'your server'}. What this phone shares: Settings → Sync → Restock server.`);
-      } else setJoined({ label: r.label, houseName: r.houseName });
+      } else {
+        const next = fromSetup
+          ? () => {
+              // 0.18.3: joined from the first screen: Home, with the first price check on its way (it had
+              // stayed on this screen). What the phone shares is here, in Settings → Sync, when wanted.
+              nav.pop();
+              nav.setTab('home');
+              nav.toast(`Joined ${r.houseName ?? 'your server'}. What this phone shares: Settings → Sync → Restock server.`);
+            }
+          : () => setJoined({ label: r.label, houseName: r.houseName });
+        const o = await restoreOffer();
+        if (o) setOffer({ offer: o, next });
+        else next();
+      }
     });
 
   const scan = async () => {
@@ -670,6 +685,18 @@ export function RestockServerScreen({ code: scanned, fromSetup }: { code?: strin
             OK
           </button>
         </div>
+      )}
+
+      {offer && (
+        <RestoreOfferSheet
+          offer={offer.offer}
+          onDone={() => {
+            const next = offer.next;
+            setOffer(undefined);
+            void syncInfo().then(setInfo);
+            next();
+          }}
+        />
       )}
 
       {info && joined && (

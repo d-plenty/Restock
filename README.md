@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release candidate 0.18.3" src="https://img.shields.io/badge/status-release%20candidate%200.18.3-ffcd00">
+  <img alt="Release candidate 0.18.4" src="https://img.shields.io/badge/status-release%20candidate%200.18.4-ffcd00">
   <img alt="Android 8.0 or newer" src="https://img.shields.io/badge/Android-8.0%2B-00843d">
   <img alt="Licence: GPL-3.0" src="https://img.shields.io/badge/licence-GPL--3.0-012169">
   <img alt="No account, no ads, no tracking" src="https://img.shields.io/badge/no%20account%20·%20no%20ads%20·%20no%20tracking-grey">
@@ -25,7 +25,7 @@
 
 <p align="center">
   <a href="#get-it">Get it</a> ·
-  <a href="#new-in-0183">New in 0.18.3</a> ·
+  <a href="#new-in-0184">New in 0.18.4</a> ·
   <a href="#accessibility">Accessibility</a> ·
   <a href="#your-own-restock-server">Restock server</a> ·
   <a href="#iphone-and-ipad">On iPhone</a> ·
@@ -143,6 +143,16 @@ The **usual price** is the middle of the prices when it wasn't on special, over 
 ## iPhone and iPad
 
 Restock runs on iPhone and iPad (one app for both), with the same screens as Android. It is not on the App Store or TestFlight yet, so for now it's installed from a computer, and with a free Apple Account it has to be installed again every 7 days (your data stays). It syncs with a Restock server, with an Android phone over your Wi-Fi, and with other iPhones and iPads through a shared iCloud Drive folder or a Nextcloud or WebDAV folder. Prices are checked in the background too: a little at a time, and a longer check from your set time while the iPhone is charging and on Wi-Fi (iOS picks the exact moment). One thing isn't possible because of Apple's restrictions: the app updating itself. Still to come there: the App Store, and home screen widgets. **[How to install it, the warnings, and what's different](docs/IPHONE.md).** The file is `restock-<version>-unsigned.ipa` on the [releases page](https://github.com/d-plenty/Restock/releases).
+
+## New in 0.18.4
+
+Restock on iPhone and iPad opens properly on a Restock server, each phone can keep its backup on the server, and a tidier Server admin.
+
+- **Fixed: iPhone and iPad stuck on "Loading…".** On a phone joined to a Restock server, Home, Pantry and the list could wait for good: each sync asked the phone's database about every record in the server's file one at a time (tens of thousands of trips), and held it meanwhile. It asks a few hundred at a time now (taking in an unchanged file of 8,400 records: 8,405 trips before, under 25 now), the screens never wait on a save, and a read that fails tries again by itself. Diagnostics → Speed names a slow read and a long sync step.
+- **Each phone's backup on your Restock server.** Turned on once with the server's passphrase, each phone backs up once a day: settings, look, shops, every tab, cards and receipts. It's locked so only the passphrase opens it (the server can't read it). Settings → Sync → Restock server → Backup has Back up now.
+- **Putting a lost phone back.** An admin adds the new phone as the lost one's replacement; the new one joins, asks for the server's passphrase, and everything comes back. The lost one then comes off the server. The server's web page can download any phone's backup too.
+- **Server admin, the basics on the go:** Phones and tablets, Sign in a computer, Passphrase (change it from the phone), Basic settings (name, addresses, Home Assistant) and Phone backups, a page each. Everything else is on the server's web page.
+- **The server's web page fits any screen,** from a phone (tables become cards) to a big monitor, and This browser → Text size makes everything bigger.
 
 ## New in 0.18.3
 

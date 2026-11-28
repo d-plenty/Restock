@@ -96,13 +96,24 @@ export interface AsyncSyncDb {
   transaction(body: () => Promise<void>): Promise<void>;
   /** Holds the database while the engine does one thing (nothing else reads or writes it meanwhile). */
   exclusive?<T>(fn: () => Promise<T>): Promise<T>;
+  /**
+   * 0.18.4: several changes in one trip, in order (inside a transaction, part of it; outside one, all
+   * or none). With it, the engine sends the changes it doesn't need an answer to together.
+   */
+  batch?(ops: { sql: string; args?: unknown[] }[]): Promise<void>;
 }
+
+/** 0.18.4: at most this many changes wait to go together (runOnAsync). */
+const SEND_TOGETHER = 500;
 
 // 0.15.1: the engine's work is written once, as steps that each ask the database one thing (DbOp),
 // and run on either kind of database: straight away (SyncDb: the server, the web) or awaited
 // (AsyncSyncDb: the iPhone and iPad app). WebSyncEngine and AsyncSyncEngine run them.
 export type DbOp = { k: 'q'; sql: string; args?: unknown[] } | { k: 'x'; sql: string; args?: unknown[] } | { k: 'tx'; body: Gen<void> };
 export type Gen<T> = Generator<DbOp, T, unknown>;
+
+/** 0.18.4: how many records one question asks about (under SQLite's oldest limit of 999 values). */
+const BATCH = 400;
 
 function* qry(sql: string, args?: unknown[]): Gen<Row[]> {
   return (yield { k: 'q', sql, args }) as Row[];
@@ -133,11 +144,36 @@ export function runOn<T>(db: SyncDb, g: Gen<T>): T {
   return next.value;
 }
 
-/** Runs the steps on a database that answers later. */
+/**
+ * Runs the steps on a database that answers later. 0.18.4: changes (which answer nothing) wait and go
+ * together (db.batch), before the next question, transaction or the end, so taking in a file is a few
+ * trips to the database instead of two for every record. A change that fails then fails the whole
+ * step there, as it would have where it was asked (no step catches a failed change).
+ */
 export async function runOnAsync<T>(db: AsyncSyncDb, g: Gen<T>): Promise<T> {
+  const batch = db.batch?.bind(db);
+  let waiting: { sql: string; args?: unknown[] }[] = [];
+  const send = async () => {
+    if (!waiting.length) return;
+    const ops = waiting;
+    waiting = [];
+    try {
+      await batch!(ops);
+    } catch (e) {
+      g.return(undefined as T);
+      throw e;
+    }
+  };
   let next = g.next();
   while (!next.done) {
     const op = next.value;
+    if (op.k === 'x' && batch) {
+      waiting.push({ sql: op.sql, args: op.args });
+      if (waiting.length >= SEND_TOGETHER) await send();
+      next = g.next(undefined);
+      continue;
+    }
+    await send();
     let answer: unknown;
     try {
       if (op.k === 'q') answer = await db.query(op.sql, op.args);
@@ -149,6 +185,7 @@ export async function runOnAsync<T>(db: AsyncSyncDb, g: Gen<T>): Promise<T> {
     }
     next = g.next(answer);
   }
+  await send();
   return next.value;
 }
 
@@ -526,12 +563,13 @@ export class SyncCore {
     return t === undefined ? null : sharedTab(t);
   }
 
-  *tabOf(tbl: string, row: Row | null | undefined): Gen<string | null> {
-    const t = (yield* this.tabOfRaw(tbl, row));
+  /** `chains`: 0.18.4, products' shops already asked for (chainsOf), so a price needn't ask again. */
+  *tabOf(tbl: string, row: Row | null | undefined, chains?: Map<string, string | null>): Gen<string | null> {
+    const t = (yield* this.tabOfRaw(tbl, row, chains));
     return t === null ? null : sharedTab(t);
   }
 
-  private *tabOfRaw(tbl: string, row: Row | null | undefined): Gen<string | null> {
+  private *tabOfRaw(tbl: string, row: Row | null | undefined, chains?: Map<string, string | null>): Gen<string | null> {
     switch (tbl) {
       case 'categories':
       case 'items':
@@ -555,7 +593,12 @@ export class SyncCore {
       case 'receipts':
         return str(row, 'section') ?? 'pantry';
       case 'prices': {
-        const r = (yield* qry('SELECT chain FROM products WHERE id = ?', [str(row, 'product_id')]));
+        const id = str(row, 'product_id');
+        if (id !== null && chains?.has(id)) {
+          const c = chains.get(id) ?? null;
+          return c === null ? null : (yield* this.chainTab(c));
+        }
+        const r = (yield* qry('SELECT chain FROM products WHERE id = ?', [id]));
         return r.length ? (yield* this.chainTab(str(r[0], 'chain'))) : null;
       }
       case 'household_settings':
@@ -595,6 +638,20 @@ export class SyncCore {
     if (more) rows = rows.slice(0, limit);
     const cards = (yield* this.shareCards());
     const receipts = (yield* this.shareReceipts());
+    // 0.18.4: the records themselves, and the shops of the prices' products, asked for in lots
+    // (a phone's own file is every record it has: one at a time, that was two questions each).
+    const wanted = new Map<string, string[]>();
+    for (const r of rows) {
+      const tbl = String(r.tbl);
+      if (!keyOf(tbl) || num(r.deleted) !== 0 || (exclude !== null && exclude === r.device)) continue;
+      const list = wanted.get(tbl) ?? [];
+      list.push(String(r.pk));
+      wanted.set(tbl, list);
+    }
+    const got = new Map<string, Map<string, Row>>();
+    for (const [tbl, pks] of wanted) got.set(tbl, (yield* this.rowsOf(tbl, keyOf(tbl)!, pks)));
+    const priceRows = got.get('prices');
+    const chains = priceRows ? (yield* this.chainsOf([...priceRows.values()].map((p) => String(p.product_id)))) : undefined;
     const entries: Entry[] = [];
     let top = since;
     for (const r of rows) {
@@ -612,10 +669,10 @@ export class SyncCore {
       if (deleted && oldestDelete > 0 && num(r.stamp) < oldestDelete) continue;
       e.deleted = deleted;
       if (!deleted) {
-        const row = (yield* qry(`SELECT * FROM ${tbl} WHERE ${key} = ?`, [pk]));
-        if (!row.length) continue;
-        const data = { ...row[0] };
-        const tab = (yield* this.tabOf(tbl, data));
+        const row = got.get(tbl)?.get(pk);
+        if (!row) continue;
+        const data = { ...row };
+        const tab = (yield* this.tabOf(tbl, data, chains));
         if (tab === LOCAL_TAB) continue; // 0.9.6: Costco stays on its phone, not even as a "moved" record
         if (tab !== null && !allowed.has(tab)) {
           // 0.9.3: a household setting of a tab this pair doesn't share is left out, never sent as moved.
@@ -638,6 +695,70 @@ export class SyncCore {
       entries.push(e);
     }
     return { entries, top, more };
+  }
+
+  // ---------- 0.18.4: asking about records a few hundred at a time ----------
+  // On an iPhone or iPad every question is a trip across to the system's SQLite and back, and the
+  // database is held meanwhile: taking in a file of 20,000 records one question at a time held it for
+  // minutes, every round (the server's file carries a few weeks of prices), and the phone's own saves,
+  // and the screens waiting on them, waited too. These ask for many at once (IN lists of BATCH).
+
+  /** What's logged here for these records (a missing one: null), keyed tbl + NUL + pk. */
+  private *loggedFor(entries: readonly (Entry | null | undefined)[]): Gen<Map<string, Row | null>> {
+    const byTbl = new Map<string, Set<string>>();
+    for (const e of entries) {
+      if (!e || typeof e !== 'object' || typeof e.tbl !== 'string' || typeof e.pk !== 'string' || !keyOf(e.tbl)) continue;
+      let set = byTbl.get(e.tbl);
+      if (!set) byTbl.set(e.tbl, (set = new Set()));
+      set.add(e.pk);
+    }
+    const out = new Map<string, Row | null>();
+    for (const [tbl, set] of byTbl) {
+      const pks = [...set];
+      for (const pk of pks) out.set(tbl + '\u0000' + pk, null);
+      for (let i = 0; i < pks.length; i += BATCH) {
+        const part = pks.slice(i, i + BATCH);
+        const rows = (yield* qry(`SELECT tbl, pk, stamp, device, deleted, created, origin FROM sync_log WHERE tbl = ? AND pk IN (${part.map(() => '?').join(', ')})`, [tbl, ...part]));
+        for (const r of rows) out.set(tbl + '\u0000' + String(r.pk), r);
+      }
+    }
+    return out;
+  }
+
+  /** Each product's shop (a missing product: null). */
+  private *chainsOf(ids: Iterable<string>): Gen<Map<string, string | null>> {
+    const list = [...new Set(ids)];
+    const out = new Map<string, string | null>();
+    for (const id of list) out.set(id, null);
+    for (let i = 0; i < list.length; i += BATCH) {
+      const part = list.slice(i, i + BATCH);
+      for (const r of (yield* qry(`SELECT id, chain FROM products WHERE id IN (${part.map(() => '?').join(', ')})`, part))) out.set(String(r.id), str(r, 'chain'));
+    }
+    return out;
+  }
+
+  /** These records of one table, by their key (a price's: its product and date, product|date). */
+  private *rowsOf(tbl: string, key: string, pks: readonly string[]): Gen<Map<string, Row>> {
+    const out = new Map<string, Row>();
+    const want = new Set(pks);
+    if (tbl === 'prices') {
+      // By product (the index), then only the dates asked for.
+      const ids = [...new Set([...want].map((pk) => pk.slice(0, pk.lastIndexOf('|'))))];
+      for (let i = 0; i < ids.length; i += BATCH) {
+        const part = ids.slice(i, i + BATCH);
+        for (const r of (yield* qry(`SELECT * FROM prices WHERE product_id IN (${part.map(() => '?').join(', ')})`, part))) {
+          const pk = `${String(r.product_id)}|${String(r.date)}`;
+          if (want.has(pk)) out.set(pk, r);
+        }
+      }
+      return out;
+    }
+    const list = [...want];
+    for (let i = 0; i < list.length; i += BATCH) {
+      const part = list.slice(i, i + BATCH);
+      for (const r of (yield* qry(`SELECT * FROM ${tbl} WHERE ${key} IN (${part.map(() => '?').join(', ')})`, part))) out.set(String(r[key]), r);
+    }
+    return out;
   }
 
   private *logEntry(tbl: string, pk: string, stamp: number, device: string, deleted: boolean, sig: string | null, created: number, origin: string | null): Gen<void> {
@@ -681,6 +802,11 @@ export class SyncCore {
     const room = (yield* this.settingsRoom());
     (yield* txn((function* (this: SyncCore) {
       (yield* run("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')"));
+      // 0.18.4: what's here already, asked for in lots (loggedFor), and the shops of the prices' products.
+      const known = (yield* this.loggedFor(entries));
+      const priceProducts: string[] = [];
+      for (const x of entries) if (x && typeof x === 'object' && x.tbl === 'prices' && x.row && typeof x.row === 'object' && typeof (x.row as Row).product_id === 'string') priceProducts.push(String((x.row as Row).product_id));
+      const chains = priceProducts.length ? (yield* this.chainsOf(priceProducts)) : new Map<string, string | null>();
       let clock = 0;
       for (const e of entries) {
         if (!e || typeof e !== 'object') continue;
@@ -702,8 +828,13 @@ export class SyncCore {
         if (tbl === 'household_settings' && !settingChangeOk(pk, e.row, deleted, room)) continue;
         if (stamp > now + CLOCK_SLACK_MS) (yield* this.setMeta('clock_warn', device));
         else clock = Math.max(clock, stamp);
-        const hadRows = (yield* qry('SELECT stamp, device, deleted, created, origin FROM sync_log WHERE tbl = ? AND pk = ?', [tbl, pk]));
-        const had = hadRows.length ? hadRows[0] : null;
+        const lk = tbl + '\u0000' + pk;
+        let had: Row | null;
+        if (known.has(lk)) had = known.get(lk) ?? null;
+        else {
+          const hadRows = (yield* qry('SELECT stamp, device, deleted, created, origin FROM sync_log WHERE tbl = ? AND pk = ?', [tbl, pk]));
+          had = hadRows.length ? hadRows[0] : null;
+        }
         let wins = had === null || newer(stamp, device, num(had.stamp), String(had.device ?? ''));
         const created = Math.trunc(num(e.created));
         const hadDeleted = had !== null && num(had.deleted) !== 0;
@@ -713,6 +844,7 @@ export class SyncCore {
           else if (!deleted && hadDeleted) wins = created > num(had.stamp);
         }
         if (tbl === 'list_entries' && !deleted && had !== null && !hadDeleted) {
+          known.delete(lk); // asked again if the file has it twice
           if ((yield* this.mergeListLine(e, stamp, device, created, wins, had, mine, columns))) changed++;
           continue;
         }
@@ -739,16 +871,19 @@ export class SyncCore {
         }
         const row = e.row && typeof e.row === 'object' ? e.row : null;
         if (!deleted) {
-          const tab = (yield* this.tabOf(tbl, row));
+          const tab = (yield* this.tabOf(tbl, row, chains));
           if (tab !== null && !mine.has(tab)) continue;
         }
         if (deleted) {
           (yield* run(`DELETE FROM ${tbl} WHERE ${key} = ?`, [pk]));
+          if (tbl === 'products') chains.set(pk, null);
         } else {
           if (row === null) continue;
           if (tbl === 'items') (yield* this.keepLocalCostcoPicks(pk, row));
           (yield* this.writeRow(tbl, tbl === 'cards' && this.role !== 'phone' ? stripCard(row) : row, (yield* this.columnsOf(tbl, columns))));
+          if (tbl === 'products') chains.set(pk, str(row, 'chain'));
         }
+        known.delete(lk);
         (yield* this.logEntry(tbl, pk, stamp, device, deleted, e.sig === null || e.sig === undefined ? null : String(e.sig), created, this.originOf(e, stamp, device, deleted, created, had, this.applyingFrom)));
         if (tbl === 'household_settings') settings = true;
         changed++;
@@ -1461,12 +1596,20 @@ export class SyncCore {
         if (p && typeof p === 'object' && typeof p.product_id === 'string' && typeof p.date === 'string' && p.date > (newest.get(p.product_id) ?? '')) newest.set(p.product_id, p.date);
     (yield* txn((function* (this: SyncCore) {
       (yield* run("INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('applying', '1')"));
-      for (const p of Array.isArray(m.prices) ? m.prices : []) {
+      // 0.18.4: the prices already here for these products, asked for in lots, not one by one.
+      const prices = Array.isArray(m.prices) ? m.prices : [];
+      const have = new Set<string>();
+      const ids = [...new Set(prices.filter((p) => p && typeof p === 'object' && typeof p.product_id === 'string').map((p) => String(p.product_id)))];
+      for (let i = 0; i < ids.length; i += BATCH) {
+        const part = ids.slice(i, i + BATCH);
+        for (const r of (yield* qry(`SELECT product_id, date FROM prices WHERE product_id IN (${part.map(() => '?').join(', ')})`, part))) have.add(String(r.product_id) + '\u0000' + String(r.date));
+      }
+      for (const p of prices) {
         if (!p || typeof p !== 'object' || typeof p.product_id !== 'string' || typeof p.date !== 'string') continue;
-        const before = (yield* qry('SELECT 1 FROM prices WHERE product_id = ? AND date = ?', [p.product_id, p.date])).length;
-        if (before) continue;
+        if (have.has(p.product_id + '\u0000' + p.date)) continue;
         if (cut !== null && p.date < cut && ((newest.get(p.product_id) ?? '') > p.date || (yield* qry('SELECT 1 FROM prices WHERE product_id = ? AND date >= ? LIMIT 1', [p.product_id, p.date])).length)) continue;
         (yield* this.writeRow('prices', p, (yield* this.columnsOf('prices', columns))));
+        have.add(p.product_id + '\u0000' + p.date);
         n++;
       }
       for (const r of Array.isArray(m.receipts) ? m.receipts : []) {

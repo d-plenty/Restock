@@ -39,6 +39,12 @@ export interface RestockNativePlugin {
    * GET /me, GET /phones, POST /phones, PATCH and DELETE /phones/<device>, sealed both ways.
    */
   serverAdmin(opts: { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string; body?: Record<string, unknown> }): Promise<Record<string, unknown>>;
+  /** 0.18.4: a phone's own requests about backups (GET /backupkey, GET and POST /restore), sealed. */
+  serverPhone(opts: { method: 'GET' | 'POST'; path: string; body?: Record<string, unknown> }): Promise<Record<string, unknown>>;
+  /** 0.18.4: this phone's backup up to the server (base64 of the RSB1 file, sealed in the app). */
+  serverBackupPut(opts: { data: string }): Promise<{ size: number }>;
+  /** 0.18.4: a phone's backup from the server (base64), or {} if there isn't one. */
+  serverBackupGet(opts: { device: string }): Promise<{ data?: string }>;
   /** 0.9.14: Send prices back now (PriceShare.java): what this phone read from the shops since the last send. */
   sharePrices(): Promise<{ sent: number }>;
   /** Download shared price history (MarketData.java) and summarise it into the market table. */
