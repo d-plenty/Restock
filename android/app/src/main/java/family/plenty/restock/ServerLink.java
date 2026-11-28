@@ -229,26 +229,7 @@ final class ServerLink {
         return new JSONObject(new String(c.doFinal(sealed, 12, sealed.length - 12), StandardCharsets.UTF_8));
     }
 
-    /** What the phone posts for a link or a QR sign-in: { pub, sealed }, for the browser's key. */
-    static JSONObject sealFor(PublicKey browser, JSONObject gift) throws Exception {
-        KeyPair eph = newKey();
-        JSONObject out = new JSONObject();
-        out.put("pub", b64u(eph.getPublic().getEncoded()));
-        out.put("sealed", b64u(sealWith(linkKey(eph.getPrivate(), browser), gift)));
-        return out;
-    }
 
-    /** webkeys/<webId>.bin: "RSE2" + a fresh public key (SPKI) + nonce + sealed JSON. */
-    static byte[] sealWebKeys(PublicKey web, JSONObject gift) throws Exception {
-        KeyPair eph = newKey();
-        byte[] pub = eph.getPublic().getEncoded();
-        byte[] sealed = sealWith(linkKey(eph.getPrivate(), web), gift);
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        out.write(RSE2);
-        out.write(pub);
-        out.write(sealed);
-        return out.toByteArray();
-    }
 
     /** Tests: what a browser does with a webkeys file. */
     static JSONObject openWebKeys(PrivateKey web, byte[] file) throws Exception {

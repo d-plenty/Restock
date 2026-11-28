@@ -117,7 +117,7 @@ export function spendLines(card: GiftCard): { at: string; balance: number; chang
 
 const DAY = 86_400_000;
 /** Midnight at the start of a YYYY-MM-DD day, on this phone's own calendar. */
-export function dayStart(ymd: string): number {
+function dayStart(ymd: string): number {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
   if (!m) return NaN;
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
@@ -125,7 +125,7 @@ export function dayStart(ymd: string): number {
   return d.getFullYear() === Number(m[1]) && d.getMonth() === Number(m[2]) - 1 && d.getDate() === Number(m[3]) ? d.getTime() : NaN;
 }
 
-export type ExpiryState = { kind: 'none' } | { kind: 'expired'; text: string } | { kind: 'soon'; days: number; text: string } | { kind: 'ok'; text: string };
+type ExpiryState = { kind: 'none' } | { kind: 'expired'; text: string } | { kind: 'soon'; days: number; text: string } | { kind: 'ok'; text: string };
 
 const longDay = (ymd: string) =>
   new Date(dayStart(ymd)).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -289,9 +289,9 @@ export const CARDS_FILE_PRIVATE =
 const CARDS_FILE_MAX_BYTES = 25 * 1024 * 1024;
 const MAX_CARDS = 500;
 /** Base64 of one photo (about 3 MB of JPEG). */
-export const MAX_PHOTO_B64 = 4 * 1024 * 1024;
+const MAX_PHOTO_B64 = 4 * 1024 * 1024;
 
-export interface CardsFile {
+interface CardsFile {
   format: typeof CARDS_FILE_FORMAT;
   v: 1;
   private: true;
@@ -320,7 +320,7 @@ export function makeCardsFile(loyalty: LoyaltyCard[], gift: GiftCard[], photos: 
   return JSON.stringify(file, null, 1);
 }
 
-export interface ReadCards {
+interface ReadCards {
   loyalty: LoyaltyCard[];
   gift: GiftCard[];
   /** By "<id>:front" / "<id>:back". */

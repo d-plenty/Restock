@@ -82,12 +82,6 @@ export function longMonth(month: string): string {
   const [y, m] = month.split('-').map(Number);
   return `${LONG_MONTHS[(m || 1) - 1] ?? month} ${y}`;
 }
-/** "Nov 2024" for a date. */
-export function monthYear(iso: string | null | undefined): string | undefined {
-  if (!iso) return undefined;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? undefined : `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-}
 /** "10 Nov 2025". */
 export function dayMonthYear(iso: string | null | undefined): string | undefined {
   if (!iso) return undefined;
@@ -185,7 +179,7 @@ export function specialEvery(points: { week: string; special: boolean }[]): stri
   return m <= 1 ? 'about every month' : `about every ${m} months`;
 }
 
-export interface Part {
+interface Part {
   key: string;
   label: string;
   bytes: number;
@@ -229,5 +223,3 @@ export function shares(values: number[]): number[] {
 export function readPeriod(v: unknown): Period {
   return v === '3' || v === 3 ? 3 : v === '6' || v === 6 ? 6 : v === 'all' ? 'all' : 12;
 }
-/** The words for a period, for headings and screen readers ("the last 6 months"). */
-export const periodWords = (p: Period) => (p === 'all' ? 'all the time there is' : `the last ${p} months`);

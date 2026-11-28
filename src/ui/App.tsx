@@ -13,13 +13,24 @@ import { wireSync } from '../lib/sync';
 import { syncBackgroundSchedule } from '../lib/check';
 import { CheckLine, trackCheck } from './refresh';
 import { wireKeyboard } from '../lib/keyboard';
-import { cachedSettings, getKV, getSettings, pruneHistory, putKV, refresh, updateSettings } from '../lib/db';
+import { allCards, allCategories, allListEntries, cachedSettings, getKV, getSettings, pruneHistory, putKV, refresh, updateSettings } from '../lib/db';
+import { loadRecommendations } from '../lib/recs';
+import { nameReads } from '../lib/waiting';
 import { checkForUpdate, learnChannel, SELF_UPDATE, weeklyCheckDue } from '../lib/updates';
 import { version as appVersion } from '../../package.json';
 import { setConnectionMode } from '../stores/http';
 import { applyTheme, isDark, syncInsets } from '../lib/theme';
 import { scheduleReminders } from '../lib/notify';
 import { useLive } from '../lib/useLive';
+
+// 0.19.0: what a screen that's still loading says it's waiting for (lib/waiting.ts).
+nameReads([
+  [loadRecommendations, 'your items and their prices'],
+  [allCategories, 'the categories'],
+  [allListEntries, 'the shopping list'],
+  [getSettings, 'the settings'],
+  [allCards, 'your cards'],
+]);
 import { Announcer, closeTopLayer, Icon, layerHost, Logo, runBackHandlers, ScreenWaiting } from './components';
 import { isMoreTab, isSectionTab, NavContext, type Nav, type Screen, type Tab } from './nav';
 import { MoreScreen } from './screens/More';
@@ -87,7 +98,6 @@ const ReceiptsScreen = lazyScreen(() => import('./screens/Receipts').then((m) =>
 const WhatsNewScreen = lazyScreen(() => import('./screens/WhatsNew').then((m) => m.WhatsNewScreen));
 const IcloudSyncScreen = lazyScreen(() => import('./screens/IcloudSync').then((m) => m.IcloudSyncScreen), { preload: isIosHere() });
 import { wireHomeAssistant } from '../lib/homeAssistant';
-import { serverMode, serverUi } from '../server-mode/flag';
 import { padSide, usePadWide, type PadSide } from './padWide';
 import { isIos } from '../lib/platform';
 import { onUndo, undo as undoStep, undoneText } from '../lib/undo';
@@ -150,7 +160,7 @@ function RestockApp() {
 
   // "Tell me when there's an update": when Restock opens, every 24 hours, or every 7 days if picked (0.9.3).
   useEffect(() => {
-    if (!ready || serverMode) return;
+    if (!ready) return;
     const t = window.setTimeout(() => {
       void (async () => {
         const s = await getSettings();
@@ -237,23 +247,6 @@ function RestockApp() {
       }),
     [toast],
   );
-
-  // 0.9.5 (undo): on the web, Ctrl+Z (Cmd+Z on a Mac) undoes the last change, outside text boxes.
-  useEffect(() => {
-    if (!serverMode) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== 'z' || e.shiftKey || e.altKey || !(e.ctrlKey || e.metaKey)) return;
-      const t = e.target as HTMLElement | null;
-      const typing = t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|range|color)$/.test((t as HTMLInputElement).type)));
-      if (typing) return;
-      e.preventDefault();
-      void undoStep().then((r) => {
-        if (r) toast(undoneText(r));
-      });
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [toast]);
 
   // 0.9.5 (save): leaving a settings screen with changes not saved asks first (settingsDraft.ts).
   // 0.10.7: and other work under way that isn't saved (leaveGuard.ts): "Leave without saving?"
@@ -363,14 +356,14 @@ function RestockApp() {
       else if (isMoreTab(t) && t !== 'more') leave(() => setTab('more'));
       else if (t !== 'home') leave(() => setTab('home'));
       // 0.9.8: leaving the app takes a second press on Home, so a stray press never throws you out.
-      else if (Date.now() - exitArmed.current < 2500) CapApp.exitApp();
+      else if (Date.now() - exitArmed.current < 2500) void CapApp.exitApp();
       else {
         exitArmed.current = Date.now();
         sayRef.current("Press back again to leave Restock");
       }
     });
     return () => {
-      sub.then((s) => s.remove());
+      void sub.then((s) => s.remove());
     };
     // The back button is listened for once; it reads the latest through refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -392,7 +385,7 @@ function RestockApp() {
   useEffect(() => {
     if (!settings) return;
     if (!settings.onboarded) return noteSeenVersion(appVersion);
-    if (shouldOfferWhatsNew(appVersion, seenVersion(), true, !serverMode)) setWhatsNew(true);
+    if (shouldOfferWhatsNew(appVersion, seenVersion(), true, true)) setWhatsNew(true);
     else noteSeenVersion(appVersion);
     // only when setup finishes or the app opens
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -467,7 +460,7 @@ function RestockApp() {
   // Tidy away prices older than the history setting, once per launch.
   useEffect(() => {
     // On a Restock server the web keeps the whole history (the phones tidy their own).
-    if (!onboarded || serverMode) return;
+    if (!onboarded) return;
     void getSettings()
       .then(async (s) => {
         await pruneHistory(s.historyWeeks);
@@ -525,7 +518,7 @@ function RestockApp() {
     // 0.18.2: Diagnostics → Speed notes the moments the screen was too busy to answer a tap.
     watchBusy();
     // 0.18.3: on an admin phone, "Is this you?" for a browser waiting for a yes (lib/approvalsWatch.ts).
-    if (!serverMode) void afterScreens().then(() => import('../lib/approvalsWatch').then((m) => m.watchApprovals(() => setAskingYes(true))).catch(() => undefined));
+    void afterScreens().then(() => import('../lib/approvalsWatch').then((m) => m.watchApprovals(() => setAskingYes(true))).catch(() => undefined));
     // 0.15.2: the screens opened now and then are loaded quietly, so none opens on a blank page.
     void preloadScreens().finally(screensReady);
     // 0.16.0: this phone's name in the household follows the person's (after a restore, say).
@@ -537,8 +530,7 @@ function RestockApp() {
     // 0.10.0: Shared prices is one switch, on for every phone. A phone that had sharing off stays off
     // until it's asked, once (the privacy policy says off stays off): Keep sharing turns it on from
     // now, nothing read while it was off goes. Closing the question asks again next time.
-    if (!serverMode)
-      void (async () => {
+    void (async () => {
         if (await getKV<boolean>('sharedPrices010')) return;
         const s = await getSettings();
         if (s.sharePrices !== 'no' || !s.onboarded) {
@@ -565,21 +557,19 @@ function RestockApp() {
       })().catch(() => undefined);
     // 0.9.14: Your data: ticks made on other phones or in Home Assistant since Restock last looked.
     // 0.18.1: these three once the screens are up (lib/screensFirst.ts).
-    if (!serverMode) void afterScreens().then(() => import('../lib/spending')).then(async (f) => {
+    void afterScreens().then(() => import('../lib/spending')).then(async (f) => {
       await f.noteTicks();
       await f.maybeSendSpending(); // 0.10.0: Share my spending with the server
     }).catch(() => undefined);
     // 0.9.14: Send prices back: what earlier searches and price checks read, if it didn't go yet.
-    if (!serverMode) void afterScreens().then(() => import('../lib/priceShare')).then((f) => f.sendPricesNow()).catch(() => undefined);
+    void afterScreens().then(() => import('../lib/priceShare')).then((f) => f.sendPricesNow()).catch(() => undefined);
     // 0.11.0: what searches found also goes to a household's own Restock server (lib/seen.ts)
-    if (!serverMode) void afterScreens().then(() => import('../lib/seen')).then((f) => f.sendSeenToServer()).catch(() => undefined);
+    void afterScreens().then(() => import('../lib/seen')).then((f) => f.sendSeenToServer()).catch(() => undefined);
     // 0.18.4: this phone's backup on its Restock server, once a day (lib/serverBackup.ts), a little after opening.
-    if (!serverMode) void afterScreens().then(() => new Promise((r) => setTimeout(r, 20_000))).then(() => import('../lib/serverBackup')).then((f) => f.maybeServerBackup()).catch(() => undefined);
+    void afterScreens().then(() => new Promise((r) => setTimeout(r, 20_000))).then(() => import('../lib/serverBackup')).then((f) => f.maybeServerBackup()).catch(() => undefined);
     const stopWidgets = watchWidgets();
     // 0.9.3: the shopping list with Home Assistant, if it's on for this phone (homeAssistant.ts).
-    const stopHa = serverMode
-      ? () => undefined
-      : wireHomeAssistant((fn) => {
+    const stopHa = wireHomeAssistant((fn) => {
           const h = CapApp.addListener('resume', fn);
           return () => void h.then((x) => x.remove());
         });
@@ -593,7 +583,7 @@ function RestockApp() {
     return () => {
       stopWidgets();
       stopHa();
-      sub.then((s) => s.remove());
+      void sub.then((s) => s.remove());
     };
   }, [onboarded, toast]);
 
@@ -673,7 +663,7 @@ function RestockApp() {
 
   // The screen opened on top of the tab, if any (the server's own version where it has one).
   const overlay = top ? (
-    (serverMode && serverUi.current?.screen(top)) || (
+    (
       <Suspense fallback={<ScreenWaiting />}>
         {top.name === 'item' && <ItemScreen key={top.groupId} groupId={top.groupId} />}
         {top.name === 'add' && (
@@ -789,7 +779,6 @@ function RestockApp() {
       <div className={`app${padWide ? ' pad-wide' : ''}`}>
         {/* Covers the status bar, so pages don't scroll up underneath the clock and battery. */}
         <div className="status-shade" aria-hidden />
-        {serverMode && serverUi.current && <serverUi.current.Strip />}
         {/* 0.12.9: a running sync or price check is one slim line under the clock on every screen (Home shows it in its own top) */}
         {(shownTab !== 'home' || !!top) && <CheckLine />}
         {shownTab === 'home' && <HomeScreen />}

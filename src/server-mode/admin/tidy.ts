@@ -41,3 +41,17 @@ export async function tidyOldCopies(): Promise<number> {
   }
   return gone;
 }
+
+/**
+ * 0.19.0: the page keeps no copy of itself in the browser now (pwa/sw.ts takes the old worker off):
+ * this takes off any worker and kept copy from the page's own side too, every time it opens.
+ */
+export async function retireServiceWorker(): Promise<void> {
+  try {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    if (typeof caches !== 'undefined') for (const k of await caches.keys()) if (k.startsWith('restock-')) await caches.delete(k);
+  } catch {
+    // a private window may refuse: nothing was kept there anyway
+  }
+}

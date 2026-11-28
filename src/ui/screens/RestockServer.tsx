@@ -47,13 +47,13 @@ const addressText = (a?: string | null) => (a ?? '').replace(/^https?:\/\//i, ''
 
 // ---------- what this phone shares ----------
 
-export interface Shares {
+interface Shares {
   tabs: Section[];
   receipts: boolean;
   cards: boolean;
 }
 
-export const sharesOf = (i: SyncInfo | undefined): Shares => ({
+const sharesOf = (i: SyncInfo | undefined): Shares => ({
   tabs: (i?.myTabs ?? ['pantry']).filter((t) => SECTIONS.includes(t)),
   receipts: !!i?.shareReceipts,
   cards: !!i?.shareCards,

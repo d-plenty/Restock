@@ -1,10 +1,9 @@
 // 0.16.0: "What should we call you?" (lib/myName.ts). The same box in three places: a step of the
 // first setup (after Set up or Join), a sheet on Home once after updating, and Settings → Your name.
 import { useState } from 'react';
-import { browserWord, cleanName, NAME_MAX, setMyName, skipName } from '../lib/myName';
+import { cleanName, NAME_MAX, setMyName, skipName } from '../lib/myName';
 import { Icon, Sheet } from './components';
 import { deviceWord } from '../lib/platform';
-import { serverMode } from '../server-mode/flag';
 
 /** The box and its buttons. `onDone` once saved or skipped. */
 export function NameFields({ start = '', onDone, skipLabel = 'Skip for now', saveLabel = 'Continue', autoFocus = true }: { start?: string; onDone: () => void; skipLabel?: string | null; saveLabel?: string; autoFocus?: boolean }) {
@@ -70,14 +69,14 @@ export function NameSheet({ start, onClose, fromSettings }: { start?: string; on
 /** What the name is used for (Settings → your name). */
 function NameUses({ n }: { n?: string }) {
   // 0.17.0: what this is, in its own words: this iPad, this phone, this browser (the web page).
-  const dev = serverMode ? 'browser' : deviceWord();
-  const like = serverMode ? browserWord() : dev;
+  const dev = deviceWord();
+  const like = dev;
   return (
     <div className="name-uses">
       <p>Restock says hello with it on Home.</p>
       <p>This {dev} is called by it in your household and on your Restock server (like &ldquo;{n || 'Sam'}&rsquo;s {like}&rdquo;), unless you named the {dev} yourself.</p>
-      {!serverMode && <p>Your backups have it in their names, and restoring one brings it back.</p>}
-      <p className="small">It stays on this {dev}: it isn&rsquo;t shared with the other {serverMode ? 'browsers and phones' : 'phones'} as a setting.</p>
+      <p>Your backups have it in their names, and restoring one brings it back.</p>
+      <p className="small">It stays on this {dev}: it isn&rsquo;t shared with the other phones as a setting.</p>
     </div>
   );
 }

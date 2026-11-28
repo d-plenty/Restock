@@ -8,7 +8,7 @@
 // kept; anything else is thrown away. Nothing about you or your photos is sent: it's a plain download
 // of the same two files for everyone, and photos are still read on the device.
 
-export interface ReaderModel {
+interface ReaderModel {
   key: 'det' | 'rec';
   file: string;
   bytes: number;
@@ -25,9 +25,6 @@ export const READER_BYTES = READER_MODELS.reduce((n, m) => n + m.bytes, 0);
 export const READER_SIZE_TEXT = `${Math.round(READER_BYTES / 1_000_000)} MB`;
 /** What it's for, in one line: used wherever the download is offered. */
 export const READER_WHAT = 'It reads receipts, and reads a product’s name from a photo when you add something without a barcode.';
-
-/** Built into this build (the Restock server's web pages): nothing to download or remove. */
-export const readerBundled = (): boolean => typeof __READER_BUNDLED__ !== 'undefined' && __READER_BUNDLED__;
 
 // ---------- where the files are kept ----------
 
@@ -88,7 +85,7 @@ export async function readerDownloaded(store: ModelStore = deviceStore): Promise
   }
 }
 
-export interface DownloadDeps {
+interface DownloadDeps {
   store?: ModelStore;
   /** The file's bytes, telling `onBytes` as they arrive. Throws when it can't be fetched. */
   fetchFile?: (url: string, onBytes: (n: number) => void, signal?: AbortSignal) => Promise<ArrayBuffer>;

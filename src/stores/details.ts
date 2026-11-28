@@ -1,5 +1,6 @@
 import { isNative, request, viaBrowser } from './http';
 import type { Chain } from '../types';
+import { giveUpAfter } from '../lib/giveUp';
 
 // Product details for the "hold to see it bigger" sheet: description, ingredients, allergens,
 // nutrition and other important information. Asked for only when you tap Product details,
@@ -257,6 +258,7 @@ export async function fetchDetails(
     try {
       const res = await fetch(
         `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(p.barcode)}.json?fields=ingredients_text,ingredients_text_en,allergens_tags,traces_tags,nutriments`,
+        { signal: giveUpAfter(12_000) },
       );
       if (res.ok) found = fromOpenFoodFacts((await res.json()) as Raw) ?? found;
     } catch {

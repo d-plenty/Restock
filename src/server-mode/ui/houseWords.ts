@@ -20,10 +20,8 @@ export function sharesText(p: Phone): string {
 }
 
 export const phoneName = (p: Phone) => p.label || p.name || 'Phone';
-/** 0.18.0: phones the server doesn't say are admins (on it before 0.18.0) are users. */
-export const isAdmin = (p: Phone) => p.role === 'admin';
 
-export function dayText(iso?: string): string {
+function dayText(iso?: string): string {
   if (!iso) return '';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
@@ -150,9 +148,6 @@ export const isTrouble = (a: Activity) => a.kind === 'error' || /failed|refused|
 // ---------- 0.9.5: the Data tab (docs/server-protocol.md "v3, 0.9.5: Data") ----------
 
 export type DataKind = 'prices' | 'receipts' | 'stats' | 'logs' | 'backups';
-export const DATA_KINDS: DataKind[] = ['prices', 'receipts', 'stats', 'logs', 'backups'];
-/** The kinds Clean up and Auto delete work on (the trash empties itself after 30 days). */
-export const CLEAN_KINDS: DataKind[] = ['prices', 'receipts', 'stats', 'logs'];
 /** What the server wants typed in Step 2. */
 export const WORD = 'DELETE';
 export const WORD_ALL = 'DELETE EVERYTHING';
@@ -234,7 +229,7 @@ export interface RestockExport {
   truncated?: string[];
 }
 
-export interface Deleted {
+interface Deleted {
   cutoff?: string | null;
   prices?: number;
   receipts?: number;
@@ -316,17 +311,6 @@ export async function fullExport(onStep?: (what: string) => void): Promise<Resto
   return out;
 }
 
-/** Every item of "What you buy most" for the period (50 a page, at most 200 pages). */
-export async function allTop(period: Period): Promise<TopItem[]> {
-  const out: TopItem[] = [];
-  for (let i = 0; i < 200; i++) {
-    const p = await data.top(period, out.length, 50);
-    out.push(...p.items);
-    if (!p.items.length || out.length >= p.total) break;
-  }
-  return out;
-}
-
 /** "That isn't your passphrase." and the server's own words, for a failed Step 2 (what was typed stays). */
 export function deleteError(e: unknown): string {
   if (e instanceof ApiError) {
@@ -340,12 +324,11 @@ export function deleteError(e: unknown): string {
   return errText(e);
 }
 
-
 /**
  * 0.18.1: Activity → Admin actions: what an admin did to the phones, the passphrase and the server's
  * settings (Activity shows everything else too: sign-ins, changes sent, merges).
  */
-export const ADMIN_ACTIONS: ReadonlySet<string> = new Set([
+const ADMIN_ACTIONS: ReadonlySet<string> = new Set([
   'phone-joined',
   'phone-left',
   'phone-removed',

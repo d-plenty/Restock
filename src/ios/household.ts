@@ -5,7 +5,7 @@ import { newJavaKeyPair } from '../server-mode/crypto';
 import type { AsyncSyncEngine } from '../server-mode/engine';
 
 /** SharedSettings.KEPT_ON_LEAVING: the household settings rows that are about this device's own items, and go with them. */
-export const KEPT_ON_LEAVING = "(k LIKE 'alias:%' OR k LIKE 'keep:%' OR k LIKE 'inv:%' OR k LIKE 'have:%')";
+const KEPT_ON_LEAVING = "(k LIKE 'alias:%' OR k LIKE 'keep:%' OR k LIKE 'inv:%' OR k LIKE 'have:%')";
 const KEPT_LOG = "(pk LIKE 'alias:%' OR pk LIKE 'keep:%' OR pk LIKE 'inv:%' OR pk LIKE 'have:%')";
 
 /** The notes every kind of household keeps (SyncHousehold.forget's list, for what an iPhone uses). */

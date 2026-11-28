@@ -3,7 +3,7 @@ import type { RunResult, SqlDriver, SqlOp, SqlValue } from './driver';
 import type { Section } from '../../shops';
 
 /** Bridge to the app's own Java code in android/app/src/main/java/family/plenty/restock. */
-export interface RestockNativePlugin {
+interface RestockNativePlugin {
   sqlQuery(opts: { sql: string; values: SqlValue[] }): Promise<{ rows: Record<string, unknown>[] }>;
   sqlRun(opts: { sql: string; values: SqlValue[] }): Promise<RunResult>;
   sqlBatch(opts: { ops: { sql: string; values: SqlValue[] }[] }): Promise<void>;
@@ -405,7 +405,7 @@ export interface ServerCodeCheck {
 export type AppChannel = 'github' | 'play' | 'sideload' | 'appstore' | 'fdroid';
 
 /** Why Restock was opened: a share, an app icon shortcut, a widget or a notification. */
-export type LaunchAction = 'scan' | 'list' | 'receipt' | 'share' | 'search' | 'recalls' | 'deals';
+type LaunchAction = 'scan' | 'list' | 'receipt' | 'share' | 'search' | 'recalls' | 'deals';
 
 export interface NativePermissions {
   camera: PermissionState;

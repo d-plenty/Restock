@@ -64,14 +64,6 @@ export function doneWith(id: string): void {
   tell();
 }
 
-/** For the tests: forget the role and what was answered. */
-export function resetApprovalsWatch(): void {
-  admin = undefined;
-  checkedRoleAt = 0;
-  waiting = [];
-  answered.clear();
-}
-
 let timer: ReturnType<typeof setInterval> | undefined;
 let onFirst: (() => void) | undefined;
 /**

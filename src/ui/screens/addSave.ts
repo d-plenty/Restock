@@ -60,7 +60,7 @@ export async function saveStoreProducts(picks: Iterable<StoreProduct>, barcodeFo
   return ids;
 }
 
-export interface NewItem {
+interface NewItem {
   name: string;
   section: Section;
   categoryId?: string;

@@ -16,7 +16,7 @@ import { turnOnBackups } from '../../lib/serverBackup';
 import { askPassword } from '../../lib/confirm';
 import { RestockNative } from '../../lib/sql/native';
 
-export type ServerAdminPage = 'phones' | 'passphrase' | 'settings' | 'backups';
+type ServerAdminPage = 'phones' | 'passphrase' | 'settings' | 'backups';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 

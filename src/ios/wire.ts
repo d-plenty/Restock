@@ -8,20 +8,20 @@
 //
 // The sockets and Bonjour are the app's native side (ios/App/App/RestockApple.swift, through
 // ios/lan.ts); everything else is here, on the same engine the server and iCloud sync use.
-import { strFromU8, strToU8 } from 'fflate';
+import { strToU8 } from 'fflate';
 import { hmac } from '@noble/hashes/hmac';
 import { sha256 } from '@noble/hashes/sha2';
 import { ALL_TABS, joinTabs, ownerOnly, parseTabs, type Entry, type Row, type AsyncSyncEngine } from '../server-mode/engine';
 import { b64u, base32, ecdh, hex, newEcdhKey, newJavaKeyPair, openJson, random, sealJson, signWithPkcs8, signedText, unb64, unbase32 } from '../server-mode/crypto';
 import { forgetHousehold, myKeys } from './household';
 
-export const VERSION = 90;
-export const PORT = 47461;
+const VERSION = 90;
+const PORT = 47461;
 export const SERVICE = '_restocksync._tcp';
 const PAGE = 400;
 const MAX_PHOTO = 8 * 1024 * 1024;
 const PHOTOS_PER_SYNC = 30;
-export const MAX_PHONES = 6;
+const MAX_PHONES = 6;
 const CODE_LIFE_MS = 10 * 60_000;
 const OLD_KEY_LIFE_MS = 60 * 24 * 3600 * 1000;
 const FULL = `A household can have up to ${MAX_PHONES} phones. Remove one first.`;
@@ -75,7 +75,7 @@ export class WifiProblem extends Error {
   }
 }
 /** The other phone answered, but said no (a used code, a full household): its words. */
-export class Refused extends Error {}
+class Refused extends Error {}
 
 // ---------- SyncWire's small pieces ----------
 
@@ -96,8 +96,8 @@ export function dayTag(key: Uint8Array, dayOffset: number, now: number = Date.no
   const day = Math.floor(now / 86_400_000) + dayOffset;
   return hex(hmac(sha256, key, utf8(`restock-tag|${day}`)).slice(0, 8));
 }
-export const householdId = (key: Uint8Array) => hex(sha256(cat(utf8('restock-household'), key)).slice(0, 8));
-export const pairingKey = (token: Uint8Array) => sha256(cat(utf8('restock-pairing'), token));
+const householdId = (key: Uint8Array) => hex(sha256(cat(utf8('restock-household'), key)).slice(0, 8));
+const pairingKey = (token: Uint8Array) => sha256(cat(utf8('restock-pairing'), token));
 export const pairingTag = (token: Uint8Array) => householdId(pairingKey(token));
 /** SyncHousehold.joinKey: SHA-256("restock-join" | ECDH secret | the code's pairing key). */
 const joinKeyOf = (priv: Uint8Array, theirPub: string, pairing: Uint8Array) => sha256(cat(utf8('restock-join'), ecdh(priv, unb64(theirPub)), pairing));
@@ -126,7 +126,7 @@ const isJpeg = (b: Uint8Array) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8
 const b64 = (b: Uint8Array) => btoa(Array.from(b, (x) => String.fromCharCode(x)).join(''));
 const unb64std = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
-export function photoPaths(row: Row | null | undefined): string[] {
+function photoPaths(row: Row | null | undefined): string[] {
   const out: string[] = [];
   if (!row) return out;
   if (typeof row.photo === 'string' && PHOTO_PATH.test(row.photo)) out.push(row.photo);
@@ -157,7 +157,7 @@ class Client {
   }
 }
 
-export interface SyncSummary {
+interface SyncSummary {
   reached: number;
   received: number;
   sent: number;
@@ -166,7 +166,7 @@ export interface SyncSummary {
   error: string | null;
 }
 
-export interface WifiInfo {
+interface WifiInfo {
   joined: boolean;
   owner: boolean;
   household: string | null;
@@ -1054,5 +1054,3 @@ export class WifiHouse {
     (await forgetHousehold(this.e, ['wifi_house', 'pair_token', 'pair_until', 'pair_code', 'oldkey', 'oldkey_until', 'owner_secrets', 'invite', 'asked_key_at', 'adv_name']));
   }
 }
-
-export const _text = (b: Uint8Array) => strFromU8(b);

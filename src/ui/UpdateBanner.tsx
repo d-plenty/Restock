@@ -8,7 +8,6 @@
 import { useState } from 'react';
 import { version } from '../../package.json';
 import { checkForUpdate, installUpdate, isNewer, RELEASES, SELF_UPDATE } from '../lib/updates';
-import { serverMode } from '../server-mode/flag';
 import type { Settings } from '../types';
 import { Icon } from './components';
 import { useNav } from './nav';
@@ -23,7 +22,7 @@ export function UpdateBanner({ settings }: { settings: Settings }) {
   const nav = useNav();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const next = SELF_UPDATE && !serverMode ? updateWaiting(settings.updates) : undefined;
+  const next = SELF_UPDATE ? updateWaiting(settings.updates) : undefined;
   if (!next) return null;
   const update = async () => {
     setBusy(true);

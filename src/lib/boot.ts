@@ -33,12 +33,7 @@ function idb<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<
   });
 }
 
-/** 0.9.2: the web app on a Restock server opens its own copy (src/server-mode/live.ts). */
-let opener: (() => Promise<void>) | undefined;
-export const setDatabaseOpener = (fn: () => Promise<void>) => (opener = fn);
-
 export async function openDatabase(): Promise<void> {
-  if (opener) return opener();
   // 0.15.1: the iPhone and iPad app in the system's own SQLite (ios/nativeDb.ts), as Android is in its own.
   if (Capacitor.isNativePlatform() && isIos() && (await import('../ios/nativeDb').then((m) => m.nativeSqlHere()))) return openAppleDatabase();
   // iPhone app: Android has its own SQLite. The iPhone app keeps the same database with sql.js, in the
@@ -157,7 +152,6 @@ async function openMarketDb(load: () => Promise<import('sql.js').SqlJsStatic>, m
 
 /** The sql.js database itself, where that's what this app runs on (not Android), and a nudge to save it after writing to it directly. */
 let sqlJs: { db: import('sql.js').Database; saved: () => void } | undefined;
-export const sqlJsDatabase = () => sqlJs;
 
 /**
  * 0.15.1: the database the iPhone and iPad app's sync engine works on (ios/sync.ts): the system's
@@ -171,8 +165,6 @@ export async function syncDatabase(): Promise<typeof syncDb> {
   syncDb = { db: asyncSyncDbOf(syncDbOf(sqlJs.db)), saved: sqlJs.saved };
   return syncDb;
 }
-/** Set once the database is open (and by the tests). */
-export const setSyncDatabase = (d: typeof syncDb) => (syncDb = d);
 
 /** The iPhone and iPad app on the system's SQLite: the same two files, kept as they were first (ios/nativeDb.ts). */
 async function openAppleDatabase(): Promise<void> {

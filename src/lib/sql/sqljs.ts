@@ -1,7 +1,7 @@
 import type { Database, SqlJsStatic } from 'sql.js';
 import type { RunResult, SqlDriver, SqlOp, SqlValue } from './driver';
 
-export interface SqlJsOptions {
+interface SqlJsOptions {
   /** Loads the sql.js library (differs between browser and Node). */
   load: () => Promise<SqlJsStatic>;
   /** Previously saved database bytes, if any. */

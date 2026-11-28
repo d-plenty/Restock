@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react';
 import { updateSettings } from '../../lib/db';
-import { useLive } from '../../lib/useLive';
 import { syncAvailable, syncInfo, type SyncInfo } from '../../lib/sync';
 import { SECTION_NAMES, type Section } from '../../shops';
 import type { Settings } from '../../types';
-import { Icon } from '../components';
 import { useNav } from '../nav';
-import { startTour } from '../Tour';
-import { isEssential, noticeSetUpTiles, tilesLeft } from './Setup';
 import { SHARE_TABS, shareTab } from './Sync';
 
 /**
@@ -55,61 +51,5 @@ export function TabOffer({ settings }: { settings: Settings }) {
         </button>
       </div>
     </div>
-  );
-}
-
-/** Home: "Finish setting up" (until done or dismissed) and "Take the tour" (until taken or dismissed). */
-export function SetupNudges({ settings }: { settings: Settings }) {
-  const nav = useNav();
-  // 0.9.3: phone sync or a Restock server counts for the Backups tile.
-  const cover = useLive(syncInfo, []);
-  // 0.10.10: only the three to start with (it said "11 left" on day one), and one card at a time:
-  // setup first, then the tour.
-  const left = tilesLeft(settings, cover).filter((t) => isEssential(t.id));
-  const setupCard = left.length > 0 && !settings.setup.dismissed;
-  // Set up without anyone tapping Next (permissions allowed, a card added): counts as done.
-  useEffect(() => {
-    void noticeSetUpTiles();
-  }, []);
-  return (
-    <>
-      <TabOffer settings={settings} />
-      {setupCard && (
-        <div className="card nudge">
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <span className="grow">
-              <span className="title" style={{ fontSize: 15 }}>
-                Finish setting up · {left.length} left
-              </span>
-              <span className="small">{left.map((t) => t.title).join(', ')}</span>
-            </span>
-            <button className="icon-btn" aria-label="Hide this" onClick={() => updateSettings({ setup: { ...settings.setup, dismissed: true } })}>
-              <Icon name="close" size={16} />
-            </button>
-          </div>
-          <button className="btn small primary" style={{ alignSelf: 'flex-start' }} onClick={() => nav.push({ name: 'setup' })}>
-            Continue setup
-          </button>
-        </div>
-      )}
-      {!setupCard && !settings.tour.seen && (
-        <div className="card nudge">
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <span className="grow">
-              <span className="title" style={{ fontSize: 15 }}>
-                New to Restock? Take the tour
-              </span>
-              <span className="small">A two-minute look round with sample items. They go away when the tour ends.</span>
-            </span>
-            <button className="icon-btn" aria-label="No thanks" onClick={() => updateSettings({ tour: { ...settings.tour, seen: true } })}>
-              <Icon name="close" size={16} />
-            </button>
-          </div>
-          <button className="btn small primary" style={{ alignSelf: 'flex-start' }} onClick={() => void startTour()}>
-            Take the tour
-          </button>
-        </div>
-      )}
-    </>
   );
 }

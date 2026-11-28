@@ -10,7 +10,7 @@ import { BlockedError, isBlockMessage } from '../stores/http';
 
 export type StoreChain = Exclude<Chain, 'other'>;
 
-export interface ChainHealth {
+interface ChainHealth {
   lastOk?: string;
   lastFail?: string;
   error?: string;
@@ -19,7 +19,7 @@ export interface ChainHealth {
   /** The person opened the shop's page (Unblock) during this run of failures and it still didn't work. */
   unblockTried?: string;
 }
-export type StoreHealth = Partial<Record<StoreChain, ChainHealth>>;
+type StoreHealth = Partial<Record<StoreChain, ChainHealth>>;
 
 const KEY = 'storeHealth';
 
@@ -82,7 +82,7 @@ export const isBlockedError = (error: string | undefined): boolean => isBlockMes
 // comes back if the shop is still failing.
 const HIDDEN_KEY = 'hiddenShopWarnings';
 const HIDE_FOR_MS = 24 * 3_600_000;
-export type HiddenWarnings = Partial<Record<StoreChain, string>>;
+type HiddenWarnings = Partial<Record<StoreChain, string>>;
 
 export async function getHiddenWarnings(): Promise<HiddenWarnings> {
   return (await getKV<HiddenWarnings>(HIDDEN_KEY).catch(() => undefined)) ?? {};

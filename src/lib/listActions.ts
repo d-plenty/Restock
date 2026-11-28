@@ -63,7 +63,7 @@ export function scannedLine(name: string | undefined, code: string): { text: str
 export const takeOffList = (ids: string[], name: string) => act(`${name} taken off your shopping list`, () => deleteListEntries(ids));
 
 // 0.9.6: "Move to" another list (Groceries, Keg, Health, General), with Undo: moveLine.ts.
-export { moveAll, moveTo } from './moveLine';
+export {  moveTo } from './moveLine';
 
 /**
  * 0.9.12: "2 coconut cream", "coconut cream x2" or "3x milk" typed on a list is that many: the

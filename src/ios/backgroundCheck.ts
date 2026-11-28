@@ -23,9 +23,9 @@ import type { Settings } from '../types';
 import { appleHere, RestockApple } from './apple';
 
 /** Each is given a little less than iOS's own limit, so what was found is saved before it ends. */
-export const REFRESH_MS = 20_000;
+const REFRESH_MS = 20_000;
 /** How long before iOS's end a run stops (the save takes a moment). */
-export const MARGIN_MS = 3_000;
+const MARGIN_MS = 3_000;
 
 let stopAsked = false;
 let listening = false;
@@ -130,7 +130,7 @@ export function priceSince(readings: { date: string; price: number }[], cur: { d
 }
 
 /** The new deals worth a notification: lines to show, and the keys that mark them as sent. */
-export async function newDeals(recs: Recommendation[], sent: Set<string>): Promise<{ lines: string[]; keys: string[]; items: string[] }> {
+async function newDeals(recs: Recommendation[], sent: Set<string>): Promise<{ lines: string[]; keys: string[]; items: string[] }> {
   const lines: string[] = [];
   const keys: string[] = [];
   const items: string[] = [];

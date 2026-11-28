@@ -151,7 +151,7 @@ export function AddPhoneSheet({ info, onClose, onWifi }: { info: SyncInfo; onClo
 }
 
 /** The personal things a phone can take back off a v3 server (never groceries). */
-export const PERSONAL: { kind: TakeBack; title: string }[] = [
+const PERSONAL: { kind: TakeBack; title: string }[] = [
   { kind: 'keg', get title() { return SECTION_NAMES.keg; } },
   { kind: 'pharmacy', get title() { return SECTION_NAMES.pharmacy; } },
   { kind: 'receipts', title: 'Receipts' },

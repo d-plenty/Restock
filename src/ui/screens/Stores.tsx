@@ -67,7 +67,7 @@ const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** The word Restock searches for when testing a shop. */
 import { getHealth, offerUnblock, TEST_WORD } from '../../lib/health';
 import { UnblockButton } from '../Unblock';
-export { TEST_WORD };
+;
 
 /**
  * "Find near me": every supermarket, bottle shop or pharmacy Restock knows within about 25 km,
@@ -472,7 +472,7 @@ const TAB_GROUP: Record<Section, ShopGroup> = { pantry: 'supermarket', keg: 'bot
  * searches. A shop can be on more than one tab (Woolworths for Pantry and for Baby); its branch is
  * the same on each. Nothing is ticked to start with. Under a ticked shop: its status and Edit.
  */
-export function ShopPicker({ settings, section }: { settings: Settings; section: Section }) {
+function ShopPicker({ settings, section }: { settings: Settings; section: Section }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<CustomShop>();
   const [costco, setCostco] = useState(false);

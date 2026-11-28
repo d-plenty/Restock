@@ -1,6 +1,8 @@
 import { useLatest } from './useLatest';
 import { isLite } from '../lib/simple';
 import { noteSpeed } from '../lib/speedLog';
+import { poke } from '../lib/live';
+import { waitingReport } from '../lib/waiting';
 import { useNow } from './useNow';
 import { wasSince } from '../lib/wasSince';
 import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react';
@@ -228,7 +230,7 @@ const paths: Record<string, ReactNode> = {
  * 0.10.7: the icon pack for custom sections (shops.ts PACK_ICON_IDS), drawn like the rest: 24 × 24,
  * round 2 px lines in the text colour, so they sit with Keg, Health and the others.
  */
-export const PACK_ICONS: Record<string, ReactNode> = {
+const PACK_ICONS: Record<string, ReactNode> = {
   bottle: paths.baby,
   paw: paths.pets,
   car: (
@@ -286,7 +288,7 @@ export const PACK_ICONS: Record<string, ReactNode> = {
  * (setSectionIcons), so every <Icon name={section}> follows it.
  */
 let sectionIcons: Partial<Record<string, string>> = {};
-export function setSectionIcons(map: Partial<Record<string, string>>) {
+function setSectionIcons(map: Partial<Record<string, string>>) {
   sectionIcons = map;
 }
 
@@ -375,9 +377,56 @@ export function ScreenWaiting({ title, back = true, name }: { title?: string; ba
           </span>
         </div>
       )}
+      {slow && <StillWaiting />}
     </div>
   );
 }
+
+/**
+ * 0.19.0: a screen that's still loading after a while says what it's waiting for and what went
+ * wrong (lib/waiting.ts), with Copy for a report and Try again. Before, it said "Loading…" for as
+ * long as it took, even for good.
+ */
+function StillWaiting() {
+  const [lines, setLines] = useState<string[]>();
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    const started = Date.now();
+    const t = setInterval(() => {
+      if (Date.now() - started >= STILL_MS) setLines(waitingReport());
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+  if (!lines) return null;
+  const text = [`Restock ${__APP_VERSION__} · still loading`, ...lines, ...(lines.length ? [] : ['Nothing is waiting on the database (this screen’s own code may not have loaded).'])].join('\n');
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+    } catch {
+      // No clipboard here: the words are on the screen to photograph.
+    }
+  };
+  return (
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <strong>This is taking longer than it should</strong>
+      <span className="small">Restock keeps trying by itself. If it stays like this, these lines say why: please send them with a report.</span>
+      <pre className="small" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', margin: 0, userSelect: 'text' }}>
+        {text}
+      </pre>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button className="btn small" style={{ minHeight: 44 }} onClick={() => void copy()}>
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+        <button className="btn small" style={{ minHeight: 44 }} onClick={() => poke()}>
+          Try again
+        </button>
+      </div>
+    </div>
+  );
+}
+/** How long a screen loads before it says what it's waiting for. */
+const STILL_MS = 6000;
 
 /** 0.10.2: shops marked Beta where they're picked or set up (it works the same; it's tested less). 0.10.3: and IGA and the new shops (shops.ts). */
 export { BETA_SHOPS } from '../shops';
@@ -432,7 +481,7 @@ export function specialTag(price: number | undefined, was: number | undefined, h
   return half || price <= was / 2 + 0.005 ? `HALF PRICE · ${save}` : `SPECIAL · ${save}`;
 }
 
-export function MemberTag({ chain }: { chain: Chain }) {
+function MemberTag({ chain }: { chain: Chain }) {
   const { name, cls } = memberProgram(chain);
   return <span className={`tag ${cls}`}>{name ? `MEMBER PRICE · ${name.toUpperCase()}` : 'MEMBER PRICE'}</span>;
 }
@@ -452,7 +501,7 @@ export function stockWhere(chain: string, long = false): string {
  * until 1 Sep 2026", easier to see than the grey it was, and red once that date is more than 14 days
  * back (lib/wasSince). The SPECIAL tag beside it is unchanged.
  */
-export function PromoTag({ promo }: { promo?: string }) {
+function PromoTag({ promo }: { promo?: string }) {
   const label = promoLabel(promo);
   if (!label) return null;
   const was = wasSince(label);
@@ -529,21 +578,6 @@ export function Thumb({ src, icon = 'box' }: { src?: string; icon?: string }) {
       ) : (
         <span style={{ color: 'var(--muted)' }}>
           <Icon name={icon} size={24} />
-        </span>
-      )}
-    </div>
-  );
-}
-
-export function Price({ value, was }: { value?: number; was?: number }) {
-  return (
-    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <span className="num" style={{ fontSize: 17, fontWeight: 600 }}>
-        {money(value)}
-      </span>
-      {was !== undefined && was > (value ?? 0) && (
-        <span className="num small" style={{ textDecoration: 'line-through' }}>
-          {money(was)}
         </span>
       )}
     </div>

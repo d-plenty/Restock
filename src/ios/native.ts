@@ -31,7 +31,7 @@ const SHARE_UA = 'Restock/0.3 (iPhone; grocery price tracker) share';
  * trolley works from one item you add yourself. The same script as Android's (StoreWeb.RECORDER).
  * Nothing is sent anywhere, and the app trims and checks it before you share it.
  */
-export const RECORDER =
+const RECORDER =
   '(function(){if(window.__rsRec)return;window.__rsRec=1;var K=\'__restockRec\';' +
   'function save(e){try{var a=JSON.parse(sessionStorage.getItem(K)||\'[]\');e.at=Date.now();e.page=location.pathname;a.push(e);if(a.length>300)a.shift();sessionStorage.setItem(K,JSON.stringify(a));}catch(x){}}' +
   'function cut(s,n){s=s==null?\'\':String(s);return s.length>n?s.slice(0,n)+\'...\':s;}' +

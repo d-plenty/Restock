@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 
-export interface TextFile {
+interface TextFile {
   name: string;
   text: string;
 }
@@ -15,7 +15,12 @@ export async function shareTextFiles(files: TextFile[], mime = 'application/json
     const { Share } = await import('@capacitor/share');
     const uris: string[] = [];
     for (const f of files) uris.push((await Filesystem.writeFile({ path: f.name, data: f.text, directory: Directory.Cache, encoding: Encoding.UTF8 })).uri);
-    await Share.share({ title, files: uris });
+    try {
+      await Share.share({ title, files: uris });
+    } catch (e) {
+      // 0.19.0: closing the share menu without choosing isn't a failure (it was reported as one).
+      if (!/cancel/i.test(e instanceof Error ? e.message : String(e))) throw e;
+    }
     return;
   }
   for (const f of files) {

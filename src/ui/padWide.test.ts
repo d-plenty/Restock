@@ -6,7 +6,6 @@ import { renderHook } from '@testing-library/react';
 const platform = { name: 'web' };
 vi.mock('@capacitor/core', () => ({ Capacitor: { getPlatform: () => platform.name, isNativePlatform: () => platform.name !== 'web' } }));
 vi.mock('../lib/platform', () => ({ isIos: () => platform.name === 'ios' }));
-vi.mock('../server-mode/flag', () => ({ serverMode: false }));
 
 let width = 1280;
 beforeEach(() => {

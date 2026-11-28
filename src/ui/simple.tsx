@@ -108,7 +108,7 @@ export function ItemRow({
 }
 
 /** The cart button at the end of a row of yours: on the list or not, one tap either way. */
-export function ListButton({ rec, listed }: { rec: Recommendation; listed?: string }) {
+function ListButton({ rec, listed }: { rec: Recommendation; listed?: string }) {
   const nav = useNav();
   return (
     <button

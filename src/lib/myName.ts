@@ -4,7 +4,6 @@
 // It's used for Home's greeting ("Good morning, Declan"; with no name, "Good morning"), for this
 // phone's name in the household and on a Restock server ("Declan's iPhone"), and in backup file
 // names. It's this phone's own: in its backups (so a restore brings it back), never synced.
-import { serverMode } from '../server-mode/flag';
 import { getSettings, updateSettings } from './db';
 import { Capacitor } from '@capacitor/core';
 import { deviceWord, isIos } from './platform';
@@ -56,8 +55,6 @@ export async function setMyName(name: string): Promise<void> {
   const n = cleanName(name);
   await updateSettings({ myName: n || undefined, nameAsked: true });
   await labelPhone(n).catch(quiet('your name'));
-  // 0.17.0: the web page on a server names this browser by it too (server-mode/live.ts)
-  if (serverMode) await import('../server-mode/live').then((m) => m.nameThisBrowser(n)).catch(quiet('your name'));
 }
 
 /** Skipped: not asked again. */

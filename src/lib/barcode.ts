@@ -1,6 +1,7 @@
 // Barcode lookup and scanning — all open source, no Google Play services.
 // Scanning uses zxing-cpp compiled to WebAssembly (zxing-wasm, MIT licence), bundled
 // inside the app so nothing is downloaded from a CDN.
+import { giveUpAfter } from './giveUp';
 
 export interface BarcodeInfo {
   barcode: string;
@@ -16,6 +17,7 @@ export async function lookupBarcode(barcode: string): Promise<BarcodeInfo> {
   try {
     const res = await fetch(
       `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,product_name_en,brands,quantity,image_small_url`,
+      { signal: giveUpAfter(12_000) },
     );
     if (!res.ok) return info;
     const json = (await res.json()) as {

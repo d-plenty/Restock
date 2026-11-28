@@ -13,7 +13,7 @@ import { sha256 } from '@noble/hashes/sha2';
 import { isSyncFile, webFileName, type AsyncSyncEngine, type SyncFileMessage, type WebSyncEngine } from './engine';
 
 /** 0.15.1: the round runs on either engine: one that answers straight away, or the iPhone's, which answers later. */
-export type AnyEngine = WebSyncEngine | AsyncSyncEngine;
+type AnyEngine = WebSyncEngine | AsyncSyncEngine;
 
 export interface Remote {
   files(): Promise<{ name: string; size: number; version?: string; modified?: string }[]>;
@@ -22,7 +22,7 @@ export interface Remote {
   write(name: string, bytes: Uint8Array, ifMatch?: string): Promise<{ version?: string } | unknown>;
 }
 
-export interface Keys {
+interface Keys {
   webId: string;
   webPriv: string;
   webPub: string;
@@ -50,7 +50,7 @@ export interface SharedSection {
   catalogues: Record<string, { url?: string; note?: string }>;
 }
 
-export interface RoundOptions {
+interface RoundOptions {
   /** A house (protocol v3): no webkeys/, no archives, no webPub. */
   v3?: boolean;
   /** 0.13.2, a phone (the iPhone and iPad app): its own file's name, and what goes in it besides the entries (`shares`). */

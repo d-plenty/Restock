@@ -11,14 +11,15 @@ export interface VersionNotes {
 
 export const WHATS_NEW: VersionNotes[] = [
   {
-    version: '0.18.4',
-    about: 'Restock on iPhone opens properly on a Restock server, each phone keeps its backup on the server, and a tidier Server admin.',
+    version: '0.19.0',
+    about: 'A screen that stays on “Loading…” now says why and keeps trying, Restock opens quicker, and the code for versions before 0.14.0 is gone.',
     changes: [
-      'Fixed: on an iPhone or iPad joined to a Restock server, Home, Pantry and the list could stay on “Loading…”. Syncing asks the database a few hundred things at a time now, not one by one.',
-      'Each phone can keep its whole backup on your Restock server, once a day (Settings → Sync → Restock server → Backup). Locked so only the server’s passphrase opens it.',
-      'A lost or broken phone: an admin adds the new one as its replacement, and the new one puts the backup back with the server’s passphrase.',
-      'Server admin on the phone is the basics on the go, a page each: Phones and tablets, Sign in a computer, Passphrase (new), Basic settings and Phone backups.',
-      'The server’s web page fits any screen, from a phone to a big monitor, and its Text size makes everything bigger.',
+      'A screen still loading after a few seconds says what it’s waiting for and what went wrong, with Copy for a report and Try again.',
+      'A read that never gets an answer is tried again by itself (it used to wait for good), and on iPhone and iPad it’s also asked a second way.',
+      'Opening Restock asks its database for less: the same question asked by several screens at once is answered once.',
+      'Checks with GitHub and barcode look-ups give up after a few seconds instead of waiting. Closing the share menu is no longer noted as a problem.',
+      'Code for Restock and Restock servers before 0.14.0 is gone, which makes the app and the server smaller.',
+      'The server’s web page: Test both on Addresses now asks the server, so it’s right for an address the page isn’t open on.',
     ],
   },
 ];

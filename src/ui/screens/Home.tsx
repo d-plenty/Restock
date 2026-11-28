@@ -35,7 +35,6 @@ import { shopTileNote } from '../../lib/ownSpecials';
 import { ownCounts } from '../../lib/ownSpecialsLive';
 import { TabOffer } from './SetupNudges';
 import { UpdateBanner } from '../UpdateBanner';
-import { serverMode } from '../../server-mode/flag';
 import { ConnectionsSheet } from './SettingsParts';
 import { planOf } from '../../lib/checkSchedule';
 import { getCheckLog, missedSlot, missedWords, whenWords } from '../../lib/checkLog';
@@ -90,7 +89,7 @@ export function HomeScreen() {
   };
   // 0.10.2: a scheduled check that didn't happen says so (Advanced → Diagnostics says why).
   const missed =
-    isNative() && !serverMode && settings.sync.backgroundActivity
+    isNative() && settings.sync.backgroundActivity
       ? missedSlot(planOf(settings), settings.lastCheck, runs)
       : undefined;
 
@@ -148,9 +147,7 @@ export function HomeScreen() {
           ) : (
             <>
               <span>
-                {serverMode
-                  ? 'Prices come from your phones'
-                  : !isNative()
+                {!isNative()
                   ? 'Live prices work in the Android app'
                   : settings.lastCheck
                     ? // 0.17.0: one short line (when the next check is, is in Settings → Prices and deals)
@@ -178,7 +175,7 @@ export function HomeScreen() {
 
       {/* 0.12.0: adding starts here: search, or the barcode button (Add was a tab in the middle of the bar) */}
       {/* On a Restock server's web page there's no shop search (shops turn web pages away), so no search box here: Pantry says where adding is done. */}
-      {!serverMode && <AddBar />}
+      <AddBar />
       {worth.length > 0 && (
         <div className="navy-sum">
           <span>
@@ -197,7 +194,7 @@ export function HomeScreen() {
       <SaveWarning />
 
       {/* 0.12.0: the "finish setting up" and tour cards are gone from Home (each thing is asked when it's first needed; both are in Settings). The household's offer of a tab it now shares stays. */}
-      {!serverMode && <TabOffer settings={settings} />}
+      <TabOffer settings={settings} />
 
       {Object.entries(refresh.busy ? {} : errors).map(([chain, msg]) =>
         offerUnblock(chain, msg) && chain !== 'other' ? (
@@ -222,7 +219,7 @@ export function HomeScreen() {
       {/* 0.14.0: a loyalty card about to run out (Cards → its expiry date). */}
       <CardExpiryNotice />
 
-      {!serverMode && sync && recs.length > 0 && needsBackupNudge(settings, recs.length, oldest, now, protection(false, sync).covered) && (
+      {sync && recs.length > 0 && needsBackupNudge(settings, recs.length, oldest, now, protection(false, sync).covered) && (
         <div className="card hint" style={{ flexDirection: 'column', gap: 8 }}>
           <strong>Back up your pantry</strong>
           {/* 0.12.0: two lines (it was a paragraph) */}
@@ -372,22 +369,18 @@ function FirstHome({ tourSeen }: { tourSeen?: boolean }) {
   return (
     <>
       <div className="card first-card">
-        <strong className="first-card-title">{serverMode ? 'Nothing here yet' : 'Add what you buy'}</strong>
+        <strong className="first-card-title">Add what you buy</strong>
         <span className="small">
-          {serverMode
-            ? 'Add what you buy on a phone: adding is by shop search, which only phones can do. This page then shows what your phones found.'
-            : 'Search for it or scan its barcode. Restock watches the price and tells you when it is a real special.'}
+          Search for it or scan its barcode. Restock watches the price and tells you when it is a real special.
         </span>
-        {!serverMode && (
-          <div className="two">
-            <button className="btn primary" onClick={() => nav.push({ name: 'add' })}>
-              <Icon name="search" size={18} /> Search
-            </button>
-            <button className="btn" onClick={() => nav.push({ name: 'add', scan: true })}>
-              <Icon name="scan" size={18} /> Scan
-            </button>
-          </div>
-        )}
+        <div className="two">
+          <button className="btn primary" onClick={() => nav.push({ name: 'add' })}>
+            <Icon name="search" size={18} /> Search
+          </button>
+          <button className="btn" onClick={() => nav.push({ name: 'add', scan: true })}>
+            <Icon name="scan" size={18} /> Scan
+          </button>
+        </div>
       </div>
       <button
         className="btn ghost"
@@ -395,15 +388,13 @@ function FirstHome({ tourSeen }: { tourSeen?: boolean }) {
           await loadDemo();
           // 0.9.12: on the web page they stay in this browser (they never sync), so it says so.
           nav.toast(
-            serverMode
-              ? 'Sample items added, in this browser only: they never go to your phones. Remove them any time in Settings.'
-              : 'Sample items added. Remove them any time in Settings.',
+            'Sample items added. Remove them any time in Settings.',
           );
         }}
       >
         Look around with sample items
       </button>
-      {!serverMode && !tourSeen && (
+      {!tourSeen && (
         <button className="btn ghost" onClick={() => void startTour()}>
           Take the two-minute tour
         </button>

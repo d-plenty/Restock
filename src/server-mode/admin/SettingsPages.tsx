@@ -127,19 +127,6 @@ export function HouseholdPage() {
 
 // ---------- Addresses ----------
 
-/** Does the address answer from this computer? (Only what the browser can tell: not every network.) */
-async function answers(url: string): Promise<boolean> {
-  try {
-    const c = new AbortController();
-    const t = setTimeout(() => c.abort(), 5000);
-    await fetch(url.replace(/\/+$/, '') + '/api/v3/health', { mode: 'no-cors', cache: 'no-store', signal: c.signal });
-    clearTimeout(t);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function AddressesPage() {
   const s = useSettings();
   const d = s.data;
@@ -165,12 +152,16 @@ export function AddressesPage() {
   };
   const test = async () => {
     setTests({ home: h ? null : undefined, away: a ? null : undefined });
-    const [x, y] = await Promise.all([h ? answers(h) : Promise.resolve(undefined), a ? answers(a) : Promise.resolve(undefined)]);
-    setTests({ home: x, away: y });
+    try {
+      const out = await api3.testAddresses({ ...(h ? { home: h } : {}), ...(a ? { away: a } : {}) });
+      setTests({ home: h ? out.home === true : undefined, away: a ? out.away === true : undefined });
+    } catch (e) {
+      setTests({});
+      setError({ text: errText(e) });
+    }
   };
   const tag = (v: boolean | null | undefined, what: string) =>
-    v === undefined ? null : v === null ? <span className="sv-tag user">Testing {what}…</span> : <span className={`sv-tag ${v ? 'ok' : 'warn'}`}>{v ? `${what} answers` : `${what} didn't answer from here`}</span>;
-  const mixed = typeof location !== 'undefined' && location.protocol === 'https:' && /^http:/i.test(h);
+    v === undefined ? null : v === null ? <span className="sv-tag user">Testing {what}…</span> : <span className={`sv-tag ${v ? 'ok' : 'warn'}`}>{v ? `${what} answers` : `${what} didn't answer the server`}</span>;
   return (
     <>
       <PageHead group={GROUP} title="Addresses" sub="How phones reach this server, at home and away. Phones try the home address first, for a moment, then the away one.">
@@ -204,7 +195,7 @@ export function AddressesPage() {
             <button className="sv-btn sm" type="button" style={{ alignSelf: 'flex-start' }} disabled={!h && !a} onClick={() => void test()}>
               Test both
             </button>
-            {mixed && <span className="sv-small">This page is open on https, so the browser won't try the http:// home address. Phones still can.</span>}
+            <span className="sv-small">The server tries each address itself, and checks a Restock server with this household's name answers. Away from home, your phones may still need to be on mobile data to be sure.</span>
           </Card>
           <Card title="What phones get">
             <p className="sv-small">New phones get both addresses in their QR code. Phones already on the server pick up a change the next time they sync.</p>

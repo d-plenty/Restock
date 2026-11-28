@@ -5,9 +5,9 @@
 import { cachedSettings, updateSettings } from './db';
 
 /** Asked when the pantry has at least this many items… */
-export const ASK_ITEMS = 20;
+const ASK_ITEMS = 20;
 /** …and this many shopping trips have been finished on this phone. */
-export const ASK_TRIPS = 3;
+const ASK_TRIPS = 3;
 
 /** A shopping trip finished (everything got, or Done). */
 export async function noteTripDone(): Promise<void> {

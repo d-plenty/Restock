@@ -7,7 +7,7 @@ import { Icon, Sheet } from './components';
 // 0.15.0: only what an iPhone build can still be without: the Files folder (an old build) and the
 // shop's own page (a build without the Apple part). Everything else works on iPhone now, or says how
 // it works there in its own words.
-export type IosReason = 'icloud' | 'shopPage';
+type IosReason = 'icloud' | 'shopPage';
 
 /** Why something is greyed on an iPhone: a heading and what to do instead. */
 export const IOS_REASONS: Record<IosReason, { title: string; why: string; instead?: string }> = {

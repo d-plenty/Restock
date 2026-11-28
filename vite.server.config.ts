@@ -2,17 +2,17 @@
 // server, with the phone-only parts left out. Build with: npm run build:server-web
 // Output: server/public/app, or SERVER_WEB_OUT=<folder> (or --outDir <folder>).
 //
-// 0.9.5: also a home screen web app (src/server-mode/pwa): the manifest and icons in pwa/, the
-// iPhone's meta tags in the page, and the service worker (sw.js) with this build's app shell.
+// 0.9.5: also a home screen web app (src/server-mode/pwa): the manifest and icons in pwa/, and the
+// iPhone's meta tags in the page. 0.19.0: sw.js only takes the earlier worker off (pwa/sw.ts).
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { build, defineConfig, mergeConfig, type Plugin } from 'vite';
 import base from './vite.config';
 import { MANIFEST } from './src/server-mode/pwa/manifest';
-import { buildId, shellFiles, SHELL_MARKER, SW_FILE } from './src/server-mode/pwa/swCore';
 
 const ICONS = ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-192.png', 'icon-maskable-512.png'];
 const SW_ENTRY = 'src/server-mode/pwa/sw.ts';
+const SW_FILE = 'sw.js';
 
 function restockPwa(): Plugin {
   return {
@@ -45,7 +45,7 @@ function restockPwa(): Plugin {
         this.emitFile({ type: 'asset', fileName: `pwa/${name}`, source: readFileSync(new URL(`./src/server-mode/pwa/icons/${name}`, import.meta.url)) });
       this.emitFile({ type: 'asset', fileName: 'pwa/manifest.webmanifest', source: JSON.stringify(MANIFEST, null, 2) + '\n' });
     },
-    async generateBundle(_opts, bundle) {
+    async generateBundle() {
       // The worker on its own: one classic script that needs no other file (the page shares code
       // with it, so it can't be a chunk of this build).
       const out = await build({
@@ -60,14 +60,7 @@ function restockPwa(): Plugin {
       });
       const chunk = (Array.isArray(out) ? out : [out]).flatMap((o) => ('output' in o ? o.output : [])).find((o) => o.type === 'chunk');
       if (!chunk || chunk.type !== 'chunk') throw new Error('restock-pwa: sw.js was not built');
-      const files = shellFiles([...Object.keys(bundle), 'index.html']);
-      // 0.9.6: the app's version is part of the id too, so a new release is always a new shell
-      // (restock-shell-<id>), and the old one goes when the new worker takes over.
-      const version = (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version?: string }).version ?? '';
-      const manifest = { build: buildId(files, `${version}\n${chunk.code}`), version, files };
-      const marker = new RegExp(`(["'\`])${SHELL_MARKER}\\1`);
-      if (!marker.test(chunk.code)) throw new Error('restock-pwa: the shell marker is missing from sw.js');
-      this.emitFile({ type: 'asset', fileName: SW_FILE, source: chunk.code.replace(marker, () => JSON.stringify(JSON.stringify(manifest))) });
+      this.emitFile({ type: 'asset', fileName: SW_FILE, source: chunk.code });
     },
   };
 }
@@ -75,8 +68,6 @@ function restockPwa(): Plugin {
 export default mergeConfig(
   base,
   defineConfig({
-    // The server hands out the photo reader's model files itself (a browser never goes to GitHub for them).
-    define: { 'import.meta.env.VITE_SERVER_MODE': JSON.stringify('1'), __READER_BUNDLED__: 'true' },
     plugins: [restockPwa()],
     build: { outDir: process.env.SERVER_WEB_OUT || 'server/public/app', emptyOutDir: true, sourcemap: false },
   }),

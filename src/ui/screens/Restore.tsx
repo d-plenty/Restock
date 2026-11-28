@@ -297,7 +297,7 @@ export function RestoreSheet({
 }
 
 /** Read a picked file into a summary, or explain why it can't be used. */
-export async function readBackupFile(file: File): Promise<BackupSummary> {
+async function readBackupFile(file: File): Promise<BackupSummary> {
   let text = await file.text();
   // 0.9.0: a locked backup asks for its password (three goes).
   if (isLocked(text)) {

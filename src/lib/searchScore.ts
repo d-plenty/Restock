@@ -6,7 +6,7 @@ import { intendedKind, scoreAll, UNLIKELY, normaliseQuery, type Scored } from '.
 import type { StoreProduct } from '../stores/types';
 import { isRight } from './searchExpect';
 
-export interface Mark {
+interface Mark {
   shop: string;
   word: string;
   /** What the person sees first: the shop's results, or the kind it was searched for instead. */

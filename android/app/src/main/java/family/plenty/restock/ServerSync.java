@@ -97,6 +97,9 @@ final class ServerSync {
         }
     }
 
+    /** 0.19.0: what a phone still linked to its server the pre-0.14.0 way is told. */
+    static final String OLD_LINK = "This phone joined your Restock server before Restock 0.14.0. Leave the server here (Settings → Sync), then join it again with a new code from an admin.";
+
     /** Forgets a server's notes (not the connection): its files are read and written afresh. */
     void clearNotes() throws Exception {
         for (String k : new String[] { "server_top", "server_keys", "server_at", "server_unread", "server_files", "server_webkeys", "server_off_at", "server_off_prices", "server_off_waiting", "server_keysfile" })
@@ -173,31 +176,6 @@ final class ServerSync {
         return out;
     }
 
-    /** What a browser is given: this household's serverKeys (every version this phone has known), its name and owner key. */
-    JSONObject gift() throws Exception {
-        noteFileKey();
-        String hid = h.hid() == null ? "" : h.hid();
-        JSONObject keys = new JSONObject();
-        String stored = e.meta("server_filekeys");
-        JSONArray all = stored == null ? new JSONArray() : new JSONArray(stored);
-        for (int i = 0; i < all.length(); i++) {
-            JSONObject k = all.getJSONObject(i);
-            if (hid.equals(k.optString("hid"))) keys.put(String.valueOf(k.getInt("keyv")), k.getString("key"));
-        }
-        keys.put(String.valueOf(keyv()), ServerLink.b64u(SyncFolder.serverKey(key())));
-        JSONObject hh = new JSONObject();
-        String name = e.householdValue("name");
-        hh.put("name", name != null ? name : e.meta("household"));
-        hh.put("owner_pub", e.householdValue("owner_pub"));
-        JSONObject g = new JSONObject();
-        g.put("format", "restock-keys");
-        g.put("v", 1);
-        g.put("keyv", keyv());
-        g.put("keys", keys);
-        g.put("household", hh);
-        return g;
-    }
-
     ServerOffload offloader(ServerOffload.Remote f, long now) throws Exception {
         return new ServerOffload(e, f, fileKeys(), SyncFolder.serverKey(key()), keyv(), now);
     }
@@ -217,8 +195,6 @@ final class ServerSync {
         ServerOffload.Result offload;
         /** 0.9.4: the v3 server says this phone was removed (SyncHub forgets the household). */
         boolean removed;
-        /** 0.9.4: this round moved the phone to v3 (after the household was handed to the server). */
-        boolean upgraded;
         /** 0.9.4: a newer household key came in keys/<device>.bin this round. */
         boolean rekeyed;
     }
@@ -389,11 +365,10 @@ final class ServerSync {
             try {
                 out.result = roundSync(f, nowIso, out);
             } catch (ServerFolder.UpdateException up) {
-                // 0.9.4: the household was handed to the server: carry on with v3, no code needed.
-                upgrade();
-                out.upgraded = true;
-                f = open();
-                out.result = roundSync(f, nowIso, out);
+                // 0.19.0: a link made before Restock 0.14.0 (the server's first way of syncing) isn't carried over any more.
+                out.error = OLD_LINK;
+                out.cause = up;
+                return out;
             }
             // 0.9.5: the server asked phones to resend (its signed server row's `resend`).
             if (v3()) resendIfAsked(f, nowIso, now, out);
@@ -406,11 +381,6 @@ final class ServerSync {
             e.db.exec("DELETE FROM sync_meta WHERE key LIKE 'server_keysver:%'");
             for (String n : names)
                 if ((n.startsWith("restock-sync-keys") && n.endsWith(".json")) && f.version(n) != null) e.setMeta("server_keysver:" + n, f.version(n));
-            if (!v3()) try {
-                writeWebKeys(f, names);
-            } catch (Exception ex) {
-                // next round
-            }
             try {
                 ServerOffload off = offloader(f, now);
                 // 0.9.4: nothing older than the house's "Keep data for" goes up (it would be pruned there at once).
@@ -455,42 +425,6 @@ final class ServerSync {
             out.cause = ex;
         }
         return out;
-    }
-
-    /**
-     * The current keys sealed for each browser the server lists whose key this phone can trust (one
-     * it let in itself, or one named in that browser's own sealed file), as webkeys/<webId>.bin.
-     * Written again when the household's key changes (a phone removed) or a browser is added.
-     */
-    void writeWebKeys(ServerFolder f, List<String> names) throws Exception {
-        Set<String> trusted = new HashSet<>();
-        String mine = e.meta("server_webs");
-        if (mine != null) {
-            JSONArray a = new JSONArray(mine);
-            for (int i = 0; i < a.length(); i++) trusted.add(a.getString(i));
-        }
-        Map<String, String> named = new HashMap<>();
-        for (JSONObject r : e.db.query("SELECT key, value FROM sync_meta WHERE key LIKE 'server_webpub:%'"))
-            named.put(r.getString("key").substring("server_webpub:".length()), spki(r.getString("value")));
-        if (trusted.isEmpty() && named.isEmpty()) return;
-        JSONArray webs = f.call("GET", "/web", null).optJSONArray("webs");
-        if (webs == null) return;
-        List<String[]> to = new ArrayList<>();
-        for (int i = 0; i < webs.length(); i++) {
-            JSONObject w = webs.optJSONObject(i);
-            if (w == null) continue;
-            String id = w.optString("webId", ""), pub = spki(w.optString("webPub", ""));
-            if (!id.matches("[A-Za-z0-9_-]{8,60}") || pub == null) continue;
-            if (trusted.contains(pub) || pub.equals(named.get(id))) to.add(new String[] { id, pub });
-        }
-        StringBuilder mark = new StringBuilder(h.hid() + ":" + keyv());
-        for (String[] w : to) mark.append('|').append(w[0]).append('=').append(w[1]);
-        boolean allThere = true;
-        for (String[] w : to) if (!names.contains("webkeys/" + w[0] + ".bin")) allThere = false;
-        if (mark.toString().equals(e.meta("server_webkeys")) && allThere) return;
-        JSONObject g = gift();
-        for (String[] w : to) f.write("webkeys/" + w[0] + ".bin", ServerLink.sealWebKeys(ServerLink.publicKey(ServerLink.unb64(w[1])), g));
-        e.setMeta("server_webkeys", mark.toString());
     }
 
     /** A public key as SPKI base64url, or null if it isn't one. */
@@ -668,77 +602,6 @@ final class ServerSync {
         e.setMeta("server_home", where.isEmpty() ? null : where.get(0));
         e.setMeta("server_away", where.size() > 1 ? where.get(1) : null);
         return gift;
-    }
-
-    /**
-     * 0.9.4: a phone already on the server when its household was handed over (403 update): POST
-     * /api/v3/upgrade, signed with its v2 key, so no code. It keeps sharing what it shared.
-     */
-    void upgrade() throws Exception {
-        String me = e.device();
-        KeyPair mine = ServerLink.newKey();
-        String n = nonce();
-        JSONObject body = new JSONObject();
-        body.put("kex", ServerLink.b64u(mine.getPublic().getEncoded()));
-        body.put("myPub", h.myPub());
-        body.put("n", n);
-        String pinned = e.meta("server_kex");
-        java.security.PublicKey kex = pinned == null ? null : ServerLink.publicKey(ServerLink.unb64(pinned));
-        JSONObject ha = haPayload();
-        if (ha != null && kex != null) body.put("ha", ServerLink.b64u(ServerLink.sealAad(ServerLink.v3Key(mine.getPrivate(), kex, ServerLink.unb64(n), ServerLink.HA_INFO), "RSA3" + me, ha, null)));
-        ServerFolder f = new ServerFolder(addresses(), me, ServerLink.privateKey(e.meta("server_dev_priv")), ServerFolder.API3);
-        SyncDav.Response r = f.first("POST", ServerFolder.API3 + "/upgrade", body);
-        if (r.status < 200 || r.status >= 300) {
-            String said = ServerFolder.messageOf(r);
-            throw new SyncDav.Problem(said.isEmpty() ? "Your Restock server didn't let this phone carry on. Scan a new code from its Add a phone page." : said);
-        }
-        JSONObject ans = new JSONObject(r.text());
-        if (kex == null) {
-            // Not pinned yet (this phone never scanned a v3 code): the server's key as it says, taken only
-            // because the gift it opens has this household's own key in it (only the household has that).
-            String k = ans.optString("kex", "");
-            if (k.isEmpty()) k = publicKex(addresses());
-            if (k.isEmpty()) throw new SyncDav.Problem("Update your Restock server to finish moving this phone over.");
-            kex = ServerLink.publicKey(ServerLink.unb64(k));
-        }
-        JSONObject gift = openGift(mine.getPrivate(), kex, n, me, ans);
-        JSONObject keys = gift.optJSONObject("keys");
-        byte[] cur = h.key();
-        boolean ours = false;
-        if (keys != null) for (String v : SyncHousehold.keysOf(keys)) {
-            try {
-                if (java.util.Arrays.equals(cur, SyncWire.decodeKey(keys.getString(v)))) ours = true;
-            } catch (Exception odd) {
-                // not a key
-            }
-        }
-        if (!ours) throw new SecurityException("The server's answer doesn't have your household's key in it.");
-        String own = e.meta("owner_pin");
-        String said = gift.getJSONObject("household").optString("owner_pub", "");
-        if (own != null && !own.equals(said)) throw new SecurityException("The server's answer is for another household.");
-        final String kexB64 = ServerLink.b64u(kex.getEncoded());
-        e.db.transaction(() -> {
-            install(gift, kexB64, null, mine, "keep");
-            // What it shared before: its tabs and cards as they are, receipts as the household had them.
-            e.setMeta("share_receipts", "1".equals(e.meta("receipts_eff")) ? "1" : "0");
-        });
-        // Home Assistant wasn't sent above when the server's key wasn't pinned yet (a phone that joined
-        // with a 0.9.3 code): never sealed to a key the server only said it has. Now the gift has shown
-        // the key is the house's, it goes in a second upgrade (the server takes it once, while it doesn't
-        // run Home Assistant itself). Best effort: otherwise it's set up on the server's page.
-        if (ha != null && pinned == null) {
-            try {
-                String n2 = nonce();
-                JSONObject again = new JSONObject();
-                again.put("kex", body.getString("kex"));
-                again.put("myPub", h.myPub());
-                again.put("n", n2);
-                again.put("ha", ServerLink.b64u(ServerLink.sealAad(ServerLink.v3Key(mine.getPrivate(), kex, ServerLink.unb64(n2), ServerLink.HA_INFO), "RSA3" + me, ha, null)));
-                f.first("POST", ServerFolder.API3 + "/upgrade", again);
-            } catch (Exception ignored) {
-                // Home Assistant stays as it is here; the server's page can set it up
-            }
-        }
     }
 
     /**
@@ -984,8 +847,8 @@ final class ServerSync {
         if (!on()) throw new IllegalStateException("Connect this phone to your Restock server first.");
         ServerLink.Code c = ServerLink.parse(code);
         if ("handover".equals(c.kind)) throw new IllegalArgumentException("That's the server's Take this household code. Scan it from Hand this household to the server.");
-        if (c.v == 3 && !v3()) throw new IllegalArgumentException("That page is on a newer Restock server than this phone is set up for. Sync once, then try again.");
-        if (c.v != 3 && v3()) throw new IllegalArgumentException("That code is from an older Restock web page. Reload the page and scan the new code.");
+        if (!v3()) throw new IllegalStateException(OLD_LINK);
+        if (c.v != 3) throw new IllegalArgumentException("That code is from an older Restock web page. Reload the page and scan the new code.");
         Set<String> hosts = new java.util.LinkedHashSet<>();
         for (String a : addresses()) {
             String x = ServerLink.hostOf(a);
@@ -1017,7 +880,7 @@ final class ServerSync {
             throw new IllegalStateException("Couldn't reach your Restock server. Try again at home, or when the server's away address works.");
         }
         // 0.9.4: on a v3 server the phone only says yes (signed); the server gives that browser its keys.
-        JSONObject body = c.v == 3 ? new JSONObject().put("approve", true).put("k", ServerLink.b64u(c.browser.getEncoded())) : ServerLink.sealFor(c.browser, gift());
+        JSONObject body = new JSONObject().put("approve", true).put("k", ServerLink.b64u(c.browser.getEncoded()));
         int st = f.status("POST", ("link".equals(c.kind) ? "/link/" : "/qrlogin/") + c.id, body);
         if (st == 404 || st == 410) throw new IllegalStateException("That code has run out. Refresh the web page and scan the new code.");
         if (st == 409) throw new IllegalStateException("That code has already been used. Refresh the web page and scan the new code.");

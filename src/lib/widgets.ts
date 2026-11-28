@@ -12,7 +12,7 @@ import { bandColour, contrast, NAVY, textOn } from './theme';
 // What the home screen widgets show. Android draws them (Widgets.java); the app hands over the
 // words each time something changes, a moment later so a burst of changes is one update.
 
-export interface WidgetData {
+interface WidgetData {
   deals: { text: string; extra?: string }[];
   list: { text: string; extra?: string }[];
   listCount: number;

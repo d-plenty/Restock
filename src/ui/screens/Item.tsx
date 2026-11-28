@@ -1,6 +1,6 @@
 import { useNow } from '../useNow';
 import { ShelfNotices } from './ShelfNotices';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { flavourNoteFor, flavourSets } from '../../lib/flavours';
 import { act } from '../../lib/undo';
 import { allCategories, cardChains, deleteGroup, getGroup, groupProductIds, openEntryForGroup, readingsFor, removeProductFromGroup, updateGroup } from '../../lib/db';
@@ -11,8 +11,6 @@ import { genericName, nameHasSize } from '../../lib/naming';
 import { orderOptions, PRODUCT_ORDERS } from '../../lib/productOrder';
 import { ensureNotificationPermission, notificationsAllowed, scheduleReminders } from '../../lib/notify';
 import { isNative } from '../../stores/http';
-import { serverMode, serverUi } from '../../server-mode/flag';
-import { firstPhoto, ItemPhoto } from '../../server-mode/ui/deskShared';
 import { getSettings, updateSettings } from '../../lib/db';
 import { loadRecommendations } from '../../lib/recs';
 import { money, tidySize } from '../../lib/units';
@@ -173,23 +171,6 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   const [preview, setPreview] = useState<Option>();
   const [rangeWeeks, setRangeWeeks] = useState<number>();
   const adding = useRef(false);
-  // 0.9.4, the web on a server: the server keeps older prices than this browser (weeks), so the chart
-  // asks it for the product it shows (as the desktop side panel does). Never on the phone.
-  const [older, setOlder] = useState<Map<string, PriceReading[]>>(new Map());
-  const olderPrices = serverMode ? serverUi.current?.olderPrices : undefined;
-  const wantOlder = olderPrices && data ? (data.rec.options.find((o) => o.product.id === (selected ?? data.rec.best?.product.id ?? data.group.usualProductId)) ?? data.rec.options[0])?.product.id : undefined;
-  useEffect(() => {
-    if (!olderPrices || !wantOlder || older.has(wantOlder)) return;
-    let live = true;
-    const from = new Date(Date.now() - Math.max(...HISTORY_WEEKS) * 7 * 86_400_000).toISOString();
-    void olderPrices(wantOlder, from)
-      .catch(() => [] as PriceReading[])
-      .then((rows) => live && setOlder((m) => new Map(m).set(wantOlder, rows)));
-    return () => {
-      live = false;
-    };
-  }, [olderPrices, wantOlder, older]);
-
   const [checkingCostco, setCheckingCostco] = useState(false); // 0.9.6 (review L1): "Check at Costco"
   if (data === undefined) return <ScreenWaiting title="Item" />;
   if (data === null) {
@@ -210,14 +191,9 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   const chartId = selected ?? rec.best?.product.id ?? group.usualProductId;
   const chartOption = rec.options.find((o) => o.product.id === chartId) ?? rec.options[0];
   const ownReadings = chartOption ? (readings.get(chartOption.product.id) ?? []) : [];
-  // 0.9.4, server mode: the server's prices and this browser's, once per time and price (this browser's
-  // copy wins), and as far back as the server keeps. On a phone, just its own.
-  const fromServer = chartOption ? (older.get(chartOption.product.id) ?? []) : [];
-  const seenHere = new Set(ownReadings.map((r) => `${r.date.slice(0, 16)}|${r.price}`));
-  const extra = fromServer.filter((r) => !seenHere.has(`${r.date.slice(0, 16)}|${r.price}`));
-  const allReadings = extra.length ? [...ownReadings, ...extra].sort((a, b) => a.date.localeCompare(b.date)) : ownReadings;
-  // The chart shows the range picked above it (up to the history you keep, or the server keeps).
-  const keepWeeks = fromServer.length ? Math.max(...HISTORY_WEEKS) : (appSettings?.historyWeeks ?? 8);
+  const allReadings = ownReadings;
+  // The chart shows the range picked above it (up to the history you keep).
+  const keepWeeks = appSettings?.historyWeeks ?? 8;
   const weeks = Math.min(rangeWeeks ?? keepWeeks, keepWeeks);
   const from = now - weeks * 7 * 86_400_000;
   const chartReadings = allReadings.filter((r) => Date.parse(r.date) >= from);
@@ -383,12 +359,6 @@ export function ItemScreen({ groupId }: { groupId: string }) {
   return (
     <div className="screen">
       {/* 0.9.5, the web on a server: the item's big photo at the top (its first letter if none). */}
-      {serverMode && (
-        <ItemPhoto
-          src={firstPhoto(rec.options.find((o) => o.product.id === group.usualProductId)?.product, rec.best?.product, ...rec.options.map((o) => o.product))}
-          name={group.name}
-        />
-      )}
       <TopBar
         title={group.name}
         right={

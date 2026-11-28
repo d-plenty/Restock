@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { isLite } from '../lib/simple';
 
-export const CHUNK = 50;
+const CHUNK = 50;
 
 export function useChunks(stepAsked?: number): { limit: number; more: (total: number) => React.ReactNode } {
   const step = stepAsked ?? (isLite() ? 40 : CHUNK);

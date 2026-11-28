@@ -152,7 +152,7 @@ export function tooOld(version: string | undefined): boolean {
 // ---------- the merge ----------
 
 /** One side as it was at the last round: the words Home Assistant shows, and ticked or not. */
-export interface Side {
+interface Side {
   s: string;
   c: boolean;
 }

@@ -210,7 +210,7 @@ function cantShipStates(text: string): string[] | undefined {
 const isoDay = (d: string, m: string, y: string) => `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
 
 /** What a product's words say (a result tile's, or a product page's). */
-export interface Facts {
+interface Facts {
   price?: number;
   wasPrice?: number;
   save?: number;
@@ -341,7 +341,7 @@ export function estimateSize(price: number, own: CostcoInfo['ownUnit']): string 
 
 // ---------- making a product ----------
 
-export interface RawCostco {
+interface RawCostco {
   id: string;
   name: string;
   url?: string;
@@ -569,7 +569,7 @@ function abs(u: string): string {
 }
 
 /** Words on the page that say Costco turned the request away (a robot check, a block page). */
-export const looksBlocked = (html: string): string | undefined =>
+const looksBlocked = (html: string): string | undefined =>
   /captcha|are you a robot|verify you are (?:a )?human|unusual traffic|access denied|request unsuccessful|pardon our interruption|you have been blocked/i.test(
     textOf(html.slice(0, 30_000)),
   )
@@ -648,7 +648,7 @@ export function parseCostcoPage(html: string, state?: string): StoreProduct[] {
 
 // ---------- the adapter ----------
 
-export interface Deps {
+interface Deps {
   isNative: () => boolean;
   settings: () => { area?: { label: string } } | undefined;
   request: (opts: Parameters<typeof request>[0]) => Promise<HttpResult>;

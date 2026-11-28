@@ -2,7 +2,7 @@
 // each is the default (Australian green). Icon colours are built into the app (Android can't
 // recolour an installed icon), so this list matches the icons in android/app/src/main/res.
 
-export interface Swatch {
+interface Swatch {
   id: string;
   name: string;
   hex: string;

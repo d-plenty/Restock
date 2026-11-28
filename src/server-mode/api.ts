@@ -39,7 +39,7 @@ export function setV3Auth(a: { session: string; key: Uint8Array } | undefined): 
 }
 
 /** What the server said about itself (GET /api/v3/health; a 0.9.3 server has no such path). */
-export interface ServerInfo {
+interface ServerInfo {
   /** 2: a 0.9.3 server, or a 0.9.4 one in v2 mode for browsers; 3: a house. */
   api: 2 | 3;
   /** 0.9.4 servers: 'new' (not set up), 'v2' (a 0.9.3 household on it, no longer served from 0.15.0), 'v3', 'released'. */
@@ -175,20 +175,12 @@ async function answer<T>(r: Promise<Response>): Promise<T> {
 /** An array that's either the answer itself or one field of it. */
 const listOf = <T>(v: unknown, field: string): T[] => (Array.isArray(v) ? (v as T[]) : v && typeof v === 'object' && Array.isArray((v as Record<string, unknown>)[field]) ? ((v as Record<string, unknown>)[field] as T[]) : []);
 
-export interface FileInfo {
+interface FileInfo {
   name: string;
   size: number;
   modified?: string;
   version?: string;
   by?: string;
-}
-
-export interface Device {
-  device: string;
-  name?: string;
-  added?: string;
-  seen?: string;
-  lastSeen?: string;
 }
 
 export interface Activity {
@@ -204,11 +196,6 @@ export interface Activity {
   kind?: string;
   detail?: string | Record<string, unknown>;
 }
-
-/** 0.15.0: the 0.9.3 household's routes are gone; signing in is v3 (api3). Only the plain health check is left here. */
-export const api = {
-  health: () => json<{ ok?: boolean; app?: string; version?: string; api?: number }>(call('GET', '/api/v2/health')),
-};
 
 /**
  * What the server is: GET /api/v3/health (0.9.4). A 0.9.3 server answers 404 there, and is a v2
@@ -337,7 +324,7 @@ export interface HaConfig {
   blocked?: string | null;
 }
 
-export interface HistoryRow {
+interface HistoryRow {
   product_id?: string;
   productId?: string;
   date: string;
@@ -419,6 +406,8 @@ export const api3 = {
 
   settings: () => v3get<HouseSettings>('/api/v3/settings'),
   /** Keeping less (data is deleted) needs the passphrase again: `confirm`. */
+  /** 0.19.0: do these addresses answer, and as this server? Asked of the server (the page may only talk to its own address). */
+  testAddresses: (a: { home?: string; away?: string }) => v3send<{ home?: boolean; away?: boolean }>('POST', '/api/v3/addresses/test', a),
   putSettings: (s: HouseSettings, confirm?: Confirm) => v3send<HouseSettings>('PUT', '/api/v3/settings', confirm ? { ...s, confirm } : s),
   prune: (before: string, confirm: Confirm) => v3send<{ prices?: number; receipts?: number }>('POST', '/api/v3/prune', { before, confirm }),
   passphrase: (body: { c: string; proof: string; salt: string; auth: string; backupSealed?: string }) => v3send<SessionGift & { session?: string; sealed?: string }>('POST', '/api/v3/passphrase', body, true),

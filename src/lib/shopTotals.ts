@@ -38,7 +38,7 @@ export interface ShopLine {
   fair: number;
 }
 
-export interface MissingLine {
+interface MissingLine {
   item: string;
   groupId: string;
   /** The cheapest version at another store, if there is one. */
@@ -176,7 +176,7 @@ type Qty = ReturnType<typeof productQty>;
  * 90 times the 24-pack. A size in sheets set against one in packs is counted in rolls on both
  * sides ("… 24 Pack"); when the rolls can't be told, they aren't compared by amount at all.
  */
-export function alike(a: Option, b: Option): [Qty, Qty] {
+function alike(a: Option, b: Option): [Qty, Qty] {
   const qa = productQty(a.product);
   const qb = productQty(b.product);
   const sheets = (o: Option) => !o.product.qty && inSheets(o.product.size);
@@ -211,7 +211,7 @@ function fairCost(rec: Recommendation, chain: Chain3, qty: number): number | und
   return Math.min(...from.map((o) => sameAmountCost(o, ref, qty)));
 }
 
-export interface Recommended {
+interface Recommended {
   /** The store to go to. */
   recommended?: ShopTotal;
   /** The store with the lowest total for how the list is set (same shopping, or at the till). */
@@ -506,7 +506,7 @@ export function shopTotals(entries: ListEntry[], recs: Recommendation[], allChai
   return { stores, around, pickFor, linked: linked.length, unpriced, oneOffs, by };
 }
 
-export interface AroundPlan {
+interface AroundPlan {
   /** What to recommend: shopping around, or one store that has everything. */
   pick: 'around' | ShopTotal;
   /** Shopping around for how the list is set: the same shopping (best value) or at the till (lowest price). */

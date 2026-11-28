@@ -4,7 +4,7 @@ import { chainName } from '../shops';
 import { storeChoice, wooliesAccount, type Chain, type Settings } from '../types';
 
 /** Stock is only shown for this long after it was checked: it changes during the day. */
-export const STOCK_FRESH_MS = 3 * 60 * 60_000;
+const STOCK_FRESH_MS = 3 * 60 * 60_000;
 export const stockFresh = (at?: string, now = Date.now()) => !!at && now - Date.parse(at) < STOCK_FRESH_MS;
 
 export type Stock = 'in' | 'out' | 'unknown';

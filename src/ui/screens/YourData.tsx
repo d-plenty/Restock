@@ -7,7 +7,6 @@ import { RestockNative } from '../../lib/sql/native';
 import { syncInfo } from '../../lib/sync';
 import { useLive, useSettings } from '../../lib/useLive';
 import { money } from '../../lib/units';
-import { serverMode } from '../../server-mode/flag';
 import { PriceChart, PriceKey, ShopBars, SpendingChart } from '../../server-mode/ui/DeskDataCharts';
 import { PERIODS, type DataSeries, type DataStats, type Period } from '../../server-mode/ui/houseData';
 import { isNative } from '../../stores/http';
@@ -112,8 +111,6 @@ export function YourData() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemId, period, source]);
-
-  if (serverMode) return <p className="small">Your data is on the Your data page here.</p>;
   const shown = cleanSearch(find) ? items.filter((g) => g.name.toLowerCase().includes(cleanSearch(find).toLowerCase())) : items;
   const sp = stats?.spending;
 

@@ -180,11 +180,11 @@ function rowsSame(a: Row | null | undefined, b: Row | null | undefined, skipVola
 
 // ---------- actions ----------
 
-export interface ActOptions {
+interface ActOptions {
   /** Steps with the same key within a few seconds become one (the + button pressed three times). */
   merge?: string;
 }
-export interface ActContext {
+interface ActContext {
   /** Something outside the database to put back too (a receipt's photo). */
   onUndo: (fn: () => Promise<void>) => void;
   /**
@@ -430,8 +430,3 @@ export async function undoable(change: () => Promise<void>, _rows?: RowSet[] | P
 export const groupRows = (ids: string[]) => rowsForGroups(ids);
 export const entryRows = (ids: string[]): RowSet[] =>
   ids.length ? [{ table: 'list_entries', where: `id IN (${ids.map(() => '?').join(',')})`, params: ids }] : [];
-export const productRows = (groupId: string, productId: string): RowSet[] => [
-  { table: 'items', where: 'id = ?', params: [groupId] },
-  { table: 'products', where: 'id = ?', params: [productId] },
-  { table: 'prices', where: 'product_id = ?', params: [productId] },
-];

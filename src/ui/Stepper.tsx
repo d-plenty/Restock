@@ -12,7 +12,7 @@ import type { ListEntry } from '../types';
 export const ZERO_HOLD_MS = 2000;
 
 /** 0.9.5 (undo): a new amount; pressing + a few times is one Undo. */
-export const setQty = (e: { id: string; text: string }, qty: number, name = e.text) =>
+const setQty = (e: { id: string; text: string }, qty: number, name = e.text) =>
   act(`${name}: ${qty} on your list`, () => updateListEntry(e.id, { qty }), { merge: `qty:${e.id}` });
 
 export function Stepper({ e, name, small }: { e: ListEntry; /** What it's called in messages (a tab's row: the item's name). */ name?: string; /** A tab's row: a little narrower. */ small?: boolean }) {

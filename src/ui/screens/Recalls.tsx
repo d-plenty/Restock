@@ -14,7 +14,7 @@ import { useNav } from '../nav';
 // official Australian recall lists against what you have. RecallChecker.java does the checking,
 // for both the daily check and "Check now", and saves what it found for this page.
 
-export interface FoundRecall {
+interface FoundRecall {
   id: string;
   source: string;
   title: string;
@@ -27,7 +27,7 @@ export interface FoundRecall {
   foundAt: string;
 }
 
-export const OFFICIAL = [
+const OFFICIAL = [
   { name: 'Food recalls', who: 'Food Standards Australia New Zealand', url: 'https://www.foodstandards.gov.au/food-recalls/alerts' },
   { name: 'Product recalls', who: 'Product Safety Australia (ACCC)', url: 'https://www.productsafety.gov.au/recalls' },
   { name: 'Medicine recalls', who: 'Therapeutic Goods Administration', url: 'https://apps.tga.gov.au/PROD/SARA/arn-report.aspx' },
@@ -175,7 +175,8 @@ export function RecallsScreen() {
       const failed = Object.keys(r.errors);
       nav.toast(
         failed.length && !r.checked
-          ? `Couldn't reach the recall lists: ${Object.values(r.errors)[0]}`
+          ? // 0.19.0: the browser's own words for no connection ("Failed to fetch", "Load failed") say nothing: plain words instead.
+            `Couldn't reach the recall lists${/failed to fetch|load failed|network/i.test(String(Object.values(r.errors)[0])) ? '. Check your connection and try again.' : `: ${Object.values(r.errors)[0]}`}`
           : r.found
             ? `${r.found} possible recall${r.found === 1 ? '' : 's'} for things you have`
             : `Checked ${r.checked} recent recalls: nothing matches what you have`,

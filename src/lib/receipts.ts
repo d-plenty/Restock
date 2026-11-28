@@ -74,7 +74,7 @@ export const removeReceiptsUndoable = (list: Receipt[], label: string) =>
 
 // ---------- reading a receipt ----------
 
-export interface ReadReceipt {
+interface ReadReceipt {
   shop?: string;
   chain?: StoreChain;
   section?: Section;

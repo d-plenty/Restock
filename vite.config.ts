@@ -10,7 +10,7 @@ export default defineConfig({
   // The app's version, shown in Settings and Diagnostics.
   // The photo reader's model files are downloaded on first use in the apps (lib/readerModels.ts); the
   // Restock server's web build turns this on to carry them itself (vite.server.config.ts).
-  define: { __APP_VERSION__: JSON.stringify(pkg.version), __READER_BUNDLED__: 'false' },
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   base: './',
   // 0.10.7: the text reader's engine loads its own files; the dev server mustn't repack it.
   optimizeDeps: { exclude: ['onnxruntime-web'] },

@@ -1,5 +1,3 @@
-import { serverMode } from '../server-mode/flag';
-import { sharedSpecials } from '../server-mode/live';
 import type { StoreProduct } from '../stores/types';
 import type { ListEntry } from '../types';
 import { buildCatalogue } from './myCatalogue';
@@ -22,12 +20,7 @@ export const weekDay = (ms = Date.now()) => {
 export async function ownCounts(recs: Recommendation[], chains: string[], entries: ListEntry[]): Promise<Map<string, number>> {
   const cat = buildCatalogue(recs, chains);
   const lists: Record<string, StoreProduct[]> = {};
-  if (serverMode) {
-    const shared = await sharedSpecials();
-    for (const [c, l] of Object.entries(shared.lists)) lists[c] = (l?.items ?? []) as unknown as StoreProduct[];
-  } else {
-    for (const l of await cachedSpecials()) lists[l.chain] = l.items;
-  }
+  for (const l of await cachedSpecials()) lists[l.chain] = l.items;
   const lines = entries.some((e) => !e.checked && !e.groupId && e.product?.storeProductId);
   const since = weekDay();
   const out = new Map<string, number>();

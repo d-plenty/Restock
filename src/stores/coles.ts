@@ -47,7 +47,7 @@ async function ensureKey(force = false, jar = ''): Promise<string> {
 type Raw = Record<string, unknown>;
 
 /** 0.10.2: where a product is at the Coles branch it was asked about. Mirrored in Aisles.java. */
-export interface ColesAisle {
+interface ColesAisle {
   a?: string;
   side?: string;
   o?: number;
@@ -87,7 +87,7 @@ export function colesAisle(p: Raw): ColesAisle | undefined {
  * search, 7 Nov 2026). A sale is "SPECIAL" (with a "was" price), a multi-buy, a half price, a
  * "was" price above today's, or the online-special flag. Mirrored in StoreClient.java.
  */
-export function colesOnSale(pricing: Raw, price?: number, was?: number, promo?: string): boolean {
+function colesOnSale(pricing: Raw, price?: number, was?: number, promo?: string): boolean {
   const type = typeof pricing.promotionType === 'string' ? pricing.promotionType.toUpperCase() : '';
   if (!!was && !!price && was > price) return true;
   if (pricing.onlineSpecial === true) return true;
@@ -164,7 +164,7 @@ async function searchOnce(term: string, storeId: string, key: string, page = 1, 
   return flattenColes(parseJson<Raw>(NAME, res));
 }
 
-export function colesSearchPath(term: string, storeId: string, page = 1): string {
+function colesSearchPath(term: string, storeId: string, page = 1): string {
   const params = new URLSearchParams({
     storeId,
     searchTerm: term,

@@ -135,7 +135,7 @@ export function findPaper(img: Img): Quad | undefined {
   return q;
 }
 
-export const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
+const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /** The 3×3 matrix taking the unit square's corners to a quad. */
 function squareToQuad(q: Quad): number[] {

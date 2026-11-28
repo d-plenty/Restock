@@ -5,7 +5,6 @@ import { downloadMarket, megabytes, windowCost, windowIndex, type MarketDays, ty
 import { sharedOn } from '../../lib/priceShare';
 import { pruneSeen, seenCount, seenKeepWeeks } from '../../lib/seen';
 import { useLive } from '../../lib/useLive';
-import { serverMode } from '../../server-mode/flag';
 import { SHARED_TITLE } from './SharedPrices';
 import { afterSave, updateSettings } from '../../lib/settingsDraft';
 import { isNative } from '../../stores/http';
@@ -103,7 +102,7 @@ function SearchKeepSettings({ settings }: { settings: Settings }) {
     });
   };
   return (
-    <div className="card flush" id="s-searchkeep" aria-disabled={serverMode || undefined}>
+    <div className="card flush" id="s-searchkeep">
       <div style={{ padding: '12px 14px 4px' }}>
         <span className="title" style={{ fontSize: 15 }}>
           Search results
@@ -111,24 +110,17 @@ function SearchKeepSettings({ settings }: { settings: Settings }) {
         <p className="small" style={{ margin: '4px 0 0' }}>Restock remembers what your searches and scans find.{' '}<More title="Search results"><p>Restock remembers what your searches and scans find: the product, its price that day, its barcode and whether it was in stock. That's how it can
           tell you what something cost before, and judge a sale on something you don't track yet. A search always asks the shops again: a remembered
           price is never shown as today's. They stay on this phone, and go to your own Restock server if you have one.</p></More></p>
-        {serverMode ? (
-          <p className="small" style={{ margin: '6px 0 0' }}>
-            <strong>Set on each phone.</strong> Searching the shops and remembering what they said happens in the Android app.
-          </p>
-        ) : (
-          <p className="small" style={{ margin: '6px 0 0' }} role="status">
-            {count && count.rows > 0
-              ? `${count.rows.toLocaleString('en-AU')} price${count.rows === 1 ? '' : 's'} remembered, kept for ${historyLabel(weeks)}.`
-              : `Nothing remembered yet. Kept for ${historyLabel(weeks)}.`}
-          </p>
-        )}
+        <p className="small" style={{ margin: '6px 0 0' }} role="status">
+          {count && count.rows > 0
+            ? `${count.rows.toLocaleString('en-AU')} price${count.rows === 1 ? '' : 's'} remembered, kept for ${historyLabel(weeks)}.`
+            : `Nothing remembered yet. Kept for ${historyLabel(weeks)}.`}
+        </p>
       </div>
-      <label className="check" style={serverMode ? { opacity: 0.5 } : undefined}>
+      <label className="check">
         <input
           type="checkbox"
           className="switch"
           checked={own}
-          disabled={serverMode}
           onChange={(e) => void save(e.target.checked ? settings.historyWeeks : undefined)}
         />
         <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -138,7 +130,7 @@ function SearchKeepSettings({ settings }: { settings: Settings }) {
           <span className="small">Off: the same as your price history.</span>
         </span>
       </label>
-      {own && !serverMode && (
+      {own && (
         <div style={{ padding: '0 14px 12px' }}>
           <select className="input" aria-label="How long to keep search results" value={weeks} onChange={(e) => void save(Number(e.target.value))}>
             {KEEP_WEEKS.map((w) => (

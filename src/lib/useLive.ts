@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { cachedSettings, getSettings } from './db';
 import { onChange } from './live';
 import { screenReading } from './screensFirst';
+import { noteQuiet } from './quietErrors';
 import { noteSpeed } from './speedLog';
+import { plainName, waitingFor, words } from './waiting';
 import { cachedDraftSettings, getSettings as draftSettings } from './settingsDraft';
 import type { Settings } from '../types';
 
@@ -28,53 +30,86 @@ export function useLive<T>(query: () => Promise<T>, deps: unknown[] = [], initia
     // 0.18.4: a run that fails is tried again (after 1, 2, 4 … 30 seconds), so a screen never stays
     // on "Loading…" because one answer went wrong; and a slow one is noted for Diagnostics → Speed.
     let failures = 0;
-    const name = query.name || 'a screen';
+    let lastError: string | undefined;
+    // 0.19.0: a run that hasn't answered in STUCK_MS is given up on (its answer still counts if it
+    // ever comes) and another is started: before, one read that never answered kept its screen on
+    // "Loading…" for good. What's waited for, and why, is noted (lib/waiting.ts) for the screen to say.
+    let runNo = 0;
+    /** Between a failed run and the next try: still waiting, as far as the screen is concerned. */
+    let resting: { done(): void } | undefined;
     const load = () => {
       if (busy || timer) {
         again = true;
         return;
       }
       busy = true;
+      const mine = ++runNo;
       const started = Date.now();
       // Background work waits while a screen reads (lib/screensFirst.ts).
       const read = screenReading();
+      resting?.done();
+      resting = undefined;
+      const wait = waitingFor(plainName(query), 'screen', { failures, error: lastError });
+      let over = false;
+      /** This run is over (answered, failed or given up on): the next may start. */
+      const end = (retry: boolean) => {
+        if (over) return;
+        over = true;
+        clearTimeout(stuck);
+        read();
+        const took = Date.now() - started;
+        if (took >= SLOW_MS) noteSpeed('read', took, plainName(query));
+        if (mine !== runNo) return;
+        busy = false;
+        if (retry) again = true;
+        if (alive && again) {
+          again = false;
+          timer = setTimeout(() => {
+            timer = undefined;
+            if (alive) load();
+          }, failures ? Math.min(30_000, 1000 * 2 ** (failures - 1)) : Math.min(2000, Math.max(200, took)));
+        }
+      };
+      const fail = (e: unknown) => {
+        console.error('query failed', e);
+        failures++;
+        lastError = words(e);
+        noteQuiet(`screen: ${plainName(query)}`, e);
+        wait.failed(e);
+        if (alive) resting = waitingFor(plainName(query), 'screen', { failures, error: lastError });
+        end(true);
+      };
+      const stuck = setTimeout(() => {
+        if (over) return;
+        fail(new Error(`no answer after ${STUCK_MS / 1000} seconds`));
+      }, STUCK_MS);
       let run: Promise<T>;
       try {
         run = query();
       } catch (e) {
-        busy = false;
-        read();
-        console.error('query failed', e);
+        fail(e);
         return;
       }
-      run
-        .then((v) => {
+      run.then(
+        (v) => {
+          // An answer always counts, even from a run already given up on.
           failures = 0;
+          lastError = undefined;
           if (alive) setValue(v);
-        })
-        .catch((e) => {
-          console.error('query failed', e);
-          failures++;
-          again = true;
-        })
-        .finally(() => {
-          busy = false;
-          read();
-          const took = Date.now() - started;
-          if (took >= SLOW_MS) noteSpeed('read', took, name);
-          if (alive && again) {
-            again = false;
-            timer = setTimeout(() => {
-              timer = undefined;
-              if (alive) load();
-            }, failures ? Math.min(30_000, 1000 * 2 ** (failures - 1)) : Math.min(2000, Math.max(200, Date.now() - started)));
-          }
-        });
+          wait.done();
+          end(false);
+        },
+        (e) => {
+          if (over) return;
+          fail(e);
+        },
+      );
     };
     load();
     const off = onChange(load);
     return () => {
       alive = false;
+      resting?.done();
       if (timer) clearTimeout(timer);
       off();
     };
@@ -85,6 +120,8 @@ export function useLive<T>(query: () => Promise<T>, deps: unknown[] = [], initia
 
 /** 0.18.4: a screen's read that takes this long is noted (Diagnostics → Speed). */
 const SLOW_MS = 3000;
+/** 0.19.0: a read with no answer after this long is tried again. */
+export const STUCK_MS = 20_000;
 
 /** The settings, live: straight away from the last read (db.ts cachedSettings), then kept up to date. */
 export const useSettings = (): Settings | undefined => useLive(getSettings, [], cachedSettings);

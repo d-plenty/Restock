@@ -119,7 +119,11 @@ enum RestockSql {
                 switch sqlite3_column_type(st, i) {
                 case SQLITE_NULL: row[name] = NSNull()
                 case SQLITE_INTEGER: row[name] = Int(sqlite3_column_int64(st, i))
-                case SQLITE_FLOAT: row[name] = sqlite3_column_double(st, i)
+                case SQLITE_FLOAT:
+                    // 0.19.0: a number that isn't finite (infinity) can't cross to the app: the whole answer was
+                    // dropped and the app got nothing, so the read failed every time. It crosses as nothing (null).
+                    let d = sqlite3_column_double(st, i)
+                    row[name] = d.isFinite ? d : NSNull()
                 case SQLITE_BLOB:
                     let bytes = sqlite3_column_bytes(st, i)
                     if let p = sqlite3_column_blob(st, i), bytes > 0 { row[name] = Data(bytes: p, count: Int(bytes)).base64EncodedString() } else { row[name] = "" }

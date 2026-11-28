@@ -22,7 +22,7 @@ export const LIMITS = {
 
 /** The shop never imported or exported (Declan, 11 Nov 2026). */
 // 0.9.7: Costco's prices are imported and exported like any shop's: no shop is left out any more.
-export const NEVER_SHOP = '\u0000';
+const NEVER_SHOP = '\u0000';
 
 /** A price as sent. */
 export interface ImportPrice {
@@ -165,7 +165,7 @@ function priceOf(r: Record<string, unknown>, problems: Record<string, number>): 
  * The products of a restock-export's tables (products, and prices by product_id; or a product row's
  * own `prices`), one per product: rows for the same shop and shop number (or barcode) are one.
  */
-export function productsOf(tables: Record<string, unknown>, kind: 'json' | 'csv'): ReadFile {
+function productsOf(tables: Record<string, unknown>, kind: 'json' | 'csv'): ReadFile {
   refuseSecrets(tables);
   const problems: Record<string, number> = {};
   const costco = { products: 0, prices: 0 };
@@ -554,7 +554,7 @@ export interface ImportState {
 
 export const firstImport = (): ImportState => ({ phase: 'idle', chunks: 0, at: 0, check: emptyTally(), done: emptyTally(), pass: '', busy: false, cancel: false });
 
-export type ImportAction =
+type ImportAction =
   | { t: 'reading'; file: string }
   | { t: 'read'; read: ReadFile; chunks: number }
   | { t: 'checked'; at: number; answer: CheckAnswer }

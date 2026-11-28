@@ -22,7 +22,9 @@ describe('backup passwords', () => {
     const locked = await backupJson({ ...EVERYTHING, password: 'correct horse' });
     expect(isLocked(locked)).toBe(true);
     expect(isLocked(plain)).toBe(false);
-    expect(locked).not.toContain('Milk');
+    // A quoted field name, not a bare word: four letters turn up in the sealed text by chance now and then.
+    expect(plain).toContain('"name":');
+    expect(locked).not.toContain('"name":');
     await expect(unlockBackup(locked, 'wrong horse')).rejects.toThrow('doesn’t open this backup');
     const opened = await unlockBackup(locked, 'correct horse');
     expect(readBackup(opened).counts.items).toBe(readBackup(plain).counts.items);

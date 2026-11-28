@@ -16,9 +16,6 @@ import { useLive } from '../../lib/useLive';
 import { chainName, SECTION_NAMES, shopDef, websiteOf, type Section, type StoreChain } from '../../shops';
 import { isNative } from '../../stores/http';
 import type { StoreProduct } from '../../stores/types';
-import { serverMode } from '../../server-mode/flag';
-import { sharedSpecials } from '../../server-mode/live';
-import { photoUrl } from '../../server-mode/ui/deskShared';
 import { ChainDot, Icon, LoadingBar, Sheet, Thumb, TopBar, ScreenWaiting } from '../components';
 import { useNav } from '../nav';
 import { NoneFound } from '../simple';
@@ -53,9 +50,6 @@ const STEP = 60;
 export function tileBadge(s: Pick<Special, 'deal'>): { text: string; tone: Special['deal']['tone'] } {
   return s.deal;
 }
-/** Outside links open in the phone's browser; on the web page, in a new tab. */
-const OUT = serverMode ? { target: '_blank', rel: 'noopener noreferrer' } : {};
-
 export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
   const nav = useNav();
   const name = chainName(chain);
@@ -69,8 +63,6 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
     const listed = new Set(entries.filter((e) => !e.checked && e.groupId).map((e) => e.groupId!));
     return { section, deals: page?.deals ?? [], doubts: doubtfulDeals(recs, chain, page?.deals ?? []), seen, listed, entries, lines };
   }, [chain]);
-  // The web page: what the phones shared (nothing is asked of a shop from here).
-  const shared = useLive(async () => (serverMode ? await sharedSpecials() : undefined), []);
   const [lists, setLists] = useState<SpecialsList[]>();
   const [busy, setBusy] = useState(false);
   const [link, setLink] = useState<CatalogueLink>();
@@ -81,7 +73,7 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
   const [added, setAdded] = useState<Set<string>>(new Set());
 
   const load = async (fresh = false) => {
-    if (!full || serverMode || !base?.lines) return;
+    if (!full || !base?.lines) return;
     setBusy(true);
     try {
       const l = await loadSpecials(fresh);
@@ -99,13 +91,13 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chain, base?.lines]);
   useEffect(() => {
-    if (!serverMode) void findCatalogue(chain).then(setLink, () => setLink({ missing: 'unchecked' }));
+    void findCatalogue(chain).then(setLink, () => setLink({ missing: 'unchecked' }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chain]);
 
   const list: StoreProduct[] = useMemo(
-    () => (serverMode ? ((shared?.lists[chain]?.items ?? []) as unknown as StoreProduct[]) : (lists?.find((l) => l.chain === chain)?.items ?? [])),
-    [shared, lists, chain],
+    () => lists?.find((l) => l.chain === chain)?.items ?? [],
+    [lists, chain],
   );
   const all = useMemo(() => (base ? ownSpecials(base.deals, base.lines ? list : [], base.seen, base.entries, base.doubts) : []), [base, list]);
   const real = realCount(all);
@@ -115,7 +107,7 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
   if (!base) return <ScreenWaiting title={name} />;
   const err = lists?.find((l) => l.chain === chain)?.error;
   const known = shopDef(chain)?.catalogue;
-  const own = httpsLink(serverMode ? (known?.url ?? shared?.catalogues[chain]?.url) : link?.url);
+  const own = httpsLink(link?.url);
   const site = httpsLink(websiteOf(chain));
   const isListed = (s: Special) => (s.groupId ? base.listed.has(s.groupId) : s.from !== 'yours' || added.has(s.key));
 
@@ -144,18 +136,18 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
         {(own || site) && (
           <div className="shopcat-links">
             {own && (
-              <a className="btn primary" href={own} {...OUT} style={{ textDecoration: 'none' }} aria-label={`Open ${possessive(name)} catalogue${serverMode ? ' (opens a new tab)' : ''}`}>
+              <a className="btn primary" href={own} style={{ textDecoration: 'none' }} aria-label={`Open ${possessive(name)} catalogue`}>
                 <Icon name="book" size={18} /> Open the catalogue
               </a>
             )}
             {site && (
-              <a className="btn" href={site} {...OUT} style={{ textDecoration: 'none' }} aria-label={`Open ${possessive(name)} website${serverMode ? ' (opens a new tab)' : ''}`}>
+              <a className="btn" href={site} style={{ textDecoration: 'none' }} aria-label={`Open ${possessive(name)} website`}>
                 <Icon name="external" size={18} /> Website
               </a>
             )}
           </div>
         )}
-        {!serverMode && !own && link?.missing && (
+        {!own && link?.missing && (
           <span className="small">
             {link.missing === 'unchecked'
               ? isNative()
@@ -214,9 +206,8 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
       {!items.length && !busy && cleanSearch(typed) && (
         <NoneFound
           text={`None of your ${name} specials match "${cleanSearch(typed)}".`}
-          label={serverMode ? undefined : `Search ${name} for ${cleanSearch(typed)}`}
-          onAdd={serverMode ? undefined : () => nav.push({ name: 'add', section: base.section, toPantry: true, chain, query: cleanSearch(typed) })}
-          phoneOnly={serverMode ? 'Searching a shop is done on a phone.' : undefined}
+          label={`Search ${name} for ${cleanSearch(typed)}`}
+          onAdd={() => nav.push({ name: 'add', section: base.section, toPantry: true, chain, query: cleanSearch(typed) })}
         />
       )}
       {!items.length && !busy && !cleanSearch(typed) && (
@@ -233,7 +224,7 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
               <div className="cat-tile" key={s.key}>
                 <button className="cat-tile-open" onClick={() => setInfo(s)} aria-label={`${s.name}, ${money(s.price)}. Details`}>
                   <span className="cat-tile-photo">
-                    <Thumb src={serverMode ? photoUrl(s.imageUrl) : s.imageUrl} />
+                    <Thumb src={s.imageUrl} />
                     <span className={`cat-tile-badge ${badge.tone}`}>{badge.text}</span>
                   </span>
                   <span className="cat-tile-name">{s.name}</span>
@@ -324,7 +315,6 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
             <>
               <button
                 className="btn"
-                disabled={serverMode}
                 onClick={() =>
                   nav.push({
                     name: 'add',
@@ -336,7 +326,6 @@ export function ShopCatalogueScreen({ chain }: { chain: StoreChain }) {
               >
                 <Icon name="plus" size={18} /> {toPantry}
               </button>
-              {serverMode && <span className="small muted">Adding to the pantry is by shop search, which works in the Android app.</span>}
             </>
           )}
         </Sheet>

@@ -23,7 +23,7 @@ const WHAT: Record<string, string> = {
 
 export const phonesWords = (phones: string[]) => (phones.length === 0 ? 'an admin phone' : phones.length === 1 ? phones[0] : `${phones.slice(0, -1).join(', ')} or ${phones[phones.length - 1]}`);
 
-export function Digits({ number }: { number: string }) {
+function Digits({ number }: { number: string }) {
   return (
     <div className="sv-digits" role="img" aria-label={`The number to match: ${number.split('').join(' ')}`}>
       {number.split('').map((d, i) => (

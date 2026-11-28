@@ -12,7 +12,7 @@ import type { SqlDriver, SqlOp } from './driver';
 // Prices are only ever added (each phone tidies its own old prices), keyed by product and date.
 
 /** Synced tables and how each record is named in sync_log. Mirrored in SyncEngine.java. */
-export const SYNCED: { table: string; key: string; deletes: boolean }[] = [
+const SYNCED: { table: string; key: string; deletes: boolean }[] = [
   { table: 'categories', key: 'id', deletes: true },
   { table: 'products', key: 'id', deletes: true },
   { table: 'items', key: 'id', deletes: true },
@@ -81,7 +81,7 @@ const STAMP_AFTER = `MAX(CAST((julianday('now') - 2440587.5) * 86400000 AS INTEG
  * depends on the phone's own store, so changing only those doesn't count as a change to sync.
  * New product columns that should sync go in this list too.
  */
-export const PRODUCT_SYNCED_COLUMNS = ['chain', 'name', 'brand', 'size', 'barcode', 'store_product_id', 'image_url', 'qty', 'qty_unit', 'created_at'];
+const PRODUCT_SYNCED_COLUMNS = ['chain', 'name', 'brand', 'size', 'barcode', 'store_product_id', 'image_url', 'qty', 'qty_unit', 'created_at'];
 
 /** 0.8.5: every sync trigger again, with STAMP_AFTER, and products' update trigger leaving stock out. */
 const SYNC_TRIGGERS_085: string[] = SYNCED.flatMap((t) => {
@@ -158,9 +158,9 @@ const SYNC_090: string[] = [
  * - sync_peers.seen: how far each other phone has got through this phone's own changes, so old
  *   deletes everyone has seen can be tidied away (SyncEngine.compact).
  */
-export const RECEIPTS_SYNCED = { table: 'receipts', key: 'id', deletes: true };
+const RECEIPTS_SYNCED = { table: 'receipts', key: 'id', deletes: true };
 /** Every synced table from 0.9.1 on (SYNCED, then receipts). Mirrored in SyncEngine.java's TABLES. */
-export const SYNCED_091 = [...SYNCED, RECEIPTS_SYNCED];
+const SYNCED_091 = [...SYNCED, RECEIPTS_SYNCED];
 const STAMP_NOW = `MAX(CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER), COALESCE((SELECT CAST(value AS INTEGER) FROM sync_meta WHERE key = 'clock'), 0) + 1)`;
 const SYNC_091: string[] = [
   'ALTER TABLE sync_peers ADD COLUMN seen INTEGER NOT NULL DEFAULT 0',
@@ -186,7 +186,7 @@ const SYNC_091: string[] = [
  * A phone that was on 0.9.2 or older passed over other phones' household settings (an unknown
  * table): it reads everything again once, so they come across.
  */
-export const HOUSEHOLD_SETTINGS_SYNCED = { table: 'household_settings', key: 'k', deletes: true };
+const HOUSEHOLD_SETTINGS_SYNCED = { table: 'household_settings', key: 'k', deletes: true };
 /** Every synced table from 0.9.3 on. Mirrored in SyncEngine.java's TABLES. */
 export const SYNCED_093 = [...SYNCED_091, HOUSEHOLD_SETTINGS_SYNCED];
 const SYNC_093: string[] = [

@@ -69,8 +69,6 @@ export function forget(): void {
   remember(undefined);
 }
 
-export const signOutEverywhere = (): Promise<void> => signOutEverywhereV3();
-
 export async function signOut(): Promise<void> {
   await api3.logout(false).catch(() => undefined);
   forget();
@@ -304,10 +302,4 @@ export async function confirmWithVault(passphrase: string): Promise<{ confirm: C
   const confirm = { c: ch.c, proof: loginProof(loginKeyOf(keys.auth), ch.c, s.sid) };
   keys.auth.fill(0);
   return { confirm, vault: keys.vault };
-}
-
-/** Sign out everywhere (v3): every browser's session ends, this one's too. Phones keep syncing. */
-async function signOutEverywhereV3(): Promise<void> {
-  await api3.logout(true);
-  forget();
 }

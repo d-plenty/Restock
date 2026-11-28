@@ -1,6 +1,7 @@
 import { isIos } from './platform';
 import { RestockNative, type AppChannel } from './sql/native';
 import { isNative } from '../stores/http';
+import { giveUpAfter } from './giveUp';
 
 /**
  * F-Droid installs and updates apps itself and doesn't allow apps that update themselves, so its
@@ -55,7 +56,7 @@ export interface UpdateInfo {
 }
 
 /** A GitHub release, as much of it as Restock reads. */
-export interface GitHubRelease {
+interface GitHubRelease {
   tag_name?: string;
   body?: string;
   html_url?: string;
@@ -126,7 +127,9 @@ export function isNewer(a: string, b: string): boolean {
 
 /** Asks GitHub for the latest release. Only called when you tap Check, or weekly if you turned that on. */
 export async function checkForUpdate(current: string): Promise<UpdateInfo> {
-  const res = await fetch(LATEST, { headers: { Accept: 'application/vnd.github+json' } });
+  const res = await fetch(LATEST, { headers: { Accept: 'application/vnd.github+json' }, signal: giveUpAfter(15_000) }).catch((e: unknown) => {
+    throw e instanceof DOMException && e.name === 'TimeoutError' ? new Error('GitHub didn’t answer. Try again in a little while.') : e;
+  });
   if (!res.ok) throw new Error(res.status === 403 ? 'GitHub is busy. Try again in a little while.' : `GitHub answered ${res.status}`);
   return readRelease((await res.json()) as GitHubRelease, current);
 }
@@ -181,7 +184,7 @@ export async function installUpdate(url: string, sha256 = published.get(url)): P
 /** 0.9.3: what GitHub publishes now for this APK address, if the latest release still has it. */
 async function recheck(url: string): Promise<string | undefined> {
   try {
-    const res = await fetch(LATEST, { headers: { Accept: 'application/vnd.github+json' } });
+    const res = await fetch(LATEST, { headers: { Accept: 'application/vnd.github+json' }, signal: giveUpAfter(15_000) });
     if (!res.ok) return undefined;
     const info = readRelease((await res.json()) as GitHubRelease, '0');
     return info.apkUrl === url && info.sha256 && HEX64.test(info.sha256) ? info.sha256.toLowerCase() : undefined;

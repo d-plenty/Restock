@@ -1281,7 +1281,7 @@ final class SyncHub {
             return r.result;
         }
         // (D13: a folder goes after one last round, once the household is a house: syncFolder.)
-        if (r.upgraded || r.rekeyed) readvertise();
+        if (r.rekeyed) readvertise();
         // 0.9.3: a round that worked (from any start) lets the quick check look every minute again.
         if (r.error == null) pollGate.ok();
         if (r.error != null && r.cause != null) Log.w(TAG, "syncServer", r.cause);

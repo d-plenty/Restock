@@ -102,15 +102,6 @@ export function SyncOverview({ settings, info, onInfo, haSummary }: { settings: 
           </button>
         </div>
       )}
-      {info?.server && info.serverApi === 2 && info.isOwner && info.serverMode === 'v2' && (
-        <div className="banner green" role="status" style={{ gap: 8 }}>
-          <strong>Your server can be the house now</strong>
-          <span style={{ fontSize: 13 }}>Hand this household to the server, so it does the owner phone's job around the clock.</span>
-          <button className="btn small primary" style={{ alignSelf: 'flex-start' }} onClick={() => nav.push({ name: 'restockServer' })}>
-            Hand this household to the server
-          </button>
-        </div>
-      )}
 
       {!setUp ? (
         <>

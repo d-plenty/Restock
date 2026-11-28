@@ -54,7 +54,6 @@ import { ExportSheet, pricesIn } from './BackupParts';
 import { LegalSheet } from './Legal';
 import { ImportSheet, RestoreSheet } from './Restore';
 import { getHaConfig, haPhone, phoneLabel } from '../../lib/homeAssistant';
-import { serverMode } from '../../server-mode/flag';
 import { ConnectionsSheet, PriceCheckSettings, NotificationSettings, Fold, UpdateRows } from './SettingsParts';
 
 /** Settings → Shopping list: how much shopping around has to save (0.9.0). */
@@ -525,7 +524,7 @@ function SettingsBody({ page, side, onOpen, current }: { page?: SettingsPage; /*
             Sync
           </div>
           {/* 0.9.3: the household on top, how the phones sync, then backups. Any of the three counts as kept elsewhere. */}
-          <SyncOverview settings={settings} info={syncShown} onInfo={setSyncShown} haSummary={serverMode ? undefined : haSummary} />
+          <SyncOverview settings={settings} info={syncShown} onInfo={setSyncShown} haSummary={haSummary} />
           {/* 0.10.0: with a Restock server, Your data can show the household's figures from it. */}
           {syncShown?.server && syncShown.serverApi === 3 && (
             <div className="card flush">
@@ -685,7 +684,7 @@ function SettingsBody({ page, side, onOpen, current }: { page?: SettingsPage; /*
                 className="row"
                 onClick={async () => {
                   await loadDemo();
-                  nav.toast(serverMode ? 'Sample items added, in this browser only: they never go to your phones' : 'Sample items added');
+                  nav.toast('Sample items added');
                 }}
               >
                 <span className="grow">

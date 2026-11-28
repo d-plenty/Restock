@@ -71,7 +71,6 @@ export function takePendingJoin(): string | undefined {
   pendingJoin = undefined;
   return c;
 }
-export const hasPendingJoin = () => !!pendingJoin;
 
 /** Puts them back on this phone. Returns what to say about the server (a code to join with, or to ask for one). */
 export async function restoreConnections(c: Connections | undefined): Promise<{ server?: 'join' | 'ask' }> {

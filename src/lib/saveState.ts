@@ -3,7 +3,7 @@
 // A failed save used to be swallowed; now it's counted, shown in Diagnostics, and Home says so when
 // it keeps failing.
 
-export interface SaveState {
+interface SaveState {
   /** Where the database is kept: a file in the app's own storage, or the web view's storage. */
   where?: 'file' | 'web';
   /** When it was last written, ms. */

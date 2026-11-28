@@ -88,7 +88,6 @@ export function AddResults(p: {
   PER_SHOP: 3;
   anyResults: boolean;
   changing: Chain | undefined;
-  costcoLeftOut: false;
   instead: Partial<Record<Chain, { kind: string; items: StoreProduct[]; top: string[]; }>>;
   lastText: string;
   loadMore: (chain: StoreChain) => Promise<void>;
@@ -100,7 +99,6 @@ export function AddResults(p: {
   resultRow: (sp: StoreProduct, top: Set<string>) => JSX.Element;
   results: Partial<Record<Chain, ChainResult>>;
   searchChain: (chain: StoreChain, text: string, rq: RankQuery, storeId?: string) => Promise<void>;
-  searchCostcoToo: () => void;
   searched: StoreChain[];
   setOriginal: Dispatch<SetStateAction<Partial<Record<Chain, boolean>>>>;
   setPicks: Dispatch<SetStateAction<Map<string, StoreProduct>>>;
@@ -120,7 +118,7 @@ export function AddResults(p: {
   topKeys: Set<string>;
   view: Chain | "all";
 }) {
-  const { PER_SHOP, anyResults, changing, costcoLeftOut, instead, lastText, loadMore, mixed, original, picks, rankQ, reportWrong, resultRow, results, searchChain, searchCostcoToo, searched, setOriginal, setPicks, setShopView, setShowUnlikely, setShowing, setSortBy, setSpecialsOnly, setSuggest, settings, showUnlikely, showing, shownItems, sortBy, specialsOnly, suggest, topKeys, view } = p;
+  const { PER_SHOP, anyResults, changing, instead, lastText, loadMore, mixed, original, picks, rankQ, reportWrong, resultRow, results, searchChain, searched, setOriginal, setPicks, setShopView, setShowUnlikely, setShowing, setSortBy, setSpecialsOnly, setSuggest, settings, showUnlikely, showing, shownItems, sortBy, specialsOnly, suggest, topKeys, view } = p;
   return (
     <>
       {anyResults && !changing && (
@@ -199,15 +197,6 @@ export function AddResults(p: {
         <div className="banner grey">
           <strong>Shop search works in the Android app</strong>
           <span style={{ fontSize: 13 }}>In this preview you can still add items by hand.</span>
-        </div>
-      )}
-
-      {costcoLeftOut && isNative() && (
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span className="small">Costco is only searched when you press Search.</span>
-          <button className="btn" style={TAP} onClick={searchCostcoToo}>
-            <Icon name="search" size={18} /> Search Costco
-          </button>
         </div>
       )}
 

@@ -11,7 +11,6 @@ import type { Recommendation } from '../../lib/verdict';
 import { chainName, customDef, EXTRA_SECTIONS, enabledIn, MAX_CUSTOM, SECTION_NAMES, type Section } from '../../shops';
 import { customsInUse, NewCustomSheet } from './CustomSections';
 import type { Chain } from '../../types';
-import { serverMode } from '../../server-mode/flag';
 import { BetaTag, Icon } from '../components';
 import { useNav } from '../nav';
 
@@ -35,7 +34,7 @@ function tabSummary(recs: Recommendation[] | undefined, section: Section): { thi
  * tab that isn't set up. A tab switched off from More (Settings: Show it in More) isn't shown, but
  * still works. The web page's phone layout shows the same (PhoneLayout.tsx MorePage).
  */
-export function MoreTop({ children }: { children?: ReactNode }) {
+function MoreTop({ children }: { children?: ReactNode }) {
   const nav = useNav();
   const settings = useSettings();
   const recs = useLive(loadRecommendations, []);
@@ -66,7 +65,7 @@ export function MoreTop({ children }: { children?: ReactNode }) {
                   onClick={() => {
                     if (shops.length) return nav.setTab(s);
                     nav.push({ name: 'settings' });
-                    if (!serverMode) nav.push({ name: 'stores', section: s });
+                    nav.push({ name: 'stores', section: s });
                   }}
                 >
                   <span className="more-tile-icon">
@@ -94,7 +93,7 @@ export function MoreTop({ children }: { children?: ReactNode }) {
       {(builtInFree || customRoom) && (
         <div className="more-adds">
           {/* 0.12.5: one button. Chemist, Bottle shop, Baby, Pets, Automotive, Tools, Office and Your own are picked inside it; none is put here ahead of time. */}
-          <button className="more-add more-custom" onClick={() => (serverMode ? nav.push({ name: 'settings' }) : setMaking(true))}>
+          <button className="more-add more-custom" onClick={() => (setMaking(true))}>
             <Icon name="pack:star" size={20} />
             <span className="grow" style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
               <span>Create a custom tab</span>

@@ -31,7 +31,7 @@ const STREET =
   /\b\d{1,5}[a-z]?(?:[-/]\d{1,5}[a-z]?)?\s+(?:[a-z]+\s+){0,3}(?:st|street|rd|road|ave|avenue|dr|drive|ct|court|pl|place|cres|crescent|bvd|blvd|boulevard|hwy|highway|lane|ln|way|tce|terrace|pde|parade|cct|circuit|cl|close|gr|grove|esp|esplanade)\b\.?/gi;
 
 /** Blanks anything that looks personal in a piece of text. */
-export function scrubText(text: string): string {
+function scrubText(text: string): string {
   return text
     .replace(EMAIL, '(removed)')
     .replace(STREET, '(removed)')

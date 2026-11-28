@@ -20,14 +20,14 @@ export interface CatalogueDeal {
   note: string;
 }
 
-export interface CataloguePage {
+interface CataloguePage {
   chain: string;
   /** 'sales': this week's sales. 'cheapest': where this shop beats the others. */
   kind: 'sales' | 'cheapest';
   deals: CatalogueDeal[];
 }
 
-export interface MyCatalogue {
+interface MyCatalogue {
   /** The specials week: Wednesday to Tuesday. */
   from: Date;
   to: Date;

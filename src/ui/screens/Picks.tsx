@@ -12,9 +12,8 @@ import { allPicks, pickCategoryIds, PICKS_ABOUT, PICKS_TITLE, picksDone, picksYo
 import { nameKey } from '../../lib/sameName';
 import { act } from '../../lib/undo';
 import { useLive } from '../../lib/useLive';
-import { serverMode } from '../../server-mode/flag';
 import { chainName } from '../../types';
-import { ChainDot, Icon, Thumb, TopBar } from '../components';
+import { ChainDot, Thumb, TopBar } from '../components';
 import { useNav } from '../nav';
 
 /** "47 added to your pantry. 3 skipped: already in your pantry". */
@@ -122,18 +121,12 @@ export function PicksScreen() {
         Tick what you want, or select all. They go in your pantry only, not on your shopping list, and anything you already have by the same
         name is left exactly as it is. Prices aren't included: Restock checks each one once it's added.
       </p>
-      {serverMode && (
-        <p className="phone-only compact" role="note">
-          <Icon name="phone" size={16} />
-          <span>Adding these is done on a phone: Settings, then {PICKS_TITLE}.</span>
-        </p>
-      )}
       <div className="picks-bar">
         <strong className="num" role="status">
           {chosen.length ? `${chosen.length} ticked` : `${free.length} to pick from`}
           {have.size > 0 && <span className="small"> · {have.size} already yours</span>}
         </strong>
-        <button className="chip" disabled={!free.length || serverMode} onClick={() => setTicked(all ? new Set() : new Set(free.map((p) => p.n)))}>
+        <button className="chip" disabled={!free.length} onClick={() => setTicked(all ? new Set() : new Set(free.map((p) => p.n)))}>
           {all ? 'Select none' : 'Select all'}
         </button>
       </div>
@@ -148,7 +141,7 @@ export function PicksScreen() {
                 const on = ticked.has(p.n) && !mine;
                 return (
                   <label key={p.n} className={`row pick-row${mine ? ' mine' : ''}`}>
-                    <input type="checkbox" checked={on} disabled={mine || serverMode} onChange={() => tick(p.n)} aria-label={mine ? `${p.name}: already in your pantry` : p.name} />
+                    <input type="checkbox" checked={on} disabled={mine} onChange={() => tick(p.n)} aria-label={mine ? `${p.name}: already in your pantry` : p.name} />
                     <Thumb src={p.main[0]?.imageUrl} icon="pantry" />
                     <span className="grow">
                       <span className="title" style={{ fontSize: 15 }}>
@@ -173,7 +166,7 @@ export function PicksScreen() {
         </section>
       ))}
       <div className="sticky-cta picks-end">
-        <button className="btn primary block" disabled={!chosen.length || busy || serverMode} onClick={() => void add()}>
+        <button className="btn primary block" disabled={!chosen.length || busy} onClick={() => void add()}>
           {busy ? 'Adding…' : chosen.length ? `Add ${chosen.length} to my pantry` : 'Add to my pantry'}
         </button>
         <button className="btn block" onClick={nav.pop}>

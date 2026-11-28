@@ -22,7 +22,7 @@ export type { CompareStyle };
 // With nothing it can trust, it says "size unknown" and leaves that line out of the cheapest comparison.
 
 /** What Restock needs to know about a product to size it: a saved product or a shop's search result. */
-export interface SizeSource {
+interface SizeSource {
   name: string;
   size?: string;
   brand?: string;
@@ -36,7 +36,7 @@ export interface SizeSource {
 }
 
 /** A product with its price, for looking at look-alikes. */
-export interface PoolItem extends SizeSource {
+interface PoolItem extends SizeSource {
   id?: string;
   price?: number;
 }
@@ -337,7 +337,7 @@ export function sizeLabel(p: SizeSource & { sizing?: Sizing }): string {
   return s.basis === 'shop' && p.size && sameAsWords && !/pack|pk|each|ea\b/i.test(p.size) ? (tidySize(p.size, p.name) ?? measureText(s.qty, s.unit)) : `${measureText(s.qty, s.unit)}${note}`;
 }
 
-export interface PriceLine {
+interface PriceLine {
   /** "$0.98 each": one can, bottle or item. Missing for a single one (its price is the price). */
   each?: string;
   /** "$2.61 / L": what decides the cheapest. Missing when the size is unknown. */

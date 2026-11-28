@@ -155,7 +155,7 @@ function Scanner({
       timer = window.setTimeout(tick, 120);
     };
 
-    (async () => {
+    void (async () => {
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('No camera is available here.');
         stream = await navigator.mediaDevices.getUserMedia({

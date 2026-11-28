@@ -75,7 +75,7 @@ export function listLineWithoutCostco<T extends Partial<ListEntry>>(e: T): T {
 type Picks = Pick<Group, 'id' | 'usualProductId' | 'sameProductIds' | 'altProductIds'>;
 
 /** This phone's Costco products, their prices, which items pick them, and its Costco setting. */
-export interface CostcoHere {
+interface CostcoHere {
   products: Snapshot['products'];
   prices: Snapshot['prices'];
   groups: Picks[];

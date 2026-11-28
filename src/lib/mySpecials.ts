@@ -13,7 +13,7 @@ export type SpecialFrom = 'yours' | 'list' | 'seen';
 export type SpecialSort = 'saving' | 'price' | 'az';
 
 /** 0.12.6: the kind of deal, said on the tile's corner (it said "Your item" on every one). */
-export type DealTone = 'good' | 'wait' | 'fake';
+type DealTone = 'good' | 'wait' | 'fake';
 export interface DealWord {
   text: string;
   tone: DealTone;

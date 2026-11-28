@@ -55,7 +55,7 @@ export const PACKING = new Set(
 );
 
 /** How it's packed, when the name says: cans and bottles of the same size are different containers. */
-export type Container = 'can' | 'bottle' | 'glass' | 'pouch' | 'jar' | 'tub' | 'squeeze' | 'sachet';
+type Container = 'can' | 'bottle' | 'glass' | 'pouch' | 'jar' | 'tub' | 'squeeze' | 'sachet';
 
 function containerOf(name: string): Container | undefined {
   const n = name.toLowerCase();
@@ -157,7 +157,7 @@ export interface SizeOption {
   vs?: number;
 }
 
-export interface OtherSizes {
+interface OtherSizes {
   /** The same can, bottle or jar in other pack counts. Fewest first. */
   packs: SizeOption[];
   /** The same product in another container size or kind (250mL cans, 1.25L bottles). Smallest first. */

@@ -6,6 +6,17 @@ import type { VersionNotes } from './whatsNew';
 
 export const EARLIER: VersionNotes[] = [
   {
+    version: '0.18.4',
+    about: 'Restock on iPhone opens properly on a Restock server, each phone keeps its backup on the server, and a tidier Server admin.',
+    changes: [
+      'Fixed: on an iPhone or iPad joined to a Restock server, Home, Pantry and the list could stay on “Loading…”. Syncing asks the database a few hundred things at a time now, not one by one.',
+      'Each phone can keep its whole backup on your Restock server, once a day (Settings → Sync → Restock server → Backup). Locked so only the server’s passphrase opens it.',
+      'A lost or broken phone: an admin adds the new one as its replacement, and the new one puts the backup back with the server’s passphrase.',
+      'Server admin on the phone is the basics on the go, a page each: Phones and tablets, Sign in a computer, Passphrase (new), Basic settings and Phone backups.',
+      'The server’s web page fits any screen, from a phone to a big monitor, and its Text size makes everything bigger.',
+    ],
+  },
+  {
     version: '0.18.3',
     about: 'Look after your server from a phone, a yes on your phone to sign in to its page, and home and away addresses that just work.',
     changes: [

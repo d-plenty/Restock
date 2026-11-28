@@ -35,7 +35,7 @@ export interface Have {
   /** Running low at or under this (same terms as amount). Missing: only "out", at nothing left. */
   low?: number;
 }
-export type HaveState = 'ok' | 'low' | 'out';
+type HaveState = 'ok' | 'low' | 'out';
 
 const INV_TAB = 'inv:tab:';
 const INV_AUTO = 'inv:auto';

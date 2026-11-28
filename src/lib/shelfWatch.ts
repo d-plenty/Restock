@@ -162,8 +162,6 @@ export async function processShelf(): Promise<ShelfWatch> {
 }
 /** 0.18.4: processShelf's saves, one lot after another. */
 let saving: Promise<void> = Promise.resolve();
-/** For the tests: when processShelf's saves are done. */
-export const shelfSaved = (): Promise<void> => saving;
 
 /**
  * A search just showed these: any that Restock already keeps (same shop, same product number) with

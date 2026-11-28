@@ -13,15 +13,16 @@
 // own writes asked before it, so it always sees them; what the sync engine is in the middle of it
 // doesn't see until the engine has finished (as with any other database).
 import { noteSpeed } from '../lib/speedLog';
+import { waitingFor } from '../lib/waiting';
 import type { RunResult, SqlDriver, SqlOp, SqlValue } from '../lib/sql/driver';
 import type { AsyncSyncDb, Row } from '../server-mode/engine';
 import { appleHere, RestockApple } from './apple';
 import { DB_FILE, MARKET_FILE, databaseStore, fileStore, looksLikeSqlite, type WebCopy } from './store';
 
 /** The plugin version that has the database (RestockSql.swift). */
-export const SQL_VERSION = 4;
+const SQL_VERSION = 4;
 /** 0.15.2: the plugin version with the read lane (sqlRead). */
-export const READ_LANE_VERSION = 5;
+const READ_LANE_VERSION = 5;
 /** The copies kept before the first open in the system's SQLite. */
 export const KEPT = { [DB_FILE]: 'restock-before-0.15.1.sqlite', [MARKET_FILE]: 'restock-market-before-0.15.1.sqlite' } as const;
 
@@ -58,12 +59,24 @@ export async function readLaneHere(): Promise<boolean> {
 /** 0.18.2: how long a read waits for the app's own last write before reading what's there. */
 export const READ_WAIT_MS = 250;
 
+/** 0.19.0: how long the read lane gets before the same read is also asked the other way. */
+export const READ_LANE_PATIENCE_MS = 6000;
+
 /** A read that the read lane can take: a SELECT (anything else, PRAGMAs included, goes the writing way). */
 export const isRead = (sql: string): boolean => /^\s*SELECT\b/i.test(sql);
 
 /** What the bridge can carry: true/false as 1/0 (as sql.js and Android store them), nothing as null. */
 export const bindable = (args: readonly unknown[] = []): SqlValue[] =>
   args.map((a) => (a === undefined || a === null ? null : typeof a === 'boolean' ? (a ? 1 : 0) : typeof a === 'number' || typeof a === 'string' ? a : String(a)));
+
+/**
+ * 0.19.0: the rows of an answer. An answer the bridge couldn't carry arrives empty (no rows at all):
+ * that's said in words, with the question, instead of failing somewhere later as "undefined".
+ */
+export function rowsOf(answer: { rows?: unknown } | undefined | null, sql: string): Row[] {
+  if (answer && Array.isArray(answer.rows)) return answer.rows as Row[];
+  throw new Error(`The database's answer didn't arrive (${sql.replace(/\s+/g, ' ').trim().slice(0, 70)})`);
+}
 
 interface Raw {
   query(sql: string, args?: readonly unknown[]): Promise<Row[]>;
@@ -85,9 +98,9 @@ export class AppleDb implements SqlDriver {
     opts: { readLane?: boolean } = {},
   ) {
     const sqlRead = p.sqlRead?.bind(p);
-    if (opts.readLane && sqlRead) this.read = async (sql, args) => (await sqlRead({ db: name, sql, values: bindable(args) })).rows as Row[];
+    if (opts.readLane && sqlRead) this.read = async (sql, args) => rowsOf(await sqlRead({ db: name, sql, values: bindable(args) }), sql);
     this.raw = {
-      query: async (sql, args) => (await p.sqlQuery({ db: name, sql, values: bindable(args) })).rows as Row[],
+      query: async (sql, args) => rowsOf(await p.sqlQuery({ db: name, sql, values: bindable(args) }), sql),
       run: (sql, args) => p.sqlRun({ db: name, sql, values: bindable(args) }),
       batch: async (ops) => {
         if (ops.length) await p.sqlBatch({ db: name, ops: ops.map((o) => ({ sql: o.sql, values: bindable(o.params) })) });
@@ -119,10 +132,42 @@ export class AppleDb implements SqlDriver {
       return Promise.race([this.written, new Promise((r) => setTimeout(r, READ_WAIT_MS))]).then(() => {
         const waited = Date.now() - t0;
         if (waited >= READ_WAIT_MS) noteSpeed('read', waited);
-        return read(sql, params) as Promise<T[]>;
+        return this.readEitherWay(read, sql, params) as Promise<T[]>;
       });
     }
     return this.write(() => this.raw.query(sql, params) as Promise<T[]>);
+  }
+  /**
+   * 0.19.0: a read on the read lane; if that hasn't answered after READ_LANE_PATIENCE_MS (or fails),
+   * the same question goes the writing connection's way too, and the first answer counts. So the
+   * read lane being stuck behind one huge read, or not working at all, can't keep a screen waiting.
+   */
+  private readEitherWay(read: (sql: string, args: readonly unknown[]) => Promise<Row[]>, sql: string, params: SqlValue[]): Promise<Row[]> {
+    return new Promise<Row[]>((yes, no) => {
+      let other: Promise<Row[]> | undefined;
+      let failed = 0;
+      const fail = (e: unknown) => {
+        if (++failed === 2) no(e);
+      };
+      const otherWay = (why: string) => {
+        if (other) return;
+        noteSpeed('read', READ_LANE_PATIENCE_MS, `read lane ${why}`);
+        other = this.raw.query(sql, params);
+        other.then(yes, fail);
+      };
+      const t = setTimeout(() => otherWay('slow'), READ_LANE_PATIENCE_MS);
+      read(sql, params).then(
+        (rows) => {
+          clearTimeout(t);
+          yes(rows);
+        },
+        (e) => {
+          clearTimeout(t);
+          otherWay('failed');
+          fail(e);
+        },
+      );
+    });
   }
   run(sql: string, params: SqlValue[] = []): Promise<RunResult> {
     return this.write(() => this.raw.run(sql, params));
@@ -154,9 +199,12 @@ export class AppleDb implements SqlDriver {
       exclusive: (fn) =>
         this.turn(async () => {
           const t0 = Date.now();
+          // 0.19.0: and while it holds it, a screen that's waiting can say so (lib/waiting.ts).
+          const wait = waitingFor('sync is holding the database (saves wait for it)', 'database');
           try {
             return await fn();
           } finally {
+            wait.done();
             noteSpeed('hold', Date.now() - t0);
           }
         }),

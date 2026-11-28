@@ -2,7 +2,6 @@ import type { DataSeries, DataStats, Period, TopItem, TopPage } from '../server-
 import type { SqlValue } from './sql/driver';
 import { getKV, onBeforeListDelete, putKV, queryRows, runSql, marketQuery } from './db';
 import { RestockNative } from './sql/native';
-import { serverMode } from '../server-mode/flag';
 
 // 0.9.14: Settings → Your data on a phone without a Restock server: spending from what you tick off,
 // worked out on this phone the same way the server's Data tab does it (server/src/v3/data.mjs,
@@ -386,7 +385,6 @@ export const phoneSpending = () =>
 
 /** Notes ticks now (after ticking, before clearing the list, when Restock opens). Quiet on failure. */
 export async function noteTicks(): Promise<void> {
-  if (serverMode) return;
   try {
     await phoneSpending().recordTicks();
   } catch {
@@ -397,7 +395,6 @@ export async function noteTicks(): Promise<void> {
 let timer: ReturnType<typeof setTimeout> | undefined;
 /** After a tick: noted a moment later, so a few ticks in a row are one look. */
 export function noteTicksSoon(): void {
-  if (serverMode) return;
   if (timer) clearTimeout(timer);
   timer = setTimeout(() => {
     timer = undefined;
@@ -406,7 +403,7 @@ export function noteTicksSoon(): void {
 }
 
 // Before ticked lines are cleared off the list, their purchases are noted (phones only).
-if (!serverMode) onBeforeListDelete(noteTicks);
+onBeforeListDelete(noteTicks);
 
 /** 0.10.0: whether Your data shows the Restock server's figures (and this phone shares its spending there). */
 export const spendingOnServer = (s: { yourData?: { server: boolean } }) => s.yourData?.server !== false;
@@ -417,7 +414,6 @@ export const spendingOnServer = (s: { yourData?: { server: boolean } }) => s.you
  * request). The server keeps the ones it already has as they are. Resolves how many it added.
  */
 export async function sendSpendingToServer(): Promise<number> {
-  if (serverMode) return 0;
   // 0.10.1: remembered per server (its address), so a phone that later joins another household's
   // server sends its spending there too. 0.10.0 kept just "sent" (true): that's this server.
   const { syncInfo } = await import('./sync');
@@ -434,7 +430,6 @@ export async function sendSpendingToServer(): Promise<number> {
 
 /** At start: on a Restock server with Share my spending on, the earlier spending goes once. */
 export async function maybeSendSpending(): Promise<void> {
-  if (serverMode) return;
   try {
     const [{ syncInfo }, { getSettings }] = await Promise.all([import('./sync'), import('./db')]);
     const i = await syncInfo();

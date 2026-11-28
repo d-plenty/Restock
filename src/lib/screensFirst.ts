@@ -22,9 +22,6 @@ export function screenReading(): () => void {
   };
 }
 
-/** How many screens are reading right now. */
-export const screensReading = (): number => reading;
-
 /**
  * Background work calls this between steps: it lets the phone draw (a pause of `restMs`), and while
  * a screen is reading, waits for it (at most `maxMs`).

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { readerInstalled } from '../lib/receiptReader';
-import { downloadReader, READER_SIZE_TEXT, READER_WHAT, readerBundled, readerDownloaded, removeReader } from '../lib/readerModels';
+import { downloadReader, READER_SIZE_TEXT, READER_WHAT, readerDownloaded, removeReader } from '../lib/readerModels';
 import { deviceWord } from '../lib/platform';
 import { Sheet } from './components';
 import { useNav } from './nav';
@@ -106,7 +106,6 @@ export function ReaderSettings() {
   useEffect(() => {
     void readerDownloaded().then(setHere);
   }, []);
-  if (readerBundled()) return null;
   return (
     <div className="card" style={{ gap: 10 }}>
       <div>

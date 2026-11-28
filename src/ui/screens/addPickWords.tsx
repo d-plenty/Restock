@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { SECTION_NAMES, type Section } from '../../shops';
 import { Icon } from '../components';
 
-export type AddTarget = 'both' | 'pantry' | 'list';
+type AddTarget = 'both' | 'pantry' | 'list';
 
 /**
  * 0.10.7: one of the Add buttons. While one is saving, only that one changes (a spinner and

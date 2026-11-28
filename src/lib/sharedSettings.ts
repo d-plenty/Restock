@@ -53,11 +53,11 @@
 import { CUSTOM_SECTIONS, MADE_SECTIONS, SECTIONS, SHOPS, checkCustomDef, isCustomSection, isMadeSection, isLocalOnlyShop, shareTab, shopDef, type CustomShop, type Section } from '../shops';
 import { siteOf } from './site';
 
-export const ALL_TABS: Section[] = ['pantry', 'keg', 'pharmacy'];
+const ALL_TABS: Section[] = ['pantry', 'keg', 'pharmacy'];
 
 /** Settings that are the household's (a row each), besides the shops and tabs. */
 export const SCALAR_KEYS = ['shopAroundMin', 'defaultThresholdPct', 'listCompare', 'productOrder', 'recalls.enabled'] as const;
-export type ScalarKey = (typeof SCALAR_KEYS)[number];
+type ScalarKey = (typeof SCALAR_KEYS)[number];
 
 /** What a missing setting means (types.ts DEFAULT_SETTINGS). */
 export const DEFAULTS = {
@@ -77,7 +77,7 @@ const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.i
 
 /** A built-in shop's id (not one people added). */
 // 0.9.6: Costco is this phone's own (shops.ts LOCAL_ONLY_SHOPS), never a household shop.
-export const builtIn = (id: string): boolean => !id.startsWith('custom-') && !!shopDef(id) && !isLocalOnlyShop(id);
+const builtIn = (id: string): boolean => !id.startsWith('custom-') && !!shopDef(id) && !isLocalOnlyShop(id);
 
 /** The built-in shops shared with a tab, in shops.ts order (0.10.3: Baby and Pets shops go with Groceries). */
 export const builtInsOn = (tab: string): string[] => SHOPS.filter((s) => shareTab(s.section) === tab && !isLocalOnlyShop(s.id)).map((s) => s.id);
@@ -86,7 +86,7 @@ export const builtInsOn = (tab: string): string[] => SHOPS.filter((s) => shareTa
 export const rowTab = (t: string): string => (isCustomSection(t) ? 'pantry' : t);
 
 /** 0.10.3: a shop row's `tabs`, checked: known tabs, in their order, at least one (SharedSettings.java checkTabs). */
-export function checkTabs(v: unknown): Section[] | undefined {
+function checkTabs(v: unknown): Section[] | undefined {
   if (!Array.isArray(v)) return undefined;
   const t = SECTIONS.filter((s) => v.includes(s));
   return t.length ? t : undefined;
@@ -141,13 +141,13 @@ export function checkShop(v: unknown, id: string): CustomShop | undefined {
 
 const SHOP_FIELDS = ['id', 'name', 'website', 'section', 'search', 'createdAt'] as const;
 /** The same shop, field by field (a missing search is the same as none). */
-export function sameShop(a: Obj, b: Obj): boolean {
+function sameShop(a: Obj, b: Obj): boolean {
   return SHOP_FIELDS.every((f) => (a[f] ?? null) === (b[f] ?? null));
 }
 
-export const BRANCH_PREFIX = 'branch:';
+const BRANCH_PREFIX = 'branch:';
 /** 0.10.7: a custom section's name, colour and icon (custom:baby, custom:c1 …). */
-export const CUSTOM_PREFIX = 'custom:';
+const CUSTOM_PREFIX = 'custom:';
 
 /** 0.9.4: a branch:<chain> row's value, checked (SharedSettings.java checkBranch), or undefined. */
 export function checkBranch(k: string, v: unknown): { name: string; storeNo?: string } | undefined {

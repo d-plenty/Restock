@@ -6,7 +6,7 @@
 import { genericName } from './naming';
 import { tidyItemName } from './itemName';
 
-export interface NamePick {
+interface NamePick {
   name: string;
   brand?: string;
 }

@@ -7,7 +7,7 @@
 /** The bars a toast must clear. */
 const BOTTOM_BARS = '.sticky-cta, .save-bar, .selectbar, .add-mini, nav.tabs, .setup-foot.sticky';
 
-export type Box = { top: number; bottom: number; left: number; right: number };
+type Box = { top: number; bottom: number; left: number; right: number };
 
 /**
  * How far above the window's bottom edge (in screen pixels) the toast's bottom should sit: a gap

@@ -29,7 +29,7 @@ export interface CheckResult {
   complete?: boolean;
 }
 
-export interface CheckOptions {
+interface CheckOptions {
   /** Android: the scheduled check for the latest slot (the catch-up when Restock opens). */
   slot?: boolean;
   /** 0.15.2, iPhone: someone pressed Check now (so it may carry on after Restock leaves the screen). */
@@ -230,7 +230,7 @@ export async function checkBySearch(
 export const SAVE_EVERY = 20;
 
 /** What a check has found and not saved yet: saved every SAVE_EVERY products and at the end, with `note` if given. */
-export function findings(note?: () => { key: string; value: unknown }) {
+function findings(note?: () => { key: string; value: unknown }) {
   let readings: Omit<PriceReading, 'id'>[] = [];
   let photos: { id: string; imageUrl: string }[] = [];
   let seen = 0;
@@ -256,7 +256,7 @@ export function findings(note?: () => { key: string; value: unknown }) {
 }
 
 /** A shop product with no product page of its own to check (found in a page's data, not a link). */
-export const isPageless = (chain: Chain, storeProductId?: string) =>
+const isPageless = (chain: Chain, storeProductId?: string) =>
   chain !== 'other' && kindOf(chain) === 'web' && !!storeProductId && !/^https?:\/\/[^#]+$/.test(storeProductId);
 
 /**

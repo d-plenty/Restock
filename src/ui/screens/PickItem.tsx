@@ -7,7 +7,6 @@ import { act } from '../../lib/undo';
 import { useLive } from '../../lib/useLive';
 import { enabledIn, SECTION_PLACE, type Section } from '../../shops';
 import { isNative } from '../../stores/http';
-import { serverMode, serverUi } from '../../server-mode/flag';
 import type { ListEntry } from '../../types';
 import { Icon, Sheet, useBackLayer, SearchField } from '../components';
 import { useNav } from '../nav';
@@ -17,8 +16,8 @@ import { pickedWords } from './addSave';
 
 // Loaded when first needed: the web app on a Restock server uses this sheet too, and never searches
 // the shops from it. 0.15.2: on a phone they're loaded quietly once Restock has started (lazyScreen).
-const AddScreen = lazyScreen(() => import('./Add').then((m) => m.AddScreen), { preload: !serverMode });
-const ManualSheet = lazyScreen(() => import('./AddSheets').then((m) => m.ManualSheet), { preload: !serverMode });
+const AddScreen = lazyScreen(() => import('./Add').then((m) => m.AddScreen), { preload: true });
+const ManualSheet = lazyScreen(() => import('./AddSheets').then((m) => m.ManualSheet), { preload: true });
 
 /** Whether the phone thinks it's online (searching the shops needs the internet; nothing else here does). */
 function useOnline(): boolean {
@@ -83,8 +82,6 @@ export function PickItemSheet({
   const [byHand, setByHand] = useState(false);
   const online = useOnline();
   const native = isNative();
-  // 0.9.5 (web search): on a Restock server's web page, its shop search (when the household turned it on).
-  const web = !native && serverMode ? serverUi.current?.webSearch : undefined;
   const pantry = useLive(async () => (await allGroups()).filter((g) => (g.section ?? 'pantry') === section), [section]);
   const extras = useLive(async () => {
     const [cats, s] = await Promise.all([allCategories(), getSettings()]);
@@ -151,36 +148,14 @@ export function PickItemSheet({
           </span>{' '}
           Back to {place}
         </button>
-        {web ? (
-          // 0.9.5 (web search): the server searches the shops; the same ticks, bar and sheet.
-          <web.PickResults
-            section={section}
-            key={shopsFor}
-            query={shopsFor}
-            entry={entry}
-            word={word}
-            always={always}
-            onAlways={setAlways}
-            toPantry={toPantry}
-            wantId={toPantry ? entry.product?.storeProductId : undefined}
-            onDone={(said) => {
-              if (said) nav.toast(said);
-              onClose();
-            }}
-          />
-        ) : (
-          <Suspense fallback={<p className="small">Getting the shop search ready…</p>}>
-            <AddScreen key={shopsFor} query={shopsFor} section={section} forLine={forLine} />
-          </Suspense>
-        )}
+        <Suspense fallback={<p className="small">Getting the shop search ready…</p>}>
+          <AddScreen key={shopsFor} query={shopsFor} section={section} forLine={forLine} />
+        </Suspense>
       </Sheet>
     );
 
   /** What's under the pantry list: search the shops (online, in the app), or why not. */
-  const shopAction = web ? (
-    // 0.9.5 (web search): Search the shops (on), or where to do it (off).
-    <web.PickButton typed={typed} pantryShown={!!pantry && shown.length > 0} busy={busy} onSearch={(q) => setShopsFor(q)} auto={toPantry || noneOfMine} />
-  ) : !native ? (
+  const shopAction = !native ? (
     <div className="banner grey">
       <strong>Shop search works in the Android app</strong>
       <span style={{ fontSize: 13 }}>Here you can still pick one of your items, or keep it as just the words.</span>

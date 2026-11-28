@@ -2,7 +2,7 @@ import { RestockNative } from './sql/native';
 import { isNative } from '../stores/http';
 import { toLines, type ReadLine } from './reader/lines';
 import type { FromWorker, ToWorker, WorkerFiles } from './reader/ocrWorker';
-import { readerBundled, readerDownloaded, readerFiles } from './readerModels';
+import { readerDownloaded, readerFiles } from './readerModels';
 // The photo reader's engine and letter list are part of the app. Its two model files (PaddleOCR's
 // PP-OCRv5 mobile, Apache-2.0; about 20 MB) are downloaded on first use in the phone and tablet apps
 // (lib/readerModels.ts) and built into the Restock server's web pages (reader/bundled.ts). The engine
@@ -21,7 +21,7 @@ export type { ReadLine };
 
 /** Whether the reader can read: built in (the server's web pages), or its files have been downloaded. */
 export async function readerInstalled(): Promise<boolean> {
-  return readerBundled() || readerDownloaded();
+  return readerDownloaded();
 }
 
 /** Thrown by readText when the reader's files aren't on the device yet. */
@@ -32,12 +32,8 @@ class ReaderMissing extends Error {
   }
 }
 
-/** The two model files: from the build where they're built in, otherwise the downloaded ones. */
+/** The two model files (downloaded on first use, lib/readerModels.ts). */
 async function modelFiles(): Promise<{ det: string | ArrayBuffer; rec: string | ArrayBuffer }> {
-  if (__READER_BUNDLED__) {
-    const b = await import('./reader/bundled');
-    return { det: new URL(b.det, location.href).href, rec: new URL(b.rec, location.href).href };
-  }
   const f = await readerFiles();
   if (!f) throw new ReaderMissing();
   return f;

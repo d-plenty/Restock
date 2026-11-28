@@ -5,7 +5,7 @@
 // what you track is sent anywhere. The full history isn't kept, only the summary.
 import { gunzipSync, strFromU8 } from 'fflate';
 
-export const SOURCE = 'restock-prices';
+const SOURCE = 'restock-prices';
 export const WINDOW_BASE = 'https://raw.githubusercontent.com/d-plenty/restock-prices/main/window/';
 const WINDOWS = [56, 182, 365];
 const DAY = 86_400_000;
@@ -18,7 +18,7 @@ const MAX_POINTS = 400;
 export const MAX_BYTES = 150 * 1024 * 1024;
 const REFRESH_MS = 7 * DAY;
 
-export interface Summary {
+interface Summary {
   normal: number;
   sale?: number;
   saleShare: number;
@@ -176,7 +176,7 @@ export function windowDays(s: MarketSettings | undefined): number {
   const d = s?.marketData?.days ?? 56;
   return WINDOWS.includes(d) ? d : 56;
 }
-export const daily = (s: MarketSettings | undefined) => s?.marketData?.every === 'daily';
+const daily = (s: MarketSettings | undefined) => s?.marketData?.every === 'daily';
 
 /** The shops this device uses, each once. */
 export function chainsOf(s: MarketSettings | undefined): string[] {
@@ -185,7 +185,7 @@ export function chainsOf(s: MarketSettings | undefined): string[] {
   return out;
 }
 
-export interface WindowIndex {
+interface WindowIndex {
   format?: string;
   shops?: Record<string, { to?: string; full?: string }>;
 }
@@ -239,7 +239,7 @@ export interface MarketDeps {
   now?: () => number;
 }
 
-export interface MarketResult {
+interface MarketResult {
   products: number;
   bytes: number;
   byChain: Record<string, number>;

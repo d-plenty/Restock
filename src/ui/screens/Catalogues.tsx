@@ -4,7 +4,6 @@ import { ownCounts } from '../../lib/ownSpecialsLive';
 import { loadRecommendations } from '../../lib/recs';
 import { useLive, useSettings } from '../../lib/useLive';
 import { activeSections, chainName, enabledIn, hostOf, shopDef, shopOnTab, websiteOf, type Section, type StoreChain, withCustom } from '../../shops';
-import { serverMode } from '../../server-mode/flag';
 import { storeChoice, type Settings } from '../../types';
 import { ChainDot, Icon, TopBar, ScreenWaiting } from '../components';
 import { useNav } from '../nav';
@@ -68,9 +67,8 @@ function ShopRow({ chain, n }: { chain: StoreChain; n: number | undefined }) {
           <a
             className="btn small"
             href={site}
-            {...(serverMode ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             style={{ textDecoration: 'none' }}
-            aria-label={`${chainName(chain)} website${serverMode ? ' (opens a new tab)' : ''}`}
+            aria-label={`${chainName(chain)} website`}
           >
             <Icon name="external" size={16} /> Website
           </a>

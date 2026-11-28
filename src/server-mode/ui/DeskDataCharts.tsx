@@ -8,26 +8,8 @@ import '../dataCharts.css';
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { chainName } from '../../shops';
 import { money } from '../../lib/units';
-import {
-  barLayout,
-  bytesText,
-  cheapestByWeek,
-  dayMonthYear,
-  labelEvery,
-  longMonth,
-  monthLabel,
-  moneyAxis,
-  axisCents,
-  moneyShort,
-  niceScale,
-  shares,
-  storageParts,
-  thisMonth,
-  xsOf,
-  yOf,
-  type Box,
-} from './dataCharts';
-import type { DataSeries, DataStats, DataSummary } from './houseData';
+import { barLayout, cheapestByWeek, dayMonthYear, labelEvery, longMonth, monthLabel, moneyAxis, axisCents, moneyShort, niceScale, shares, thisMonth, xsOf, yOf, type Box } from './dataCharts';
+import type { DataSeries, DataStats } from './houseData';
 
 /** A table of the chart's numbers, shown when asked (and always there for screen readers). */
 function NumbersTable({ caption, head, rows }: { caption: string; head: string[]; rows: (string | number)[][] }) {
@@ -321,28 +303,3 @@ export function PriceKey({ usual }: { usual: number | null }) {
 }
 
 // ---------- storage ----------
-
-export function StorageBar({ summary, names }: { summary: DataSummary; names: Record<string, string> }) {
-  const parts = storageParts(summary, names);
-  const label = `Storage: ${parts.map((p) => `${p.label} ${bytesText(p.bytes)}`).join(', ')}`;
-  return (
-    <>
-      <div className="dd-stack" role="img" aria-label={label}>
-        {parts
-          .filter((p) => p.pct > 0)
-          .map((p) => (
-            <span key={p.key} className={`dd-seg dd-c-${p.key}`} style={{ width: `${p.pct}%` }} />
-          ))}
-      </div>
-      <ul className="dd-legend">
-        {parts.map((p) => (
-          <li key={p.key}>
-            <span className={`dd-swatch dd-c-${p.key}`} aria-hidden />
-            <span className="grow">{p.label}</span>
-            <strong className="num">{bytesText(p.bytes)}</strong>
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}

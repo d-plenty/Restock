@@ -21,7 +21,7 @@ const UNBLOCK_BAR = 'Do the tick box or puzzle if the page shows one. When you s
 
 // 0.12.8: 'unread': the shop's page opened and nothing turned Restock away, but no products could be
 // read from its search (it said "Still blocked" for that too, which sent people round in circles).
-export type UnblockResult = 'working' | 'blocked' | 'unread' | 'unknown';
+type UnblockResult = 'working' | 'blocked' | 'unread' | 'unknown';
 
 /** What a test of one shop came to (pure, for testing). */
 export function resultOf(r: { ok: boolean; blocked?: boolean } | undefined): UnblockResult {

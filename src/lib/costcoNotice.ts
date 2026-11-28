@@ -44,8 +44,6 @@ export const costcoMinimum = (n: number) => `Minimum ${n} when buying online`;
 export const costcoCantShip = (state: string) => `Can't ship to ${state}`;
 export const costcoSpecialUntil = (save: string, until?: string) => (until ? `On special, save ${save}, until ${until}` : `On special, save ${save}`);
 
-export const COSTCO_WEB_NOTE = "Costco's prices are online prices, which include delivery. Costco is looked up only when someone searches.";
-
 export const COSTCO_BUSY_MESSAGE = 'You have searched Costco a few times in the last minute. Wait a minute, then try again.';
 export const costcoBlockedMessage = (detail: string) =>
   `Costco blocked the search (${detail}). Restock has stopped trying for now. Try again later, or type the shelf price in by hand.`;

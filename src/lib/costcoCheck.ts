@@ -12,7 +12,7 @@ import { localDay } from './verdict';
 // background check, widgets, alerts and recalls never ask Costco (check.ts, PriceChecker.java).
 
 /** What "Check at Costco" says when it is done (or could not be done). */
-export interface CostcoCheck {
+interface CostcoCheck {
   ok: boolean;
   text: string;
 }

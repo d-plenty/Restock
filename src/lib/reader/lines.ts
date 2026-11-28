@@ -2,11 +2,11 @@
 // further along). A receipt needs them back as lines, item and price together, even when the photo
 // is a little crooked. This puts them back together.
 
-export interface Point {
+interface Point {
   x: number;
   y: number;
 }
-export interface FoundText {
+interface FoundText {
   text: string;
   /** 0 to 1 */
   confidence: number;

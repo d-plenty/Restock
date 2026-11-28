@@ -12,7 +12,7 @@ import type { Settings } from '../types';
 // writes them all; leaving asks "Save your changes?" first (canLeave). With no draft open (the
 // setup steps, say), everything here is saved straight away, as before.
 
-export type LeaveChoice = 'save' | 'discard' | 'keep';
+type LeaveChoice = 'save' | 'discard' | 'keep';
 
 /** Something on the screen that isn't the settings (the web's household settings, say). */
 export interface DraftPart {

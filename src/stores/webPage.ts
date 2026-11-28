@@ -12,7 +12,7 @@ import type { StoreProduct } from './types';
 // doesn't have a dedicated connection, and for shops the person adds themselves.
 
 type Raw = Record<string, unknown>;
-export type ParseHtml = (html: string) => Document;
+type ParseHtml = (html: string) => Document;
 
 const defaultParse: ParseHtml = (html) => new DOMParser().parseFromString(html, 'text/html');
 
@@ -320,7 +320,7 @@ function ldAvailability(offer: Raw | undefined): boolean | undefined {
 }
 
 /** One schema.org Product (or its first offer) as a StoreProduct. */
-export function fromLdProduct(chain: Chain, o: Raw, base: string): StoreProduct | undefined {
+function fromLdProduct(chain: Chain, o: Raw, base: string): StoreProduct | undefined {
   const offers = Array.isArray(o.offers) ? (o.offers as Raw[]) : o.offers ? [o.offers as Raw] : [];
   const offer = offers[0] && typeIs(offers[0], 'AggregateOffer') ? offers[0] : (offers.find((x) => priceOf(x.price) !== undefined) ?? offers[0]);
   const price = priceOf(offer?.price) ?? priceOf(offer?.lowPrice) ?? priceOf((offer?.priceSpecification as Raw | undefined)?.price);

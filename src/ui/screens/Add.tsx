@@ -29,7 +29,7 @@ import { COSTCO_LIST_NOTE } from '../../lib/costcoLocal';
 import { isBlockedError, offerUnblock, recordHealth } from '../../lib/health';
 import { isExactBarcode, rankAll, score, tokens, type RankQuery } from '../../stores/rank';
 import { chainName, mainProductIds, searchStoreId, type AlertLevel, type Chain, type Group } from '../../types';
-import { activeSections, costcoIsOn, enabledIn, isLocalOnlyShop, SECTION_NAMES, SECTION_PLACE, SECTION_SHOPS, searchChainsIn, type Section, type StoreChain } from '../../shops';
+import { activeSections, enabledIn, isLocalOnlyShop, SECTION_NAMES, SECTION_PLACE, SECTION_SHOPS, searchChainsIn, type Section, type StoreChain } from '../../shops';
 import { Icon, useBackHandler, ProductPreview, Sheet, SearchField } from '../components';
 import { useNav } from '../nav';
 import { type NoteTone } from '../simple';
@@ -504,16 +504,6 @@ export function AddScreen({
     rememberSearch(t);
     setRecent(recentSearches());
     void search(fixed, { text: fixed }, section, pressed);
-  };
-
-  // 0.9.6 (review L1): Costco is on and this search left it out (it was not a Search press): a
-  // button to ask Costco too, one page, only when pressed.
-  // 0.9.8: Costco is in every search now, so this button never shows (kept for a search made before).
-  const costcoLeftOut = !!settings && !!lastText && costcoIsOn() && !searched.includes('costco') && false;
-  const searchCostcoToo = () => {
-    if (!settings || !lastText || searched.includes('costco')) return;
-    setSearched((s) => (s.includes('costco') ? s : [...s, 'costco']));
-    void searchChain('costco', lastText, rankQ, searchStoreId(settings, 'costco'));
   };
 
   const doScan = async () => {
@@ -1364,7 +1354,7 @@ export function AddScreen({
       </div>
       <ChangeHead altMode={altMode} anchorChain={anchorChain} backToPicks={backToPicks} changing={changing} picks={picks} />
 
-      <AddResults PER_SHOP={PER_SHOP} anyResults={anyResults} changing={changing} costcoLeftOut={costcoLeftOut} instead={instead} lastText={lastText} loadMore={loadMore} mixed={mixed} original={original} picks={picks} rankQ={rankQ} reportWrong={reportWrong} resultRow={resultRow} results={results} searchChain={searchChain} searchCostcoToo={searchCostcoToo} searched={searched} setOriginal={setOriginal} setPicks={setPicks} setShopView={setShopView} setShowUnlikely={setShowUnlikely} setShowing={setShowing} setSortBy={setSortBy} setSpecialsOnly={setSpecialsOnly} setSuggest={setSuggest} settings={settings} showUnlikely={showUnlikely} showing={showing} shownItems={shownItems} sortBy={sortBy} specialsOnly={specialsOnly} suggest={suggest} topKeys={topKeys} view={view} />
+      <AddResults PER_SHOP={PER_SHOP} anyResults={anyResults} changing={changing} instead={instead} lastText={lastText} loadMore={loadMore} mixed={mixed} original={original} picks={picks} rankQ={rankQ} reportWrong={reportWrong} resultRow={resultRow} results={results} searchChain={searchChain} searched={searched} setOriginal={setOriginal} setPicks={setPicks} setShopView={setShopView} setShowUnlikely={setShowUnlikely} setShowing={setShowing} setSortBy={setSortBy} setSpecialsOnly={setSpecialsOnly} setSuggest={setSuggest} settings={settings} showUnlikely={showUnlikely} showing={showing} shownItems={shownItems} sortBy={sortBy} specialsOnly={specialsOnly} suggest={suggest} topKeys={topKeys} view={view} />
 
       <ShopDone altMode={altMode} anyResults={anyResults} attachTo={attachTo} backToPicks={backToPicks} changing={changing} declined={declined} finishEarly={finishEarly} finishedAt={finishedAt} forLine={forLine} nextShopAfter={nextShopAfter} notSoldAt={notSoldAt} picks={picks} results={results} searched={searched} view={view} />
 

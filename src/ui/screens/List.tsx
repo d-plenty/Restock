@@ -9,8 +9,6 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import { clearTrip, loadTrip, reopensTrip, resumeAsked, subscribeTrip, takeResume, type SavedTrip } from '../../lib/trip';
 import { nameHasSize } from '../../lib/naming';
 import { lookupBarcode, scanBarcode } from '../../lib/barcode';
-import { serverMode, serverUi } from '../../server-mode/flag';
-import { PhoneOnlyNote } from '../../server-mode/ui/PhoneOnly';
 import { cleanSearch } from '../../lib/searchText';
 import { addListEntry, allCategories, allGroups, allListEntries, checkEntriesOp, deleteListEntries, findProductByBarcode, groupProductIds, nowIso, runOps, uid, updateListEntry, updateSettings, cachedSettings } from '../../lib/db';
 import { buzz, scannedLine, splitCount } from '../../lib/listActions';
@@ -99,7 +97,7 @@ function listAsText(c: Ctx, open: ListEntry[], only?: ShopKey): string {
   return lines.join('\n').trim();
 }
 
-export async function shareText(text: string): Promise<'shared' | 'copied'> {
+async function shareText(text: string): Promise<'shared' | 'copied'> {
   try {
     if (isNative()) {
       const { Share } = await import('@capacitor/share');
@@ -124,7 +122,7 @@ export const tickEntry = (e: { id: string; text: string }, checked: boolean, nam
 const removeEntries = (ids: string[], label: string) => act(label, () => deleteListEntries(ids));
 
 // 0.13.0: the stepper has its own file (a tab's rows use it too).
-export { Stepper, setQty } from '../Stepper';
+;
 
 /**
  * A line whose pick is out of stock where you're shopping: in stock at your second Coles (go there
@@ -248,8 +246,6 @@ export function useListAdd(entries: ListEntry[], recs: Recommendation[], section
 
 export function ListScreen() {
   const nav = useNav();
-  // 0.9.5 (web search): on a Restock server's web page, its shop search and camera Scan (main.tsx hands them in).
-  const webSearch = serverMode ? serverUi.current?.webSearch : undefined;
   const allEntries = useLive(allListEntries, []);
   const allRecs = useLive(loadRecommendations, []);
   const allCats = useLive(allCategories, []);
@@ -667,17 +663,14 @@ export function ListScreen() {
         style={{ display: 'flex', gap: 8 }}
       >
         {/* 0.12.0: it says what it does: "Add to shopping list", with its own Add button */}
-        <input className="input" placeholder={(settings.a11y?.text ?? 1) >= 1.3 || serverMode ? 'Add to list' : 'Add to shopping list'} aria-label="Add to shopping list" value={text} onChange={(e) => setText(e.target.value)} />
+        <input className="input" placeholder={(settings.a11y?.text ?? 1) >= 1.3 ? 'Add to list' : 'Add to shopping list'} aria-label="Add to shopping list" value={text} onChange={(e) => setText(e.target.value)} />
         <button type="submit" className="btn primary" aria-label="Add to shopping list" disabled={!text.trim()} style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }}>
           <Icon name="plus" />
         </button>
-        {!serverMode && (
-          <button type="button" className="btn" aria-label="Scan a barcode to add" style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }} onClick={scanToList}>
-            <Icon name="scan" />
-          </button>
-        )}
+        <button type="button" className="btn" aria-label="Scan a barcode to add" style={{ width: 52, minWidth: 52, flexShrink: 0, padding: 0 }} onClick={scanToList}>
+          <Icon name="scan" />
+        </button>
         {/* 0.9.5 (web search): on a Restock server's web page (an iPhone), its camera Scan, by the add box. */}
-        {serverMode && webSearch && <webSearch.Scan section={searchTabOf(section) ?? 'pantry'} />}
       </form>
       {entries.length > 0 && (
         <div className="navy-tools">
@@ -732,20 +725,15 @@ export function ListScreen() {
           <button className="btn" onClick={() => void add(text)}>
             <Icon name="plus" size={18} /> <span className="clip">Add "{text.trim()}"</span>
           </button>
-          {serverMode ? (
-            // 0.9.5 (web search): Search the shops (when the household turned it on), or a link to Settings.
-            webSearch ? <webSearch.ListButton text={text} list={section} /> : <PhoneOnlyNote compact />
-          ) : (
-            <button
-              className="btn primary"
-              onClick={() => {
-                nav.push({ name: 'add', query: text.trim(), forList: true, section: searchTabOf(section) });
-                setText('');
-              }}
-            >
-              <Icon name="search" size={18} /> Search the shops
-            </button>
-          )}
+          <button
+            className="btn primary"
+            onClick={() => {
+              nav.push({ name: 'add', query: text.trim(), forList: true, section: searchTabOf(section) });
+              setText('');
+            }}
+          >
+            <Icon name="search" size={18} /> Search the shops
+          </button>
         </div>
       )}
       {/* 0.10.5: one summary card: the total, what shopping around saves, and Compare. 0.10.10: Compare
@@ -797,9 +785,6 @@ export function ListScreen() {
           </button>
         </div>
       )}
-
-      {/* 0.9.5 (web search): what the shops have for what was typed or scanned. */}
-      {webSearch && <webSearch.ListPanel list={section} onAdded={() => setText('')} />}
 
       {!entries.length && (
         <div className="empty">

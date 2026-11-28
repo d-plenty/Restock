@@ -4,7 +4,7 @@ import { activeSections } from '../shops';
 import { changed, onChange } from './live';
 import { emptyState, HaError, haLineId, haLists, onHaList, restApi, syncRound, type HaState, type Line, type Store, type Transport } from './haSync';
 import { RestockNative } from './sql/native';
-import { HA_CONFIG, HA_STATE, HA_STATUS, haPairingResets, LIST_ALIASES, LOCAL_ONLY_KV, onHaPairingReset, resetHaPairing } from './haKeys';
+import { HA_CONFIG, HA_STATE, HA_STATUS, haPairingResets, LIST_ALIASES, onHaPairingReset, resetHaPairing } from './haKeys';
 import {
   claimHaPhone,
   FROM_HA,
@@ -52,8 +52,8 @@ import { background } from './undo';
 // handles it (or to set it up on the server's page). The token goes to the server only sealed in
 // the handover or upgrade payload (HomeAssistant.java), and is deleted here once the server runs it.
 
-export { HA_CONFIG, HA_STATE, HA_STATUS, LIST_ALIASES, LOCAL_ONLY_KV };
-export { claimHaPhone, getAliases, haPhone, keepAsWords, linesToPick, pickItemFor, pickWord, type HaHouse, type HaPhone };
+export { HA_CONFIG, HA_STATE,  LIST_ALIASES,  };
+export {  getAliases, haPhone, keepAsWords, linesToPick, pickItemFor, pickWord, type HaHouse, type HaPhone };
 
 /** 0.9.4: what a Java round answers (HaSync.Outcome). */
 export interface HaRound {
@@ -80,7 +80,7 @@ const haNative = () => RestockNative as unknown as HaNative;
 
 export const DEFAULT_LIST = 'todo.shopping_list';
 
-export interface HaConfig {
+interface HaConfig {
   enabled: boolean;
   /** "http://homeassistant.local:8123", tidied (tidyAddress). */
   address: string;

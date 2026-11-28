@@ -12,7 +12,7 @@ import { nowIso, updateProduct } from './db';
 import { storeChoice, type Chain, type Settings } from '../types';
 import { stockPlaces, type ShopStock, type Stock, type StockItem } from './stockWhere';
 
-export { STOCK_FRESH_MS, stockFresh, stockPlaces, type ShopStock, type Stock, type StockItem } from './stockWhere';
+export {    type ShopStock,  type StockItem } from './stockWhere';
 
 const find = (found: StoreProduct[], item: StockItem) =>
   found.find((p) => item.storeProductId && String(p.storeProductId) === String(item.storeProductId));

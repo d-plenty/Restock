@@ -12,7 +12,7 @@ const COMMON = new Set(
   ).split(' '),
 );
 
-export interface PassphraseCheck {
+interface PassphraseCheck {
   ok: boolean;
   /** What's wrong, for the person (empty when ok). */
   problem: string;
@@ -21,7 +21,7 @@ export interface PassphraseCheck {
   label: string;
 }
 
-export const words = (s: string) => s.trim().split(/[\s\-_.,;:]+/u).filter((w) => w.length >= 2);
+const words = (s: string) => s.trim().split(/[\s\-_.,;:]+/u).filter((w) => w.length >= 2);
 
 const squash = (s: string) => s.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 

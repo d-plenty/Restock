@@ -10,7 +10,6 @@ vi.mock('./db', () => ({
 }));
 vi.mock('./diagnostics', () => ({ problems: async () => [] }));
 vi.mock('../stores/http', () => ({ isNative: () => false }));
-vi.mock('../server-mode/flag', () => ({ serverMode: false }));
 
 import { makeMessage, sendFeedback, sendWaiting, waitingCount, withoutSecrets } from './feedback';
 

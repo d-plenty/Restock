@@ -301,7 +301,7 @@ export async function change<T>(run: () => Promise<T>, saved = 'Saved'): Promise
 
 // ---------- a QR code (zxing's writer, bundled; nothing leaves the page) ----------
 
-export function qrSvg(symbol: { data: ArrayLike<number>; width: number; height: number }): string {
+function qrSvg(symbol: { data: ArrayLike<number>; width: number; height: number }): string {
   const q = 4;
   let d = '';
   for (let y = 0; y < symbol.height; y++) for (let x = 0; x < symbol.width; x++) if (symbol.data[y * symbol.width + x] < 128) d += `M${x + q} ${y + q}h1v1h-1z`;

@@ -9,7 +9,7 @@
  * to every phone, and a server can be down or out of reach when you need it. Even weekly backups
  * kept for 4 weeks cover that.
  */
-export interface Protection {
+interface Protection {
   local: boolean;
   phones: boolean;
   server: boolean;
@@ -45,7 +45,7 @@ export function suggestLocalText(p: Protection): string {
 }
 
 /** What the Sync and backups strip shows: all well, or the first thing that needs you. */
-export interface SyncStatus {
+interface SyncStatus {
   ok: boolean;
   title: string;
   /**

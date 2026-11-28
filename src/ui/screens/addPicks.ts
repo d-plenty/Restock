@@ -25,7 +25,7 @@ export function togglePick(picks: ReadonlyMap<string, StoreProduct>, sp: StorePr
  * - `arrow`: the bar at the bottom (with the green arrow) was tapped: it opens.
  * - `close`: closed (the X, back, or after adding).
  */
-export type SheetEvent = { kind: 'picks'; size: number } | { kind: 'arrow'; size: number } | { kind: 'close' };
+type SheetEvent = { kind: 'picks'; size: number } | { kind: 'arrow'; size: number } | { kind: 'close' };
 export function sheetOpenAfter(open: boolean, e: SheetEvent): boolean {
   if (e.kind === 'close' || e.size === 0) return false;
   return e.kind === 'arrow' ? true : open;

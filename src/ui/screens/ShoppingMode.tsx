@@ -9,8 +9,6 @@ import { branchAdvice, branchName, stockRows } from '../../lib/stock';
 import { useEffect, useState, type ReactNode } from 'react';
 import { clearTrip, saveTrip, type SavedTrip } from '../../lib/trip';
 import { scanBarcode } from '../../lib/barcode';
-import { serverMode } from '../../server-mode/flag';
-import { PhoneOnlyNote } from '../../server-mode/ui/PhoneOnly';
 import { noteTripDone } from '../../lib/inventoryAsk';
 import { allCards, updateListEntry, updateSettings, cachedSettings } from '../../lib/db';
 import { buzz } from '../../lib/listActions';
@@ -37,7 +35,7 @@ import { ShopKey, Ctx, recFor, dealFor, shopOf, qtyOf, packsOf, priceOf, tickEnt
  * 0.10.9: shopping mode's shops to pick from: "Where are you first?", each shop with how many things
  * and about how much, then "Where to next?" with the done ones greyed (tap one to go back in).
  */
-export function ShopPicker({
+function ShopPicker({
   shops,
   doneAt,
   anyCount,
@@ -125,10 +123,9 @@ export function ShopPicker({
   );
 }
 
-export function ShopRow({
+function ShopRow({
   e,
   name,
-  onOpen,
   thumb,
   extra,
   children,
@@ -136,7 +133,6 @@ export function ShopRow({
 }: {
   e: ListEntry;
   name: string;
-  onOpen?: () => void;
   /** 0.12.7: told before the tick is saved, so the trip remembers which shop it was got at. */
   onTicked?: (on: boolean) => void;
   thumb?: ReactNode;
@@ -148,30 +144,13 @@ export function ShopRow({
     onTicked?.(ev.target.checked);
     void tickEntry(e, ev.target.checked, name);
   };
-  if (!serverMode)
-    return (
-      <label className={`shoprow${e.checked ? ' got' : ''}`}>
-        <input type="checkbox" checked={e.checked} onChange={tick} />
-        {thumb}
-        {children}
-        {extra}
-      </label>
-    );
   return (
-    <div className={`shoprow${e.checked ? ' got' : ''}`}>
-      <label className="tick-hit">
-        <input type="checkbox" checked={e.checked} onChange={tick} aria-label={`Got ${name}`} />
-      </label>
+    <label className={`shoprow${e.checked ? ' got' : ''}`}>
+      <input type="checkbox" checked={e.checked} onChange={tick} />
       {thumb}
-      {onOpen ? (
-        <button type="button" className="shoprow-open" onClick={onOpen} aria-label={`${name}, open the item`}>
-          {children}
-        </button>
-      ) : (
-        children
-      )}
+      {children}
       {extra}
-    </div>
+    </label>
   );
 }
 
@@ -536,7 +515,7 @@ export function ShoppingMode({
   const [sort, setSortState] = useState<NonNullable<Settings['shopSort']>>(() => {
     const start = cachedSettings()?.shopSort ?? { by: 'aisle' };
     // The web has no aisle numbers: it starts with your categories instead.
-    return serverMode && start.by === 'aisle' ? { by: 'category' } : start;
+    return start;
   });
   const setSort = (next: NonNullable<Settings['shopSort']>) => {
     setSortState(next);
@@ -555,7 +534,7 @@ export function ShoppingMode({
   };
   // 0.10.8: no aisle known for anything on the list (most shops don't say): no Aisle option, and
   // the list goes by category, until an aisle is known (your pick is kept for when it is).
-  const anyAisle = !serverMode && entries.some((e) => !e.checked && !!aisleAt(e));
+  const anyAisle = entries.some((e) => !e.checked && !!aisleAt(e));
   const by = sort.by === 'aisle' && !anyAisle ? 'category' : sort.by;
   const sortShop = (items: ListEntry[]) =>
     by === 'az' ? [...items].sort(azOf) : by === 'category' ? [...items].sort(byCategory) : sortByAisle(items, aisleAt, nameOf, !!sort.down);
@@ -620,12 +599,6 @@ export function ShoppingMode({
     void noteTripDone();
     onClose();
   };
-  // 0.9.4, the web on a server: a line opens its product (only the checkbox ticks); see ShopRow.
-  const openOf = (e: ListEntry) => {
-    const g = recFor(all, e)?.group.id;
-    return serverMode && g ? () => nav.push({ name: 'item', groupId: g }) : undefined;
-  };
-
   /** Scan something going into the trolley: tick it off, and say if the price matches. */
   const scanToTick = async () => {
     const out = await scanBarcode('Scan to tick it off');
@@ -702,11 +675,9 @@ export function ShoppingMode({
             )}
           </div>
         )}
-        {!serverMode && (
-          <button className="icon-btn" aria-label="Scan to tick off" onClick={() => void scanToTick()}>
-            <Icon name="scan" size={20} />
-          </button>
-        )}
+        <button className="icon-btn" aria-label="Scan to tick off" onClick={() => void scanToTick()}>
+          <Icon name="scan" size={20} />
+        </button>
         {/* 0.12.10: with things still to get it's Pause (the trip is kept); with none, Done */}
         <button className="btn small primary" onClick={leave} aria-label={left.length ? 'Pause shopping. You can resume it later' : 'Done shopping'}>
           {left.length ? 'Pause' : 'Done'}
@@ -736,8 +707,8 @@ export function ShoppingMode({
           Sort by
         </span>
         <div className="seg" role="group" aria-label="Sort each shop by">
-          {(anyAisle || serverMode) && (
-            <button type="button" aria-pressed={by === 'aisle'} disabled={serverMode} onClick={() => setSort({ ...sort, by: 'aisle' })}>
+          {(anyAisle) && (
+            <button type="button" aria-pressed={by === 'aisle'} onClick={() => setSort({ ...sort, by: 'aisle' })}>
               Aisle
             </button>
           )}
@@ -748,7 +719,7 @@ export function ShoppingMode({
             A–Z
           </button>
         </div>
-        {by === 'aisle' && !serverMode && (
+        {by === 'aisle' && (
           <button
             type="button"
             className="btn small ghost"
@@ -760,7 +731,6 @@ export function ShoppingMode({
         )}
       </div>
       )}
-      {view && serverMode && <PhoneOnlyNote compact text="Aisle numbers are in shopping mode on the phone (they come from your Coles branch)." />}
       <div className="shopmode-list">
         {info && <ProductPreview product={info} onClose={() => setInfo(undefined)} />}
         {adding && <AddWhileShopping entries={allEntries} recs={recs} section={section} onClose={() => setAdding(false)} />}
@@ -830,7 +800,7 @@ export function ShoppingMode({
               >
                 {shop !== 'any' && <ChainDot chain={shop} />} {shopName(shop)}
                 {/* 0.10.2: at your other Coles today? Its aisles instead. */}
-                {shop === 'coles' && second && !serverMode && (
+                {shop === 'coles' && second && (
                   <button type="button" className="linkish small" style={{ marginLeft: 'auto', padding: 0, textTransform: 'none', letterSpacing: 0 }} onClick={() => setColesSlot(colesSlot === '1' ? '2' : '1')}>
                     At {colesSlot === '1' ? second : branchName(cachedSettings(), 'coles')} instead
                   </button>
@@ -844,7 +814,6 @@ export function ShoppingMode({
                     key={e.id}
                     e={e}
                     name={name}
-                    onOpen={openOf(e)}
                     onTicked={(on) => noteTick(e, on)}
                     // 0.10.8: its photo, with the blue ⓘ, as on the list: tap it to see the product in full
                     // (photo, size, ingredients), so you know what you're looking for on the shelf.
@@ -904,7 +873,7 @@ export function ShoppingMode({
                       )}
                       {/* 0.10.2: where it is in the shop (shopping mode only). 0.10.8: only when the shop
                           has said; no 'Aisle: unknown' on every line. */}
-                      {!e.checked && !serverMode && aisleAt(e) && (
+                      {!e.checked && aisleAt(e) && (
                         <span className="tags" style={{ marginTop: 3 }}>
                           <span className="tag aisle">{aisleLabel(aisleAt(e))}</span>
                         </span>
@@ -998,7 +967,6 @@ export function ShoppingMode({
                   key={e.id}
                   e={e}
                   name={name}
-                  onOpen={openOf(e)}
                   thumb={
                     best ? (
                       <span className="thumb-btn" aria-hidden>

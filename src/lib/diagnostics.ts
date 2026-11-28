@@ -6,7 +6,7 @@ import { getKV, putKV } from './db';
 // Diagnostics. Kept on the phone only. And a recorder that captures exactly what shops send back
 // during one search, for "Send search details" (so a shop's connection can be fixed).
 
-export interface Problem {
+interface Problem {
   at: string;
   chain: StoreChain;
   what: 'search' | 'price check' | 'recalls' | 'backup' | 'other';

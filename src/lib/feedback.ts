@@ -1,6 +1,5 @@
 import { version } from '../../package.json';
 import { isNative } from '../stores/http';
-import { serverMode } from '../server-mode/flag';
 import { getKV, getSettings, marketStatus, putKV, uid } from './db';
 import { problems } from './diagnostics';
 
@@ -24,7 +23,7 @@ export interface Screenshot {
   data: string;
 }
 
-export interface FeedbackMessage {
+interface FeedbackMessage {
   format: 'restock-feedback';
   v: 1;
   install: string;
@@ -51,7 +50,7 @@ async function installId(): Promise<string> {
   return id;
 }
 
-export function platform(): FeedbackMessage['platform'] {
+function platform(): FeedbackMessage['platform'] {
   if (isNative()) return 'android';
   return /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'iphone' : 'web';
 }
@@ -88,7 +87,6 @@ export async function diagnostics(): Promise<Record<string, unknown>> {
     householdNamed: !!household?.name,
     syncSettings: { mode: sync?.mode, schedule: sync?.schedule, serverSet: !!sync?.serverUrl, backgroundActivity: sync?.backgroundActivity },
     platform: platform(),
-    serverMode,
     userAgent: navigator.userAgent,
     screen: typeof window === 'undefined' ? undefined : `${window.screen?.width}×${window.screen?.height} @${window.devicePixelRatio}`,
     language: navigator.language,

@@ -7,10 +7,9 @@
 import { RestockNative } from './sql/native';
 import { syncInfo } from './sync';
 import { b64u, derivePassphrase, loginKeyOf, loginProof, openBackupKey, random, sealBackupKey, unb64 } from '../server-mode/crypto';
-import type { Activity, Browser, HaConfig, HouseSettings, Updates } from '../server-mode/api';
-import type { DataSummary } from '../server-mode/ui/houseWords';
+import type { HaConfig, HouseSettings, Updates } from '../server-mode/api';
 
-export type { Activity, Browser, HaConfig, HouseSettings, Updates, DataSummary };
+export type { HouseSettings };
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 const call = <T>(method: Method, path: string, body?: Record<string, unknown>) => RestockNative.serverAdmin({ method, path, ...(body ? { body } : {}) }) as Promise<T>;
@@ -29,7 +28,7 @@ export interface Approval {
 }
 
 /** What /me says: the role, the server's version, and (an admin) the updates and how many requests wait. */
-export interface Me {
+interface Me {
   device: string;
   role: 'admin' | 'user';
   label: string | null;
@@ -44,15 +43,8 @@ export const answer = (id: string, yes: boolean) => call<{ ok: boolean }>('POST'
 
 export const settings = () => call<HouseSettings>('GET', '/settings');
 export const putSettings = (s: Partial<HouseSettings> & Record<string, unknown>) => call<HouseSettings>('PUT', '/settings', s);
-export const activity = async (limit = 100) => (await call<{ activity?: Activity[] }>('GET', `/activity?limit=${limit}`)).activity ?? [];
-export const browsers = async () => (await call<{ browsers?: Browser[] }>('GET', '/browsers')).browsers ?? [];
-export const endBrowser = (id: string) => call<unknown>('DELETE', `/browsers/${encodeURIComponent(id)}`);
 export const homeAssistant = () => call<HaConfig>('GET', '/homeassistant');
 export const putHomeAssistant = (c: HaConfig & { token?: string }) => call<HaConfig>('PUT', '/homeassistant', c as Record<string, unknown>);
-export const testHomeAssistant = () => call<{ ok?: boolean; message?: string }>('POST', '/homeassistant/test', {});
-export const summary = () => call<DataSummary>('GET', '/data/summary');
-export const serverLog = () => call<{ text: string; lines: number }>('GET', '/server/log');
-export const updates = () => call<Updates>('GET', '/server/updates');
 
 /**
  * The passphrase, proved without it leaving the phone: the server's salt and a one-off challenge,
@@ -69,19 +61,6 @@ export async function proveFor(passphrase: string): Promise<{ c: string; proof: 
   keys.vault.fill(0);
   return { c: ch.c, proof: loginProof(key, ch.c, 'phone:' + info.device) };
 }
-
-/** How long data is kept (null: until deleted). Keeping less deletes what's older now: the passphrase and DELETE. */
-export async function setKeep(months: number | null, passphrase?: string): Promise<void> {
-  await call('PUT', '/data/autodelete', { months, ...(passphrase ? { typed: 'DELETE', confirm: await proveFor(passphrase) } : {}) });
-}
-
-/** The recovery key, with the passphrase. */
-export async function recoveryKey(passphrase: string): Promise<string> {
-  const r = await call<{ recovery?: string }>('POST', '/recovery', { confirm: await proveFor(passphrase) });
-  if (!r.recovery) throw new Error("The server didn't send the recovery key.");
-  return r.recovery;
-}
-export const recoverySaved = () => call('POST', '/recovery', { saved: true });
 
 /**
  * 0.18.4: a new passphrase, from the phone: the current one proved over this phone's id, and the new

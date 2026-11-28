@@ -16,7 +16,7 @@ export function shopsLeft<T extends string>(chosen: readonly T[], done: readonly
   return left.length ? left : [...chosen];
 }
 
-export interface TripRecs {
+interface TripRecs {
   /** Each item's products at the shops still to visit, with an alternative standing in where it fills a gap. */
   recs: Recommendation[];
   /** Product ids that are standing in as an alternative (to say so on the line). */

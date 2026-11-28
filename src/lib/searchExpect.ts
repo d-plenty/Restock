@@ -3,7 +3,7 @@
 // isn't, even though it matches `want` (chocolate milk for "milk"). A shop that doesn't sell a
 // brand ("dolmio" at Aldi) counts as right when it offers the same kind of thing instead.
 
-export interface Expect {
+interface Expect {
   want: RegExp;
   not?: RegExp;
 }

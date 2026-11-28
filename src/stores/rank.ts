@@ -204,7 +204,7 @@ function asFlavour(q: string[], name: string): boolean {
  * are usually the everyday one (Nutella the spread, not Nutella croissants). Worth a little,
  * never more than a clear difference in what it is (0.8.5). Without a position, nothing.
  */
-export const placeBonus = (index?: number) => (index === undefined ? 0 : 0.15 * Math.exp(-index / 8) - 0.05);
+const placeBonus = (index?: number) => (index === undefined ? 0 : 0.15 * Math.exp(-index / 8) - 0.05);
 
 /** Words that just mean the plain, everyday one: full cream milk is milk, plain flour is flour. */
 const PLAIN = /\b(full cream|plain|regular|original|classic|table|everyday|traditional|pure|standard)\b/g;

@@ -15,7 +15,7 @@ import { compareStyleOfProducts, priceLine, sizingOf, withSizes } from './unitPr
 import type { CompareStyle } from './units';
 import { chainName, costcoDecides } from '../shops';
 
-export type VerdictKind = 'great' | 'good' | 'small' | 'wait' | 'fake' | 'normal' | 'nodata';
+type VerdictKind = 'great' | 'good' | 'small' | 'wait' | 'fake' | 'normal' | 'nodata';
 
 export interface Verdict {
   kind: VerdictKind;
@@ -56,7 +56,7 @@ export const verdictLabel = (v: Pick<Verdict, 'kind' | 'always'>): string => (v.
  */
 const ALWAYS_WINDOW = 21;
 const ALWAYS_DAYS = 14;
-export function alwaysOnSpecial(readings: PriceReading[], now: number): { days: number; was: number } | undefined {
+function alwaysOnSpecial(readings: PriceReading[], now: number): { days: number; was: number } | undefined {
   const recent = readings.filter((r) => now - Date.parse(r.date) <= ALWAYS_WINDOW * DAY);
   const special = recent.filter((r) => r.isSpecial);
   if (special.length < ALWAYS_DAYS) return undefined;
@@ -106,7 +106,7 @@ export function specialsWeekStart(now: number): number {
   return from.getTime();
 }
 
-export function median(values: number[]): number | undefined {
+function median(values: number[]): number | undefined {
   if (!values.length) return undefined;
   const s = [...values].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);
@@ -307,7 +307,7 @@ export function lineCost(o: { price?: number; shelfPrice?: number; multi?: Multi
 const pct = (d: number) => `${Math.round(d * 100)}%`;
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 /** At this discount or more, a sale is never "wait for a better one". */
-export const HALF_PRICE = 0.45;
+const HALF_PRICE = 0.45;
 
 /**
  * Judge one product's current price.

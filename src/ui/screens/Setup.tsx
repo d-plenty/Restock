@@ -43,7 +43,7 @@ import { WidgetSettings } from './WidgetSettings';
 // tiles. Each tile can be done in any order, or Continue goes through the unfinished ones.
 // Anything left can be finished later from Settings → Setup.
 
-export type TileId =
+type TileId =
   | 'pantry'
   | 'keg'
   | 'pharmacy'
@@ -253,7 +253,7 @@ export const isEssential = (id: TileId) => ESSENTIAL.includes(id);
 export const TILES: Tile[] = TILE_ORDER.filter((id) => SELF_UPDATE || id !== 'updates').map((id) => ALL_TILES.find((t) => t.id === id)!);
 
 /** 0.9.3: what this phone syncs with, for the Backups tile (any of backup, phone sync or server counts). */
-export type Cover = { paired?: boolean; server?: boolean; members?: unknown[] } | null | undefined;
+type Cover = { paired?: boolean; server?: boolean; members?: unknown[] } | null | undefined;
 
 /** A tile's status, as shown on it. */
 export function tileStatus(s: Settings, id: TileId, cover?: Cover): { text: string; ok: boolean } {
@@ -489,7 +489,7 @@ function MarketSetup({ settings }: { settings: Settings }) {
           onKeep={() => setAsking(false)}
           onOff={() => {
             setAsking(false);
-            turn(false);
+            void turn(false);
           }}
         />
       )}

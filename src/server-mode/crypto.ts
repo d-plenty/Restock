@@ -19,10 +19,10 @@ import { pbkdf2Async } from '@noble/hashes/pbkdf2';
 import { sha256 } from '@noble/hashes/sha2';
 import { gunzipSync, gzipSync, strFromU8, strToU8 } from 'fflate';
 
-export const RSF1 = strToU8('RSF1');
-export const RSV2 = strToU8('RSV2');
-export const RSE2 = strToU8('RSE2');
-export const LINK_INFO = 'restock-link-v2';
+const RSF1 = strToU8('RSF1');
+const RSV2 = strToU8('RSV2');
+const RSE2 = strToU8('RSE2');
+const LINK_INFO = 'restock-link-v2';
 export const SERVER_KEY_INFO = 'restock-server-files-v1';
 /** The passphrase's PBKDF2 rounds (docs/server-protocol.md). */
 const PBKDF2_ROUNDS = 600_000;
@@ -155,7 +155,7 @@ function inWorker(pw: Uint8Array, salt: Uint8Array, rounds: number): Promise<Uin
 
 // ---------- the vault (RSV2) ----------
 
-export interface Vault {
+interface Vault {
   webId: string;
   /** The web's ECDH P-256 private key (32 bytes, base64url). */
   webPriv: string;
@@ -272,8 +272,8 @@ export function sealWebKeys(webPub: Uint8Array, keys: Record<string, string>): U
 // - RSK1: "RSK1" + nonce (12) + AES-256-GCM(HKDF(vaultKey, "restock-backup-key-v1"), aad "RSK1", private key (32)).
 // - RSB1: "RSB1" + a one-off public key (SPKI, 91) + nonce (12) + AES-256-GCM(link key, aad "RSB1",
 //   gzip(JSON { format: 'restock-phone-backup', v: 1, device, label, at, json })).
-export const RSK1 = strToU8('RSK1');
-export const RSB1 = strToU8('RSB1');
+const RSK1 = strToU8('RSK1');
+const RSB1 = strToU8('RSB1');
 const BACKUP_KEY_INFO = 'restock-backup-key-v1';
 const backupWrap = (vaultKey: Uint8Array) => hkdf(sha256, vaultKey, undefined, strToU8(BACKUP_KEY_INFO), 32);
 
@@ -297,7 +297,7 @@ export function openBackupKey(vaultKey: Uint8Array, sealed: string): Uint8Array 
   }
 }
 
-export interface PhoneBackup {
+interface PhoneBackup {
   format: 'restock-phone-backup';
   v: 1;
   device: string;
@@ -373,13 +373,13 @@ export const RSJ3 = 'RSJ3';
 export const RSE3 = 'RSE3';
 export const RSH3 = 'RSH3';
 export const RSA3 = 'RSA3';
-export const JOIN_INFO = 'restock-join-v3';
-export const KEYS_INFO = 'restock-keys-v3';
-export const HANDOVER_INFO = 'restock-handover-v3';
-export const HA_INFO = 'restock-ha-v3';
-export const LOGIN_INFO = 'restock-login-v3';
-export const SESSION_INFO = 'restock-session-v3';
-export const MEMBER_JOIN = 'restock-member-v3';
+const JOIN_INFO = 'restock-join-v3';
+const KEYS_INFO = 'restock-keys-v3';
+const HANDOVER_INFO = 'restock-handover-v3';
+const HA_INFO = 'restock-ha-v3';
+const LOGIN_INFO = 'restock-login-v3';
+const SESSION_INFO = 'restock-session-v3';
+const MEMBER_JOIN = 'restock-member-v3';
 
 /** The ECDH secret with a P-256 public key (SPKI or raw point): the shared x-coordinate, 32 bytes. */
 export function ecdh(priv: Uint8Array, theirPub: Uint8Array): Uint8Array {

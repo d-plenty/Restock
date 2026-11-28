@@ -2,7 +2,7 @@
 // straight away (with Undo); there's no "check it, then add" sheet in between any more.
 import type { Group } from '../../types';
 
-export type Role = 'main' | 'alt';
+type Role = 'main' | 'alt';
 
 /** The change to an item that adds these (saved) products as what you buy there, or as Also happy with. */
 export function attachPatch(g: Group, ids: string[], as: Role, chains: string[] = []): Partial<Group> | undefined {

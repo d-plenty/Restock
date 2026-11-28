@@ -179,7 +179,7 @@ describe('0.13.0: see what Declan and Sarah use', () => {
   });
   it('is offered in Settings and at the bottom of the Pantry', () => {
     expect(read('./screens/Settings.tsx')).toMatch(/row\(PICKS_TITLE,/);
-    expect(read('./screens/Pantry.tsx')).toMatch(/section === 'pantry' && !editing && !serverMode && picksOn && <PicksOffer/);
+    expect(read('./screens/Pantry.tsx')).toMatch(/section === 'pantry' && !editing && picksOn && <PicksOffer/);
     expect(read('./screens/Picks.tsx')).toContain("No thanks, I'll add my own");
   });
 });

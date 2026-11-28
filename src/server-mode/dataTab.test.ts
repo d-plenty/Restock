@@ -22,7 +22,6 @@ import {
   storageParts,
   yOf,
 } from './ui/dataCharts';
-import { canDelete, firstStep, stepOne, stepReducer, stepTwo, type Steps } from './ui/deleteSteps';
 import { data, OLD_SERVER, PERIODS, periodParam, type DataSummary } from './ui/houseData';
 
 describe('the spreadsheet (.xlsx)', () => {
@@ -262,79 +261,6 @@ describe('chart scaling', () => {
     expect(parts.find((p) => p.key === 'logs')!.pct).toBeGreaterThan(0.9);
     expect(parts.find((p) => p.key === 'receipts')!.pct).toBe(0);
     expect(parts.reduce((a, p) => a + p.pct, 0)).toBeCloseTo(100, 6);
-  });
-});
-
-describe('the two checks', () => {
-  const at2 = (s: Partial<Steps> = {}): Steps => ({ ...firstStep(), step: 2, ...s });
-
-  it("can't skip Step 1: Delete does nothing there, even with the word and passphrase typed", () => {
-    const s = { ...firstStep(), typed: 'DELETE', pass: 'pass phrase' };
-    expect(canDelete(s, 'DELETE')).toBe(false);
-    expect(stepReducer(s, { t: 'start', word: 'DELETE' })).toBe(s);
-    const two = stepReducer(s, { t: 'continue' });
-    expect(two.step).toBe(2);
-    expect(stepReducer(two, { t: 'start', word: 'DELETE' }).busy).toBe(true);
-  });
-
-  it('a wrong word blocks Delete; capitals count, spaces around it do not', () => {
-    for (const typed of ['delete', 'DELET', 'DELETE EVERYTHING', '']) expect(canDelete(at2({ typed, pass: 'x' }), 'DELETE'), typed).toBe(false);
-    expect(canDelete(at2({ typed: ' DELETE ', pass: 'x' }), 'DELETE')).toBe(true);
-    expect(canDelete(at2({ typed: 'DELETE', pass: '' }), 'DELETE')).toBe(false);
-    expect(canDelete(at2({ typed: 'DELETE', pass: 'x' }), 'DELETE EVERYTHING')).toBe(false);
-    expect(canDelete(at2({ typed: 'DELETE EVERYTHING', pass: 'x' }), 'DELETE EVERYTHING')).toBe(true);
-    const s = at2({ typed: 'DELET', pass: 'x' });
-    expect(stepReducer(s, { t: 'start', word: 'DELETE' })).toBe(s);
-  });
-
-  it("a refusal says why and keeps what was typed; Back keeps it too; it can't go twice", () => {
-    let s = stepReducer(at2({ typed: 'DELETE', pass: 'wrong one' }), { t: 'start', word: 'DELETE' });
-    expect(stepReducer(s, { t: 'start', word: 'DELETE' })).toBe(s);
-    expect(stepReducer(s, { t: 'back' })).toBe(s);
-    s = stepReducer(s, { t: 'fail', error: "That isn't your passphrase. Nothing was deleted." });
-    expect(s).toMatchObject({ step: 2, busy: false, typed: 'DELETE', pass: 'wrong one', error: "That isn't your passphrase. Nothing was deleted." });
-    s = stepReducer(s, { t: 'pass', v: 'right one' });
-    expect(s.error).toBeUndefined();
-    s = stepReducer(s, { t: 'back' });
-    expect(s).toMatchObject({ step: 1, typed: 'DELETE', pass: 'right one' });
-  });
-
-  const summary: DataSummary = {
-    kinds: {
-      prices: { count: 18420, products: 214, archives: 3, oldest: '2024-11-02T00:00:00.000Z', bytes: 92 * 1024 * 1024 },
-      receipts: { count: 412, pinned: 2, photos: 380, oldest: '2024-11-05T00:00:00.000Z', bytes: 61 * 1024 * 1024 },
-      stats: { count: 3000, oldest: '2025-12-01T00:00:00.000Z', bytes: 12 * 1024 * 1024 },
-      logs: { count: 6210, activity: 400, oldest: '2026-10-01T00:00:00.000Z', bytes: 9 * 1024 * 1024 },
-      backups: { count: 3, folders: 1, oldest: '2026-11-08T00:00:00.000Z', bytes: 12 * 1024 * 1024, nightly: false, keptDays: 30 },
-    },
-    total: 190 * 1024 * 1024,
-    other: 4 * 1024 * 1024,
-    database: 100,
-    files: 100,
-    measured: 'dbstat',
-    disk: { free: 412 * 1024 ** 3, size: 1000 * 1024 ** 3 },
-    autoDelete: { months: null, cutoff: null },
-    resend: { at: null, next: null },
-    at: '2026-11-10T00:00:00.000Z',
-  };
-
-  it('Step 1 gives exact counts when all of a kind goes (newest prices and pinned receipts stay)', () => {
-    const one = stepOne(summary, ['prices', 'receipts', 'stats', 'logs', 'backups'], null);
-    expect(one.goes[0]).toBe('18,206 older prices. The newest price of each of the 214 products stays.');
-    expect(one.goes[1]).toBe('410 receipts and their photos. Pinned receipts (2) stay.');
-    expect(one.goes[2]).toContain('3,000 ticked items');
-    expect(one.goes[3]).toBe('6,210 activity and log entries.');
-    expect(one.goes[4]).toContain('3 deleted files');
-    expect(stepTwo(one, null)).toEqual({ line: "About 186 MB of your household's history will be gone for everyone on this server.", action: 'Delete 186 MB' });
-  });
-
-  it('Step 1 with a date says what is there now, and which kinds lose nothing', () => {
-    const one = stepOne(summary, ['prices', 'stats', 'logs'], '2025-11-10T00:00:00.000Z');
-    expect(one.goes).toHaveLength(1);
-    expect(one.goes[0]).toContain('Prices from before 10 Nov 2025 (there are 18,420 now, the oldest from Nov 2024)');
-    expect(one.none).toEqual(['Nothing ticked off is that old.', 'No activity or logs are that old.']);
-    expect(one.bytes).toBeUndefined();
-    expect(stepTwo(one, '2025-11-10T00:00:00.000Z').action).toBe('Delete older data');
   });
 });
 

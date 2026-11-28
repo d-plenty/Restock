@@ -23,7 +23,7 @@ export async function freshData({ empty = false } = {}): Promise<void> {
   if (!empty) await loadDemo();
 }
 
-export interface Shown {
+interface Shown {
   /** Where the screen sent you (nav.push), in order. */
   pushed: Screen[];
   popped: number;

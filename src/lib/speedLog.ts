@@ -2,7 +2,7 @@
 // screen took to show, how long the prices took to work out, and each time the screen was too busy
 // to answer a tap for more than a moment (and whether a price check or a sync was running then).
 // Kept on this phone only, the last 60, so a report about a slow iPad can come with real figures.
-export interface SpeedNote {
+interface SpeedNote {
   at: number;
   what: 'screen' | 'prices' | 'busy' | 'read' | 'hold';
   ms: number;

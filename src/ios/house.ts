@@ -24,7 +24,7 @@ import { forgetHousehold, myKeys } from './household';
 /** One request: what was sent back, as bytes. Throws only when the server couldn't be reached at all. */
 /** 0.18.3: `connectMs`, a shorter wait to connect (the home address, with the away one to try next). */
 /** 0.18.3: how long to wait to connect to an address that isn't the last one to try. */
-export const QUICK_CONNECT_MS = 2500;
+const QUICK_CONNECT_MS = 2500;
 export type Http = (o: { method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'PROPFIND' | 'MKCOL'; url: string; headers: Record<string, string>; body?: Uint8Array; connectMs?: number }) => Promise<{ status: number; headers: Record<string, string>; bytes: Uint8Array }>;
 
 /** Something the person can act on, in words (SyncDav.Problem). */
@@ -44,7 +44,7 @@ const CLOCK = "This phone's date or time looks wrong, so the server turned it do
 const SEALED = 'application/x-restock-sealed';
 const DAMAGED = "That code is damaged. Make a new one on the server's Add a phone page.";
 
-export interface Invite {
+interface Invite {
   v: 2 | 3;
   home: string | null;
   away: string | null;
@@ -131,7 +131,7 @@ interface Gift {
   server?: { home?: unknown; away?: unknown; keepMonths?: unknown };
 }
 
-export interface HouseInfo {
+interface HouseInfo {
   joined: boolean;
   home: string | null;
   away: string | null;

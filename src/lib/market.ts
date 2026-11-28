@@ -2,6 +2,7 @@ import { isNative } from '../stores/http';
 import { clearMarket, getKV, marketStatus, refresh } from './db';
 import { RestockNative } from './sql/native';
 import { SHARED_PRICE_SHOPS } from '../shops';
+import { giveUpAfter } from './giveUp';
 
 // Shared price history ("Judge new items from day one"): the phone downloads restock-prices'
 // day-one files (Restock's own weekly collection on GitHub) for the shops it uses, and keeps a short
@@ -40,7 +41,7 @@ let indexCache: Promise<WindowIndex | undefined> | undefined;
 
 /** window/index.json (a few hundred bytes), or undefined when it can't be fetched. */
 export function windowIndex(): Promise<WindowIndex | undefined> {
-  indexCache ??= fetch(`${WINDOW_BASE}index.json`, { cache: 'no-store' })
+  indexCache ??= fetch(`${WINDOW_BASE}index.json`, { cache: 'no-store', signal: giveUpAfter(20_000) })
     .then((r) => (r.ok ? (r.json() as Promise<WindowIndex>) : undefined))
     .catch(() => undefined)
     .then((v) => {
@@ -70,7 +71,7 @@ export function windowCost(days: MarketDays, chains: readonly string[], index?: 
   return { download, stored, measured, shops };
 }
 
-export interface MarketInfo {
+interface MarketInfo {
   count: number;
   byChain: Record<string, number>;
   updatedAt?: string;

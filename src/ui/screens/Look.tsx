@@ -260,8 +260,8 @@ export function LookSettings({ settings }: { settings: Settings }) {
 /** 0.18.1: picking Simple with the photo reader downloaded: say it's kept, and where it can go. */
 async function simpleReaderNote(): Promise<string> {
   try {
-    const { readerBundled, readerDownloaded, READER_SIZE_TEXT } = await import('../../lib/readerModels');
-    if (readerBundled() || !(await readerDownloaded())) return '';
+    const { readerDownloaded, READER_SIZE_TEXT } = await import('../../lib/readerModels');
+    if (!(await readerDownloaded())) return '';
     return ` The photo reader (${READER_SIZE_TEXT}) stays downloaded: remove it in Settings → Shopping list and receipts if you don't use it.`;
   } catch {
     return '';

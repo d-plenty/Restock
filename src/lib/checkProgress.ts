@@ -2,14 +2,14 @@
 // iOS stopped it in the background) carries on from there next time instead of starting again. One
 // more than a day old starts again from the beginning. Android's check keeps the same note in the
 // same place (PriceChecker.java PROGRESS_KV), so either phone's check reads the other's the same way.
-import { getKV, putKV } from './db';
+import { getKV } from './db';
 
 /** Kept in the kv table under this key: this phone only (sync reads and writes only "settings"). */
 export const PROGRESS_KEY = 'checkProgress';
 /** A check cut off longer ago than this starts again. */
 export const RESUME_FOR_MS = 24 * 3_600_000;
 
-export interface CheckProgress {
+interface CheckProgress {
   /** When this check started (the first part of it, for one carried on). */
   started: string;
   /** Products already checked. */
@@ -24,5 +24,3 @@ export function carryOn(was: CheckProgress | undefined, now = Date.now()): Check
 }
 
 export const readProgress = () => getKV<CheckProgress>(PROGRESS_KEY).catch(() => undefined);
-export const saveProgress = (p: CheckProgress) => putKV(PROGRESS_KEY, p);
-export const clearProgress = () => putKV(PROGRESS_KEY, null);

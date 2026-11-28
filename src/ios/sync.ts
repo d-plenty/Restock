@@ -512,7 +512,7 @@ export async function serverData(path: string): Promise<Record<string, unknown>>
 }
 
 /** 0.18.0: RestockNativePlugin.serverAdmin: the server's phones, as an admin phone (sealed both ways). */
-export type AdminMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+type AdminMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 /** 0.18.3: what an admin phone asks its server for (RestockNativePlugin.ADMIN_PATHS is the same). */
 export const ADMIN_PATHS = /^\/(me|phones(\/[A-Za-z0-9_-]{1,64})?|approvals(\/[A-Za-z0-9_-]{20,40})?|confirm\/challenge|settings|activity(\?limit=\d{1,4})?|browsers(\/[A-Za-z0-9_-]{22})?|homeassistant(\/(test|sync))?|data\/(summary|autodelete)|recovery|passphrase|backupkey|server\/(log|updates|restart))$/;
 export async function serverAdmin(method: AdminMethod, path: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -521,7 +521,7 @@ export async function serverAdmin(method: AdminMethod, path: string, body?: Reco
 }
 
 /** 0.18.4: any phone's own requests about backups (RestockNativePlugin.PHONE_PATHS is the same). */
-export const PHONE_PATHS = /^\/(backupkey|restore)$/;
+const PHONE_PATHS = /^\/(backupkey|restore)$/;
 export async function serverPhone(method: 'GET' | 'POST', path: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
   if (!PHONE_PATHS.test(path) || !['GET', 'POST'].includes(method)) throw new Error('Not something a phone asks its server.');
   return (await hub()).house.sealed(method, path, body ?? (method === 'GET' ? undefined : {}));

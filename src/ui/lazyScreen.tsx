@@ -4,7 +4,7 @@
 // still waits for its code, the first time only.
 import { lazy, useState, type ComponentType, type ReactElement, type ReactNode } from 'react';
 
-export interface LazyScreen<P> {
+interface LazyScreen<P> {
   (props: P): ReactElement;
   /** Loads its code now (nothing happens if it's loaded already). */
   preload(): Promise<unknown>;

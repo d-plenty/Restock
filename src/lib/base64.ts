@@ -16,6 +16,3 @@ export function base64ToBytes(s: string): Uint8Array {
 
 /** Text (UTF-8) as base64. */
 export const textToBase64 = (text: string): string => bytesToBase64(new TextEncoder().encode(text));
-
-/** Base64 back to text (UTF-8). */
-export const base64ToText = (s: string): string => new TextDecoder().decode(base64ToBytes(s));

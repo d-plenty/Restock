@@ -13,6 +13,8 @@ import {
   type Settings,
 } from '../types';
 import { changed, pricesChangeCount } from './live';
+import { waitingFor } from './waiting';
+import { noteQuiet } from './quietErrors';
 import { listLineWithoutCostco } from './costcoLocal';
 import { applyCustomSections, asListSection, isCustomSection, DEFAULT_SECTION_CATEGORIES, SECTIONS, costcoStateOf, setCostcoState, setCustomShops, setShopTabs, shareTab, shopDef, isGoneShop, withoutGone, type ListSection, type Section } from '../shops';
 import type { SqlDriver, SqlOp, SqlValue } from './sql/driver';
@@ -29,8 +31,115 @@ import { applyRows, changedRows, syncedTabs } from './sharedSettings';
 
 let driver: SqlDriver | undefined;
 
+/**
+ * 0.19.0: how many times the app has gone to the database since it opened, and how many rows came
+ * back. On an iPhone or iPad each one is a trip to the system's SQLite and back, so this is what a
+ * slow screen is made of there (Diagnostics → Speed shows it, and the speed tests watch it).
+ */
+export const dbTrips: { reads: number; writes: number; rows: number; saved: number; detail?: Map<string, { n: number; rows: number }> } = { reads: 0, writes: 0, rows: 0, saved: 0 };
+
+/**
+ * 0.19.0: the same question asked while its answer is still on the way shares that answer. Opening
+ * Restock, several screens and helpers ask for the same things at once (the items four times, the
+ * price history twice, the same settings dozens of times): on an iPhone or iPad each was its own
+ * trip to the system's SQLite. Nothing is kept once the answer is in, and a save forgets what's on
+ * the way, so no one is ever told something older than a fresh read would say. Callers get their own
+ * list of the same rows.
+ */
+const recent = new Map<string, Promise<unknown[]>>();
+const firstWords = (sql: string): string => sql.replace(/\s+/g, ' ').trim().slice(0, 70);
+/** 0.19.0: a read the database never answers fails after this long, saying which (it used to wait for good). */
+export const READ_LIMIT_MS = 30_000;
+function answered<T>(run: Promise<T>, sql: string): Promise<T> {
+  return new Promise<T>((yes, no) => {
+    const t = setTimeout(() => no(new Error(`The database didn’t answer in ${READ_LIMIT_MS / 1000} seconds: ${firstWords(sql)}`)), READ_LIMIT_MS);
+    run.then(
+      (v) => {
+        clearTimeout(t);
+        yes(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        no(e);
+      },
+    );
+  });
+}
+/** 0.19.0: the shared prices' own database, with its reads noted and limited as the main one's are. */
+const watched = (d: SqlDriver): SqlDriver => ({
+  query: async (sql, params) => {
+    const wait = waitingFor(`shared prices: ${firstWords(sql)}`, 'database');
+    try {
+      const rows = await answered(d.query(sql, params), sql);
+      wait.done();
+      return rows as never;
+    } catch (e) {
+      wait.failed(e);
+      throw e;
+    }
+  },
+  run: (sql, params) => noted(`shared prices, saving: ${firstWords(sql)}`, d.run(sql, params)),
+  batch: (ops) => noted(`shared prices, saving ${ops.length}`, d.batch(ops)),
+});
+/** A save, noted while it waits (it has no time limit: it may be queued behind a sync round). */
+async function noted<T>(what: string, run: Promise<T>): Promise<T> {
+  const wait = waitingFor(what, 'database');
+  try {
+    const v = await run;
+    wait.done();
+    return v;
+  } catch (e) {
+    wait.failed(e);
+    throw e;
+  }
+}
+const fronted = (d: SqlDriver): SqlDriver => ({
+  query: async (sql, params) => {
+    const key = params?.length ? `${sql}\u0000${JSON.stringify(params)}` : sql;
+    const going = recent.get(key);
+    if (going) {
+      dbTrips.saved++;
+      return [...(await going)] as never;
+    }
+    dbTrips.reads++;
+    const wait = waitingFor(firstWords(sql), 'database');
+    const rows = answered(d.query(sql, params), sql);
+    recent.set(key, rows);
+    try {
+      const got = await rows;
+      wait.done();
+      dbTrips.rows += got.length;
+      // For the speed tests (they set `detail`): which questions, how often, how many rows.
+      if (dbTrips.detail) {
+        const k = sql.replace(/\s+/g, ' ').slice(0, 110);
+        const e = dbTrips.detail.get(k) ?? { n: 0, rows: 0 };
+        e.n++;
+        e.rows += got.length;
+        dbTrips.detail.set(k, e);
+      }
+      return [...got] as never;
+    } catch (e) {
+      wait.failed(e);
+      throw e;
+    } finally {
+      if (recent.get(key) === rows) recent.delete(key);
+    }
+  },
+  run: (sql, params) => {
+    dbTrips.writes++;
+    recent.clear();
+    return noted(`saving: ${firstWords(sql)}`, d.run(sql, params)).finally(() => recent.clear());
+  },
+  batch: (ops) => {
+    dbTrips.writes++;
+    recent.clear();
+    return noted(`saving ${ops.length}: ${firstWords(ops[0]?.sql ?? '')}`, d.batch(ops)).finally(() => recent.clear());
+  },
+});
+
 export async function initDb(d: SqlDriver): Promise<void> {
-  driver = d;
+  recent.clear();
+  driver = fronted(d);
   // 0.18.2: another database: nothing read from the last one is kept.
   readCache.gen = -1;
   readCache.map = new Map();
@@ -53,7 +162,7 @@ function sql(): SqlDriver {
 // and iPad app keeps it there (lib/boot.ts), so the main file it writes after every change stays
 // small; Android and the server keep the table in the main database as before.
 let marketDriver: SqlDriver | undefined;
-export const setMarketDriver = (d: SqlDriver | undefined) => (marketDriver = d);
+export const setMarketDriver = (d: SqlDriver | undefined) => (marketDriver = d ? watched(d) : d);
 const msql = (): SqlDriver => marketDriver ?? sql();
 /** Reads the shared price history, wherever it's kept. */
 export const marketQuery = <T = Record<string, unknown>>(text: string, params: SqlValue[] = []): Promise<T[]> => msql().query<T>(text, params);
@@ -76,13 +185,13 @@ export function setResetWatcher(fn: typeof resetWatcher): void {
   resetWatcher = fn;
 }
 
-async function write(ops: SqlOp[]): Promise<void> {
+async function write(ops: SqlOp[], scope?: 'noprices'): Promise<void> {
   if (!ops.length) return;
   if (watchWrites) await watchWrites(ops);
   if (ops.length === 1) await sql().run(ops[0].sql, ops[0].params);
   else await sql().batch(ops);
   // 0.18.2: says whether the price history was touched (readingsFor keeps what it read until it is).
-  changed(ops.some((o) => /\bprices\b/i.test(o.sql)) ? undefined : 'noprices');
+  changed(scope ?? (ops.some((o) => /\bprices\b/i.test(o.sql)) ? undefined : 'noprices'));
 }
 
 export function uid(): string {
@@ -515,7 +624,8 @@ export async function getProduct(id: string): Promise<Product | undefined> {
 export async function getProducts(ids: string[]): Promise<Product[]> {
   if (!ids.length) return [];
   const products = (await sql().query(`SELECT * FROM products WHERE id IN (${placeholders(ids.length)})`, ids)).map(toProduct);
-  return attachMarket(products);
+  // 0.19.0: the shared price history is an extra: if its database can't answer, the products still come.
+  return attachMarket(products).catch((e) => (noteQuiet('shared prices', e), products));
 }
 
 /** Adds shared price history to products that have it (see MarketSummary). */
@@ -956,7 +1066,6 @@ export interface RowSet {
   where: string;
   params: SqlValue[];
 }
-export type SavedRows = (RowSet & { rows: Record<string, SqlValue>[] })[];
 
 /** The rows deleting these pantry items touches: the items, their products, prices and list lines. */
 export async function rowsForGroups(ids: string[]): Promise<RowSet[]> {
@@ -990,7 +1099,9 @@ export async function pruneHistory(weeks: number, now = Date.now()): Promise<num
   const cutoff = new Date(now - weeks * 7 * 86_400_000).toISOString();
   const where = `date < ? AND source <> 'demo' AND date < (SELECT MAX(q.date) FROM prices q WHERE q.product_id = prices.product_id)`;
   const [{ n }] = await sql().query<{ n: number }>(`SELECT COUNT(*) AS n FROM prices WHERE ${where}`, [cutoff]);
-  if (Number(n) > 0) await write([{ sql: `DELETE FROM prices WHERE ${where}`, params: [cutoff] }]);
+  // 0.19.0: 'noprices': only prices older than what's kept go, so what was just read of the history
+  // still stands (it was read all over again after this, most days' first opening).
+  if (Number(n) > 0) await write([{ sql: `DELETE FROM prices WHERE ${where}`, params: [cutoff] }], 'noprices');
   return Number(n);
 }
 
@@ -1426,7 +1537,7 @@ export async function restoreParts(
 const sameName = (x: string) => x.trim().toLowerCase().replace(/\s+/g, ' ');
 
 /** What addParts brought in and what it passed over, for the screen to say. */
-export interface AddCounts {
+interface AddCounts {
   added: { items: number; lines: number; cards: number; receipts: number };
   skipped: { items: number; lines: number; cards: number; receipts: number };
 }

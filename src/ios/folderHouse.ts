@@ -27,7 +27,7 @@
 // what actually shuts them out.
 //
 // No iPhone-only code here (the folder is an interface), so it's tested on a computer.
-import { strFromU8, strToU8 } from 'fflate';
+import { strToU8 } from 'fflate';
 import { b64u, hkdf32, newJavaKeyPair, openJson, random, sealJson, unb64 } from '../server-mode/crypto';
 import { ALL_TABS, joinTabs, parseTabs, type AsyncSyncEngine } from '../server-mode/engine';
 import { syncRound, type Remote, type RoundResult } from '../server-mode/round';
@@ -60,7 +60,7 @@ const welcomeName = (device: string) => `restock-welcome-${device}.bin`;
 const syncName = (device: string) => `restock-sync-${device}.bin`;
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
-export interface FolderInvite {
+interface FolderInvite {
   hid: string;
   k: string;
   name: string | null;
@@ -96,7 +96,7 @@ export function parseFolderCode(code: string): FolderInvite {
   return { hid: f.h, k: b64u(k), name: f.n ? f.n.slice(0, 80) : null };
 }
 
-export interface FolderInfo {
+interface FolderInfo {
   joined: boolean;
   /** Scanned a code and waiting for the owner's device to answer. */
   joining: boolean;
@@ -490,5 +490,3 @@ export class FolderHouse {
   }
 }
 
-/** Not used by the app: the plain words of a sealed join or welcome, for the tests. */
-export const _text = (b: Uint8Array) => strFromU8(b);

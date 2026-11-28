@@ -3,7 +3,7 @@
 // the text size, and the animations: the opening when the page loads, the holidays, and movement.
 import { useSyncExternalStore } from 'react';
 
-export interface Prefs {
+interface Prefs {
   theme: 'light' | 'dark' | 'system';
   style: 'default' | 'simple';
   text: 'smaller' | 'normal' | 'bigger';
@@ -18,7 +18,7 @@ const KEY = 'restock-server-look';
 const TEXT = { smaller: 0.92, normal: 1, bigger: 1.15 } as const;
 
 /** What was kept, checked (anything odd is the default). Exported for the tests. */
-export function readPrefs(raw: string | null): Prefs {
+function readPrefs(raw: string | null): Prefs {
   let v: Partial<Prefs> = {};
   try {
     const j = JSON.parse(raw ?? '{}') as unknown;

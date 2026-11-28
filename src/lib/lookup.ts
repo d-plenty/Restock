@@ -3,6 +3,7 @@ import { adapterFor } from '../stores';
 import type { BarcodeInfo } from './barcode';
 import { findProductByBarcode, getSettings } from './db';
 import { sameCode } from './searchHelp';
+import { giveUpAfter } from './giveUp';
 
 // Working out what a scanned barcode is, and what to search the shops for.
 //
@@ -16,7 +17,7 @@ import { sameCode } from './searchHelp';
 // and for medicines the active ingredient and strength, like "paracetamol 500mg", so an unknown
 // brand still finds the same medicine. Results are still ranked by the full name and pack size.
 
-export interface Identified extends BarcodeInfo {
+interface Identified extends BarcodeInfo {
   /** Where the name came from, for "Found on …". */
   source?: string;
   /** The entry only had the brand; the kind of product was added from its category. */
@@ -34,6 +35,7 @@ async function openDb(db: OpenDb, code: string): Promise<Identified | undefined>
   try {
     const res = await fetch(
       `https://${OPEN_HOSTS[db].host}/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_en,generic_name,generic_name_en,categories,brands,quantity,image_small_url,image_front_small_url`,
+      { signal: giveUpAfter(12_000) },
     );
     if (!res.ok) return undefined;
     const json = (await res.json()) as {

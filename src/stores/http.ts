@@ -36,7 +36,7 @@ export class ColesCheckError extends BlockedError {
   }
 }
 
-export const COLES_CHECK_MESSAGE =
+const COLES_CHECK_MESSAGE =
   "Coles wants to check you're a person. Tap Open Coles, let the page load (tick the box if it asks), tap Done, then try again.";
 
 /** True for an error the "Open <store>" button might fix (from search or the native price check). */
@@ -44,7 +44,7 @@ export const isBlockMessage = (msg: string | undefined) => !!msg && /Open Coles|
 
 // ---------- backup connection: the store's own page in a hidden browser ----------
 
-export type ConnectionMode = 'auto' | 'browser';
+type ConnectionMode = 'auto' | 'browser';
 let mode: ConnectionMode = 'auto';
 /** "auto": direct requests, falling back to the hidden browser. "browser": always the hidden browser. */
 export function setConnectionMode(m: ConnectionMode) {
@@ -104,7 +104,7 @@ export function clearCookies(host?: string) {
 /** An honest app identity. Some stores' bot protection rejects "Chrome" that isn't really Chrome. */
 export const APP_UA = 'Restock/0.3 (Android; grocery price tracker)';
 
-export const MOBILE_UA = 'Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
+const MOBILE_UA = 'Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36';
 
 export interface HttpResult {
   status: number;

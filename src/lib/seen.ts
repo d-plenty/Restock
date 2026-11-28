@@ -1,7 +1,6 @@
 import type { StoreProduct } from '../stores/types';
 import { KEEP_WEEKS, type Settings } from '../types';
 import { getKV, putKV, queryRows, runOps } from './db';
-import { serverMode } from '../server-mode/flag';
 import { isNative } from '../stores/http';
 import { RestockNative } from './sql/native';
 
@@ -69,7 +68,7 @@ const SEND_AFTER_MS = 3 * 60_000;
 
 /** Remembers what a search showed (the newest reading of the day wins). Never throws. */
 export function noteSeen(products: StoreProduct[], day = localDay()): Promise<void> {
-  if (serverMode || !products.length) return writing;
+  if (!products.length) return writing;
   const rows = products.map((p) => seenShape(p, day)).filter((r): r is SeenRow => !!r);
   if (!rows.length) return writing;
   writing = writing
@@ -103,7 +102,6 @@ export interface SeenBefore {
  */
 export async function seenBefore(products: Pick<StoreProduct, 'chain' | 'storeProductId' | 'price'>[], today = localDay()): Promise<Map<string, SeenBefore>> {
   const out = new Map<string, SeenBefore>();
-  if (serverMode) return out;
   await writing;
   const byChain = new Map<string, string[]>();
   for (const p of products) if (p.storeProductId) byChain.set(p.chain, [...(byChain.get(p.chain) ?? []), p.storeProductId]);
@@ -128,7 +126,6 @@ export async function seenBefore(products: Pick<StoreProduct, 'chain' | 'storePr
 
 /** The newest remembered reading of each product at a shop that was on special, since `sinceDay`. */
 export async function seenSpecials(chain: string, sinceDay: string): Promise<SeenRow[]> {
-  if (serverMode) return [];
   await writing;
   return queryRows<SeenRow>(
     `SELECT s.* FROM seen_prices s WHERE s.chain = ? AND s.day >= ? AND s.is_special = 1
@@ -144,7 +141,6 @@ export const seenKeepWeeks = (s: Pick<Settings, 'historyWeeks' | 'searchKeepWeek
 
 /** Deletes remembered results older than the time they're kept for. Resolves how many went. */
 export async function pruneSeen(s: Pick<Settings, 'historyWeeks' | 'searchKeepWeeks'>, now = Date.now()): Promise<number> {
-  if (serverMode) return 0;
   const weeks = seenKeepWeeks(s);
   // only ever a real choice: a nonsense number deletes nothing (as pruneHistory)
   if (!(KEEP_WEEKS as readonly number[]).includes(weeks) || !Number.isFinite(now)) return 0;
@@ -157,7 +153,6 @@ export async function pruneSeen(s: Pick<Settings, 'historyWeeks' | 'searchKeepWe
 
 /** How many are remembered, and from when ("Remembering 1,240 prices of 310 products, since 3 Nov"). */
 export async function seenCount(): Promise<{ rows: number; products: number; oldest?: string }> {
-  if (serverMode) return { rows: 0, products: 0 };
   await writing;
   const [r] = await queryRows<{ n: number; p: number; d: string | null }>(
     "SELECT COUNT(*) AS n, COUNT(DISTINCT chain || '|' || store_product_id) AS p, MIN(day) AS d FROM seen_prices",
@@ -173,7 +168,7 @@ const CURSOR = 'seenServerCursor';
  * 404 and the rows wait), or offline. Resolves how many the server took.
  */
 export async function sendSeenToServer(): Promise<number> {
-  if (serverMode || !isNative()) return 0;
+  if (!isNative()) return 0;
   try {
     const { syncInfo } = await import('./sync');
     const i = await syncInfo();

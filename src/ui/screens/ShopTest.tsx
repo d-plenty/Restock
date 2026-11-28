@@ -114,8 +114,8 @@ function shopTestReport(r: Result, version: string): string {
 
 // 0.11.3: how each shop went the last time it was tested here, kept on this phone (kv "shopTestLog"),
 // so the new shops (none tried on a phone before release) can be gone through and seen at a glance.
-export type ShopOutcome = 'worked' | 'check' | 'blocked' | 'failed';
-export interface ShopTestLog {
+type ShopOutcome = 'worked' | 'check' | 'blocked' | 'failed';
+interface ShopTestLog {
   [shop: string]: { at: string; outcome: ShopOutcome; found: number };
 }
 /** Worked; worked after a bot check; blocked (a check Restock won't pass for you); or didn't work. */
@@ -123,7 +123,7 @@ export function shopOutcome(r: { found: unknown[]; error?: string; botCheck?: bo
   if (!r.error && r.found.length) return r.botCheck ? 'check' : 'worked';
   return r.botCheck || r.blocked || isBlockedError(r.error) ? 'blocked' : 'failed';
 }
-export const OUTCOME_WORDS: Record<ShopOutcome, string> = {
+const OUTCOME_WORDS: Record<ShopOutcome, string> = {
   worked: 'Worked',
   check: 'Worked, after a bot check',
   blocked: 'Blocked: needs Unblock',

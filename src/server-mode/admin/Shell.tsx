@@ -14,7 +14,7 @@ const TOP: { id: PageId; title: string; icon: IconName }[] = [
   { id: 'phones', title: 'Phones and admins', icon: 'phone' },
   { id: 'data', title: 'Data', icon: 'data' },
 ];
-export const SETTINGS: { id: PageId; title: string; icon: IconName }[] = [
+const SETTINGS: { id: PageId; title: string; icon: IconName }[] = [
   { id: 'household', title: 'Household', icon: 'home' },
   { id: 'addresses', title: 'Addresses', icon: 'globe' },
   { id: 'security', title: 'Sign-in and security', icon: 'shield' },
@@ -23,7 +23,7 @@ export const SETTINGS: { id: PageId; title: string; icon: IconName }[] = [
   { id: 'upkeep', title: 'Updates and moving', icon: 'wrench' },
 ];
 const ALL = [...TOP, ...SETTINGS];
-export const titleOf = (id: PageId) => ALL.find((p) => p.id === id)?.title ?? '';
+const titleOf = (id: PageId) => ALL.find((p) => p.id === id)?.title ?? '';
 
 const fromHash = (): PageId => {
   const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#\/?/, '');

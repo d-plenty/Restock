@@ -6,7 +6,7 @@
 // none stays in "Other", and you can always move it.
 import type { Category, Section } from '../types';
 
-export type CategoryKind = 'pantry' | 'fridge' | 'cleaning' | 'bathroom';
+type CategoryKind = 'pantry' | 'fridge' | 'cleaning' | 'bathroom';
 
 const has = (words: string) => new RegExp(`\\b(?:${words})\\b`, 'i');
 

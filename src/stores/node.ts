@@ -17,7 +17,7 @@ import { SHOPS, isLocalOnlyShop, priceSource, type StoreChain } from '../shops';
 import { setTransport, type HttpResult, type RequestOptions } from './http';
 
 /** The shops' API hosts, besides their websites (aldi.ts API, endeavour.ts ENDEAVOUR.api). */
-export const API_HOSTS: Record<string, StoreChain> = {
+const API_HOSTS: Record<string, StoreChain> = {
   'api.aldi.com.au': 'aldi',
   'api.danmurphys.com.au': 'danmurphys',
   'api.bws.com.au': 'bws',
@@ -205,7 +205,7 @@ async function readCapped(res: Response, max: number, name: string): Promise<str
 }
 
 /** http.ts `request`, on the server. */
-export async function nodeRequest(opts: RequestOptions): Promise<HttpResult> {
+async function nodeRequest(opts: RequestOptions): Promise<HttpResult> {
   const search = current;
   if (!search) throw new ShopRefusedError('The server only asks a shop while someone searches.');
   let url: URL;

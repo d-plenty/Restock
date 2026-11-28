@@ -150,8 +150,7 @@ export function applyCustomSections(s: { customSections?: Partial<Record<MadeSec
 const iconListeners = new Set<(icons: Partial<Record<string, string>>) => void>();
 export const onSectionIcons = (fn: (icons: Partial<Record<string, string>>) => void) => void iconListeners.add(fn);
 /** 0.10.3: the tab a section's records are shared with (household sync): Baby and Pets go with Groceries. */
-export type ShareTab = 'pantry' | 'keg' | 'pharmacy';
-export const SHARE_TABS: ShareTab[] = ['pantry', 'keg', 'pharmacy'];
+type ShareTab = 'pantry' | 'keg' | 'pharmacy';
 export const shareTab = (s: string | null | undefined): ShareTab => (s === 'keg' || s === 'pharmacy' ? s : 'pantry');
 
 /**
@@ -172,10 +171,10 @@ export const asListSection = (v: unknown): ListSection =>
 /** The tab a list's lines are shared with (household sync, the server, What this phone shares): General goes with Groceries. */
 export const listShareTab = (s: ListSection | null | undefined): ShareTab => shareTab(s);
 
-export type GroceryChain = 'woolworths' | 'coles' | 'aldi' | 'costco';
-export type LiquorChain =
+type GroceryChain = 'woolworths' | 'coles' | 'aldi' | 'costco';
+type LiquorChain =
   'danmurphys' | 'bws' | 'liquorland' | 'liquorlandwarehouse' | 'liquorlandcellars' | 'bottleo' | 'cellarbrations' | 'thirstycamel' | 'porters';
-export type PharmacyChain =
+type PharmacyChain =
   | 'chemistwarehouse'
   | 'mychemist'
   | 'amcal'
@@ -193,9 +192,9 @@ export type PharmacyChain =
   | 'nationalpharmacies'
   | 'chempro';
 /** 0.10.3 (beta): IGA, and the baby, pet and big box shops. Read from their websites ('web'). */
-export type MoreChain = 'iga' | 'babybunting' | 'bigw' | 'kmart' | 'target' | 'petbarn' | 'petstock' | 'petcircle' | 'bunnings';
+type MoreChain = 'iga' | 'babybunting' | 'bigw' | 'kmart' | 'target' | 'petbarn' | 'petstock' | 'petcircle' | 'bunnings';
 /** 0.11.3 (beta): more shops to pick from, all read from their websites ('web') and none tried on a phone before release. */
-export type Chain0113 =
+type Chain0113 =
   | 'foodworks'
   | 'drakes'
   | 'harrisfarm'
@@ -259,9 +258,9 @@ export type StoreChain = Exclude<Chain, 'other'>;
  * - web: any shop website. Restock finds its search page and reads the products and prices
  *   the page already carries for search engines, using the hidden browser when it needs to.
  */
-export type ShopKind = GroceryChain | 'endeavour' | 'web';
+type ShopKind = GroceryChain | 'endeavour' | 'web';
 
-export interface ShopDef {
+interface ShopDef {
   id: BuiltinChain;
   name: string;
   section: Section;

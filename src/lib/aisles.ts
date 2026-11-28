@@ -52,8 +52,6 @@ const aisleNumber = (v: AisleAt | undefined): number | undefined => {
   return m ? Number(m[0]) : undefined;
 };
 
-export type ShopSort = 'aisle' | 'category' | 'az';
-
 /**
  * Sorts a shop's lines by aisle: numbered aisles first (1 to 50, or 50 to 1), then aisles with a
  * name ("Freezer"), then the ones the shop doesn't know, A–Z. Within an aisle, the shop's own order,

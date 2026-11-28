@@ -7,8 +7,8 @@
 // Nothing here talks to the server: it only shapes rows into files.
 import { strToU8, zipSync } from 'fflate';
 
-export type Cell = string | number | boolean | null | undefined;
-export interface Table {
+type Cell = string | number | boolean | null | undefined;
+interface Table {
   name: string;
   /** Column order (the keys of the rows); left out: every key, in the order first seen. */
   columns?: string[];
@@ -153,7 +153,7 @@ export function sheetName(name: string, used: Set<string>): string {
 }
 
 /** Excel's cap on rows a sheet (the header takes one); longer tables are cut there. */
-export const MAX_ROWS = 1_048_575;
+const MAX_ROWS = 1_048_575;
 /** Excel's cap on characters in a cell. */
 const MAX_CELL = 32_767;
 
@@ -308,7 +308,7 @@ export function exportTables(exp: { tables: Record<string, unknown> }): Table[] 
 
 /** 0.9.6: the shop whose prices never go into an export (Declan, 11 Nov 2026). */
 // 0.9.7: Costco's prices are imported and exported like any shop's: no shop is left out any more.
-export const NEVER_SHOP = '\u0000';
+const NEVER_SHOP = '\u0000';
 
 /**
  * 0.9.6: the export without Costco's prices, whatever the server sent (a 0.9.5 server doesn't leave
@@ -351,18 +351,3 @@ export function fileBase(what = 'data', at = new Date()): string {
 }
 
 export const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-/** Hands the browser a file to save. */
-export function saveFile(bytes: Uint8Array | string, name: string, type: string): void {
-  const blob = new Blob([typeof bytes === 'string' ? bytes : (bytes as BlobPart)], { type });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.rel = 'noopener';
-  document.body.append(a);
-  a.click();
-  setTimeout(() => {
-    URL.revokeObjectURL(a.href);
-    a.remove();
-  }, 1000);
-}

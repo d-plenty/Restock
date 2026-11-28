@@ -24,13 +24,13 @@
 import { applyRows, checkShop, checkValue, decode, rowTab, SCALAR_KEYS } from './sharedSettings';
 import { SECTIONS, SHOPS, isLocalOnlyShop, sectionOf, tabsOf } from '../shops';
 import { getSettings, householdContext, queryRows, reapplyHouseholdSettings, runOps } from './db';
-import { cleanSummary, PER_PHONE, type PhoneSummary } from './phoneSummary';
+import { cleanSummary, type PhoneSummary } from './phoneSummary';
 import type { CustomShop, ProductOrder, Section, Settings, StoreChain } from '../types';
 
-export { PER_PHONE, reapplyHouseholdSettings, type PhoneSummary };
+;
 
 /** One tab's shops, for the household. */
-export interface TabShops {
+interface TabShops {
   /** The tab switched on (Pantry is always on). */
   on: boolean;
   /** The shops picked on this tab (built-in ids like "coles", and "custom-…" for shops people added). */
@@ -39,7 +39,7 @@ export interface TabShops {
   customShops: CustomShop[];
 }
 
-export interface HouseholdSettings {
+interface HouseholdSettings {
   /** "Shop around" is only suggested when it saves at least this many dollars. */
   shopAroundMin: number;
   /** The alert level new items start with, in % off. */
@@ -55,7 +55,7 @@ export interface HouseholdSettings {
 }
 
 /** What setHouseholdSettings changes: any of the above; for a tab, any of on, chains (the whole list) and customShops (the whole list). */
-export type HouseholdSettingsPatch = Partial<Omit<HouseholdSettings, 'tabs'>> & { tabs?: Partial<Record<Section, Partial<TabShops>>> };
+type HouseholdSettingsPatch = Partial<Omit<HouseholdSettings, 'tabs'>> & { tabs?: Partial<Record<Section, Partial<TabShops>>> };
 
 /**
  * The household's settings, by their Settings path. Shops: which shops each shared tab uses
@@ -190,7 +190,7 @@ export async function setHouseholdSettings(patch: HouseholdSettingsPatch): Promi
 }
 
 /** One phone's own settings, for the web's Settings → Phones. */
-export interface PhoneInfo {
+interface PhoneInfo {
   device: string;
   /** The phone's name in the household. */
   name: string;

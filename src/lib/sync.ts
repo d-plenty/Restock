@@ -95,7 +95,7 @@ export function demoSync(): (SyncInfo & { _joined?: { label?: string; houseName?
 
 // iPhone and iPad (0.13.2): each way of syncing is asked about by itself (canSync), because they
 // arrive one at a time there; a way that isn't there yet stays on the screen, greyed, with why.
-export type SyncWay = 'server' | 'wifi' | 'folder';
+type SyncWay = 'server' | 'wifi' | 'folder';
 /** The ways of syncing this build of the iPhone and iPad app can do. */
 export const IOS_SYNC: Record<SyncWay, boolean> = { server: true, wifi: true, folder: true };
 /** Can this device sync that way? Android: every way. The web preview: none (its screens say so). */

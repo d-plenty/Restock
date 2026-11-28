@@ -543,7 +543,7 @@ export function scoreAll(q: RankQuery, items: StoreProduct[]): Scored[] {
 }
 
 /** A result this good is the thing you searched for, not just something like it. */
-export const GOOD = 0.85;
+const GOOD = 0.85;
 
 /**
  * The results worth recommending at a shop: good matches in their own right and close to the

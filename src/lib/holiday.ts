@@ -74,10 +74,10 @@ export function holidayOn(d = new Date()): Holiday | undefined {
 type Look = Pick<Settings, 'look'>;
 
 /** Holidays switched on (they are unless turned off). */
-export const holidaysOn = (s: Look | undefined): boolean => s?.look.holidays !== false;
+const holidaysOn = (s: Look | undefined): boolean => s?.look.holidays !== false;
 
 /** 0.18.0: one holiday switched off on its own (Look and colours), the others still on. */
-export const holidayOff = (s: Look | undefined, h: Holiday): boolean => !!s?.look.holidaysOff?.includes(h);
+const holidayOff = (s: Look | undefined, h: Holiday): boolean => !!s?.look.holidaysOff?.includes(h);
 
 /** The holiday showing now: its opening animation. */
 export const holidayNow = (s: Look | undefined, d = new Date()): Holiday | undefined => {

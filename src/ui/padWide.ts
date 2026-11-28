@@ -7,12 +7,11 @@
 import { Capacitor } from '@capacitor/core';
 import { useSyncExternalStore } from 'react';
 import { isIos } from '../lib/platform';
-import { serverMode } from '../server-mode/flag';
 
 /** Wide enough for the side bar (an iPad in landscape, a large one upright, or a computer). */
 const PAD_WIDE_MIN = 1000;
 
-const query = () => ((serverMode || isIos() || Capacitor.getPlatform() === 'android') && typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(`(min-width: ${PAD_WIDE_MIN}px)`) : undefined);
+const query = () => ((isIos() || Capacitor.getPlatform() === 'android') && typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(`(min-width: ${PAD_WIDE_MIN}px)`) : undefined);
 const subscribe = (fn: () => void) => {
   const q = query();
   q?.addEventListener('change', fn);
@@ -35,7 +34,5 @@ const PAD_SIDE = [
   { screen: 'cards', label: 'Cards', icon: 'card' },
   { screen: 'settings', label: 'Settings', icon: 'settings' },
 ] as const;
-/** 0.15.0: the web page's side bar: the same rows, and the server's own pages under Your server. */
-const PAD_SIDE_WEB = [...PAD_SIDE, { screen: 'server', label: 'Your server', icon: 'server' }] as const;
-export type PadSide = (typeof PAD_SIDE_WEB)[number]['screen'];
-export const padSide = () => (serverMode ? PAD_SIDE_WEB : PAD_SIDE);
+export type PadSide = (typeof PAD_SIDE)[number]['screen'];
+export const padSide = () => PAD_SIDE;

@@ -98,7 +98,7 @@ async function search(term: string, storeId?: string, page = 1): Promise<StorePr
 /** 0 = app identity, 1 = browser style. Same as StoreClient.java. */
 let aldiStyle = 0;
 
-export function aldiHeaders(style: number): Record<string, string> {
+function aldiHeaders(style: number): Record<string, string> {
   return style === 0
     ? { Accept: 'application/json', 'User-Agent': APP_UA }
     : { Accept: 'application/json', Origin: 'https://www.aldi.com.au', Referer: 'https://www.aldi.com.au/' };

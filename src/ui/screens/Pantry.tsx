@@ -16,7 +16,6 @@ import { PicksOffer } from './Picks';
 import { HaveChip, HaveSheet, InventoryButton, useInventory } from '../Inventory';
 import { haveState, INVENTORY_SECTIONS, setInventoryTab } from '../../lib/inventory';
 import { cleanSearch } from '../../lib/searchText';
-import { serverMode } from '../../server-mode/flag';
 import { isMoreTab, useNav } from '../nav';
 import { isMadeSection, SECTION_NAMES, type Section, slots } from '../../shops';
 import { confirmAction } from '../../lib/confirm';
@@ -105,7 +104,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
   const settingsNow = useSettings();
   const asking = useRef(false);
   useEffect(() => {
-    if (section !== 'pantry' || asking.current || serverMode || !shouldAskInventory(settingsNow, recs?.length ?? 0, inv.tabs.size > 0)) return;
+    if (section !== 'pantry' || asking.current || !shouldAskInventory(settingsNow, recs?.length ?? 0, inv.tabs.size > 0)) return;
     asking.current = true;
     void (async () => {
       await inventoryAsked();
@@ -311,15 +310,10 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
         <BigAdd
           label={ADD_LABEL(section)}
           onAdd={() => nav.push({ name: 'add', section, toPantry: true })}
-          onScan={serverMode ? undefined : () => nav.push({ name: 'add', section, toPantry: true, scan: true })}
+          onScan={() => nav.push({ name: 'add', section, toPantry: true, scan: true })}
         />
       )}
       {/* The web page: said before the tap, not after it (phone-only parts say where they work). */}
-      {!editing && serverMode && (
-        <p className="small" style={{ margin: 0 }}>
-          Adding by shop search is done on a phone. Here you can look up a barcode among your household's products.
-        </p>
-      )}
       {recs.length > 0 && <SearchField placeholder={SEARCH_HINT[section]} aria-label={SEARCH_HINT[section]} value={q} onValue={setQ} />}
       </div>
       {recs.length > 0 && (
@@ -370,9 +364,8 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
         ) : typed && !editing ? (
           <NoneFound
             text={`"${typed}" isn't in ${section === 'pantry' ? 'your pantry' : SECTION_NAMES[section]} yet.`}
-            label={serverMode ? undefined : `Add ${typed} to ${section === 'pantry' ? 'pantry' : SECTION_NAMES[section]}`}
-            onAdd={serverMode ? undefined : () => nav.push({ name: 'add', section, toPantry: true, query: typed })}
-            phoneOnly={serverMode ? 'Adding by shop search is done on a phone.' : undefined}
+            label={`Add ${typed} to ${section === 'pantry' ? 'pantry' : SECTION_NAMES[section]}`}
+            onAdd={() => nav.push({ name: 'add', section, toPantry: true, query: typed })}
           />
         ) : (
           <p className="small" role="status">
@@ -454,7 +447,7 @@ export function PantryScreen({ section = 'pantry' }: { section?: Section }) {
       )}
 
       {/* 0.13.0: a head start, offered at the bottom of the Pantry until it's used or turned down */}
-      {section === 'pantry' && !editing && !serverMode && picksOn && <PicksOffer onNo={() => setPicksNo(true)} />}
+      {section === 'pantry' && !editing && picksOn && <PicksOffer onNo={() => setPicksNo(true)} />}
 
       {editing && (
         <SelectBar

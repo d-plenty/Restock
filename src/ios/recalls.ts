@@ -30,7 +30,7 @@ const recall = (source: string, title: string, url: string, date?: string): Reca
 
 // ---------- text ----------
 
-export function text(html: string | undefined): string {
+function text(html: string | undefined): string {
   if (!html) return '';
   return html
     .replace(/<[^>]+>/g, ' ')
@@ -97,7 +97,7 @@ export function parseRss(xml: string, source: string): Recall[] {
 const OFFICIAL = ['foodstandards.gov.au', 'productsafety.gov.au', 'tga.gov.au'];
 
 /** The list a source's notices come from, opened instead of a notice's link that can't be used. */
-export function listPage(source: string): string {
+function listPage(source: string): string {
   if (source === 'FSANZ') return 'https://www.foodstandards.gov.au/food-recalls/alerts';
   if (source === 'TGA') return 'https://www.tga.gov.au/safety/safety-alerts';
   return 'https://www.productsafety.gov.au/recalls';
@@ -169,7 +169,7 @@ export function matches(r: Recall, t: Thing): boolean {
 }
 
 /** The names of your things a recall might affect (each at most once). */
-export function affected(r: Recall, things: Thing[]): string[] {
+function affected(r: Recall, things: Thing[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const t of things) {
@@ -224,7 +224,7 @@ export interface RecallStore {
   things(): Promise<Thing[]>;
 }
 
-export interface RecallResult {
+interface RecallResult {
   checked: number;
   found: number;
   fresh: number;

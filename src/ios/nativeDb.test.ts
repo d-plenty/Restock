@@ -1,9 +1,9 @@
 // 0.15.1: the iPhone and iPad app's database in the system's SQLite (nativeDb.ts), against a stand-in
 // for RestockSql.swift that keeps each "file" in sql.js and answers later, as the bridge does.
 import initSqlJs, { type Database } from 'sql.js';
-import { beforeAll, describe, expect, test } from 'vitest';
+import { beforeAll, describe, expect, test, vi } from 'vitest';
 import { AsyncSyncEngine } from '../server-mode/engine';
-import { AppleDb, bindable, isRead, KEPT, READ_WAIT_MS, readyFile, type AppleSqlPlugin } from './nativeDb';
+import { AppleDb, bindable, isRead, KEPT, READ_LANE_PATIENCE_MS, READ_WAIT_MS, readyFile, rowsOf, type AppleSqlPlugin } from './nativeDb';
 import { DB_FILE } from './store';
 
 let SQL: Awaited<ReturnType<typeof initSqlJs>>;
@@ -192,6 +192,42 @@ describe('the database in the system SQLite', () => {
     release();
     await Promise.all([held, w]);
     expect((await d.query<{ n: number }>('SELECT COUNT(*) AS n FROM household'))[0].n).toBe(1);
+  });
+
+  test('0.19.0: a read lane that never answers, or fails, is not the end: the same read goes the other way', async () => {
+    const s = fakeSwift();
+    const d0 = new AppleDb('restock.sqlite', s.p);
+    await d0.run('CREATE TABLE t (a)');
+    await d0.run('INSERT INTO t VALUES (7)');
+    // The read lane takes the question and says nothing.
+    vi.useFakeTimers();
+    try {
+      const silent = new AppleDb('restock.sqlite', { ...s.p, sqlRead: () => new Promise(() => undefined) }, { readLane: true });
+      const got = silent.query<{ a: number }>('SELECT a FROM t');
+      await vi.advanceTimersByTimeAsync(READ_LANE_PATIENCE_MS + 50);
+      expect(await got).toEqual([{ a: 7 }]);
+      // It fails outright: the other way straight away, no waiting.
+      const broken = new AppleDb('restock.sqlite', { ...s.p, sqlRead: () => Promise.reject(new Error('SQL query failed: disk I/O error')) }, { readLane: true });
+      const got2 = broken.query<{ a: number }>('SELECT a FROM t');
+      await vi.advanceTimersByTimeAsync(50);
+      expect(await got2).toEqual([{ a: 7 }]);
+      // Both ways fail: the error comes back (it doesn't wait for good).
+      const dead = new AppleDb('restock.sqlite', { ...s.p, sqlRead: () => Promise.reject(new Error('one')), sqlQuery: () => Promise.reject(new Error('two')) }, { readLane: true });
+      const got3 = dead.query('SELECT a FROM t').catch((e: Error) => e.message);
+      await vi.advanceTimersByTimeAsync(50);
+      expect(await got3).toMatch(/one|two/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("0.19.0: an answer the bridge couldn't carry (it arrives with no rows at all) is an error in words, not \"undefined\"", async () => {
+    expect(rowsOf({ rows: [] }, 'SELECT 1')).toEqual([]);
+    expect(() => rowsOf({}, 'SELECT * FROM prices WHERE product_id IN (?)')).toThrow(/answer didn't arrive \(SELECT \* FROM prices/);
+    expect(() => rowsOf(undefined, 'SELECT 1')).toThrow(/didn't arrive/);
+    const s = fakeSwift();
+    const d = new AppleDb('restock.sqlite', { ...s.p, sqlQuery: async () => ({}) as never });
+    await expect(d.query('PRAGMA user_version')).rejects.toThrow(/didn't arrive/);
   });
 
   test('without the read lane (an older native side), reads wait their turn as before', async () => {

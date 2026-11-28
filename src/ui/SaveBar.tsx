@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { addDraftPart, draftChanged, draftState, onDraft, openDraft, saveDraft, type DraftPart, type DraftState } from '../lib/settingsDraft';
+import { draftState, onDraft, openDraft, saveDraft, type DraftState } from '../lib/settingsDraft';
 import { Icon } from './components';
 
 // 0.9.5 (save): "Save settings", on the phone and the web (settingsDraft.ts).
@@ -25,12 +25,6 @@ export function useSettingsDraft(): void {
       close();
     };
   }, []);
-}
-
-/** A part of a settings screen with its own changes (not the settings), saved with the rest. */
-export function useDraftPart(part: DraftPart, deps: unknown[]): void {
-  useEffect(() => addDraftPart(part), deps); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => draftChanged());
 }
 
 export function useDraftState(): DraftState & { justSaved: boolean } {
@@ -91,20 +85,6 @@ export function SaveBar({ label }: { label?: string; onlyWhenChanged?: boolean }
         {s.justSaved && <Icon name="check" size={16} stroke={3} />} {text}
       </span>
       <SaveButton label={label} />
-    </div>
-  );
-}
-
-/** Web: the same, as a status line and the button, for the page header and the page's foot. */
-export function DeskSave({ foot }: { foot?: boolean }) {
-  const s = useDraftState();
-  const text = saveStatusText(s);
-  return (
-    <div className={`dk-save${foot ? ' foot' : ''}${s.dirty ? ' dirty' : ''}`}>
-      <span className={`dk-save-text${s.error ? ' err' : ''}`} role={foot ? undefined : 'status'} aria-live={foot ? undefined : 'polite'}>
-        {text}
-      </span>
-      <SaveButton className="dk-save-btn" />
     </div>
   );
 }

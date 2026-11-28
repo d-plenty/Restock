@@ -10,7 +10,7 @@ import { Icon, Sheet } from '../components';
 import { PairingQr } from './SyncCodes';
 
 /** What can be picked in a backup, and how many of each there are. */
-export interface PartCounts {
+interface PartCounts {
   bySection: Record<Section, number>;
   list: number;
   /** Loyalty cards and (0.9.6) gift cards together. */

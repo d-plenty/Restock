@@ -3,7 +3,7 @@
 // so it's all tested on its own (haMatch.test.ts).
 
 /** A line's words read for matching: how many, the name without the number, and the key it matches on. */
-export interface ParsedLine {
+interface ParsedLine {
   qty: number;
   /** As typed or said, tidied ("milk" from "2 x milk"). */
   name: string;

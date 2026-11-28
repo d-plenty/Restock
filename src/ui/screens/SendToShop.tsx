@@ -15,7 +15,7 @@ import { useNav } from '../nav';
 // their website after you've signed in there. The automatic way may stop working whenever
 // Woolworths changes its site, and probably isn't allowed under their terms.
 
-export interface SendLine {
+interface SendLine {
   name: string;
   qty: number;
   /** The shop's own product number, when the line is linked to a product there. */

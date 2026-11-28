@@ -82,3 +82,67 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.event.release.tag_name }}" "restock-$VERSION-unsigned.ipa" --clobber
+
+  # 0.19.0: the same code, started in an iPhone simulator on the Mac, to see that it opens: the
+  # app is installed and launched, must still be running half a minute later, and pictures of its
+  # screen (10 and 30 seconds in) and its log are kept with the run (ios-simulator). It can't fail
+  # the .ipa: it's a job of its own, and a failure here only shows as a cross beside it.
+  simulator:
+    runs-on: macos-26
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/sim" \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            > "$RUNNER_TEMP/sim-build.log" 2>&1 || { tail -n 150 "$RUNNER_TEMP/sim-build.log"; exit 1; }
+          tail -n 3 "$RUNNER_TEMP/sim-build.log"
+      - name: Open it in an iPhone simulator
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          APP=$(find "$RUNNER_TEMP/sim/Build/Products" -maxdepth 2 -name '*.app' | head -n 1)
+          test -n "$APP"
+          PHONE=$(xcrun simctl list devices available | grep -E '^\s+iPhone' | head -n 1 | grep -oE '[0-9A-F]{8}-[0-9A-F-]{27}')
+          test -n "$PHONE"
+          xcrun simctl list devices available | grep "$PHONE"
+          xcrun simctl boot "$PHONE"
+          xcrun simctl bootstatus "$PHONE" -b
+          xcrun simctl install "$PHONE" "$APP"
+          xcrun simctl launch "$PHONE" family.plenty.restock
+          sleep 10
+          xcrun simctl io "$PHONE" screenshot "$RUNNER_TEMP/out/after-10-seconds.png" || true
+          sleep 20
+          xcrun simctl io "$PHONE" screenshot "$RUNNER_TEMP/out/after-30-seconds.png" || true
+          xcrun simctl spawn "$PHONE" log show --last 2m --style compact --predicate 'process == "App"' > "$RUNNER_TEMP/out/app-log.txt" 2>&1 || true
+          if xcrun simctl spawn "$PHONE" launchctl list | grep -q family.plenty.restock; then
+            echo "Restock is still running after 30 seconds."
+          else
+            echo "::error::Restock isn't running 30 seconds after it was opened in the simulator. Its log is in this run's files (ios-simulator)."
+            tail -n 60 "$RUNNER_TEMP/out/app-log.txt"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: ios-simulator
+          path: |
+            ${{ runner.temp }}/out
+            ${{ runner.temp }}/sim-build.log
+          if-no-files-found: ignore

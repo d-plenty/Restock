@@ -153,7 +153,8 @@ async function workOutRecommendations(): Promise<Recommendation[]> {
   const now = Date.now();
   // 0.9.6: a product with no size can copy it from the same barcode anywhere in the catalogue.
   const codes = productRows.filter((p) => p.barcode && !hasSize(p)).map((p) => p.barcode!);
-  const same = codes.length ? (await getProductsByBarcode(codes)).filter((p) => !products.has(p.id)) : [];
+  // 0.19.0: an extra too: without it the items still show.
+  const same = codes.length ? (await getProductsByBarcode(codes).catch(() => [] as Product[])).filter((p) => !products.has(p.id)) : [];
   // 0.11.3: packs that changed size and products a shop no longer lists (this phone's price checks).
   const watch = await processShelf().catch(() => ({}) as ShelfWatch);
   const watching = Object.keys(watch).length > 0;
